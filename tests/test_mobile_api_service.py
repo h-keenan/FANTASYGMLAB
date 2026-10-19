@@ -5157,6 +5157,203 @@ def test_external_week_projections_rejects_unsupported_position(monkeypatch):
     assert response.status_code == 422
 
 
+# Phase 2 of coridian_'s external content-posting bot wish list: structured
+# news evidence (docs/external-api-contract.md). Gated by the exact same
+# require_external_api_key dependency Phase 1's projections routes use
+# above — these tests only confirm this new route is covered by it too,
+# not re-testing the missing/wrong-key 401 ground test_external_projections_
+# reject_missing_and_wrong_api_key already covers in full.
+def test_external_player_news_requires_api_key(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    no_header = client.get("/v1/external/players/9001/news")
+    assert no_header.status_code == 401
+
+    wrong_key = client.get(
+        "/v1/external/players/9001/news",
+        headers={"Authorization": "Bearer not-the-secret"},
+    )
+    assert wrong_key.status_code == 401
+
+
+def test_external_player_news_returns_full_field_shape_for_normal_item(monkeypatch):
+    """A single actionable article mentioning the player surfaces every
+    field the contract (docs/external-api-contract.md) promises, including
+    real Sleeper structured-status corroboration (`corroboration_label`) —
+    the same `corroborate_with_structured_injury` building block Alerts/
+    Dashboard already use, not a second, parallel label scheme — and a null
+    `superseded_by`/`retraction_status` when nothing contradicts it.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from modules import news as news_module
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    now = time.time()
+    players_frame = pd.DataFrame(
+        [
+            {
+                "player_id": "9001",
+                "name": "Nico Collins",
+                "status": "Questionable",
+                "injury_status": "Hamstring",
+            }
+        ]
+    )
+    fake_pool = [
+        {
+            "title": "Nico Collins (hamstring) questionable for Sunday",
+            "summary": "The Texans WR was limited in practice.",
+            "link": "https://example.com/collins-injury",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 3600,
+        },
+    ]
+
+    news_module.clear_enriched_news_pool_cache()
+    with patch("modules.rankings.load_players", return_value=players_frame):
+        with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+            with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                response = client.get(
+                    "/v1/external/players/9001/news",
+                    headers={"Authorization": "Bearer the-real-secret-key"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["player_id"] == "9001"
+    assert len(body["items"]) == 1
+    item = body["items"][0]
+    assert item["player_id"] == "9001"
+    assert item["event_type"] == "INJURY"
+    assert item["source_urls"] == ["https://example.com/collins-injury"]
+    assert "questionable" in item["supported_claims"]
+    # News-implied status (Q) and Sleeper's own structured status (Q) agree.
+    assert item["corroboration_label"] == "CORROBORATED"
+    assert item["superseded_by"] is None
+    assert item["retraction_status"] is None
+    # published_at reflects the article's own timestamp (~1 hour before
+    # checked_at, this response's computation time) — never fabricated.
+    from datetime import datetime
+
+    published_at = datetime.fromisoformat(item["published_at"])
+    checked_at = datetime.fromisoformat(item["checked_at"])
+    assert 0 < (checked_at - published_at).total_seconds() < 7200
+
+
+def test_external_player_news_unknown_player_returns_empty_items(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
+    with patch("modules.rankings.load_players", return_value=players_frame):
+        response = client.get(
+            "/v1/external/players/does-not-exist/news",
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "player_id": "does-not-exist", "items": []}
+
+
+def test_external_player_news_supersession_fires_for_recovery_not_for_escalation(monkeypatch):
+    """The narrow, mechanically-detectable supersession case this ships
+    with (docs/external-api-contract.md): a later, opposite-direction event
+    in the same injury/availability chain marks an earlier one superseded —
+    but a same-direction escalation (questionable -> doubtful, both "down")
+    must NEVER be flagged as a retraction.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from modules import news as news_module
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    now = time.time()
+    players_frame = pd.DataFrame(
+        [{"player_id": "9001", "name": "Nico Collins", "status": "Healthy", "injury_status": ""}]
+    )
+
+    # Case 1: a real retraction — "ruled out" later overturned by "activated
+    # ... cleared to play" (INACTIVE "down" -> RETURN_TO_PLAY "up").
+    recovery_pool = [
+        {
+            "title": "Nico Collins ruled out for Sunday with hamstring injury",
+            "summary": "x",
+            "link": "https://espn.com/a1",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 20 * 86400,
+        },
+        {
+            "title": "Nico Collins activated from injured reserve, cleared to play Sunday",
+            "summary": "x",
+            "link": "https://rotowire.com/a2",
+            "source": "https://www.rotowire.com/rss/news.php",
+            "published_ts": now - 5 * 86400,
+        },
+    ]
+    news_module.clear_enriched_news_pool_cache()
+    with patch("modules.rankings.load_players", return_value=players_frame):
+        with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+            with patch("modules.news.load_cached_news_pool", return_value=recovery_pool):
+                response = client.get(
+                    "/v1/external/players/9001/news",
+                    headers={"Authorization": "Bearer the-real-secret-key"},
+                )
+    items = {item["event_type"]: item for item in response.json()["items"]}
+    assert items["RETURN_TO_PLAY"]["superseded_by"] is None
+    assert items["RETURN_TO_PLAY"]["retraction_status"] is None
+    assert items["INACTIVE"]["superseded_by"] == items["RETURN_TO_PLAY"]["event_identity"]
+    assert items["INACTIVE"]["retraction_status"] == "superseded"
+
+    # Case 2: a natural escalation only, no recovery event at all — neither
+    # item may be marked superseded.
+    escalation_pool = [
+        {
+            "title": "Nico Collins questionable with ankle injury",
+            "summary": "x",
+            "link": "https://espn.com/a0",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 10 * 86400,
+        },
+        {
+            "title": "Nico Collins now doubtful with ankle injury",
+            "summary": "x",
+            "link": "https://cbssports.com/a0b",
+            "source": "https://www.cbssports.com/rss/headlines/nfl/",
+            "published_ts": now - 9 * 86400,
+        },
+    ]
+    news_module.clear_enriched_news_pool_cache()
+    with patch("modules.rankings.load_players", return_value=players_frame):
+        with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+            with patch("modules.news.load_cached_news_pool", return_value=escalation_pool):
+                response = client.get(
+                    "/v1/external/players/9001/news",
+                    headers={"Authorization": "Bearer the-real-secret-key"},
+                )
+    for item in response.json()["items"]:
+        assert item["superseded_by"] is None
+        assert item["retraction_status"] is None
+
+
 def test_career_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/career")

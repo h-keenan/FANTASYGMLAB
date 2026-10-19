@@ -1324,6 +1324,216 @@ def independent_corroboration_bonus(
     return {identity: len(sources) for identity, sources in by_id.items()}
 
 
+RETRACTION_SUPERSEDED = "superseded"
+
+# How far apart two opposite-direction events for the same player/family can
+# be and still count as one superseding the other. Generous on purpose --
+# dynasty injury/role threads routinely span weeks (e.g. "ruled out" one
+# Sunday, "cleared to play" three weeks later) -- but still bounded so a
+# years-old unrelated event can never retroactively "supersede" something.
+SUPERSESSION_WINDOW_SECONDS = 30 * 24 * 3600
+
+
+def _source_key_for_article(raw: Mapping[str, Any]) -> str:
+    """Same host-ish collapsing ``independent_corroboration_bonus`` uses,
+    factored out so the structured-news-evidence grouping below can collapse
+    syndication/aggregator reposts the identical way without double-counting
+    them as independent sources.
+    """
+
+    source = str(raw.get("source") or raw.get("link") or "").casefold()
+    if "news.google" in source or "google news" in source:
+        return "aggregator"
+    if "://" in source:
+        parts = source.split("/")
+        return parts[2] if len(parts) > 2 else source
+    return source
+
+
+def group_player_events_by_identity(
+    articles: Sequence[Mapping[str, Any]],
+    *,
+    player_id: str,
+    player_name: str = "",
+) -> List[Dict[str, Any]]:
+    """Classify every article mentioning one player into a ``FootballEvent``,
+    then group by ``FootballEvent.event_identity`` (the family-qualified
+    identity ``football_event_from_article`` already computes) so repeated
+    or syndicated coverage of the same underlying claim collapses into one
+    item carrying EVERY independent source link -- not just the one
+    representative ``source_url`` a single ``FootballEvent`` carries.
+
+    Built for the external structured-news-evidence API
+    (``docs/external-api-contract.md``), which has no roster/session
+    context to resolve identity through -- callers already filter
+    ``articles`` down to ones that name this player (the same phrase-match
+    ``GET /v1/players/{id}/news`` already performs), and pass that same
+    ``player_id``/``player_name`` straight through here.
+
+    Returns one dict per distinct ``event_identity``, newest first:
+    ``{"event": FootballEvent, "source_urls": [...], "supported_claims": [...]}``.
+    ``event`` is the group's earliest-known-timestamp member (first report);
+    ``source_urls`` is one URL per independent source (host, with
+    aggregators/syndication collapsed to a single "aggregator" source, same
+    as ``independent_corroboration_bonus``); ``supported_claims`` is the
+    union of every member event's ``matched_evidence`` phrases, in
+    first-seen order.
+    """
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for raw in articles or ():
+        if not isinstance(raw, Mapping):
+            continue
+        enriched = dict(raw)
+        if player_id:
+            enriched["matched_player_id"] = player_id
+        if player_name:
+            enriched["matched_player"] = player_name
+        event = football_event_from_article(enriched)
+        if player_id and str(event.player_id) != str(player_id):
+            continue
+        identity = event.event_identity
+        if not identity:
+            continue
+        bucket = buckets.setdefault(
+            identity,
+            {"events": [], "links": {}},
+        )
+        bucket["events"].append(event)
+        link = str(raw.get("link") or "").strip()
+        if link:
+            source_key = _source_key_for_article(raw) or "unknown"
+            bucket["links"].setdefault(source_key, link)
+
+    results: List[Dict[str, Any]] = []
+    for identity, bucket in buckets.items():
+        events: List[FootballEvent] = bucket["events"]
+        timed = [e for e in events if e.article_time and e.article_time > 0]
+        representative = min(timed, key=lambda e: e.article_time) if timed else events[0]
+        claims: List[str] = []
+        seen_claims: set[str] = set()
+        for event in events:
+            for phrase in event.matched_evidence:
+                if phrase not in seen_claims:
+                    seen_claims.add(phrase)
+                    claims.append(phrase)
+        results.append(
+            {
+                "event": representative,
+                "source_urls": list(bucket["links"].values()),
+                "supported_claims": claims,
+            }
+        )
+
+    results.sort(key=lambda item: item["event"].article_time or 0, reverse=True)
+    return results
+
+
+# Grouping used ONLY by detect_supersession below -- deliberately broader
+# than event_family_key (which drives alert-escalation/cooldown dedup and
+# keeps "ruled out" and "cleared to play" in separate buckets on purpose, so
+# a recovery doesn't reset an unrelated alert's cooldown timer). A
+# contradiction detector needs the opposite: injury/availability status and
+# its own recovery ARE the same chain, since "ruled out" -> "cleared to
+# play" is exactly the retraction shape this detector exists to catch.
+_SUPERSESSION_FAMILIES: tuple[frozenset[str], ...] = (
+    frozenset(
+        {
+            FT_INJURY,
+            FT_INACTIVE,
+            FT_IR_PUP_NFI,
+            FT_INJURY_SEVERITY_UPDATE,
+            FT_RETURN_TO_PRACTICE,
+            FT_RETURN_TO_PLAY,
+            FT_ACTIVE,
+        }
+    ),
+    frozenset(
+        {
+            FT_POSITION_BATTLE,
+            FT_STARTER_CHANGE,
+            FT_ROLE_INCREASE,
+            FT_ROLE_DECREASE,
+            FT_DEPTH_CHART_CHANGE,
+        }
+    ),
+)
+
+
+def _supersession_family(event_type: str) -> str:
+    for family in _SUPERSESSION_FAMILIES:
+        if event_type in family:
+            return "|".join(sorted(family))
+    return str(event_type or "")
+
+
+def detect_supersession(
+    event_groups: Sequence[Mapping[str, Any]],
+) -> Dict[str, str]:
+    """Conservative, mechanically-scoped retraction/supersession detector.
+
+    Flags ``earlier_identity -> later_identity`` only when, for the same
+    player, ALL of the following hold:
+
+    - both events have a real (non-zero) ``article_time``, and the later
+      one's is strictly after the earlier one's -- an event with no known
+      timestamp is never used on either side;
+    - they share the same ``_supersession_family`` bucket (the combined
+      injury/availability chain -- INJURY/INACTIVE/IR_PUP_NFI/
+      INJURY_SEVERITY_UPDATE/RETURN_TO_PRACTICE/RETURN_TO_PLAY/ACTIVE -- or
+      the combined role chain -- POSITION_BATTLE/STARTER_CHANGE/
+      ROLE_INCREASE/ROLE_DECREASE/DEPTH_CHART_CHANGE; every other event type
+      is its own singleton family) -- an unrelated family never supersedes
+      another;
+    - their ``event_direction`` values are the two opposite poles "up" and
+      "down" (in either order). A same-direction progression -- e.g.
+      questionable -> doubtful -> ruled out are all "down" -- is NEVER
+      flagged by construction, so natural escalation is never mistaken for
+      a retraction;
+    - they fall within ``SUPERSESSION_WINDOW_SECONDS`` of each other.
+
+    When an earlier event has more than one later, opposite-direction event
+    within the window, it is marked superseded by the EARLIEST such later
+    event (the first report that overturned it) -- a still-later,
+    same-direction follow-up of that later event is its own, separately
+    evaluated earlier/later pair.
+
+    This intentionally does NOT catch every real-world retraction. Two
+    same-direction contradictions never get flagged, most notably two
+    different TRADE claims naming different destinations (``event_direction``
+    is "neutral" for ``FT_TRADE`` on both sides, so they never satisfy the
+    "opposite poles" rule above) -- see ``docs/external-api-contract.md``
+    for the exact, honest scope this ships with.
+    """
+
+    timed = [
+        group
+        for group in event_groups
+        if isinstance(group, Mapping)
+        and getattr(group.get("event"), "article_time", 0)
+        and group["event"].article_time > 0
+    ]
+    ordered = sorted(timed, key=lambda group: group["event"].article_time)
+
+    superseded_by: Dict[str, str] = {}
+    for i, earlier in enumerate(ordered):
+        earlier_event: FootballEvent = earlier["event"]
+        family = _supersession_family(earlier_event.event_type)
+        for later in ordered[i + 1 :]:
+            later_event: FootballEvent = later["event"]
+            if later_event.event_identity == earlier_event.event_identity:
+                continue
+            if later_event.article_time - earlier_event.article_time > SUPERSESSION_WINDOW_SECONDS:
+                continue
+            if _supersession_family(later_event.event_type) != family:
+                continue
+            if {earlier_event.event_direction, later_event.event_direction} != {"up", "down"}:
+                continue
+            superseded_by[earlier_event.event_identity] = later_event.event_identity
+            break
+    return superseded_by
+
+
 def opponent_ids_from_roster_map(
     roster_player_map: Mapping[Any, Any] | None,
     *,

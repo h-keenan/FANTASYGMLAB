@@ -72,6 +72,10 @@ Deployment topology (Render):
                                                     content-posting bot — see docs/external-api-contract.md
   - GET  /v1/external/projections                — (static API key) the full week's projectable
                                                     slate, optionally filtered by position
+  - GET  /v1/external/players/{id}/news         — (static API key) structured news evidence for
+                                                    one player — source links, timestamps, supported
+                                                    claims, confidence/corroboration, and a conservative
+                                                    supersession signal — see docs/external-api-contract.md
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -157,6 +161,7 @@ from modules import (
     matchup_win_probability,
     my_news,
     news as news_cache,
+    news_intelligence,
     news_signal,
     nfl_schedule,
     player_awards,
@@ -5274,6 +5279,128 @@ def get_external_week_projections(
         "model_version": EXTERNAL_PROJECTIONS_MODEL_VERSION,
         "items": items,
     }
+
+
+# ---------------------------------------------------------------------------
+# External (bot) structured news evidence — Phase 2 of coridian_'s external
+# content-posting bot wish list (full contract: docs/external-api-contract.md).
+# Gated by the exact same require_external_api_key dependency as Phase 1
+# above; this section adds no new auth.
+# ---------------------------------------------------------------------------
+
+
+def _external_news_payload(
+    player_id: str,
+    group: Mapping[str, Any],
+    *,
+    superseded_by: str,
+    checked_at: str,
+) -> dict[str, Any]:
+    """Shape one modules.news_intelligence.group_player_events_by_identity
+    group into the external contract (docs/external-api-contract.md):
+    `published_at` is the group's earliest-known article timestamp (first
+    report), honestly `None` when no member article carries one; `checked_at`
+    is this response's own computation time (nothing here is persisted with
+    a separate "last verified" timestamp to report instead) — the same
+    honesty discipline the Phase 1 projections payload's `calculated_at`
+    already uses.
+    """
+
+    event: news_intelligence.FootballEvent = group["event"]
+    published_at = (
+        datetime.fromtimestamp(event.article_time, tz=timezone.utc).isoformat()
+        if event.article_time and event.article_time > 0
+        else None
+    )
+    return {
+        "player_id": str(player_id),
+        "event_identity": event.event_identity,
+        "event_type": event.event_type,
+        "description": event.explanation,
+        "source_urls": list(group.get("source_urls") or []),
+        "published_at": published_at,
+        "checked_at": checked_at,
+        "supported_claims": list(group.get("supported_claims") or []),
+        "confidence": event.confidence,
+        "corroboration_label": event.corroboration_label,
+        "superseded_by": superseded_by or None,
+        "retraction_status": news_intelligence.RETRACTION_SUPERSEDED if superseded_by else None,
+    }
+
+
+@app.get(
+    "/v1/external/players/{player_id}/news",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_player_news(
+    player_id: str,
+    limit: int = MAX_PLAYER_NEWS_LIMIT,
+) -> dict[str, Any]:
+    """Structured news evidence for one player — Phase 2 of coridian_'s
+    external content-posting bot wish list (docs/external-api-contract.md):
+    confirmed player id, every independent corroborating source link,
+    publish timestamp, the specific supporting evidence phrases, real
+    structured-status corroboration, and a conservative, mechanically-scoped
+    supersession signal. Always 200: an unknown player id or one with no
+    recent actionable coverage returns an empty `items` list rather than a
+    4xx, same honesty-over-error discipline as the projections endpoints.
+
+    Shares its article source and player-name phrase-match with
+    `GET /v1/players/{id}/news` (the per-user-session version just above) —
+    the generic news pool is already league/session-independent
+    (`modules.news.enriched_news_pool`), so this route needs no session at
+    all, only the static API key. It additionally groups matching articles
+    by `modules.news_intelligence`'s per-claim `event_identity` (collapsing
+    syndicated/aggregator reposts of the same claim into one item with every
+    independent source URL attached, not just one representative link),
+    joins real Sleeper structured-status corroboration
+    (`corroborate_with_structured_injury` — the exact building block
+    Alerts/Dashboard already use, not a second label scheme), and runs
+    `detect_supersession` across this player's own event history to flag
+    the narrow, mechanically-detectable retraction case described in the
+    contract doc.
+    """
+
+    if not 1 <= limit <= MAX_PLAYER_NEWS_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_PLAYER_NEWS_LIMIT}.")
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    row_matches = players_df[players_df["player_id"] == player_id] if not players_df.empty else players_df
+    player_name = str(row_matches.iloc[0].get("name") or "").strip() if not row_matches.empty else ""
+    if not player_name:
+        return {"ok": True, "player_id": str(player_id), "items": []}
+
+    news_cache.schedule_news_cache_refresh()
+    enriched = news_cache.enriched_news_pool()
+    matches = [
+        item
+        for item in enriched
+        if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS
+        and news_signal.contains_phrase(news_signal.article_text(item), player_name)
+    ]
+
+    groups = news_intelligence.group_player_events_by_identity(
+        matches, player_id=str(player_id), player_name=player_name
+    )
+    for group in groups:
+        group["event"] = news_intelligence.corroborate_with_structured_injury(
+            group["event"], players_df
+        )
+    superseded = news_intelligence.detect_supersession(groups)
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    items = [
+        _external_news_payload(
+            player_id,
+            group,
+            superseded_by=superseded.get(group["event"].event_identity, ""),
+            checked_at=checked_at,
+        )
+        for group in groups[:limit]
+    ]
+    return {"ok": True, "player_id": str(player_id), "items": items}
 
 
 @app.get("/v1/players/{player_id}/career")
