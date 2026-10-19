@@ -27,5 +27,24 @@ Expand beyond the existing "follow trade ideas" feature:
   behavior/results and surface them similarly. Needs more thought on what
   "interesting" means here before building.
 
+### Home screen widget
+Mini dashboard widget, filtered to only very-high-priority items so it
+doesn't get cluttered.
+
+### Guess-the-player mini game
+Quick, dismissible pop-up: "whose stats are these?" using real last-week
+stats, full player card shown but photo/name blacked out (tier/prestige
+ring still visible). Cheap to build off data the app already computes;
+real instant-engagement potential.
+
+### Become a one-stop-shop platform: host leagues directly
+Let people create/host leagues on FantasyDesk itself, not just import from
+Sleeper. Needs real legal/regulatory research (fantasy-sports hosting
+legality varies by state) and a stats-sourcing plan independent of
+Sleeper's API. Big bet, not technically hard once researched, given the
+app's infrastructure already exists. Pairs with:
+- Referral vouchers for whoever creates a league once it hits a join
+  threshold — a real growth lever once hosting exists.
+
 ---
 coridian_, 2026-10-19.
