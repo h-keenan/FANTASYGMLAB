@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
 
-import type { BriefingItem, PortfolioFailedLeague, PortfolioLeague, PortfolioResponse } from "@/lib/api";
+import Link from "next/link";
+import { useState } from "react";
+
+import { api, type BriefingItem, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioResponse } from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
 import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -103,15 +106,36 @@ function SignalRow({ item }: { item: BriefingItem }) {
   );
 }
 
-function FailedLeaguesNote({ leagues }: { leagues: PortfolioFailedLeague[] }) {
-  const names = leagues.map((league) => league.league_name).join(", ");
+function FailedLeaguesNote({
+  leagues,
+  busyLeagueId,
+  onRemove,
+}: {
+  leagues: PortfolioFailedLeague[];
+  busyLeagueId: string | null;
+  onRemove: (leagueId: string) => void;
+}) {
   const plural = leagues.length === 1 ? "league" : "leagues";
   return (
     <div
-      className="px-3 py-2 text-sm"
+      className="flex flex-col gap-1.5 px-3 py-2 text-sm"
       style={{ background: "var(--color-warning-soft)", border: "var(--border-width-default) solid var(--color-warning)" }}
     >
-      {`Couldn't load ${leagues.length} ${plural} right now: ${names}. Everything else below is up to date.`}
+      <span>{`Couldn't load ${leagues.length} ${plural} right now. Everything else below is up to date.`}</span>
+      {leagues.map((league) => (
+        <div key={league.league_id} className="flex items-center justify-between gap-2">
+          <span style={{ color: "var(--color-text-secondary)" }}>{league.league_name}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(league.league_id)}
+            disabled={busyLeagueId === league.league_id}
+            className="text-xs font-bold whitespace-nowrap"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            {busyLeagueId === league.league_id ? "Removing…" : "Not your league? Remove"}
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -211,6 +235,20 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
 }
 
 export function PortfolioContent({ data }: { data: PortfolioResponse }) {
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
+  const failedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
+
+  const removeFailedLeague = (leagueId: string) => {
+    setBusyLeagueId(leagueId);
+    api
+      .removeSavedLeague(leagueId)
+      .then((result) => {
+        if (result.ok) setRemovedIds((prev) => [...prev, leagueId]);
+      })
+      .finally(() => setBusyLeagueId(null));
+  };
+
   if (!data.is_premium) {
     return (
       <PremiumUpsellCard
@@ -222,7 +260,7 @@ export function PortfolioContent({ data }: { data: PortfolioResponse }) {
     );
   }
 
-  if (data.leagues.length === 0 && data.failed_leagues.length === 0) {
+  if (data.leagues.length === 0 && failedLeagues.length === 0) {
     return (
       <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
         <header className="flex flex-col gap-1">
@@ -250,7 +288,9 @@ export function PortfolioContent({ data }: { data: PortfolioResponse }) {
         </p>
       </header>
 
-      {data.failed_leagues.length > 0 ? <FailedLeaguesNote leagues={data.failed_leagues} /> : null}
+      {failedLeagues.length > 0 ? (
+        <FailedLeaguesNote leagues={failedLeagues} busyLeagueId={busyLeagueId} onRemove={removeFailedLeague} />
+      ) : null}
 
       {data.leagues.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

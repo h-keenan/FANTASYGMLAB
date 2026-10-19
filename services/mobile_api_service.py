@@ -1188,6 +1188,72 @@ def save_league(
     }
 
 
+@app.delete("/v1/leagues/{league_id}/save")
+def remove_saved_league(
+    league_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Remove a saved league from the caller's account.
+
+    coridian_, 2026-10-19: "need a way once signed in to add more leauges or
+    remove leauges" / "the couldnt load 2 leauges takes up too much space
+    and i never selected those leauges to be loaded into the site to
+    beguin with" — Portfolio's `saved_leagues` rows aren't only created by
+    this service's own `save_league` (an explicit Sleeper import); the
+    Streamlit app's automatic context persist (app._persist_supabase_
+    account_context, which runs on every league view) also writes/refreshes
+    a row for any league the account merely viewed there. Those rows can
+    land on an account without ever going through a deliberate "save" step
+    on web-next, and if Sleeper can't resolve one at request time it shows
+    up in Portfolio's `failed_leagues`. This is the one place a user can
+    get rid of a saved league regardless of how it got saved.
+    """
+
+    normalized = saved_leagues.normalize_league_id(league_id)
+    if not normalized:
+        raise HTTPException(status_code=422, detail="league_id is required.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    existing, error = account_store.fetch_rows(
+        config,
+        access_token,
+        saved_leagues.LEAGUES_TABLE,
+        user_id=user_id,
+        extra_query="select=league_id,is_default",
+    )
+    if error:
+        return {"ok": False, "reason": "not_available"}
+    removed_row = next((row for row in existing if str(row.get("league_id")) == normalized), None)
+
+    ok, _delete_error = account_store.delete_rows(
+        config,
+        access_token,
+        saved_leagues.LEAGUES_TABLE,
+        query=f"user_id=eq.{user_id}&league_id=eq.{normalized}",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+
+    # The removed league was the account's default — promote the next
+    # remaining one so Home/Portfolio still has somewhere to land, instead
+    # of silently leaving the account with no default at all.
+    if removed_row and removed_row.get("is_default"):
+        remaining = [row for row in existing if str(row.get("league_id")) != normalized]
+        if remaining:
+            account_store.upsert_saved_league(
+                config,
+                access_token,
+                {"user_id": user_id, "league_id": str(remaining[0].get("league_id")), "is_default": True},
+            )
+
+    return {"ok": True, "reason": ""}
+
+
 @app.get("/v1/leagues/{league_id}")
 def get_league(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     league = sleeper.get_league(league_id)

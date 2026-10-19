@@ -1,8 +1,19 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PortfolioContent } from "./PortfolioContent";
-import type { BriefingItem, PortfolioLeague, PortfolioResponse } from "@/lib/api";
+import { api, type BriefingItem, type PortfolioLeague, type PortfolioResponse } from "@/lib/api";
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      removeSavedLeague: vi.fn(),
+    },
+  };
+});
 
 function briefingItem(overrides: Partial<BriefingItem>): BriefingItem {
   return {
@@ -70,6 +81,10 @@ const BASE_RESPONSE: PortfolioResponse = {
 };
 
 describe("PortfolioContent", () => {
+  beforeEach(() => {
+    vi.mocked(api.removeSavedLeague).mockReset();
+  });
+
   it("renders a league card with its record, rank, and every quick-glance signal", () => {
     render(<PortfolioContent data={BASE_RESPONSE} />);
 
@@ -197,8 +212,48 @@ describe("PortfolioContent", () => {
       />,
     );
 
-    expect(screen.getByText(/Couldn't load 1 league right now: Broken League/)).toBeInTheDocument();
+    expect(screen.getByText(/Couldn't load 1 league right now/)).toBeInTheDocument();
+    expect(screen.getByText("Broken League")).toBeInTheDocument();
     expect(screen.getByText(/The Contenders — Dynasty Overlords/)).toBeInTheDocument();
+  });
+
+  // coridian_, 2026-10-19: "the couldnt load 2 leauges takes up too much
+  // space and i never selected those leauges to be loaded into the site to
+  // beguin with" — a league shown here can exist on the account without a
+  // deliberate web-next save (Streamlit's own auto-persist can write one),
+  // so the user needs a direct way to get rid of it.
+  it("removes a failed league from the note when Remove succeeds", async () => {
+    vi.mocked(api.removeSavedLeague).mockResolvedValue({ ok: true, reason: "" });
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          failed_leagues: [{ league_id: "league-2", league_name: "Broken League", reason: "unavailable" }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /remove/i }));
+
+    await waitFor(() => expect(api.removeSavedLeague).toHaveBeenCalledWith("league-2"));
+    await waitFor(() => expect(screen.queryByText("Broken League")).not.toBeInTheDocument());
+  });
+
+  it("keeps the failed league visible if Remove fails", async () => {
+    vi.mocked(api.removeSavedLeague).mockResolvedValue({ ok: false, reason: "not_available" });
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          failed_leagues: [{ league_id: "league-2", league_name: "Broken League", reason: "unavailable" }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /remove/i }));
+
+    await waitFor(() => expect(api.removeSavedLeague).toHaveBeenCalledWith("league-2"));
+    expect(screen.getByText("Broken League")).toBeInTheDocument();
   });
 
   it("shows the exact Premium upsell copy for a free account", () => {
