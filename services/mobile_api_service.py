@@ -5824,6 +5824,16 @@ def update_gm_stance(
 # age-curve/pick-multiplier valuation math GM Stance used to drive (see
 # _fetch_gm_stance_with_set_flag above). See modules.team_stance's module
 # docstring for the full mapping and rationale.
+# coridian_, 2026-10-19: continuing the site-wide load-time audit (see
+# _fetch_saved_leagues_cached / _fetch_profile_fields above) -- this is a
+# third uncached hot path, called from ~11 different league-scoped
+# endpoints (Dashboard, My Team, Matchup, Trade Hub, Trade Finder, Trade
+# Analyzer, Waivers, GM Plan, ...), each paying its own full uncached
+# Supabase round trip for a value that only changes when the user
+# explicitly declares a new stance.
+_TEAM_STANCE_TTL_SECONDS = 15
+
+
 def _fetch_team_stance(config: dict, user_id: str, access_token: str, league_id: str) -> str:
     """Best-effort read — any failure/missing row/missing table returns ""
     (no stance declared), never raises. A Team Situation outage must never
@@ -5831,6 +5841,18 @@ def _fetch_team_stance(config: dict, user_id: str, access_token: str, league_id:
 
     if not user_id:
         return ""
+    cache_key = redis_cache.build_cache_key("team_stance", user_id, league_id)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_TEAM_STANCE_TTL_SECONDS,
+            compute=lambda: _fetch_team_stance_uncached(config, user_id, access_token, league_id),
+        )
+    except Exception:
+        return _fetch_team_stance_uncached(config, user_id, access_token, league_id)
+
+
+def _fetch_team_stance_uncached(config: dict, user_id: str, access_token: str, league_id: str) -> str:
     rows, error = account_store.fetch_rows(
         config,
         access_token,
