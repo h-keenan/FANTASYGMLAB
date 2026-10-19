@@ -79,3 +79,25 @@ export function awardTierTone(tier: PlayerAward["tier"]): "gold" | "silver" | "b
   if (tier === "gold" || tier === "silver" || tier === "bronze") return tier;
   return "neutral";
 }
+
+// coridian_, 2026-10-19 (screenshot): "this guy is a backup and the
+// starting qb is hurt so he is starting but that needs to be explained and
+// the contributor tag doesnt make sense if he hasnt been playing much" —
+// player_tier (modules/player_tiers.py) is a long-horizon, season-long
+// value read; opportunity_label (modules/rankings.opportunity_profile) is
+// a right-now depth-chart read. They can legitimately disagree — a backup
+// promoted this week by an injury reads "Elite Opportunity" immediately,
+// while his season-long tier hasn't caught up — and showing both chips
+// with no explanation reads as a contradiction, not two different time
+// horizons. A real fix that reconciles the two signals belongs in the
+// shared ranking engine (used by web, mobile, and Streamlit alike); this
+// is the presentation-only stopgap: flag the specific combination that
+// caused the confusion and say why, without changing either value.
+const LOW_PLAYER_TIERS = new Set(["Contributor", "Depth", "Developmental"]);
+const HIGH_OPPORTUNITY_LABELS = new Set(["Elite Opportunity", "Strong Opportunity"]);
+
+export function tierOpportunityMismatchCaption(tier: string | null | undefined, opportunityLabel: string | null | undefined): string | null {
+  if (!tier || !opportunityLabel) return null;
+  if (!LOW_PLAYER_TIERS.has(tier) || !HIGH_OPPORTUNITY_LABELS.has(opportunityLabel)) return null;
+  return `${tier} reflects value over the full season — this role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
+}

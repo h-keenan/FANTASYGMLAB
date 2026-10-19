@@ -19,6 +19,7 @@ import {
   ordinal,
   seasonStatGroups,
   statPercentileBand,
+  tierOpportunityMismatchCaption,
 } from "@/lib/playerQuickViewPresentation";
 
 /**
@@ -328,6 +329,15 @@ export function PlayerQuickView({
             <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
           ) : null}
         </div>
+        {/* coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt
+            make sense if he hasnt been playing much" — tier (season-long
+            value) and opportunity_label (right-now depth-chart read) can
+            legitimately disagree; this names the specific combination that
+            caused the confusion instead of leaving two silently
+            contradicting chips. */}
+        {tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label) ? (
+          <p className="pqv-tier-mismatch-note">{tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label)}</p>
+        ) : null}
 
         <div className="pqv-body">
           {loading ? (

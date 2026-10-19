@@ -1021,6 +1021,11 @@ a {
   gap: var(--space-xs);
   margin-top: var(--space-xs);
 }
+.pqv-tier-mismatch-note {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-xs);
+}
 .pqv-chip {
   background: var(--color-surface-muted);
   border: var(--border-width-default) solid var(--color-border);
