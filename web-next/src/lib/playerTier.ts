@@ -46,6 +46,27 @@ export const PLAYER_TIER_LADDER: PlayerTierIdentity[] = [
 const DEFAULT_TIER = PLAYER_TIER_LADDER[6];
 const TIER_BY_ID = new Map(PLAYER_TIER_LADDER.map((tier) => [tier.tierId, tier]));
 
+export type TierGlowIntensity = "strong" | "medium" | "subtle" | null;
+
+// coridian_, 2026-10-19 (queued cosmetic, lowest priority): "an effect
+// around the prestige ring ... different for different tiers. Obviously
+// lower tiers don't need one." Only the top three tiers glow at all —
+// everyone from `starter` down keeps the plain ring unchanged, same as
+// today.
+const GLOW_INTENSITY_BY_TIER: Record<PlayerTierId, TierGlowIntensity> = {
+  generational: "strong",
+  elite: "medium",
+  impact_starter: "subtle",
+  starter: null,
+  contributor: null,
+  committee_role: null,
+  depth_developmental: null,
+};
+
+export function tierGlowIntensity(tierId: PlayerTierId): TierGlowIntensity {
+  return GLOW_INTENSITY_BY_TIER[tierId];
+}
+
 // Verbatim copy of mobile's STORED_TIER_TO_ID synonym table.
 const STORED_TIER_TO_ID: Record<string, PlayerTierId> = {
   elite: "generational",

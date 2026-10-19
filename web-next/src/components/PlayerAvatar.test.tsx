@@ -35,4 +35,22 @@ describe("PlayerAvatar", () => {
     const hero = render(<PlayerAvatar playerId="p1" tier="starter" size={112} />);
     expect(hero.container.querySelector("img")?.style.border).toContain("5px");
   });
+
+  // coridian_, 2026-10-19 (queued cosmetic): only the top three tiers glow.
+  it("glows the top three tiers, not starter and below", () => {
+    const generational = render(<PlayerAvatar playerId="p1" tier="generational" />);
+    expect(generational.container.querySelector("img")?.className).toContain("prestige-glow");
+
+    const elite = render(<PlayerAvatar playerId="p1" tier="elite" />);
+    expect(elite.container.querySelector("img")?.className).toContain("prestige-glow");
+
+    const impactStarter = render(<PlayerAvatar playerId="p1" tier="impact_starter" />);
+    expect(impactStarter.container.querySelector("img")?.className).toContain("prestige-glow");
+
+    const starter = render(<PlayerAvatar playerId="p1" tier="starter" />);
+    expect(starter.container.querySelector("img")?.className).not.toContain("prestige-glow");
+
+    const noTier = render(<PlayerAvatar playerId="p1" />);
+    expect(noTier.container.querySelector("img")?.className).not.toContain("prestige-glow");
+  });
 });

@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PLAYER_TIER_LADDER, resolvePlayerTier } from './playerTier.ts';
+import { PLAYER_TIER_LADDER, resolvePlayerTier, tierGlowIntensity } from './playerTier.ts';
 
 test('every tier has a distinct shortLabel and abbrLabel (no component should ever render the same word twice)', () => {
   for (const tier of PLAYER_TIER_LADDER) {
@@ -33,4 +33,15 @@ test('resolvePlayerTier maps the legacy "star" stored value to the elite tier (i
   const resolved = resolvePlayerTier('star');
   assert.equal(resolved.tierId, 'elite');
   assert.notEqual(resolved.abbrLabel, resolved.shortLabel);
+});
+
+// coridian_, 2026-10-19 (queued cosmetic): only the top three tiers glow.
+test('tierGlowIntensity: only the top three tiers glow, nothing from starter down', () => {
+  assert.equal(tierGlowIntensity('generational'), 'strong');
+  assert.equal(tierGlowIntensity('elite'), 'medium');
+  assert.equal(tierGlowIntensity('impact_starter'), 'subtle');
+  assert.equal(tierGlowIntensity('starter'), null);
+  assert.equal(tierGlowIntensity('contributor'), null);
+  assert.equal(tierGlowIntensity('committee_role'), null);
+  assert.equal(tierGlowIntensity('depth_developmental'), null);
 });
