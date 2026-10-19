@@ -3386,6 +3386,71 @@ def test_quick_view_returns_real_season_stats_and_bio(monkeypatch):
     assert body["model"] is not None
     assert body["model"]["market_score"] is None
     assert body["model"]["age_score_label"] == "Age Lens"
+    # The fixture has no depth_chart_order_delta column at all (no prior
+    # snapshot ever recorded) -- must not crash, must render nothing.
+    assert body["model"]["depth_chart_note"] is None
+
+
+# coridian_, 2026-10-19: "was there any way for us to predict (scenario)
+# something like cam skattebo having 0 snaps and relaying that to USERS?"
+def test_quick_view_names_a_real_depth_chart_promotion(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = _fake_quick_view_frame()
+    frame["depth_chart_order_delta"] = 2
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["model"]["depth_chart_note"] == "Moved up 2 spots on the depth chart since last week."
+
+
+def test_quick_view_names_a_real_depth_chart_demotion(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = _fake_quick_view_frame()
+    frame["depth_chart_order_delta"] = -1
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["model"]["depth_chart_note"] == "Moved down 1 spot on the depth chart since last week."
+
+
+def test_quick_view_stays_quiet_when_there_is_no_real_depth_chart_move(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = _fake_quick_view_frame()
+    frame["depth_chart_order_delta"] = 0
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["model"]["depth_chart_note"] is None
 
 
 def _rated_quick_view_frame(pool_size=20):

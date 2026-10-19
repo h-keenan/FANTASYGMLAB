@@ -1156,6 +1156,12 @@ export interface QuickViewModel {
   opportunity_confidence: number | null;
   workload_trend: string | null;
   usage_trend: UsageTrend | null;
+  /** coridian_, 2026-10-19: predicting a role change before it's obvious
+   * from games played/injury status — a plain-language note when this
+   * player's Sleeper depth_chart_order moved at least one spot since the
+   * last players.db refresh (modules.depth_chart_history). Null when
+   * there's no prior snapshot yet or the move is too small to state. */
+  depth_chart_note: string | null;
   decision_fit_narrative: string | null;
   market_rating?: number | null;
   opportunity_rating?: number | null;

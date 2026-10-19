@@ -70,11 +70,14 @@ DEFAULT_DB_PATH = ROOT / "data" / "players.db"
 # Sibling cache files that a refresh=True build_players_table run may also
 # rewrite as a side effect (modules.sleeper.get_players writes
 # sleeper_players.json; modules.fantasycalc.get_dynasty_values writes
-# fantasycalc_values.csv on its own separate 6h TTL). Only ones that
-# actually changed get included in the commit.
+# fantasycalc_values.csv on its own separate 6h TTL; default_refresh_runner
+# below additionally records a depth-chart-order snapshot, see
+# modules.depth_chart_history). Only ones that actually changed get
+# included in the commit.
 DEFAULT_SIBLING_PATHS: tuple[Path, ...] = (
     ROOT / "data" / "sleeper_players.json",
     ROOT / "data" / "fantasycalc_values.csv",
+    ROOT / "data" / "depth_chart_snapshots.json",
 )
 REFRESH_SUBPROCESS_SCRIPT = ROOT / "scripts" / "refresh_players_db_subprocess.py"
 REFRESH_SUBPROCESS_TIMEOUT_S = 600
@@ -114,7 +117,34 @@ def default_refresh_runner(db_path: Path) -> int:
     except subprocess.TimeoutExpired:
         print("refresh subprocess timed out", file=sys.stderr)
         return 1
+    if completed.returncode == 0:
+        _record_depth_chart_snapshot_best_effort(db_path)
     return completed.returncode
+
+
+def _record_depth_chart_snapshot_best_effort(db_path: Path) -> None:
+    """Update data/depth_chart_snapshots.json from the just-refreshed
+    players.db, and write the resulting depth_chart_order_delta column
+    back into players.db itself so services/mobile_api_service.py (a
+    separate running process that never sees this script's in-memory
+    DataFrame) can read it like any other column. A real players.db
+    refresh must never fail or be left uncommitted because of this, so
+    any error here is swallowed, same fails-soft contract as every other
+    best-effort enrichment in this codebase."""
+
+    try:
+        import sqlite3
+
+        from modules import depth_chart_history, rankings
+
+        players_df = rankings.load_players(str(db_path))
+        if players_df is None or players_df.empty:
+            return
+        updated = depth_chart_history.record_depth_chart_snapshot(players_df)
+        with sqlite3.connect(str(db_path)) as connection:
+            updated.to_sql("players", connection, if_exists="replace", index=False)
+    except Exception as error:
+        print(f"depth-chart snapshot recording failed (non-fatal): {error}", file=sys.stderr)
 
 
 def _run_git(

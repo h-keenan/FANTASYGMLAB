@@ -202,3 +202,47 @@ def test_only_the_changed_sibling_files_are_staged(repo_with_remote):
     ).stdout
     assert "players.db" in show
     assert "sleeper_players.json" not in show
+
+
+def test_default_refresh_runner_records_a_depth_chart_snapshot_on_success(tmp_path, monkeypatch):
+    """A successful subprocess run should trigger the best-effort
+    depth-chart snapshot step; a failed one must not."""
+
+    db_path = tmp_path / "players.db"
+    recorded: list[Path] = []
+    monkeypatch.setattr(rac, "_record_depth_chart_snapshot_best_effort", lambda path: recorded.append(path))
+
+    class _FakeCompleted:
+        returncode = 0
+
+    monkeypatch.setattr(rac.subprocess, "run", lambda *a, **k: _FakeCompleted())
+    rc = rac.default_refresh_runner(db_path)
+
+    assert rc == 0
+    assert recorded == [db_path]
+
+
+def test_default_refresh_runner_skips_the_snapshot_step_on_a_failed_refresh(tmp_path, monkeypatch):
+    db_path = tmp_path / "players.db"
+    recorded: list[Path] = []
+    monkeypatch.setattr(rac, "_record_depth_chart_snapshot_best_effort", lambda path: recorded.append(path))
+
+    class _FakeFailed:
+        returncode = 1
+
+    monkeypatch.setattr(rac.subprocess, "run", lambda *a, **k: _FakeFailed())
+    rc = rac.default_refresh_runner(db_path)
+
+    assert rc == 1
+    assert recorded == []
+
+
+def test_depth_chart_snapshot_failure_never_propagates(tmp_path):
+    """A real players.db refresh must never fail or be left uncommitted
+    because of this best-effort enrichment step."""
+
+    db_path = tmp_path / "players.db"
+    db_path.write_bytes(b"not a real sqlite file")
+
+    # Should not raise even though db_path isn't a real players.db.
+    rac._record_depth_chart_snapshot_best_effort(db_path)
