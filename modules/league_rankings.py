@@ -307,7 +307,13 @@ def build_league_rankings_frame(
 # session (open Dashboard, tap into Team Rankings) with zero sharing before
 # this cache existed. Same live-time-bucket idiom modules.sleeper and
 # trade_hub_engine already use for their own caches.
-LEAGUE_RANKINGS_FRAME_TTL_SECONDS = 30
+# coridian_, 2026-10-19, performance audit: widened from the original 30s
+# to 2 minutes, alongside the same change in modules.league_value_settings/
+# modules.trade_hub_engine/modules.waivers_ui — a real league's roster
+# doesn't change faster than every couple minutes in practice (trades/
+# waivers/drops happen a handful of times a week), so 30s was paying for
+# far more recomputation than the data's real freshness ever needed.
+LEAGUE_RANKINGS_FRAME_TTL_SECONDS = 120
 
 
 def _league_rankings_frame_cache_bucket() -> int:

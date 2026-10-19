@@ -43,7 +43,13 @@ GENERIC_DYNASTY_VALUE_PREFIX = (
 # "what can I act on right now"), long enough that the flood of mobile
 # clients polling Waivers during a live waiver period share one computed
 # pool instead of each re-running it.
-WAIVER_POOL_TTL_SECONDS = 30
+# coridian_, 2026-10-19, performance audit: widened from the original 30s
+# to 2 minutes, alongside the same change in modules.league_value_settings/
+# modules.league_rankings/modules.trade_hub_engine — still fast enough that
+# a fresh add/drop or injury designation shows up well within any
+# reasonable expectation, while cutting repeat-visit recompute cost during
+# a live waiver period substantially.
+WAIVER_POOL_TTL_SECONDS = 120
 
 
 def _waiver_pool_cache_bucket() -> int:
