@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Dict, List, Literal, Optional
 from urllib.parse import quote
 
+from modules import sleeper as _sleeper
+
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 
 LeagueLookupStatus = Literal["empty_username", "user_not_found", "no_leagues", "ok", "unavailable"]
@@ -79,10 +81,28 @@ def _resolve_user_id(username: str) -> tuple[Optional[str], bool]:
 
 
 def resolve_sleeper_user_id(username: str) -> Optional[str]:
-    """Public entry point: Sleeper user_id for a username, or None if not found."""
+    """Public entry point: Sleeper user_id for a username, or None if not found.
 
-    user_id, _transport_error = _resolve_user_id(username)
-    return user_id
+    Delegates to modules.sleeper.get_user_id (an @lru_cache'd near-duplicate
+    of this module's own _resolve_user_id — same candidate-casing loop,
+    same "first match wins" contract, Optional[str] in both cases) instead
+    of maintaining a second, UNCACHED copy of the same Sleeper lookup.
+
+    Real production impact (perf audit, coridian_ 2026-10-19): this is
+    called from _resolve_my_roster on nearly every league-scoped request
+    (Dashboard, Trade Hub, Waivers, My Team, Trade Finder, Portfolio's own
+    per-league fan-out) — a real, uncached Sleeper network round trip on
+    every single one of those, for a username -> user_id mapping that
+    essentially never changes. get_user_id already solves exactly this for
+    every OTHER caller in the codebase; this was the one uncached straggler.
+
+    Deliberately NOT applied to this module's OTHER caller of
+    _resolve_user_id (lookup_user_leagues) — that one-time, user-initiated
+    League Import flow genuinely needs the transport_error distinction
+    get_user_id doesn't expose (a real "Sleeper is down" vs. "that username
+    doesn't exist" difference), so it keeps its own uncached path."""
+
+    return _sleeper.get_user_id(username)
 
 
 def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLookupResult:
