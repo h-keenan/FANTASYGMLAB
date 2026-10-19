@@ -113,6 +113,42 @@ function SignalRow({ item, showDivider }: { item: BriefingItem; showDivider: boo
   );
 }
 
+/**
+ * coridian_, 2026-10-19: a league stuck mid-draft (Sleeper doesn't assign
+ * roster players until the whole draft completes — same reason Dashboard's
+ * quiet state already explains this via notReadyReasonMessage) landed here
+ * with the same scary "Couldn't load" warning styling as a genuine failure
+ * (no linked account, league gone, Sleeper down). Split the two: an
+ * `empty_roster` league gets a calm, non-warning note that links straight
+ * into Live Draft — the feature actually built for "my draft isn't done
+ * yet" — instead of a dead-end error asking if it's even your league.
+ */
+function DraftingLeaguesNote({ leagues }: { leagues: PortfolioFailedLeague[] }) {
+  return (
+    <div
+      className="flex flex-col gap-1.5 px-3 py-2 text-sm"
+      style={{ background: "var(--color-surface-muted)", border: "var(--border-width-default) solid var(--color-border)" }}
+    >
+      <span style={{ color: "var(--color-text-secondary)" }}>
+        {leagues.length === 1 ? "Draft still in progress:" : "Drafts still in progress:"} rosters will show up here
+        once each draft finishes.
+      </span>
+      {leagues.map((league) => (
+        <div key={league.league_id} className="flex items-center justify-between gap-2">
+          <span style={{ color: "var(--color-text-secondary)" }}>{league.league_name}</span>
+          <Link
+            href={`/live-draft/${league.league_id}`}
+            className="text-xs font-bold whitespace-nowrap"
+            style={{ color: "var(--color-accent)" }}
+          >
+            Watch live draft →
+          </Link>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FailedLeaguesNote({
   leagues,
   busyLeagueId,
@@ -245,7 +281,9 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
 export function PortfolioContent({ data }: { data: PortfolioResponse }) {
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
-  const failedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
+  const allFailedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
+  const draftingLeagues = allFailedLeagues.filter((league) => league.reason === "empty_roster");
+  const failedLeagues = allFailedLeagues.filter((league) => league.reason !== "empty_roster");
 
   const removeFailedLeague = (leagueId: string) => {
     setBusyLeagueId(leagueId);
@@ -268,7 +306,7 @@ export function PortfolioContent({ data }: { data: PortfolioResponse }) {
     );
   }
 
-  if (data.leagues.length === 0 && failedLeagues.length === 0) {
+  if (data.leagues.length === 0 && allFailedLeagues.length === 0) {
     return (
       <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
         <header className="flex flex-col gap-1">
@@ -296,21 +334,23 @@ export function PortfolioContent({ data }: { data: PortfolioResponse }) {
         </p>
       </header>
 
+      {draftingLeagues.length > 0 ? <DraftingLeaguesNote leagues={draftingLeagues} /> : null}
+
       {failedLeagues.length > 0 ? (
         <FailedLeaguesNote leagues={failedLeagues} busyLeagueId={busyLeagueId} onRemove={removeFailedLeague} />
       ) : null}
 
-      {data.leagues.length === 0 ? (
+      {data.leagues.length === 0 && failedLeagues.length > 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           None of your saved leagues could be loaded right now. Try again in a moment.
         </p>
-      ) : (
+      ) : data.leagues.length > 0 ? (
         <div className="flex flex-col gap-4">
           {data.leagues.map((league) => (
             <PortfolioLeagueCard key={league.league_id} league={league} />
           ))}
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

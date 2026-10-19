@@ -119,6 +119,14 @@ export default function PortfolioScreen() {
     );
   }
 
+  // coridian_, 2026-10-19: a league stuck mid-draft (Sleeper doesn't assign
+  // roster players until the whole draft completes) landed in the same
+  // scary "Couldn't load" note as a genuine failure (no linked account,
+  // league gone, Sleeper down). Split the two so a drafting league gets a
+  // calm, informational note instead.
+  const draftingLeagues = data.failed_leagues.filter((league) => league.reason === 'empty_roster');
+  const realFailedLeagues = data.failed_leagues.filter((league) => league.reason !== 'empty_roster');
+
   if (data.leagues.length === 0 && data.failed_leagues.length === 0) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
@@ -156,8 +164,11 @@ export default function PortfolioScreen() {
                 </TouchableOpacity>
               ) : null}
             </View>
-            {data.failed_leagues.length > 0 ? (
-              <FailedLeaguesNote leagues={data.failed_leagues} colors={colors} styles={styles} />
+            {draftingLeagues.length > 0 ? (
+              <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} />
+            ) : null}
+            {realFailedLeagues.length > 0 ? (
+              <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} />
             ) : null}
           </View>
         }
@@ -177,6 +188,27 @@ export default function PortfolioScreen() {
         onClose={() => setShareOpen(false)}
         leagues={data.leagues}
       />
+    </View>
+  );
+}
+
+function DraftingLeaguesNote({
+  leagues,
+  colors,
+  styles,
+}: {
+  leagues: PortfolioFailedLeague[];
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const names = leagues.map((league) => league.league_name).join(', ');
+  const plural = leagues.length === 1 ? 'league' : 'leagues';
+  return (
+    <View style={styles.failedNote}>
+      <Ionicons name="time-outline" size={14} color={colors.textSecondary} style={styles.failedNoteIcon} />
+      <AppText style={styles.failedNoteText}>
+        {`Draft still in progress for ${leagues.length} ${plural}: ${names}. Rosters will show up here once each draft finishes.`}
+      </AppText>
     </View>
   );
 }

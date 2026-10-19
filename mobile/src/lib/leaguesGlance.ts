@@ -180,9 +180,25 @@ export function glanceDestination(module: GlanceModule): GlanceDestination {
   }
 }
 
-/** "Couldn't load 2 leagues right now: A, B." */
+/**
+ * coridian_, 2026-10-19: a league stuck mid-draft (Sleeper doesn't assign
+ * roster players until the whole draft completes) was lumped into this same
+ * "Couldn't load" note as a genuine failure (no linked account, league
+ * gone, Sleeper down) — split out via glanceDraftingNote below instead.
+ *
+ * "Couldn't load 2 leagues right now: A, B."
+ */
 export function glanceFailedNote(failed: LeagueGlanceFailedLeague[]): string {
-  if (failed.length === 0) return '';
-  const names = failed.map((league) => league.league_name).join(', ');
-  return `Couldn't load ${failed.length} ${failed.length === 1 ? 'league' : 'leagues'} right now: ${names}.`;
+  const real = failed.filter((league) => league.reason !== 'empty_roster');
+  if (real.length === 0) return '';
+  const names = real.map((league) => league.league_name).join(', ');
+  return `Couldn't load ${real.length} ${real.length === 1 ? 'league' : 'leagues'} right now: ${names}.`;
+}
+
+/** "Draft still in progress for 1 league: A." */
+export function glanceDraftingNote(failed: LeagueGlanceFailedLeague[]): string {
+  const drafting = failed.filter((league) => league.reason === 'empty_roster');
+  if (drafting.length === 0) return '';
+  const names = drafting.map((league) => league.league_name).join(', ');
+  return `Draft still in progress for ${drafting.length} ${drafting.length === 1 ? 'league' : 'leagues'}: ${names}.`;
 }

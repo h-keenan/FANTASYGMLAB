@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   glanceDestination,
+  glanceDraftingNote,
   glanceFailedNote,
   glanceLayout,
   glanceNewsBadge,
@@ -123,5 +124,41 @@ test('glanceFailedNote: names every league that failed', () => {
       { league_id: 'b', league_name: 'Bravo', reason: 'not_a_member_of_league' },
     ]),
     "Couldn't load 2 leagues right now: Alpha, Bravo.",
+  );
+});
+
+// coridian_, 2026-10-19: a league stuck mid-draft (empty_roster) is not a
+// real failure — split out of glanceFailedNote entirely, with its own calm
+// note via glanceDraftingNote.
+test('glanceFailedNote: excludes leagues that are just still drafting', () => {
+  assert.equal(
+    glanceFailedNote([{ league_id: 'a', league_name: 'Alpha', reason: 'empty_roster' }]),
+    '',
+  );
+  assert.equal(
+    glanceFailedNote([
+      { league_id: 'a', league_name: 'Alpha', reason: 'empty_roster' },
+      { league_id: 'b', league_name: 'Bravo', reason: 'unavailable' },
+    ]),
+    "Couldn't load 1 league right now: Bravo.",
+  );
+});
+
+test('glanceDraftingNote: names every league still drafting, nothing else', () => {
+  assert.equal(glanceDraftingNote([]), '');
+  assert.equal(
+    glanceDraftingNote([{ league_id: 'a', league_name: 'Alpha', reason: 'unavailable' }]),
+    '',
+  );
+  assert.equal(
+    glanceDraftingNote([{ league_id: 'a', league_name: 'Alpha', reason: 'empty_roster' }]),
+    'Draft still in progress for 1 league: Alpha.',
+  );
+  assert.equal(
+    glanceDraftingNote([
+      { league_id: 'a', league_name: 'Alpha', reason: 'empty_roster' },
+      { league_id: 'b', league_name: 'Bravo', reason: 'empty_roster' },
+    ]),
+    'Draft still in progress for 2 leagues: Alpha, Bravo.',
   );
 });
