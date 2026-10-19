@@ -393,6 +393,144 @@ def test_me_defaults_to_free_when_profile_lookup_fails(monkeypatch):
     assert body["user"]["profile_status"] == "error"
 
 
+def test_founder_analytics_requires_bearer_token(monkeypatch):
+    client = _client(monkeypatch)
+
+    response = client.get("/v1/founder/analytics")
+
+    assert response.status_code == 401
+
+
+def test_founder_analytics_rejects_caller_without_founder_ops_claim(monkeypatch):
+    # A perfectly ordinary, authenticated account — no app_metadata at all —
+    # must get a real 403, not an empty/filtered report.
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/founder/analytics",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 403
+
+
+def test_founder_analytics_ignores_client_editable_user_metadata_impersonation(monkeypatch):
+    # user_metadata (unlike app_metadata) is editable by the account itself —
+    # a non-founder flipping that field client-side must never grant access.
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {
+        "id": "user-123",
+        "email": "gm@example.com",
+        "user_metadata": {"founder_ops": True},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/founder/analytics",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 403
+
+
+def test_founder_analytics_returns_report_for_founder_capable_caller(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {
+        "id": "founder-1",
+        "email": "founder@example.com",
+        "app_metadata": {"founder_ops": True},
+    }
+
+    fake_report = {
+        "window_key": "7d",
+        "window_label": "Last 7 days",
+        "measured": True,
+        "event_count": 42,
+        "sessions": 7,
+        "storage": {"kind": "supabase", "scope_label": "All app instances"},
+    }
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch.object(
+            mobile_api_service.founder_analytics,
+            "build_report",
+            return_value=fake_report,
+        ) as mock_build_report,
+    ):
+        response = client.get(
+            "/v1/founder/analytics",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["report"] == fake_report
+    mock_build_report.assert_called_once_with(window_key="7d")
+
+
+def test_founder_analytics_accepts_window_query_param(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {
+        "id": "founder-1",
+        "email": "founder@example.com",
+        "app_metadata": {"founder_ops": True},
+    }
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch.object(
+            mobile_api_service.founder_analytics, "build_report", return_value={}
+        ) as mock_build_report,
+    ):
+        response = client.get(
+            "/v1/founder/analytics?window=30d",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    mock_build_report.assert_called_once_with(window_key="30d")
+
+
+def test_founder_analytics_falls_back_to_default_window_for_unknown_value(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {
+        "id": "founder-1",
+        "email": "founder@example.com",
+        "app_metadata": {"founder_ops": True},
+    }
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch.object(
+            mobile_api_service.founder_analytics, "build_report", return_value={}
+        ) as mock_build_report,
+    ):
+        response = client.get(
+            "/v1/founder/analytics?window=not-a-real-window",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    mock_build_report.assert_called_once_with(window_key="7d")
+
+
 def test_me_reports_ok_status_for_a_new_user_with_no_profile_row_yet(monkeypatch):
     client = _client(monkeypatch)
 

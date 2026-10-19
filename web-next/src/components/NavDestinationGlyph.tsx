@@ -20,7 +20,8 @@ export type NavGlyphName =
   | "players"
   | "liveDraft"
   | "teamSituation"
-  | "community";
+  | "community"
+  | "founderAnalytics";
 
 /**
  * One icon per nav destination, shared by Dashboard's Explore grid
@@ -231,6 +232,16 @@ export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; s
           <circle cx="352" cy="180" r="52" {...stroke} />
           <path d="M48 432c0-84 64-140 128-140s128 56 128 140" {...stroke} />
           <path d="M296 320c56 4 104 52 104 112" {...stroke} />
+        </svg>
+      );
+    case "founderAnalytics":
+      // A plain bar-chart glyph for the founder-only internal analytics
+      // destination — deliberately not reusing leagueRankings' podium icon
+      // (that one is a user-facing ranking concept; this is an internal
+      // metrics dashboard, a distinct idea even though both are "bars").
+      return (
+        <svg {...common}>
+          <path d="M96 416V256M256 416V96M416 416V224" {...stroke} />
         </svg>
       );
     default:
