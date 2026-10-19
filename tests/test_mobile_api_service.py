@@ -427,7 +427,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
     table_response.json.return_value = [{"user_id": "user-123"}]
 
     # auth fetch, then one requests.get per table in _EXPORTABLE_USER_TABLES.
-    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 13):
+    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 14):
         response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
@@ -448,6 +448,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
         "decision_memory_events",
         "decision_memory_baselines",
         "notification_read_state",
+        "guess_the_player_streaks",
     }
     assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
 
@@ -10850,3 +10851,365 @@ def test_lookup_sleeper_leagues_falls_back_to_the_linked_username(monkeypatch):
     assert body["status"] == "no_leagues"
     assert body["message"]
     mock_lookup.assert_called_once_with("linked_gm")
+
+
+def _fake_guess_the_player_frame():
+    return pd.DataFrame(
+        [
+            {"player_id": "1", "name": "Bench Runner", "position": "RB", "team": "kc", "player_tier": "depth"},
+            {"player_id": "2", "name": "Other Back", "position": "RB", "team": "nyj", "player_tier": "depth"},
+            {"player_id": "3", "name": "Third Back", "position": "RB", "team": "dal", "player_tier": "contributor"},
+            {"player_id": "4", "name": "Star RB", "position": "RB", "team": "sf", "player_tier": "elite"},
+            {"player_id": "5", "name": "Fourth Back", "position": "RB", "team": "atl", "player_tier": "depth"},
+        ]
+    )
+
+
+def _fake_guess_the_player_weeks(values):
+    return [{"week": i + 1, "games_played": 1, "fantasy_points_ppr": v, "rush_attempts": 10} for i, v in enumerate(values)]
+
+
+def _fake_guess_the_player_season_stats():
+    return {
+        "1": {
+            "stats_season": 2025,
+            "ppg": 4.0,
+            "fantasy_points_ppr": 24.0,
+            "games_played": 6,
+            "weekly": _fake_guess_the_player_weeks([3, 4, 3, 2, 30, 4]),
+        },
+        "2": {
+            "stats_season": 2025,
+            "ppg": 3.5,
+            "fantasy_points_ppr": 21.0,
+            "games_played": 6,
+            "weekly": _fake_guess_the_player_weeks([3, 4, 3, 4, 3, 4]),
+        },
+        "3": {
+            "stats_season": 2025,
+            "ppg": 4.5,
+            "fantasy_points_ppr": 27.0,
+            "games_played": 6,
+            "weekly": _fake_guess_the_player_weeks([4, 5, 4, 5, 4, 5]),
+        },
+        "4": {
+            "stats_season": 2025,
+            "ppg": 20.0,
+            "fantasy_points_ppr": 120.0,
+            "games_played": 6,
+            "weekly": _fake_guess_the_player_weeks([18, 22, 20, 19, 21, 20]),
+        },
+        "5": {
+            "stats_season": 2025,
+            "ppg": 3.0,
+            "fantasy_points_ppr": 18.0,
+            "games_played": 6,
+            "weekly": _fake_guess_the_player_weeks([3, 3, 3, 3, 3, 3]),
+        },
+    }
+
+
+def _real_guess_the_player_pick_id():
+    """The real pick_id the fixture above resolves to (player 1, week 5,
+    2025) — computed via the actual module, never hardcoded, so this never
+    silently drifts from modules.guess_the_player's own hashing."""
+
+    from modules import guess_the_player as gtp
+
+    return gtp.compute_pick_id(2025, "1", 5)
+
+
+def _patch_guess_the_player_today(monkeypatch, value="2026-10-19"):
+    from services import mobile_api_service
+
+    monkeypatch.setattr(mobile_api_service, "_guess_the_player_today", lambda: value)
+
+
+def test_guess_the_player_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/guess-the-player")
+    assert response.status_code == 401
+
+
+def test_guess_the_player_returns_real_pick_with_zero_streak_for_a_new_user(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch(
+                "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+            ):
+                response = client.get("/v1/guess-the-player", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["available"] is True
+    assert body["already_answered"] is False
+    assert body["last_result"] is None
+    assert body["correct_player"] is None
+    assert body["streak"] == {"current_streak": 0, "best_streak": 0}
+
+    prompt = body["prompt"]
+    assert prompt["pick_id"] == _real_guess_the_player_pick_id()
+    assert prompt["week"] == 5
+    assert prompt["position"] == "RB"
+    assert prompt["tier"] == "depth"
+    # Hidden-identity contract: the real name/team never appear directly,
+    # only buried inside the shuffled options list.
+    assert "name" not in prompt
+    assert "team" not in prompt
+    option_names = {option["name"] for option in prompt["options"]}
+    assert "Bench Runner" in option_names
+    assert len(prompt["options"]) == 4
+    # Real per-week fields only — never a fabricated yards/TD figure (see
+    # modules.guess_the_player's module docstring).
+    stat_labels = {item["label"] for item in prompt["stat_line"]}
+    assert "Rush Attempts" in stat_labels
+    assert "Receiving Yards" not in stat_labels
+
+
+def test_guess_the_player_reports_already_answered_when_streak_matches_todays_pick(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {
+            "user_id": "user-123",
+            "current_streak": 3,
+            "best_streak": 5,
+            "last_pick_id": _real_guess_the_player_pick_id(),
+            "last_result": "correct",
+        }
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch(
+                "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+            ):
+                response = client.get("/v1/guess-the-player", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["already_answered"] is True
+    assert body["last_result"] == "correct"
+    assert body["streak"] == {"current_streak": 3, "best_streak": 5}
+    assert body["correct_player"] == {
+        "player_id": "1",
+        "name": "Bench Runner",
+        "team": "KC",
+        "position": "RB",
+        "tier": "depth",
+    }
+
+
+def test_guess_the_player_reports_unavailable_when_no_surprising_player_exists(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    flat_stats = {
+        "1": {
+            "stats_season": 2025,
+            "weekly": _fake_guess_the_player_weeks([3, 4, 3, 4, 3, 4]),
+        }
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch("modules.sleeper.get_season_player_stats", return_value=flat_stats):
+                response = client.get("/v1/guess-the-player", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is False
+    assert body["prompt"] is None
+    assert body["reason"] == "no_surprising_player_today"
+
+
+def test_answer_guess_the_player_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/guess-the-player/answer", json={"pick_id": "abc", "player_id": "1"})
+    assert response.status_code == 401
+
+
+def test_answer_guess_the_player_rejects_missing_fields(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/guess-the-player/answer",
+            json={"pick_id": "", "player_id": ""},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_answer_guess_the_player_rejects_a_stale_pick_id(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch(
+                "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+            ):
+                response = client.post(
+                    "/v1/guess-the-player/answer",
+                    json={"pick_id": "not-todays-pick", "player_id": "1"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 409
+
+
+def test_answer_guess_the_player_correct_increments_the_real_streak(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {"user_id": "user-123", "current_streak": 2, "best_streak": 4, "last_pick_id": "yesterdays-pick", "last_result": "correct"}
+    ]
+    upsert_response = Mock(status_code=201)
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+                with patch(
+                    "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+                ):
+                    response = client.post(
+                        "/v1/guess-the-player/answer",
+                        json={"pick_id": _real_guess_the_player_pick_id(), "player_id": "1"},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["correct"] is True
+    assert body["already_answered"] is False
+    assert body["correct_player"] == {
+        "player_id": "1",
+        "name": "Bench Runner",
+        "team": "KC",
+        "position": "RB",
+        "tier": "depth",
+    }
+    assert body["streak"] == {"current_streak": 3, "best_streak": 4}
+    write_payload = mock_post.call_args.kwargs["json"]
+    assert write_payload["current_streak"] == 3
+    assert write_payload["best_streak"] == 4
+    assert write_payload["last_result"] == "correct"
+
+
+def test_answer_guess_the_player_incorrect_resets_the_streak(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {"user_id": "user-123", "current_streak": 5, "best_streak": 5, "last_pick_id": "yesterdays-pick", "last_result": "correct"}
+    ]
+    upsert_response = Mock(status_code=201)
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("requests.post", return_value=upsert_response):
+            with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+                with patch(
+                    "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+                ):
+                    response = client.post(
+                        "/v1/guess-the-player/answer",
+                        # Any real option other than the true answer (player 1).
+                        json={"pick_id": _real_guess_the_player_pick_id(), "player_id": "2"},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["correct"] is False
+    assert body["streak"] == {"current_streak": 0, "best_streak": 5}
+
+
+def test_answer_guess_the_player_replays_the_stored_result_for_a_repeat_submission(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    pick_id = _real_guess_the_player_pick_id()
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {"user_id": "user-123", "current_streak": 1, "best_streak": 3, "last_pick_id": pick_id, "last_result": "correct"}
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("requests.post") as mock_post:
+            with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+                with patch(
+                    "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+                ):
+                    # Guessing wrong THIS time must not matter — the day's
+                    # pick was already answered, so the original (correct)
+                    # result replays unchanged and the streak never moves.
+                    response = client.post(
+                        "/v1/guess-the-player/answer",
+                        json={"pick_id": pick_id, "player_id": "2"},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["already_answered"] is True
+    assert body["correct"] is True
+    assert body["streak"] == {"current_streak": 1, "best_streak": 3}
+    mock_post.assert_not_called()
+
+
+def test_answer_guess_the_player_fails_closed_when_table_missing(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=404)
+    streak_rows_response.json.return_value = {}
+    upsert_response = Mock(status_code=404)
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("requests.post", return_value=upsert_response):
+            with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+                with patch(
+                    "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+                ):
+                    response = client.post(
+                        "/v1/guess-the-player/answer",
+                        json={"pick_id": _real_guess_the_player_pick_id(), "player_id": "1"},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    # Never a crash/500 just because the migration hasn't been applied yet.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["correct"] is True
+    # Not durably recorded (table missing) -- the response still reports
+    # the pre-guess streak rather than an un-persisted increment.
+    assert body["streak"] == {"current_streak": 0, "best_streak": 0}

@@ -217,6 +217,73 @@ export interface DashboardResponse {
   entitlement: { is_premium: boolean; visible_count: number; hidden_count: number };
 }
 
+/** GET /v1/guess-the-player's `prompt` — the hidden-identity payload for
+ * today's featured player/week. The real player's name/team are never
+ * present directly here, only buried (indistinguishably from the
+ * distractors) inside `options` — see services/mobile_api_service.py's
+ * _guess_the_player_public_prompt. `stat_line` holds only real per-week
+ * fields this app actually tracks (targets/receptions/rush or pass
+ * attempts) — never a fabricated yards/TD figure, since the backend's
+ * weekly stats cache doesn't retain those at weekly granularity (see
+ * modules/guess_the_player.py's module docstring). */
+export interface GuessThePlayerStatLineItem {
+  label: string;
+  value: number;
+}
+
+export interface GuessThePlayerOption {
+  player_id: string;
+  name: string;
+}
+
+export interface GuessThePlayerPrompt {
+  pick_id: string;
+  season: number;
+  week: number;
+  position: string;
+  /** Raw stored tier string (e.g. "depth") — same shape PlayerAvatar/
+   * resolvePlayerTier already normalize everywhere else, so the prestige
+   * ring can render even before the reveal. */
+  tier: string;
+  stat_line: GuessThePlayerStatLineItem[];
+  fantasy_points_ppr: number;
+  options: GuessThePlayerOption[];
+}
+
+export interface GuessThePlayerStreak {
+  current_streak: number;
+  best_streak: number;
+}
+
+export interface GuessThePlayerCorrectIdentity {
+  player_id: string;
+  name: string;
+  team: string;
+  position: string;
+  tier: string;
+}
+
+export interface GuessThePlayerResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+  prompt: GuessThePlayerPrompt | null;
+  already_answered: boolean;
+  last_result: "correct" | "incorrect" | null;
+  /** Only ever populated when `already_answered` is true — never sent
+   * alongside an unanswered prompt (that would leak the answer). */
+  correct_player: GuessThePlayerCorrectIdentity | null;
+  streak: GuessThePlayerStreak;
+}
+
+export interface GuessThePlayerAnswerResponse {
+  ok: boolean;
+  already_answered: boolean;
+  correct: boolean;
+  correct_player: GuessThePlayerCorrectIdentity;
+  streak: GuessThePlayerStreak;
+}
+
 /** One roster slot on My Team's Roster Core/Depth — mirrors mobile's
  * LineupPlayer (mobile/src/lib/api.ts), the reference implementation for
  * GET .../my-team. `overall_rating` is the 0-99 "OVR" badge, percentiled
@@ -2039,6 +2106,15 @@ export const api = {
     authorizedRequest<DashboardResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/dashboard?lens=${encodeURIComponent(lens)}`,
     ),
+
+  // "Guess the Player" Dashboard mini-game (coridian_, 2026-10-19) —
+  // league-independent, one shared daily pick for every signed-in user.
+  getGuessThePlayer: () => authorizedRequest<GuessThePlayerResponse>("/v1/guess-the-player"),
+  answerGuessThePlayer: (pickId: string, playerId: string) =>
+    authorizedRequest<GuessThePlayerAnswerResponse>("/v1/guess-the-player/answer", {
+      method: "POST",
+      jsonBody: { pick_id: pickId, player_id: playerId },
+    }),
 
   getMyTeam: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<MyTeamResponse>(

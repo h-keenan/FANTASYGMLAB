@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
+import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { WatchListCard } from "@/components/WatchListCard";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
@@ -52,6 +53,14 @@ export function DashboardContent({
       <header className="flex flex-col gap-1">
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
       </header>
+
+      {/* "Guess the Player" mini-game (coridian_, 2026-10-19) — league-
+          independent (one shared daily pick for every signed-in user), so
+          it fetches its own data rather than reading from `data` above.
+          Renders nothing while loading, on fetch failure, or once
+          dismissed — never blocks or visually disrupts the real Game Plan
+          content below it. */}
+      <GuessThePlayerCard />
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
         <h2 id="game-plan-heading" style={{ font: "var(--type-section-title)" }}>
