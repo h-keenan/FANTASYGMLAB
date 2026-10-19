@@ -34,14 +34,7 @@ export function WatchListCard({
 }) {
   if (items.length === 0) return null;
   return (
-    <article
-      className="flex flex-col"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
+    <article className="glass-surface flex flex-col" style={{ overflow: "hidden" }}>
       {items.map((item, index) => {
         const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
         return (

@@ -72,7 +72,7 @@ function LeagueSwitcherButton({ leagueId, leagueName }: { leagueId: string; leag
               of the viewport (coridian_, 2026-10-18, screenshot: "Switch
               league button clips off screen"). left-0 keeps it growing
               rightward into the header's own open space instead. */}
-          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 w-56" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+          <div role="menu" className="glass-surface absolute left-0 top-full mt-1 flex flex-col py-1 w-56" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {leagues.length === 0 ? (
               <span className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 No other saved leagues
@@ -142,7 +142,7 @@ function EvaluationLensButton({ leagueId }: { leagueId: string }) {
               row, so on a narrow phone it can land near the left edge of
               its own wrapped row — a right-0 anchored w-64 menu had
               nowhere to grow but off the left edge of the viewport. */}
-          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 w-64" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+          <div role="menu" className="glass-surface absolute left-0 top-full mt-1 flex flex-col py-1 w-64" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {VALUATION_LENS_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -286,10 +286,8 @@ export function Header() {
               />
               <div
                 role="menu"
-                className="absolute right-0 top-full mt-1 flex flex-col py-1 min-w-[12rem]"
+                className="glass-surface absolute right-0 top-full mt-1 flex flex-col py-1 min-w-[12rem]"
                 style={{
-                  background: "var(--color-surface-secondary)",
-                  border: "var(--border-width-default) solid var(--color-border)",
                   zIndex: 50,
                   // This button is always the last header item, so right-0
                   // is correct (nothing clips today), but clamping width is
