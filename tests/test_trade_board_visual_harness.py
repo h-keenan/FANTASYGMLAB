@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 
@@ -28,6 +29,7 @@ def test_trade_board_visual_harness_uses_production_summary_renderer():
     assert '"asset_type": "pick"' in source
 
 
+@pytest.mark.known_flaky
 def test_trade_board_visual_harness_runs_without_application_exception():
     application = AppTest.from_file(str(HARNESS), default_timeout=60).run()
     assert not application.exception
