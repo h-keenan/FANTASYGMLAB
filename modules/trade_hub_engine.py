@@ -31,9 +31,7 @@ import pandas as pd
 
 from modules import league_rankings
 from modules import league_value_settings
-from modules import player_eligibility
 from modules import player_quick_view
-from modules import rankings
 from modules import redis_cache
 from modules import sleeper
 from modules import trade_hub_ui
@@ -569,16 +567,22 @@ def _generate_trade_idea_records_cached(
         return []
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(players_db_path)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(players_db_path)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="trade_hub_ideas_cache", league=league
+    # coridian_, 2026-10-19: "Dashboard takes too long to load" — this used
+    # to run its own load -> filter -> apply_valuation_lens pass here, the
+    # exact same "asker-independent, redone from scratch" cost
+    # build_valued_players_frame_cached already exists to fix (same 30s
+    # Redis-backed cache league_rankings/waivers_ui/playoff_simulator and
+    # this same function's own df_summary call just below already share).
+    # get_league_dashboard had already computed and cached this identical
+    # (league_id, lens) frame moments earlier in the same request via that
+    # cached front door, but this call site never reused it, so Dashboard's
+    # trade tile paid the full valuation pass a second time on any cache
+    # miss of trade_hub_ideas's own separate 30s bucket.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
     )
-    if players_df.empty:
+    if valued.empty:
         return []
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     rosters = sleeper.get_rosters(league_id)
     # coridian_, 2026-10-18: "it still takes too long to load" — Dashboard's
@@ -715,16 +719,18 @@ def generate_trade_finder_records(
         return []
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(players_db_path)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(players_db_path)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="trade_finder", league=league
+    # Deliberately not routed through this module's own 30s trade-ideas
+    # cache (see docstring above), but the expensive valuation-lens pass
+    # itself is still worth sharing with whatever ELSE just asked about
+    # this same (league_id, lens) -- Dashboard, Trade Hub, League Rankings,
+    # Draft Center, Waivers all already reuse this exact cached frame
+    # (league_value_settings.build_valued_players_frame_cached) rather than
+    # each re-running load -> filter -> apply_valuation_lens from scratch.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
     )
-    if players_df.empty:
+    if valued.empty:
         return []
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     rosters = sleeper.get_rosters(league_id)
     return generate_trade_idea_records(
