@@ -72,6 +72,31 @@ def test_news_alert_tile_preserves_existing_canonical_source_fields():
     assert tile["news_article_title"] == "Ashton Jeanty injury update"
 
 
+def test_news_alert_tile_sets_route_player_name_alongside_route_player_id():
+    # coridian_: a free-agent injury watch tile ("KaVontae Turpin ruled
+    # out") had no player card despite a resolved player_id, because this
+    # tile only ever put the name in the display-only news_player_name
+    # field. BriefingItemPlayers.tsx requires route_player_name AND
+    # route_player_id truthy together to render an identity card.
+    event = news_intelligence.FootballEvent(
+        event_type="INJURY",
+        player_name="KaVontae Turpin",
+        player_id="turpin-1",
+        source="Fixture Wire",
+    )
+    tile = news_intelligence.NewsAlert(
+        event=event,
+        severity="HIGH",
+        should_alert=True,
+        title="KaVontae Turpin ruled out",
+        body="Report",
+        why_care="Affects the free-agent pool.",
+        action_hint="Monitor.",
+    ).as_tile()
+    assert tile["route_player_id"] == "turpin-1"
+    assert tile["route_player_name"] == "KaVontae Turpin"
+
+
 def test_same_canonical_event_resolves_for_player_and_dedupes():
     state = _state()
     nc.publish_activity_inventory(state, [_tile()], league_id="L1")
