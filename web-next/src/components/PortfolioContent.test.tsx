@@ -100,6 +100,19 @@ describe("PortfolioContent", () => {
     expect(screen.getByText("Open Dynasty Overlords Dashboard →")).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-19 (screenshot): "this is a trade and a usage
+  // alert and something else, but they're not clearly segregated, and so
+  // it all looks one interconnected piece of information"
+  it("separates a league's stacked signals with a real divider, not just a category chip", () => {
+    render(<PortfolioContent data={BASE_RESPONSE} />);
+
+    const firstSignal = screen.getByText("Trade away Test Player before Week 10").closest("div.flex.flex-col.gap-1\\.5");
+    const secondSignal = screen.getByText("Test Backup is questionable for Sunday").closest("div.flex.flex-col.gap-1\\.5");
+
+    expect((firstSignal as HTMLElement).style.borderTop).toBe("");
+    expect((secondSignal as HTMLElement).style.borderTop).toContain("var(--color-border)");
+  });
+
   // coridian_, 2026-10-18, screenshot: "not specific just says watch for no
   // reason" — a signal whose reason text alone doesn't name its subject.
   it("shows the signal's headline, not just its reason text", () => {

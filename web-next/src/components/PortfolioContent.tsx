@@ -43,7 +43,7 @@ function rankLabel(league: PortfolioLeague): string {
   return `Roster Power ${formatRank(league.power_rank, league.power_rank_tied)}`;
 }
 
-function SignalRow({ item }: { item: BriefingItem }) {
+function SignalRow({ item, showDivider }: { item: BriefingItem; showDivider: boolean }) {
   const color = categoryColorVar(item.category);
   const label = categoryLabel(item.category);
   // coridian_, 2026-10-18, screenshot: "not specific just says watch for no
@@ -70,7 +70,14 @@ function SignalRow({ item }: { item: BriefingItem }) {
     showReason && !(item.category === "watch" && hasPlayerVisual && (reasonText.includes(" | ") || reasonText.includes(" - ")));
 
   return (
-    <div className="flex flex-col gap-1.5 mt-2">
+    <div
+      className="flex flex-col gap-1.5 mt-2"
+      style={
+        showDivider
+          ? { paddingTop: "var(--space-sm)", borderTop: "var(--border-width-default) solid var(--color-border)" }
+          : undefined
+      }
+    >
       <div className="flex items-start gap-2">
         <span
           className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
@@ -213,8 +220,16 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
 
       {signals.length > 0 ? (
         <div className="flex flex-col">
+          {/* coridian_, 2026-10-19 (screenshot): "this is a trade and a
+              usage alert and something else, but they're not clearly
+              segregated, and so it all looks one interconnected piece of
+              information" — Dashboard's own Today's Game Plan already
+              separates TOP PRIORITY/WATCH cards with a real divider
+              (GamePlanCard/WatchListCard each render as their own bordered
+              card); this compact Portfolio list stacked the same signals
+              with nothing but a category chip to tell them apart. */}
           {signals.map((item, index) => (
-            <SignalRow key={item.recommendation_id || `${item.category}-${index}`} item={item} />
+            <SignalRow key={item.recommendation_id || `${item.category}-${index}`} item={item} showDivider={index > 0} />
           ))}
         </div>
       ) : (
