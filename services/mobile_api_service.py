@@ -6694,6 +6694,19 @@ def get_league_dashboard(
     if my_roster is None:
         return _empty_dashboard_response(reason)
 
+    # coridian_, 2026-10-19: real "timed out"/slow-load complaints led to a
+    # perf audit that found this check used to run AFTER sleeper.get_league
+    # and the full build_valued_players_frame_cached pipeline (valuing the
+    # WHOLE league's eligible player pool) — real, measured production
+    # latency: an empty-roster caller (still drafting, or genuinely no
+    # roster) paid that entire cost just to then throw it away on this
+    # early return. roster_player_ids only ever depends on my_roster, which
+    # is already resolved above — moved first so this cheapest possible
+    # response path no longer pays for work it never uses.
+    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    if not roster_player_ids:
+        return _empty_dashboard_response("empty_roster")
+
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
@@ -6710,10 +6723,6 @@ def get_league_dashboard(
         return _empty_dashboard_response("no_player_data")
 
     score_field = league_value_settings.valuation_score_field(lens)
-
-    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
-    if not roster_player_ids:
-        return _empty_dashboard_response("empty_roster")
 
     rosters = sleeper.get_rosters(league_id)
     all_rostered_player_ids: set[str] = set()
