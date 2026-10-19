@@ -4,6 +4,7 @@ import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { WatchListCard } from "@/components/WatchListCard";
+import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -59,7 +60,17 @@ export function DashboardContent({
 
         {data.quiet || data.items.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            No urgent roster issues right now.
+            {/* Zach's repro: a league still mid-draft resolves to an empty
+                roster (Sleeper doesn't populate roster.players until the
+                draft completes), which previously crashed this page
+                entirely (see services/mobile_api_service.py's
+                get_league_dashboard fix). Now that it returns cleanly,
+                this reason deserves a message that actually explains why,
+                not the generic "no urgent issues" line. */}
+            {notReadyReasonMessage(data.reason, {
+              linkAccount: "Connect your Sleeper account to see your Game Plan.",
+              emptyRoster: "Your roster doesn't have any players yet — this is expected if your draft is still in progress.",
+            }) || "No urgent roster issues right now."}
           </p>
         ) : (
           <div className="flex flex-col gap-3">

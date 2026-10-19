@@ -1826,6 +1826,16 @@ export interface LiveDraftRankingRow {
   rank_scoring_format: string;
   rank_unavailable_reason: string;
   base_value: number | null;
+  // Score-breakdown components the classic Streamlit page's "Score
+  // breakdown" expander reads (base_value + these five sum into
+  // league_adjusted_draft_score) — ported here so Live Draft no longer
+  // needs to link out to that page for the detail (coridian_: "another
+  // redirect to the classic website to view the full live draft").
+  format_adjustment: number | null;
+  scarcity_score: number | null;
+  roster_fit_score: number | null;
+  age_strategy_adjustment: number | null;
+  availability_adjustment: number | null;
   league_adjusted_draft_score: number | null;
   overall_rating: number | null;
   // Always 0 straight off this endpoint — there's no server session to

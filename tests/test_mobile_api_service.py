@@ -1300,6 +1300,20 @@ def test_live_draft_state_returns_a_real_built_snapshot(monkeypatch):
     assert body["recommendations"][0]["overall_rating"] is not None
     assert {row["player_id"] for row in body["rankings"]} == set(fake_pool["player_id"])
     assert all(row["overall_rating"] is not None for row in body["rankings"])
+    # coridian_: "another redirect to the classic website to view the full
+    # live draft" — the score-breakdown components modules/live_draft.py
+    # already computes (and the classic Streamlit page's own "Score
+    # breakdown" expander already reads) must come through the wire too,
+    # not just the final league_adjusted_draft_score.
+    for row in body["rankings"]:
+        for field in (
+            "format_adjustment",
+            "scarcity_score",
+            "roster_fit_score",
+            "age_strategy_adjustment",
+            "availability_adjustment",
+        ):
+            assert field in row
     assert {row["roster_id"] for row in body["team_rankings"]} == {1, 2}
     assert body["pick_rows"] == []
 
@@ -5720,6 +5734,39 @@ def test_dashboard_reports_no_linked_username(monkeypatch):
     assert body["ok"] is True
     assert body["quiet"] is True
     assert body["reason"] == "no_sleeper_username_linked"
+    # Zach, screenshot: a league still mid-draft resolved to this exact
+    # "no roster yet" shape and crashed the Dashboard client with "Something
+    # went wrong" — DashboardContent.tsx reads data.entitlement.hidden_count
+    # unconditionally, and DashboardResponse's own TS type declares
+    # entitlement/quiet_reason as always-present, but every early-return
+    # branch previously omitted both. Must match the full response's exact
+    # contract (web-next/src/lib/api.ts's DashboardResponse), not just be
+    # present in some shape.
+    assert body["quiet_reason"] == "no_sleeper_username_linked"
+    assert body["entitlement"] == {"is_premium": False, "visible_count": 0, "hidden_count": 0}
+
+
+def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monkeypatch):
+    """Same contract check as test_dashboard_reports_no_linked_username, but
+    for a Pro caller — is_premium must reflect their real tier even on an
+    early-return branch, not a hardcoded False."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/dashboard",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["entitlement"] == {"is_premium": True, "visible_count": 0, "hidden_count": 0}
 
 
 def test_dashboard_returns_real_briefing_items(monkeypatch):
