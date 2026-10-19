@@ -42,7 +42,7 @@ Expand beyond the existing "follow trade ideas" feature:
 Mini dashboard widget, filtered to only very-high-priority items so it
 doesn't get cluttered.
 
-### Guess-the-player mini game
+### Guess-the-player mini game (up next, coridian_ 2026-10-19: "add guess the player to the queue")
 Quick, dismissible pop-up: "whose stats are these?" using real last-week
 stats, full player card shown but photo/name blacked out (tier/prestige
 ring still visible). Cheap to build off data the app already computes;
@@ -53,7 +53,18 @@ Let people create/host leagues on FantasyDesk itself, not just import from
 Sleeper. Needs real legal/regulatory research (fantasy-sports hosting
 legality varies by state) and a stats-sourcing plan independent of
 Sleeper's API. Big bet, not technically hard once researched, given the
-app's infrastructure already exists. Pairs with:
+app's infrastructure already exists.
+
+coridian_, 2026-10-19: "we would not have anything to do with the money
+aspect if that's the blocker for it" — league buy-ins/payouts would happen
+user-to-user, off-platform, not through FantasyDesk. Meaningfully smaller
+legal lift than running escrow/payments ourselves (no money-transmission
+licensing), but still needs real research, not assumed clean — gambling-law
+classification for a fantasy-sports contest can turn on more than who
+moves the money (state-by-state skill-vs-chance tests, entry-fee
+structuring, etc.).
+
+Pairs with:
 - Referral vouchers for whoever creates a league once it hits a join
   threshold — a real growth lever once hosting exists.
 
