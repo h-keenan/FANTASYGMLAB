@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { api, type PlayerAward, type QuickViewResponse, type WeeklyStatPoint } from "@/lib/api";
+import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { ModelRadarChart } from "@/components/ModelRadarChart";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { PositionBadge } from "@/components/PositionBadge";
-import { WeeklyPointsPanel } from "@/components/WeeklyPointsChart";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
@@ -30,12 +30,17 @@ import {
  * Deliberately a condensed MODAL, not mobile's full-screen PlayerDetail
  * push: coridian_ asked for "the popups like pqv", and app.py's own PQV is
  * itself a dialog (DECISION_SURFACE_DIALOG_CSS) with a separate, bigger
- * "Open Profile" destination for the full dossier — web-next has no such
- * full-profile route yet, so this modal is deliberately scoped to what a
- * *quick* look needs: identity, value/rank, health/usage signals, season
- * stats with position percentiles, the Model sub-rating chips + Decision
- * Fit sentence, verified awards, and bio — not career season-by-season
- * history or the news/schedule tabs mobile's deeper screen also carries.
+ * "Open Profile" destination for the full dossier. This modal stays scoped
+ * to what a *quick* look needs: identity, value/rank, health/usage signals,
+ * season stats with position percentiles, the Model sub-rating chips +
+ * Decision Fit sentence, verified awards, and bio — not career
+ * season-by-season history or the schedule tab mobile's deeper screen also
+ * carries. The "Open Full Profile" link in this modal's actions row (below)
+ * is the real full-profile destination (players/[leagueId]/[playerId],
+ * PlayerProfileContent.tsx) — mobile's PlayerDetailScreen.tsx's Stats/
+ * Trends/Schedule/Career/Model tabs, ported (coridian_, 2026-10-19: "the
+ * pqv on the app has tabs that the site doesnt. Thats a consistency
+ * error" — see docs/roadmap.md's "PQV parity gap" entry).
  *
  * Identity (name/team/position/photo) is NOT part of GET .../quick-view's
  * response (that endpoint is league-independent and assumes the caller
@@ -57,16 +62,6 @@ export function PlayerQuickView({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
-  const [weeklyStats, setWeeklyStats] = useState<{ season: number; weeks: WeeklyStatPoint[] } | null>(null);
-  // null = backend default (the current season). coridian_, 2026-10-19:
-  // "need to see other years week by week" — the endpoint and client
-  // already supported a `season` argument (Player Compare's dual chart
-  // already passes one per side), just never had a selector here.
-  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
-  // The real current season, learned from the backend's own default-season
-  // response rather than guessed client-side — anchors the "how far back
-  // can I go" selector even after the user has picked an older season.
-  const [currentSeasonAnchor, setCurrentSeasonAnchor] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Swipe-down-to-dismiss, via the drag handle only (not the whole modal —
@@ -132,31 +127,6 @@ export function PlayerQuickView({
       cancelled = true;
     };
   }, [identity.player_id]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    api
-      .getPlayerWeeklyStats(identity.player_id, selectedSeason ?? undefined)
-      .then((response) => {
-        if (cancelled) return;
-        setWeeklyStats({ season: response.season, weeks: response.weeks });
-        if (selectedSeason == null) setCurrentSeasonAnchor(response.season);
-      })
-      .catch(() => {
-        // Soft-fail: the rest of the modal is still useful without this.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [identity.player_id, selectedSeason]);
-
-  // mobile_api_service.py's own bound: MAX_WEEKLY_STATS_SEASONS_BACK = 7.
-  const WEEKLY_STATS_SEASONS_BACK = 7;
-  const seasonOptions = currentSeasonAnchor
-    ? Array.from({ length: WEEKLY_STATS_SEASONS_BACK + 1 }, (_, i) => currentSeasonAnchor - i)
-    : [];
 
   // Focus the close button on open, restore body scroll on close — the
   // minimal accessible-modal contract (focus moves into the dialog, page
@@ -360,38 +330,11 @@ export function PlayerQuickView({
                 </section>
               ) : null}
 
-              {weeklyStats ? (
-                <section className="pqv-stat-season">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3>Week by Week · {weeklyStats.season}</h3>
-                    {seasonOptions.length > 1 ? (
-                      <select
-                        aria-label="Season"
-                        value={selectedSeason ?? currentSeasonAnchor ?? ""}
-                        onChange={(event) => setSelectedSeason(Number(event.target.value))}
-                        className="text-xs px-2 py-1"
-                        style={{
-                          background: "var(--color-surface-muted)",
-                          color: "var(--color-text-secondary)",
-                          border: "var(--border-width-default) solid var(--color-border)",
-                        }}
-                      >
-                        {seasonOptions.map((season) => (
-                          <option key={season} value={season}>
-                            {season}
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
-                  </div>
-                  <WeeklyPointsPanel
-                    name={identity.name || "This player"}
-                    weeks={weeklyStats.weeks}
-                    season={weeklyStats.season}
-                    gradientId="pqv-weekly-fill"
-                  />
-                </section>
-              ) : null}
+              <PlayerTrendsPanel
+                playerId={identity.player_id}
+                name={identity.name || "This player"}
+                gradientId="pqv-weekly-fill"
+              />
 
               {stats?.seasons.map((season) => (
                 <section key={season.label} className="pqv-stat-season">
@@ -433,6 +376,20 @@ export function PlayerQuickView({
 
         {identity.leagueId ? (
           <div className="pqv-actions">
+            {/* coridian_, 2026-10-19: "the pqv on the app has tabs that the
+                site doesnt. Thats a consistency error" — this is the real
+                product fix: a destination for mobile's Stats/Trends/
+                Schedule/Career/Model tabs, which this condensed modal
+                deliberately never carries (see this file's own header doc
+                comment). */}
+            <a
+              className="pqv-action-link"
+              href={`/players/${encodeURIComponent(identity.leagueId)}/${encodeURIComponent(
+                identity.player_id,
+              )}?name=${encodeURIComponent(identity.leagueName || "")}`}
+            >
+              Open Full Profile
+            </a>
             <a
               className="pqv-action-link"
               href={`/player-compare/${encodeURIComponent(identity.leagueId)}?a=${encodeURIComponent(
@@ -449,7 +406,11 @@ export function PlayerQuickView({
   );
 }
 
-function StatGroup({
+/** Exported (not just this modal's private renderer) so the full Player
+ * Profile page (players/[leagueId]/[playerId]) can reuse the identical
+ * stat-row + percentile-bar markup for its Stats tab instead of a second
+ * copy — see that page's own module doc comment. */
+export function StatGroup({
   title,
   items,
   hideTitle = false,
@@ -482,7 +443,9 @@ function StatGroup({
   );
 }
 
-function SubRatingRow({
+/** Exported for the full Player Profile page's Model tab — same
+ * chip-row/radar-chart renderer, not a second copy. */
+export function SubRatingRow({
   model,
 }: {
   model: {
@@ -523,7 +486,10 @@ function SubRatingRow({
   );
 }
 
-function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
+/** Exported for the full Player Profile page, which (like mobile's own
+ * PlayerDetailScreen) shows Awards tab-agnostically rather than inventing a
+ * sixth tab for it. */
+export function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
   return (
     <section className="pqv-awards" aria-label="Player awards">
       <h3>Awards</h3>
@@ -539,7 +505,9 @@ function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
   );
 }
 
-function BioGrid({
+/** Exported for the full Player Profile page, same tab-agnostic treatment
+ * as AwardsStrip above. */
+export function BioGrid({
   bio,
 }: {
   bio: {
