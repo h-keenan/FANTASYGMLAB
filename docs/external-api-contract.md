@@ -3,9 +3,9 @@
 Phase 1 of coridian_'s external content-posting bot wish list: real API-key
 auth (not a per-user Supabase session — a bot has no user account) plus a
 documented weekly-projections endpoint. Phase 2 (structured news evidence
-with a conservative retraction/supersession signal) is also covered below.
-One more phase (persisted rating-change history) is separate, larger, later
-work — not covered by this document.
+with a conservative retraction/supersession signal) and Phase 3 (persisted
+rating-change history) are also covered below — this is now the complete
+wish list.
 
 All `/v1/external/*` routes live in `services/mobile_api_service.py` and are
 served by the same `fantasygm-lab-mobile-api` Render service as the mobile
@@ -375,6 +375,150 @@ versa).
   `superseded_by` as "not flagged by this detector," not as "confirmed
   still accurate."
 
+## `GET /v1/external/players/{player_id}/rating-history`
+
+Phase 3, last and biggest piece of coridian_'s external content-posting bot
+wish list: previous/current FantasyDesk overall rating, the delta between
+them, the current snapshot's effective date, and an actual, supplied
+explanation.
+
+This is fundamentally different from every endpoint above: Phases 1 and 2
+compute their answer fresh on every request (nothing is persisted). This
+endpoint instead reads a **real, persisted daily time series** —
+`modules/player_rating_history.py` writes one row per player, once a day,
+to a dedicated Supabase table (`docs/supabase_player_rating_snapshots.sql`),
+via its own standalone scheduled job
+(`.github/workflows/player-rating-snapshot.yml`, daily at 07:00 UTC). The
+rating stored is the exact same 0-99 "overall rating" badge every other
+screen in this app already shows
+(`modules.player_quick_view.overall_ratings_for_pool`), computed over the
+same canonical, no-league-context, whole-universe-of-fantasy-relevant-
+players pool `services/fantasy_content.py`'s public content feed already
+builds — never a second, independently-derived rating.
+
+**Response fields**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `player_id` | string | Echoes the requested player id. |
+| `status` | string | `"ok"` (2+ real snapshots exist) or `"insufficient_history"` (see below). |
+| `previous_rating` | integer \| null | The prior daily snapshot's 0-99 rating. `null` unless `status` is `"ok"`. |
+| `current_rating` | integer \| null | The most recent daily snapshot's 0-99 rating. `null` only when there is no snapshot at all for this player yet. |
+| `delta` | integer \| null | `current_rating - previous_rating`. `null` unless `status` is `"ok"`. |
+| `effective_at` | string \| null | The most recent snapshot's calendar date (`YYYY-MM-DD`, UTC) — when `current_rating` became effective. `null` only when there is no snapshot at all. |
+| `explanation` | string \| null | A short, honest, human-readable reason for the change (see "Explanation logic" below). `null` unless `status` is `"ok"`. |
+
+This endpoint always returns HTTP `200` once authenticated. There is no
+"unknown player" 4xx — an id with zero real snapshots looks identical to
+any other `insufficient_history` response (every field null), the same
+honesty-over-error discipline every other endpoint in this contract uses.
+
+### Example: `"ok"` — a real multi-day comparison
+
+`GET /v1/external/players/4046/rating-history`
+
+```json
+{
+  "player_id": "4046",
+  "status": "ok",
+  "previous_rating": 80,
+  "current_rating": 84,
+  "delta": 4,
+  "effective_at": "2026-10-19",
+  "explanation": "Overall rating increased 4 points since the last snapshot. No significant driver identified for this change."
+}
+```
+
+A case where a real, direction-matching news event landed inside the
+snapshot window cites it directly instead of the generic fallback:
+
+```json
+{
+  "player_id": "4046",
+  "status": "ok",
+  "previous_rating": 85,
+  "current_rating": 72,
+  "delta": -13,
+  "effective_at": "2026-10-19",
+  "explanation": "Overall rating decreased 13 points since the last snapshot, coinciding with recent news: Inactive: Nico Collins ruled out for Sunday with hamstring injury [credible_observation; non-speculative]"
+}
+```
+
+### Example: `"insufficient_history"` — not enough real data yet
+
+Zero snapshots exist for this player at all (e.g. the migration was just
+run, or the daily job hasn't executed yet):
+
+```json
+{
+  "player_id": "9999",
+  "status": "insufficient_history",
+  "previous_rating": null,
+  "current_rating": null,
+  "delta": null,
+  "effective_at": null,
+  "explanation": null
+}
+```
+
+Exactly one real snapshot exists (the sweep has run once, but there's
+nothing yet to compare it against) — `current_rating`/`effective_at` are
+real and reported, but nothing else is fabricated:
+
+```json
+{
+  "player_id": "4046",
+  "status": "insufficient_history",
+  "previous_rating": null,
+  "current_rating": 80,
+  "delta": null,
+  "effective_at": "2026-10-19",
+  "explanation": null
+}
+```
+
+### Real data only begins accumulating once the scheduled job runs post-merge
+
+**There is no real rating history the moment this ships.** Until
+`docs/supabase_player_rating_snapshots.sql` has been run against Supabase
+*and* `.github/workflows/player-rating-snapshot.yml` has actually executed
+on its daily schedule for **2 or more days**, every player's rating-history
+request returns `status: "insufficient_history"` — this is expected,
+correct behavior, not a bug. Nothing in this endpoint, the storage module,
+or the scheduled job ever fabricates a baseline, a fake prior snapshot, or
+a delta computed from nothing — the same honesty discipline Phase 1's
+non-`"ok"` projection statuses and Phase 2's supersession scope already
+establish above.
+
+### Explanation logic
+
+The `explanation` field is a simple, direction-gated template — deliberately
+**not** a free-form generated narrative, and never a claim this codebase
+can't actually back up:
+
+1. `delta == 0`: `"No meaningful rating change since the last snapshot."`
+2. Otherwise, the template states the direction and magnitude
+   (`"Overall rating {increased|decreased} N point(s) since the last
+   snapshot"`), then:
+   - If a real, actionable news event about this player — reusing Phase
+     2's own `modules.news_intelligence`/`modules.news` building blocks,
+     no second parallel pipeline — has an `event_direction` that agrees
+     with the rating's own direction (an "up" event for an increase, a
+     "down" event for a decrease) and was published inside this snapshot's
+     window (previous `effective_at` through current `effective_at`), its
+     real description is cited by name: `", coinciding with recent news:
+     <description>"`.
+   - Otherwise, the honest fallback: `"No significant driver identified
+     for this change."`
+
+This mirrors `modules.player_value_history`'s own "only attribute a change
+to a signal that actually corroborates it, otherwise say 'Other factors'"
+discipline, applied to the 0-99 rating badge instead of the raw composite
+score. A recent on-field production trend is a real signal this codebase
+could add as a second corroborating factor in a future pass, but it is
+deliberately **not** included yet — the explanation only ever cites a
+signal that is directly, mechanically checkable today.
+
 ## Change history
 
 - `v1` (2026-10-19): initial release — single-player and full-week-slate
@@ -384,3 +528,9 @@ versa).
   confidence/corroboration, and the narrow supersession signal described
   above. Purely additive — no existing field, status value, or route
   changed.
+- `v1` (2026-10-19): added `GET /v1/external/players/{player_id}/rating-history`
+  — persisted previous/current overall rating, delta, effective date, and
+  an honest, template-driven explanation, backed by a new daily Supabase
+  snapshot table and scheduled job. Purely additive — no existing field,
+  status value, or route changed. Real history only begins accumulating
+  once the scheduled job has run for 2+ days post-merge (see above).

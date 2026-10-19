@@ -1,0 +1,52 @@
+name: Player Rating Snapshot
+
+# Phase 3 of coridian_'s external content-posting bot wish list: a real,
+# persisted daily time series of each player's 0-99 overall rating (see
+# modules/player_rating_history.py and docs/external-api-contract.md's
+# GET /v1/external/players/{id}/rating-history). Same "standalone GitHub
+# Actions job, own Supabase service-role access" shape as
+# trade-outcome-result-sweep.yml — a bug here can't affect that sweep (or
+# any other scheduled job in this repo) or vice versa.
+#
+# Schedule picked to avoid colliding with every other daily/6-hourly job in
+# this repo:
+#   - push-trigger-sweep.yml / injury-status-sync.yml: every 30 minutes
+#   - players-db-refresh.yml: every 6 hours, on the hour (0/6/12/18 UTC)
+#   - trade-outcome-result-sweep.yml: daily at 13:00 UTC
+# 07:00 UTC runs once a day, shortly after the 06:00 players-db-refresh
+# pass, so the canonical pool this reads is as fresh as possible, and well
+# clear of trade-outcome-result-sweep's 13:00 slot.
+#
+# Required GitHub repo/environment secrets (same names every other
+# Supabase-backed scheduled job in this repo already uses):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: player-rating-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run player rating snapshot sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_player_rating_snapshot.py
