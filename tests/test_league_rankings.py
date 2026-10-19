@@ -523,6 +523,83 @@ def test_build_league_summary_and_draft_capital_cached_concurrent_misses_single_
     assert all(summary.iloc[0]["league_id"] == league_id for summary, _ in results)
 
 
+def test_league_rankings_cached_builders_reuse_the_shared_valued_players_frame_cache(monkeypatch):
+    """coridian_, 2026-10-19: real "Portfolio takes 18+ seconds, repeatable"
+    report on a real 12-team/32-roster dynasty league led to a perf audit.
+
+    Profiled against a realistic 12-team fixture: _build_league_summary_and_
+    draft_capital_cached, _build_league_rankings_frame_cached, and
+    _build_roster_health_metrics_frame_cached each used to run their OWN
+    private load -> filter -> apply_valuation_lens pass instead of reusing
+    league_value_settings.build_valued_players_frame_cached's already-shared
+    cache entry for the identical (league_id, lens, players_db_path) inputs
+    -- an exact duplicate of a problem modules.trade_hub_engine's own
+    generate_trade_idea_records_cached already got fixed for. Confirmed via
+    call-count instrumentation (apply_valuation_lens, the real expensive
+    step -- ~90-370ms per call against this app's real player pool at
+    realistic league scale): calling all three cached front doors for the
+    SAME key used to run that pass 3 times even with Redis fully healthy;
+    it must now run it exactly once, with the other two served from the
+    one shared cache entry."""
+
+    monkeypatch.setattr(sleeper, "get_league", lambda _league_id: {"league_id": "x", "settings": {}})
+    monkeypatch.setattr(
+        rankings, "load_players", lambda _db_path: pd.DataFrame([{"player_id": "p1", "name": "P1"}])
+    )
+    monkeypatch.setattr(
+        player_eligibility, "filter_current_fantasy_players", lambda df, **_kwargs: df
+    )
+    monkeypatch.setattr(league_value_settings, "valuation_score_field", lambda _lens: "value_score")
+
+    call_count = 0
+    original_apply_valuation_lens = league_value_settings.apply_valuation_lens
+
+    def _counting_apply_valuation_lens(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original_apply_valuation_lens(*args, **kwargs)
+
+    monkeypatch.setattr(league_value_settings, "apply_valuation_lens", _counting_apply_valuation_lens)
+    monkeypatch.setattr(
+        league_rankings,
+        "build_league_summary_and_draft_capital",
+        lambda _valued, league_id, **_kwargs: (
+            pd.DataFrame([{"league_id": league_id}]),
+            pd.DataFrame([{"league_id": league_id}]),
+        ),
+    )
+    monkeypatch.setattr(
+        league_rankings,
+        "build_league_rankings_frame",
+        lambda _valued, league_id, **_kwargs: pd.DataFrame([{"league_id": league_id}]),
+    )
+    monkeypatch.setattr(
+        league_rankings,
+        "build_roster_health_metrics_frame",
+        lambda _valued, league_id, **_kwargs: pd.DataFrame([{"league_id": league_id}]),
+    )
+
+    league_id = "test-shared-valuation-cache-reuse"
+    summary, draft_capital = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+    )
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+    )
+    health_frame = league_rankings.build_roster_health_metrics_frame_cached(
+        league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+    )
+
+    assert not summary.empty and not draft_capital.empty
+    assert not rankings_frame.empty
+    assert not health_frame.empty
+    assert call_count == 1, (
+        "three cached league_rankings front doors asking about the exact same "
+        "(league_id, lens, players_db_path) must share ONE full-pool "
+        "apply_valuation_lens pass, not run it once per front door"
+    )
+
+
 # --- Mobile/web archetype parity -------------------------------------------
 #
 # Regression for the gap a prior audit found: services/mobile_api_service.py's
