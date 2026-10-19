@@ -247,15 +247,29 @@ export function PlayerQuickView({
 
         <div className="pqv-scroll">
 
-        {/* coridian_, 2026-10-18: "rework the top of the pqv with a bigger
-            pfp and reorganized top" — the 88px avatar sat beside a narrow
-            column squeezing name, meta, the OVR gauge + rank cells, AND the
-            chip row all into the same cramped width. Bigger avatar (112px)
-            now anchors just identity (name/meta) beside it; the rank strip
-            and signal chips drop below as their own full-width rows
-            instead of fighting the avatar for horizontal space. */}
+        {/* coridian_, 2026-10-19: "theres nothing to the right of pfp and
+            name and thats just wasted space. also the elite tag should be
+            right under pfp" / "Overall and usage and anything else thats
+            up there and not positioned properly" — the prior layout (PR
+            from 2026-10-18) fixed the avatar/copy from fighting the rank
+            strip and chips for width, but then left that same width empty
+            below the name on anything wider than the ~480px bottom-sheet
+            breakpoint. Tier now sits under the avatar (matching its own
+            prestige-ring color, same as before); OVR gauge, rank cells,
+            and the usage-trend chip move up beside the name/meta instead
+            of dropping to their own full-width rows underneath. */}
         <header className="pqv-hero">
-          <PlayerAvatar playerId={identity.player_id} tier={identity.tier} size={112} />
+          <div className="pqv-hero-avatar-col">
+            <PlayerAvatar playerId={identity.player_id} tier={identity.tier} size={112} />
+            {identity.tier ? (
+              <span
+                className="pqv-chip pqv-tier-chip"
+                style={{ borderColor: `var(${resolvePlayerTier(identity.tier).colorVar})`, color: `var(${resolvePlayerTier(identity.tier).colorVar})` }}
+              >
+                {identity.tier}
+              </span>
+            ) : null}
+          </div>
           <div className="pqv-hero-copy">
             {identity.sourceLabel ? <div className="pqv-source-label">{identity.sourceLabel}</div> : null}
             <h2 id="pqv-name" className="pqv-name">
@@ -267,60 +281,51 @@ export function PlayerQuickView({
               <span>·</span>
               <span>Age {identity.age ?? "N/A"}</span>
             </div>
+            <div className="pqv-rank-strip">
+              <OvrGauge rating={overallRating} size="lg" />
+              <div className="pqv-rank-cells">
+                {identity.score != null ? (
+                  <div className="pqv-rank-cell">
+                    <span>Value</span>
+                    <strong>{formatScore(identity.score)}</strong>
+                  </div>
+                ) : null}
+                {identity.overall_rank ? (
+                  <div className="pqv-rank-cell">
+                    <span>Overall rank</span>
+                    <strong>{formatRank(identity.overall_rank)}</strong>
+                  </div>
+                ) : null}
+                {identity.position_rank ? (
+                  <div className="pqv-rank-cell">
+                    <span>Position rank</span>
+                    <strong>
+                      {identity.position || ""}
+                      {identity.position_rank}
+                    </strong>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            {/* coridian_, 2026-10-18: "Starter and usage still need to be
+                color coordinated" — usage uses its own real tone
+                (positive/negative) the API already computes
+                (modules.rankings.recency_trend_display), not a new rule. */}
+            {model?.usage_trend ? (
+              <span
+                className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}
+                title={model.usage_trend.detail}
+              >
+                {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
+              </span>
+            ) : null}
           </div>
         </header>
 
-        <div className="pqv-rank-strip">
-          <OvrGauge rating={overallRating} size="lg" />
-          <div className="pqv-rank-cells">
-            {identity.score != null ? (
-              <div className="pqv-rank-cell">
-                <span>Value</span>
-                <strong>{formatScore(identity.score)}</strong>
-              </div>
-            ) : null}
-            {identity.overall_rank ? (
-              <div className="pqv-rank-cell">
-                <span>Overall rank</span>
-                <strong>{formatRank(identity.overall_rank)}</strong>
-              </div>
-            ) : null}
-            {identity.position_rank ? (
-              <div className="pqv-rank-cell">
-                <span>Position rank</span>
-                <strong>
-                  {identity.position || ""}
-                  {identity.position_rank}
-                </strong>
-              </div>
-            ) : null}
-          </div>
-        </div>
         <div className="pqv-signal-row">
-          {/* coridian_, 2026-10-18: "Starter and usage still need to be
-              color coordinated" — both previously rendered as the same
-              flat gray .pqv-chip as every other chip here, no different
-              from an inert label. Tier now matches the avatar's own
-              prestige-ring color (same resolvePlayerTier source, so a
-              player's ring and tier chip always agree); usage uses its
-              own real tone (positive/negative) the API already computes
-              (modules.rankings.recency_trend_display), not a new rule. */}
-          {identity.tier ? (
-            <span className="pqv-chip" style={{ borderColor: `var(${resolvePlayerTier(identity.tier).colorVar})`, color: `var(${resolvePlayerTier(identity.tier).colorVar})` }}>
-              {identity.tier}
-            </span>
-          ) : null}
           {identity.opportunity_label ? <span className="pqv-chip">{identity.opportunity_label}</span> : null}
           {injury.label ? (
             <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
-          ) : null}
-          {model?.usage_trend ? (
-            <span
-              className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}
-              title={model.usage_trend.detail}
-            >
-              {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
-            </span>
           ) : null}
         </div>
 
