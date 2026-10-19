@@ -80,6 +80,7 @@ function quickView(overrides: Partial<QuickViewResponse> = {}): QuickViewRespons
       opportunity_confidence: 85,
       workload_trend: "Stable",
       usage_trend: { direction: "up", trend_pct: 12, confidence_label: "High confidence", arrow: "↑", tone: "positive" },
+      depth_chart_note: null,
       decision_fit_narrative: "Market value (92nd percentile at WR) is the biggest driver of this valuation.",
       market_rating: 91,
       opportunity_rating: 84,
@@ -191,6 +192,21 @@ describe("PlayerQuickView", () => {
     expect(tierChip.style.color).toBe("var(--color-tier-starter)");
     const usageChip = screen.getByText(/12% usage/);
     expect(usageChip.className).toContain("pqv-chip--positive");
+  });
+
+  // coridian_, 2026-10-19: "was there any way for us to predict (scenario)
+  // something like cam skattebo having 0 snaps and relaying that to
+  // USERS?"
+  it("shows a real depth-chart-order move as a plain-language note", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(
+      quickView({ model: { ...quickView().model!, depth_chart_note: "Moved up 1 spot on the depth chart since last week." } }),
+    );
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    expect(screen.getByText("Moved up 1 spot on the depth chart since last week.")).toBeInTheDocument();
   });
 
   it("shows the week-by-week points chart once weekly stats load", async () => {

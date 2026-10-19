@@ -48,6 +48,7 @@ function model(overrides: Partial<QuickViewModel>): QuickViewModel {
     opportunity_confidence: 85,
     workload_trend: null,
     usage_trend: null,
+    depth_chart_note: null,
     decision_fit_narrative: null,
     ...overrides,
   };

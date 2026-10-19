@@ -320,6 +320,13 @@ export function PlayerQuickView({
                 {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
               </span>
             ) : null}
+            {/* coridian_, 2026-10-19: "was there any way for us to predict
+                (scenario) something like cam skattebo having 0 snaps and
+                relaying that to USERS?" — a depth-chart-order move is a
+                leading indicator games-played/injury-status signals can't
+                catch (a coaching-decision role change has no injury
+                signal at all). */}
+            {model?.depth_chart_note ? <p className="pqv-tier-mismatch-note">{model.depth_chart_note}</p> : null}
           </div>
         </header>
 

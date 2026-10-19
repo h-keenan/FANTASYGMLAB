@@ -2661,6 +2661,38 @@ def _project_usage_trend(row: pd.Series) -> dict[str, Any] | None:
     return rankings.recency_trend_display(row)
 
 
+# A meaningful depth-chart move is at least one full spot (e.g. 2 -> 1) --
+# anything smaller doesn't exist (depth_chart_order is an integer rank).
+DEPTH_CHART_NOTE_MIN_DELTA = 1
+
+
+def _project_depth_chart_note(row: pd.Series) -> str | None:
+    """A plain-language note when this player's depth_chart_order moved at
+    least one spot since the last players.db refresh (modules.
+    depth_chart_history, written every 6h alongside the full rebuild).
+
+    coridian_, 2026-10-19: "was there any way for us to predict (scenario)
+    something like cam skattebo having 0 snaps and relaying that to
+    USERS?" -- depth-chart movement is a leading indicator games-played/
+    injury-status signals can't catch (a coaching-decision role change has
+    no injury signal at all). ``None`` when there's no prior snapshot to
+    compare against yet (first-ever run) or the move is too small to be
+    worth stating -- same "state nothing rather than noise" contract as
+    usage_trend's own gate just above.
+    """
+
+    delta = row.get("depth_chart_order_delta") if "depth_chart_order_delta" in row.index else None
+    try:
+        delta_value = int(delta) if delta is not None and pd.notna(delta) else 0
+    except (TypeError, ValueError):
+        delta_value = 0
+    if abs(delta_value) < DEPTH_CHART_NOTE_MIN_DELTA:
+        return None
+    if delta_value > 0:
+        return f"Moved up {delta_value} spot{'s' if delta_value != 1 else ''} on the depth chart since last week."
+    return f"Moved down {abs(delta_value)} spot{'s' if abs(delta_value) != 1 else ''} on the depth chart since last week."
+
+
 def _project_injury_impact_player(item: Any) -> dict[str, Any]:
     """One entry of modules.rankings.roster_injury_context's
     `top_injury_impact_players`, trimmed to what a mobile card renders."""
@@ -4080,6 +4112,7 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
         "opportunity_confidence": _clean_json_value(row.get("opportunity_confidence")),
         "workload_trend": _clean_json_value(row.get("workload_trend")),
         "usage_trend": _project_usage_trend(row),
+        "depth_chart_note": _project_depth_chart_note(row),
         "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),
         **{
             key: _clean_json_value(value)
