@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 import { ValuationLensProvider } from "@/context/ValuationLensContext";
+import { AppContentShell } from "@/components/AppContentShell";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { GmOrb } from "@/components/GmOrb";
 import { Header } from "@/components/Header";
@@ -52,12 +53,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <PlayerQuickViewProvider>
               {/* Desktop-width persistent left nav (coridian_, 2026-10-17:
                   "desktop side menu") — fixed-position, so it sits outside
-                  this flex flow; the wrapper below pushes the real content
-                  clear of it via md:pl-60 instead. */}
+                  this flex flow; AppContentShell pushes the real content
+                  clear of it via md:pl-60 instead, but only when the
+                  sidebar is actually showing (signed-in) — see that
+                  component's own doc comment. */}
               <Suspense fallback={null}>
                 <DesktopSidebar />
               </Suspense>
-              <div className="flex flex-col flex-1 md:pl-60">
+              <AppContentShell>
                 {/* Header handles its own internal Suspense boundary now
                     (just around its league-aware sub-piece), so the brand
                     mark/wordmark render synchronously on every page instead
@@ -70,7 +73,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     first paint is far less noticeable than a missing header. */}
                 <Header />
                 {children}
-              </div>
+              </AppContentShell>
               <Suspense fallback={null}>
                 <GmOrb />
               </Suspense>
