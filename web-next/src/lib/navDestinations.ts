@@ -78,6 +78,17 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
     { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news", color: "var(--color-information)" },
     { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory", color: "var(--color-diagnostic)" },
     { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting", color: "var(--color-success)" },
+    {
+      // Social/community layer (docs/roadmap.md), coridian_ 2026-10-19 —
+      // deliberately league-independent like Portfolio/Trade History/
+      // College Scouting above: the whole point is trades from OTHER
+      // users' leagues, never filtered to the one currently selected.
+      label: "Community",
+      path: "/community",
+      subtitle: "Craziest trades this week, anonymized",
+      glyph: "community",
+      color: "var(--color-premium)",
+    },
   ];
 
   return { coreLeagueDestinations, gmToolsDestinations, generalDestinations };
@@ -109,6 +120,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   news: "News",
   "trade-history": "Trade History",
   "college-scouting": "College Scouting",
+  community: "Community",
   "trade-analyzer": "Trade Analyzer",
   "trade-finder": "Trade Finder",
   "player-compare": "Player Compare",

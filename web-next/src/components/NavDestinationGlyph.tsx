@@ -19,7 +19,8 @@ export type NavGlyphName =
   | "tradeFinder"
   | "players"
   | "liveDraft"
-  | "teamSituation";
+  | "teamSituation"
+  | "community";
 
 /**
  * One icon per nav destination, shared by Dashboard's Explore grid
@@ -37,7 +38,10 @@ export type NavGlyphName =
  * on both platforms. Trade Finder/Trade Analyzer/Live Draft have no mobile
  * equivalent (mobile collapses Trade Hub/Finder/Analyzer into one "Trades"
  * destination, and never surfaces Live Draft as quick-nav) — those three
- * use their own Ionicons pick instead of inventing new iconography.
+ * use their own Ionicons pick instead of inventing new iconography. Community
+ * (web-next Social/community layer, docs/roadmap.md) is new on both
+ * platforms with no existing Ionicons pick anywhere in this app yet — its
+ * "people" glyph below is a small original shape, not a ported one.
  */
 export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; size?: number }) {
   const common = {
@@ -218,6 +222,15 @@ export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; s
         <svg {...common}>
           <path d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192Z" fill="none" stroke="currentColor" strokeMiterlimit={10} strokeWidth={32} />
           <path d="m350.67 150.93-117.2 46.88a64 64 0 0 0-35.66 35.66l-46.88 117.2a8 8 0 0 0 10.4 10.4l117.2-46.88a64 64 0 0 0 35.66-35.66l46.88-117.2a8 8 0 0 0-10.4-10.4M256 280a24 24 0 1 1 24-24 24 24 0 0 1-24 24" fill="currentColor" />
+        </svg>
+      );
+    case "community":
+      return (
+        <svg {...common}>
+          <circle cx="176" cy="156" r="68" {...stroke} />
+          <circle cx="352" cy="180" r="52" {...stroke} />
+          <path d="M48 432c0-84 64-140 128-140s128 56 128 140" {...stroke} />
+          <path d="M296 320c56 4 104 52 104 112" {...stroke} />
         </svg>
       );
     default:
