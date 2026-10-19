@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import { api, type TradeHubResponse } from "@/lib/api";
 import { TradeHubContent } from "@/components/TradeHubContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,6 +19,14 @@ export default function TradeHubPage() {
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
   const { lens } = useValuationLens(leagueId);
+
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("trade_hub_opened", { leagueId });
+    // Deliberately NOT depending on `lens` -- a lens change re-renders this
+    // page but isn't a new "open" of Trade Hub, and `once_key` (leagueId)
+    // already dedupes a genuine remount for the same league anyway.
+  }, [session, leagueId]);
 
   const [tradeHub, setTradeHub] = useState<TradeHubResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

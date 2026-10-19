@@ -6,6 +6,7 @@ import { usePathname, useParams, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
@@ -92,7 +93,13 @@ export function GmOrb() {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          // Every real open is its own meaningful interaction, not a
+          // reached-once-ever milestone -- no dedup (see
+          // lib/analytics.ts's trackFeatureUse doc).
+          trackFeatureUse("gm_orb_opened", { leagueId: leagueId || undefined, dedupe: false });
+        }}
         aria-label="Open GM menu"
         // coridian_, 2026-10-18: "Gm orb is still too high" — bottom-6
         // (24px) left too much empty space below it; bottom-3 (12px) sits

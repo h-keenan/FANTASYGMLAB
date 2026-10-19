@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GmOrb } from "./GmOrb";
 import { useAuth } from "@/context/AuthContext";
+import { trackFeatureUse } from "@/lib/analytics";
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -12,6 +13,13 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard/league-1",
   useParams: () => ({ leagueId: "league-1" }),
   useSearchParams: () => new URLSearchParams(),
+}));
+
+// Real analytics (lib/analytics.ts) does its own fire-and-forget network
+// call -- irrelevant to what this file is testing (founder gating / wiring)
+// and would otherwise hit a real `fetch` during these component tests.
+vi.mock("@/lib/analytics", () => ({
+  trackFeatureUse: vi.fn(),
 }));
 
 type MockSession = { user: { id: string; app_metadata?: Record<string, unknown> } };
@@ -74,5 +82,27 @@ describe("GmOrb founder gating", () => {
     const { container } = render(<GmOrb />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+/**
+ * The real bug this wiring fixes: web-next never called into
+ * modules/launch_analytics.py at all, so `analytics_events` stayed empty
+ * despite real traffic (services/mobile_api_service.py's new
+ * POST /v1/analytics/event is the fix). This is one of the handful of real
+ * call sites wired for that pass -- see lib/analytics.ts's own test file
+ * for coverage of the client module itself.
+ */
+describe("GmOrb analytics wiring", () => {
+  it("fires gm_orb_opened every time the orb is opened", () => {
+    mockAuth({ user: { id: "user-1" } });
+    render(<GmOrb />);
+
+    fireEvent.click(screen.getByLabelText("Open GM menu"));
+
+    expect(trackFeatureUse).toHaveBeenCalledWith("gm_orb_opened", {
+      leagueId: "league-1",
+      dedupe: false,
+    });
   });
 });

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import { api, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,6 +19,11 @@ export default function MyTeamPage() {
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
   const { lens } = useValuationLens(leagueId);
+
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("my_team_opened", { leagueId });
+  }, [session, leagueId]);
 
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   // Best-effort supplements — a Strength & Pressure/Team Snapshot field

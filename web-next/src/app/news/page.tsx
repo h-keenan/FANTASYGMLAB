@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import { api, type NewsResponse } from "@/lib/api";
 import { NewsContent } from "@/components/NewsContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -17,6 +18,11 @@ export default function NewsPage() {
 
   const [data, setData] = useState<NewsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("news_opened");
+  }, [session]);
 
   useEffect(() => {
     if (authLoading) return;
