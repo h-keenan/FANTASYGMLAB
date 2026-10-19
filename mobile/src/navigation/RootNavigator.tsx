@@ -8,6 +8,7 @@ import type { CollegeProspect, DraftPickAsset, RankedPlayer } from '../lib/api';
 import BrandMark from '../components/BrandMark';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
+import GuessThePlayerPrompt from '../components/GuessThePlayerPrompt';
 import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../context/AuthContext';
@@ -253,6 +254,7 @@ export default function RootNavigator() {
         </AppStack.Navigator>
         {hideFloatingChrome ? null : <GmOrb />}
         {hideFloatingChrome ? null : <TradeOutcomePrompt />}
+        {hideFloatingChrome ? null : <GuessThePlayerPrompt />}
         </View>
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>
