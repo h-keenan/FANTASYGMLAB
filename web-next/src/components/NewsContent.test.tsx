@@ -1,8 +1,24 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NewsContent } from "./NewsContent";
 import type { NewsItem, NewsResponse } from "@/lib/api";
+
+// A real Date.now()-relative published_ts ("1 hour ago") plus the
+// component's own default `nowMs` (also real Date.now(), see
+// groupNewsByDate) made every assertion of "Today" genuinely flaky right
+// around midnight UTC — CI runs in UTC, and "1 hour ago" crosses into
+// yesterday for roughly the first hour of every day. Pinning the clock
+// mid-day, far from any boundary, makes every item below deterministically
+// "Today" regardless of when the suite actually runs.
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-06-15T12:00:00Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function newsItem(overrides: Partial<NewsItem>): NewsItem {
   return {
@@ -41,11 +57,14 @@ describe("NewsContent", () => {
         }),
       ],
     };
-    render(<NewsContent data={data} />);
+    const { container } = render(<NewsContent data={data} />);
 
     expect(screen.getByText("Justin Jefferson")).toBeInTheDocument();
     expect(screen.getByText("WR")).toBeInTheDocument();
     expect(screen.getByText("MIN")).toBeInTheDocument();
+    // coridian_, 2026-10-19 (screenshot, same gap on Alerts): "why is
+    // there no player card on these?"
+    expect(container.querySelector('img[src*="6794.jpg"]')).toBeInTheDocument();
   });
 
   it("shows both stacked identity chips for a two-player item", () => {

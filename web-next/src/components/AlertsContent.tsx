@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
 import {
   ROSTER_RELATIONSHIP_LABEL,
@@ -87,6 +88,15 @@ function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertIt
       {alert.matched_player ? (
         <div className="flex items-center gap-2 mt-1">
           <PositionBadge position={alert.matched_player_position} />
+          {/* coridian_, 2026-10-19 (screenshot): "why is there no player
+              card on these?" — this row had a position badge and a name
+              but no photo, unlike News/Portfolio's identity chips, which
+              already use this exact PlayerAvatar. The whole row is a link
+              to the source article (or a mark-as-read trigger), so this
+              stays a plain image, not its own nested PlayerIdentityTrigger
+              — a second interactive element here would be invalid HTML
+              and would fight the row's own click/keydown handler. */}
+          <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={28} />
           <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
             {alert.matched_player}
           </span>

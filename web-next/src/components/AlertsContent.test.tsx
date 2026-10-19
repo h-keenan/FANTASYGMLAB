@@ -46,7 +46,7 @@ const BASE_RESPONSE: AlertsResponse = {
 
 describe("AlertsContent", () => {
   it("renders the league name, grouped event type, and the alert's headline/player identity", () => {
-    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    const { container } = render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
     expect(screen.getByText("Injury / Status")).toBeInTheDocument();
@@ -54,6 +54,9 @@ describe("AlertsContent", () => {
     expect(screen.getByText("Test Player")).toBeInTheDocument();
     expect(screen.getByText("Starter")).toBeInTheDocument();
     expect(screen.getByText("Source: Rotoworld")).toBeInTheDocument();
+    // coridian_, 2026-10-19 (screenshot): "why is there no player card on
+    // these?"
+    expect(container.querySelector('img[src*="4046.jpg"]')).toBeInTheDocument();
   });
 
   it("marks an alert read and calls the API when the row is opened", () => {
