@@ -160,6 +160,40 @@ def test_premium_aggregates_in_saved_order_and_isolates_failures(monkeypatch):
     assert failed == {"L-skip": "not_a_member_of_league", "L-boom": "unavailable"}
 
 
+def test_glance_prefers_the_leagues_own_saved_sleeper_username(monkeypatch):
+    """Same real production bug as test_my_roster_prefers_the_leagues_own_saved_sleeper_username
+    (tests/test_mobile_api_service.py), one endpoint over: an account that
+    relinks to a SECOND Sleeper username for a new league must not lose the
+    glance card for an already-saved league still linked under the first
+    username. saved_leagues.sleeper_username (captured per-league, at save
+    time) must win over the now-stale global profile value."""
+    from services import mobile_api_service
+
+    _stub_supabase_and_news(
+        monkeypatch,
+        mobile_api_service,
+        [{"league_id": "L-orig", "league_name": "Original League", "sleeper_username": "harryhard"}],
+    )
+
+    seen_usernames: list[str] = []
+
+    def _fake_glance(*, league_id, sleeper_username, **_k):
+        seen_usernames.append(sleeper_username)
+        return _glance_ok(league_id)
+
+    monkeypatch.setattr(mobile_api_service.league_glance, "build_league_glance", _fake_glance)
+
+    # The account-wide profile value (_glance_request's fixed "gm_dynasty")
+    # stands in for the now-stale global value after a relink to a second
+    # username for an unrelated new league — the saved row's own
+    # "harryhard" must be what actually reaches build_league_glance.
+    response = _glance_request(_client(monkeypatch))
+
+    assert response.status_code == 200
+    assert seen_usernames == ["harryhard"]
+    assert [league["league_id"] for league in response.json()["leagues"]] == ["L-orig"]
+
+
 def test_premium_with_no_saved_leagues_is_empty_not_broken(monkeypatch):
     from services import mobile_api_service
 
