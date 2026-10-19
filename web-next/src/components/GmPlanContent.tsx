@@ -67,14 +67,7 @@ function focusItemKey(item: GmPlanFocusItem, index: number): string {
 
 function FactCard({ accent, children }: { accent: string; children: ReactNode }) {
   return (
-    <article
-      className="flex flex-col gap-1 p-3"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        borderLeft: `3px solid ${accent}`,
-      }}
-    >
+    <article className="glass-surface flex flex-col gap-1 p-3" style={{ borderLeft: `3px solid ${accent}` }}>
       {children}
     </article>
   );
@@ -173,13 +166,8 @@ function TradeOpportunityCard({ item }: { item: GmPlanTradeItem }) {
 
   return (
     <article
-      className="flex flex-col gap-3 p-4"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        borderLeft: `3px solid ${accent}`,
-        boxShadow: "var(--shadow-card)",
-      }}
+      className="glass-surface flex flex-col gap-3 p-4"
+      style={{ borderLeft: `3px solid ${accent}` }}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
@@ -591,14 +579,7 @@ export function GmPlanContent({
         </p>
       ) : (
         <>
-          <section
-            className="flex flex-col gap-2 p-4"
-            style={{
-              background: "var(--color-surface-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              boxShadow: "var(--shadow-card)",
-            }}
-          >
+          <section className="glass-surface flex flex-col gap-2 p-4">
             <div className="flex items-center gap-2 flex-wrap">
               {data.season_phase_label ? (
                 <span
@@ -654,8 +635,7 @@ export function GmPlanContent({
             </p>
           ) : (
             <div
-              className="flex flex-col px-3"
-              style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+              className="glass-surface flex flex-col px-3"
             >
               {protectedRows.map((row) => (
                 <ProtectPlayerRow
@@ -699,8 +679,7 @@ export function GmPlanContent({
             </p>
           ) : (
             <div
-              className="flex flex-col px-3"
-              style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+              className="glass-surface flex flex-col px-3"
             >
               {watching.map((row) => (
                 <TargetRowView

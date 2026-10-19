@@ -174,7 +174,7 @@ function StandingsSection({ data, myRosterId }: { data: LeagueTeamRankingsRespon
         title={title}
         note={`${data.week_label ? `${data.week_label} — ` : ""}Actual results from league matchups — separate from Roster Power strength.`}
       />
-      <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="glass-surface flex flex-col">
         {ordered.map((team) => {
           const percentile = percentileFromRank(team.standing_rank, ordered.length);
           const secondary = [`Win% ${team.win_pct_label ?? "—"}`, `PF ${team.points_for_label ?? "0.0"}`, `PA ${team.points_against_label ?? "0.0"}`];
@@ -287,7 +287,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
             {playoffOddsReasonMessage(result.reason)}
           </p>
         ) : (
-          <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+          <div className="glass-surface flex flex-col">
             {result.teams.map((team, index) => (
               <PlayoffOddsRow key={team.roster_id} team={team} rankLabel={formatRank(index + 1)} myRosterId={myRosterId} />
             ))}
@@ -305,7 +305,7 @@ function RankBoardSection({ board, teams, myRosterId }: { board: RankBoardKey; t
   return (
     <section className="flex flex-col gap-3">
       <SectionHeading kicker={config.kicker} title={config.title} note={config.note} />
-      <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="glass-surface flex flex-col">
         {ordered.map((team) => {
           const rank = team[config.rankField] as number | null;
           const tied = Boolean(team[config.tiedField]);

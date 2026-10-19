@@ -365,6 +365,21 @@ body {
   }
 }
 
+/* Companion to .glass-surface for text inputs and small controls — same
+   rounded-glass language, scaled down (smaller radius, no heavy blur or
+   drop shadow) so a form field doesn't read as its own floating card. */
+.glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-control);
+}
+@media (prefers-color-scheme: light) {
+  .glass-input {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(10, 30, 45, 0.12);
+  }
+}
+
 /* coridian_, 2026-10-17: "desktop scaling is still too small and hard to
    read." Every --font-size, --type, and --space token is rem-based
    (relative to html's root size, not body's), so this is the one place

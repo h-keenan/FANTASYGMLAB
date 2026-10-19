@@ -206,11 +206,7 @@ export function NewsContent({ data }: { data: NewsResponse }) {
                       </span>
                     </div>
                     <div
-                      className="px-3"
-                      style={{
-                        background: "var(--color-surface-secondary)",
-                        border: "var(--border-width-default) solid var(--color-border)",
-                      }}
+                      className="glass-surface px-3"
                     >
                       {group.items.map((item, itemIndex) => (
                         <NewsCard key={item.link ?? `${item.title ?? "item"}-${itemIndex}`} item={item} />

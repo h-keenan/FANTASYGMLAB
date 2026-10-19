@@ -227,8 +227,7 @@ export function LiveDraftTradeEvaluator({
 
   return (
     <section
-      className="flex flex-col gap-3 p-4"
-      style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+      className="glass-surface flex flex-col gap-3 p-4"
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-0.5">

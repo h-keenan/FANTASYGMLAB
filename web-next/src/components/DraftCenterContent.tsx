@@ -142,10 +142,7 @@ export function DraftCenterContent({
                   {season || "Future"}
                 </span>
                 <div
-                  style={{
-                    background: "var(--color-surface-secondary)",
-                    border: "var(--border-width-default) solid var(--color-border)",
-                  }}
+                  className="glass-surface"
                 >
                   {seasonPicks.map((pick, index) => (
                     <PickRow

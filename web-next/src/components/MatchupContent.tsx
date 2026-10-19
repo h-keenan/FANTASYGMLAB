@@ -368,7 +368,7 @@ function RealLineupSection({ title, side }: { title: string; side: MatchupSide }
           </span>
         ) : null}
       </div>
-      <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="glass-surface flex flex-col">
         {side.real_starters.map((player, index) => (
           <RealStarterRow key={`${side.roster_id}-real-${player.player_id}-${index}`} player={player} />
         ))}
@@ -391,7 +391,7 @@ function SuggestedLineupSection({ title, side }: { title: string; side: MatchupS
           No startable players on this roster right now.
         </p>
       ) : (
-        <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+        <div className="glass-surface flex flex-col">
           {side.starters.map((player) => (
             <SuggestedStarterRow key={player.player_id} player={player} />
           ))}
@@ -431,8 +431,7 @@ export function MatchupContent({ leagueName, matchup }: { leagueName: string; ma
       <RealLineupSection title={`${opponent.team_name}'s actual lineup`} side={opponent} />
 
       <p
-        className="text-sm p-4"
-        style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
+        className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}
       >
         The suggested starters below are each roster&apos;s best available lineup by season-long value — the same
         optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. This is a

@@ -267,11 +267,7 @@ export function AlertsContent({
                   </span>
                 </div>
                 <div
-                  className="px-3"
-                  style={{
-                    background: "var(--color-surface-secondary)",
-                    border: "var(--border-width-default) solid var(--color-border)",
-                  }}
+                  className="glass-surface px-3"
                 >
                   {group.alerts.map((alert) => (
                     <AlertRow key={alert.alert_key} alert={alert} onOpen={openAndMarkRead} />

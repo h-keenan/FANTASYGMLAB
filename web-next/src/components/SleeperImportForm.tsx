@@ -97,12 +97,8 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
             <button
               key={league.league_id}
               onClick={() => openLeague(league)}
-              className="text-left px-4 py-3 flex items-center justify-between"
-              style={{
-                background: "var(--color-surface-secondary)",
-                border: "var(--border-width-default) solid var(--color-border)",
-                color: "var(--color-text-primary)",
-              }}
+              className="glass-surface text-left px-4 py-3 flex items-center justify-between"
+              style={{ color: "var(--color-text-primary)" }}
             >
               <span>
                 <span className="block font-bold">{league.name}</span>
@@ -125,9 +121,8 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
           existing account there is required — the landing page sells the
           product's value but never mentions the dependency. */}
       <div
-        className="flex flex-col gap-1 px-3 py-3 text-xs"
+        className="glass-input flex flex-col gap-1 px-3 py-3 text-xs"
         style={{
-          background: "var(--color-surface-secondary)",
           borderLeft: "var(--border-width-semantic) solid var(--color-accent)",
           color: "var(--color-text-secondary)",
         }}
@@ -156,12 +151,8 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
           value={username}
           onChange={(event) => setUsername(event.target.value)}
           placeholder="Sleeper username"
-          className="px-3 py-2"
-          style={{
-            background: "var(--color-surface-secondary)",
-            color: "var(--color-text-primary)",
-            border: "var(--border-width-default) solid var(--color-border)",
-          }}
+          className="glass-input px-3 py-2"
+          style={{ color: "var(--color-text-primary)" }}
         />
       </label>
       {message ? (

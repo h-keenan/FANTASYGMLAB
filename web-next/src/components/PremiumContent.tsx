@@ -47,11 +47,8 @@ export function PlanCard({
 
   return (
     <div
-      className="p-4 flex flex-col gap-2"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: `var(--border-width-default) solid ${plan.tier === "front_office" ? "var(--color-premium)" : "var(--color-border)"}`,
-      }}
+      className="glass-surface p-4 flex flex-col gap-2"
+      style={plan.tier === "front_office" ? { borderColor: "var(--color-premium)" } : undefined}
     >
       <span
         className="flex items-center gap-1.5 text-xs font-bold uppercase"
