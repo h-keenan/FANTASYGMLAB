@@ -129,6 +129,7 @@ _TABLE_SETUP_DOCS: dict[str, str] = {
     "mobile_alert_reads": "docs/supabase_mobile_alert_reads.sql",
     "trade_outcomes": "docs/supabase_trade_outcomes.sql",
     "push_tokens": "docs/supabase_push_tokens.sql",
+    "guess_the_player_streaks": "docs/supabase_guess_the_player.sql",
 }
 
 
@@ -367,6 +368,30 @@ def upsert_user_settings(config: dict, access_token: str, payload: dict) -> tupl
     return upsert_row(config, access_token, "user_settings", payload, on_conflict="user_id")
 
 
+def fetch_guess_the_player_streak(config: dict, access_token: str, *, user_id: str) -> tuple[dict, str]:
+    """This user's Guess the Player streak row (docs/supabase_guess_the_player.sql).
+
+    Empty dict (never an error the caller must branch on) when the user has
+    no row yet — a brand-new player simply starts at 0/0, same "missing row
+    means default state" contract fetch_user_settings already uses.
+    """
+
+    rows, error = fetch_rows(
+        config,
+        access_token,
+        "guess_the_player_streaks",
+        user_id=user_id,
+        timing_label="supabase_guess_the_player_streak_lookup",
+    )
+    if error:
+        return {}, error
+    return dict(rows[0]) if rows else {}, ""
+
+
+def upsert_guess_the_player_streak(config: dict, access_token: str, payload: dict) -> tuple[bool, str]:
+    return upsert_row(config, access_token, "guess_the_player_streaks", payload, on_conflict="user_id")
+
+
 def fetch_rows(
     config: dict,
     access_token: str,
@@ -528,6 +553,7 @@ EXPORTABLE_USER_TABLES = (
     "decision_memory_events",
     "decision_memory_baselines",
     "notification_read_state",
+    "guess_the_player_streaks",
 )
 
 

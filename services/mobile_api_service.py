@@ -119,6 +119,7 @@ from modules import (
     faab,
     gm_plan,
     gm_targets,
+    guess_the_player,
     injury_ui,
     league_format_context,
     league_history,
@@ -833,6 +834,7 @@ _EXPORTABLE_USER_TABLES = (
     "decision_memory_events",
     "decision_memory_baselines",
     "notification_read_state",
+    "guess_the_player_streaks",
 )
 
 
@@ -3876,6 +3878,232 @@ def mark_league_alert_read(
     if response.status_code >= 400:
         return {"ok": False, "reason": "not_available"}
     return {"ok": True, "reason": ""}
+
+
+# ---------------------------------------------------------------------------
+# Guess the Player ("Whose stats are these?") — Dashboard mini-game.
+# coridian_, 2026-10-19 (confirmed spec, via Discord): one real player's
+# real recent stat line, name/photo hidden, multiple-choice reveal, a real
+# persisted streak (docs/supabase_guess_the_player.sql). The actual
+# selection/distractor logic lives in modules.guess_the_player — this is
+# just auth, caching, and streak read/write.
+# ---------------------------------------------------------------------------
+
+_GUESS_THE_PLAYER_CACHE_TTL_SECONDS = 24 * 60 * 60
+
+
+def _guess_the_player_today() -> str:
+    """A UTC calendar date, not local time — so the featured pick can never
+    disagree between callers in different timezones hitting the same
+    always-on backend instance."""
+
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _guess_the_player_compute_pick(today: str) -> dict[str, Any] | None:
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        return None
+    season_stats = sleeper.get_season_player_stats()
+    if not season_stats:
+        return None
+    return guess_the_player.build_daily_pick(players_df, season_stats, seed=today)
+
+
+def _guess_the_player_daily_pick(today: str) -> dict[str, Any] | None:
+    """Today's featured (player, week) pick.
+
+    Identical across every backend worker/process for the same `today`
+    even WITHOUT this cache — modules.guess_the_player.build_daily_pick
+    seeds its own randomness off `today`, not off call order — so this
+    cache exists purely to avoid repeating the full players-table scan on
+    every request, same fail-open contract as redis_single_flight_cache's
+    other callers (e.g. _fetch_saved_leagues_cached above).
+    """
+
+    cache_key = redis_cache.build_cache_key("guess_the_player_daily_pick", today)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_GUESS_THE_PLAYER_CACHE_TTL_SECONDS,
+            compute=lambda: _guess_the_player_compute_pick(today),
+        )
+    except Exception:
+        return _guess_the_player_compute_pick(today)
+
+
+def _guess_the_player_public_prompt(pick: dict[str, Any]) -> dict[str, Any]:
+    """The hidden-identity payload GET actually returns — the real
+    player's name/team/player_id never appear outside the shuffled
+    `options` list, indistinguishable there from the real distractors."""
+
+    return {
+        "pick_id": pick["pick_id"],
+        "season": pick["season"],
+        "week": pick["week"],
+        "position": pick["position"],
+        "tier": pick["tier"],
+        "stat_line": pick["stat_line"],
+        "fantasy_points_ppr": pick["fantasy_points_ppr"],
+        "options": [dict(option) for option in pick["options"]],
+    }
+
+
+def _guess_the_player_streak_int(row: dict[str, Any] | None, key: str) -> int:
+    if not row:
+        return 0
+    try:
+        return int(row.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _guess_the_player_streak_payload(row: dict[str, Any] | None) -> dict[str, Any]:
+    return {
+        "current_streak": _guess_the_player_streak_int(row, "current_streak"),
+        "best_streak": _guess_the_player_streak_int(row, "best_streak"),
+    }
+
+
+def _guess_the_player_correct_identity(pick: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "player_id": pick["player_id"],
+        "name": pick["name"],
+        "team": pick["team"],
+        "position": pick["position"],
+        "tier": pick["tier"],
+    }
+
+
+@app.get("/v1/guess-the-player")
+def get_guess_the_player(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Today's "Whose stats are these?" pick plus the caller's real,
+    persisted streak. League-independent — one shared pick per calendar
+    day for every signed-in user.
+    """
+
+    today = _guess_the_player_today()
+    pick = _guess_the_player_daily_pick(today)
+    if pick is None:
+        return {
+            "ok": True,
+            "available": False,
+            "reason": "no_surprising_player_today",
+            "prompt": None,
+            "already_answered": False,
+            "last_result": None,
+            "correct_player": None,
+            "streak": {"current_streak": 0, "best_streak": 0},
+        }
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    streak_row, _ = account_store.fetch_guess_the_player_streak(
+        config, str(user.get("_access_token") or ""), user_id=user_id
+    )
+    already_answered = bool(streak_row) and str(streak_row.get("last_pick_id") or "") == pick["pick_id"]
+    last_result = str(streak_row.get("last_result") or "").strip() if already_answered else ""
+
+    return {
+        "ok": True,
+        "available": True,
+        "reason": "",
+        "prompt": _guess_the_player_public_prompt(pick),
+        "already_answered": already_answered,
+        "last_result": last_result or None,
+        # Only revealed once this user has genuinely already answered
+        # TODAY's pick — never alongside an unanswered prompt, which would
+        # leak the answer before a real guess.
+        "correct_player": _guess_the_player_correct_identity(pick) if already_answered else None,
+        "streak": _guess_the_player_streak_payload(streak_row),
+    }
+
+
+class GuessThePlayerAnswerRequest(BaseModel):
+    pick_id: str
+    player_id: str
+
+
+@app.post("/v1/guess-the-player/answer")
+def answer_guess_the_player(
+    body: GuessThePlayerAnswerRequest, user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Score one guess against today's real pick and durably update the
+    caller's streak (docs/supabase_guess_the_player.sql).
+
+    Idempotent per pick_id: resubmitting the SAME day's pick_id (reload,
+    double-tap, retried request) replays the already-recorded result
+    instead of re-scoring — a streak can only move once per real daily
+    pick, never inflate from a repeat submission.
+    """
+
+    pick_id = str(body.pick_id or "").strip()
+    guessed_player_id = str(body.player_id or "").strip()
+    if not pick_id or not guessed_player_id:
+        raise HTTPException(status_code=422, detail="pick_id and player_id are required.")
+
+    today = _guess_the_player_today()
+    pick = _guess_the_player_daily_pick(today)
+    if pick is None or pick["pick_id"] != pick_id:
+        # The day rolled over (or the cache rotated) between the client's
+        # fetch and this submission — fail closed with a reason the client
+        # can react to (refetch today's pick) rather than scoring against
+        # stale or mismatched data.
+        raise HTTPException(status_code=409, detail="This pick has expired. Refresh and try again.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    streak_row, _ = account_store.fetch_guess_the_player_streak(config, access_token, user_id=user_id)
+
+    if streak_row and str(streak_row.get("last_pick_id") or "") == pick_id:
+        correct = str(streak_row.get("last_result") or "").strip() == "correct"
+        return {
+            "ok": True,
+            "already_answered": True,
+            "correct": correct,
+            "correct_player": _guess_the_player_correct_identity(pick),
+            "streak": _guess_the_player_streak_payload(streak_row),
+        }
+
+    correct = guessed_player_id == pick["player_id"]
+    current_streak = _guess_the_player_streak_int(streak_row, "current_streak")
+    best_streak = _guess_the_player_streak_int(streak_row, "best_streak")
+    new_current = current_streak + 1 if correct else 0
+    new_best = max(best_streak, new_current)
+
+    ok, _ = account_store.upsert_guess_the_player_streak(
+        config,
+        access_token,
+        {
+            "user_id": user_id,
+            "current_streak": new_current,
+            "best_streak": new_best,
+            "last_pick_id": pick_id,
+            "last_result": "correct" if correct else "incorrect",
+        },
+    )
+    # Fails closed to "today's guess still scores for THIS response, just
+    # isn't durably recorded" rather than a crash — same contract
+    # mark_league_alert_read already documents for a not-yet-migrated table.
+    streak_payload = (
+        {"current_streak": new_current, "best_streak": new_best}
+        if ok
+        else _guess_the_player_streak_payload(streak_row)
+    )
+
+    return {
+        "ok": True,
+        "already_answered": False,
+        "correct": correct,
+        "correct_player": _guess_the_player_correct_identity(pick),
+        "streak": streak_payload,
+    }
 
 
 TRADE_OUTCOMES_TABLE = "trade_outcomes"
