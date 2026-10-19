@@ -701,7 +701,35 @@ def require_user(
     return normalized
 
 
+# coridian_, 2026-10-19: real reported site-wide load-time complaint
+# (separate regression already fixed for account_store.fetch_saved_leagues
+# -- see _fetch_saved_leagues_cached above). Auditing every authenticated
+# endpoint's own round trips turned up a second, much larger instance of
+# the same class of gap: _fetch_profile_fields had NO cache at all despite
+# being called from ~20 different endpoints (every one of them, not just
+# the 14 that also call _resolve_my_roster) -- meaning essentially every
+# authenticated request on this API paid a full uncached Supabase round
+# trip just to read entitlement/sleeper_username. Same short-TTL
+# single-flight cache as saved_leagues: this data only changes on a
+# deliberate action (a Stripe/RevenueCat webhook, a username relink), both
+# of which already have their own real propagation latency, so a brief
+# cache window is invisible in practice.
+_PROFILE_FIELDS_TTL_SECONDS = 15
+
+
 def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict[str, str]:
+    cache_key = redis_cache.build_cache_key("profile_fields", user_id)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_PROFILE_FIELDS_TTL_SECONDS,
+            compute=lambda: _fetch_profile_fields_uncached(config, user_id, access_token),
+        )
+    except Exception:
+        return _fetch_profile_fields_uncached(config, user_id, access_token)
+
+
+def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str) -> dict[str, str]:
     """Read select `profiles` columns using the caller's own token (RLS-scoped).
 
     Entitlement always fails closed to "free" on any error (network, HTTP,
