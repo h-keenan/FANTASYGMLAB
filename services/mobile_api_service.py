@@ -6901,6 +6901,14 @@ def get_league_dashboard(
 # saved dozens.
 _PORTFOLIO_FANOUT_MAX_WORKERS = 8
 
+# A single per-league row makes up to 3 sequential calls (team_stance,
+# GM Targets, dashboard_engine.build_league_summary's own Sleeper/rankings
+# work), each individually bounded at 15s (this file's established
+# requests.get timeout convention) — 25s gives real, slow-but-working rows
+# room to finish while still bounding the whole fan-out well under a
+# typical client/proxy timeout, instead of the old unbounded wait.
+_PORTFOLIO_FANOUT_TIMEOUT_SECONDS = 25
+
 _PORTFOLIO_UPSELL = {
     "title": "See every league at a glance",
     "body": (
@@ -7101,20 +7109,54 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
 
     # Fan the per-league work out across a thread pool instead of paying
     # each saved league's Supabase + Sleeper round trips back to back.
-    # executor.map yields results in `saved_rows` order regardless of which
-    # worker finishes first, so the loop below reproduces exactly the old
-    # sequential loop's ordering and output. See _build_portfolio_row's
-    # docstring for the thread-safety case.
+    # Bounded by _PORTFOLIO_FANOUT_TIMEOUT_SECONDS overall (coridian_,
+    # 2026-10-19: "timed out loading portfolio" — the old bare
+    # `executor.map` had no bound at all, so one genuinely hung Sleeper
+    # call for one saved league blocked the ENTIRE response forever rather
+    # than just that one league's row, defeating this endpoint's own
+    # "one broken league never blanks the rest" design intent). Futures are
+    # submitted individually (not via executor.map) so a still-running one
+    # past the deadline can be reported as a timed-out failure instead of
+    # blocked on; `shutdown(wait=False)` below lets any such orphaned
+    # thread finish on its own without holding this response open for it.
     results: list[dict[str, Any]] = []
     if saved_rows:
         worker = functools.partial(
             _build_portfolio_row, config, user_id, access_token, lens, sleeper_username, entitlement
         )
         max_workers = min(len(saved_rows), _PORTFOLIO_FANOUT_MAX_WORKERS)
-        with concurrent.futures.ThreadPoolExecutor(
+        executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix="dgm-portfolio-fanout"
-        ) as executor:
-            results = list(executor.map(worker, saved_rows))
+        )
+        try:
+            futures = [executor.submit(worker, row) for row in saved_rows]
+            concurrent.futures.wait(futures, timeout=_PORTFOLIO_FANOUT_TIMEOUT_SECONDS)
+            for row, future in zip(saved_rows, futures):
+                if future.done():
+                    try:
+                        results.append(future.result())
+                    except Exception:
+                        results.append(
+                            {
+                                "status": "failed",
+                                "league_id": saved_leagues.normalize_league_id(row.get("league_id")) or "",
+                                "league_name": str(row.get("league_name") or "").strip()
+                                or str(row.get("league_id") or ""),
+                                "reason": "unavailable",
+                            }
+                        )
+                else:
+                    results.append(
+                        {
+                            "status": "failed",
+                            "league_id": saved_leagues.normalize_league_id(row.get("league_id")) or "",
+                            "league_name": str(row.get("league_name") or "").strip()
+                            or str(row.get("league_id") or ""),
+                            "reason": "timed_out",
+                        }
+                    )
+        finally:
+            executor.shutdown(wait=False)
 
     for result in results:
         status = result["status"]

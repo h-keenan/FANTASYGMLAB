@@ -7710,6 +7710,80 @@ def test_portfolio_fanout_preserves_saved_league_order_despite_uneven_completion
     assert [row["league_id"] for row in body["failed_leagues"]] == ["league-skip", "league-boom"]
 
 
+def test_portfolio_fanout_times_out_a_hung_league_instead_of_the_whole_request(monkeypatch):
+    """coridian_, 2026-10-19: "timed out loading portfolio" — real repro.
+    The old fan-out used a bare `executor.map` with no overall bound, so
+    ONE genuinely hung per-league call (e.g. Sleeper never responding)
+    blocked the entire response forever instead of just that one league's
+    row — defeating this endpoint's own "one broken league never blanks
+    the rest" design intent. A hung league must now show up in
+    failed_leagues with reason "timed_out" while every other league's real
+    row still comes back, and the whole request must return well within
+    the (monkeypatched tiny) fan-out deadline rather than waiting for the
+    hung call."""
+
+    from services import mobile_api_service
+
+    saved_rows = [
+        {"league_id": "league-hung", "league_name": "Hung League"},
+        {"league_id": "league-ok", "league_name": "OK League"},
+    ]
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: (saved_rows, "")
+    )
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", lambda *a, **k: "")
+    monkeypatch.setattr(mobile_api_service, "_fetch_gm_target_player_ids", lambda *a, **k: ((), ()))
+    # Real deadline is 25s -- shrink it so this test stays fast while still
+    # exercising the real timeout/orphan-thread code path.
+    monkeypatch.setattr(mobile_api_service, "_PORTFOLIO_FANOUT_TIMEOUT_SECONDS", 0.1)
+
+    def _fake_build_league_summary(*, league_id, **_kwargs):
+        if league_id == "league-hung":
+            # Deliberately longer than the shrunk deadline above -- this
+            # thread is still "running" (never cancelled, Python threads
+            # can't be force-killed) when the fan-out gives up on it.
+            time.sleep(1.0)
+            return {"ok": True, "reason": "", "team_name": "never seen"}
+        return {
+            "ok": True,
+            "reason": "",
+            "team_name": "OK Team",
+            "wins": 5,
+            "losses": 2,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 1,
+            "power_rank_tied": False,
+            "top_item": None,
+        }
+
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _fake_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    started = time.monotonic()
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+    elapsed = time.monotonic() - started
+
+    assert response.status_code == 200
+    assert elapsed < 1.0, "the response must not wait for the hung league's full sleep"
+    body = response.json()
+    assert [row["league_id"] for row in body["leagues"]] == ["league-ok"]
+    assert body["failed_leagues"] == [
+        {"league_id": "league-hung", "league_name": "Hung League", "reason": "timed_out"}
+    ]
+
+
 def test_portfolio_fanout_runs_concurrently_and_is_faster_than_sequential(monkeypatch):
     """The whole point of parallelizing the per-league fan-out: N saved
     leagues should cost roughly the slowest ONE league's latency, not the
