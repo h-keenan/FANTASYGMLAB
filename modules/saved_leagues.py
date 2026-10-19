@@ -60,10 +60,17 @@ def max_leagues_for(entitlement: Any) -> int | None:
     """
 
     tier = premium.canonical_tier(entitlement)
-    if tier == premium.FRONT_OFFICE:
+    # coridian_, 2026-10-19: "go ahead and do that until we have enough
+    # features to segregate between pro and front office" -- unlimited
+    # saved leagues was the one real functional difference Front Office
+    # ever had over Pro (everything else was copy, not a gate). Folding it
+    # into Pro too is a temporary simplification while there's no real
+    # feature split to justify two paid tiers, not a permanent merge --
+    # see modules.premium's own FRONT_OFFICE tier, left intact for when
+    # that changes. The single already-subscribed Front Office customer
+    # is unaffected either way (still reads as FRONT_OFFICE here).
+    if tier in (premium.PRO, premium.FRONT_OFFICE):
         return None
-    if tier == premium.PRO:
-        return MAX_LEAGUES_PRO
     return MAX_LEAGUES_FREE
 
 

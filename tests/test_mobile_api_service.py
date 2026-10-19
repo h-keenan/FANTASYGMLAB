@@ -555,7 +555,14 @@ def test_billing_plans_requires_auth(monkeypatch):
     assert response.status_code == 401
 
 
-def test_billing_plans_returns_pro_and_front_office(monkeypatch):
+# coridian_, 2026-10-19: "go ahead and do that until we have enough
+# features to segregate between pro and front office" — Front Office is
+# no longer offered as a selectable new-signup plan (unlimited leagues,
+# its one real functional difference, now applies to Pro too). The tier,
+# its price plumbing, and checkout-by-direct-request (tested separately
+# below) are all left fully intact for when there's a real feature split
+# to bring it back for.
+def test_billing_plans_returns_only_pro(monkeypatch):
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
@@ -576,17 +583,15 @@ def test_billing_plans_returns_pro_and_front_office(monkeypatch):
         response = client.get("/v1/billing/plans", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
-    plans = {(p["tier"], p["interval"]): p for p in response.json()["plans"]}
+    body = response.json()
+    plans = {(p["tier"], p["interval"]): p for p in body["plans"]}
     assert plans[("pro", "monthly")]["price"] == "$9.99"
     assert plans[("pro", "annual")]["price"] == "$59.99"
-    assert plans[("front_office", "annual")]["price"] == "$99.99"
+    assert ("front_office", "annual") not in plans
+    assert len(body["plans"]) == 2
 
 
-def test_billing_plans_falls_back_when_front_office_price_missing(monkeypatch):
-    # plan_display_details only returns a front_office_annual key when
-    # STRIPE_PRICE_FRONT_OFFICE_ANNUAL is actually configured — confirms the
-    # endpoint still returns all 3 plans (via DEFAULT_PLAN_DETAILS) rather
-    # than dropping Front Office from the response entirely.
+def test_billing_plans_includes_the_publishable_key(monkeypatch):
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
@@ -594,28 +599,20 @@ def test_billing_plans_falls_back_when_front_office_price_missing(monkeypatch):
 
     from modules import stripe_billing
 
-    fake_details = {
-        stripe_billing.MONTHLY: ("Monthly", "$9.99", "per month"),
-        stripe_billing.ANNUAL: ("Annual", "$59.99", "per year"),
-    }
-
     with (
         patch("requests.get", return_value=auth_user_response),
-        patch("modules.stripe_billing.plan_display_details", return_value=fake_details),
+        patch(
+            "modules.stripe_billing.load_stripe_config",
+            return_value=stripe_billing.StripeBillingConfig(publishable_key="pk_test_abc123"),
+        ),
     ):
         response = client.get("/v1/billing/plans", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
-    plans = {(p["tier"], p["interval"]): p for p in response.json()["plans"]}
-    front_office = plans[("front_office", "annual")]
-    label, price, cadence = stripe_billing.DEFAULT_PLAN_DETAILS[stripe_billing.FRONT_OFFICE_ANNUAL]
-    assert front_office["label"] == label
-    assert front_office["price"] == price
-    assert front_office["cadence"] == cadence
-    assert "Everything in Pro" in front_office["features"]
+    assert response.json()["stripe_publishable_key"] == "pk_test_abc123"
 
 
-def test_billing_plans_include_tier_specific_feature_lists(monkeypatch):
+def test_billing_plans_feature_list_is_the_shared_premium_benefit_copy(monkeypatch):
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
@@ -630,9 +627,6 @@ def test_billing_plans_include_tier_specific_feature_lists(monkeypatch):
     # /v1/me already serves — never a separately-maintained list.
     assert plans[("pro", "monthly")]["features"] == plans[("pro", "annual")]["features"]
     assert len(plans[("pro", "monthly")]["features"]) > 0
-    front_office_features = plans[("front_office", "annual")]["features"]
-    assert front_office_features[0] == "Everything in Pro"
-    assert front_office_features != plans[("pro", "annual")]["features"]
 
 
 def test_billing_checkout_requires_auth(monkeypatch):
@@ -10275,9 +10269,11 @@ def test_me_reports_the_saved_league_cap_for_the_plan(monkeypatch):
         paid = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
 
     # The client renders the league wall from this number, so it has to be
-    # the server's cap — never a constant duplicated in the app.
+    # the server's cap — never a constant duplicated in the app. coridian_,
+    # 2026-10-19: unlimited saved leagues now applies to Pro too (the one
+    # real functional difference Front Office ever had).
     assert free.json()["user"]["league_cap"] == saved_leagues.MAX_LEAGUES_FREE
-    assert paid.json()["user"]["league_cap"] == saved_leagues.MAX_LEAGUES_PREMIUM
+    assert paid.json()["user"]["league_cap"] == saved_leagues.MAX_LEAGUES_FRONT_OFFICE_GUARD
 
 
 def test_save_league_rejects_empty_league_id(monkeypatch):

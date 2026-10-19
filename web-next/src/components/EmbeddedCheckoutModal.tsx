@@ -1,6 +1,7 @@
 "use client";
 
-import { loadStripe } from "@stripe/stripe-js";
+import { useMemo } from "react";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 
 /**
@@ -14,17 +15,37 @@ import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe
  * entirely inside Stripe's own iframe; this app still never touches card
  * details, same contract as the hosted flow it's replacing.
  *
- * The publishable key is intentionally public (safe to ship in the client
- * bundle, unlike the secret key services/mobile_api_service.py uses) --
- * loadStripe() is called once at module scope, matching Stripe's own
- * guidance, not inside the component (which would re-create the Stripe.js
- * instance on every render).
+ * `publishableKey` comes from the backend (GET /v1/billing/plans), not a
+ * NEXT_PUBLIC_ build-time env var — web-next isn't deployed on Render
+ * (confirmed with Zach, 2026-10-19), so there's no build pipeline to bake
+ * it into; it's intentionally public/safe to ship to the client either
+ * way (unlike the secret key services/mobile_api_service.py uses).
  */
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  : null;
+const stripePromiseCache = new Map<string, Promise<Stripe | null>>();
 
-export function EmbeddedCheckoutModal({ clientSecret, onClose }: { clientSecret: string; onClose: () => void }) {
+function stripePromiseFor(publishableKey: string): Promise<Stripe | null> | null {
+  if (!publishableKey) return null;
+  // Memoized by key (not module scope) so a dev hot-reload or a key
+  // rotation never leaves a stale Stripe.js instance half-initialized,
+  // while still never re-creating it on every render for the same key.
+  let cached = stripePromiseCache.get(publishableKey);
+  if (!cached) {
+    cached = loadStripe(publishableKey);
+    stripePromiseCache.set(publishableKey, cached);
+  }
+  return cached;
+}
+
+export function EmbeddedCheckoutModal({
+  clientSecret,
+  publishableKey,
+  onClose,
+}: {
+  clientSecret: string;
+  publishableKey: string;
+  onClose: () => void;
+}) {
+  const stripePromise = useMemo(() => stripePromiseFor(publishableKey), [publishableKey]);
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-4"

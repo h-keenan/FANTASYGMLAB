@@ -57,7 +57,12 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
       ) : (
         <div className="flex flex-col gap-3">
           {plans.plans.map((plan) => (
-            <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} returnTo="/" />
+            <PlanCard
+              key={`${plan.tier}-${plan.interval}`}
+              plan={plan}
+              returnTo="/"
+              publishableKey={plans.stripe_publishable_key}
+            />
           ))}
         </div>
       )}

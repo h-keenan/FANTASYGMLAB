@@ -101,6 +101,12 @@ export interface BillingPlan {
 export interface BillingPlansResponse {
   ok: boolean;
   plans: BillingPlan[];
+  /** Zach, 2026-10-19 ("we dont need renders publuishable" / "find a work
+   * around" — web-next isn't deployed on Render, so there's no
+   * NEXT_PUBLIC_ build-time pipeline to bake this into): served at
+   * runtime from here instead, before the user can even reach Subscribe.
+   * Intentionally public/safe to ship to the client. */
+  stripe_publishable_key: string;
 }
 
 export interface BillingCheckoutResponse {

@@ -42,6 +42,7 @@ from modules import app_config
 
 CONFIG_KEYS = (
     "STRIPE_SECRET_KEY",
+    "STRIPE_PUBLISHABLE_KEY",
     "STRIPE_BILLING_MODE",
     "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PRICE_MONTHLY",
@@ -135,6 +136,14 @@ class BillingUnavailableError(RuntimeError):
 class StripeBillingConfig:
     billing_mode: str = "test"
     secret_key: str = ""
+    # Zach, 2026-10-19 ("we dont need renders publuishable" / "find a work
+    # around" -- web-next isn't deployed on Render at all, it's the same
+    # Caddy-fronted server as the API, so there's no build-time
+    # NEXT_PUBLIC_ env var pipeline to rely on): the publishable key
+    # (intentionally public, safe to ship to the client, unlike secret_key)
+    # is served to the frontend at runtime via GET /v1/billing/plans
+    # instead of being baked into the Next.js build.
+    publishable_key: str = ""
     webhook_secret: str = ""
     # GM Pro prices. Field names kept as `price_monthly`/`price_annual`
     # (not renamed to `price_pro_*`) so every existing call site/test that
@@ -211,6 +220,7 @@ def load_stripe_config(*, environ: dict | None = None, secrets: Any = None) -> S
     return StripeBillingConfig(
         billing_mode=_safe_text(values["STRIPE_BILLING_MODE"]).casefold() or "test",
         secret_key=values["STRIPE_SECRET_KEY"],
+        publishable_key=values["STRIPE_PUBLISHABLE_KEY"],
         webhook_secret=values["STRIPE_WEBHOOK_SECRET"],
         price_monthly=price_monthly,
         price_annual=price_annual,
