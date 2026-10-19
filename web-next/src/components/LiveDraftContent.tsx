@@ -378,6 +378,21 @@ export function LiveDraftContent({
         </p>
       </header>
 
+      {/* coridian_, 2026-10-19: "at least put a coming soon tag on the live
+          draft section for now" — this page is real and functional, but
+          completely untested end-to-end against a live draft (see
+          docs/roadmap.md's open-initiatives entry). Not gated/disabled,
+          just honestly labeled while that testing pass is still pending. */}
+      <div
+        className="glass-input flex items-center gap-2 px-3 py-2 text-xs"
+        style={{ borderLeft: "var(--border-width-semantic) solid var(--color-warning)", color: "var(--color-text-secondary)" }}
+      >
+        <span className="font-bold uppercase" style={{ color: "var(--color-warning)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          Coming soon
+        </span>
+        <span>This page is still being tested end-to-end against a real live draft — treat recommendations as a preview.</span>
+      </div>
+
       {liveOrPaused.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {discovery.drafts.length === 0
