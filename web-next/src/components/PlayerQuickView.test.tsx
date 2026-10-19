@@ -134,6 +134,32 @@ describe("PlayerQuickView", () => {
     expect(screen.getByText(/Loading player detail/)).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt make
+  // sense if he hasnt been playing much" — tier/opportunity_label are
+  // available from the `identity` prop immediately, no fetch needed.
+  it("explains a low tier vs. high right-now opportunity (e.g. an injury-driven promotion)", () => {
+    vi.mocked(api.getPlayerQuickView).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.getPlayerAwards).mockReturnValue(new Promise(() => {}));
+
+    render(
+      <PlayerQuickView
+        identity={identity({ tier: "Contributor", opportunity_label: "Elite Opportunity" })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/reflects value over the full season/)).toBeInTheDocument();
+  });
+
+  it("stays quiet when tier and opportunity_label don't contradict", () => {
+    vi.mocked(api.getPlayerQuickView).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.getPlayerAwards).mockReturnValue(new Promise(() => {}));
+
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    expect(screen.queryByText(/reflects value over the full season/)).not.toBeInTheDocument();
+  });
+
   it("renders stats, model sub-ratings, decision fit, awards, and bio once loaded", async () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
