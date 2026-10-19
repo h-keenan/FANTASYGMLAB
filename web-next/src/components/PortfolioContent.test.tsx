@@ -230,6 +230,27 @@ describe("PortfolioContent", () => {
     expect(screen.getByText(/The Contenders — Dynasty Overlords/)).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-19: a league stuck mid-draft landed in the same
+  // scary "Couldn't load" note as a genuine failure (no linked account,
+  // league gone). It should get its own calm note with a Live Draft link
+  // instead, separate from the Remove-this-league failure note.
+  it("shows a drafting league in its own note with a Live Draft link, not the failure note", () => {
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          failed_leagues: [{ league_id: "league-3", league_name: "Still Drafting", reason: "empty_roster" }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/Draft still in progress/)).toBeInTheDocument();
+    expect(screen.getByText("Still Drafting")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Watch live draft/ })).toHaveAttribute("href", "/live-draft/league-3");
+    expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+  });
+
   // coridian_, 2026-10-19: "the couldnt load 2 leauges takes up too much
   // space and i never selected those leauges to be loaded into the site to
   // beguin with" — a league shown here can exist on the account without a

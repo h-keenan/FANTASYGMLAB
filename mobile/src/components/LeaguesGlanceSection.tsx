@@ -13,6 +13,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { setLastLeague } from '../lib/lastLeague';
 import {
   glanceDestination,
+  glanceDraftingNote,
   glanceFailedNote,
   glanceLayout,
   glanceNewsBadge,
@@ -136,6 +137,7 @@ export default function LeaguesGlanceSection({
   const cards = data?.leagues ?? [];
   const layout = glanceLayout(cards.length);
   const failedNote = glanceFailedNote(data?.failed_leagues ?? []);
+  const draftingNote = glanceDraftingNote(data?.failed_leagues ?? []);
 
   return (
     <View style={styles.section}>
@@ -161,6 +163,12 @@ export default function LeaguesGlanceSection({
               />
             ))}
           </View>
+          {draftingNote ? (
+            <View style={styles.failedNote}>
+              <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+              <AppText style={styles.failedNoteText}>{draftingNote}</AppText>
+            </View>
+          ) : null}
           {failedNote ? (
             <View style={styles.failedNote}>
               <Ionicons name="alert-circle-outline" size={14} color={colors.textSecondary} />
