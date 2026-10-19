@@ -377,9 +377,14 @@ function TargetRowView({
         </PlayerIdentityTrigger>
         <div className="flex items-center gap-2 shrink-0">
           {player?.score !== null && player?.score !== undefined ? (
-            <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-              {formatWaiverScore(player.score)}
-            </span>
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+                Value
+              </span>
+              <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
+                {formatWaiverScore(player.score)}
+              </span>
+            </div>
           ) : null}
           {player?.position_rank ? (
             <span
