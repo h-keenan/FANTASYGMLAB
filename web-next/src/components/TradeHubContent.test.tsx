@@ -107,6 +107,17 @@ describe("TradeHubContent", () => {
     expect(screen.getByText("Fringe Contender")).toBeInTheDocument();
   });
 
+  // coridian_, screenshot: "there's no explanation of what retool means...
+  // people's natural inclination when they don't know what something is
+  // on a phone is probably to tap it."
+  it("reveals a plain-language explanation of the strategy on tap", () => {
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
+
+    expect(screen.queryByText(/middle ground/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /What does this mean\?/ }));
+    expect(screen.getByText(/middle ground/)).toBeInTheDocument();
+  });
+
   it("shows the roster-not-ready message instead of an empty board when `reason` is set", () => {
     const notReady: TradeHubResponse = { ok: true, reason: "empty_roster", ideas: [], entitlement: null, team_strategy: "" };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={notReady} />);

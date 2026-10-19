@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useState } from "react";
 
 import type { TradeHubResponse } from "@/lib/api";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
@@ -35,6 +36,51 @@ function formatStrategyLabel(strategy: string): string {
     .filter(Boolean)
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+// coridian_, screenshot: "it says values reflect a retool strategy, yet
+// there's nowhere to change that strategy, and there's no explanation of
+// what retool means or dynasty or whatever else young contender... people's
+// natural inclination when they don't know what something is on a phone is
+// probably to tap it." Plain-language versions of the same five age-curve
+// buckets modules/trade_hub_engine.py's apply_strategy_age_curve actually
+// applies — not invented copy, just that function's real behavior in
+// words. Changing the strategy itself stays out of scope here (it's driven
+// by Team Situation on this page, a deliberate separate control surface,
+// not a Trade-Hub-local setting) — this fix is the missing explanation.
+const STRATEGY_EXPLANATIONS: Record<string, string> = {
+  contender: "Values lean toward players in their prime (25-30) who help you win now, and slightly discount very young players and aging running backs.",
+  fringe_contender: "A lighter version of Contender — still leans toward players who help you win soon, without discounting youth as much.",
+  retool: "A middle ground: values tilt toward younger players (25 and under) while still crediting players through their late 20s.",
+  rebuild: "Values lean heavily toward young players and discount aging ones, since the plan is to build around players who'll be good years from now.",
+  tank: "The most aggressive lean toward youth — older players are discounted the most, prioritizing future assets over today's roster.",
+};
+
+function StrategyExplainer({ strategy }: { strategy: string }) {
+  const [open, setOpen] = useState(false);
+  const explanation = STRATEGY_EXPLANATIONS[strategy];
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="text-xs text-left underline self-start"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        Values here reflect a <strong>{formatStrategyLabel(strategy)}</strong> strategy — they may differ
+        slightly from Waivers, Dashboard, or Player Quick View. What does this mean?
+      </button>
+      {open ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          {explanation ||
+            "This strategy nudges trade values based on player age, favoring whichever players fit your current team-building plan."}{" "}
+          Set under Team Situation, not here.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function TradeHubContent({
@@ -77,12 +123,7 @@ export function TradeHubContent({
             player can show a different number there than here, with
             nothing explaining why. This names the strategy these values
             were generated under instead of leaving that silent. */}
-        {data.team_strategy ? (
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Values here reflect a <strong>{formatStrategyLabel(data.team_strategy)}</strong> strategy — they may
-            differ slightly from Waivers, Dashboard, or Player Quick View.
-          </span>
-        ) : null}
+        {data.team_strategy ? <StrategyExplainer strategy={data.team_strategy} /> : null}
       </header>
 
       {data.ideas.length === 0 ? (
