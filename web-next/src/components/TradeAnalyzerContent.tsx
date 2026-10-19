@@ -107,11 +107,8 @@ function TradeSidePanel({
   const hasAssets = players.length > 0 || picks.length > 0;
   return (
     <div
-      className="flex flex-col gap-2 p-3 min-w-0"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: `var(--border-width-default) solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
-      }}
+      className="glass-surface flex flex-col gap-2 p-3 min-w-0"
+      style={active ? { borderColor: "var(--color-accent)" } : undefined}
     >
       <button type="button" onClick={onSelect} className="flex items-center gap-1.5 self-start">
         <span className="inline-block" style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor }} />
@@ -180,13 +177,8 @@ function VerdictCard({
 
   return (
     <section
-      className="flex flex-col gap-3 p-4"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        borderLeft: `3px solid ${toneColor}`,
-        boxShadow: "var(--shadow-card)",
-      }}
+      className="glass-surface flex flex-col gap-3 p-4"
+      style={{ borderLeft: `3px solid ${toneColor}` }}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span
@@ -608,12 +600,8 @@ export function TradeAnalyzerContent({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={searchPlaceholder}
-          className="w-full px-3 py-2 text-sm"
-          style={{
-            background: "var(--color-surface-secondary)",
-            border: "var(--border-width-default) solid var(--color-border)",
-            color: "var(--color-text-primary)",
-          }}
+          className="glass-input w-full px-3 py-2 text-sm"
+          style={{ color: "var(--color-text-primary)" }}
         />
 
         <div className="flex flex-col divide-y max-h-80 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>

@@ -57,8 +57,7 @@ function draftFromProspect(prospect: CollegeProspect): ReportDraft {
 function EmptyState({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div
-      className="flex flex-col gap-1 items-start px-4 py-6"
-      style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+      className="glass-surface flex flex-col gap-1 items-start px-4 py-6"
     >
       <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
         {title}
@@ -98,8 +97,7 @@ function ProspectCard({
 
   return (
     <article
-      className="flex flex-col gap-2 p-3"
-      style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+      className="glass-surface flex flex-col gap-2 p-3"
     >
       <div className="flex items-center gap-2">
         <PositionBadge position={prospect.position} />

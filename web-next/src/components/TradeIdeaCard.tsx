@@ -115,13 +115,8 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
 
   return (
     <article
-      className="flex flex-col gap-3 p-4"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        borderLeft: `3px solid ${accent}`,
-        boxShadow: "var(--shadow-card)",
-      }}
+      className="glass-surface flex flex-col gap-3 p-4"
+      style={{ borderLeft: `3px solid ${accent}` }}
     >
       {idea.category || impact ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">

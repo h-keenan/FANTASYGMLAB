@@ -152,6 +152,7 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
               contentStyle={{
                 background: "var(--color-surface-secondary)",
                 border: "var(--border-width-default) solid var(--color-border)",
+                borderRadius: "var(--radius-control)",
                 color: "var(--color-text-primary)",
                 fontSize: "0.75rem",
               }}

@@ -181,7 +181,7 @@ function OpponentPicker({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col items-center gap-2 py-4" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="glass-surface flex flex-col items-center gap-2 py-4">
         <IdentityCard player={basePlayer} />
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Choose an opponent below.
@@ -199,7 +199,7 @@ function OpponentPicker({
           color: "var(--color-text-primary)",
         }}
       />
-      <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="glass-surface flex flex-col">
         {results.length === 0 ? (
           <p className="text-sm px-3 py-4" style={{ color: "var(--color-text-muted)" }}>
             No players match.
@@ -414,7 +414,7 @@ export function PlayerCompareContent({
 
           <section className="flex flex-col gap-2">
             <SectionHeader title="Value & Rank" />
-            <div className="flex flex-col px-1" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+            <div className="glass-surface flex flex-col px-1">
               {valueRows.map((row, index) => (
                 <CompareRowView key={row.label} row={row} isLast={index === valueRows.length - 1} />
               ))}
@@ -424,7 +424,7 @@ export function PlayerCompareContent({
           {showModelRows ? (
             <section className="flex flex-col gap-2">
               <SectionHeader title="Model Breakdown" />
-              <div className="flex flex-col px-1" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+              <div className="glass-surface flex flex-col px-1">
                 {modelRows.map((row, index) => (
                   <CompareRowView key={row.label} row={row} isLast={index === modelRows.length - 1} />
                 ))}
@@ -435,7 +435,7 @@ export function PlayerCompareContent({
           {showTrendRows ? (
             <section className="flex flex-col gap-2">
               <SectionHeader title="Trends" />
-              <div className="flex flex-col px-1" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+              <div className="glass-surface flex flex-col px-1">
                 {trendRows.map((row, index) => (
                   <CompareTextRowView key={row.label} row={row} isLast={index === trendRows.length - 1} />
                 ))}

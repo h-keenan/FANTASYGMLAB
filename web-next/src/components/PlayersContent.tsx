@@ -323,10 +323,7 @@ export function PlayersContent({
                 {season || "Future"}
               </span>
               <div
-                style={{
-                  background: "var(--color-surface-secondary)",
-                  border: "var(--border-width-default) solid var(--color-border)",
-                }}
+                className="glass-surface"
               >
                 {seasonPicks.map((pick, index) => (
                   <PickRow key={pick.pick_id} pick={pick} showOwner showDivider={index < seasonPicks.length - 1} />

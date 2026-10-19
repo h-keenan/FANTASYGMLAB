@@ -163,14 +163,7 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
   const showHealthFlag = Boolean(league.health_flag) && league.health_flag !== "Stable";
 
   return (
-    <article
-      className="flex flex-col p-4"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
+    <article className="glass-surface flex flex-col p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
           {/* coridian_, 2026-10-18 (screenshot): Portfolio's league cards

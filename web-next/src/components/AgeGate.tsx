@@ -87,12 +87,7 @@ export function AgeGate({ onConfirmed }: { onConfirmed: () => void }) {
           maxLength={2}
           value={month}
           onChange={(event) => setMonth(event.target.value.replace(/\D/g, ""))}
-          className="w-16 px-2 py-2 text-center"
-          style={{
-            background: "var(--color-surface-secondary)",
-            color: "var(--color-text-primary)",
-            border: "var(--border-width-default) solid var(--color-border)",
-          }}
+          className="glass-input w-16 px-2 py-2 text-center" style={{ color: "var(--color-text-primary)" }}
         />
         <input
           aria-label="Birth day"
@@ -100,12 +95,7 @@ export function AgeGate({ onConfirmed }: { onConfirmed: () => void }) {
           maxLength={2}
           value={day}
           onChange={(event) => setDay(event.target.value.replace(/\D/g, ""))}
-          className="w-16 px-2 py-2 text-center"
-          style={{
-            background: "var(--color-surface-secondary)",
-            color: "var(--color-text-primary)",
-            border: "var(--border-width-default) solid var(--color-border)",
-          }}
+          className="glass-input w-16 px-2 py-2 text-center" style={{ color: "var(--color-text-primary)" }}
         />
         <input
           aria-label="Birth year"
@@ -113,12 +103,7 @@ export function AgeGate({ onConfirmed }: { onConfirmed: () => void }) {
           maxLength={4}
           value={year}
           onChange={(event) => setYear(event.target.value.replace(/\D/g, ""))}
-          className="w-20 px-2 py-2 text-center"
-          style={{
-            background: "var(--color-surface-secondary)",
-            color: "var(--color-text-primary)",
-            border: "var(--border-width-default) solid var(--color-border)",
-          }}
+          className="glass-input w-20 px-2 py-2 text-center" style={{ color: "var(--color-text-primary)" }}
         />
       </div>
       {error ? (

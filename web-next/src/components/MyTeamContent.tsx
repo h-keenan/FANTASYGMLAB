@@ -342,7 +342,7 @@ export function MyTeamContent({
             No suggested starters yet.
           </p>
         ) : (
-          <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+          <div className="glass-surface flex flex-col">
             {starters.map((player) => (
               <LineupRow key={player.player_id} player={player} />
             ))}
@@ -361,7 +361,7 @@ export function MyTeamContent({
         ) : (
           <div className="flex flex-col gap-4">
             {activeBench.length > 0 ? (
-              <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+              <div className="glass-surface flex flex-col">
                 {activeBench.map((player) => (
                   <LineupRow key={player.player_id} player={player} muted />
                 ))}
@@ -372,7 +372,7 @@ export function MyTeamContent({
                 <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
                   Injured Reserve
                 </span>
-                <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+                <div className="glass-surface flex flex-col">
                   {irBench.map((player) => (
                     <LineupRow key={player.player_id} player={player} muted />
                   ))}
@@ -384,7 +384,7 @@ export function MyTeamContent({
                 <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
                   Taxi Squad
                 </span>
-                <div className="flex flex-col" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}>
+                <div className="glass-surface flex flex-col">
                   {taxiBench.map((player) => (
                     <LineupRow key={player.player_id} player={player} muted />
                   ))}

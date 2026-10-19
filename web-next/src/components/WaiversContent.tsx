@@ -120,12 +120,8 @@ function FaabRange({ player, prominent = false }: { player: WaiverPriorityAdd; p
 function PriorityAddPrimaryCard({ player }: { player: WaiverPriorityAdd }) {
   return (
     <article
-      className="flex flex-col gap-3 p-4"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-premium)",
-        boxShadow: "var(--shadow-card)",
-      }}
+      className="glass-surface flex flex-col gap-3 p-4"
+      style={{ borderColor: "var(--color-premium)" }}
     >
       <div className="flex items-center gap-2">
         <span
@@ -227,8 +223,7 @@ function BestAvailableTile({ position, player, count }: { position: string; play
   return (
     <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[7.5rem]">
       <div
-        className="flex flex-col items-center gap-1 p-3"
-        style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+        className="glass-surface flex flex-col items-center gap-1 p-3"
       >
         <PositionBadge position={position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
@@ -356,8 +351,7 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
             <PriorityAddPrimaryCard player={topPriority} />
             {secondaryPriority.length > 0 ? (
               <div
-                className="flex flex-col px-3"
-                style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+                className="glass-surface flex flex-col px-3"
               >
                 {secondaryPriority.map((player, index) => (
                   <PriorityAddCompactRow key={player.player_id} player={player} showDivider={index < secondaryPriority.length - 1} />
@@ -403,8 +397,7 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
                   Stash Candidates
                 </span>
                 <div
-                  className="flex flex-col px-3"
-                  style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+                  className="glass-surface flex flex-col px-3"
                 >
                   {data.stash_candidates.map((player) => (
                     <FreeAgentRow key={player.player_id} player={player} />
@@ -418,8 +411,7 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
                   Watchlist Depth
                 </span>
                 <div
-                  className="flex flex-col px-3"
-                  style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+                  className="glass-surface flex flex-col px-3"
                 >
                   {data.watchlist_candidates.map((player) => (
                     <FreeAgentRow key={player.player_id} player={player} />
@@ -433,8 +425,7 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
                   FAAB Shortlist
                 </span>
                 <div
-                  className="flex flex-col px-3"
-                  style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+                  className="glass-surface flex flex-col px-3"
                 >
                   {data.faab_targets.map((player) => (
                     <FreeAgentRow key={player.player_id} player={player} />
@@ -497,8 +488,7 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
         ) : (
           <>
             <div
-              className="flex flex-col px-3"
-              style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+              className="glass-surface flex flex-col px-3"
             >
               {visibleFreeAgents.map((player) => (
                 <FreeAgentRow key={player.player_id} player={player} />
