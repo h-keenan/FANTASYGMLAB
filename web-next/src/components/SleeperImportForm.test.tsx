@@ -32,6 +32,7 @@ describe("SleeperImportForm", () => {
       signInWithOAuth: vi.fn(),
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
+      deleteAccount: vi.fn(),
       isGuest: false,
     });
   });

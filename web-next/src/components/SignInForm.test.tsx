@@ -53,6 +53,7 @@ describe("SignInForm", () => {
       signInWithOAuth,
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
+      deleteAccount: vi.fn(),
       isGuest: false,
     });
   });

@@ -125,5 +125,6 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "trade-finder": "Trade Finder",
   "player-compare": "Player Compare",
   premium: "Premium",
+  account: "Account",
   legal: "Legal",
 };

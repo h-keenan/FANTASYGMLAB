@@ -17,6 +17,16 @@ interface AuthContextValue {
   signInWithOAuth: (provider: "google" | "apple") => Promise<{ error: string | null }>;
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  /** Account page (2026-10-19) — self-service account deletion, Apple App
+   * Store Guideline 5.1.1(v) parity with mobile's existing "Delete
+   * account" flow (mobile/src/context/AuthContext.tsx). Calls the same
+   * `public.delete_user()` Supabase RPC (docs/supabase_delete_account.sql)
+   * directly with the caller's own session — security-definer but
+   * auth.uid()-scoped inside the function body, so this can only ever
+   * delete the caller's own row. Deleting auth.users cascades to every
+   * app table referencing it (profiles, saved_leagues, gm_targets, etc.),
+   * so no separate per-table cleanup is needed here. */
+  deleteAccount: () => Promise<{ error: string | null }>;
   /** True for a currently-signed-in guest (anonymous) session — mirrors
    * mobile's `isGuest` (mobile/src/lib/guestConversion.ts). A guest here is
    * a real Supabase session (`signInAnonymously`), not Streamlit's
@@ -103,6 +113,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signOut: async () => {
         await supabase.auth.signOut();
+      },
+      deleteAccount: async () => {
+        const { error } = await supabase.rpc("delete_user");
+        if (error) return { error: error.message };
+        await supabase.auth.signOut();
+        return { error: null };
       },
     }),
     [session, loading],
