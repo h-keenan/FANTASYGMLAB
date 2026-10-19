@@ -35,8 +35,13 @@ Expand beyond the existing "follow trade ideas" feature:
   anonymized as "Team A traded with Team B," not by real identity.
 - Highlight-style framing, e.g. "craziest trades this week."
 - Possibly extend the same idea to draft picks — pull interesting draft
-  behavior/results and surface them similarly. Needs more thought on what
-  "interesting" means here before building.
+  behavior/results and surface them similarly.
+
+coridian_, 2026-10-19, on what "interesting" means: trades flagged by our
+own system as engagement-prone (not just chronological/raw) — reuses the
+app's existing trade-grading/evaluation signals rather than inventing a
+new "interesting" heuristic from scratch. Reactions are emoji-only, no
+comments/replies — deliberately so the feature needs no moderation layer.
 
 ### Home screen widget
 Mini dashboard widget, filtered to only very-high-priority items so it
