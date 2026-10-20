@@ -1,5 +1,6 @@
 from typing import Any, Mapping
 
+from modules.player_state_authority import is_suspended
 from modules.rankings import injury_level
 
 
@@ -126,7 +127,9 @@ def explain_player_decision(
     elif age_value and age_value >= 29:
         profile_bits.append("with an older age curve")
 
-    if injury_key == "major":
+    if injury_key == "major" and is_suspended(row.get("status"), row.get("injury_status")):
+        profile_bits.append("while currently suspended")
+    elif injury_key == "major":
         profile_bits.append("while carrying major injury discount")
     elif injury_key == "moderate":
         profile_bits.append("with meaningful short-term injury risk")

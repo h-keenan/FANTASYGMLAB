@@ -34,7 +34,7 @@ from modules.player_eligibility import (
     filter_current_fantasy_players,
     player_eligibility,
 )
-from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
+from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES, is_suspended
 from modules.sleeper import (
     get_players,
     get_prior_season_player_stats,
@@ -2357,6 +2357,24 @@ def _injury_level_cached(status: str, injury_status: str) -> str:
         return "moderate"
     if status in minor_terms or has_term(status, minor_terms) or has_term(injury_status, minor_terms):
         return "minor"
+    # Suspension (Sleeper's real `injury_status` "Sus" — confirmed against
+    # data/sleeper_players.json, 2026-10-19 valuation-system audit) is
+    # scheduled, known-duration unavailability, not injury-recovery
+    # uncertainty — functionally the same "fully out for a known/bounded
+    # time" fact as the IR/PUP/NFI statuses in major_terms above, so it gets
+    # the same "major" severity for every numeric/boolean consumer here
+    # (injury_multiplier's discount, is_ruled_out(), risk_multiplier(),
+    # waiver_actionability()'s sibling check in player_state_authority.py).
+    # It is deliberately NOT folded into major_terms itself, because that set
+    # is reused verbatim as free-text injury wording in several callers
+    # (trade_hub_ui.py's trade_asset_injury_context(), player_cards.py's
+    # injury_value_impact(), chat.py's trade narrative) — those call
+    # is_suspended() directly to say "Suspended" instead of "injury", and
+    # injury_display_label() below does the same for its raw tag. Without
+    # this check "Sus" fell through to the generic "minor" catch-all,
+    # alongside things like day-to-day soreness.
+    if is_suspended(status, injury_status):
+        return "major"
     if injury_status and injury_status not in healthy_markers:
         return "minor"
     return "healthy"
@@ -2414,6 +2432,8 @@ def injury_display_label(status: str, injury_status: str = "") -> str:
     level = injury_level(status, injury_status)
     if level == "healthy":
         return ""
+    if is_suspended(status, injury_status):
+        return "Suspended"
     tag = str(injury_status or "").strip()
     if tag:
         return tag

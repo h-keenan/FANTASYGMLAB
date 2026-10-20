@@ -180,7 +180,7 @@ def injury_badge_html(
         tone = "success"
     elif label not in {
         "Q", "QUESTIONABLE", "D", "DOUBTFUL", "O", "OUT", "IR",
-        "PUP", "SUSP", "SUSPENDED", "INACTIVE",
+        "PUP", "SUS", "SUSP", "SUSPENDED", "INACTIVE",
     }:
         tone = "neutral"
     short = {
@@ -190,6 +190,12 @@ def injury_badge_html(
         "D": "Doubt",
         "OUT": "Out",
         "O": "Out",
+        # "SUS" is Sleeper's real `injury_status` spelling for a suspended
+        # player (confirmed against data/sleeper_players.json) — this
+        # component already anticipated "SUSPENDED" but never the real feed
+        # value, so a suspended player's badge fell through to a raw,
+        # neutral-toned "SUS" instead of the danger-toned abbreviation below.
+        "SUS": "SUSP",
         "SUSPENDED": "SUSP",
     }.get(label, label)
     classes = " ".join(("dg-football-injury", f"dg-football-injury--{tone}", *extra_classes))

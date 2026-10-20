@@ -23,6 +23,7 @@ from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.interaction_contract import TAP_DELEGATION_JS, on_clicked_change
 from modules.player_images import get_player_image_url
+from modules.player_state_authority import is_suspended
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.page_shell import page_body
 
@@ -934,7 +935,10 @@ def trade_asset_injury_context(
                 updated_at /= 1000.0
             uncertain = updated_at <= 0 or time.time() - updated_at > 60 * 24 * 60 * 60
 
-    if level == "major":
+    if level == "major" and is_suspended(asset.get("status"), asset.get("injury_status")):
+        label = "Suspended"
+        note = "Suspended for a known length of time, not injured; treat as fully unavailable dynasty value until the suspension ends."
+    elif level == "major":
         label = "Major Injury Risk"
         note = "Long-term or reserve-level injury signal; treat this as an injury-discount dynasty target, not clean current production."
     elif level == "moderate":
