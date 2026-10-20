@@ -228,3 +228,96 @@ def test_build_daily_pick_returns_none_when_no_surprise_exists():
 def test_build_daily_pick_returns_none_on_empty_inputs():
     assert gtp.build_daily_pick(pd.DataFrame(), {}, seed="2026-10-19") is None
     assert gtp.build_daily_pick(_players_frame(), {}, seed="2026-10-19") is None
+
+
+# ---------------------------------------------------------------------------
+# "Who is who?" name-match mode. Player "4" (Star RB, elite tier) is the
+# only high-profile player in the shared fixture above; its week 5 value is
+# 21.0 (index 4 of [18, 22, 20, 19, 21, 20]) -- genuinely less than player
+# "1"'s real week-5 breakout of 30.0, so the fixture already contains one
+# real same-week inversion without any new fixture data.
+# ---------------------------------------------------------------------------
+
+
+def test_find_name_match_candidates_pairs_the_real_breakout_week_with_a_real_high_profile_loss():
+    players_by_id = {row["player_id"]: row for row in _players_frame().to_dict("records")}
+    pairings = gtp.find_name_match_candidates(_season_stats(), players_by_id)
+
+    assert len(pairings) == 1
+    pairing = pairings[0]
+    assert pairing["obscure_player_id"] == "1"
+    assert pairing["famous_player_id"] == "4"
+    assert pairing["week"] == 5
+    assert pairing["obscure_actual_fantasy_points_ppr"] == 30.0
+    assert pairing["famous_actual_fantasy_points_ppr"] == 21.0
+    assert pairing["famous_actual_fantasy_points_ppr"] < pairing["obscure_actual_fantasy_points_ppr"]
+
+
+def test_find_name_match_candidates_excludes_a_non_high_profile_famous_side():
+    # Player "3" (contributor tier) must never stand in as the "famous"
+    # side even though its week-5 value (4.0) is also below player 1's 30.0
+    # -- only HIGH_PROFILE_TIER_IDS tiers may be the famous side.
+    players_by_id = {row["player_id"]: row for row in _players_frame().to_dict("records")}
+    pairings = gtp.find_name_match_candidates(_season_stats(), players_by_id)
+    assert all(pairing["famous_player_id"] != "3" for pairing in pairings)
+
+
+def test_find_name_match_candidates_requires_a_genuine_inversion():
+    players_by_id = {row["player_id"]: row for row in _players_frame().to_dict("records")}
+    # Flatten the only high-profile player's weekly production so it always
+    # beats the real breakout week -- no pairing should qualify.
+    stats = _season_stats()
+    stats["4"] = {
+        "stats_season": 2025,
+        "ppg": 40.0,
+        "fantasy_points_ppr": 240.0,
+        "games_played": 6,
+        "weekly": _weeks([40, 40, 40, 40, 40, 40]),
+    }
+    assert gtp.find_name_match_candidates(stats, players_by_id) == []
+
+
+def test_compute_name_match_pick_id_is_stable_and_identity_scoped():
+    first = gtp.compute_name_match_pick_id(2025, "4", "1", 5)
+    same = gtp.compute_name_match_pick_id(2025, "4", "1", 5)
+    different_pair = gtp.compute_name_match_pick_id(2025, "4", "2", 5)
+    assert first == same
+    assert first != different_pair
+    # Must never collide with the original game's own pick_id for the same
+    # (season, player, week) identity.
+    assert first != gtp.compute_pick_id(2025, "1", 5)
+
+
+def test_build_daily_name_match_pick_includes_both_real_identities_and_hides_nothing_fabricated():
+    pick = gtp.build_daily_name_match_pick(_players_frame(), _season_stats(), seed="2026-10-19")
+
+    assert pick is not None
+    assert pick["famous_player_id"] == "4"
+    assert pick["famous_name"] == "Star RB"
+    assert pick["obscure_player_id"] == "1"
+    assert pick["obscure_name"] == "Bench Runner"
+    assert pick["week"] == 5
+    assert {pick["famous_slot"], pick["obscure_slot"]} == {"A", "B"}
+    assert pick["famous_slot"] != pick["obscure_slot"]
+
+    famous_slot_payload = pick["slots"][pick["famous_slot"]]
+    obscure_slot_payload = pick["slots"][pick["obscure_slot"]]
+    assert famous_slot_payload["fantasy_points_ppr"] == 21.0
+    assert obscure_slot_payload["fantasy_points_ppr"] == 30.0
+    assert famous_slot_payload["stat_line"]
+    assert obscure_slot_payload["stat_line"]
+
+
+def test_build_daily_name_match_pick_returns_none_when_no_pairing_exists():
+    flat_stats = {
+        "1": {
+            "stats_season": 2025,
+            "weekly": _weeks([3, 4, 3, 4, 3, 4]),
+        }
+    }
+    assert gtp.build_daily_name_match_pick(_players_frame(), flat_stats, seed="2026-10-19") is None
+
+
+def test_build_daily_name_match_pick_returns_none_on_empty_inputs():
+    assert gtp.build_daily_name_match_pick(pd.DataFrame(), {}, seed="2026-10-19") is None
+    assert gtp.build_daily_name_match_pick(_players_frame(), {}, seed="2026-10-19") is None

@@ -41,7 +41,11 @@ type RevealState = {
   correctPlayer: GuessThePlayerCorrectIdentity;
 };
 
-function streakCaption(streak: { current_streak: number; best_streak: number }): string {
+/** Exported so GuessThePlayerNameMatchCard.tsx — a separate daily
+ * mini-game that shares this same "N in a row · Best M" streak shape —
+ * can reuse the exact same copy/logic rather than inventing a second
+ * version of it. */
+export function streakCaption(streak: { current_streak: number; best_streak: number }): string {
   if (streak.current_streak <= 0 && streak.best_streak <= 0) return "Start a streak";
   const current = `${streak.current_streak} in a row`;
   if (streak.best_streak <= streak.current_streak) return current;

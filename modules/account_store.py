@@ -130,6 +130,7 @@ _TABLE_SETUP_DOCS: dict[str, str] = {
     "trade_outcomes": "docs/supabase_trade_outcomes.sql",
     "push_tokens": "docs/supabase_push_tokens.sql",
     "guess_the_player_streaks": "docs/supabase_guess_the_player.sql",
+    "guess_the_player_name_match_streaks": "docs/supabase_guess_the_player_name_match.sql",
     "community_trade_reactions": "docs/supabase_community_trade_reactions.sql",
 }
 
@@ -393,6 +394,36 @@ def upsert_guess_the_player_streak(config: dict, access_token: str, payload: dic
     return upsert_row(config, access_token, "guess_the_player_streaks", payload, on_conflict="user_id")
 
 
+def fetch_guess_the_player_name_match_streak(config: dict, access_token: str, *, user_id: str) -> tuple[dict, str]:
+    """This user's "Who is who?" name-match streak row
+    (docs/supabase_guess_the_player_name_match.sql) — a separate table from
+    fetch_guess_the_player_streak's own, since this is a distinct game with
+    its own difficulty/feel and must never share a streak with the
+    original "Whose stats are these?" game.
+
+    Empty dict (never an error the caller must branch on) when the user has
+    no row yet, same "missing row means default state" contract
+    fetch_guess_the_player_streak already uses.
+    """
+
+    rows, error = fetch_rows(
+        config,
+        access_token,
+        "guess_the_player_name_match_streaks",
+        user_id=user_id,
+        timing_label="supabase_guess_the_player_name_match_streak_lookup",
+    )
+    if error:
+        return {}, error
+    return dict(rows[0]) if rows else {}, ""
+
+
+def upsert_guess_the_player_name_match_streak(config: dict, access_token: str, payload: dict) -> tuple[bool, str]:
+    return upsert_row(
+        config, access_token, "guess_the_player_name_match_streaks", payload, on_conflict="user_id"
+    )
+
+
 def fetch_rows(
     config: dict,
     access_token: str,
@@ -555,6 +586,7 @@ EXPORTABLE_USER_TABLES = (
     "decision_memory_baselines",
     "notification_read_state",
     "guess_the_player_streaks",
+    "guess_the_player_name_match_streaks",
     "community_trade_reactions",
 )
 

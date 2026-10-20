@@ -166,19 +166,29 @@ def find_surprise_candidates(
 
 
 def select_daily_candidate(
-    candidates: Sequence[Mapping[str, Any]], *, seed: str
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    seed: str,
+    sort_key: Any = None,
 ) -> dict[str, Any] | None:
     """One candidate, deterministic for a given seed (the calendar date) —
     every backend worker/process picks the identical candidate for the same
     day with no shared cache or lock required for CORRECTNESS (a Redis cache
     around the caller is still worthwhile for the CPU cost of building
-    `candidates` in the first place, see services/mobile_api_service.py)."""
+    `candidates` in the first place, see services/mobile_api_service.py).
+
+    ``sort_key`` defaults to the original "Whose stats are these?" shape
+    (``player_id``/``week``); the name-match mode below reuses this same
+    function with its own key rather than duplicating the
+    stable-order-then-seeded-choice logic.
+    """
 
     if not candidates:
         return None
     # Stable pre-shuffle order so the same `seed` always indexes the same
     # candidate regardless of dict/set iteration order upstream.
-    ordered = sorted(candidates, key=lambda item: (item["player_id"], item["week"]))
+    key_fn = sort_key or (lambda item: (item["player_id"], item["week"]))
+    ordered = sorted(candidates, key=key_fn)
     rng = random.Random(seed)
     return dict(rng.choice(ordered))
 
@@ -345,4 +355,192 @@ def build_daily_pick(
         "stat_line": stat_line,
         "fantasy_points_ppr": picked["actual_fantasy_points_ppr"],
         "options": all_options,
+    }
+
+
+# ---------------------------------------------------------------------------
+# "Who is who?" name-match mode — coridian_'s own pitch (Discord, 2026-10-19,
+# describing a SECOND mini-game alongside the one above): "you get two
+# players and one player is, you know, a known name that's good, and then
+# one player is kind of an unknown name who maybe has better stats than the
+# known name, and so you pick and choose who is who."
+#
+# Deliberately a different mechanic from "Whose stats are these?" above:
+# BOTH players' real identity (name/photo/position/team) is shown up front,
+# never hidden. What's hidden is which of the two real, UNLABELED stat
+# lines ("Slot A"/"Slot B") belongs to which player. The surprise this mode
+# is built to guarantee: the obscure player's real stat line is genuinely
+# better than the famous player's, in the exact same real week — reuses
+# find_surprise_candidates's own "surprising bench-tier week" contract for
+# the obscure side, rather than inventing a second selection heuristic.
+# ---------------------------------------------------------------------------
+
+# Top two of the seven-tier ladder (modules.player_tier_identity) — the
+# real-world "recognizable name" counterpart to LOW_PROFILE_TIER_IDS's
+# bottom three. Drawing the famous side only from here means a star having
+# a normal great week can never accidentally BE the "surprise" side; the
+# surprise always comes from the bottom-tier player per
+# find_surprise_candidates's own existing contract.
+HIGH_PROFILE_TIER_IDS = frozenset({"generational", "elite"})
+
+
+def _is_high_profile(player_row: Mapping[str, Any]) -> bool:
+    identity = player_tier_identity.resolve_player_tier_identity(player_row)
+    return identity.tier_id in HIGH_PROFILE_TIER_IDS
+
+
+def find_name_match_candidates(
+    season_stats: Mapping[str, Mapping[str, Any]],
+    players_by_id: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Every (obscure, famous) pairing where, in the exact SAME real week,
+    a genuine surprise week from a normally low-profile player
+    (find_surprise_candidates's own selection contract, reused unchanged)
+    actually outscored a real high-profile player's own real stat line for
+    that identical week.
+
+    Anchoring both sides to the SAME week (rather than picking each
+    player's own best week independently) keeps the comparison honest: the
+    inversion is a genuine same-week fact, never two different,
+    cherry-picked weeks stitched together to manufacture a surprise.
+    """
+
+    pairings: list[dict[str, Any]] = []
+    for obscure in find_surprise_candidates(season_stats, players_by_id):
+        season = obscure["season"]
+        week = obscure["week"]
+        obscure_points = obscure["actual_fantasy_points_ppr"]
+        for famous_player_id, stats in season_stats.items():
+            if not isinstance(stats, Mapping):
+                continue
+            if str(famous_player_id) == obscure["player_id"]:
+                continue
+            try:
+                stats_season = int(stats.get("stats_season") or 0)
+            except (TypeError, ValueError):
+                continue
+            if stats_season != season:
+                continue
+            famous_row = players_by_id.get(str(famous_player_id))
+            if not famous_row or not _is_high_profile(famous_row):
+                continue
+
+            famous_week = next(
+                (w for w in usable_weeks(stats.get("weekly")) if int(w.get("week") or 0) == week),
+                None,
+            )
+            if famous_week is None:
+                continue
+            try:
+                famous_points = float(famous_week.get("fantasy_points_ppr"))
+            except (TypeError, ValueError):
+                continue
+            if famous_points >= obscure_points:
+                # Must be a genuine inversion — the famous player actually
+                # losing that week — never a tie or a famous-player win.
+                continue
+
+            pairings.append(
+                {
+                    "season": season,
+                    "week": week,
+                    "obscure_player_id": obscure["player_id"],
+                    "obscure_position": obscure["position"],
+                    "obscure_week_stats": obscure["week_stats"],
+                    "obscure_actual_fantasy_points_ppr": obscure_points,
+                    "famous_player_id": str(famous_player_id),
+                    "famous_week_stats": famous_week,
+                    "famous_actual_fantasy_points_ppr": round(famous_points, 1),
+                }
+            )
+    return pairings
+
+
+def compute_name_match_pick_id(season: int, famous_player_id: str, obscure_player_id: str, week: int) -> str:
+    """Stable, opaque identity for one day's name-match pairing — same
+    "hash of real identity, not raw content" convention as
+    compute_pick_id, namespaced so it can never collide with that
+    function's own pick_id for the original game."""
+
+    raw = f"name_match:{int(season)}:{str(famous_player_id)}:{str(obscure_player_id)}:{int(week)}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+
+def build_daily_name_match_pick(
+    players_df: pd.DataFrame,
+    season_stats: Mapping[str, Mapping[str, Any]],
+    *,
+    seed: str,
+) -> dict[str, Any] | None:
+    """The full daily name-match pick: both real identities, both real
+    per-week stat lines, and which opaque slot ("A"/"B") each one actually
+    belongs to (kept out of the public payload by the caller until
+    answered). Returns ``None`` when no genuine same-week inversion exists
+    today — the caller must report the card as unavailable rather than
+    fabricate one.
+    """
+
+    if players_df is None or players_df.empty or not season_stats:
+        return None
+
+    players_by_id: dict[str, dict[str, Any]] = {}
+    for _, row in players_df.iterrows():
+        player_id = str(row.get("player_id") or "").strip()
+        if player_id:
+            players_by_id[player_id] = row.to_dict()
+
+    pairings = find_name_match_candidates(season_stats, players_by_id)
+    picked = select_daily_candidate(
+        pairings,
+        seed=seed,
+        sort_key=lambda item: (item["famous_player_id"], item["obscure_player_id"], item["week"]),
+    )
+    if picked is None:
+        return None
+
+    famous_row = players_by_id.get(picked["famous_player_id"]) or {}
+    obscure_row = players_by_id.get(picked["obscure_player_id"]) or {}
+    famous_name = str(famous_row.get("name") or "").strip()
+    obscure_name = str(obscure_row.get("name") or "").strip()
+    famous_stat_line = stat_line_for_week(picked["famous_week_stats"])
+    obscure_stat_line = stat_line_for_week(picked["obscure_week_stats"])
+    if not famous_name or not obscure_name or not famous_stat_line or not obscure_stat_line:
+        # Fail closed rather than ship a half-identified or empty-stat-line
+        # pairing (shouldn't happen given the gates above, but never guess).
+        return None
+
+    rng = random.Random(f"{seed}:name_match:slot")
+    famous_slot = rng.choice(["A", "B"])
+    obscure_slot = "B" if famous_slot == "A" else "A"
+
+    pick_id = compute_name_match_pick_id(
+        picked["season"], picked["famous_player_id"], picked["obscure_player_id"], picked["week"]
+    )
+
+    return {
+        "pick_id": pick_id,
+        "season": picked["season"],
+        "week": picked["week"],
+        "famous_player_id": picked["famous_player_id"],
+        "famous_name": famous_name,
+        "famous_team": str(famous_row.get("team") or "").strip().upper(),
+        "famous_position": str(famous_row.get("position") or "").strip().upper(),
+        "famous_tier": str(famous_row.get("player_tier") or "").strip(),
+        "obscure_player_id": picked["obscure_player_id"],
+        "obscure_name": obscure_name,
+        "obscure_team": str(obscure_row.get("team") or "").strip().upper(),
+        "obscure_position": picked["obscure_position"],
+        "obscure_tier": str(obscure_row.get("player_tier") or "").strip(),
+        "famous_slot": famous_slot,
+        "obscure_slot": obscure_slot,
+        "slots": {
+            famous_slot: {
+                "stat_line": famous_stat_line,
+                "fantasy_points_ppr": picked["famous_actual_fantasy_points_ppr"],
+            },
+            obscure_slot: {
+                "stat_line": obscure_stat_line,
+                "fantasy_points_ppr": picked["obscure_actual_fantasy_points_ppr"],
+            },
+        },
     }

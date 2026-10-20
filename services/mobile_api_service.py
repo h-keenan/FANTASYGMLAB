@@ -1112,6 +1112,7 @@ _EXPORTABLE_USER_TABLES = (
     "decision_memory_baselines",
     "notification_read_state",
     "guess_the_player_streaks",
+    "guess_the_player_name_match_streaks",
     "community_trade_reactions",
 )
 
@@ -4380,6 +4381,221 @@ def answer_guess_the_player(
         "already_answered": False,
         "correct": correct,
         "correct_player": _guess_the_player_correct_identity(pick),
+        "streak": streak_payload,
+    }
+
+
+# ---------------------------------------------------------------------------
+# "Who is who?" name-match mode — a SECOND, distinct daily mini-game
+# (coridian_, 2026-10-19, same Discord thread as the game above): "you get
+# two players and one player is, you know, a known name that's good, and
+# then one player is kind of an unknown name who maybe has better stats
+# than the known name, and so you pick and choose who is who." Unlike the
+# game above, BOTH players' real identity is shown up front — what's
+# hidden is which of the two real, unlabeled stat lines ("Slot A"/"Slot B")
+# belongs to which player. Its own daily pick and its own persisted streak
+# (docs/supabase_guess_the_player_name_match.sql) — never mixed with the
+# original game's streak, these are different games with different
+# difficulty/feel. Selection logic lives in modules.guess_the_player's
+# find_name_match_candidates/build_daily_name_match_pick.
+# ---------------------------------------------------------------------------
+
+_GUESS_THE_PLAYER_NAME_MATCH_CACHE_TTL_SECONDS = 24 * 60 * 60
+
+
+def _guess_the_player_name_match_compute_pick(today: str) -> dict[str, Any] | None:
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        return None
+    season_stats = sleeper.get_season_player_stats()
+    if not season_stats:
+        return None
+    return guess_the_player.build_daily_name_match_pick(players_df, season_stats, seed=today)
+
+
+def _guess_the_player_name_match_daily_pick(today: str) -> dict[str, Any] | None:
+    """Today's featured name-match pairing. Same calendar-day boundary as
+    _guess_the_player_today (one shared backend, one UTC date for every
+    caller) and the same fail-open Redis cache contract as
+    _guess_the_player_daily_pick — a separate cache key/namespace so the
+    two games' daily picks can never collide or evict each other."""
+
+    cache_key = redis_cache.build_cache_key("guess_the_player_name_match_daily_pick", today)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_GUESS_THE_PLAYER_NAME_MATCH_CACHE_TTL_SECONDS,
+            compute=lambda: _guess_the_player_name_match_compute_pick(today),
+        )
+    except Exception:
+        return _guess_the_player_name_match_compute_pick(today)
+
+
+def _guess_the_player_name_match_identity(pick: dict[str, Any], *, who: str) -> dict[str, Any]:
+    return {
+        "player_id": pick[f"{who}_player_id"],
+        "name": pick[f"{who}_name"],
+        "team": pick[f"{who}_team"],
+        "position": pick[f"{who}_position"],
+        "tier": pick[f"{who}_tier"],
+    }
+
+
+def _guess_the_player_name_match_public_prompt(pick: dict[str, Any]) -> dict[str, Any]:
+    """The payload GET actually returns. Both real identities are always
+    shown — nothing hidden there — only `slots` keeps the real stat lines
+    unlabeled as to which player each belongs to (never alongside
+    `famous_slot`/`obscure_slot`, the answer key)."""
+
+    return {
+        "pick_id": pick["pick_id"],
+        "season": pick["season"],
+        "week": pick["week"],
+        "famous_player": _guess_the_player_name_match_identity(pick, who="famous"),
+        "obscure_player": _guess_the_player_name_match_identity(pick, who="obscure"),
+        "slots": {
+            slot: {"stat_line": payload["stat_line"], "fantasy_points_ppr": payload["fantasy_points_ppr"]}
+            for slot, payload in pick["slots"].items()
+        },
+    }
+
+
+def _guess_the_player_name_match_correct_pairing(pick: dict[str, Any]) -> dict[str, Any]:
+    return {"famous_slot": pick["famous_slot"], "obscure_slot": pick["obscure_slot"]}
+
+
+@app.get("/v1/guess-the-player/name-match")
+def get_guess_the_player_name_match(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Today's "Who is who?" pairing plus the caller's real, persisted
+    streak for THIS game specifically (never the original game's streak).
+    League-independent — one shared pairing per calendar day for every
+    signed-in user.
+    """
+
+    today = _guess_the_player_today()
+    pick = _guess_the_player_name_match_daily_pick(today)
+    if pick is None:
+        return {
+            "ok": True,
+            "available": False,
+            "reason": "no_name_match_pairing_today",
+            "prompt": None,
+            "already_answered": False,
+            "last_result": None,
+            "correct_pairing": None,
+            "streak": {"current_streak": 0, "best_streak": 0},
+        }
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    streak_row, _ = account_store.fetch_guess_the_player_name_match_streak(
+        config, str(user.get("_access_token") or ""), user_id=user_id
+    )
+    already_answered = bool(streak_row) and str(streak_row.get("last_pick_id") or "") == pick["pick_id"]
+    last_result = str(streak_row.get("last_result") or "").strip() if already_answered else ""
+
+    return {
+        "ok": True,
+        "available": True,
+        "reason": "",
+        "prompt": _guess_the_player_name_match_public_prompt(pick),
+        "already_answered": already_answered,
+        "last_result": last_result or None,
+        # Only revealed once this user has genuinely already answered
+        # TODAY's pairing — never alongside an unanswered prompt, which
+        # would leak which slot is which before a real guess.
+        "correct_pairing": _guess_the_player_name_match_correct_pairing(pick) if already_answered else None,
+        "streak": _guess_the_player_streak_payload(streak_row),
+    }
+
+
+class GuessThePlayerNameMatchAnswerRequest(BaseModel):
+    pick_id: str
+    famous_slot: str
+
+
+@app.post("/v1/guess-the-player/name-match/answer")
+def answer_guess_the_player_name_match(
+    body: GuessThePlayerNameMatchAnswerRequest, user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Score one "who is who?" guess against today's real pairing and
+    durably update the caller's OWN name-match streak
+    (docs/supabase_guess_the_player_name_match.sql) — never the original
+    game's streak.
+
+    Idempotent per pick_id, identical contract to answer_guess_the_player:
+    resubmitting the SAME day's pick_id replays the already-recorded
+    result instead of re-scoring.
+    """
+
+    pick_id = str(body.pick_id or "").strip()
+    guessed_slot = str(body.famous_slot or "").strip().upper()
+    if not pick_id or guessed_slot not in {"A", "B"}:
+        raise HTTPException(status_code=422, detail="pick_id and a valid famous_slot ('A' or 'B') are required.")
+
+    today = _guess_the_player_today()
+    pick = _guess_the_player_name_match_daily_pick(today)
+    if pick is None or pick["pick_id"] != pick_id:
+        # The day rolled over (or the cache rotated) between the client's
+        # fetch and this submission — fail closed with a reason the client
+        # can react to (refetch today's pairing) rather than scoring
+        # against stale or mismatched data.
+        raise HTTPException(status_code=409, detail="This pick has expired. Refresh and try again.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    streak_row, _ = account_store.fetch_guess_the_player_name_match_streak(
+        config, access_token, user_id=user_id
+    )
+
+    if streak_row and str(streak_row.get("last_pick_id") or "") == pick_id:
+        correct = str(streak_row.get("last_result") or "").strip() == "correct"
+        return {
+            "ok": True,
+            "already_answered": True,
+            "correct": correct,
+            "correct_pairing": _guess_the_player_name_match_correct_pairing(pick),
+            "streak": _guess_the_player_streak_payload(streak_row),
+        }
+
+    correct = guessed_slot == pick["famous_slot"]
+    current_streak = _guess_the_player_streak_int(streak_row, "current_streak")
+    best_streak = _guess_the_player_streak_int(streak_row, "best_streak")
+    new_current = current_streak + 1 if correct else 0
+    new_best = max(best_streak, new_current)
+
+    ok, _ = account_store.upsert_guess_the_player_name_match_streak(
+        config,
+        access_token,
+        {
+            "user_id": user_id,
+            "current_streak": new_current,
+            "best_streak": new_best,
+            "last_pick_id": pick_id,
+            "last_result": "correct" if correct else "incorrect",
+        },
+    )
+    # Fails closed to "today's guess still scores for THIS response, just
+    # isn't durably recorded" rather than a crash — same contract
+    # answer_guess_the_player already documents for a not-yet-migrated
+    # table.
+    streak_payload = (
+        {"current_streak": new_current, "best_streak": new_best}
+        if ok
+        else _guess_the_player_streak_payload(streak_row)
+    )
+
+    return {
+        "ok": True,
+        "already_answered": False,
+        "correct": correct,
+        "correct_pairing": _guess_the_player_name_match_correct_pairing(pick),
         "streak": streak_payload,
     }
 
