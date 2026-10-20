@@ -188,6 +188,7 @@ from modules import (
     rankings,
     record_signal,
     redis_cache,
+    referrals,
     roster_needs,
     saved_leagues,
     share_card_renderer,
@@ -1193,6 +1194,83 @@ def link_sleeper_username(
     return {"ok": True, "sleeper_username": username}
 
 
+# Referral program (modules.referrals) — a complete, already-built system
+# (per-user invite code/link, distinct-leaguemate connection tracking, a
+# capped free-month GM Pro reward) that until now was only ever wired into
+# the legacy Streamlit app.py, invisible to every web-next/mobile user. This
+# exposes the exact same logic here, reusing modules.referrals as-is (no
+# changes to its reward math or anti-abuse rules).
+#
+# app.py's own trigger for crediting a referral is not a separate "redeem"
+# action — it's the moment `modules.sleeper_leagues.lookup_user_leagues`
+# resolves successfully (status "ok" or "no_leagues"), right after the
+# existing `sleeper_connected` analytics event (see app.py's
+# `load_leagues_for_username` and modules/referrals.py's own
+# "Wiring" docstring). GET /v1/sleeper/leagues below is this service's exact
+# equivalent of that call, so an optional `referral_code` param there is
+# where redemption is wired, not a new standalone endpoint — matching the
+# real flow rather than inventing one.
+#
+# modules.referrals.handle_sleeper_connected expects a Streamlit-shaped
+# mutable `session_state`; this service has no such durable per-session
+# object (every request is stateless), so `_redeem_referral_code` builds one
+# ephemeral dict per call from this request's own auth + a fresh read of the
+# caller's own user_settings row, then throws it away. The web-next/mobile
+# client is what holds the pending code across the gap between landing on a
+# `?ref=` link and connecting Sleeper (captured client-side into
+# localStorage the same way modules.referrals.capture_referral_code stashes
+# it in session_state), and passes it back on that one call.
+def _redeem_referral_code(*, user: dict[str, Any], config: dict, code: str) -> dict[str, Any]:
+    clean_code = str(code or "").strip()
+    if not clean_code:
+        return {"attempted": False}
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    settings_row, _error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    session_state: dict[str, Any] = {
+        referrals.PENDING_CODE_SESSION_KEY: clean_code,
+        "auth_session": {"user_id": user_id, "access_token": access_token},
+        "account_user_settings": settings_row,
+    }
+    error = referrals.handle_sleeper_connected(config=config, session_state=session_state)
+    return {"attempted": True, "ok": not bool(error), "message": error}
+
+
+@app.get("/v1/referrals/my-code")
+def get_my_referral_code(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """This user's own shareable invite code/link, plus their current GM Pro
+    reward status — how many distinct leaguemates have connected Sleeper
+    through it, and how many free comp months that has earned so far.
+
+    Read-only: reuses modules.referrals' pure encoding/state helpers (no
+    core logic duplicated here) against this user's own user_settings row,
+    the same table/row-ownership shape every other settings-backed endpoint
+    on this service already reads (see get_community_preferences above).
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    code = referrals.referral_code_for_user(user_id)
+    link = referrals.referral_link(user_id, base_url=app_config.app_base_url())
+    settings_row, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        settings_row = {}
+    program = referrals.program_state(settings_row)
+    return {
+        "ok": not bool(error),
+        "code": code,
+        "link": link,
+        "connected_count": int(program.get("connected_count") or 0),
+        "comp_months_granted": int(program.get("comp_months_granted") or 0),
+        "comp_until": program.get("comp_until"),
+        "comp_is_active": referrals.comp_is_active(settings_row),
+        "comp_months_remaining_capacity": referrals.comp_months_remaining_capacity(settings_row),
+        "referrals_per_comp_month": referrals.REFERRALS_PER_COMP_MONTH,
+        "max_comp_months": referrals.MAX_COMP_MONTHS,
+    }
+
+
 # All three billing endpoints below are thin wrappers around
 # modules.stripe_billing's already-correct, already-unit-tested functions —
 # the same ones modules/premium_page.py (Streamlit) has used all along.
@@ -1383,6 +1461,7 @@ def create_billing_portal(user: dict[str, Any] = Depends(require_user)) -> dict[
 @app.get("/v1/sleeper/leagues")
 def lookup_sleeper_leagues(
     username: str = "",
+    referral_code: str = "",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """The Sleeper leagues behind a username, for the add-league picker.
@@ -1391,11 +1470,18 @@ def lookup_sleeper_leagues(
     web's onboarding import uses) — saves nothing. Falls back to the
     caller's linked `profiles.sleeper_username` when none is supplied so
     the app can pre-populate the picker.
+
+    `referral_code` (optional): this is also the real moment app.py credits
+    a pending referral (see modules.referrals.handle_sleeper_connected's own
+    docstring and the "Referral program" comment above
+    link_sleeper_username) — a username resolving here, successfully or
+    with no leagues, is exactly app.py's own `sleeper_connected` condition.
+    The caller only sends this once, right after landing on a `?ref=` link.
     """
 
+    config = auth_supabase.get_supabase_config()
     clean = str(username or "").strip()
     if not clean:
-        config = auth_supabase.get_supabase_config()
         user_id = str(user.get("id") or "")
         if user_id:
             profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
@@ -1404,7 +1490,7 @@ def lookup_sleeper_leagues(
         return {"ok": False, "status": "empty_username", "leagues": [], "username": "", "message": sleeper_leagues.league_lookup_customer_message("empty_username")}
 
     result = sleeper_leagues.lookup_user_leagues(clean)
-    return {
+    response: dict[str, Any] = {
         "ok": result.status == "ok",
         "status": result.status,
         "username": clean,
@@ -1420,6 +1506,9 @@ def lookup_sleeper_leagues(
         ],
         "message": sleeper_leagues.league_lookup_customer_message(result.status),
     }
+    if referral_code and result.status in {"ok", "no_leagues"}:
+        response["referral"] = _redeem_referral_code(user=user, config=config, code=referral_code)
+    return response
 
 
 class SaveLeagueRequest(BaseModel):
