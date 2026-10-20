@@ -31,6 +31,11 @@ export default function TradeAnalyzerPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  // Players' "Add to Trade" quick-add (Revision 20) threads the tapped
+  // player through here as ?playerId=, the same gamePlanTileHref
+  // convention Waivers/Trade Hub already read — TradeAnalyzerContent
+  // resolves which roster owns it and pre-populates the builder on mount.
+  const quickAddPlayerId = searchParams.get("playerId") || undefined;
   const { lens } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
@@ -99,6 +104,7 @@ export default function TradeAnalyzerPage() {
       picks={data.picks}
       rosters={data.rosters}
       teamProfiles={data.teamProfiles}
+      quickAddPlayerId={quickAddPlayerId}
     />
   );
 }
