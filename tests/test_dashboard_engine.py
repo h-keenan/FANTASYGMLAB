@@ -725,6 +725,65 @@ def test_compose_next_move_briefing_includes_trade_tile_when_rosters_given():
     assert presentation["trade_package"]["receive"][0]["player_id"] == "target-wr1"
 
 
+def test_compose_next_move_briefing_threads_untouchable_ids_into_fallback_trade_generation():
+    # Recommendation-compliance audit finding: when a caller omits its own
+    # precomputed trade_idea_records (modules.push_triggers' scheduled push
+    # sweep — the Dashboard/mobile API/Portfolio surfaces all precompute
+    # their own copy via trade_hub_engine.generate_trade_idea_records_cached
+    # with untouchable_player_ids already threaded, so this fallback never
+    # runs for them), this function's own fallback call to
+    # trade_hub_engine.generate_trade_idea_records must still see the
+    # caller's GM Targets untouchable/target lists — otherwise that
+    # fallback could recommend trading away a player the user had
+    # explicitly protected, even though every other surface showing the
+    # identical recommendation already respects that flag.
+    league_id = "dashboard-engine-test-league-2"
+    roster_id = "1"
+    my_players = [
+        _player("qb1", "QB", value=80),
+        _player("rb1", "RB", value=70),
+        _player("rb2", "RB", value=40),
+        _player("wr1", "WR", value=65),
+        _player("wr2", "WR", value=30),
+        _player("te1", "TE", value=25),
+    ]
+    other_roster_players = [_player("opp-rb", "RB", value=55)]
+    players_df = pd.DataFrame(my_players + other_roster_players)
+    rosters = [
+        {"roster_id": 1, "players": [p["player_id"] for p in my_players]},
+        {"roster_id": 2, "players": [p["player_id"] for p in other_roster_players]},
+    ]
+
+    league_payload = _sleeper_response(
+        {
+            "roster_positions": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"] + ["BN"] * 6,
+            "settings": {"taxi_slots": 0, "reserve_slots": 0},
+        }
+    )
+    rosters_payload = _sleeper_response(rosters)
+
+    with patch("requests.get", side_effect=[league_payload, rosters_payload]):
+        with patch(
+            "modules.trade_hub_engine.generate_trade_idea_records",
+            return_value=[_fake_trade_idea_record()],
+        ) as mock_generate:
+            dashboard_engine.compose_next_move_briefing(
+                league_id=league_id,
+                roster_id=roster_id,
+                players_df=players_df,
+                roster_player_ids={p["player_id"] for p in my_players},
+                all_rostered_player_ids={p["player_id"] for p in my_players + other_roster_players},
+                league_settings=SETTINGS,
+                score_field="dynasty_score",
+                rosters=rosters,
+                untouchable_player_ids=("qb1",),
+                gm_target_player_ids=("wr1",),
+            )
+
+    assert mock_generate.call_args.kwargs["untouchable_player_ids"] == ("qb1",)
+    assert mock_generate.call_args.kwargs["gm_target_player_ids"] == ("wr1",)
+
+
 def test_compose_next_move_briefing_flags_roster_pressure_when_over_limit():
     league_id = "dashboard-engine-test-league-2"
     roster_id = "1"

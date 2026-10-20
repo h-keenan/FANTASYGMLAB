@@ -134,6 +134,8 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
     # stance reminder doesn't fire and pollute this test's pushes_sent count.
     gm_stance_response = Mock(status_code=200)
     gm_stance_response.json.return_value = [{"user_id": "u1", "league_id": "league-1"}]
+    gm_untouchable_response = Mock(status_code=200)
+    gm_untouchable_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
     already_notified_response = Mock(status_code=200)
@@ -164,6 +166,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                         profiles_response,
                                         preferences_response,
                                         gm_stance_response,
+                                        gm_untouchable_response,
                                         not_notified_response,
                                     ],
                                 ):
@@ -210,6 +213,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                         profiles_response,
                                         preferences_response,
                                         gm_stance_response,
+                                        gm_untouchable_response,
                                         already_notified_response,
                                     ],
                                 ):
@@ -259,6 +263,8 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
     preferences_response.json.return_value = []
     gm_stance_response = Mock(status_code=200)
     gm_stance_response.json.return_value = [{"user_id": "u1", "league_id": "league-1"}]
+    gm_untouchable_response = Mock(status_code=200)
+    gm_untouchable_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -294,6 +300,7 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
                                         profiles_response,
                                         preferences_response,
                                         gm_stance_response,
+                                        gm_untouchable_response,
                                         not_notified_response,
                                     ],
                                 ):
@@ -458,6 +465,8 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
     preferences_response.json.return_value = []
     gm_stance_response = Mock(status_code=200)
     gm_stance_response.json.return_value = [{"user_id": "u1", "league_id": "league-1"}]
+    gm_untouchable_response = Mock(status_code=200)
+    gm_untouchable_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -484,6 +493,7 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
                                         profiles_response,
                                         preferences_response,
                                         gm_stance_response,
+                                        gm_untouchable_response,
                                         not_notified_response,
                                     ],
                                 ):
@@ -687,6 +697,84 @@ def test_fetch_gm_stance_leagues_empty_when_not_configured():
     mock_get.assert_not_called()
 
 
+def test_fetch_gm_targets_untouchable_ids_groups_by_user_and_league():
+    response = Mock(status_code=200)
+    response.json.return_value = [
+        {"user_id": "u1", "league_id": "league-1", "player_id": "p9"},
+        {"user_id": "u1", "league_id": "league-1", "player_id": "p10"},
+        {"user_id": "u1", "league_id": "league-2", "player_id": "p11"},
+    ]
+    with patch("requests.get", return_value=response) as mock_get:
+        result = push_triggers.fetch_gm_targets_untouchable_ids(_config(), ["u1", "u2"])
+    assert result == {
+        "u1": {"league-1": {"p9", "p10"}, "league-2": {"p11"}},
+        "u2": {},
+    }
+    params = mock_get.call_args.kwargs["params"]
+    assert params["untouchable"] == "eq.true"
+
+
+def test_fetch_gm_targets_untouchable_ids_empty_when_not_configured():
+    with patch("requests.get") as mock_get:
+        result = push_triggers.fetch_gm_targets_untouchable_ids(push_triggers.PushTriggerConfig(), ["u1"])
+    assert result == {}
+    mock_get.assert_not_called()
+
+
+def test_league_briefing_push_items_threads_gm_targets_untouchable_ids_through():
+    # Recommendation-compliance audit finding: league_briefing_push_items
+    # never precomputes its own trade_idea_records (unlike the Dashboard/
+    # mobile API/Portfolio surfaces, which all fetch GM Targets and thread
+    # untouchable_player_ids into trade_hub_engine.generate_trade_idea_records_cached
+    # themselves before calling compose_next_move_briefing) — it relies on
+    # compose_next_move_briefing's own fallback generation. Before this
+    # parameter existed, that fallback had no way to see the caller's
+    # untouchable list at all, so this sweep's "Next Move" trade tile could
+    # recommend sending away a player the user explicitly protected
+    # elsewhere in the app, even though every other surface showing the
+    # identical recommendation already respected that flag.
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 90}])
+    fake_briefing = Mock(items=[])
+    with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+        with patch(
+            "modules.sleeper.get_rosters",
+            return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+        ):
+            with patch(
+                "modules.dashboard_engine.compose_next_move_briefing", return_value=fake_briefing
+            ) as mock_compose:
+                push_triggers.league_briefing_push_items(
+                    league_id="league-1",
+                    sleeper_user_id="sleeper-user-1",
+                    players_df=players_df,
+                    score_field="dynasty_score",
+                    untouchable_player_ids=("p1",),
+                )
+
+    assert mock_compose.call_args.kwargs["untouchable_player_ids"] == ("p1",)
+
+
+def test_league_briefing_push_items_defaults_to_no_untouchable_ids():
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 90}])
+    fake_briefing = Mock(items=[])
+    with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+        with patch(
+            "modules.sleeper.get_rosters",
+            return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+        ):
+            with patch(
+                "modules.dashboard_engine.compose_next_move_briefing", return_value=fake_briefing
+            ) as mock_compose:
+                push_triggers.league_briefing_push_items(
+                    league_id="league-1",
+                    sleeper_user_id="sleeper-user-1",
+                    players_df=players_df,
+                    score_field="dynasty_score",
+                )
+
+    assert mock_compose.call_args.kwargs["untouchable_player_ids"] == ()
+
+
 def test_gm_stance_reminder_push_item_fires_when_league_has_no_stance():
     item = push_triggers.gm_stance_reminder_push_item(
         league_id="league-1", league_name="Test League", leagues_with_stance=set()
@@ -721,6 +809,8 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
     # Nobody has a Team Situation stance stored for league-1 yet.
     gm_stance_response = Mock(status_code=200)
     gm_stance_response.json.return_value = []
+    gm_untouchable_response = Mock(status_code=200)
+    gm_untouchable_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -747,6 +837,7 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
                                         profiles_response,
                                         preferences_response,
                                         gm_stance_response,
+                                        gm_untouchable_response,
                                         not_notified_response,
                                     ],
                                 ):
