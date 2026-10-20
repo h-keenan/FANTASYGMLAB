@@ -3,7 +3,10 @@ import inspect
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pandas as pd
+
 import app
+from modules import gm_targets as gt
 from modules import trade_hub_ui
 
 
@@ -701,6 +704,162 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("st.session_state.get(\"espn_limited_mode\")", source)
         self.assertIn("app-degraded-state", source)
         self.assertIn("Sleeper remains the full Trade Hub path", source)
+
+
+class TestTradeHubHonorsGmTargetsUntouchable(unittest.TestCase):
+    """Recommendation-compliance audit finding: a player marked untouchable via
+    GM Targets' real, id-keyed "Mark untouchable" button (modules/gm_targets.py
+    set_untouchable) must still be excluded from Trade Hub's trade-idea
+    generation in app.py — it must NOT require the separate, legacy,
+    name-keyed profile["untouchables"] list (toggled by a different control)
+    to already contain that player.
+
+    Pre-fix, `_player_detail_trade_outlook` computed its `untouchables` tuple
+    from only `profile.get("untouchables", [])`; with an empty legacy list
+    (as here) and a GM-Targets-only protected player, the tuple was empty and
+    the player was fully tradeable. Post-fix it must include the protected
+    player's name via gm_targets.resolve_untouchable_names.
+    """
+
+    def setUp(self):
+        app.st.session_state.clear()
+        gt._cache_targets(
+            app.st.session_state,
+            league_id="league-1",
+            targets=[
+                gt.GmTarget(
+                    user_id="u1",
+                    league_id="league-1",
+                    player_id="6794",
+                    untouchable=True,
+                )
+            ],
+        )
+
+    def tearDown(self):
+        app.st.session_state.clear()
+
+    def test_gm_targets_untouchable_player_reaches_trade_idea_generation(self):
+        df_players = pd.DataFrame(
+            [
+                {"player_id": "vp-1", "name": "Viewed Player"},
+                {"player_id": "6794", "name": "Josh Jacobs"},
+            ]
+        )
+        player_row = pd.Series({"player_id": "vp-1", "name": "Viewed Player"})
+
+        captured = {}
+
+        def _fake_search(**kwargs):
+            captured["search_untouchables"] = kwargs.get("untouchables")
+            return {"ideas": []}
+
+        def _fake_enforce(ideas, **kwargs):
+            captured["enforce_untouchables"] = kwargs.get("untouchables")
+            return ideas
+
+        with (
+            patch.object(app, "load_profile_key", return_value={"untouchables": []}),
+            patch.object(app, "cached_team_direction_summary", return_value=pd.DataFrame()),
+            patch.object(app, "get_roster_player_ids", return_value=["vp-1", "6794"]),
+            patch.object(app, "strategy_adjusted_pick_score_multiplier", return_value=1.0),
+            patch.object(app, "apply_strategy_age_curve", side_effect=lambda df, *_a, **_k: df),
+            patch.object(app, "draft_pick_valuation_settings_items", return_value=()),
+            patch.object(app, "_session_roster_player_map", return_value={}),
+            patch.object(app, "cached_draft_pick_assets", return_value=()),
+            patch.object(
+                app.trade_ideas_module, "freeze_player_search_roster_map", return_value=()
+            ),
+            patch.object(
+                app.trade_ideas_module, "freeze_player_search_pick_assets", return_value=()
+            ),
+            patch.object(app, "cached_player_trade_hub_ideas", side_effect=_fake_search),
+            patch.object(app, "enforce_cached_trade_ideas", side_effect=_fake_enforce),
+            patch.object(app, "enrich_trade_ideas_with_manager_tendencies", return_value=[]),
+        ):
+            result = app._player_detail_trade_outlook(
+                player_row=player_row,
+                df_players=df_players,
+                username="tester",
+                selected_league_id="league-1",
+                my_roster_id=1,
+                score_field="value_score",
+                league_settings={},
+                team_strategy="retool",
+                pick_score_multiplier=1.0,
+            )
+
+        self.assertEqual(result["headline"], "No trade outlook available yet.")
+        self.assertIn("Josh Jacobs", captured["search_untouchables"])
+        self.assertIn("Josh Jacobs", captured["enforce_untouchables"])
+
+
+class TestOtherUntouchableReadSitesHonorGmTargets(unittest.TestCase):
+    """app.py's Dashboard ("Next Move" trade tile, render_home_dashboard) and
+    My Team (its "Untouchables"/trade-advisor block, inside main()) each have
+    their own independent `profile.get("untouchables", [])` read — a separate
+    occurrence from `_player_detail_trade_outlook`'s, covered by
+    TestTradeHubHonorsGmTargetsUntouchable above. Both are inline in very
+    large Streamlit render functions (not standalone callables), so this
+    guards their wiring at the source level: the GM Targets reconciling
+    helper call must be present, and must run before (not after) the
+    trade-idea-generation calls it feeds, inside the correct enclosing
+    function — a regression here would silently reopen the exact
+    recommendation-compliance gap TestTradeHubHonorsGmTargetsUntouchable
+    proves is closed for the PQV site.
+    """
+
+    @staticmethod
+    def _function_body(source: str, def_line: str) -> str:
+        start = source.index(def_line)
+        try:
+            next_def = source.index("\ndef ", start + len(def_line))
+        except ValueError:
+            next_def = len(source)
+        return source[start:next_def]
+
+    def test_dashboard_next_move_tile_resolves_gm_targets_before_generating_ideas(self):
+        source = Path("app.py").read_text(encoding="utf-8")
+        body = self._function_body(source, "def render_home_dashboard(")
+
+        self.assertIn("gm_targets.resolve_untouchable_names(", body)
+        self.assertLess(
+            body.index("gm_targets.resolve_untouchable_names("),
+            body.index("cached_dashboard_trade_headline("),
+            "GM Targets must be resolved before render_home_dashboard's "
+            "trade-headline tile is generated, not after.",
+        )
+
+    def test_my_team_trade_advisor_resolves_gm_targets_after_profile_save_before_generating_ideas(self):
+        source = Path("app.py").read_text(encoding="utf-8")
+        body = self._function_body(source, "def main():")
+
+        resolve_idx = body.index("gm_targets.resolve_untouchable_names(")
+        save_idx = body.index('save_profile_key(username, selected_league_id, profile)')
+        trade_idx = body.index("raw_ideas = cached_trade_ideas(")
+
+        # Must run AFTER the profile save (so the merged, GM-Targets-inclusive
+        # value is never the thing written back into the legacy
+        # profile["untouchables"] store — see resolve_untouchable_names'
+        # docstring on why dual-writing there was rejected) ...
+        self.assertLess(save_idx, resolve_idx)
+        # ... but BEFORE trade-idea generation reads it.
+        self.assertLess(resolve_idx, trade_idx)
+
+    def test_pqv_untouchable_status_badge_resolves_gm_targets(self):
+        """Player Quick View's "Untouchable" status badge/button label (the
+        same class of trust gap — showing e.g. "Core Asset" for a player
+        GM Targets already protects) must also read the reconciled state,
+        not only the legacy profile list."""
+
+        source = Path("app.py").read_text(encoding="utf-8")
+        body = self._function_body(source, "def render_player_quick_view_content(")
+
+        self.assertIn("gm_targets.resolve_untouchable_names(", body)
+        self.assertLess(
+            body.index("gm_targets.resolve_untouchable_names("),
+            body.index("is_untouchable = raw_name in untouchables"),
+        )
 
 
 if __name__ == "__main__":

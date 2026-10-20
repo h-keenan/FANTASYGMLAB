@@ -764,6 +764,66 @@ def test_enrich_target_surfaces_injury_display():
     assert missing_row_card.injury_display == ""
 
 
+def test_resolve_untouchable_names_unions_legacy_and_gm_targets_state():
+    """Recommendation-compliance audit finding: app.py's Trade Hub/Game
+    Plan/My Team trade-idea generation protects players via a legacy
+    NAME-keyed list (profile["untouchables"]) that GM Targets' real,
+    id-keyed "Mark untouchable" button never wrote to. A player protected
+    only through GM Targets must still come back out of the union by name.
+    """
+
+    session = _premium_session()
+    gt._cache_targets(
+        session,
+        league_id="L1",
+        targets=[
+            gt.GmTarget(
+                user_id="u",
+                league_id="L1",
+                player_id="6794",
+                untouchable=True,
+            ),
+            gt.GmTarget(
+                user_id="u",
+                league_id="L1",
+                player_id="9999",
+                untouchable=False,
+            ),
+        ],
+    )
+
+    resolved = gt.resolve_untouchable_names(
+        session,
+        league_id="L1",
+        legacy_names=["Legacy Only Guy"],
+        player_id_to_name={"6794": "Josh Jacobs", "9999": "Not Untouchable Guy"},
+        environ={},
+    )
+
+    assert resolved == ("Josh Jacobs", "Legacy Only Guy")
+
+
+def test_resolve_untouchable_names_without_gm_targets_state_is_legacy_only():
+    session = _premium_session()
+    resolved = gt.resolve_untouchable_names(
+        session,
+        league_id="L1",
+        legacy_names=["Legacy Only Guy", ""],
+        player_id_to_name={"6794": "Josh Jacobs"},
+        environ={},
+    )
+    assert resolved == ("Legacy Only Guy",)
+
+
+def test_resolve_untouchable_names_tolerates_missing_session_and_lookup():
+    assert gt.resolve_untouchable_names(
+        None, league_id="L1", legacy_names=["Solo Name"]
+    ) == ("Solo Name",)
+    assert gt.resolve_untouchable_names(
+        {}, league_id="L1", legacy_names=None, player_id_to_name=None
+    ) == ()
+
+
 def test_no_stale_auth_supabase_loaders_in_repo():
     """Wider drift check — no production call sites for the removed loader."""
 
