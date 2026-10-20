@@ -489,7 +489,22 @@ def build_league_summary(
             continue
 
         current_scores = _score_starter_weighted_roster(df_team, current_score_field, lineup_settings)
-        long_term_scores = _score_starter_weighted_roster(df_team, score_field, lineup_settings)
+        # When the two score fields are the same column (e.g. GET
+        # .../my-team-needs in services/mobile_api_service.py always
+        # passes current_score_field=score_field, and any lens whose
+        # score_field is "value_score" -- today only "Non-Dynasty" -- makes
+        # every OTHER caller's current_score_field default collide with it
+        # too), this would otherwise re-run the identical sort/starter-pick/
+        # weighting pass over the same roster a second time for a
+        # byte-for-byte identical result. Reuse it instead -- this is a
+        # per-roster cost paid for every roster in the league, on every
+        # call, so it compounds across a whole league's worth of rosters
+        # each time.
+        long_term_scores = (
+            current_scores
+            if score_field == current_score_field
+            else _score_starter_weighted_roster(df_team, score_field, lineup_settings)
+        )
         avg_age = float(df_team["age"].mean()) if df_team["age"].notna().any() else None
 
         rows.append(

@@ -6,6 +6,7 @@ Provider calls belong to the History route via injected fetchers.
 
 from __future__ import annotations
 
+import concurrent.futures
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -393,8 +394,29 @@ def collect_season_transactions(
     span = max(1, min(MAX_TRANSACTION_WEEK, _int(span, 1)))
     collected: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for week in range(1, span + 1):
-        rows = fetch_transactions(league_id, week) or []
+
+    # The per-week calls are fanned out across a small thread pool rather
+    # than made one at a time — a full season is up to MAX_TRANSACTION_WEEK
+    # (18) of these, each its own Sleeper HTTP round-trip, so the old
+    # sequential loop paid up to 18x real network latency on every call
+    # with a cold cache (every call for /v1/leagues/{id}/history and
+    # /v1/leagues/{id}/storylines in services/mobile_api_service.py, which
+    # wrap this function directly with no caching of their own at all —
+    # unlike modules.pick_flow/modules.manager_activity/modules.
+    # team_trade_history, which each wrap their OWN derived result from
+    # this same function in a Redis-shared cache). Same
+    # concurrent.futures.ThreadPoolExecutor + executor.map pattern as
+    # modules.league_recaps.build_matchup_history_rows' identical fix for
+    # the sibling per-week-matchups scan: executor.map preserves week
+    # order, so the dedupe loop below still runs in the same order as the
+    # old sequential version — same output, just parallel I/O.
+    weeks = list(range(1, span + 1))
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(weeks)), thread_name_prefix="dgm-history-transactions"
+    ) as executor:
+        fetched = list(executor.map(lambda week: fetch_transactions(league_id, week) or [], weeks))
+
+    for week, rows in zip(weeks, fetched):
         for raw in rows:
             if not isinstance(raw, Mapping):
                 continue
