@@ -29,11 +29,18 @@ def normalize_player_id(value: Any) -> str:
     return text
 
 
+_NAME_GENERATIONAL_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+
 def normalize_player_name(name: Any) -> str:
     if name is None:
         return ""
     text = str(name).casefold().strip()
-    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+    normalized = re.sub(r"[^a-z0-9]+", " ", text).strip()
+    tokens = normalized.split()
+    while tokens and tokens[-1] in _NAME_GENERATIONAL_SUFFIXES:
+        tokens.pop()
+    return " ".join(tokens)
 
 
 def ensure_identity_columns(df_players: pd.DataFrame | None) -> pd.DataFrame:
