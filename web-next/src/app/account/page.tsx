@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { api, type MeResponse, type PushCategory } from "@/lib/api";
+import { api, type MeResponse, type PushCategory, type ReferralStatusResponse } from "@/lib/api";
 import { AccountContent } from "@/components/AccountContent";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -35,6 +35,12 @@ export default function AccountPage() {
   // (fetched in a separate, non-awaited call below) since it's the one
   // genuinely new preference surface this page adds.
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
+  // null = not loaded yet (or the fetch failed, see referralError below) --
+  // ReferralCard treats this the same "fail soft, don't block the rest of
+  // the page" way as pushCategories above.
+  const [referral, setReferral] = useState<ReferralStatusResponse | null>(null);
+  const [referralError, setReferralError] = useState<string | null>(null);
+  const [referralRetryToken, setReferralRetryToken] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
@@ -66,10 +72,22 @@ export default function AccountPage() {
         // Fail soft — see the pushCategories comment above.
       });
 
+    api
+      .getMyReferralCode()
+      .then((result) => {
+        if (!cancelled) {
+          setReferral(result);
+          setReferralError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setReferralError(err instanceof Error ? err.message : "Could not load your invite link.");
+      });
+
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, router, retryToken]);
+  }, [authLoading, session, router, retryToken, referralRetryToken]);
 
   const handleToggleCommunityOptOut = useCallback((next: boolean) => {
     setCommunityOptedOut(next);
@@ -77,6 +95,11 @@ export default function AccountPage() {
       // Revert on failure so the toggle never silently lies about state.
       setCommunityOptedOut(!next);
     });
+  }, []);
+
+  const handleRetryReferral = useCallback(() => {
+    setReferralError(null);
+    setReferralRetryToken((token) => token + 1);
   }, []);
 
   const handleTogglePushCategory = useCallback((category: PushCategory, enabled: boolean) => {
@@ -137,6 +160,9 @@ export default function AccountPage() {
       onToggleCommunityOptOut={handleToggleCommunityOptOut}
       pushCategories={pushCategories}
       onTogglePushCategory={handleTogglePushCategory}
+      referral={referral}
+      referralError={referralError}
+      onRetryReferral={handleRetryReferral}
       onOpenBillingPortal={handleOpenBillingPortal}
       onExportData={handleExportData}
       onDeleteAccount={handleDeleteAccount}

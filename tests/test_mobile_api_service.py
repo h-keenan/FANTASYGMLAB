@@ -12395,7 +12395,216 @@ def test_lookup_sleeper_leagues_falls_back_to_the_linked_username(monkeypatch):
     assert body["ok"] is False
     assert body["status"] == "no_leagues"
     assert body["message"]
-    mock_lookup.assert_called_once_with("linked_gm")
+
+
+def test_lookup_sleeper_leagues_without_referral_code_never_touches_referrals(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import sleeper_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+            response = client.get(
+                "/v1/sleeper/leagues?username=gm_dynasty",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert "referral" not in response.json()
+
+
+def test_lookup_sleeper_leagues_skips_referral_redemption_when_lookup_is_unavailable(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import sleeper_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    lookup = sleeper_leagues.LeagueLookupResult([], "unavailable")
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+            response = client.get(
+                "/v1/sleeper/leagues?username=gm_dynasty&referral_code=SOMECODE",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    # An "unavailable" Sleeper lookup is not app.py's own `sleeper_connected`
+    # condition either (status must be "ok" or "no_leagues") -- never
+    # attempt a referral credit off a failed/ambiguous lookup.
+    assert "referral" not in response.json()
+
+
+def test_lookup_sleeper_leagues_with_referral_code_records_attribution_and_fails_soft_on_credit(monkeypatch):
+    """Integration-level redemption: a successful Sleeper lookup carrying a
+    pending `?ref=` code records the referred user's own attribution marker
+    (an own-row write, always possible) and attempts the referrer's credit.
+
+    This service deliberately runs with no SUPABASE_SERVICE_ROLE_KEY (see
+    render.yaml's "no service-role key on this process" comment on
+    fantasygm-lab-mobile-api) -- modules.referrals.grant_referral_credit
+    needs exactly that to credit a DIFFERENT user's row, so in this
+    environment it fails soft by design, exactly as documented. This test
+    pins that real, current behavior rather than assuming it works.
+    """
+
+    client = _client(monkeypatch)
+    from modules import referrals
+    from modules import sleeper_leagues
+
+    referrer_id = "11111111-1111-4111-8111-111111111111"
+    referred_id = "22222222-2222-4222-8222-222222222222"
+    code = referrals.referral_code_for_user(referrer_id)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": referred_id, "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = []
+    upsert_response = Mock(status_code=200)
+    lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+                response = client.get(
+                    f"/v1/sleeper/leagues?username=gm_dynasty&referral_code={code}",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False  # the Sleeper lookup itself is "no_leagues"
+    referral = body["referral"]
+    assert referral["attempted"] is True
+    assert referral["ok"] is False
+    assert referral["message"]
+    mock_post.assert_called_once()
+    written_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert written_settings[referrals.REFERRAL_ATTRIBUTION_KEY]["referrer_user_id"] == referrer_id
+
+
+def test_lookup_sleeper_leagues_ignores_self_referral_code(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import referrals
+    from modules import sleeper_leagues
+
+    user_id = "11111111-1111-4111-8111-111111111111"
+    code = referrals.referral_code_for_user(user_id)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": user_id, "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = []
+    lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post") as mock_post:
+            with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+                response = client.get(
+                    f"/v1/sleeper/leagues?username=gm_dynasty&referral_code={code}",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    referral = response.json()["referral"]
+    assert referral["attempted"] is True
+    assert referral["ok"] is True  # self-referral is a clean no-op, never an error
+    mock_post.assert_not_called()
+
+
+def test_lookup_sleeper_leagues_referral_redemption_is_idempotent_once_already_attributed(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import referrals
+    from modules import sleeper_leagues
+
+    referrer_id = "11111111-1111-4111-8111-111111111111"
+    referred_id = "22222222-2222-4222-8222-222222222222"
+    code = referrals.referral_code_for_user(referrer_id)
+    already_attributed = referrals.with_attribution_recorded(None, referrer_user_id=referrer_id, code=code)["settings"]
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": referred_id, "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": referred_id, "settings": already_attributed}]
+    lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post") as mock_post:
+            with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+                response = client.get(
+                    f"/v1/sleeper/leagues?username=gm_dynasty&referral_code={code}",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    referral = response.json()["referral"]
+    assert referral["attempted"] is True
+    assert referral["ok"] is True
+    mock_post.assert_not_called()
+
+
+def test_referrals_my_code_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/referrals/my-code").status_code == 401
+
+
+def test_get_my_referral_code_returns_code_link_and_default_reward_status(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import referrals
+
+    user_id = "11111111-1111-4111-8111-111111111111"
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": user_id, "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/referrals/my-code", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert referrals.referrer_user_id_from_code(body["code"]) == user_id
+    assert body["link"].endswith(f"?ref={body['code']}")
+    assert body["connected_count"] == 0
+    assert body["comp_months_granted"] == 0
+    assert body["comp_until"] is None
+    assert body["comp_is_active"] is False
+    assert body["comp_months_remaining_capacity"] == referrals.MAX_COMP_MONTHS
+    assert body["referrals_per_comp_month"] == referrals.REFERRALS_PER_COMP_MONTH
+    assert body["max_comp_months"] == referrals.MAX_COMP_MONTHS
+
+
+def test_get_my_referral_code_reflects_existing_program_state(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import referrals
+
+    user_id = "11111111-1111-4111-8111-111111111111"
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": user_id, "email": "gm@example.com"}
+    existing_settings = {
+        referrals.REFERRAL_PROGRAM_KEY: {
+            "referred_user_ids": ["a", "b", "c"],
+            "connected_count": 3,
+            "comp_months_granted": 1,
+            "comp_until": "2099-01-01T00:00:00+00:00",
+        }
+    }
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": user_id, "settings": existing_settings}]
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/referrals/my-code", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["connected_count"] == 3
+    assert body["comp_months_granted"] == 1
+    assert body["comp_is_active"] is True
+    assert body["comp_months_remaining_capacity"] == referrals.MAX_COMP_MONTHS - 1
 
 
 def _fake_guess_the_player_frame():

@@ -2093,6 +2093,25 @@ export interface PushPreferencesResponse {
   categories: Record<PushCategory, boolean>;
 }
 
+/** Referral program (modules.referrals, GET /v1/referrals/my-code) — a
+ * complete, already-built invite-code/reward system that until now was only
+ * ever wired into the legacy Streamlit app. `comp_until` is an ISO
+ * timestamp (or null, never earned a comp month yet); `connected_count` is
+ * every distinct leaguemate who has connected Sleeper through this user's
+ * link, not merely clicked it. */
+export interface ReferralStatusResponse {
+  ok: boolean;
+  code: string;
+  link: string;
+  connected_count: number;
+  comp_months_granted: number;
+  comp_until: string | null;
+  comp_is_active: boolean;
+  comp_months_remaining_capacity: number;
+  referrals_per_comp_month: number;
+  max_comp_months: number;
+}
+
 /** GDPR/CCPA self-service data export — GET /v1/me/export. Every Supabase
  * table row this account owns, as one JSON document; `tables` is left
  * loosely typed since its shape mirrors whatever each table actually
@@ -2755,6 +2774,11 @@ export const api = {
       method: "POST",
       jsonBody: { category, enabled },
     }),
+
+  // Account page (2026-10-19) — the referral program's own invite
+  // code/link + reward status (see services/mobile_api_service.py's
+  // GET /v1/referrals/my-code).
+  getMyReferralCode: () => authorizedRequest<ReferralStatusResponse>("/v1/referrals/my-code"),
 
   // Account page (2026-10-19) — GDPR/CCPA data export, the same
   // GET /v1/me/export mobile's "Export My Data" row already calls.

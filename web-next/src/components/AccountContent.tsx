@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import type { MeResponse, PushCategory } from "@/lib/api";
+import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
+import { ReferralCard } from "@/components/ReferralCard";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same four categories, same copy — so a user who's seen this in the app
@@ -318,6 +319,9 @@ export function AccountContent({
   onToggleCommunityOptOut,
   pushCategories,
   onTogglePushCategory,
+  referral,
+  referralError,
+  onRetryReferral,
   onOpenBillingPortal,
   onExportData,
   onDeleteAccount,
@@ -328,6 +332,9 @@ export function AccountContent({
   onToggleCommunityOptOut: (next: boolean) => void;
   pushCategories: Record<PushCategory, boolean> | null;
   onTogglePushCategory: (category: PushCategory, enabled: boolean) => void;
+  referral: ReferralStatusResponse | null;
+  referralError: string | null;
+  onRetryReferral: () => void;
   onOpenBillingPortal: () => Promise<void>;
   onExportData: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
@@ -344,6 +351,7 @@ export function AccountContent({
 
       <IdentitySection user={user} />
       <BillingSection entitlement={user.entitlement} onOpenBillingPortal={onOpenBillingPortal} />
+      <ReferralCard referral={referral} error={referralError} onRetry={onRetryReferral} />
       <PreferencesSection
         communityOptedOut={communityOptedOut}
         onToggleCommunityOptOut={onToggleCommunityOptOut}
