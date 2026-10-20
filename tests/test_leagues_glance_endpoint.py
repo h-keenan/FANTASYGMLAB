@@ -8,6 +8,7 @@ Redis is tests/conftest.py's autouse fakeredis, fresh per test.
 
 from __future__ import annotations
 
+import time
 from unittest.mock import Mock, patch
 
 import pytest
@@ -316,6 +317,54 @@ def test_loads_the_news_pool_once_and_only_on_a_cache_miss(monkeypatch):
 
     _glance_request(client)  # every league is a cache hit now
     assert loads["n"] == 1
+
+
+def test_fanout_times_out_a_hung_league_instead_of_the_whole_request(monkeypatch):
+    """Same bug class as test_portfolio_fanout_times_out_a_hung_league_instead_of_the_whole_request
+    (tests/test_mobile_api_service.py), found during a 2026-10-19 performance
+    audit: this endpoint's fan-out used a bare `executor.map` with no overall
+    bound, so ONE genuinely hung per-league call (e.g. Sleeper never
+    responding) blocked the entire response forever instead of just that one
+    league's row -- defeating this endpoint's own "one broken league never
+    blanks the rest" design intent. A hung league must now show up in
+    failed_leagues with reason "timed_out" while every other league's real
+    row still comes back, and the whole request must return well within the
+    (monkeypatched tiny) fan-out deadline rather than waiting for the hung
+    call."""
+    from services import mobile_api_service
+
+    _stub_supabase_and_news(
+        monkeypatch,
+        mobile_api_service,
+        [
+            {"league_id": "L-hung", "league_name": "Hung League"},
+            {"league_id": "L-ok", "league_name": "OK League"},
+        ],
+    )
+    # Real deadline is 25s -- shrink it so this test stays fast while still
+    # exercising the real timeout/orphan-thread code path.
+    monkeypatch.setattr(mobile_api_service, "_LEAGUE_GLANCE_FANOUT_TIMEOUT_SECONDS", 0.1)
+
+    def _fake_glance(*, league_id, **_kwargs):
+        if league_id == "L-hung":
+            # Deliberately longer than the shrunk deadline above -- this
+            # thread is still "running" (never cancelled, Python threads
+            # can't be force-killed) when the fan-out gives up on it.
+            time.sleep(1.0)
+            return _glance_ok(league_id)
+        return _glance_ok(league_id)
+
+    monkeypatch.setattr(mobile_api_service.league_glance, "build_league_glance", _fake_glance)
+
+    started = time.monotonic()
+    response = _glance_request(_client(monkeypatch))
+    elapsed = time.monotonic() - started
+
+    assert response.status_code == 200
+    assert elapsed < 1.0, "the response must not wait for the hung league's full sleep"
+    body = response.json()
+    assert [league["league_id"] for league in body["leagues"]] == ["L-ok"]
+    assert body["failed_leagues"] == [{"league_id": "L-hung", "league_name": "Hung League", "reason": "timed_out"}]
 
 
 def test_adds_a_new_route_alongside_dashboard_and_portfolio():
