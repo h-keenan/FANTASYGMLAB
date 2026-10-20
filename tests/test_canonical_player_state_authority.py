@@ -74,6 +74,38 @@ def test_injury_level_matches_player_state_authority_for_inactive_and_practice_s
     assert rankings.is_ruled_out("Out", "") is True
 
 
+def test_injury_level_treats_na_injury_status_as_healthy_not_minor():
+    """Injury-awareness audit finding (2026-10-19 valuation-system audit):
+    Sleeper's real `injury_status` vocabulary includes a literal "NA" value
+    carried by 96 real rostered players (confirmed against
+    data/sleeper_players.json — e.g. Kaleb McGary, `status` "Active",
+    `injury_status` "NA", no injury_notes/injury_start_date; mostly backup
+    skill/O-line players with no actual injury designation). rankings.py's
+    `_injury_level_cached` healthy_markers set only recognized
+    ("", "none", "healthy", "active"), so every one of these genuinely
+    healthy players fell through to the catch-all "minor" severity bucket —
+    feeding a wrong injury-risk discount and a spurious injury tag into every
+    downstream consumer of injury_level()/is_injury_status() (My Team injury
+    alerts, trade_ideas.py's injury framing and need-counting, waiver/faab
+    logic, player card "Injury Risk" badges).
+    """
+
+    mcgary = _actual_record("Kaleb McGary")
+    assert mcgary["injury_status"] == "NA"
+    assert rankings.injury_level(mcgary["status"], mcgary["injury_status"]) == "healthy"
+    assert rankings.is_injury_status(mcgary) is False
+
+    # Case/spelling-variant guard, same discipline as the rest of injury_level().
+    assert rankings.injury_level("Active", "na") == "healthy"
+    assert rankings.injury_level("Active", "N/A") == "healthy"
+
+    # Regression guard: a real injury designation must still classify
+    # correctly — "NA" must not swallow genuine injury tags.
+    assert rankings.injury_level("Active", "Questionable") == "minor"
+    assert rankings.injury_level("Active", "Out") == "moderate"
+    assert rankings.injury_level("Injured Reserve", "") == "major"
+
+
 def test_actual_keenan_survives_current_player_universe_reconciliation():
     keenan = _actual_record("Keenan Allen")
     frame = _reconciled_frame()
