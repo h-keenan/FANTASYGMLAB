@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { api, type LineupPlayer, type MyTeamResponse, type PremiumUpsell, type TradeIdea } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
@@ -32,9 +32,16 @@ import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
  * that can never return results. mobile's TradeFinderScreen.tsx is still
  * ungated and should get the same fix separately.
  *
- * Strategy/lens default to "retool"/"Dynasty", matching TradeHubContent's
- * own documented default (web-next has no GmStance/ValuationLens context
- * the way mobile does yet).
+ * Lens defaults to "Dynasty", matching TradeHubContent's own documented
+ * default (web-next has no ValuationLens context the way mobile does for
+ * every page yet). Strategy used to default to a hardcoded "retool" too —
+ * recommendation-compliance audit finding: that meant a search here never
+ * reflected the caller's declared Team Situation (Competing/Rebuilding),
+ * only "Balanced", the one stance "retool" happens to match — so this now
+ * fetches GET .../team-stance's already-mapped `strategy` field on mount,
+ * same as mobile's TradeFinderScreen.tsx (useGmStance) does, falling back
+ * to "retool" only while that fetch is in flight or if it fails/no stance
+ * is set (unchanged from before for those cases).
  *
  * Deliberately NOT covered: the "Quick view a selected player" button grid
  * Streamlit's workspace renders below the selection — a tap-through to
@@ -135,6 +142,27 @@ export function TradeFinderContent({
   // null = not yet known (no search attempted); set from the first search
   // response's `is_premium`/`upsell` — see the premium-gating note above.
   const [premiumUpsell, setPremiumUpsell] = useState<{ locked: boolean; upsell: PremiumUpsell | null } | null>(null);
+  // The caller's declared Team Situation, mapped to the real engine
+  // strategy key — see this file's docstring. Defaults to "retool" (the
+  // same default as before this fetch existed) until GET .../team-stance
+  // resolves, matching mobile's useGmStance AUTO_STRATEGY fallback.
+  const [strategy, setStrategy] = useState("retool");
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTeamStance(leagueId)
+      .then((result) => {
+        if (!cancelled && result.strategy) setStrategy(result.strategy);
+      })
+      .catch(() => {
+        // Team Situation fetch failing is never fatal — search still runs
+        // under the same "retool" default it always has.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
 
   function toggle(playerId: string) {
     setSelectedIds((prev) => {
@@ -152,7 +180,7 @@ export function TradeFinderContent({
     setSearchError(null);
     setSearching(true);
     try {
-      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), "retool", lens);
+      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens);
       setIdeas(result.ideas);
       setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
       if (result.ideas.length === 0 && result.reason === "no_players_selected") {

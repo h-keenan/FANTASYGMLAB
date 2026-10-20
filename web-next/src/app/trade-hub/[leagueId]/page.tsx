@@ -28,6 +28,34 @@ export default function TradeHubPage() {
     // already dedupes a genuine remount for the same league anyway.
   }, [session, leagueId]);
 
+  // Recommendation-compliance audit finding: this page used to hardcode
+  // "retool" regardless of the caller's declared Team Situation, so a user
+  // who declared Competing/Rebuilding never actually saw ideas generated
+  // under their own stated stance here — only Dashboard/GM Plan (which
+  // derive the real strategy server-side) and mobile's TradeHubScreen
+  // (which reads it via useGmStance) did. GET .../team-stance already
+  // returns the exact mapped engine key (`strategy`) Trade Hub needs; this
+  // mirrors mobile's useGmStance gating (null until resolved, falling back
+  // to "retool" on fetch failure/no stance set, same as always) rather than
+  // firing the real idea search under a possibly-wrong default first.
+  const [strategy, setStrategy] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    api
+      .getTeamStance(leagueId)
+      .then((result) => {
+        if (!cancelled) setStrategy(result.strategy || "retool");
+      })
+      .catch(() => {
+        if (!cancelled) setStrategy("retool");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session, leagueId]);
+
   const [tradeHub, setTradeHub] = useState<TradeHubResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,10 +65,11 @@ export default function TradeHubPage() {
       router.replace("/");
       return;
     }
+    if (strategy === null) return;
     let cancelled = false;
 
     api
-      .getTradeHub(leagueId, "retool", lens)
+      .getTradeHub(leagueId, strategy, lens)
       .then((result) => {
         if (!cancelled) setTradeHub(result);
       })
@@ -51,7 +80,7 @@ export default function TradeHubPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, strategy, router]);
 
   if (authLoading || (!tradeHub && !error)) {
     return (
