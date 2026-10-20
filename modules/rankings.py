@@ -2320,7 +2320,13 @@ assert _MAJOR_NFL_STATUS_VALUES <= NFL_NON_ACTIONABLE_STATUSES, (
 
 @lru_cache(maxsize=4096)
 def _injury_level_cached(status: str, injury_status: str) -> str:
-    healthy_markers = {"", "none", "healthy", "active"}
+    # "na"/"n/a" are Sleeper's real `injury_status` spelling for "no injury
+    # designation" (confirmed against data/sleeper_players.json: 96 real
+    # rostered players, e.g. Kaleb McGary, carry literal injury_status "NA"
+    # with no injury_notes/injury_start_date) — not a severity level. Without
+    # this, these genuinely healthy players fell through to the "minor"
+    # catch-all below.
+    healthy_markers = {"", "none", "healthy", "active", "na", "n/a"}
     major_terms = {
         "injured reserve",
         "ir",
