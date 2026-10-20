@@ -65,14 +65,17 @@ export function DashboardContent({
           it fetches its own data rather than reading from `data` above.
           Renders nothing while loading, on fetch failure, or once
           dismissed — never blocks or visually disrupts the real Game Plan
-          content below it. */}
-      <GuessThePlayerCard />
+          content below it. `leagueId` is only used for its "League
+          Leaderboard" link (feature-brainstorm audit, 2026-10-19) — the
+          leaderboard itself is league-scoped even though the daily pick
+          isn't. */}
+      <GuessThePlayerCard leagueId={leagueId} />
 
       {/* "Who is who?" name-match mini-game (coridian_, 2026-10-19) — a
           second, distinct daily mini-game alongside Guess the Player
           above; same league-independent, self-fetching, dismissible
           shape, own daily pick and own streak. */}
-      <GuessThePlayerNameMatchCard />
+      <GuessThePlayerNameMatchCard leagueId={leagueId} />
 
       {/* League Pulse (coridian_'s brainstorm list, "do it all") — real
           league-wide activity/streak leaders off GET .../team-rankings.

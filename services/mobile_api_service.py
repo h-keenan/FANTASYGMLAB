@@ -149,6 +149,7 @@ from modules import (
     gm_plan,
     gm_targets,
     guess_the_player,
+    guess_the_player_leaderboard,
     injury_ui,
     launch_analytics,
     league_format_context,
@@ -4598,6 +4599,109 @@ def answer_guess_the_player_name_match(
         "correct_pairing": _guess_the_player_name_match_correct_pairing(pick),
         "streak": streak_payload,
     }
+
+
+# ---------------------------------------------------------------------------
+# League-scoped "Guess the Player" leaderboard — feature-brainstorm audit
+# (coridian_, 2026-10-19, "do it all"): both mini-games above already
+# persist a real, durable per-user streak; comparing streaks among a
+# user's actual leaguemates is pure assembly of that existing data. See
+# modules.guess_the_player_leaderboard's module docstring for the full
+# "who counts as a leaguemate" + cross-user service-role design (same
+# pattern as GET /v1/community/trades above).
+# ---------------------------------------------------------------------------
+
+
+def _guess_the_player_leaderboard_entries(
+    config: guess_the_player_leaderboard.LeaderboardConfig,
+    *,
+    league_id: str,
+    table: str,
+    members: list[dict[str, Any]],
+    user_ids: list[str],
+    profiles_by_user: dict[str, dict[str, Any]],
+    viewer_user_id: str,
+) -> list[dict[str, Any]]:
+    streaks_by_user = guess_the_player_leaderboard.fetch_streaks(config, table, user_ids)
+    return guess_the_player_leaderboard.build_leaderboard(
+        members,
+        league_id=league_id,
+        streaks_by_user=streaks_by_user,
+        profiles_by_user=profiles_by_user,
+        viewer_user_id=viewer_user_id,
+    )
+
+
+@app.get("/v1/leagues/{league_id}/guess-the-player/leaderboard")
+def get_guess_the_player_leaderboard(
+    league_id: str, user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Both mini-games' real streaks, ranked among the other FantasyDesk
+    accounts that have THIS league saved (see modules.guess_the_player_
+    leaderboard's module docstring for exactly who that is and isn't).
+
+    Fails closed, same contract as GET /v1/community/trades: any missing
+    service-role config, Supabase hiccup, or unexpected error returns an
+    empty-but-200 leaderboard rather than a 500 — this is a Dashboard/
+    mini-game extra, never something that should block a client.
+    """
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    empty_response = {
+        "ok": True,
+        "configured": False,
+        "stat_line": {"entries": []},
+        "name_match": {"entries": []},
+    }
+
+    try:
+        config = guess_the_player_leaderboard.load_leaderboard_config()
+        if not config.configured:
+            return empty_response
+
+        members = guess_the_player_leaderboard.fetch_league_members(config, league_id)
+        if not members:
+            return {
+                "ok": True,
+                "configured": True,
+                "stat_line": {"entries": []},
+                "name_match": {"entries": []},
+            }
+
+        user_ids = [str(member.get("user_id") or "") for member in members]
+        profiles_by_user = guess_the_player_leaderboard.fetch_profiles(config, user_ids)
+        viewer_user_id = str(user.get("id") or "")
+
+        stat_line_entries = _guess_the_player_leaderboard_entries(
+            config,
+            league_id=league_id,
+            table=guess_the_player_leaderboard.STAT_LINE_STREAKS_TABLE,
+            members=members,
+            user_ids=user_ids,
+            profiles_by_user=profiles_by_user,
+            viewer_user_id=viewer_user_id,
+        )
+        name_match_entries = _guess_the_player_leaderboard_entries(
+            config,
+            league_id=league_id,
+            table=guess_the_player_leaderboard.NAME_MATCH_STREAKS_TABLE,
+            members=members,
+            user_ids=user_ids,
+            profiles_by_user=profiles_by_user,
+            viewer_user_id=viewer_user_id,
+        )
+
+        return {
+            "ok": True,
+            "configured": True,
+            "stat_line": {"entries": stat_line_entries},
+            "name_match": {"entries": name_match_entries},
+        }
+    except Exception:
+        return empty_response
 
 
 TRADE_OUTCOMES_TABLE = "trade_outcomes"

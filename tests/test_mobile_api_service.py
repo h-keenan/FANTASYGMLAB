@@ -12013,6 +12013,148 @@ def test_react_to_community_trade_remove_deletes_own_reaction_row(monkeypatch):
     assert "outcome_id=eq.outcome-1" in deleted_url
 
 
+def test_guess_the_player_leaderboard_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/leagues/league-123/guess-the-player/leaderboard").status_code == 401
+
+
+def test_guess_the_player_leaderboard_404s_for_unknown_league(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get(
+                "/v1/leagues/league-123/guess-the-player/leaderboard",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 404
+
+
+def test_guess_the_player_leaderboard_returns_empty_when_service_role_not_configured(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "league-123"}):
+            response = client.get(
+                "/v1/leagues/league-123/guess-the-player/leaderboard",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "ok": True,
+        "configured": False,
+        "stat_line": {"entries": []},
+        "name_match": {"entries": []},
+    }
+
+
+def test_guess_the_player_leaderboard_ranks_leaguemates_and_handles_no_streak_history(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "viewer-user", "email": "gm@example.com"}
+
+    saved_leagues_response = Mock(status_code=200)
+    saved_leagues_response.json.return_value = [
+        {"user_id": "viewer-user", "sleeper_username": "viewer", "team_id": "Viewer Team"},
+        {"user_id": "other-user", "sleeper_username": "other", "team_id": "Other Team"},
+        # No streak row anywhere for this user — must still appear, at 0/0.
+        {"user_id": "no-streak-user", "sleeper_username": "nostreak", "team_id": "No Streak Team"},
+    ]
+    profiles_response = Mock(status_code=200)
+    profiles_response.json.return_value = []
+    stat_line_streaks_response = Mock(status_code=200)
+    stat_line_streaks_response.json.return_value = [
+        {"user_id": "viewer-user", "current_streak": 2, "best_streak": 4},
+        {"user_id": "other-user", "current_streak": 7, "best_streak": 7},
+    ]
+    name_match_streaks_response = Mock(status_code=200)
+    name_match_streaks_response.json.return_value = [
+        {"user_id": "viewer-user", "current_streak": 1, "best_streak": 1},
+    ]
+
+    with patch("requests.get", side_effect=[
+        auth_user_response,
+        saved_leagues_response,
+        profiles_response,
+        stat_line_streaks_response,
+        name_match_streaks_response,
+    ]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "league-123"}):
+            response = client.get(
+                "/v1/leagues/league-123/guess-the-player/leaderboard",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["configured"] is True
+
+    stat_line_entries = body["stat_line"]["entries"]
+    assert [entry["display_name"] for entry in stat_line_entries] == [
+        "Other Team",
+        "Viewer Team",
+        "No Streak Team",
+    ]
+    assert [entry["rank"] for entry in stat_line_entries] == [1, 2, 3]
+    no_streak_entry = stat_line_entries[2]
+    assert no_streak_entry["current_streak"] == 0
+    assert no_streak_entry["best_streak"] == 0
+    assert no_streak_entry["is_viewer"] is False
+    viewer_entry = stat_line_entries[1]
+    assert viewer_entry["is_viewer"] is True
+    # Raw Supabase user_id never reaches the client.
+    serialized = str(body)
+    assert "viewer-user" not in serialized
+    assert "other-user" not in serialized
+    assert "no-streak-user" not in serialized
+
+    name_match_entries = body["name_match"]["entries"]
+    # viewer-user is the only one with a name-match streak row; the other
+    # two tie at 0/0 and fall back to alphabetical display_name order.
+    assert [entry["display_name"] for entry in name_match_entries] == [
+        "Viewer Team",
+        "No Streak Team",
+        "Other Team",
+    ]
+    assert name_match_entries[0]["current_streak"] == 1
+
+
+def test_guess_the_player_leaderboard_empty_when_no_leaguemates_have_accounts(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "viewer-user", "email": "gm@example.com"}
+    empty_saved_leagues_response = Mock(status_code=200)
+    empty_saved_leagues_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, empty_saved_leagues_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "league-123"}):
+            response = client.get(
+                "/v1/leagues/league-123/guess-the-player/leaderboard",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "ok": True,
+        "configured": True,
+        "stat_line": {"entries": []},
+        "name_match": {"entries": []},
+    }
+
+
 def test_community_preferences_require_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.get("/v1/community/preferences").status_code == 401

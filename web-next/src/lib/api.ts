@@ -396,6 +396,34 @@ export interface GuessThePlayerNameMatchAnswerResponse {
   streak: GuessThePlayerNameMatchStreak;
 }
 
+/** League-scoped leaderboard for both Guess the Player mini-games' real,
+ * persisted streaks — mirrors services/mobile_api_service.py's GET
+ * .../guess-the-player/leaderboard and modules.guess_the_player_leaderboard's
+ * build_leaderboard output. `member_id` is an opaque per-league id, never
+ * the raw Supabase auth user_id (see that module's docstring); it exists
+ * purely as a stable React key. "Leaguemates" here means the other
+ * FantasyDesk accounts that have this same league saved — not every real
+ * Sleeper manager in the league, most of whom have no app account at all. */
+export interface GuessThePlayerLeaderboardEntry {
+  member_id: string;
+  display_name: string;
+  current_streak: number;
+  best_streak: number;
+  rank: number;
+  is_viewer: boolean;
+}
+
+export interface GuessThePlayerLeaderboardResponse {
+  ok: boolean;
+  /** False only when the backend's service-role Supabase access isn't
+   * configured — distinct from "configured but nobody else has an
+   * account here yet" (also an empty `entries` array, but `configured`
+   * stays true). */
+  configured: boolean;
+  stat_line: { entries: GuessThePlayerLeaderboardEntry[] };
+  name_match: { entries: GuessThePlayerLeaderboardEntry[] };
+}
+
 /** One roster slot on My Team's Roster Core/Depth — mirrors mobile's
  * LineupPlayer (mobile/src/lib/api.ts), the reference implementation for
  * GET .../my-team. `overall_rating` is the 0-99 "OVR" badge, percentiled
@@ -2463,6 +2491,15 @@ export const api = {
       method: "POST",
       jsonBody: { pick_id: pickId, famous_slot: famousSlot },
     }),
+
+  // League-scoped leaderboard across both Guess the Player mini-games'
+  // real streaks (feature-brainstorm audit, 2026-10-19) — unlike the two
+  // calls above, this one IS league-scoped: it ranks the other FantasyDesk
+  // accounts that have this same league saved.
+  getGuessThePlayerLeaderboard: (leagueId: string) =>
+    authorizedRequest<GuessThePlayerLeaderboardResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/guess-the-player/leaderboard`,
+    ),
 
   getMyTeam: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<MyTeamResponse>(

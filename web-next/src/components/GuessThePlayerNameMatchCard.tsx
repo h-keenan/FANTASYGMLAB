@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
@@ -44,7 +45,7 @@ type RevealState = {
   correctPairing: GuessThePlayerNameMatchCorrectPairing;
 };
 
-export function GuessThePlayerNameMatchCard() {
+export function GuessThePlayerNameMatchCard({ leagueId }: { leagueId?: string } = {}) {
   const [data, setData] = useState<GuessThePlayerNameMatchResponse | null>(null);
   const [dismissedPickId, setDismissedPickId] = useState<string | null>(() =>
     getDismissedGuessThePlayerNameMatchPickId(),
@@ -240,9 +241,20 @@ export function GuessThePlayerNameMatchCard() {
         </p>
       ) : null}
 
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {streakCaption(data.streak)}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {streakCaption(data.streak)}
+        </p>
+        {leagueId ? (
+          <Link
+            href={`/guess-the-player-leaderboard/${encodeURIComponent(leagueId)}`}
+            className="text-xs font-bold shrink-0"
+            style={{ color: "var(--color-accent)" }}
+          >
+            League Leaderboard →
+          </Link>
+        ) : null}
+      </div>
     </article>
   );
 }
