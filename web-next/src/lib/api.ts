@@ -330,6 +330,72 @@ export interface GuessThePlayerAnswerResponse {
   streak: GuessThePlayerStreak;
 }
 
+/* "Who is who?" name-match mode — a SECOND, distinct daily mini-game
+ * (coridian_, 2026-10-19, same Discord thread as Guess the Player above):
+ * "you get two players and one player is, you know, a known name that's
+ * good, and then one player is kind of an unknown name who maybe has
+ * better stats than the known name, and so you pick and choose who is
+ * who." Unlike Guess the Player, BOTH players' real identity is shown up
+ * front — what's hidden is which of the two real, unlabeled stat lines
+ * ("Slot A"/"Slot B") belongs to which player. Mirrors
+ * services/mobile_api_service.py's _guess_the_player_name_match_*
+ * helpers. Its own daily pick and its own persisted streak — never mixed
+ * with GuessThePlayerStreak above. */
+export interface GuessThePlayerNameMatchIdentity {
+  player_id: string;
+  name: string;
+  team: string;
+  position: string;
+  tier: string;
+}
+
+export interface GuessThePlayerNameMatchSlot {
+  stat_line: GuessThePlayerStatLineItem[];
+  fantasy_points_ppr: number;
+}
+
+export interface GuessThePlayerNameMatchPrompt {
+  pick_id: string;
+  season: number;
+  week: number;
+  famous_player: GuessThePlayerNameMatchIdentity;
+  obscure_player: GuessThePlayerNameMatchIdentity;
+  /** Keyed "A"/"B" — deliberately doesn't say which player each slot
+   * belongs to; that's the guess. */
+  slots: Record<string, GuessThePlayerNameMatchSlot>;
+}
+
+export interface GuessThePlayerNameMatchStreak {
+  current_streak: number;
+  best_streak: number;
+}
+
+export interface GuessThePlayerNameMatchCorrectPairing {
+  famous_slot: string;
+  obscure_slot: string;
+}
+
+export interface GuessThePlayerNameMatchResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+  prompt: GuessThePlayerNameMatchPrompt | null;
+  already_answered: boolean;
+  last_result: "correct" | "incorrect" | null;
+  /** Only ever populated when `already_answered` is true — never sent
+   * alongside an unanswered prompt (that would leak the pairing). */
+  correct_pairing: GuessThePlayerNameMatchCorrectPairing | null;
+  streak: GuessThePlayerNameMatchStreak;
+}
+
+export interface GuessThePlayerNameMatchAnswerResponse {
+  ok: boolean;
+  already_answered: boolean;
+  correct: boolean;
+  correct_pairing: GuessThePlayerNameMatchCorrectPairing;
+  streak: GuessThePlayerNameMatchStreak;
+}
+
 /** One roster slot on My Team's Roster Core/Depth — mirrors mobile's
  * LineupPlayer (mobile/src/lib/api.ts), the reference implementation for
  * GET .../my-team. `overall_rating` is the 0-99 "OVR" badge, percentiled
@@ -2385,6 +2451,17 @@ export const api = {
     authorizedRequest<GuessThePlayerAnswerResponse>("/v1/guess-the-player/answer", {
       method: "POST",
       jsonBody: { pick_id: pickId, player_id: playerId },
+    }),
+
+  // "Who is who?" name-match mini-game (coridian_, 2026-10-19) — a second,
+  // distinct daily mini-game alongside Guess the Player above, with its
+  // own daily pick and its own streak.
+  getGuessThePlayerNameMatch: () =>
+    authorizedRequest<GuessThePlayerNameMatchResponse>("/v1/guess-the-player/name-match"),
+  answerGuessThePlayerNameMatch: (pickId: string, famousSlot: string) =>
+    authorizedRequest<GuessThePlayerNameMatchAnswerResponse>("/v1/guess-the-player/name-match/answer", {
+      method: "POST",
+      jsonBody: { pick_id: pickId, famous_slot: famousSlot },
     }),
 
   getMyTeam: (leagueId: string, lens: string = "Dynasty") =>

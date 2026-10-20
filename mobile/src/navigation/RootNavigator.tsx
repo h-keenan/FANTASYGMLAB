@@ -9,6 +9,7 @@ import BrandMark from '../components/BrandMark';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import GuessThePlayerPrompt from '../components/GuessThePlayerPrompt';
+import GuessThePlayerNameMatchPrompt from '../components/GuessThePlayerNameMatchPrompt';
 import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../context/AuthContext';
@@ -255,6 +256,7 @@ export default function RootNavigator() {
         {hideFloatingChrome ? null : <GmOrb />}
         {hideFloatingChrome ? null : <TradeOutcomePrompt />}
         {hideFloatingChrome ? null : <GuessThePlayerPrompt />}
+        {hideFloatingChrome ? null : <GuessThePlayerNameMatchPrompt />}
         </View>
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>

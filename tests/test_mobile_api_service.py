@@ -757,7 +757,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
     table_response.json.return_value = [{"user_id": "user-123"}]
 
     # auth fetch, then one requests.get per table in _EXPORTABLE_USER_TABLES.
-    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 15):
+    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 16):
         response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
@@ -779,6 +779,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
         "decision_memory_baselines",
         "notification_read_state",
         "guess_the_player_streaks",
+        "guess_the_player_name_match_streaks",
         "community_trade_reactions",
     }
     assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
@@ -12748,6 +12749,308 @@ def test_answer_guess_the_player_fails_closed_when_table_missing(monkeypatch):
                         json={"pick_id": _real_guess_the_player_pick_id(), "player_id": "1"},
                         headers={"Authorization": "Bearer good-token"},
                     )
+
+    # Never a crash/500 just because the migration hasn't been applied yet.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["correct"] is True
+    # Not durably recorded (table missing) -- the response still reports
+    # the pre-guess streak rather than an un-persisted increment.
+    assert body["streak"] == {"current_streak": 0, "best_streak": 0}
+
+
+# ---------------------------------------------------------------------------
+# "Who is who?" name-match mode. Same shared fixtures as the "Whose stats
+# are these?" tests above -- player "4" (Star RB, elite tier) is the only
+# high-profile player, and its real week-5 value (21.0) genuinely loses to
+# player "1"'s real week-5 breakout (30.0), so the fixture already contains
+# one real same-week inversion.
+# ---------------------------------------------------------------------------
+
+
+def _real_guess_the_player_name_match_pick_id():
+    """The real pick_id the shared fixture resolves to (famous player 4,
+    obscure player 1, week 5, season 2025) -- computed via the actual
+    module, never hardcoded."""
+
+    from modules import guess_the_player as gtp
+
+    return gtp.compute_name_match_pick_id(2025, "4", "1", 5)
+
+
+def test_guess_the_player_name_match_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/guess-the-player/name-match")
+    assert response.status_code == 401
+
+
+def test_guess_the_player_name_match_returns_real_pairing_with_zero_streak_for_a_new_user(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch(
+                "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+            ):
+                response = client.get(
+                    "/v1/guess-the-player/name-match", headers={"Authorization": "Bearer good-token"}
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["available"] is True
+    assert body["already_answered"] is False
+    assert body["last_result"] is None
+    assert body["correct_pairing"] is None
+    assert body["streak"] == {"current_streak": 0, "best_streak": 0}
+
+    prompt = body["prompt"]
+    assert prompt["pick_id"] == _real_guess_the_player_name_match_pick_id()
+    assert prompt["week"] == 5
+    # Unlike the original game, BOTH real identities are always shown.
+    assert prompt["famous_player"]["name"] == "Star RB"
+    assert prompt["famous_player"]["tier"] == "elite"
+    assert prompt["obscure_player"]["name"] == "Bench Runner"
+    assert prompt["obscure_player"]["tier"] == "depth"
+    # Never leak which slot is whose before an answer.
+    assert "famous_slot" not in prompt
+    assert "obscure_slot" not in prompt
+    assert set(prompt["slots"].keys()) == {"A", "B"}
+    points = {slot["fantasy_points_ppr"] for slot in prompt["slots"].values()}
+    assert points == {21.0, 30.0}
+    for slot in prompt["slots"].values():
+        assert slot["stat_line"]
+
+
+def test_guess_the_player_name_match_reports_already_answered_when_streak_matches_todays_pick(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {
+            "user_id": "user-123",
+            "current_streak": 2,
+            "best_streak": 2,
+            "last_pick_id": _real_guess_the_player_name_match_pick_id(),
+            "last_result": "correct",
+        }
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch(
+                "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+            ):
+                response = client.get(
+                    "/v1/guess-the-player/name-match", headers={"Authorization": "Bearer good-token"}
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["already_answered"] is True
+    assert body["last_result"] == "correct"
+    assert body["streak"] == {"current_streak": 2, "best_streak": 2}
+    assert body["correct_pairing"]["famous_slot"] in {"A", "B"}
+    assert body["correct_pairing"]["obscure_slot"] in {"A", "B"}
+    assert body["correct_pairing"]["famous_slot"] != body["correct_pairing"]["obscure_slot"]
+
+
+def test_guess_the_player_name_match_reports_unavailable_when_no_pairing_exists(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    flat_stats = {
+        "1": {
+            "stats_season": 2025,
+            "weekly": _fake_guess_the_player_weeks([3, 4, 3, 4, 3, 4]),
+        }
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch("modules.sleeper.get_season_player_stats", return_value=flat_stats):
+                response = client.get(
+                    "/v1/guess-the-player/name-match", headers={"Authorization": "Bearer good-token"}
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is False
+    assert body["prompt"] is None
+    assert body["reason"] == "no_name_match_pairing_today"
+
+
+def test_answer_guess_the_player_name_match_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/guess-the-player/name-match/answer", json={"pick_id": "abc", "famous_slot": "A"})
+    assert response.status_code == 401
+
+
+def test_answer_guess_the_player_name_match_rejects_invalid_slot(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/guess-the-player/name-match/answer",
+            json={"pick_id": "abc", "famous_slot": "C"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_answer_guess_the_player_name_match_rejects_a_stale_pick_id(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+            with patch(
+                "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+            ):
+                response = client.post(
+                    "/v1/guess-the-player/name-match/answer",
+                    json={"pick_id": "not-todays-pick", "famous_slot": "A"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 409
+
+
+def _answer_name_match(client, *, famous_slot, streak_rows_response, mock_post_response=None):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    upsert_response = mock_post_response or Mock(status_code=201)
+
+    with patch("requests.get", side_effect=[auth_user_response, streak_rows_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            with patch("modules.rankings.load_players", return_value=_fake_guess_the_player_frame()):
+                with patch(
+                    "modules.sleeper.get_season_player_stats", return_value=_fake_guess_the_player_season_stats()
+                ):
+                    response = client.post(
+                        "/v1/guess-the-player/name-match/answer",
+                        json={"pick_id": _real_guess_the_player_name_match_pick_id(), "famous_slot": famous_slot},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+    return response, mock_post
+
+
+def test_answer_guess_the_player_name_match_correct_increments_its_own_streak(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    from modules import guess_the_player as gtp
+
+    pick = gtp.build_daily_name_match_pick(
+        _fake_guess_the_player_frame(), _fake_guess_the_player_season_stats(), seed="2026-10-19"
+    )
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {"user_id": "user-123", "current_streak": 1, "best_streak": 1, "last_pick_id": "yesterdays-pick", "last_result": "correct"}
+    ]
+
+    response, mock_post = _answer_name_match(
+        client, famous_slot=pick["famous_slot"], streak_rows_response=streak_rows_response
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["correct"] is True
+    assert body["already_answered"] is False
+    assert body["streak"] == {"current_streak": 2, "best_streak": 2}
+    write_payload = mock_post.call_args.kwargs["json"]
+    assert write_payload["current_streak"] == 2
+    assert write_payload["last_result"] == "correct"
+
+
+def test_answer_guess_the_player_name_match_incorrect_resets_its_own_streak(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    from modules import guess_the_player as gtp
+
+    pick = gtp.build_daily_name_match_pick(
+        _fake_guess_the_player_frame(), _fake_guess_the_player_season_stats(), seed="2026-10-19"
+    )
+    wrong_slot = "B" if pick["famous_slot"] == "A" else "A"
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {"user_id": "user-123", "current_streak": 4, "best_streak": 4, "last_pick_id": "yesterdays-pick", "last_result": "correct"}
+    ]
+
+    response, _ = _answer_name_match(client, famous_slot=wrong_slot, streak_rows_response=streak_rows_response)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["correct"] is False
+    assert body["streak"] == {"current_streak": 0, "best_streak": 4}
+
+
+def test_answer_guess_the_player_name_match_replays_the_stored_result_for_a_repeat_submission(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+    pick_id = _real_guess_the_player_name_match_pick_id()
+    streak_rows_response = Mock(status_code=200)
+    streak_rows_response.json.return_value = [
+        {"user_id": "user-123", "current_streak": 1, "best_streak": 3, "last_pick_id": pick_id, "last_result": "correct"}
+    ]
+
+    from modules import guess_the_player as gtp
+
+    pick = gtp.build_daily_name_match_pick(
+        _fake_guess_the_player_frame(), _fake_guess_the_player_season_stats(), seed="2026-10-19"
+    )
+    wrong_slot = "B" if pick["famous_slot"] == "A" else "A"
+
+    response, mock_post = _answer_name_match(
+        client, famous_slot=wrong_slot, streak_rows_response=streak_rows_response
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["already_answered"] is True
+    assert body["correct"] is True
+    assert body["streak"] == {"current_streak": 1, "best_streak": 3}
+    mock_post.assert_not_called()
+
+
+def test_answer_guess_the_player_name_match_fails_closed_when_table_missing(monkeypatch):
+    client = _client(monkeypatch)
+    _patch_guess_the_player_today(monkeypatch)
+
+    from modules import guess_the_player as gtp
+
+    pick = gtp.build_daily_name_match_pick(
+        _fake_guess_the_player_frame(), _fake_guess_the_player_season_stats(), seed="2026-10-19"
+    )
+    streak_rows_response = Mock(status_code=404)
+    streak_rows_response.json.return_value = {}
+    upsert_response = Mock(status_code=404)
+
+    response, _ = _answer_name_match(
+        client,
+        famous_slot=pick["famous_slot"],
+        streak_rows_response=streak_rows_response,
+        mock_post_response=upsert_response,
+    )
 
     # Never a crash/500 just because the migration hasn't been applied yet.
     assert response.status_code == 200

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
+import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { WatchListCard } from "@/components/WatchListCard";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
@@ -61,6 +62,12 @@ export function DashboardContent({
           dismissed — never blocks or visually disrupts the real Game Plan
           content below it. */}
       <GuessThePlayerCard />
+
+      {/* "Who is who?" name-match mini-game (coridian_, 2026-10-19) — a
+          second, distinct daily mini-game alongside Guess the Player
+          above; same league-independent, self-fetching, dismissible
+          shape, own daily pick and own streak. */}
+      <GuessThePlayerNameMatchCard />
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
         <h2 id="game-plan-heading" style={{ font: "var(--type-section-title)" }}>
