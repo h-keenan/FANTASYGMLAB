@@ -26,10 +26,9 @@ modules.league_history.normalize_transaction):
 from __future__ import annotations
 
 import time
-from functools import lru_cache
 from typing import Any, Mapping
 
-from modules import league_history, sleeper
+from modules import league_history, redis_cache, sleeper
 
 
 def league_pick_flow_counts(
@@ -122,7 +121,21 @@ def _pick_flow_cache_bucket() -> int:
     return int(time.time() // PICK_FLOW_TTL_SECONDS)
 
 
-@lru_cache(maxsize=64)
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache)
+# — same pattern, and same reason, as modules.manager_activity's/
+# modules.team_trade_history's own caches: this used to be a per-process
+# functools.lru_cache, which only protected ONE mobile-api worker. Under
+# docker-compose.yml's multiple uvicorn workers, each worker has its own
+# process memory, so that old cache would let the same season-long
+# transaction scan (collect_season_transactions, one Sleeper call per week
+# of the season) run redundantly once per worker AND a cache hit in worker A
+# would never help a request landing on worker B. Redis fixes both: the
+# distributed lock makes only one worker, cluster-wide, actually run the
+# scan for a given (league_id, bucket), and the cached result lives in
+# Redis, not in any one worker's memory.
+_PICK_FLOW_LOCK_TIMEOUT_SECONDS = 15.0
+
+
 def _league_pick_flow_counts_cached(league_id: str, _bucket: int) -> dict[int, dict[str, int]]:
     return league_pick_flow_counts(league_id)
 
@@ -130,12 +143,17 @@ def _league_pick_flow_counts_cached(league_id: str, _bucket: int) -> dict[int, d
 def league_pick_flow_counts_cached(league_id: str) -> dict[int, dict[str, int]]:
     """Cached front door for `league_pick_flow_counts` — shares one
     (league_id) cache key across callers within the same 30-minute window
-    instead of each re-scanning the season's transactions."""
+    instead of each re-scanning the season's transactions.
 
-    return _league_pick_flow_counts_cached(league_id, _pick_flow_cache_bucket())
+    Single-flight + cache, shared across every mobile-api worker via
+    Redis: see modules.redis_cache.redis_single_flight_cache and this
+    module's own comment above `_PICK_FLOW_LOCK_TIMEOUT_SECONDS`."""
 
-
-def clear_pick_flow_cache() -> None:
-    """Test/refresh hook — mirrors manager_activity's own cache-clear."""
-
-    _league_pick_flow_counts_cached.cache_clear()
+    key = (league_id, _pick_flow_cache_bucket())
+    cache_key = redis_cache.build_cache_key("league_pick_flow_counts", *key)
+    return redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=PICK_FLOW_TTL_SECONDS,
+        compute=lambda: _league_pick_flow_counts_cached(*key),
+        lock_timeout_seconds=_PICK_FLOW_LOCK_TIMEOUT_SECONDS,
+    )

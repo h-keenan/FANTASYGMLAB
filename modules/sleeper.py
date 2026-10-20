@@ -302,6 +302,17 @@ def get_season_player_stats(
         try:
             cache_age = time.time() - os.path.getmtime(cache_path)
             if cache_age < _player_stats_cache_ttl(selected_season):
+                try:
+                    mtime_ns = os.stat(cache_path).st_mtime_ns
+                except Exception:
+                    mtime_ns = -1
+                if mtime_ns != -1:
+                    with _season_stats_memo_lock:
+                        memoized = _season_stats_memo.get(cache_path)
+                        memo_fresh = _season_stats_memo_mtime_ns.get(cache_path) == mtime_ns
+                        memo_has_weekly = _season_stats_memo_has_weekly.get(cache_path, False)
+                    if memoized is not None and memo_fresh and (not keep_weekly or memo_has_weekly):
+                        return memoized
                 with open(cache_path, "r", encoding="utf-8") as handle:
                     cached = json.load(handle)
                 if isinstance(cached, dict):
@@ -316,6 +327,11 @@ def get_season_player_stats(
                     if keep_weekly and not has_weekly:
                         pass
                     else:
+                        if mtime_ns != -1:
+                            with _season_stats_memo_lock:
+                                _season_stats_memo[cache_path] = cached
+                                _season_stats_memo_mtime_ns[cache_path] = mtime_ns
+                                _season_stats_memo_has_weekly[cache_path] = has_weekly
                         return cached
         except Exception:
             pass
@@ -339,6 +355,11 @@ def get_season_player_stats(
         try:
             with open(cache_path, "w", encoding="utf-8") as handle:
                 json.dump(aggregated, handle)
+            fresh_mtime_ns = os.stat(cache_path).st_mtime_ns
+            with _season_stats_memo_lock:
+                _season_stats_memo[cache_path] = aggregated
+                _season_stats_memo_mtime_ns[cache_path] = fresh_mtime_ns
+                _season_stats_memo_has_weekly[cache_path] = keep_weekly
         except Exception:
             pass
         return aggregated
@@ -571,6 +592,23 @@ def load_cached_players_disk(
 _players_memo_lock = threading.Lock()
 _players_memo: Optional[Dict[str, Any]] = None
 _players_memo_mtime_ns: int = -1
+
+# get_season_player_stats()'s disk cache (~2.3MB/season in production) had the
+# same gap get_players() used to have above: a fresh-within-TTL cache hit
+# still did a full open()+json.load() on *every* call, with no in-process
+# memoization. Measured ~20ms of synchronous disk I/O + JSON decode per call
+# (python3 -c timing against the real on-disk cache file). Several hot mobile
+# endpoints call this once per request (Matchup, Player Detail weekly-stats/
+# schedule/external-projections, Waivers' defense-strength lookup, Rankings),
+# so this was real repeated work for identical data within a cache file's TTL
+# window, same class of bug as the get_players() fix above. Keyed by
+# cache_path (which already encodes season) and its mtime, same invalidation
+# contract as the memo above: a real cache-file rewrite (refresh=True, or the
+# TTL lapsing and triggering a rebuild) naturally busts it.
+_season_stats_memo_lock = threading.Lock()
+_season_stats_memo: Dict[str, Dict[str, Any]] = {}
+_season_stats_memo_mtime_ns: Dict[str, int] = {}
+_season_stats_memo_has_weekly: Dict[str, bool] = {}
 
 
 def get_players(refresh: bool = False) -> Dict[str, Any]:
