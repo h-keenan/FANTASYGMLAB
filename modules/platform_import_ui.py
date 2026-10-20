@@ -12,11 +12,22 @@ ESPN_MAPPING_WARN_THRESHOLD = 0.85
 ESPN_MAPPING_BLOCK_THRESHOLD = 0.60
 DEFAULT_LEAGUE_IMPORT_PLATFORM = "Sleeper"
 ESPN_LIMITED_FEATURES = {
-    "enabled": ["Import review", "Roster mapping review"],
+    "enabled": [
+        "Import review",
+        "Roster mapping review",
+        "Live ESPN league and roster import: validated against ESPN's public API with a real, active "
+        "public league (league load, roster fetch, and player-identity mapping all confirmed working "
+        "on live data, not mocks).",
+    ],
     "degraded": [
-        "Dashboard/My Team/League Rankings remain gated until ESPN page wiring is validated.",
-        "Trade Hub and Waivers remain Sleeper-first until ESPN free-agent and transaction paths are validated.",
-        "Draft Assistant live support and traded-pick features are unavailable for ESPN early access.",
+        "Dashboard/My Team/League Rankings remain gated until those downstream pages (not just the "
+        "import step) are validated against ESPN-sourced rosters.",
+        "Trade Hub and Waivers remain Sleeper-first until ESPN free-agent and transaction paths are "
+        "validated against live data.",
+        "Draft Assistant live support and traded-pick features are unavailable for ESPN early access; "
+        "ESPN draft and traded-pick retrieval have not been validated against live data.",
+        "Private ESPN leagues (SWID/ESPN_S2 cookie auth) have not been validated against a live private "
+        "league; only public-league access has been confirmed.",
     ],
 }
 
