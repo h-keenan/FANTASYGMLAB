@@ -131,4 +131,65 @@ describe("TradeHubContent", () => {
 
     expect(screen.getByText(/No trade ideas right now/)).toBeInTheDocument();
   });
+
+  // Recommendation-compliance audit, Check 3 — CTA reachability: a GM Plan/
+  // Dashboard trade tile's CTA now carries ?playerId= (the headline idea's
+  // receive-side player), and this page must actually surface/highlight
+  // the one idea that's about, not just avoid crashing on the param.
+  describe("highlightPlayerId (GM Plan deep link)", () => {
+    const twoIdeas: TradeHubResponse = {
+      ...RESPONSE,
+      ideas: [
+        idea({ partner_team_name: "Rival GM", package: { ...idea({}).package, receive: [asset({ player_id: "opp-wr", name: "Opp Wide Receiver", position: "WR" })] } }),
+        idea({
+          partner_team_name: "Other GM",
+          rationale: "A completely different idea.",
+          package: {
+            send: [asset({ player_id: "my-te", name: "My Tight End", position: "TE" })],
+            receive: [asset({ player_id: "their-qb", name: "Their Quarterback", position: "QB" })],
+            value_edge: "+300",
+            confidence: "Medium",
+          },
+        }),
+      ],
+    };
+
+    it("leaves every idea collapsed and unmarked without a highlightPlayerId (current/before behavior)", () => {
+      const { container } = render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={twoIdeas} />);
+      expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
+      expect(screen.queryByText("A completely different idea.")).not.toBeInTheDocument();
+    });
+
+    it("highlights and auto-expands only the idea naming the given player id", () => {
+      const { container } = render(
+        <TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={twoIdeas} highlightPlayerId="their-qb" />,
+      );
+
+      const highlighted = container.querySelectorAll('[data-highlighted="true"]');
+      expect(highlighted).toHaveLength(1);
+      expect(highlighted[0].textContent).toContain("Other GM");
+      // Auto-expanded: its rationale shows without clicking "Review package".
+      expect(screen.getByText("A completely different idea.")).toBeInTheDocument();
+      // The non-matching idea stays collapsed.
+      expect(screen.queryByText("Clear value upgrade at a position of need.")).not.toBeInTheDocument();
+    });
+
+    it("matches a send-side (give-away) player id too, not just the receive side", () => {
+      const { container } = render(
+        <TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={twoIdeas} highlightPlayerId="my-te" />,
+      );
+      const highlighted = container.querySelectorAll('[data-highlighted="true"]');
+      expect(highlighted).toHaveLength(1);
+      expect(highlighted[0].textContent).toContain("Other GM");
+    });
+
+    it("falls back gracefully (no crash, nothing highlighted) when the playerId matches no idea", () => {
+      const { container } = render(
+        <TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={twoIdeas} highlightPlayerId="does-not-exist" />,
+      );
+      expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
+      expect(screen.getByText("Rival GM")).toBeInTheDocument();
+      expect(screen.getByText("Other GM")).toBeInTheDocument();
+    });
+  });
 });

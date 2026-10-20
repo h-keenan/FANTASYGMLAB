@@ -18,6 +18,11 @@ export default function TradeHubPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  // Recommendation-compliance audit, Check 3 — a GM Plan/Dashboard trade
+  // tile's CTA now threads the headline idea's receive-side player through
+  // here (see gamePlanTileHref/resolveGamePlanTargetPlayerId) instead of
+  // landing on this generic board with no way to tell which idea it meant.
+  const highlightPlayerId = searchParams.get("playerId") || undefined;
   const { lens } = useValuationLens(leagueId);
 
   useEffect(() => {
@@ -98,5 +103,13 @@ export default function TradeHubPage() {
     );
   }
 
-  return <TradeHubContent leagueId={leagueId} leagueName={leagueName} data={tradeHub} lens={lens} />;
+  return (
+    <TradeHubContent
+      leagueId={leagueId}
+      leagueName={leagueName}
+      data={tradeHub}
+      lens={lens}
+      highlightPlayerId={highlightPlayerId}
+    />
+  );
 }
