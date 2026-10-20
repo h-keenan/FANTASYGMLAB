@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TradeFinderContent } from "./TradeFinderContent";
 import { api } from "@/lib/api";
@@ -22,6 +22,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       getTradeFinderIdeas: vi.fn(),
+      getTeamStance: vi.fn(),
     },
   };
 });
@@ -100,6 +101,14 @@ function myTeam(overrides: Partial<MyTeamResponse>): MyTeamResponse {
 }
 
 describe("TradeFinderContent", () => {
+  beforeEach(() => {
+    // No Team Situation declared, by default — the same "retool" behavior
+    // every test below already expects. The dedicated test further down
+    // overrides this to assert a declared stance's real strategy flows
+    // through to the search call instead.
+    vi.mocked(api.getTeamStance).mockResolvedValue({ ok: true, stance: "" });
+  });
+
   it("renders every roster player (starters + bench) in the picker", () => {
     render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
 
@@ -132,6 +141,29 @@ describe("TradeFinderContent", () => {
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("Favorable")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
+  });
+
+  it("searches under the caller's declared Team Situation strategy, not a hardcoded default", async () => {
+    // Recommendation-compliance audit finding: this used to always search
+    // under "retool" regardless of what the user declared in Team
+    // Situation. A declared "Competing" stance maps (team_stance.
+    // team_strategy_for_stance) to the real engine key "contender" —
+    // GET .../team-stance already returns that mapped value as `strategy`.
+    vi.mocked(api.getTeamStance).mockResolvedValue({ ok: true, stance: "competing", strategy: "contender" });
+    const response: TradeFinderResponse = { ok: true, ideas: [idea({})], reason: "", is_premium: true, upsell: null };
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+    // Flush the mount-time GET .../team-stance fetch before interacting,
+    // so `strategy` has already updated from its "retool" default.
+    await act(async () => {});
+
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "contender", "Dynasty");
   });
 
   it("shows a no-results message when the search returns an empty idea list", async () => {
