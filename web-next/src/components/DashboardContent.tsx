@@ -4,6 +4,7 @@ import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
+import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { WatchListCard } from "@/components/WatchListCard";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
@@ -11,10 +12,14 @@ import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
  * Revision 1 (see PR description for exactly what's deferred: What
- * Changed, League Pulse, roster-aware News Alert tiles, league recap
- * teaser, orientation tour, startup-mode/ESPN-degraded variants — all of
- * those need either a new engine endpoint beyond a thin wrapper or are
- * Streamlit-session-state-shaped and aren't core to this milestone).
+ * Changed, roster-aware News Alert tiles, league recap teaser, orientation
+ * tour, startup-mode/ESPN-degraded variants — all of those need either a
+ * new engine endpoint beyond a thin wrapper or are Streamlit-session-state-
+ * shaped and aren't core to this milestone). League Pulse, originally
+ * deferred for the same reason, now has its own thin wrapper after all —
+ * GET .../team-rankings' real transaction_activity_count/current_streak
+ * fields (modules.manager_activity/modules.team_streaks) — see
+ * LeaguePulseCard.tsx.
  * Covers: Today's Game Plan (GET .../dashboard's `items`, entitlement-
  * capped) and Team Snapshot (the same response's `team_snapshot`, which on
  * this backend already combines web's separate League Snapshot + Team
@@ -68,6 +73,13 @@ export function DashboardContent({
           above; same league-independent, self-fetching, dismissible
           shape, own daily pick and own streak. */}
       <GuessThePlayerNameMatchCard />
+
+      {/* League Pulse (coridian_'s brainstorm list, "do it all") — real
+          league-wide activity/streak leaders off GET .../team-rankings.
+          Self-fetching, same contract as the two mini-game cards above:
+          renders nothing while loading, on fetch failure, or when no team
+          has a standout signal yet. */}
+      <LeaguePulseCard leagueId={leagueId} />
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
         <h2 id="game-plan-heading" style={{ font: "var(--type-section-title)" }}>
