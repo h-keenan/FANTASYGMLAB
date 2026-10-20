@@ -23,7 +23,11 @@ import { buildWeeklyPointsSummary, fillWeeklyPointGaps } from "@/lib/playerCompa
  * convention.
  */
 
-const CHART_HEIGHT = 160;
+// Exported so PlayerTrendsPanel.tsx's loading skeleton can reserve this
+// exact footprint instead of a second, independently-guessed number that
+// could drift from this one and reintroduce a layout jump when the real
+// chart swaps in.
+export const CHART_HEIGHT = 160;
 
 function formatPoints(value: number): string {
   return value.toFixed(1);

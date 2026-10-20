@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { api, type WeeklyStatPoint } from "@/lib/api";
-import { WeeklyPointsPanel } from "@/components/WeeklyPointsChart";
+import { CHART_HEIGHT, WeeklyPointsPanel } from "@/components/WeeklyPointsChart";
 
 /**
  * Points By Week, with a season-back selector — ports mobile's
@@ -76,7 +76,20 @@ export function PlayerTrendsPanel({
     );
   }
   if (!weeklyStats) {
-    return <p className="pqv-status-text">Loading weekly trends…</p>;
+    // Skeleton sized to the real section below (name label, CHART_HEIGHT
+    // chart, caption line) so this panel's own independent fetch doesn't
+    // grow the modal a second time once the outer loading gate has
+    // already resolved — see globals.css's .pqv-skeleton-chart comment.
+    return (
+      <section className="pqv-stat-season" aria-busy="true">
+        <div className="pqv-skeleton-line pqv-skeleton-line--label" />
+        <div className="pqv-skeleton-chart" style={{ height: CHART_HEIGHT }} />
+        <div className="pqv-skeleton-line pqv-skeleton-line--short" style={{ alignSelf: "center" }} />
+        <p className="sr-only" role="status">
+          Loading weekly trends…
+        </p>
+      </section>
+    );
   }
 
   return (
