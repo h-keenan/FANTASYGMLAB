@@ -346,6 +346,47 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn("player-value-injury-major", html)
         self.assertIn("Major injury risk affecting value", html)
 
+    def test_suspended_player_value_is_labeled_suspension_not_major_injury(self):
+        """Injury-awareness audit finding (2026-10-19): a suspended player
+        classifies as rankings.injury_level() == "major" (same full
+        unavailability discount as IR/PUP/NFI), but a suspension is not an
+        injury, so this surface must say "Suspension affecting value," not
+        the generic "Major injury risk affecting value" below."""
+
+        impact = player_cards.injury_value_impact(
+            {"injury_level": "major", "status": "Active", "injury_status": "Sus"}
+        )
+        self.assertEqual(impact["level"], "major")
+        self.assertEqual(impact["label"], "Suspension affecting value")
+        self.assertNotIn("injury", impact["label"].lower())
+
+        html = player_cards.injury_adjusted_value_html(
+            "Value",
+            "74",
+            {"injury_level": "major", "status": "Active", "injury_status": "Sus"},
+            css_class="compact-player-value",
+        )
+        self.assertIn("player-value-injury-major", html)
+        self.assertIn("Suspension affecting value", html)
+
+    def test_resolve_player_status_labels_suspension_explicitly(self):
+        """A suspended player must get its own "Suspended" status, not the
+        generic "Injury Risk" fallback — same audit finding as above."""
+
+        from modules import rankings
+
+        style = player_cards.resolve_player_status(
+            {"status": "Active", "injury_status": "Sus"},
+            is_injury_status=rankings.is_injury_status,
+        )
+        self.assertEqual(style["label"], "Suspended")
+
+        healthy_style = player_cards.resolve_player_status(
+            {"status": "Active", "injury_status": ""},
+            is_injury_status=rankings.is_injury_status,
+        )
+        self.assertNotEqual(healthy_style["label"], "Suspended")
+
     def test_unknown_injury_value_uses_meaningful_marker(self):
         html = player_cards.injury_adjusted_value_html(
             "Value",

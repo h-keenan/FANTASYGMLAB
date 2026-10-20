@@ -106,6 +106,53 @@ def test_injury_level_treats_na_injury_status_as_healthy_not_minor():
     assert rankings.injury_level("Injured Reserve", "") == "major"
 
 
+def test_injury_level_treats_suspension_as_major_but_not_as_an_injury():
+    """Injury-awareness audit finding (2026-10-19 valuation-system audit):
+    Sleeper's real `injury_status` field carries a literal "Sus" value for
+    currently-suspended players (confirmed against data/sleeper_players.json
+    — e.g. C.J. Gardner-Johnson, `status` "Active", no injury_notes/
+    injury_start_date; ~8 real rostered players carry this value right now,
+    though the exact roster drifts week to week — this is a vocabulary
+    check, never a hardcoded player list beyond this one real example).
+
+    rankings.py's `_injury_level_cached` didn't recognize "Sus" as its own
+    category, so it fell through to the generic "minor" severity catch-all
+    alongside things like day-to-day soreness — meaningfully understating
+    the real risk: a suspended player is 100% unavailable for a known
+    length of time, not "probably fine, slight injury risk."
+
+    A suspension is scheduled, known-duration unavailability, not an injury
+    (no recovery-uncertainty question attached), so this classifies it with
+    the same "major" severity bucket already used for IR/PUP/NFI's "fully
+    out for a known/bounded time" (correct numeric/boolean treatment:
+    injury_multiplier's full discount, is_ruled_out()), while
+    injury_display_label() and player_state_authority.is_suspended() give it
+    its own explicit "Suspended" label rather than a generic injury word.
+    """
+
+    cjgj = _actual_record("C.J. Gardner-Johnson")
+    assert cjgj["injury_status"] == "Sus"
+    assert player_state_authority.is_suspended(cjgj["status"], cjgj["injury_status"]) is True
+    assert rankings.injury_level(cjgj["status"], cjgj["injury_status"]) == "major"
+    assert rankings.is_ruled_out(cjgj["status"], cjgj["injury_status"]) is True
+    assert rankings.is_injury_status(cjgj) is True
+    assert rankings.injury_display_label(cjgj["status"], cjgj["injury_status"]) == "Suspended"
+
+    # Case/spelling-variant guard, same discipline as the rest of injury_level().
+    assert rankings.injury_level("Active", "suspended") == "major"
+    assert rankings.injury_level("Active", "SUSPENSION") == "major"
+    assert player_state_authority.is_suspended("Active", "SUS") is True
+
+    # Regression guard: a real injury designation must still classify
+    # correctly — "Sus" must not swallow genuine injury/healthy tags, and
+    # must not be confused with the unrelated "NA" healthy-marker fix above.
+    assert rankings.injury_level("Active", "Questionable") == "minor"
+    assert rankings.injury_level("Active", "Out") == "moderate"
+    assert rankings.injury_level("Injured Reserve", "") == "major"
+    assert rankings.injury_level("Active", "NA") == "healthy"
+    assert player_state_authority.is_suspended("Active", "NA") is False
+
+
 def test_actual_keenan_survives_current_player_universe_reconciliation():
     keenan = _actual_record("Keenan Allen")
     frame = _reconciled_frame()

@@ -203,3 +203,47 @@ def test_zero_snap_role_blocked_player_is_not_ranked_despite_high_value_score():
         max_items=6,
     )
     assert solo.empty
+
+
+def test_suspended_free_agent_is_never_actionable_despite_active_status():
+    """Injury-awareness audit finding (2026-10-19 valuation-system audit):
+    Sleeper never puts "Suspended" in the roster-level `status` field —
+    suspension is only signaled by a literal "Sus" `injury_status` tag
+    (confirmed against data/sleeper_players.json; real example:
+    C.J. Gardner-Johnson, `status` "Active", `injury_status` "Sus").
+
+    waiver_actionability() only inspected `status`, never `injury_status`,
+    so a suspended free agent's roster-level status reading plain "Active"
+    sailed through as a safe waiver add for the entire length of the
+    suspension, the same bug class as the earlier same-day IR/PUP/NFI fix
+    (where the wrong field was trusted outright) but here the relevant
+    field was never even consulted.
+    """
+
+    suspended = _player("suspended-wr", injury_status="Sus")
+    decision = player_state_authority.waiver_actionability(suspended)
+    assert decision == {"actionable": False, "reason": "suspended"}
+
+    pool = player_state_authority.waiver_actionable_player_pool(
+        pd.DataFrame([suspended, _player("healthy", dynasty_score=1700)]),
+        {},
+    )
+    assert pool["player_id"].tolist() == ["healthy"]
+
+    ranked = waivers_ui.rank_priority_add_candidates(
+        pd.DataFrame([suspended, _player("healthy", dynasty_score=1700)]),
+        score_field="dynasty_score",
+        needed_positions=["WR"],
+        league_settings={"qb_format": "1QB"},
+        roster_df=pd.DataFrame(),
+        max_items=2,
+    )
+    assert "suspended-wr" not in ranked["player_id"].astype(str).tolist()
+
+    # Case/spelling-variant guard, same discipline as the rest of this
+    # module's status handling, and a future-proofing check in case Sleeper
+    # ever does send a literal roster-level status of "Suspended" (already
+    # listed defensively in _NFL_ACTIONABLE_STATUSES, never observed live).
+    assert player_state_authority.waiver_actionability(
+        _player("suspended-status", status="Suspended", injury_status="")
+    ) == {"actionable": False, "reason": "suspended"}

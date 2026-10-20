@@ -86,6 +86,22 @@ def test_injury_component_supports_existing_statuses(status, visible):
     assert "dg-football-injury" in html
 
 
+def test_injury_component_recognizes_sleeper_real_suspension_spelling():
+    """Injury-awareness audit finding (2026-10-19 valuation-system audit):
+    this component already anticipated a "SUSPENDED" status (see the
+    parametrized case above) but Sleeper's real `injury_status` feed sends
+    the literal, shorter "Sus" (confirmed against data/sleeper_players.json
+    — e.g. C.J. Gardner-Johnson). That real spelling fell through to a raw,
+    neutral-toned "SUS" badge instead of the danger-toned "SUSP" shown for
+    every other hard-out status (IR, PUP, ...).
+    """
+
+    html = football_assets.injury_badge_html("Sus")
+    assert ">SUSP<" in html
+    assert "dg-football-injury--danger" in html
+    assert "dg-football-injury--neutral" not in html
+
+
 def test_prestige_indicator_has_fixed_semantic_rail_and_accessible_text():
     html = football_assets.prestige_indicator_html("Elite", "elite")
     assert "dg-football-prestige--elite" in html

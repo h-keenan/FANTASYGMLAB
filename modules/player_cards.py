@@ -8,6 +8,7 @@ from streamlit.errors import StreamlitAPIException
 
 from modules import football_assets
 from modules.interaction_contract import TAP_DELEGATION_JS, on_clicked_change
+from modules.player_state_authority import is_suspended
 from modules.player_tier_identity import resolve_player_tier_identity
 
 PLAYER_STATUS_ALIASES = {
@@ -33,6 +34,8 @@ PLAYER_STATUS_ALIASES = {
     "drop": "Drop Candidate",
     "drop candidate": "Drop Candidate",
     "injury risk": "Injury Risk",
+    "suspended": "Suspended",
+    "suspension": "Suspended",
     "best available": "Best Available",
     "priority add": "Priority Add",
     "young stash": "Young Stash",
@@ -59,6 +62,7 @@ PLAYER_STATUS_STYLES = {
     "Hold": {"glyph": "HD", "tone": "hold"},
     "Drop Candidate": {"glyph": "CUT", "tone": "drop"},
     "Injury Risk": {"glyph": "IR", "tone": "risk"},
+    "Suspended": {"glyph": "SUS", "tone": "risk"},
     "Best Available": {"glyph": "FA", "tone": "premium"},
     "Priority Add": {"glyph": "ADD", "tone": "rise"},
     "Young Stash": {"glyph": "YS", "tone": "hold"},
@@ -204,6 +208,15 @@ def injury_value_impact(row) -> dict[str, str]:
     level = _safe_text(row.get("injury_level"), "unknown").strip().lower()
     if level == "healthy":
         return {"level": "healthy", "class": "", "label": ""}
+    # Suspension classifies as injury_level "major" (same full-unavailability
+    # discount as IR/PUP/NFI), but it is not an injury, so this surface
+    # checked first to avoid the misleading "Major injury risk" copy below.
+    if is_suspended(row.get("status"), row.get("injury_status")):
+        return {
+            "level": "major",
+            "class": "player-value-injury-adjusted player-value-injury-major",
+            "label": "Suspension affecting value",
+        }
     if level == "major":
         return {
             "level": "major",
@@ -355,6 +368,14 @@ def resolve_player_status(
     if opportunity_label in STRONG_OPPORTUNITY_LABELS or workload_trend in {"Rising", "Contingent"}:
         return player_status_style("Rising")
 
+    # Checked ahead of the generic is_injury_status() fallback: a suspension
+    # is a known, scheduled unavailability, not an injury, so it gets its
+    # own explicit status rather than being folded into "Injury Risk" (see
+    # modules.player_state_authority.is_suspended(), the single source of
+    # truth for this check).
+    if is_suspended(row.get("status"), row.get("injury_status")):
+        return player_status_style("Suspended")
+
     if is_injury_status(row):
         return player_status_style("Injury Risk")
 
@@ -396,6 +417,7 @@ def resolve_player_card_primary_status(
         "Drop Candidate",
         "Rising",
         "Injury Risk",
+        "Suspended",
         "Best Available",
         "Priority Add",
         "Young Stash",

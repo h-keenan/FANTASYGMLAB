@@ -66,6 +66,36 @@ NFL_NON_ACTIONABLE_STATUSES = frozenset(
 )
 _NFL_NON_ACTIONABLE_STATUSES = NFL_NON_ACTIONABLE_STATUSES  # internal alias, kept for this module's own readability
 
+# Suspension is scheduled, known-duration unavailability, not an injury —
+# a different kind of fact than anything in NFL_NON_ACTIONABLE_STATUSES
+# above, which is why it gets its own set keyed on its own field rather than
+# being folded into that one. Confirmed against data/sleeper_players.json
+# (2026-10-19 valuation-system audit): Sleeper encodes it only via a literal
+# "Sus" `injury_status` tag (currently ~8 real rostered players, e.g.
+# C.J. Gardner-Johnson — the exact roster drifts week to week, so this is a
+# vocabulary check, never a hardcoded player list). For every one of those
+# players the roster-level `status` field independently read "Active" or
+# "Inactive" — Sleeper has never been observed to send a literal status of
+# "Suspended", even though _NFL_ACTIONABLE_STATUSES above already lists it
+# defensively. is_suspended() below checks both fields so this stays correct
+# if that ever changes.
+SUSPENDED_INJURY_STATUS_TERMS = frozenset({"sus", "suspended", "suspension"})
+
+
+def is_suspended(status: object, injury_status: object = "") -> bool:
+    """True when Sleeper's real suspension signal is present.
+
+    Single source of truth for "this player is suspended" so rankings.py's
+    injury-severity vocabulary, waiver_actionability() below, and any UI
+    surface that needs to say "Suspended" instead of a generic injury word
+    never drift apart on what counts.
+    """
+
+    return (
+        _text(injury_status).casefold() in SUSPENDED_INJURY_STATUS_TERMS
+        or _text(status).casefold() in SUSPENDED_INJURY_STATUS_TERMS
+    )
+
 
 def _text(value: object) -> str:
     if value is None:
@@ -107,6 +137,13 @@ def waiver_actionability(player: Mapping[str, object] | pd.Series) -> dict[str, 
     status = _text(player.get("status")).casefold()
     if status in _NFL_NON_ACTIONABLE_STATUSES:
         return {"actionable": False, "reason": "non_actionable_nfl_status"}
+    # Suspension never shows up in the literal `status` field (see
+    # SUSPENDED_INJURY_STATUS_TERMS above — Sleeper encodes it only via the
+    # weekly `injury_status` tag "Sus"), so without this check a suspended
+    # free agent's `status` reads plain "Active" and sails through as a safe
+    # waiver add for the length of the suspension.
+    if is_suspended(status, player.get("injury_status")):
+        return {"actionable": False, "reason": "suspended"}
     if _optional_bool(player.get("active")) is False:
         return {"actionable": False, "reason": "explicitly_inactive"}
     if status not in _NFL_ACTIONABLE_STATUSES and _optional_bool(player.get("active")) is not True:
