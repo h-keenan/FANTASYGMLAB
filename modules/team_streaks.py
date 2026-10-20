@@ -21,10 +21,9 @@ signal."
 from __future__ import annotations
 
 import time
-from functools import lru_cache
 from typing import Any
 
-from modules import league_recaps, sleeper
+from modules import league_recaps, redis_cache, sleeper
 
 
 def _safe_positive_int(value: Any, default: int = 0) -> int:
@@ -148,7 +147,20 @@ def _team_streaks_cache_bucket() -> int:
     return int(time.time() // TEAM_STREAKS_TTL_SECONDS)
 
 
-@lru_cache(maxsize=64)
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache)
+# — same pattern, and same reason, as modules.manager_activity's/
+# modules.team_trade_history's own caches: this used to be a per-process
+# functools.lru_cache, which only protected ONE mobile-api worker. Under
+# docker-compose.yml's multiple uvicorn workers, each worker has its own
+# process memory, so that old cache would let the same season-long matchup
+# scan run redundantly once per worker AND a cache hit in worker A would
+# never help a request landing on worker B. Redis fixes both: the
+# distributed lock makes only one worker, cluster-wide, actually run the
+# scan for a given (league_id, bucket), and the cached result lives in
+# Redis, not in any one worker's memory.
+_TEAM_STREAKS_LOCK_TIMEOUT_SECONDS = 15.0
+
+
 def _league_current_streaks_cached(league_id: str, _bucket: int) -> dict[int, dict[str, int]]:
     return league_current_streaks(league_id)
 
@@ -156,12 +168,17 @@ def _league_current_streaks_cached(league_id: str, _bucket: int) -> dict[int, di
 def league_current_streaks_cached(league_id: str) -> dict[int, dict[str, int]]:
     """Cached front door for `league_current_streaks` — shares one
     (league_id) cache key across callers within the same 30-minute window
-    instead of each re-scanning the season's matchups."""
+    instead of each re-scanning the season's matchups.
 
-    return _league_current_streaks_cached(league_id, _team_streaks_cache_bucket())
+    Single-flight + cache, shared across every mobile-api worker via
+    Redis: see modules.redis_cache.redis_single_flight_cache and this
+    module's own comment above `_TEAM_STREAKS_LOCK_TIMEOUT_SECONDS`."""
 
-
-def clear_team_streaks_cache() -> None:
-    """Test/refresh hook — mirrors manager_activity's own cache-clear."""
-
-    _league_current_streaks_cached.cache_clear()
+    key = (league_id, _team_streaks_cache_bucket())
+    cache_key = redis_cache.build_cache_key("league_current_streaks", *key)
+    return redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=TEAM_STREAKS_TTL_SECONDS,
+        compute=lambda: _league_current_streaks_cached(*key),
+        lock_timeout_seconds=_TEAM_STREAKS_LOCK_TIMEOUT_SECONDS,
+    )
