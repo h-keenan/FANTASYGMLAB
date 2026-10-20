@@ -60,14 +60,17 @@ export function DashboardContent({
           it fetches its own data rather than reading from `data` above.
           Renders nothing while loading, on fetch failure, or once
           dismissed — never blocks or visually disrupts the real Game Plan
-          content below it. */}
-      <GuessThePlayerCard />
+          content below it. `leagueId` is only used for its "League
+          Leaderboard" link (feature-brainstorm audit, 2026-10-19) — the
+          leaderboard itself is league-scoped even though the daily pick
+          isn't. */}
+      <GuessThePlayerCard leagueId={leagueId} />
 
       {/* "Who is who?" name-match mini-game (coridian_, 2026-10-19) — a
           second, distinct daily mini-game alongside Guess the Player
           above; same league-independent, self-fetching, dismissible
           shape, own daily pick and own streak. */}
-      <GuessThePlayerNameMatchCard />
+      <GuessThePlayerNameMatchCard leagueId={leagueId} />
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
         <h2 id="game-plan-heading" style={{ font: "var(--type-section-title)" }}>
