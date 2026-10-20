@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { api, type SleeperLeagueSummary } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { trackFeatureUse } from "@/lib/analytics";
 
 /**
  * Ports app.py's guest Sleeper-username import (load_leagues_for_username /
@@ -13,6 +14,19 @@ import { useAuth } from "@/context/AuthContext";
  * (anonymous "guest" or signed-in) — see AuthContext's signInAsGuest and
  * the PR description for why this mirrors mobile's reference
  * implementation rather than Streamlit's sessionless guest model.
+ *
+ * Audit finding, 2026-10-20: this is web-next's only "connect a Sleeper
+ * league" flow (reached both from "/" onboarding and from /connect-league),
+ * and it had zero analytics wiring -- the entire League Import funnel step
+ * (modules.launch_analytics.FUNNEL_STEPS' "League Import": "league_import_
+ * completed") and the sleeper_connected relaunch-taxonomy event had never
+ * fired once from web-next. The four events wired below
+ * (sleeper_connected, league_import_started, league_import_completed,
+ * league_import_failed) are all pre-existing TRACKED_EVENTS entries;
+ * placement/once_key choices mirror app.py's own emission sites for the
+ * same user actions (load_leagues_for_username / set_selected_league)
+ * exactly, so Founder Analytics' funnel keeps the same semantics it
+ * already has for the legacy surface.
  */
 export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: string, leagueName: string) => void }) {
   const { signInAsGuest, session } = useAuth();
@@ -35,6 +49,10 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
     setMessage(null);
     setNoSleeperAccount(false);
     setLeagues([]);
+    // Mirrors app.py's load_leagues_for_username, which fires this on every
+    // lookup attempt (once per session) regardless of outcome -- this is
+    // the "attempted a Sleeper connect" signal, not "succeeded".
+    trackFeatureUse("league_import_started");
 
     try {
       if (!session) {
@@ -47,10 +65,20 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
       }
 
       const result = await api.lookupSleeperLeagues(clean);
+      if (result.ok) {
+        // Mirrors app.py: the username itself resolved on Sleeper's side
+        // (even a zero-leagues account counts here, same as lookup.status
+        // "ok" or "no_leagues" there) -- this is identity resolution, not
+        // league selection, so it fires before the leagues.length check.
+        trackFeatureUse("sleeper_connected");
+      }
       if (!result.ok || result.leagues.length === 0) {
         setStatus("error");
         setNoSleeperAccount(result.status === "user_not_found");
         setMessage(result.message || "No eligible leagues found for that username.");
+        if (!result.ok) {
+          trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: result.status || "unavailable" } });
+        }
         return;
       }
 
@@ -63,6 +91,9 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
       if (result.leagues.length === 1) {
         const only = result.leagues[0];
         await api.saveLeague({ leagueId: only.league_id, sleeperUsername: clean, leagueName: only.name, makeDefault: true });
+        // once_key scoped by leagueId (trackFeatureUse's default dedupe),
+        // matching app.py's set_selected_league: once_key=selected_league_id.
+        trackFeatureUse("league_import_completed", { leagueId: only.league_id });
         setStatus("idle");
         onLeagueChosen(only.league_id, only.name);
         return;
@@ -73,6 +104,7 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
     }
   };
 
@@ -80,11 +112,13 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
     setStatus("loading");
     try {
       await api.saveLeague({ leagueId: league.league_id, sleeperUsername: username.trim(), leagueName: league.name });
+      trackFeatureUse("league_import_completed", { leagueId: league.league_id });
       setStatus("idle");
       onLeagueChosen(league.league_id, league.name);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Could not open that league.");
+      trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
     }
   };
 

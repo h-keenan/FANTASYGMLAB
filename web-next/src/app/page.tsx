@@ -9,6 +9,7 @@ import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
+import { trackFeatureUse } from "@/lib/analytics";
 import { supabase } from "@/lib/supabase";
 
 // useSearchParams() (for ?billing=success, see paywallDismissed below)
@@ -46,6 +47,15 @@ function LandingPageContent() {
   const [carouselDone, setCarouselDone] = useState(() => searchParams.get("billing") === "success");
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
   const skippedExistingSession = useRef(false);
+  // Guards the one-time `landing_viewed` fire below -- see its own effect's
+  // doc comment for why a plain `!loading && !checkingSavedLeagues` check
+  // isn't safe here on its own.
+  const welcomeViewTracked = useRef(false);
+  // Distinguishes "the saved-leagues redirect check genuinely finished and
+  // found nothing to redirect to" (safe to count as a real landing view)
+  // from "checkingSavedLeagues just hasn't flipped true yet this tick"
+  // (same false value, opposite meaning) -- see the effect below.
+  const savedLeaguesCheck = useRef<"idle" | "pending" | "resolved">("idle");
 
   // A returning user (page refresh with a still-valid persisted Supabase
   // session) should land straight in their league, not be asked to sign in
@@ -60,6 +70,7 @@ function LandingPageContent() {
   useEffect(() => {
     if (loading || !session || skippedExistingSession.current) return;
     skippedExistingSession.current = true;
+    savedLeaguesCheck.current = "pending";
     setAccountReady(true);
     setCheckingSavedLeagues(true);
     (async () => {
@@ -77,6 +88,7 @@ function LandingPageContent() {
           router.replace("/portfolio");
           return;
         }
+        savedLeaguesCheck.current = "resolved";
         setCheckingSavedLeagues(false);
       } catch (err) {
         // Previously silent — a failure here left zero trace anywhere,
@@ -86,10 +98,44 @@ function LandingPageContent() {
         // makes it visible in a browser's own dev tools during a future
         // repro, even without a telemetry pipeline wired up yet.
         console.error("Failed to load saved leagues after sign-in", err);
+        savedLeaguesCheck.current = "resolved";
         setCheckingSavedLeagues(false);
       }
     })();
   }, [loading, session, router]);
+
+  // Fires `landing_viewed` exactly once per visitor, only once we're sure
+  // they're actually looking at the sign-in form / onboarding carousel /
+  // paywall / Sleeper import form below -- never for a signed-in visitor
+  // who's about to get auto-redirected straight to their Dashboard or
+  // Portfolio by the effect above. The naive version of this check
+  // (`!loading && !checkingSavedLeagues`) is NOT safe on its own: on the
+  // very first render after a persisted session is found, this component
+  // re-renders with `checkingSavedLeagues` still at its stale initial
+  // `false` -- the effect above hasn't committed its own `setChecking
+  // SavedLeagues(true)` yet, since that state update only lands on the
+  // NEXT render, not this one. Without the `savedLeaguesCheck` ref, that
+  // one-tick race would record a landing view for every returning user,
+  // including ones who never actually see this page's content.
+  useEffect(() => {
+    if (welcomeViewTracked.current || loading) return;
+    if (!session) {
+      // No session at all: definitely rendering the sign-in form, not
+      // redirecting anywhere.
+      welcomeViewTracked.current = true;
+      trackFeatureUse("landing_viewed", { props: { source_surface: "landing_hero" } });
+      return;
+    }
+    // A session exists -- only count this as a real view once the saved-
+    // leagues redirect check has actually run to completion and found
+    // nothing to redirect to (`"resolved"`). Still `"idle"` or `"pending"`
+    // means either the check hasn't started yet this tick, or it's still
+    // in flight / about to redirect away -- never a real view either way.
+    if (savedLeaguesCheck.current === "resolved" && !checkingSavedLeagues) {
+      welcomeViewTracked.current = true;
+      trackFeatureUse("landing_viewed", { props: { source_surface: "landing_hero" } });
+    }
+  }, [loading, session, checkingSavedLeagues]);
 
   const handleLeagueChosen = (leagueId: string, leagueName: string) => {
     router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`);

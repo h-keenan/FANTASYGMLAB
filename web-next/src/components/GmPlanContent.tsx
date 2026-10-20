@@ -19,6 +19,7 @@ import {
   type TeamStance,
   type TeamStanceResponse,
 } from "@/lib/api";
+import { trackFeatureUse } from "@/lib/analytics";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -486,6 +487,18 @@ export function GmPlanContent({
         if (next && !wasTracked) {
           const addResult = await api.addGmTarget(leagueId, playerId, "team_stance");
           if (!addResult.ok) throw new Error(addResult.reason || "not_available");
+          // Audit finding, 2026-10-20: gm_target_added (already in
+          // TRACKED_EVENTS, already labeled on the Founder Analytics
+          // dashboard) had no caller anywhere -- this is the real "save a
+          // GM Target" action (the Protected Players checklist adds the
+          // player to the same tracked-targets table GM Targets reads).
+          // dedupe: false -- every distinct player added is its own real,
+          // independently-countable interaction, same reasoning
+          // trackFeatureUse's own doc comment gives for pqv_opened/
+          // gm_orb_opened (trackFeatureUse's default once_key is scoped by
+          // leagueId alone, which would wrongly collapse every other
+          // player added in this same league down to a single count).
+          trackFeatureUse("gm_target_added", { leagueId, dedupe: false });
         }
         if (next || wasTracked) {
           const result = await api.setGmTargetUntouchable(leagueId, playerId, next);
