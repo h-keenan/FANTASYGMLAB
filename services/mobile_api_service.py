@@ -171,6 +171,7 @@ from modules import (
     nfl_schedule,
     player_awards,
     player_eligibility,
+    performance,
     pick_flow,
     player_history,
     player_projections,
@@ -7046,6 +7047,29 @@ def _build_portfolio_row(
 
 @app.get("/v1/portfolio")
 def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Thin timing wrapper — see _get_portfolio_impl for the real endpoint.
+
+    coridian_, 2026-10-19/20: real, repeatable "Portfolio takes 18+/10+/12s"
+    reports that a live DYNASTYGM_PERF capture during an actual slow load
+    could NOT explain — every individual sub-call (auth, Supabase, Sleeper)
+    measured well under 500ms in that capture, yet the page still visibly
+    took far longer to load than that. His own diagnosis: "add timing
+    around the entire Portfolio request and its major stages, including
+    queue/wait time. Existing timing entries don't account for the full
+    wait." This one enclosing time_block is exactly that — a single
+    "portfolio_total_request" entry spanning everything from the moment
+    this function starts (after FastAPI/Starlette's own request routing
+    and the require_user auth dependency have already run) to the moment
+    it returns, so the NEXT DYNASTYGM_PERF capture can show whether the
+    gap is inside this function's own Python-level work after all, or
+    entirely upstream of it (a proxy layer, worker-queue wait time before
+    this handler even started, or something client-side)."""
+
+    with performance.time_block("portfolio_total_request", category="app"):
+        return _get_portfolio_impl(lens, user)
+
+
+def _get_portfolio_impl(lens: str, user: dict[str, Any]) -> dict[str, Any]:
     """Cross-league "Portfolio" — one compact row per saved league.
 
     coridian_-approved multi-league view: a single surface showing this
