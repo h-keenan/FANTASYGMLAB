@@ -188,11 +188,16 @@ def test_apply_team_stance_framing_is_noop_for_unset_stance():
 
 
 def test_apply_team_stance_framing_appends_clause_and_preserves_everything_else():
+    # Real rebuild-shaped content: sheds an aging (30yo) send-side player and
+    # gets a pick back — genuinely supports the "fits your rebuild" claim.
     idea = {
         "rationale": "Solid value swap.",
         "value_score": 1234,
-        "send_assets": [{"player_id": "1"}],
-        "receive_assets": [{"player_id": "2"}],
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 30, "score": 4000}],
+        "receive_assets": [
+            {"asset_type": "player", "player_id": "2", "age": 24, "score": 3800},
+            {"asset_type": "pick", "player_id": "pick-1"},
+        ],
         "priority": 42,
     }
     before_snapshot = {
@@ -217,7 +222,14 @@ def test_apply_team_stance_framing_appends_clause_and_preserves_everything_else(
 
 
 def test_apply_team_stance_framing_handles_empty_rationale():
-    idea = {"rationale": ""}
+    # Real win-now-shaped content: a clear immediate-production upgrade
+    # (receive top score beats send top score by well over the 350-point
+    # gap) — genuinely supports the "win-now" claim.
+    idea = {
+        "rationale": "",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 23, "score": 2000}],
+        "receive_assets": [{"asset_type": "player", "player_id": "2", "age": 27, "score": 6000}],
+    }
     result = trade_ideas.apply_team_stance_framing([idea], "competing")
     assert result[0]["rationale"] == trade_ideas.team_stance_framing_clause("competing")
 
@@ -226,12 +238,106 @@ def test_apply_team_stance_framing_never_touches_value_score_field_name():
     # Explicit regression guard for the "presentation only" contract: the
     # framing function's own output must never introduce a value_score key
     # where one didn't already exist, and must never change one that did.
+    # Balanced has the lowest bar (no positive claim), so bare/no assets
+    # neither contradict nor require anything here.
     idea = {"rationale": "x", "value_score": 999}
     result = trade_ideas.apply_team_stance_framing([idea], "balanced")
     assert result[0]["value_score"] == 999
     idea_no_score = {"rationale": "y"}
     result2 = trade_ideas.apply_team_stance_framing([idea_no_score], "balanced")
     assert "value_score" not in result2[0]
+
+
+# --- content verification: the compliance-audit fix ------------------------
+#
+# Before this fix, apply_team_stance_framing attached the same clause to
+# EVERY idea whenever a stance was declared, regardless of what the trade
+# actually did. These prove the clause is now conditioned on the idea's own
+# send/receive assets, per stance.
+
+
+def test_rebuilding_framing_suppressed_when_trade_does_not_advance_a_rebuild():
+    # Giving up a young player for an equally-young player, no picks either
+    # way: doesn't acquire picks/youth, doesn't shed an aging asset. Must NOT
+    # claim "fits your declared rebuild".
+    idea = {
+        "rationale": "Even-up swap.",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 24, "score": 4000}],
+        "receive_assets": [{"asset_type": "player", "player_id": "2", "age": 24, "score": 4000}],
+    }
+    result = trade_ideas.apply_team_stance_framing([idea], "rebuilding")
+    assert result[0]["rationale"] == "Even-up swap."
+    assert "rebuild" not in result[0]["rationale"].casefold()
+    assert "team_stance_applied" not in result[0]
+
+
+def test_rebuilding_framing_attached_when_trade_actually_acquires_a_pick():
+    idea = {
+        "rationale": "Even-up swap.",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 24, "score": 4000}],
+        "receive_assets": [
+            {"asset_type": "player", "player_id": "2", "age": 24, "score": 3800},
+            {"asset_type": "pick", "player_id": "pick-1"},
+        ],
+    }
+    result = trade_ideas.apply_team_stance_framing([idea], "rebuilding")
+    assert "rebuild" in result[0]["rationale"].casefold()
+    assert result[0]["team_stance_applied"] == "rebuilding"
+
+
+def test_competing_framing_suppressed_when_trade_does_not_push_win_now():
+    # Receive side is both lower-scoring AND no picks spent to get a player
+    # back: not an immediate-production upgrade, not a picks-for-a-player
+    # buy-in either. Must NOT claim the win-now framing.
+    idea = {
+        "rationale": "Depth shuffle.",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 26, "score": 4000}],
+        "receive_assets": [{"asset_type": "player", "player_id": "2", "age": 26, "score": 3900}],
+    }
+    result = trade_ideas.apply_team_stance_framing([idea], "competing")
+    assert result[0]["rationale"] == "Depth shuffle."
+    assert "win-now" not in result[0]["rationale"].casefold()
+    assert "team_stance_applied" not in result[0]
+
+
+def test_competing_framing_attached_for_a_real_immediate_upgrade():
+    idea = {
+        "rationale": "Depth shuffle.",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 23, "score": 2000}],
+        "receive_assets": [{"asset_type": "player", "player_id": "2", "age": 29, "score": 6000}],
+    }
+    result = trade_ideas.apply_team_stance_framing([idea], "competing")
+    assert "win-now" in result[0]["rationale"].casefold() or "immediate" in result[0]["rationale"].casefold()
+    assert result[0]["team_stance_applied"] == "competing"
+
+
+def test_balanced_framing_suppressed_for_a_textbook_one_sided_rebuild_shaped_deal():
+    # Unambiguous rebuild shape: gains a pick AND trends younger, gives up
+    # no picks at all. Claiming "balanced" here would contradict the deal's
+    # actual, clearly one-sided shape.
+    idea = {
+        "rationale": "Package deal.",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 30, "score": 4000}],
+        "receive_assets": [
+            {"asset_type": "player", "player_id": "2", "age": 22, "score": 3600},
+            {"asset_type": "pick", "player_id": "pick-1"},
+        ],
+    }
+    result = trade_ideas.apply_team_stance_framing([idea], "balanced")
+    assert result[0]["rationale"] == "Package deal."
+    assert "balanced" not in result[0]["rationale"].casefold()
+    assert "team_stance_applied" not in result[0]
+
+
+def test_balanced_framing_attached_for_a_genuinely_mixed_deal():
+    idea = {
+        "rationale": "Package deal.",
+        "send_assets": [{"asset_type": "player", "player_id": "1", "age": 26, "score": 4000}],
+        "receive_assets": [{"asset_type": "player", "player_id": "2", "age": 25, "score": 4100}],
+    }
+    result = trade_ideas.apply_team_stance_framing([idea], "balanced")
+    assert "balanced" in result[0]["rationale"].casefold()
+    assert result[0]["team_stance_applied"] == "balanced"
 
 
 # --- name-collision guard: modules.decision_memory is unrelated -------------

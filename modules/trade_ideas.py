@@ -3082,8 +3082,12 @@ def _apply_strategy_context_to_idea(
 # `team_stance` is the user's own EXPLICIT declaration (modules.team_stance) —
 # "Rebuilding" / "Competing" / "Balanced" — never inferred from the roster.
 # The functions below are a pure, additive presentation layer: they append
-# one short clause to an already-built idea's rationale text. They never
-# read/write value_score, never change send/receive assets, never change
+# one short clause to an already-built idea's rationale text, ONLY when that
+# idea's own send/receive assets actually support the clause's content claim
+# (compliance audit, 2026-10-19: the clause used to be attached to every idea
+# whenever a stance was set, with no check against what the trade actually
+# did — see _stance_framing_supported_by_trade). They never read/write
+# value_score, never change send/receive assets, never change
 # priority/ordering, and are safe to call on the output of build_trade_ideas /
 # build_player_trade_hub_ideas after everything else has already run.
 #
@@ -3114,11 +3118,90 @@ def team_stance_framing_clause(team_stance: str) -> str:
     return TEAM_STANCE_FRAMING_CLAUSES.get(key, "")
 
 
+# Each clause above makes a content claim about the TRADE, not just about the
+# user's declared stance ("leans into youth and future draft capital",
+# "prioritizes immediate roster impact"). Thresholds below are the same
+# values trade_strategy_fit_context already uses to reason about a trade's
+# real shape (younger_return's 1-year tolerance, older_return's 28.5 age
+# floor, immediate_upgrade's 350-point score gap) — reused here, not
+# reinvented, so "does this trade's content support that claim" stays
+# consistent with how the rest of this module already judges trade shape.
+_STANCE_SHEDS_AGING_AGE_FLOOR = 28.0
+_STANCE_OLDER_RETURN_AGE_FLOOR = 28.5
+_STANCE_IMMEDIATE_UPGRADE_SCORE_GAP = 350
+_STANCE_YOUNGER_RETURN_YEARS = 1.0
+
+
+def _stance_framing_supported_by_trade(
+    stance_key: str,
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+) -> bool:
+    """Does this trade's actual send/receive content back up the stance
+    clause's claim, using the same asset-level helpers (_pick_assets,
+    _asset_avg_age, _asset_age, _top_player_score, _player_assets)
+    trade_strategy_fit_context already uses?
+
+    - Rebuilding ("leans into youth and future draft capital"): true only
+      when the deal actually brings back a pick, trends the roster younger,
+      or sheds an aging player without getting an equally old one back.
+    - Competing ("prioritizes immediate roster impact"): true only when the
+      deal is a real immediate-production upgrade, or it spends draft picks
+      to bring back a player rather than more picks.
+    - Balanced has no positive claim beyond "keeps both in play", so it's
+      suppressed only when the trade is an unambiguous, textbook example of
+      ONE of the other two shapes (gains picks AND trends younger with
+      nothing given up long-term either way, or spends picks for a real
+      upgrade with nothing coming back long-term either way) — a genuinely
+      lower bar than the other two stances.
+    - Any other/unknown stance key has no claim to verify.
+    """
+
+    incoming_picks = bool(_pick_assets(receive_assets))
+    outgoing_picks = bool(_pick_assets(send_assets))
+    send_age = _asset_avg_age(send_assets)
+    receive_age = _asset_avg_age(receive_assets)
+    younger_return = bool(
+        send_age and receive_age and receive_age + _STANCE_YOUNGER_RETURN_YEARS <= send_age
+    )
+    older_return = bool(receive_age and receive_age >= _STANCE_OLDER_RETURN_AGE_FLOOR)
+    sheds_aging_player = any(
+        _asset_age(asset) >= _STANCE_SHEDS_AGING_AGE_FLOOR for asset in _player_assets(send_assets)
+    )
+    send_top = _top_player_score(send_assets)
+    receive_top = _top_player_score(receive_assets)
+    immediate_upgrade = receive_top >= send_top + _STANCE_IMMEDIATE_UPGRADE_SCORE_GAP
+
+    rebuild_supported = bool(
+        incoming_picks or younger_return or (sheds_aging_player and not older_return)
+    )
+    competing_supported = bool(
+        immediate_upgrade
+        or (outgoing_picks and not incoming_picks and bool(_player_assets(receive_assets)))
+    )
+
+    if stance_key == team_stance_module.STANCE_REBUILDING:
+        return rebuild_supported
+    if stance_key == team_stance_module.STANCE_COMPETING:
+        return competing_supported
+    if stance_key == team_stance_module.STANCE_BALANCED:
+        textbook_rebuild_shape = incoming_picks and younger_return and not outgoing_picks
+        textbook_competing_shape = immediate_upgrade and outgoing_picks and not incoming_picks
+        return not (textbook_rebuild_shape or textbook_competing_shape)
+    return False
+
+
 def apply_team_stance_framing(
     ideas: List[Dict[str, Any]],
     team_stance: str,
 ) -> List[Dict[str, Any]]:
-    """Append one stance-aware clause to each idea's rationale text.
+    """Append one stance-aware clause to each idea's rationale text — but
+    only when that idea's own send/receive assets actually support the
+    stance clause's claim (see `_stance_framing_supported_by_trade`). An
+    idea whose real content doesn't back the claim gets no stance clause at
+    all: suppressed, never swapped for an unverified guess. Those ideas are
+    also left without a `team_stance_applied` tag, since no stance claim was
+    actually attached.
 
     Additive only: every other field on the idea (send_assets, receive_assets,
     scores, priority, tags, etc.) passes through unchanged. Returns the same
@@ -3136,9 +3219,12 @@ def apply_team_stance_framing(
             updated.append(idea)
             continue
         new_idea = dict(idea)
-        rationale = str(new_idea.get("rationale") or "").strip()
-        new_idea["rationale"] = f"{rationale} {clause}".strip() if rationale else clause
-        new_idea["team_stance_applied"] = stance_key
+        send_assets = list(new_idea.get("send_assets") or [])
+        receive_assets = list(new_idea.get("receive_assets") or [])
+        if _stance_framing_supported_by_trade(stance_key, send_assets, receive_assets):
+            rationale = str(new_idea.get("rationale") or "").strip()
+            new_idea["rationale"] = f"{rationale} {clause}".strip() if rationale else clause
+            new_idea["team_stance_applied"] = stance_key
         updated.append(new_idea)
     return updated
 
