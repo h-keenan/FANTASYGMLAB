@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -535,4 +536,92 @@ def test_render_league_history_uses_cached_grades_for_visible_filter_subset(monk
             "filter pill rerun with unchanged transaction data must not "
             "re-invoke grade_transaction"
         )
+
+
+def test_collect_season_transactions_fetches_every_week_exactly_once_in_order():
+    """Parallelizing the per-week transaction fetch must not change the
+    combined result vs. the old one-week-at-a-time loop: same transactions,
+    same dedupe/ordering, every week fetched exactly once — mirrors
+    modules.league_recaps.build_matchup_history_rows' own
+    test_build_matchup_history_rows_matches_sequential_calls for the
+    sibling fix."""
+
+    def fetch_league(_league_id):
+        return {"season": "2026", "status": "in_season", "settings": {"leg": 4}}
+
+    calls: list[tuple[str, int]] = []
+
+    def fetch_transactions(league_id, week):
+        calls.append((league_id, week))
+        return [
+            {
+                "transaction_id": f"tx-{week}",
+                "type": "free_agent",
+                "status": "complete",
+                "adds": {"p1": 1},
+            }
+        ]
+
+    payload = history.collect_season_transactions(
+        "L1", fetch_league=fetch_league, fetch_transactions=fetch_transactions
+    )
+
+    assert sorted(calls) == [("L1", week) for week in range(1, 5)]
+    assert len(calls) == 4
+    assert [item["transaction_id"] for item in payload["transactions"]] == [
+        "tx-1",
+        "tx-2",
+        "tx-3",
+        "tx-4",
+    ]
+    assert [item["_history_week"] for item in payload["transactions"]] == [1, 2, 3, 4]
+
+
+def test_collect_season_transactions_preserves_week_order_despite_timing():
+    """Weeks that finish fetching out of order (slower calls for earlier
+    weeks) must still be assembled in week order, not completion order —
+    same guard as league_recaps' sibling fix."""
+
+    def fetch_league(_league_id):
+        return {"season": "2026", "status": "in_season", "settings": {"leg": 5}}
+
+    def slow_fetch_transactions(_league_id, week):
+        # Earlier weeks sleep longer, so if order followed completion
+        # order instead of week number this would come back shuffled.
+        time.sleep(0.02 * (6 - week))
+        return [{"transaction_id": f"tx-{week}", "type": "free_agent", "status": "complete", "adds": {}}]
+
+    payload = history.collect_season_transactions(
+        "L1", fetch_league=fetch_league, fetch_transactions=slow_fetch_transactions
+    )
+    assert [item["_history_week"] for item in payload["transactions"]] == [1, 2, 3, 4, 5]
+
+
+def test_collect_season_transactions_fetches_weeks_concurrently_not_sequentially():
+    """The real bug this fixes: a full season's worth of per-week Sleeper
+    calls (up to 18) used to run one at a time, so a single
+    GET /v1/leagues/{id}/history or /storylines request (services/
+    mobile_api_service.py — both call this function with zero caching of
+    their own) paid the full sum of every week's latency. Proven here with
+    a slow fake fetcher: wall-clock time must be close to ONE week's
+    latency, not the sum of all of them."""
+
+    league = {"season": "2026", "status": "in_season", "settings": {"leg": 8}}
+    per_call_seconds = 0.05
+    week_count = 8
+
+    def fetch_transactions(_league_id, _week):
+        time.sleep(per_call_seconds)
+        return []
+
+    started = time.perf_counter()
+    history.collect_season_transactions(
+        "L1", fetch_league=lambda _league_id: league, fetch_transactions=fetch_transactions
+    )
+    elapsed = time.perf_counter() - started
+
+    # Sequential would take >= week_count * per_call_seconds (0.4s here);
+    # concurrent (up to 8 workers) should land near one call's latency.
+    # Generous bound to absorb scheduling jitter in CI.
+    assert elapsed < per_call_seconds * (week_count / 2)
 
