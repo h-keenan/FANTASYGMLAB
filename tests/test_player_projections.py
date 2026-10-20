@@ -763,3 +763,187 @@ def test_project_player_week_floored_estimate_repeats_across_weeks_for_sidelined
     first = results[0]["basis"]["recent_weighted_avg_ppr"]
     for result in results[1:]:
         assert result["basis"]["recent_weighted_avg_ppr"] == pytest.approx(first)
+
+
+# ---------------------------------------------------------------------------
+# team_qb_pass_attempts_by_week / _team_starting_qb_changed_recently —
+# coridian_'s performance audit, 2026-10-19/20: this used to be a full scan
+# of the whole `players` dict (~11k entries in production) INSIDE
+# project_player_week, redone from scratch on every single call. A caller
+# looping over many players and/or many weeks for the same team (GET
+# /v1/players/{id}/schedule — up to ~18 calls, one per remaining week; GET
+# /v1/leagues/{id}/matchup — one per starter across both rosters; GET
+# /v1/external/projections — one per WR/TE in the whole league-wide slate,
+# potentially hundreds) redid this same scan every time. Fixed by building
+# the by-team map once (`team_qb_pass_attempts_by_week`) and injecting it via
+# `project_player_week`'s new `team_qb_pass_attempts_by_team` parameter.
+# ---------------------------------------------------------------------------
+
+
+def _two_qb_team_players():
+    return {
+        "qb_a1": {"position": "QB", "team": "AAA"},
+        "qb_a2": {"position": "QB", "team": "AAA"},
+        "qb_b1": {"position": "QB", "team": "BBB"},
+        "wr_a1": {"position": "WR", "team": "AAA"},
+        "wr_b1": {"position": "WR", "team": "BBB"},
+        "fa_qb": {"position": "QB", "team": None},
+    }
+
+
+def _two_qb_team_weekly_stats():
+    return {
+        # AAA's starter flips from qb_a1 (weeks 1-2) to qb_a2 (weeks 3-4).
+        "qb_a1": {"weekly": [
+            {"week": 1, "pass_attempts": 35},
+            {"week": 2, "pass_attempts": 30},
+            {"week": 3, "pass_attempts": 2},
+        ]},
+        "qb_a2": {"weekly": [
+            {"week": 1, "pass_attempts": 1},
+            {"week": 3, "pass_attempts": 28},
+            {"week": 4, "pass_attempts": 33},
+        ]},
+        # BBB's starter never changes.
+        "qb_b1": {"weekly": [
+            {"week": 1, "pass_attempts": 32},
+            {"week": 2, "pass_attempts": 31},
+            {"week": 3, "pass_attempts": 29},
+        ]},
+    }
+
+
+def test_team_qb_pass_attempts_by_week_builds_every_team_in_one_pass():
+    players = _two_qb_team_players()
+    weekly_stats = _two_qb_team_weekly_stats()
+
+    by_team = pp.team_qb_pass_attempts_by_week(players, weekly_stats)
+
+    assert set(by_team.keys()) == {"AAA", "BBB"}
+    assert by_team["AAA"][1] == {"qb_a1": 35.0, "qb_a2": 1.0}
+    assert by_team["AAA"][3] == {"qb_a1": 2.0, "qb_a2": 28.0}
+    assert by_team["BBB"][2] == {"qb_b1": 31.0}
+    # A team-less QB (free agent) must never appear under a "None"/"" key.
+    assert "" not in by_team
+    assert None not in by_team
+
+
+def test_team_starting_qb_changed_recently_detects_a_real_leader_flip():
+    players = _two_qb_team_players()
+    weekly_stats = _two_qb_team_weekly_stats()
+
+    # Before week 5: most recent two weeks with data are 3 and 4, both led
+    # by qb_a2 (28, 33) vs qb_a1 (2, 0) -- no flip between THOSE two weeks,
+    # even though qb_a1 led weeks 1-2.
+    unchanged = pp._team_starting_qb_changed_recently(
+        "AAA", before_week=5, weekly_stats=weekly_stats, players=players
+    )
+    assert unchanged is False
+
+    # Before week 4: most recent two weeks with data are 2 (qb_a1 leads,
+    # qb_a2 has none that week) and 3 (qb_a2 leads) -- a real flip.
+    changed = pp._team_starting_qb_changed_recently(
+        "AAA", before_week=4, weekly_stats=weekly_stats, players=players
+    )
+    assert changed is True
+
+    # BBB has only one QB all season -- never a flip.
+    never_changed = pp._team_starting_qb_changed_recently(
+        "BBB", before_week=5, weekly_stats=weekly_stats, players=players
+    )
+    assert never_changed is False
+
+
+def test_team_starting_qb_changed_recently_none_with_fewer_than_two_past_weeks():
+    players = _two_qb_team_players()
+    weekly_stats = _two_qb_team_weekly_stats()
+
+    result = pp._team_starting_qb_changed_recently(
+        "AAA", before_week=2, weekly_stats=weekly_stats, players=players
+    )
+    assert result is None
+
+
+def test_team_starting_qb_changed_recently_precomputed_by_week_matches_fresh_scan():
+    """The whole point of the fix: passing the precomputed `by_week` (from
+    team_qb_pass_attempts_by_week) must produce IDENTICAL results to the
+    original fresh-scan behavior, for every before_week."""
+
+    players = _two_qb_team_players()
+    weekly_stats = _two_qb_team_weekly_stats()
+    precomputed = pp.team_qb_pass_attempts_by_week(players, weekly_stats)
+
+    for before_week in (2, 3, 4, 5, 6):
+        fresh = pp._team_starting_qb_changed_recently(
+            "AAA", before_week=before_week, weekly_stats=weekly_stats, players=players
+        )
+        from_precomputed = pp._team_starting_qb_changed_recently(
+            "AAA",
+            before_week=before_week,
+            weekly_stats=weekly_stats,
+            players=players,
+            by_week=precomputed.get("AAA", {}),
+        )
+        assert from_precomputed == fresh
+
+
+def test_project_player_week_injected_team_qb_pass_attempts_skips_the_players_scan(round_robin_schedule, monkeypatch):
+    """The real regression this fix closes: when a caller injects
+    `team_qb_pass_attempts_by_team`, project_player_week must NOT fall back
+    to scanning `players` itself. Proven by making the scan explode if it
+    ever runs."""
+
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=5, weekly_stats=weekly_stats, players=players
+    )
+    precomputed = pp.team_qb_pass_attempts_by_week(players, weekly_stats)
+
+    def _boom(*_args, **_kwargs):
+        raise AssertionError("team_qb_pass_attempts_by_week must not be called when already injected")
+
+    monkeypatch.setattr(pp, "team_qb_pass_attempts_by_week", _boom)
+
+    result = pp.project_player_week(
+        "wr_c1",
+        week=6,
+        season=2099,
+        players=players,
+        player_weekly_rows=weekly_stats["wr_c1"]["weekly"],
+        defense_strength=defense_strength,
+        weekly_stats=weekly_stats,
+        team_qb_pass_attempts_by_team=precomputed,
+    )
+
+    assert result["status"] == "ok"
+    # basis.team_qb_situation_changed_recently still gets a real answer --
+    # the injected map fed it, nothing was silently skipped.
+    assert "team_qb_situation_changed_recently" in result["basis"]
+
+
+def test_project_player_week_without_injection_still_computes_the_same_answer(round_robin_schedule):
+    """Without the new parameter (every existing caller before this fix),
+    behavior must be byte-for-byte unchanged -- same basis flag, computed
+    the slower way."""
+
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=5, weekly_stats=weekly_stats, players=players
+    )
+    precomputed = pp.team_qb_pass_attempts_by_week(players, weekly_stats)
+
+    without_injection = pp.project_player_week(
+        "wr_c1", week=6, season=2099, players=players,
+        player_weekly_rows=weekly_stats["wr_c1"]["weekly"],
+        defense_strength=defense_strength, weekly_stats=weekly_stats,
+    )
+    with_injection = pp.project_player_week(
+        "wr_c1", week=6, season=2099, players=players,
+        player_weekly_rows=weekly_stats["wr_c1"]["weekly"],
+        defense_strength=defense_strength, weekly_stats=weekly_stats,
+        team_qb_pass_attempts_by_team=precomputed,
+    )
+
+    assert without_injection == with_injection

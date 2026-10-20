@@ -5436,10 +5436,17 @@ def _weekly_projection_for_player(
     players_lookup: dict[str, Any],
     weekly_stats: dict[str, Any],
     defense_strength: dict[str, Any],
+    team_qb_pass_attempts_by_team: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One player's per-game projection for one week, from data already
     fetched once by the caller (never re-reads the season stats cache file
     or recomputes defense strength per player/week — see the callers below).
+
+    `team_qb_pass_attempts_by_team` is likewise built once by the caller
+    (`player_projections.team_qb_pass_attempts_by_week`) and forwarded so
+    `project_player_week`'s `team_qb_situation_changed_recently` basis flag
+    never re-scans the whole `players_lookup` per call — see that
+    function's own docstring.
     """
 
     record = weekly_stats.get(str(player_id))
@@ -5451,6 +5458,7 @@ def _weekly_projection_for_player(
         players=players_lookup,
         player_weekly_rows=weekly_rows or [],
         defense_strength=defense_strength,
+        team_qb_pass_attempts_by_team=team_qb_pass_attempts_by_team,
     )
     return _projection_summary_dict(result)
 
@@ -5518,6 +5526,15 @@ def get_player_schedule(
             projection_defense_strength = player_projections.team_defense_points_allowed_by_position(
                 season, weekly_stats=weekly_stats, players=players_lookup
             )
+            # Built ONCE for the whole request, same reason as
+            # players_lookup/weekly_stats/projection_defense_strength above
+            # — see team_qb_pass_attempts_by_week's own docstring: this
+            # player's team doesn't change across the up-to-18-week loop
+            # below, so the expensive players_lookup scan it replaces would
+            # otherwise redo the same work once per remaining week.
+            team_qb_pass_attempts = player_projections.team_qb_pass_attempts_by_week(
+                players_lookup, weekly_stats
+            )
             for week in weeks:
                 if week.get("bye") or week.get("played"):
                     week["projection"] = None
@@ -5529,6 +5546,7 @@ def get_player_schedule(
                     players_lookup=players_lookup,
                     weekly_stats=weekly_stats,
                     defense_strength=projection_defense_strength,
+                    team_qb_pass_attempts_by_team=team_qb_pass_attempts,
                 )
         except Exception:
             # Best-effort enrichment, same "fails soft" contract as every
@@ -5670,6 +5688,14 @@ def get_external_week_projections(
     defense_strength = player_projections.team_defense_points_allowed_by_position(
         resolved_season, weekly_stats=weekly_stats, players=players
     )
+    # Built ONCE for the whole request, same reason as players/weekly_stats/
+    # defense_strength above — coridian_'s performance audit, 2026-10-19:
+    # this endpoint can project hundreds of WR/TEs in one call (the full
+    # league-wide slate), and each one used to make
+    # project_player_week redo this same ~11k-entry `players` scan from
+    # scratch via _team_starting_qb_changed_recently. See
+    # team_qb_pass_attempts_by_week's own docstring.
+    team_qb_pass_attempts = player_projections.team_qb_pass_attempts_by_week(players, weekly_stats)
 
     items: list[dict[str, Any]] = []
     for player_id, player in players.items():
@@ -5687,6 +5713,7 @@ def get_external_week_projections(
             players=players,
             player_weekly_rows=weekly_rows or [],
             defense_strength=defense_strength,
+            team_qb_pass_attempts_by_team=team_qb_pass_attempts,
         )
         items.append(_external_projection_payload(player_id, resolved_season, int(week), result))
 
@@ -8693,6 +8720,7 @@ def _matchup_side(
                 players_lookup=projection_context.players_lookup,
                 weekly_stats=projection_context.weekly_stats,
                 defense_strength=projection_context.defense_strength,
+                team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
             )
             if projection_context is not None
             else None
@@ -8773,6 +8801,7 @@ def _project_real_starter_row(
             players_lookup=projection_context.players_lookup,
             weekly_stats=projection_context.weekly_stats,
             defense_strength=projection_context.defense_strength,
+            team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
         )
         if projection_context is not None
         else None
@@ -8802,6 +8831,7 @@ class _ProjectionContext:
     weekly_stats: dict[str, Any]
     defense_strength: dict[str, Any]
     games: pd.DataFrame | None = None
+    team_qb_pass_attempts_by_team: dict[str, Any] | None = None
 
 
 def _real_current_lineup(
@@ -8911,6 +8941,7 @@ def _real_current_lineup(
                             players_lookup=projection_context.players_lookup,
                             weekly_stats=projection_context.weekly_stats,
                             defense_strength=projection_context.defense_strength,
+                            team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
                         )
                         if projection_context is not None
                         else None
@@ -9147,6 +9178,14 @@ def get_league_matchup(
                     players=projection_players_lookup,
                 ),
                 games=nfl_schedule.load_games(),
+                # Built ONCE for the whole matchup request, same reason as
+                # every other field here — up to ~20 starters across both
+                # rosters would otherwise each redo the same full
+                # projection_players_lookup scan. See
+                # team_qb_pass_attempts_by_week's own docstring.
+                team_qb_pass_attempts_by_team=player_projections.team_qb_pass_attempts_by_week(
+                    projection_players_lookup, projection_weekly_stats
+                ),
             )
         except Exception:
             projection_context = None

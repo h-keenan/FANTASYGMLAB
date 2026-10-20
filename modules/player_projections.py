@@ -687,12 +687,60 @@ def _team_qb_quality_multiplier(
     return max(low, min(high, raw_multiplier)), True
 
 
+def team_qb_pass_attempts_by_week(
+    players: Dict[str, Any],
+    weekly_stats: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[int, Dict[str, float]]]:
+    """Every team's QBs' weekly pass-attempt volume, ``{team: {week:
+    {qb_player_id: pass_attempts}}}}`` — the expensive part of
+    ``_team_starting_qb_changed_recently`` (a full scan of every player in
+    ``players``, ~11k entries), done ONCE for every team in a single pass
+    instead of once per team.
+
+    coridian_'s performance audit, 2026-10-19: ``project_player_week``
+    calls ``_team_starting_qb_changed_recently`` for every WR/TE it
+    projects (hundreds per request on GET /v1/external/projections, up to
+    ``MAX_TRANSACTION_WEEK``-many times per request on GET
+    /v1/players/{id}/schedule's per-remaining-week loop), and that function
+    used to re-scan this same ~11k-entry ``players`` dict from scratch on
+    every single call, filtering down to one team's QBs each time — the
+    exact "redone from scratch" cost class already fixed elsewhere this
+    session. The result only depends on (team, players, weekly_stats), not
+    on ``before_week``, so a caller looping over many players and/or many
+    weeks can build this ONE map up front and pass it into every
+    ``project_player_week`` call via its ``team_qb_pass_attempts_by_team``
+    parameter.
+    """
+
+    by_team: Dict[str, Dict[int, Dict[str, float]]] = {}
+    for player_id, player in (players or {}).items():
+        if not isinstance(player, dict):
+            continue
+        if str(player.get("position") or "").strip().upper() != "QB":
+            continue
+        team = str(player.get("team") or "")
+        if not team:
+            continue
+        record = (weekly_stats or {}).get(str(player_id))
+        weekly_rows = record.get("weekly") if isinstance(record, dict) else None
+        for row in weekly_rows or []:
+            if not isinstance(row, dict):
+                continue
+            week = row.get("week")
+            attempts = row.get("pass_attempts")
+            if week is None or attempts is None:
+                continue
+            by_team.setdefault(team, {}).setdefault(int(week), {})[str(player_id)] = float(attempts)
+    return by_team
+
+
 def _team_starting_qb_changed_recently(
     team: str,
     *,
     before_week: int,
     weekly_stats: Dict[str, Dict[str, Any]],
     players: Dict[str, Any],
+    by_week: Optional[Dict[int, Dict[str, float]]] = None,
 ) -> Optional[bool]:
     """Secondary/optional signal the audit also flagged: did this team's
     starting QB (by weekly pass-attempt plurality among its own QBs) change
@@ -704,31 +752,22 @@ def _team_starting_qb_changed_recently(
     instead, the same signal weekly fantasy sites use to infer a change in
     starter).
 
+    ``by_week`` is this team's precomputed, UNFILTERED (every week, not
+    just weeks before ``before_week``) pass-attempt map — see
+    ``team_qb_pass_attempts_by_week``. When a caller already has it (or the
+    whole by-team map) in hand, passing it here skips the expensive
+    ``players`` scan entirely; omitting it computes the same thing fresh,
+    exactly as before, for backward compatibility.
+
     Returns ``None`` (never a fabricated True/False) when there are fewer
     than two past weeks of QB pass-attempt data for this team, or either of
     the two most recent weeks has no attempts recorded for any of its QBs.
     """
 
-    by_week: Dict[int, Dict[str, float]] = {}
-    for player_id, player in (players or {}).items():
-        if not isinstance(player, dict):
-            continue
-        if str(player.get("position") or "").strip().upper() != "QB":
-            continue
-        if str(player.get("team") or "") != str(team):
-            continue
-        record = (weekly_stats or {}).get(str(player_id))
-        weekly_rows = record.get("weekly") if isinstance(record, dict) else None
-        for row in weekly_rows or []:
-            if not isinstance(row, dict):
-                continue
-            week = row.get("week")
-            attempts = row.get("pass_attempts")
-            if week is None or attempts is None or int(week) >= int(before_week):
-                continue
-            by_week.setdefault(int(week), {})[str(player_id)] = float(attempts)
+    if by_week is None:
+        by_week = team_qb_pass_attempts_by_week(players, weekly_stats).get(str(team), {})
 
-    past_weeks = sorted(by_week.keys())
+    past_weeks = sorted(week for week in by_week.keys() if int(week) < int(before_week))
     if len(past_weeks) < 2:
         return None
 
@@ -867,6 +906,7 @@ def project_player_week(
     defense_strength: Optional[Dict[str, Dict[str, Dict[str, Any]]]] = None,
     team_qb_quality: Optional[Dict[str, Dict[str, Any]]] = None,
     weekly_stats: Optional[Dict[str, Dict[str, Any]]] = None,
+    team_qb_pass_attempts_by_team: Optional[Dict[str, Dict[int, Dict[str, float]]]] = None,
 ) -> Dict[str, Any]:
     """A first-pass real weekly point projection for one player, one week.
 
@@ -909,6 +949,13 @@ def project_player_week(
     default-compute ``team_qb_quality`` and the optional
     ``team_qb_situation_changed_recently`` basis flag) — it is never
     fetched at all for QB/RB/K.
+
+    ``team_qb_pass_attempts_by_team`` (see
+    ``team_qb_pass_attempts_by_week``) lets a caller looping over many
+    players and/or many weeks skip this function's own internal, otherwise
+    repeated, full scan of ``players`` for the
+    ``team_qb_situation_changed_recently`` basis flag — build it once up
+    front and pass the same map into every call.
     """
 
     player_id = str(player_id)
@@ -1015,7 +1062,15 @@ def project_player_week(
             team_qb_quality_score = team_entry.get("quality")
             team_qb_quality_selected_player_id = team_entry.get("selected_player_id")
         team_qb_situation_changed_recently = _team_starting_qb_changed_recently(
-            str(team), before_week=week, weekly_stats=resolved_weekly_stats, players=players
+            str(team),
+            before_week=week,
+            weekly_stats=resolved_weekly_stats,
+            players=players,
+            by_week=(
+                team_qb_pass_attempts_by_team.get(str(team), {})
+                if team_qb_pass_attempts_by_team is not None
+                else None
+            ),
         )
 
     # A player's real recent-week PPR rows can be genuinely negative — a
