@@ -538,6 +538,8 @@ def compose_next_move_briefing(
     auto_strategy: str = "",
     auto_strategy_label: str = "",
     season_progress: float | None = None,
+    untouchable_player_ids: tuple[str, ...] = (),
+    gm_target_player_ids: tuple[str, ...] = (),
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -569,6 +571,24 @@ def compose_next_move_briefing(
     so this function never re-fetches league/rankings data itself to get
     them. All default to empty/None, which simply means that tile never
     fires (no stance comparison without the real inputs), not an error.
+
+    `untouchable_player_ids`/`gm_target_player_ids` are the caller's GM
+    Targets state (modules.gm_targets.cached_untouchable_ids / cached_target_ids)
+    — used ONLY by the `trade_idea_records` fallback branch below.
+    Recommendation-compliance audit finding: a caller that passes its own
+    precomputed `trade_idea_records` (the Dashboard/Portfolio/mobile API —
+    see their own calls to trade_hub_engine.generate_trade_idea_records_cached
+    with untouchable_player_ids already threaded) already protected those
+    players before this function ever saw the result, so these two
+    parameters are no-ops for them. A caller that omits `trade_idea_records`
+    (modules.push_triggers' scheduled push sweep, which has no live request
+    context to share a precomputed copy with) previously had no way to pass
+    its untouchable list to this function's own fallback generation at
+    all — meaning a push notification could recommend trading away a
+    player the user had explicitly protected in GM Targets, even though
+    every other surface showing the identical recommendation already
+    respected that flag. Both default to empty, matching every existing
+    caller/test that predates this parameter.
     """
 
     if roster_df is None:
@@ -618,6 +638,8 @@ def compose_next_move_briefing(
                 score_field=score_field,
                 team_strategy=team_strategy,
                 team_stance=team_stance,
+                untouchable_player_ids=untouchable_player_ids,
+                gm_target_player_ids=gm_target_player_ids,
             )
         )
         ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))

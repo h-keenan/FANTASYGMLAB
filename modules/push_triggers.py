@@ -30,7 +30,7 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
-from modules import alert_presentation, app_config, dashboard_engine, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
+from modules import alert_presentation, app_config, dashboard_engine, gm_targets, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -254,6 +254,58 @@ def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> d
     return result
 
 
+def fetch_gm_targets_untouchable_ids(
+    config: PushTriggerConfig, user_ids: list[str]
+) -> dict[str, dict[str, set[str]]]:
+    """user_id -> league_id -> player_ids that user marked untouchable in
+    GM Targets (modules.gm_targets.GmTarget.untouchable), read service-role/
+    bulk since this sweep runs outside any one user's session — the push
+    sweep's own equivalent of modules.gm_targets.cached_untouchable_ids.
+
+    Recommendation-compliance audit finding: trade_hub_engine.
+    generate_trade_idea_records' `untouchable_player_ids` contract ("hard-
+    blocks those players from every outgoing package") only holds if every
+    trade-idea caller actually fetches and threads it through. The
+    Dashboard, mobile API, and Portfolio surfaces all do; this sweep
+    previously didn't fetch GM Targets at all, so a push notification could
+    recommend trading away a player the user had explicitly protected.
+    """
+
+    ids = [uid for uid in (_safe_text(u) for u in user_ids) if uid]
+    if not config.configured or not ids:
+        return {}
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{gm_targets.TARGETS_TABLE}",
+            headers=_headers(config),
+            params={
+                "select": "user_id,league_id,player_id",
+                "user_id": f"in.({','.join(ids)})",
+                "untouchable": "eq.true",
+            },
+            timeout=15,
+        )
+    except Exception:
+        return {}
+    if response.status_code >= 400:
+        return {}
+    try:
+        rows = response.json()
+    except Exception:
+        return {}
+    result: dict[str, dict[str, set[str]]] = {uid: {} for uid in ids}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, Mapping):
+            continue
+        user_id = _safe_text(row.get("user_id"))
+        league_id = _safe_text(row.get("league_id"))
+        player_id = _safe_text(row.get("player_id"))
+        if not user_id or not league_id or not player_id:
+            continue
+        result.setdefault(user_id, {}).setdefault(league_id, set()).add(player_id)
+    return result
+
+
 def gm_stance_reminder_push_item(
     *, league_id: str, league_name: str, leagues_with_stance: set[str]
 ) -> dict[str, Any] | None:
@@ -363,8 +415,20 @@ def league_briefing_push_items(
     sleeper_user_id: str,
     players_df: pd.DataFrame,
     score_field: str,
+    untouchable_player_ids: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
-    """The subset of one league's "Next Move" briefing worth pushing about."""
+    """The subset of one league's "Next Move" briefing worth pushing about.
+
+    `untouchable_player_ids` is the caller's GM Targets untouchable list for
+    this exact (user, league) — see fetch_gm_targets_untouchable_ids. This
+    sweep never precomputes its own `trade_idea_records` (no live request
+    context to share one with), so it relies on
+    dashboard_engine.compose_next_move_briefing's own fallback trade-idea
+    generation — threading the list through to that fallback is what makes
+    this sweep's trade tile honor the same "never send this player away"
+    guarantee the Dashboard/mobile API/Portfolio surfaces already do for the
+    identical recommendation.
+    """
 
     league = sleeper.get_league(league_id)
     if not league:
@@ -390,6 +454,7 @@ def league_briefing_push_items(
         league_settings=league_settings,
         score_field=score_field,
         rosters=rosters,
+        untouchable_player_ids=untouchable_player_ids,
     )
     league_name = _safe_text(league.get("name"), "Your league")
     items: list[dict[str, Any]] = []
@@ -518,6 +583,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
     usernames = fetch_sleeper_usernames(config, list(recipients.keys()))
     preferences = fetch_push_preferences(config, list(recipients.keys()))
     gm_stance_leagues = fetch_gm_stance_leagues(config, list(recipients.keys()))
+    gm_untouchable_ids = fetch_gm_targets_untouchable_ids(config, list(recipients.keys()))
     players_cache: dict[str, tuple[pd.DataFrame, str]] = {}
 
     for user_id, tokens in recipients.items():
@@ -556,6 +622,9 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     sleeper_user_id=sleeper_user_id,
                     players_df=players_df,
                     score_field=score_field,
+                    untouchable_player_ids=tuple(
+                        sorted(gm_untouchable_ids.get(user_id, {}).get(league_id, ()))
+                    ),
                 )
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: briefing failed ({exc})")
