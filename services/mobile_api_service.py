@@ -7480,6 +7480,20 @@ def _get_portfolio_impl(lens: str, user: dict[str, Any]) -> dict[str, Any]:
 # single-league screens each card links into are always live.
 LEAGUE_GLANCE_TTL_SECONDS = 180
 
+# Same bug class as _PORTFOLIO_FANOUT_TIMEOUT_SECONDS above, found during a
+# 2026-10-19 performance audit: this endpoint's fan-out used a bare
+# `executor.map`, which has no overall bound, so one genuinely hung
+# per-league call (Sleeper never responding, or a stuck Redis single-flight
+# lock) blocks the ENTIRE leagues-glance response forever instead of just
+# that one league's row -- directly contradicting this endpoint's own
+# docstring promise that "one failing league is reported in failed_leagues
+# instead of blanking the response." Each per-league row makes up to 3
+# sequential calls (team_stance, GM Targets, league_glance.build_league_glance's
+# own Sleeper/dashboard work), each individually bounded at 15s (this file's
+# established requests.get timeout convention); 25s mirrors Portfolio's own
+# deadline and gives real, slow-but-working rows room to finish.
+_LEAGUE_GLANCE_FANOUT_TIMEOUT_SECONDS = 25
+
 _LEAGUE_GLANCE_UPSELL = {
     "title": "All your leagues at a glance",
     "body": (
@@ -7593,8 +7607,10 @@ def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(req
     file (profile.entitlement via _fetch_profile_fields).
 
     Per-league results are cached in Redis for LEAGUE_GLANCE_TTL_SECONDS
-    and fanned out over a bounded thread pool; one failing league is
-    reported in `failed_leagues` instead of blanking the response.
+    and fanned out over a bounded thread pool, bounded overall by
+    _LEAGUE_GLANCE_FANOUT_TIMEOUT_SECONDS; one failing (or timed-out)
+    league is reported in `failed_leagues` instead of blanking the
+    response.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -7646,10 +7662,43 @@ def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(req
             _build_league_glance_row, config, user_id, access_token, lens, sleeper_username, _news_pool_loader
         )
         max_workers = min(len(saved_rows), _PORTFOLIO_FANOUT_MAX_WORKERS)
-        with concurrent.futures.ThreadPoolExecutor(
+        executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix="dgm-glance-fanout"
-        ) as executor:
-            results = list(executor.map(worker, saved_rows))
+        )
+        # Futures submitted individually (not via executor.map) so a still-
+        # running one past the deadline can be reported as a timed-out
+        # failure instead of blocked on; `shutdown(wait=False)` lets any
+        # such orphaned thread finish on its own without holding this
+        # response open for it. See _LEAGUE_GLANCE_FANOUT_TIMEOUT_SECONDS.
+        try:
+            futures = [executor.submit(worker, row) for row in saved_rows]
+            concurrent.futures.wait(futures, timeout=_LEAGUE_GLANCE_FANOUT_TIMEOUT_SECONDS)
+            for row, future in zip(saved_rows, futures):
+                if future.done():
+                    try:
+                        results.append(future.result())
+                    except Exception:
+                        results.append(
+                            {
+                                "status": "failed",
+                                "league_id": saved_leagues.normalize_league_id(row.get("league_id")) or "",
+                                "league_name": str(row.get("league_name") or "").strip()
+                                or str(row.get("league_id") or ""),
+                                "reason": "unavailable",
+                            }
+                        )
+                else:
+                    results.append(
+                        {
+                            "status": "failed",
+                            "league_id": saved_leagues.normalize_league_id(row.get("league_id")) or "",
+                            "league_name": str(row.get("league_name") or "").strip()
+                            or str(row.get("league_id") or ""),
+                            "reason": "timed_out",
+                        }
+                    )
+        finally:
+            executor.shutdown(wait=False)
 
     leagues: list[dict[str, Any]] = []
     failed_leagues: list[dict[str, Any]] = []
