@@ -184,4 +184,63 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByText("Minimal injury risk on either side.")).toBeInTheDocument();
     expect(screen.getByText("Ask for a sweetener too")).toBeInTheDocument();
   });
+
+  describe("Players' Add to Trade quick-add (quickAddPlayerId)", () => {
+    it("pre-populates You Receive with a player owned by another team, and selects that team", () => {
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+          quickAddPlayerId="receive-1"
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
+      // "Rival Team · Rival Owner" is the resolved owning team's pill label.
+      expect(screen.getByText(/Rival Team/)).toBeInTheDocument();
+      // activeSide flipped to "receive" (its label renders in the active color).
+      expect(screen.getByText("You receive")).toHaveStyle({ color: "var(--color-accent)" });
+    });
+
+    it("pre-populates You Send (not Receive) for a player already on the user's own roster", () => {
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+          quickAddPlayerId="send-1"
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove Their WR" })).not.toBeInTheDocument();
+    });
+
+    it("fails open to the plain builder when the player id is missing/stale or on no roster in this league", () => {
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+          quickAddPlayerId="not-a-real-player"
+        />,
+      );
+
+      expect(screen.getByText("Queue send and receive assets, then Analyze.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
+    });
+  });
 });

@@ -4550,6 +4550,83 @@ def test_rankings_rows_carry_overall_rating_percentiled_within_position(monkeypa
     assert ratings == sorted(ratings)
 
 
+def _fake_wide_position_pool_frame_with_stats():
+    """Same 12-WR qualifying pool + 1 thin RB as
+    `_fake_wide_position_pool_frame`, plus raw season-stat columns (Players'
+    Madden-style stat sort/percentile feature) — a strictly increasing
+    `targets`/`receptions`/`receiving_yards`/`snap_share` line so wr12 is
+    unambiguously the top of the WR distribution on every one of them.
+    """
+
+    frame = _fake_wide_position_pool_frame()
+    frame["games_played"] = [14] * 12 + [10]
+    frame["targets"] = [i * 10 for i in range(1, 13)] + [40]
+    frame["receptions"] = [i * 6 for i in range(1, 13)] + [25]
+    frame["receiving_yards"] = [i * 80 for i in range(1, 13)] + [300]
+    frame["receiving_tds"] = [i for i in range(1, 13)] + [3]
+    frame["snap_share"] = [min(0.95, 0.3 + i * 0.05) for i in range(1, 13)] + [0.4]
+    frame["fantasy_points"] = [i * 20.0 for i in range(1, 13)] + [90.0]
+    frame["ppg"] = [i * 1.5 for i in range(1, 13)] + [9.0]
+    return frame
+
+
+def test_rankings_rows_carry_position_relevant_stats_with_percentiles(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch(
+                "modules.rankings.load_players",
+                return_value=_fake_wide_position_pool_frame_with_stats(),
+            ):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    response = client.get(
+                        "/v1/leagues/abc/rankings?lens=Dynasty&limit=20",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    by_id = {player["player_id"]: player for player in response.json()["players"]}
+
+    wr12_stats = {entry["key"]: entry for entry in by_id["wr12"]["stats"]}
+    # Targets/Receptions/Rec Yards present, correctly valued, and at the top
+    # of a qualifying (12-player) WR pool.
+    assert wr12_stats["targets"]["value"] == 120
+    assert wr12_stats["targets"]["percentile"] == 100
+    assert wr12_stats["rec_yards"]["value"] == 960
+    assert wr12_stats["rec_yards"]["percentile"] == 100
+    # Share stats are normalized to a 0-100 number, not left as a 0-1 fraction.
+    assert wr12_stats["snap_share"]["value"] == pytest.approx(90.0)
+    assert wr12_stats["snap_share"]["format"] == "share"
+    # A passing stat never appears on a WR's row.
+    assert "pass_yards" not in wr12_stats
+    # A non-passer whose raw stat IS present (Games, always loaded) and whose
+    # pool is wide enough shows a real percentile.
+    assert wr12_stats["games"]["percentile"] is None  # availability is never ranked
+
+    # A thin (1-player) RB pool: a stat with a real value is still present,
+    # but gated out of a percentile rather than inventing one — the exact
+    # same PERCENTILE_MIN_POOL gate the overall-rating badge uses. Rush Att/
+    # Yards/TDs have no column in this fixture at all, so they're simply
+    # absent rather than shown as a false 0.
+    rb_stats = {entry["key"]: entry for entry in by_id["rb_lonely"]["stats"]}
+    assert "rush_att" not in rb_stats
+    assert rb_stats["targets"]["value"] == 40
+    assert all(entry["percentile"] is None for entry in rb_stats.values())
+
+
 def test_weekly_stats_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/weekly-stats")

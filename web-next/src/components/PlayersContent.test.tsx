@@ -1,8 +1,17 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { PlayersContent } from "./PlayersContent";
-import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer } from "@/lib/api";
+import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer, RankedPlayerStat } from "@/lib/api";
+
+/** Finds the one <select> among every combobox on the page whose options
+ * include `optionText` — robust against new sort/filter controls shifting
+ * positional indices, unlike `getAllByRole("combobox")[n]`. */
+function selectWithOption(optionText: string): HTMLElement {
+  const match = screen.getAllByRole("combobox").find((select) => within(select).queryByText(optionText));
+  if (!match) throw new Error(`No <select> found with an option "${optionText}"`);
+  return match;
+}
 
 function pick(overrides: Partial<DraftPickAsset>): DraftPickAsset {
   return {
@@ -151,9 +160,7 @@ describe("PlayersContent", () => {
     it("filters to rostered players using the union of every roster's players array", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} rosters={ROSTERS} />);
 
-      const selects = screen.getAllByRole("combobox");
-      const rosterSelect = selects[selects.length - 1];
-      fireEvent.change(rosterSelect, { target: { value: "Rostered" } });
+      fireEvent.change(selectWithOption("Rostered"), { target: { value: "Rostered" } });
 
       expect(screen.getByText("Alpha Receiver")).toBeInTheDocument();
       expect(screen.getByText("Beta Back")).toBeInTheDocument();
@@ -163,13 +170,82 @@ describe("PlayersContent", () => {
     it("filters to available (unrostered) players", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} rosters={ROSTERS} />);
 
-      const selects = screen.getAllByRole("combobox");
-      const rosterSelect = selects[selects.length - 1];
-      fireEvent.change(rosterSelect, { target: { value: "Available" } });
+      fireEvent.change(selectWithOption("Rostered"), { target: { value: "Available" } });
 
       expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
       expect(screen.queryByText("Beta Back")).not.toBeInTheDocument();
       expect(screen.getByText("Gamma Kicker")).toBeInTheDocument();
+    });
+  });
+
+  describe("Madden-style stat sort", () => {
+    function statsPlayer(overrides: Partial<RankedPlayer>, stats: RankedPlayerStat[]): RankedPlayer {
+      return player({ ...overrides, stats });
+    }
+
+    const WITH_STATS: LeagueRankingsResponse = {
+      ok: true,
+      players: [
+        statsPlayer(
+          { player_id: "a", name: "Alpha Receiver", position: "WR", score: 900, overall_rating: 70 },
+          [
+            { key: "targets", label: "Targets", value: 60, format: "count", percentile: 40 },
+            { key: "rec_yards", label: "Rec Yards", value: 600, format: "yards", percentile: 35 },
+          ],
+        ),
+        statsPlayer(
+          { player_id: "b", name: "Beta Receiver", position: "WR", score: 700, overall_rating: 95 },
+          [
+            { key: "targets", label: "Targets", value: 150, format: "count", percentile: 99 },
+            { key: "rec_yards", label: "Rec Yards", value: 1400, format: "yards", percentile: 97 },
+          ],
+        ),
+      ],
+    };
+
+    it("defaults to sorting by Value (the server's existing order) and hides the Raw/Percentile toggle", () => {
+      render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={WITH_STATS} />);
+
+      const rows = screen.getAllByText(/Receiver$/).map((el) => el.textContent);
+      expect(rows).toEqual(["Alpha Receiver", "Beta Receiver"]);
+      expect(screen.queryByText("Raw")).not.toBeInTheDocument();
+      expect(screen.queryByText("Percentile")).not.toBeInTheDocument();
+    });
+
+    it("offers every stat the visible pool carries, and re-sorts the board by raw value when picked", () => {
+      render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={WITH_STATS} />);
+
+      const sortSelect = selectWithOption("Rec Yards");
+      fireEvent.change(sortSelect, { target: { value: "rec_yards" } });
+
+      // Beta has the higher Rec Yards total (1400 vs 600) despite a lower
+      // Value score — the stat sort, not the server's default order, wins.
+      const rows = screen.getAllByText(/Receiver$/).map((el) => el.textContent);
+      expect(rows).toEqual(["Beta Receiver", "Alpha Receiver"]);
+      expect(screen.getByText("600")).toBeInTheDocument();
+      expect(screen.getByText("1400")).toBeInTheDocument();
+    });
+
+    it("switches to percentile mode and re-sorts/re-displays by the stat's position-group percentile", () => {
+      render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={WITH_STATS} />);
+
+      fireEvent.change(selectWithOption("Rec Yards"), { target: { value: "rec_yards" } });
+      fireEvent.click(screen.getByText("Percentile"));
+
+      expect(screen.getByText("97th")).toBeInTheDocument();
+      expect(screen.getByText("35th")).toBeInTheDocument();
+    });
+  });
+
+  describe("Add to Trade quick-add", () => {
+    it("deep-links each row into Trade Analyzer with ?playerId=, same convention as Waivers/Trade Hub", () => {
+      render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
+
+      const links = screen.getAllByRole("link", { name: "Add to Trade" });
+      expect(links[0]).toHaveAttribute(
+        "href",
+        "/trade-analyzer/league1?name=Dynasty+Overlords&playerId=a",
+      );
     });
   });
 });

@@ -46,6 +46,22 @@ import {
  * component's own docstring) and the Why → Action → Confidence → Risk
  * ordering `build_offer_result_card_html`'s own "Magna Carta §30" comment
  * documents.
+ *
+ * Revision 20 adds `quickAddPlayerId` — Players' "Add to Trade" row action
+ * threads a tapped player's id through as ?playerId= (same gamePlanTileHref
+ * convention Waivers/Trade Hub already read). On mount this resolves which
+ * roster owns that player (myRosterIds / otherTeams, both already computed
+ * below for the roster-browse search pool) and genuinely pre-populates the
+ * builder — not just a highlight/scroll like Waivers' HighlightTarget: sets
+ * activeSide + selectedTeamId and calls addPlayer's underlying state update
+ * directly (not addPlayer() itself, since it reads the *current* activeSide
+ * from a stale closure the same render tick activeSide is being set — see
+ * the effect below). A player on the user's OWN roster sets activeSide to
+ * "send" instead of "receive" (the only side that pool is drawn from) —
+ * a deliberate, sensible deviation for that one edge case, not the literal
+ * "always receive" reading. Fails open silently (plain Trade Analyzer view,
+ * no crash) when the id is missing, stale, or isn't on any roster in this
+ * league — there is no toast/error state for "couldn't find that player".
  */
 
 const MAX_SEARCH_RESULTS = 40;
@@ -352,6 +368,7 @@ export function TradeAnalyzerContent({
   picks,
   rosters,
   teamProfiles,
+  quickAddPlayerId,
 }: {
   leagueId: string;
   leagueName: string;
@@ -360,6 +377,9 @@ export function TradeAnalyzerContent({
   picks: DraftPickAsset[];
   rosters: Array<Record<string, unknown>>;
   teamProfiles: Record<string, TeamProfile>;
+  /** See this component's own docstring (Revision 20) — a Players row's
+   * "Add to Trade" deep-link, ?playerId=. */
+  quickAddPlayerId?: string;
 }) {
   const reasonMessage = myRoster.reason ? tradeAnalyzerReasonMessage(myRoster.reason) : null;
   const myRosterId = String((myRoster.roster?.roster_id as string | number | undefined) ?? "");
@@ -446,6 +466,46 @@ export function TradeAnalyzerContent({
     else setReceivePlayers((prev) => [...prev, player]);
     setVerdict(null);
     setAnalyzeError(null);
+  }
+
+  // Players' "Add to Trade" quick-add (Revision 20) — see this component's
+  // own docstring. Applied at render time (React's documented "adjusting
+  // state when a prop changes" pattern — see
+  // react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  // — guarded by comparing against `appliedQuickAddPlayerId` so it runs once
+  // per id), not inside a useEffect: a setState called synchronously inside
+  // an effect body trips react-hooks/set-state-in-effect, the same rule
+  // PlayerCompareContent.tsx's modelsLoadedFor comment already documents
+  // working around elsewhere in this app. Deliberately does NOT call
+  // addPlayer(): addPlayer reads `activeSide` from this render's closure,
+  // and setActiveSide(...) a few lines below hasn't been committed yet this
+  // same render, so addPlayer would still see the OLD side and file the
+  // player on the wrong list.
+  const [appliedQuickAddPlayerId, setAppliedQuickAddPlayerId] = useState<string | null>(null);
+  if (quickAddPlayerId && quickAddPlayerId !== appliedQuickAddPlayerId) {
+    setAppliedQuickAddPlayerId(quickAddPlayerId);
+    const quickAddPlayer = rankings.find((p) => p.player_id === quickAddPlayerId);
+    if (quickAddPlayer) {
+      if (myRosterIds.has(quickAddPlayerId)) {
+        // On the user's own roster: "receive" (the only side the search
+        // pool ever draws from, see searchPool above) would be nonsensical.
+        setActiveSide("send");
+        setSendPlayers((prev) =>
+          prev.some((p) => p.player_id === quickAddPlayer.player_id) ? prev : [...prev, quickAddPlayer],
+        );
+      } else {
+        const owner = otherTeams.find((team) => team.playerIds.has(quickAddPlayerId));
+        if (owner) {
+          setActiveSide("receive");
+          setSelectedTeamId(owner.rosterId);
+          setReceivePlayers((prev) =>
+            prev.some((p) => p.player_id === quickAddPlayer.player_id) ? prev : [...prev, quickAddPlayer],
+          );
+        }
+        // else: not on any roster in this league — fail open, no crash.
+      }
+    }
+    // else: missing/stale id, or not in this league's pool — fail open.
   }
 
   function addPick(pick: DraftPickAsset) {

@@ -312,43 +312,71 @@ def _overall_rating_from_percentile(percentile: float) -> int:
             break
     return int(min(OVERALL_RATING_MAX, max(1, round(rating))))
 
-#: Stat label -> candidate source columns, derived from the SAME definitions
-#: player_profile_ui uses to build the displayed items, so a percentile can
-#: never drift onto a different column than the number it sits next to.
-#: "Games" is deliberately absent: availability is not a performance stat, and
-#: a "90th percentile in games played" badge next to a replacement-level
-#: player reads as praise.
-_PERCENTILE_STAT_FIELDS: dict[str, tuple[str, ...]] = {
+#: Stat label -> candidate source columns / display format kind, derived
+#: directly from player_profile_ui's own stat-group definitions, so neither
+#: a percentile nor a formatted value here can ever drift onto a different
+#: column/format than the number PQV's Stats tab renders for that same
+#: label. Includes "Games" (format/fields only — see _PERCENTILE_STAT_FIELDS
+#: below for why it's excluded from percentile ranking).
+_LABEL_FIELDS: dict[str, tuple[str, ...]] = {
     label: fields
     for _group_label, _tone, stat_defs in player_profile_ui.PLAYER_PROFILE_STAT_GROUPS
     for label, fields, _format_kind, _note in stat_defs
-    if label != "Games"
+}
+_LABEL_FORMAT_KIND: dict[str, str] = {
+    label: format_kind
+    for _group_label, _tone, stat_defs in player_profile_ui.PLAYER_PROFILE_STAT_GROUPS
+    for label, _fields, format_kind, _note in stat_defs
+}
+
+#: Stat label -> candidate source columns, for percentile ranking only.
+#: "Games" is deliberately absent: availability is not a performance stat,
+#: and a "90th percentile in games played" badge next to a replacement-level
+#: player reads as praise.
+_PERCENTILE_STAT_FIELDS: dict[str, tuple[str, ...]] = {
+    label: fields for label, fields in _LABEL_FIELDS.items() if label != "Games"
 }
 
 _GAMES_FIELDS = ("games", "games_played", "gp")
 
+#: Format kind for the five derived per-game/per-touch rate stats below —
+#: not in player_profile_ui's own stat groups (they're computed, not a
+#: loaded column), so they don't get a format kind from _LABEL_FORMAT_KIND.
+_RATIO_STAT_FORMAT_KIND: dict[str, str] = {
+    "Targets/Gm": "rate",
+    "Rec/Gm": "rate",
+    "Yards/Catch": "rate",
+    "Carries/Gm": "rate",
+    "Yards/Carry": "rate",
+}
 
-def _pool_column(frame: pd.DataFrame, row: Mapping[str, object], fields: Sequence[str]) -> str:
-    """Resolve one stat to the column the displayed value actually came from."""
-
-    _value, source_field = player_profile_ui.first_player_stat_value(
-        row if isinstance(row, pd.Series) else pd.Series(dict(row)),
-        tuple(fields),
-    )
-    if source_field and source_field in frame.columns:
-        return source_field
-    return next((field for field in fields if field in frame.columns), "")
-
-
-def _pool_series(
-    frame: pd.DataFrame,
-    row: Mapping[str, object],
-    fields: Sequence[str],
-) -> pd.Series | None:
-    column = _pool_column(frame, row, fields)
-    if not column:
-        return None
-    return pd.to_numeric(frame[column], errors="coerce")
+#: Position -> the raw season-stat labels Players' Madden-style stat sort
+#: surfaces for that position (task: "a reasonable set of position-relevant
+#: raw stats", not every stat this app tracks). Its own curation, deliberately
+#: not reused from _key_stats' per-position `order` below: this list adds
+#: Snap Share and PPG (workload + per-game production, both useful sort
+#: columns Madden-style comparisons expect) that PQV's hero Key Stats group
+#: doesn't carry the same way. A label only renders here when
+#: annotate_rankings_stat_pool below actually has a value for the player
+#: (e.g. Pass Att is simply omitted for a RB, never shown as 0/blank).
+RANKINGS_STAT_LABELS_BY_POSITION: dict[str, tuple[str, ...]] = {
+    "QB": ("Games", "Pass Att", "Pass Yards", "Pass TDs", "Rush Yards", "Rush TDs", "Fantasy Pts", "PPG"),
+    "RB": (
+        "Games",
+        "Rush Att",
+        "Rush Yards",
+        "Rush TDs",
+        "Targets",
+        "Receptions",
+        "Rec Yards",
+        "Rec TDs",
+        "Snap Share",
+        "PPG",
+    ),
+    "WR": ("Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Snap Share", "Target Share", "PPG"),
+    "TE": ("Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Snap Share", "Target Share", "PPG"),
+}
+_DEFAULT_RANKINGS_STAT_LABELS: tuple[str, ...] = ("Games", "Fantasy Pts", "PPG")
 
 
 def _positive(series: pd.Series | None) -> pd.Series | None:
@@ -489,6 +517,233 @@ def overall_ratings_for_pool(
     )
 
 
+def _percentile_from_values(values: pd.Series, positions: pd.Series) -> pd.Series:
+    """1-100 percentile rank of `values`, computed within each `positions`
+    group, gated by PERCENTILE_MIN_POOL — the one shared percentile-ranking
+    primitive behind every per-stat percentile this module computes: PQV's
+    Stats tab (``_stat_percentiles`` below) and Players list's Madden-style
+    stat sort (``annotate_rankings_stat_pool``) both resolve to this same
+    rank(pct=True)-with-ties-as-average-and-a-floor logic, so they can never
+    disagree about the same player's number. A position group with fewer
+    than PERCENTILE_MIN_POOL real values returns ``None`` for every row in
+    that group rather than a precise-looking but meaningless rank. Returns
+    an ``object``-dtype Series of ``int | None``, aligned to `values`' index.
+    """
+
+    pool_sizes = values.groupby(positions).transform(lambda s: int(s.notna().sum()))
+    ranks = values.groupby(positions).rank(pct=True)
+    return pd.Series(
+        [
+            int(min(100, max(1, round(float(p) * 100)))) if not pd.isna(p) and n >= PERCENTILE_MIN_POOL else None
+            for p, n in zip(ranks, pool_sizes)
+        ],
+        index=values.index,
+        dtype=object,
+    )
+
+
+def _coalesced_numeric_column(frame: pd.DataFrame, fields: Sequence[str]) -> pd.Series | None:
+    """Vectorized equivalent of player_profile_ui.first_player_stat_value: for
+    every row in `frame`, the first candidate column (in `fields` order)
+    carrying a real value for THAT row — same per-row fallback semantics,
+    computed for the whole frame at once. In practice a given players frame
+    only ever has one of a stat's alias columns actually present (the others
+    are older season-schema names), so this reduces to "the one present
+    column" for every row identically; it only diverges from resolving a
+    single anchor row's column choice and applying it to the whole group
+    (what this module did before) in the rare case two alias columns coexist
+    with partial coverage — and then it is strictly more correct, since every
+    row is ranked on its own real value instead of whichever column one
+    anchor player happened to have. Returns ``None`` when no candidate field
+    is present in `frame` at all.
+    """
+
+    result: pd.Series | None = None
+    for field in fields:
+        if field not in frame.columns:
+            continue
+        candidate = pd.to_numeric(frame[field], errors="coerce")
+        result = candidate if result is None else result.combine_first(candidate)
+    return result
+
+
+def stat_percentiles_for_pool(
+    frame: pd.DataFrame,
+    stat_fields: Mapping[str, Sequence[str]],
+    *,
+    position_column: str = "position",
+) -> dict[str, tuple[pd.Series, pd.Series]]:
+    """Raw coalesced value + position-relative percentile for every label in
+    `stat_fields`, for every row of `frame` at once — the vectorized sibling
+    of ``_stat_percentiles`` (one player at a time) and
+    ``overall_ratings_for_pool`` (one score column, not a stat-per-label
+    map): a list endpoint ranking every row in its response can call this
+    once instead of re-filtering/re-ranking a fresh position pool per row.
+    Shares ``_percentile_from_values`` so this and ``_stat_percentiles`` can
+    never disagree about the same player's percentile.
+
+    Returns ``{label: (value_series, percentile_series)}``, both aligned to
+    `frame`'s index; a label is simply absent when none of its candidate
+    columns exist in `frame`. Empty/malformed `frame` input returns ``{}``.
+    """
+
+    if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty or position_column not in frame.columns:
+        return {}
+    positions = frame[position_column].astype(str).str.upper()
+    result: dict[str, tuple[pd.Series, pd.Series]] = {}
+    for label, fields in stat_fields.items():
+        values = _coalesced_numeric_column(frame, fields)
+        if values is None:
+            continue
+        result[label] = (values, _percentile_from_values(values, positions))
+    return result
+
+
+def _ratio_stat_values_for_pool(frame: pd.DataFrame) -> dict[str, pd.Series | None]:
+    """Raw per-game / per-touch rate columns — the same five derived rates
+    ``_efficiency_stats`` renders (Targets/Gm, Rec/Gm, Yards/Catch,
+    Carries/Gm, Yards/Carry), computed from the same raw counting columns,
+    vectorized over the whole pool at once."""
+
+    games = _positive(_coalesced_numeric_column(frame, _GAMES_FIELDS))
+    targets = _coalesced_numeric_column(frame, ("targets",))
+    receptions = _coalesced_numeric_column(frame, ("receptions",))
+    receiving_yards = _coalesced_numeric_column(frame, ("receiving_yards", "receiving_yds"))
+    rush_attempts = _coalesced_numeric_column(frame, ("rush_attempts", "rushing_attempts", "carries"))
+    rushing_yards = _coalesced_numeric_column(frame, ("rushing_yards", "rush_yards"))
+
+    def _ratio(numerator: pd.Series | None, denominator: pd.Series | None) -> pd.Series | None:
+        if numerator is None or denominator is None:
+            return None
+        return numerator / denominator
+
+    return {
+        "Targets/Gm": _ratio(targets, games),
+        "Rec/Gm": _ratio(receptions, games),
+        "Yards/Catch": _ratio(receiving_yards, _positive(receptions)),
+        "Carries/Gm": _ratio(rush_attempts, games),
+        "Yards/Carry": _ratio(rushing_yards, _positive(rush_attempts)),
+    }
+
+
+def ratio_stat_percentiles_for_pool(
+    frame: pd.DataFrame,
+    *,
+    position_column: str = "position",
+) -> dict[str, tuple[pd.Series, pd.Series]]:
+    """``stat_percentiles_for_pool``'s sibling for the five derived rate
+    stats, which have no single source column to coalesce (see
+    ``_ratio_stat_values_for_pool``)."""
+
+    if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty or position_column not in frame.columns:
+        return {}
+    positions = frame[position_column].astype(str).str.upper()
+    result: dict[str, tuple[pd.Series, pd.Series]] = {}
+    for label, values in _ratio_stat_values_for_pool(frame).items():
+        if values is None:
+            continue
+        result[label] = (values, _percentile_from_values(values, positions))
+    return result
+
+
+def _slugify_stat_label(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", label.strip().lower()).strip("_") or "stat"
+
+
+def annotate_rankings_stat_pool(
+    frame: pd.DataFrame,
+    *,
+    position_column: str = "position",
+) -> pd.DataFrame:
+    """Adds hidden ``__stat_value__<slug>`` / ``__stat_pct__<slug>`` columns
+    to `frame` for every stat label referenced by
+    ``RANKINGS_STAT_LABELS_BY_POSITION``, computed once over the whole pool —
+    the same "compute on the full ranked pool before any limit=N truncation"
+    pattern ``overall_ratings_for_pool`` already follows, just for Players'
+    per-stat sort/percentile columns instead of the single overall-rating
+    badge. Mutates and returns `frame`; a no-op when `frame` is empty/
+    malformed or missing a position column, matching every other pool
+    helper's fail-open contract in this module. Read back a row's entries
+    with ``rankings_stat_entries_for_row``.
+
+    "Games" gets a value column but never a percentile — same reasoning as
+    ``_PERCENTILE_STAT_FIELDS``'s own exclusion of it: availability is not a
+    performance stat, so it's handled as its own pass below rather than
+    through the shared percentile pools.
+    """
+
+    if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty or position_column not in frame.columns:
+        return frame
+
+    wanted_labels = set(_DEFAULT_RANKINGS_STAT_LABELS) | {
+        label for labels in RANKINGS_STAT_LABELS_BY_POSITION.values() for label in labels
+    }
+    percentile_eligible_labels = wanted_labels - {"Games"}
+    plain_fields = {label: fields for label, fields in _LABEL_FIELDS.items() if label in percentile_eligible_labels}
+    pools = {
+        **stat_percentiles_for_pool(frame, plain_fields, position_column=position_column),
+        **ratio_stat_percentiles_for_pool(frame, position_column=position_column),
+    }
+    for label, (values, percentiles) in pools.items():
+        if label not in wanted_labels:
+            continue
+        slug = _slugify_stat_label(label)
+        frame[f"__stat_value__{slug}"] = values
+        frame[f"__stat_pct__{slug}"] = percentiles
+
+    if "Games" in wanted_labels:
+        games_values = _coalesced_numeric_column(frame, _LABEL_FIELDS["Games"])
+        if games_values is not None:
+            slug = _slugify_stat_label("Games")
+            frame[f"__stat_value__{slug}"] = games_values
+            frame[f"__stat_pct__{slug}"] = pd.Series([None] * len(frame), index=frame.index, dtype=object)
+    return frame
+
+
+def _numeric_or_none(value: object) -> float | None:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return None if pd.isna(numeric) else float(numeric)
+
+
+def rankings_stat_entries_for_row(row: pd.Series) -> list[dict]:
+    """Position-relevant stat entries (key/label/value/format/percentile) for
+    one row of a frame already annotated by ``annotate_rankings_stat_pool`` —
+    Players' Madden-style stat columns. A label is omitted entirely when this
+    player has no real value for it (e.g. Pass Att for a RB), never shown as
+    a 0/blank. A row from a frame that was never annotated (every
+    ``__stat_value__*`` column absent) simply returns ``[]`` rather than
+    raising, same fail-open contract as ``rank_unavailable_reason`` elsewhere
+    on this row.
+    """
+
+    position = _text(row.get("position")).upper()
+    labels = RANKINGS_STAT_LABELS_BY_POSITION.get(position, _DEFAULT_RANKINGS_STAT_LABELS)
+    entries: list[dict] = []
+    for label in labels:
+        slug = _slugify_stat_label(label)
+        value_col = f"__stat_value__{slug}"
+        if value_col not in row.index:
+            continue
+        value = _numeric_or_none(row.get(value_col))
+        if value is None:
+            continue
+        format_kind = _LABEL_FORMAT_KIND.get(label) or _RATIO_STAT_FORMAT_KIND.get(label) or "count"
+        if format_kind == "share" and abs(value) <= 1.0:
+            value *= 100.0
+        percentile_numeric = _numeric_or_none(row.get(f"__stat_pct__{slug}"))
+        percentile = None if percentile_numeric is None else int(percentile_numeric)
+        entries.append(
+            {
+                "key": slug,
+                "label": label,
+                "value": round(value, 2),
+                "format": format_kind,
+                "percentile": percentile,
+            }
+        )
+    return entries
+
+
 def _stat_percentiles(
     players_df: pd.DataFrame | None,
     row: Mapping[str, object],
@@ -515,6 +770,12 @@ def _stat_percentiles(
     ``_fantasy_stats`` / ``_usage_stats``) plus the derived rate labels from
     ``_efficiency_stats``. A player outside the eligible pool gets ``{}`` —
     there is no meaningful peer group to rank a retired player against.
+
+    Delegates the actual ranking to ``stat_percentiles_for_pool``/
+    ``ratio_stat_percentiles_for_pool`` (the vectorized, whole-pool-at-once
+    versions Players' Madden-style stat sort also uses), scoped down to this
+    one player's position group and offset — see those functions' docstrings
+    for the shared gating/ranking logic.
     """
 
     located = _position_pool(players_df, row)
@@ -522,47 +783,17 @@ def _stat_percentiles(
         return {}
     group, offset = located
 
-    series_by_label: dict[str, pd.Series | None] = {
-        label: _pool_series(group, row, fields)
-        for label, fields in _PERCENTILE_STAT_FIELDS.items()
+    pools: dict[str, tuple[pd.Series, pd.Series]] = {
+        **stat_percentiles_for_pool(group, _PERCENTILE_STAT_FIELDS),
+        **ratio_stat_percentiles_for_pool(group),
     }
 
-    # Per-game / per-touch rates are what _efficiency_stats actually renders,
-    # so they are ranked as computed rather than inferred from their inputs.
-    games = _positive(_pool_series(group, row, _GAMES_FIELDS))
-    targets = _pool_series(group, row, ("targets",))
-    receptions = _pool_series(group, row, ("receptions",))
-    receiving_yards = _pool_series(group, row, ("receiving_yards", "receiving_yds"))
-    rush_attempts = _pool_series(group, row, ("rush_attempts", "rushing_attempts", "carries"))
-    rushing_yards = _pool_series(group, row, ("rushing_yards", "rush_yards"))
-
-    def _ratio(numerator: pd.Series | None, denominator: pd.Series | None) -> pd.Series | None:
-        denom = _positive(denominator)
-        if numerator is None or denom is None:
-            return None
-        return numerator / denom
-
-    series_by_label.update(
-        {
-            "Targets/Gm": _ratio(targets, games),
-            "Rec/Gm": _ratio(receptions, games),
-            "Yards/Catch": _ratio(receiving_yards, receptions),
-            "Carries/Gm": _ratio(rush_attempts, games),
-            "Yards/Carry": _ratio(rushing_yards, rush_attempts),
-        }
-    )
-
     percentiles: dict[str, float] = {}
-    for label, series in series_by_label.items():
-        if series is None:
+    for label, (_values, percentile_series) in pools.items():
+        value = percentile_series.iloc[offset]
+        if value is None:
             continue
-        if int(series.notna().sum()) < PERCENTILE_MIN_POOL:
-            continue
-        ranked = series.rank(pct=True).to_numpy()
-        value = ranked[offset]
-        if pd.isna(value):
-            continue
-        percentiles[label] = float(min(100, max(1, int(round(float(value) * 100)))))
+        percentiles[label] = float(value)
     return percentiles
 
 

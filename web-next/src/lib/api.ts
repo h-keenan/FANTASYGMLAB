@@ -1243,6 +1243,24 @@ export interface GmPlanResponse {
   focus_areas: GmPlanFocusArea[];
 }
 
+/** One position-relevant raw season stat on a RankedPlayer (Players'
+ * Madden-style stat sort, Revision 20) — mirrors
+ * modules.player_quick_view.rankings_stat_entries_for_row's output exactly:
+ * `key` is a stable slug safe to use as a sort id, `value` is already
+ * normalized for display (a "share" format is 0-100, not a 0-1 fraction),
+ * and `percentile` (1-100) is omitted (`null`) below
+ * modules.player_quick_view.PERCENTILE_MIN_POOL — same gate the OVR badge
+ * uses, so "no reliable comparison" never renders as a precise-looking
+ * number. A label is simply absent from a player's `stats` array when they
+ * have no real value for it (e.g. "Pass Att" for a RB) rather than a 0. */
+export interface RankedPlayerStat {
+  key: string;
+  label: string;
+  value: number;
+  format: "count" | "yards" | "td" | "points" | "ppg" | "share" | "rate";
+  percentile: number | null;
+}
+
 /** League-adjusted player rankings (GET .../rankings) — mirrors mobile's
  * RankedPlayer (mobile/src/lib/api.ts) exactly, the reference shape for
  * this endpoint. GM Targets (Revision 11) is this app's first caller; a
@@ -1263,6 +1281,11 @@ export interface RankedPlayer {
   rank_unavailable_reason: string | null;
   opportunity_label: string | null;
   overall_rating?: number | null;
+  /** Position-relevant raw stats + percentiles (Players' Madden-style stat
+   * sort) — see RankedPlayerStat above. Only populated by GET .../rankings
+   * (not the single-player GET .../players/{id}/rank lookup); absent/empty
+   * everywhere else, same fail-open contract as `usage_trend`. */
+  stats?: RankedPlayerStat[];
 }
 
 export interface LeagueRankingsResponse {

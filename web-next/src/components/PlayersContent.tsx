@@ -10,17 +10,27 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
+import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
 import { waiverInjuryDisplay, formatWaiverScore } from "@/lib/waiversPresentation";
 import {
+  OVERALL_RATING_SORT_KEY,
   PLAYERS_AGE_FILTERS,
   PLAYERS_AVAILABILITY_FILTERS,
   PLAYERS_POSITION_FILTERS,
   PLAYERS_ROSTER_FILTERS,
   PLAYERS_STATUS_FILTERS,
+  VALUE_SORT_KEY,
+  buildPlayersSortOptions,
   filterPlayers,
+  findPlayersStat,
+  formatPlayersPercentile,
+  formatPlayersStatValue,
+  sortPlayers,
   type PlayersAgeFilter,
   type PlayersAvailabilityFilter,
   type PlayersRosterFilter,
+  type PlayersSortMode,
+  type PlayersSortOption,
   type PlayersStatusFilter,
 } from "@/lib/playersPresentation";
 
@@ -61,12 +71,77 @@ import {
  *
  * Preview-capped the same way WaiversContent.tsx's All Free Agents board is
  * (a plain, non-virtualized list; mobile gets this for free from FlatList).
+ *
+ * Revision 20 (coridian_: "sort players by stats and also sort by
+ * percentile of stats... a way when searching for players to quickly add
+ * that player to a trade") adds two things:
+ *  - Madden-style stat sort — Sort By (Value/OVR plus whatever
+ *    position-relevant raw stats GET .../rankings now carries per player,
+ *    see RankedPlayer.stats in lib/api.ts and
+ *    modules.player_quick_view.rankings_stat_entries_for_row) with a
+ *    Raw/Percentile toggle, built in lib/playersPresentation.ts's
+ *    sortPlayers/buildPlayersSortOptions so this component stays pure
+ *    rendering, same split as the filter predicates above.
+ *  - An "Add to Trade" action per row, deep-linking to Trade Analyzer
+ *    (the manual builder, not Trade Hub's AI ideas) with ?playerId= — same
+ *    convention gamePlanTileHref already establishes for Waivers/Trade Hub,
+ *    reused as-is rather than inventing a second deep-link shape.
  */
 const PREVIEW_ROWS = 60;
 
 type PlayersView = "players" | "picks";
 
-function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; leagueId: string; leagueName: string }) {
+/** The selected sort column's value for this player, Madden-style — hidden
+ * entirely for the two baseline sort keys (Value/OVR already render their
+ * own tile below) and for a stat this player simply has no value for (a
+ * missing stat already sorts them to the bottom; showing nothing here is
+ * the same fail-open choice, not a "—" that reads as broken). `sortMode`
+ * picks raw value vs. this stat's own position-group percentile, matching
+ * whatever the board is actually sorted by. */
+function SortedStatTile({
+  player,
+  sortOption,
+  sortMode,
+}: {
+  player: RankedPlayer;
+  sortOption: PlayersSortOption;
+  sortMode: PlayersSortMode;
+}) {
+  if (sortOption.key === VALUE_SORT_KEY || sortOption.key === OVERALL_RATING_SORT_KEY) return null;
+  const stat = findPlayersStat(player, sortOption.key);
+  if (!stat) return null;
+  const display =
+    sortMode === "percentile"
+      ? stat.percentile != null
+        ? formatPlayersPercentile(stat.percentile)
+        : "—"
+      : formatPlayersStatValue(stat);
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+        {stat.label}
+        {sortMode === "percentile" ? " pct" : ""}
+      </span>
+      <span className="text-sm font-extrabold" style={{ color: "var(--color-text-secondary)" }}>
+        {display}
+      </span>
+    </div>
+  );
+}
+
+function PlayerRow({
+  player,
+  leagueId,
+  leagueName,
+  sortOption,
+  sortMode,
+}: {
+  player: RankedPlayer;
+  leagueId: string;
+  leagueName: string;
+  sortOption: PlayersSortOption;
+  sortMode: PlayersSortMode;
+}) {
   const injury = waiverInjuryDisplay(player.injury_status);
   return (
     <div
@@ -106,6 +181,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
         </div>
       </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">
+        <SortedStatTile player={player} sortOption={sortOption} sortMode={sortMode} />
         {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
             should say in small print value above it so its not glaring
             but its there in case someone gets confused" */}
@@ -135,6 +211,22 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
         >
           Compare
         </a>
+        {/* coridian_, 2026-10-20: "a way when searching for players to
+            quickly add that player to a trade, where it inputs it into the
+            trade hub into the appropriate section" — deep-links to Trade
+            Analyzer (the manual send/receive builder, not Trade Hub's
+            AI-suggested ideas) with ?playerId=, the same deep-link
+            convention gamePlanTileHref already establishes for Waivers/
+            Trade Hub. TradeAnalyzerContent reads it on mount, finds which
+            roster owns this player, and pre-populates the builder — see
+            that component's own docstring. */}
+        <a
+          href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
+          className="px-2 py-1 text-xs font-bold"
+          style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
+        >
+          Add to Trade
+        </a>
       </div>
     </div>
   );
@@ -160,6 +252,8 @@ export function PlayersContent({
   const [statusFilter, setStatusFilter] = useState<PlayersStatusFilter>("ALL");
   const [availabilityFilter, setAvailabilityFilter] = useState<PlayersAvailabilityFilter>("ALL");
   const [rosterFilter, setRosterFilter] = useState<PlayersRosterFilter>("ALL");
+  const [sortKey, setSortKey] = useState<string>(VALUE_SORT_KEY);
+  const [sortMode, setSortMode] = useState<PlayersSortMode>("raw");
 
   // League-wide rostered player ids — the union of every roster's `players`
   // array (GET .../rosters, raw Sleeper passthrough). Same extraction
@@ -189,7 +283,20 @@ export function PlayersContent({
       }),
     [data.players, search, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, rosteredPlayerIds],
   );
-  const visible = filtered.slice(0, PREVIEW_ROWS);
+  // Sort-by options reflect whatever stats the currently-filtered pool
+  // actually carries (e.g. a position filter narrows this to that
+  // position's curated stat set) — see buildPlayersSortOptions. If the
+  // user's chosen sortKey isn't among them (stale after changing the
+  // position filter, or just the initial "value" default), fall back to
+  // Value rather than erroring or silently sorting by nothing.
+  const sortOptions = useMemo(() => buildPlayersSortOptions(filtered), [filtered]);
+  const activeSortOption =
+    sortOptions.find((option) => option.key === sortKey) ?? sortOptions[0];
+  const sorted = useMemo(
+    () => sortPlayers(filtered, activeSortOption.key, sortMode),
+    [filtered, activeSortOption.key, sortMode],
+  );
+  const visible = sorted.slice(0, PREVIEW_ROWS);
 
   const pickSeasons = useMemo(() => groupPicksBySeason(visibleDraftPicks(picks, "league", "")), [picks]);
 
@@ -287,6 +394,41 @@ export function PlayersContent({
             ) : null}
           </div>
 
+          {/* Madden-style stat sort (Revision 20): Sort By picks the column
+              (Value/OVR, always present, plus whatever position-relevant
+              raw stats the current filter's pool carries — see
+              buildPlayersSortOptions), and the Raw/Percentile toggle picks
+              whether a stat column sorts/displays its season total or its
+              position-group percentile. The toggle only matters for a real
+              stat column, so it's hidden for Value/OVR rather than shown
+              disabled and confusing. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
+              Sort by
+            </span>
+            <select
+              value={activeSortOption.key}
+              onChange={(event) => setSortKey(event.target.value)}
+              className="filter-select px-3 py-2 text-sm"
+            >
+              {sortOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {activeSortOption.supportsPercentile ? (
+              <PillRow
+                options={[
+                  { label: "Raw", value: "raw" },
+                  { label: "Percentile", value: "percentile" },
+                ]}
+                active={sortMode}
+                onSelect={(value) => setSortMode(value as PlayersSortMode)}
+              />
+            ) : null}
+          </div>
+
           {visible.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               No players match this search and filter combination.
@@ -294,13 +436,21 @@ export function PlayersContent({
           ) : (
             <div className="flex flex-col">
               {visible.map((player) => (
-                <PlayerRow key={player.player_id} player={player} leagueId={leagueId} leagueName={leagueName} />
+                <PlayerRow
+                  key={player.player_id}
+                  player={player}
+                  leagueId={leagueId}
+                  leagueName={leagueName}
+                  sortOption={activeSortOption}
+                  sortMode={sortMode}
+                />
               ))}
             </div>
           )}
           {filtered.length > visible.length ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Showing the top {visible.length} of {filtered.length} matching players, ranked by current value.
+              Showing the top {visible.length} of {filtered.length} matching players, sorted by {activeSortOption.label}
+              {activeSortOption.supportsPercentile && sortMode === "percentile" ? " percentile" : ""}.
             </p>
           ) : (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

@@ -31,9 +31,17 @@
  * different facet from PLAYERS_AVAILABILITY_FILTERS above (that one means
  * health), so it gets its own name — PLAYERS_ROSTER_FILTERS — rather than
  * overloading "availability" with two meanings on one page.
+ *
+ * Revision 20 adds Madden-style stat sorting: sort by Value (the existing
+ * default), OVR, or any position-relevant raw stat the rankings endpoint now
+ * carries per player (modules.player_quick_view.rankings_stat_entries_for_row
+ * — see RankedPlayer.stats in lib/api.ts), with a raw-value/percentile
+ * toggle for the stat columns. This is the one place on this page that
+ * re-sorts the server's existing score-descending order — see sortPlayers'
+ * own docstring.
  */
 
-import type { RankedPlayer } from "./api";
+import type { RankedPlayer, RankedPlayerStat } from "./api";
 
 export const PLAYERS_POSITION_FILTERS = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
 export const PLAYERS_AGE_FILTERS = ["ALL", "Under 25", "25-28", "29+"] as const;
@@ -112,4 +120,105 @@ export function filterPlayers(players: RankedPlayer[], filters: PlayersFilterSta
     .filter((p) => matchesPlayersAvailability(p.injury_status, filters.availabilityFilter))
     .filter((p) => matchesPlayersRosterStatus(p.player_id, rosteredPlayerIds, rosterFilter))
     .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query));
+}
+
+/** The two always-present sort keys — not a stat entry, so neither has a
+ * separate "percentile" number of its own (OVR already *is* one; Value has
+ * no meaningful position-relative percentile distinct from the rank it
+ * already shows). */
+export const VALUE_SORT_KEY = "value";
+export const OVERALL_RATING_SORT_KEY = "overall_rating";
+
+export type PlayersSortMode = "raw" | "percentile";
+
+export interface PlayersSortOption {
+  key: string;
+  label: string;
+  /** False for Value/OVR — see the module comment above. True for every
+   * stat-column option, which always carries a percentile field (possibly
+   * `null` below PERCENTILE_MIN_POOL). */
+  supportsPercentile: boolean;
+}
+
+/** Builds the Sort By dropdown's options from whatever stats are actually
+ * present on `players` — e.g. filtering down to one position narrows this to
+ * that position's curated stat set; "ALL" positions pools the union of
+ * every stat any visible player carries. Never hand-rolls a second
+ * per-position stat catalog — this just reflects back whatever
+ * modules.player_quick_view.rankings_stat_entries_for_row already decided
+ * was relevant server-side, in the order it returned them. */
+export function buildPlayersSortOptions(players: RankedPlayer[]): PlayersSortOption[] {
+  const seen = new Map<string, string>();
+  for (const player of players) {
+    for (const stat of player.stats ?? []) {
+      if (!seen.has(stat.key)) seen.set(stat.key, stat.label);
+    }
+  }
+  const statOptions: PlayersSortOption[] = Array.from(seen, ([key, label]) => ({
+    key,
+    label,
+    supportsPercentile: true,
+  }));
+  return [
+    { key: VALUE_SORT_KEY, label: "Value", supportsPercentile: false },
+    { key: OVERALL_RATING_SORT_KEY, label: "OVR", supportsPercentile: false },
+    ...statOptions,
+  ];
+}
+
+export function findPlayersStat(player: RankedPlayer, key: string): RankedPlayerStat | undefined {
+  return player.stats?.find((stat) => stat.key === key);
+}
+
+/** Sorts `players` descending by `sortKey` — Madden's "sort the board by any
+ * column" convention, not the server's default score-descending order
+ * (`filterPlayers` above deliberately never re-sorts; this is the one place
+ * on this page that does, and only applied on top of it). `sortMode` picks
+ * raw value vs. this stat's position-group percentile for a stat column
+ * (ignored for Value/OVR — see PlayersSortOption.supportsPercentile).
+ *
+ * A player missing the sort column entirely (a stat not applicable to their
+ * position, or `null` because their position's percentile pool was too
+ * thin — see PERCENTILE_MIN_POOL) sorts to the bottom rather than
+ * disappearing or crashing, the same fail-open spirit as every other
+ * optional field already on this page. */
+export function sortPlayers(
+  players: RankedPlayer[],
+  sortKey: string,
+  sortMode: PlayersSortMode = "raw",
+): RankedPlayer[] {
+  function metric(player: RankedPlayer): number | null {
+    if (sortKey === VALUE_SORT_KEY) return player.score ?? null;
+    if (sortKey === OVERALL_RATING_SORT_KEY) return player.overall_rating ?? null;
+    const stat = findPlayersStat(player, sortKey);
+    if (!stat) return null;
+    return sortMode === "percentile" ? stat.percentile : stat.value;
+  }
+  return [...players].sort((a, b) => {
+    const av = metric(a);
+    const bv = metric(b);
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return bv - av;
+  });
+}
+
+/** Display text for one stat's raw value, format-aware — "share" stats are
+ * already normalized to 0-100 by the server (see RankedPlayerStat in
+ * lib/api.ts), everything else is just rounded to a sane precision. */
+export function formatPlayersStatValue(stat: RankedPlayerStat): string {
+  if (stat.format === "share") return `${Math.round(stat.value)}%`;
+  if (stat.format === "rate" || stat.format === "ppg" || stat.format === "points") return stat.value.toFixed(1);
+  return String(Math.round(stat.value));
+}
+
+/** "1st"/"2nd"/"3rd"/"4th"... for a 1-100 percentile — the 11th/12th/13th
+ * exception first, then last-digit, matching
+ * modules.player_quick_view._ordinal's own rule on the Python side. */
+export function formatPlayersPercentile(percentile: number): string {
+  const lastTwo = percentile % 100;
+  if (lastTwo >= 10 && lastTwo <= 20) return `${percentile}th`;
+  const suffix = { 1: "st", 2: "nd", 3: "rd" }[percentile % 10] ?? "th";
+  return `${percentile}${suffix}`;
 }

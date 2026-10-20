@@ -3330,8 +3330,19 @@ def get_league_rankings(
         ranked, score_column=score_field
     )
 
+    # Same "compute on the full pool before truncation" placement as the
+    # overall-rating column above — Players' Madden-style stat sort/
+    # percentile toggle needs raw stats + percentiles for every stat column,
+    # not just the composite score. See
+    # player_quick_view.annotate_rankings_stat_pool.
+    ranked = player_quick_view.annotate_rankings_stat_pool(ranked)
+
     ranked = ranked.sort_values(score_field, ascending=False).head(limit)
-    players = [_project_ranking_row(row, score_field) for _, row in ranked.iterrows()]
+    players = []
+    for _, row in ranked.iterrows():
+        projected = _project_ranking_row(row, score_field)
+        projected["stats"] = player_quick_view.rankings_stat_entries_for_row(row)
+        players.append(projected)
     return {"ok": True, "players": players}
 
 
