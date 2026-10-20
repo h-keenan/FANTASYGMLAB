@@ -3473,7 +3473,20 @@ def _player_detail_trade_outlook(
     )
     profile = load_profile_key(username, selected_league_id) if username else {}
     role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
-    untouchables = tuple(sorted(str(name) for name in profile.get("untouchables", [])))
+    # Union the legacy name-keyed untouchables list with GM Targets' real,
+    # id-keyed "Mark untouchable" state (recommendation-compliance audit
+    # finding — see gm_targets.resolve_untouchable_names) so a player
+    # protected only via the GM Targets button is still protected here.
+    untouchables = gm_targets.resolve_untouchable_names(
+        st.session_state,
+        league_id=selected_league_id,
+        legacy_names=profile.get("untouchables", []),
+        player_id_to_name=dict(
+            zip(df_players["player_id"].astype(str), df_players["name"])
+        )
+        if df_players is not None and not df_players.empty
+        else {},
+    )
     strategy_pick_multiplier = strategy_adjusted_pick_score_multiplier(pick_score_multiplier, team_strategy)
     roster_ids = {
         str(pid)
@@ -4161,11 +4174,20 @@ def render_player_quick_view_content(
     role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
     role_label = role_map.get(player_id, "")
     profile = load_profile_key(username, selected_league_id) if username and selected_league_id else {}
-    untouchables = {
-        _safe_text(name).strip()
-        for name in profile.get("untouchables", [])
-        if _safe_text(name).strip()
-    }
+    # Union the legacy name-keyed untouchables list with GM Targets' real,
+    # id-keyed "Mark untouchable" state so this status badge (and the
+    # "Untouchable"/"Remove" PQV button label below) agree with GM Targets'
+    # own button instead of only ever reflecting the older, separate control
+    # (recommendation-compliance audit finding; see
+    # gm_targets.resolve_untouchable_names).
+    untouchables = set(
+        gm_targets.resolve_untouchable_names(
+            st.session_state,
+            league_id=selected_league_id,
+            legacy_names=profile.get("untouchables", []),
+            player_id_to_name={player_id: raw_name} if player_id and raw_name else {},
+        )
+    )
     is_untouchable = raw_name in untouchables
 
     source_label_key = _safe_text(source_label).strip().casefold()
@@ -7009,9 +7031,22 @@ def render_home_dashboard(
     roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
     role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
     player_names = my_team_df["name"].tolist()
-    untouchables = [
-        name for name in profile.get("untouchables", []) if name in player_names
-    ]
+    # Union the legacy name-keyed untouchables list with GM Targets' real,
+    # id-keyed "Mark untouchable" state (recommendation-compliance audit
+    # finding — see gm_targets.resolve_untouchable_names). Restricting the
+    # id->name lookup to my_team_df preserves the original on-roster filter.
+    untouchables = list(
+        gm_targets.resolve_untouchable_names(
+            st.session_state,
+            league_id=selected_league_id,
+            legacy_names=[
+                name for name in profile.get("untouchables", []) if name in player_names
+            ],
+            player_id_to_name=dict(
+                zip(my_team_df["player_id"].astype(str), my_team_df["name"])
+            ),
+        )
+    )
     role_map = {str(pid): role for pid, role in roles_state.items()}
     roster_version = recommendation_lifecycle.roster_state_version_from_player_ids(
         my_team_df["player_id"].tolist() if not my_team_df.empty else ()
@@ -20282,6 +20317,28 @@ def main():
                 profile["roles"] = {str(pid): role for pid, role in roles_state.items()}
                 profile["untouchables"] = untouchables
                 save_profile_key(username, selected_league_id, profile)
+
+                # Union in GM Targets' real, id-keyed "Mark untouchable" state
+                # for every recommendation use of `untouchables` below (trade
+                # ideas, roster-limit drop/keep candidates, sell-score
+                # protection, the Untouchables roster grouping) —
+                # deliberately reassigned AFTER the profile save above (which
+                # kept its own reference to the pre-merge list), so this never
+                # persists GM-Targets-only names back into the legacy store;
+                # unmarking a player untouchable in GM Targets later still
+                # drops protection here on the next render instead of being
+                # stuck "on" forever (recommendation-compliance audit
+                # finding; see gm_targets.resolve_untouchable_names).
+                untouchables = list(
+                    gm_targets.resolve_untouchable_names(
+                        st.session_state,
+                        league_id=selected_league_id,
+                        legacy_names=untouchables,
+                        player_id_to_name=dict(
+                            zip(my_team_df["player_id"].astype(str), my_team_df["name"])
+                        ),
+                    )
+                )
 
                 role_map = {str(pid): role for pid, role in roles_state.items()}
                 st.session_state["role_map"] = role_map

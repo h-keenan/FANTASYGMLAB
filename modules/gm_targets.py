@@ -282,6 +282,63 @@ def cached_untouchable_ids(
     )
 
 
+def resolve_untouchable_names(
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str,
+    legacy_names: Iterable[str] | None = None,
+    player_id_to_name: Mapping[str, str] | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[str, ...]:
+    """Union of app.py's legacy name-keyed "untouchables" list with this
+    session's real GM Targets untouchable ids, resolved to names.
+
+    app.py's Trade Hub/Game Plan/My Team trade-idea generation (its own
+    pre-GM-Targets engine, still the only one it runs) protects players by
+    NAME via a profile-stored list (`profile["untouchables"]`, toggled by
+    Player Quick View's "Untouchable" button and My Team's "Untouchables"
+    multiselect — both write that same list). GM Targets' own "Mark
+    untouchable" button (gm_targets_ui.py) is a completely separate, id-keyed
+    control (`set_untouchable` -> this module's Supabase-backed cache) that
+    list never saw, so a player protected only via GM Targets was invisible
+    to every one of those name-keyed reads — a real "the app forgot what I
+    told it" trust gap, not a cosmetic one.
+
+    Dual-writing the real control into the legacy list was considered and
+    rejected: My Team's own render path unconditionally re-saves
+    `profile["untouchables"]` from a session-state widget value that is only
+    ever seeded from profile once per session, so a dual write made moments
+    earlier gets silently stomped back out the next time My Team renders.
+    Reconciling at read time (here, union — EITHER source protecting a
+    player protects it, never drops protection the other surface granted)
+    has no such race and needs no change to either store's write path.
+
+    `player_id_to_name` is the caller's own already-loaded player_id -> name
+    lookup (e.g. built from the `df_players`/roster DataFrame already in
+    scope at every one of app.py's untouchables read sites) — this module
+    intentionally holds no player-identity data of its own to resolve against.
+    Returns the same sorted-name-tuple shape every existing read site already
+    expects, so nothing downstream of the read site needs to change.
+    """
+
+    names = {
+        _safe_text(name) for name in (legacy_names or []) if _safe_text(name)
+    }
+    if isinstance(session, MutableMapping):
+        ensure_membership_cache(session, league_id=league_id, environ=environ)
+        ids = cached_untouchable_ids(session, league_id=league_id)
+        if ids and player_id_to_name:
+            lookup = {
+                _safe_text(pid): _safe_text(name)
+                for pid, name in player_id_to_name.items()
+            }
+            for pid in ids:
+                name = lookup.get(_safe_text(pid))
+                if name:
+                    names.add(name)
+    return tuple(sorted(names))
+
+
 def is_targeted(
     session: Mapping[str, Any] | None,
     *,
