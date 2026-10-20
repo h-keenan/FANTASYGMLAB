@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -109,6 +109,33 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
   );
 }
 
+/**
+ * Recommendation-compliance audit, Check 3 follow-up — same HighlightTarget
+ * treatment WaiversContent/TradeHubContent got in #1293: wraps whichever
+ * roster row a GM Plan/Dashboard injury-alert or value-trend tile's CTA
+ * named (?playerId=, read by the my-team page) so it scrolls into view and
+ * stays visually marked once this page loads. `active` is simply false
+ * whenever there's no match (stale/absent id) — renders exactly as before,
+ * never breaks the page.
+ */
+function HighlightTarget({ active, children }: { active: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active && ref.current && typeof ref.current.scrollIntoView === "function") {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [active]);
+  return (
+    <div
+      ref={ref}
+      data-highlighted={active ? "true" : undefined}
+      style={active ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px", borderRadius: "0.25rem" } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 function SectionHeading({ children }: { children: ReactNode }) {
   return (
     <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
@@ -123,12 +150,17 @@ export function MyTeamContent({
   needs,
   teamRanking,
   leagueSize,
+  highlightPlayerId,
 }: {
   leagueName: string;
   myTeam: MyTeamResponse;
   needs: MyTeamNeedsResponse | null;
   teamRanking: TeamRanking | null;
   leagueSize: number;
+  /** See HighlightTarget above — a GM Plan/Dashboard injury-alert or
+   * value-trend tile's specific roster player, threaded through as
+   * ?playerId= (gamePlanTileHref). */
+  highlightPlayerId?: string;
 }) {
   const notice = myTeam.reason ? myTeamReasonMessage(myTeam.reason) : null;
   if (notice) {
@@ -344,7 +376,9 @@ export function MyTeamContent({
         ) : (
           <div className="glass-surface flex flex-col">
             {starters.map((player) => (
-              <LineupRow key={player.player_id} player={player} />
+              <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                <LineupRow player={player} />
+              </HighlightTarget>
             ))}
           </div>
         )}
@@ -363,7 +397,9 @@ export function MyTeamContent({
             {activeBench.length > 0 ? (
               <div className="glass-surface flex flex-col">
                 {activeBench.map((player) => (
-                  <LineupRow key={player.player_id} player={player} muted />
+                  <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                    <LineupRow player={player} muted />
+                  </HighlightTarget>
                 ))}
               </div>
             ) : null}
@@ -374,7 +410,9 @@ export function MyTeamContent({
                 </span>
                 <div className="glass-surface flex flex-col">
                   {irBench.map((player) => (
-                    <LineupRow key={player.player_id} player={player} muted />
+                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                      <LineupRow player={player} muted />
+                    </HighlightTarget>
                   ))}
                 </div>
               </div>
@@ -386,7 +424,9 @@ export function MyTeamContent({
                 </span>
                 <div className="glass-surface flex flex-col">
                   {taxiBench.map((player) => (
-                    <LineupRow key={player.player_id} player={player} muted />
+                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                      <LineupRow player={player} muted />
+                    </HighlightTarget>
                   ))}
                 </div>
               </div>

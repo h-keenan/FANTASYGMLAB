@@ -208,4 +208,66 @@ describe("MyTeamContent", () => {
 
     expect(screen.getByText("Your roster in this league looks empty.")).toBeInTheDocument();
   });
+
+  // Recommendation-compliance audit, Check 3 follow-up — My Team's own
+  // injury-alert/value-trend GM Plan/Dashboard tiles already carry
+  // route_player_id and already get it threaded through as ?playerId= by
+  // gamePlanTileHref (same mechanism #1293 gave Waivers/Trade Hub). This
+  // page must actually surface/highlight that specific roster row, not just
+  // avoid crashing when the param is present.
+  describe("highlightPlayerId (GM Plan deep link)", () => {
+    it("marks no row as highlighted without a highlightPlayerId (current/before behavior)", () => {
+      const { container } = render(
+        <MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
+      );
+      expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
+    });
+
+    it("highlights the named starter", () => {
+      const { container } = render(
+        <MyTeamContent
+          leagueName="Dynasty Overlords"
+          myTeam={MY_TEAM}
+          needs={NEEDS}
+          teamRanking={TEAM_RANKING}
+          leagueSize={10}
+          highlightPlayerId="rb1"
+        />,
+      );
+      const highlighted = container.querySelector('[data-highlighted="true"]');
+      expect(highlighted).not.toBeNull();
+      expect(highlighted?.textContent).toContain("Test Running Back");
+    });
+
+    it("highlights the named bench player, including one on Injured Reserve", () => {
+      const { container } = render(
+        <MyTeamContent
+          leagueName="Dynasty Overlords"
+          myTeam={MY_TEAM}
+          needs={NEEDS}
+          teamRanking={TEAM_RANKING}
+          leagueSize={10}
+          highlightPlayerId="te1"
+        />,
+      );
+      const highlighted = container.querySelector('[data-highlighted="true"]');
+      expect(highlighted).not.toBeNull();
+      expect(highlighted?.textContent).toContain("Test IR Tight End");
+    });
+
+    it("falls back gracefully (no crash, no highlight) when the playerId matches nothing on the roster", () => {
+      const { container } = render(
+        <MyTeamContent
+          leagueName="Dynasty Overlords"
+          myTeam={MY_TEAM}
+          needs={NEEDS}
+          teamRanking={TEAM_RANKING}
+          leagueSize={10}
+          highlightPlayerId="does-not-exist"
+        />,
+      );
+      expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
+      expect(screen.getByText("Test Quarterback")).toBeInTheDocument();
+    });
+  });
 });

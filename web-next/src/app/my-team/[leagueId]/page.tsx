@@ -18,6 +18,13 @@ export default function MyTeamPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  // Recommendation-compliance audit, Check 3 follow-up — My Team's own
+  // injury-alert/value-trend GM Plan/Dashboard tiles already carry
+  // route_player_id (see modules/dashboard_engine.py's build_injury_tile/
+  // build_value_trend_tile) and already get threaded through as ?playerId=
+  // by gamePlanTileHref (same as Waivers/Trade Hub, #1293) — this page just
+  // wasn't reading it yet.
+  const highlightPlayerId = searchParams.get("playerId") || undefined;
   const { lens } = useValuationLens(leagueId);
 
   useEffect(() => {
@@ -105,6 +112,13 @@ export default function MyTeamPage() {
   }
 
   return (
-    <MyTeamContent leagueName={leagueName} myTeam={myTeam} needs={needs} teamRanking={teamRanking} leagueSize={leagueSize} />
+    <MyTeamContent
+      leagueName={leagueName}
+      myTeam={myTeam}
+      needs={needs}
+      teamRanking={teamRanking}
+      leagueSize={leagueSize}
+      highlightPlayerId={highlightPlayerId}
+    />
   );
 }

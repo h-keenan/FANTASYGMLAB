@@ -53,6 +53,33 @@ describe("WatchListCard", () => {
     expect(link).toHaveAttribute("href", "/waivers/abc?name=Revivalry");
   });
 
+  // Recommendation-compliance audit, Check 3 follow-up — My Team's own
+  // injury-alert/value-trend tiles (destination "my_team") carry
+  // route_player_id the same way waiver tiles do (modules/dashboard_engine's
+  // build_injury_tile/build_value_trend_tile), and gamePlanTileHref already
+  // builds that destination's href the same generic way — this just locks
+  // in that the CTA link itself already carries ?playerId= for my_team,
+  // same as it does for waivers.
+  it("encodes the item's route_player_id into the My Team CTA link", () => {
+    render(
+      <WatchListCard
+        items={[
+          item({
+            destination: "my_team",
+            headline: "Monitor Jaylen Warren's usage",
+            route_player_id: "4046",
+            route_player_name: "Jaylen Warren",
+          }),
+        ]}
+        leagueId="abc"
+        leagueName="Revivalry"
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: /Open My Team/ });
+    expect(link).toHaveAttribute("href", "/my-team/abc?name=Revivalry&playerId=4046");
+  });
+
   it("renders nothing for an empty item list", () => {
     const { container } = render(<WatchListCard items={[]} leagueId="abc" leagueName="Revivalry" />);
     expect(container).toBeEmptyDOMElement();
