@@ -146,6 +146,69 @@ class TestWaiversUI(unittest.TestCase):
         self.assertTrue(selected["kicker_need_fit"])
         self.assertIn("requires a kicker", selected["injury_replacement_note"])
 
+    def test_top_waiver_suppresses_kicker_for_a_pre_draft_league(self):
+        """coridian_, 2026-10-20, screenshot: a league that "hasn't even
+        drafted" surfaced 5 kickers at the top of Priority Adds. A
+        pre-draft/mid-draft roster is empty of a kicker for a completely
+        different reason than "genuinely forgot one" -- the whole LEAGUE
+        is mostly empty, not just this one roster. Same single-player
+        roster fixture as test_top_waiver_allows_kicker_for_clear_required_
+        lineup_need (so the only variable changed is the league-wide
+        rosters list), but now most of the league's 10 other rosters have
+        zero players too, matching a real pre-draft league's shape."""
+
+        free_agents = pd.DataFrame(
+            [
+                {"player_id": "k-2", "name": "Top Kicker", "position": "K", "value_score": 90},
+                {"player_id": "rb-1", "name": "Upside Back", "position": "RB", "value_score": 60},
+            ]
+        )
+        my_roster = {"roster_id": 1, "players": ["rb-0"]}
+        # 9 of 10 OTHER rosters are still completely empty -- a real
+        # pre-draft/mid-draft league shape (population_ratio well under 0.5).
+        other_rosters = [{"roster_id": i, "players": []} for i in range(2, 11)]
+        rosters = [my_roster] + other_rosters
+
+        selected = waivers_ui.select_top_waiver_opportunity(
+            free_agents,
+            pd.DataFrame([{"player_id": "rb-0", "position": "RB", "team": "DAL"}]),
+            {"k_count": 1},
+            "value_score",
+            league={"league_id": "pre-draft-league"},
+            rosters=rosters,
+        )
+
+        self.assertEqual(selected["player_id"], "rb-1")
+
+    def test_top_waiver_still_allows_kicker_when_league_is_populated_even_if_passed(self):
+        """Same real roster/league plumbing as the pre-draft test above,
+        but with a normally-populated league (population_ratio >= 0.5) --
+        proves passing league/rosters through doesn't itself suppress a
+        genuine kicker need, only an actual pre-draft league does."""
+
+        free_agents = pd.DataFrame(
+            [
+                {"player_id": "k-2", "name": "Top Kicker", "position": "K", "value_score": 90},
+                {"player_id": "rb-1", "name": "Upside Back", "position": "RB", "value_score": 60},
+            ]
+        )
+        my_roster = {"roster_id": 1, "players": ["rb-0"]}
+        other_rosters = [
+            {"roster_id": i, "players": [f"p{i}-1", f"p{i}-2", f"p{i}-3"]} for i in range(2, 11)
+        ]
+        rosters = [my_roster] + other_rosters
+
+        selected = waivers_ui.select_top_waiver_opportunity(
+            free_agents,
+            pd.DataFrame([{"player_id": "rb-0", "position": "RB", "team": "DAL"}]),
+            {"k_count": 1},
+            "value_score",
+            league={"league_id": "populated-league"},
+            rosters=rosters,
+        )
+
+        self.assertEqual(selected["player_id"], "k-2")
+
     def test_top_waiver_does_not_choose_qb_or_te_without_true_need(self):
         free_agents = pd.DataFrame(
             [

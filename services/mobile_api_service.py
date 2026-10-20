@@ -9267,6 +9267,8 @@ def get_league_waivers(
         league_settings=settings,
         roster_df=roster_df,
         max_items=6,
+        league=league,
+        rosters=rosters,
     )
     faab_budget = faab.sleeper_faab_budget_context(league, rosters, roster_id=roster_id)
     needed_upper = {pos.upper() for pos in needed_positions}
