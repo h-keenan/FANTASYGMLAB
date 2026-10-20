@@ -13,6 +13,11 @@ import type {
   TradeAsset,
 } from "@/lib/api";
 import { api } from "@/lib/api";
+import { trackFeatureUse } from "@/lib/analytics";
+
+vi.mock("@/lib/analytics", () => ({
+  trackFeatureUse: vi.fn(),
+}));
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -367,6 +372,32 @@ describe("GmPlanContent", () => {
       expect(api.addGmTarget).toHaveBeenCalledWith("league-1", "p1", "team_stance");
       await screen.findByRole("button", { name: "Protected" });
       expect(api.setGmTargetUntouchable).toHaveBeenCalledWith("league-1", "p1", true);
+      // Audit finding, 2026-10-20: gm_target_added (already in TRACKED_EVENTS,
+      // already labeled on the Founder Analytics dashboard) had no caller
+      // anywhere in web-next -- this is the real "save a GM Target" action.
+      expect(trackFeatureUse).toHaveBeenCalledWith("gm_target_added", { leagueId: "league-1", dedupe: false });
+    });
+
+    it("does not fire gm_target_added when the add itself fails", async () => {
+      vi.mocked(api.addGmTarget).mockResolvedValueOnce({ ok: false, reason: "not_available" });
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      fireEvent.click(screen.getAllByRole("button", { name: "Protect" })[0]);
+
+      // Reverted back to "Protect" (not "Protected") once the failed add settles.
+      await screen.findAllByRole("button", { name: "Protect" });
+      expect(screen.queryByRole("button", { name: "Protected" })).not.toBeInTheDocument();
+      expect(trackFeatureUse).not.toHaveBeenCalledWith("gm_target_added", expect.anything());
     });
 
     it("shows a no-roster message when the league has no roster players", () => {

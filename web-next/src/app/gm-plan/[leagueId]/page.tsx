@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import {
   api,
   type GmPlanResponse,
@@ -32,6 +33,15 @@ export default function GmPlanPage() {
   const [targets, setTargets] = useState<GmTargetsResponse | null>(null);
   const [rankings, setRankings] = useState<LeagueRankingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Audit finding, 2026-10-20: gm_plan_opened (already in TRACKED_EVENTS,
+  // already in ROUTE_EVENT_MAP/FEATURE_EVENT_MAP/CORE_FEATURE_EVENTS) had
+  // no caller anywhere in web-next -- same pattern as every other core
+  // surface's page-open event (see trade-hub/my-team/waivers/draft-center).
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("gm_plan_opened", { leagueId });
+  }, [session, leagueId]);
 
   useEffect(() => {
     if (authLoading) return;

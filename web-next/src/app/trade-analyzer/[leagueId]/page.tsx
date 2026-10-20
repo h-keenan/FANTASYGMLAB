@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import {
   api,
   type DraftPickAsset,
@@ -35,6 +36,17 @@ export default function TradeAnalyzerPage() {
 
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Audit finding, 2026-10-20: Trade Analyzer was the one core surface with
+  // zero analytics wiring at all (trade_hub_opened/my_team_opened/
+  // waivers_opened/draft_center_opened/live_draft_opened all already fire
+  // their own page-open event from this exact pattern) -- trade_analyzer_
+  // opened was already in modules.launch_analytics.TRACKED_EVENTS and even
+  // has a Founder Analytics dashboard label, it just never had a caller.
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("trade_analyzer_opened", { leagueId });
+  }, [session, leagueId]);
 
   useEffect(() => {
     if (authLoading) return;
