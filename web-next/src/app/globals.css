@@ -1129,6 +1129,93 @@ a {
   color: var(--color-text-muted);
   font-size: 0.85rem;
 }
+/* coridian_, 2026-10-20: "it expands the background of the PQV as those
+   modules load in and looks very clunky" — the body used to show one
+   short "Loading player detail…" line, then pop to its full, much taller
+   content in one jump, and PlayerTrendsPanel.tsx's own independent weekly-
+   stats fetch then grew the sheet a second time inside that. This skeleton
+   is sized/shaped like the eventual content (same .pqv-stat-row /
+   .pqv-stat-grid tile classes as the real stats, a chart-height box
+   matching WeeklyPointsChart's CHART_HEIGHT) so the modal's height is
+   already roughly reserved before either fetch resolves and swapping the
+   real content in doesn't visibly grow the sheet. Decorative
+   (aria-hidden) — the real "Loading…" text stays, as a screen-reader-only
+   status line, right alongside it. */
+.pqv-skeleton-line,
+.pqv-skeleton-chart,
+.pqv-skeleton-chip {
+  background: linear-gradient(
+    100deg,
+    var(--color-surface-muted) 30%,
+    var(--color-border) 50%,
+    var(--color-surface-muted) 70%
+  );
+  background-size: 200% 100%;
+  animation: pqv-skeleton-shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes pqv-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pqv-skeleton-line,
+  .pqv-skeleton-chart,
+  .pqv-skeleton-chip {
+    animation: none;
+  }
+}
+.pqv-skeleton-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border-top: var(--border-width-default) solid var(--color-border);
+  padding-top: var(--space-md);
+}
+.pqv-skeleton-section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.pqv-skeleton-line {
+  height: 0.7rem;
+}
+.pqv-skeleton-line--label {
+  width: 35%;
+  height: 0.6rem;
+}
+.pqv-skeleton-line--wide {
+  width: 100%;
+}
+.pqv-skeleton-line--mid {
+  width: 70%;
+}
+.pqv-skeleton-line--short {
+  width: 45%;
+}
+.pqv-skeleton-tile .pqv-skeleton-line {
+  height: 0.65rem;
+}
+/* Matches WeeklyPointsChart's CHART_HEIGHT exactly — see
+   PlayerTrendsPanel.tsx's import of it — so the trends section reserves
+   the real chart's footprint and doesn't grow when the real
+   WeeklyPointsPanel swaps in. */
+.pqv-skeleton-chart {
+  width: 100%;
+}
+.pqv-skeleton-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.pqv-skeleton-chip {
+  width: 4.5rem;
+  height: 1.6rem;
+  border-radius: var(--radius-sm);
+}
 .pqv-decision-fit,
 .pqv-model-row,
 .pqv-stat-season,
@@ -1158,19 +1245,42 @@ a {
   color: var(--color-text-muted);
   margin: var(--space-sm) 0 var(--space-xs) 0;
 }
+/* coridian_, 2026-10-20 (screenshots): "this takes up way too much space
+   for the information that is displaying. We need a better
+   representation" — each stat used to be a flex column stacking label,
+   value, a full-width percentile bar, and a separate percentile-text line,
+   one per row, easily 15-20 rows of scroll for a single player. Now a
+   dense 2-up (3-up at >=481px, the same breakpoint the modal itself
+   switches from a bottom sheet to a centered dialog at) grid of bordered
+   stat tiles: same label/value/percentile data, same statPercentileBand
+   thresholds, just a small color-coded dot in place of the bar + separate
+   text line. PlayerCareerTab.tsx's season grid (no percentile) and
+   PlayerProfileContent.tsx's Stats tab (via the shared StatGroup export)
+   get the same density for free since they render these exact classes. */
 .pqv-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-sm);
+}
+@media (min-width: 481px) {
+  .pqv-stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 .pqv-stat-row {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: var(--space-sm);
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-secondary);
 }
 .pqv-stat-label {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .pqv-stat-value {
   font-size: 0.95rem;
@@ -1181,25 +1291,23 @@ a {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  margin-top: auto;
+  padding-top: 2px;
 }
-.pqv-percentile-bar {
-  flex: 1;
-  height: 4px;
-  background: var(--color-border);
-  display: block;
-}
-.pqv-percentile-bar span {
-  height: 100%;
-  display: block;
+.pqv-percentile-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
   background: var(--color-text-muted);
 }
-.pqv-percentile--low .pqv-percentile-bar span {
+.pqv-percentile--low .pqv-percentile-dot {
   background: var(--color-danger);
 }
-.pqv-percentile--mid .pqv-percentile-bar span {
+.pqv-percentile--mid .pqv-percentile-dot {
   background: var(--color-action);
 }
-.pqv-percentile--high .pqv-percentile-bar span {
+.pqv-percentile--high .pqv-percentile-dot {
   background: var(--color-success);
 }
 .pqv-percentile-label {

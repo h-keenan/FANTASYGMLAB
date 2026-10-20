@@ -9,6 +9,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { PositionBadge } from "@/components/PositionBadge";
+import { CHART_HEIGHT } from "@/components/WeeklyPointsChart";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
@@ -318,7 +319,7 @@ export function PlayerQuickView({
 
         <div className="pqv-body">
           {loading ? (
-            <p className="pqv-status-text">Loading player detail…</p>
+            <PqvBodySkeleton />
           ) : loadError ? (
             <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
           ) : (
@@ -406,9 +407,62 @@ export function PlayerQuickView({
   );
 }
 
+/** coridian_, 2026-10-20: "it expands the background of the PQV as those
+ * modules load in and looks very clunky" — rendered in place of the old
+ * single "Loading player detail…" line while `detail`/`awards` are in
+ * flight. Shaped/sized like the content that replaces it (a decision-fit
+ * line, the trends chart's own CHART_HEIGHT footprint, a few stat-tile
+ * grids using the exact same .pqv-stat-row/.pqv-stat-grid classes as the
+ * real stats, a model chip row, an awards chip row) so the modal's height
+ * is already roughly reserved before the fetch resolves — no visible
+ * "grow" when the real content swaps in. Decorative only (aria-hidden);
+ * the real status text stays as an sr-only live region right below it so
+ * assistive tech and existing "Loading player detail" assertions both
+ * still see it. */
+function PqvBodySkeleton() {
+  return (
+    <>
+      <div aria-hidden="true">
+        <div className="pqv-skeleton-section">
+          <div className="pqv-skeleton-line pqv-skeleton-line--wide" />
+          <div className="pqv-skeleton-line pqv-skeleton-line--mid" />
+        </div>
+        <div className="pqv-skeleton-section">
+          <div className="pqv-skeleton-line pqv-skeleton-line--label" />
+          <div className="pqv-skeleton-chart" style={{ height: CHART_HEIGHT }} />
+        </div>
+        {["Production", "Fantasy", "Usage"].map((group) => (
+          <div className="pqv-skeleton-section" key={group}>
+            <div className="pqv-skeleton-line pqv-skeleton-line--label" />
+            <div className="pqv-stat-grid">
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="pqv-stat-row pqv-skeleton-tile">
+                  <div className="pqv-skeleton-line pqv-skeleton-line--short" />
+                  <div className="pqv-skeleton-line pqv-skeleton-line--mid" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="pqv-skeleton-section">
+          <div className="pqv-skeleton-line pqv-skeleton-line--label" />
+          <div className="pqv-skeleton-chip-row">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="pqv-skeleton-chip" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="sr-only" role="status">
+        Loading player detail…
+      </p>
+    </>
+  );
+}
+
 /** Exported (not just this modal's private renderer) so the full Player
  * Profile page (players/[leagueId]/[playerId]) can reuse the identical
- * stat-row + percentile-bar markup for its Stats tab instead of a second
+ * stat-row + percentile markup for its Stats tab instead of a second
  * copy — see that page's own module doc comment. */
 export function StatGroup({
   title,
@@ -429,10 +483,11 @@ export function StatGroup({
             <div className="pqv-stat-label">{item.label}</div>
             <div className="pqv-stat-value">{item.value}</div>
             {item.percentile != null ? (
-              <div className={`pqv-percentile pqv-percentile--${statPercentileBand(item.percentile)}`}>
-                <span className="pqv-percentile-bar">
-                  <span style={{ width: `${Math.max(1, Math.min(100, Math.round(item.percentile)))}%` }} />
-                </span>
+              <div
+                className={`pqv-percentile pqv-percentile--${statPercentileBand(item.percentile)}`}
+                title={`${ordinal(Math.round(item.percentile))} percentile at ${item.label}`}
+              >
+                <span className="pqv-percentile-dot" aria-hidden="true" />
                 <span className="pqv-percentile-label">{ordinal(Math.round(item.percentile))} pct</span>
               </div>
             ) : null}

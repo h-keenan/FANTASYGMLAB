@@ -135,6 +135,32 @@ describe("PlayerQuickView", () => {
     expect(screen.getByText(/Loading player detail/)).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-20: "it expands the background of the PQV as those
+  // modules load in and looks very clunky" — instead of a single bare
+  // status line, the loading body now renders a skeleton shaped like the
+  // eventual content (a chart-height placeholder plus stat-tile grids
+  // reusing the real .pqv-stat-row/.pqv-stat-grid classes) so the modal's
+  // height is already roughly reserved and swapping in the real content
+  // doesn't visibly grow the sheet.
+  it("renders a sized skeleton (not just a status line) while detail/awards are loading", () => {
+    vi.mocked(api.getPlayerQuickView).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.getPlayerAwards).mockReturnValue(new Promise(() => {}));
+
+    const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    // Chart-height placeholder, reserving WeeklyPointsChart's own
+    // CHART_HEIGHT footprint ahead of time.
+    const chartSkeleton = container.querySelector(".pqv-skeleton-chart") as HTMLElement | null;
+    expect(chartSkeleton).toBeInTheDocument();
+    expect(chartSkeleton?.style.height).toBe("160px");
+    // Stat-tile skeletons reuse the real tile classes so the grid is
+    // already the right shape/height before real data lands.
+    expect(container.querySelectorAll(".pqv-stat-row.pqv-skeleton-tile").length).toBeGreaterThan(0);
+    // Decorative — never double-announced to assistive tech alongside the
+    // one real sr-only status line.
+    expect(container.querySelector('[aria-hidden="true"] .pqv-skeleton-chart')).toBeInTheDocument();
+  });
+
   // coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt make
   // sense if he hasnt been playing much" — tier/opportunity_label are
   // available from the `identity` prop immediately, no fetch needed.
@@ -165,7 +191,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
-    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
     await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("p1"));
     await waitFor(() => expect(api.getPlayerAwards).toHaveBeenCalledWith("p1"));
@@ -192,6 +218,17 @@ describe("PlayerQuickView", () => {
     expect(tierChip.style.color).toBe("var(--color-tier-starter)");
     const usageChip = screen.getByText(/12% usage/);
     expect(usageChip.className).toContain("pqv-chip--positive");
+
+    // coridian_, 2026-10-20 (screenshots): "this takes up way too much
+    // space for the information that is displaying" — each stat is a
+    // compact tile (label + value + a small percentile dot) inside a
+    // dense grid, not a full-width row with its own full-width progress
+    // bar and a separate percentile-text line underneath.
+    const targetsRow = screen.getByText("Targets").closest(".pqv-stat-row");
+    expect(targetsRow).toBeInTheDocument();
+    expect(targetsRow?.querySelector(".pqv-percentile-dot")).toBeInTheDocument();
+    expect(targetsRow?.querySelector(".pqv-percentile-bar")).not.toBeInTheDocument();
+    expect(container.querySelector(".pqv-stat-grid")).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-19: "was there any way for us to predict (scenario)
@@ -207,6 +244,28 @@ describe("PlayerQuickView", () => {
 
     await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
     expect(screen.getByText("Moved up 1 spot on the depth chart since last week.")).toBeInTheDocument();
+  });
+
+  // coridian_, 2026-10-20: "it expands the background of the PQV as those
+  // modules load in" — PlayerTrendsPanel.tsx fetches weekly stats on its
+  // own, independently of the outer detail/awards gate above, so it used
+  // to mount (once that outer gate resolved) showing its own bare
+  // "Loading weekly trends…" line and only then grow a second time into
+  // the real chart. It now reserves the chart's exact CHART_HEIGHT
+  // footprint up front instead.
+  it("reserves the weekly chart's height with a skeleton instead of a second growth once it mounts", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+    vi.mocked(api.getPlayerWeeklyStats).mockReturnValue(new Promise(() => {}));
+
+    const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+
+    const trendsChartSkeleton = container.querySelector(".pqv-skeleton-chart") as HTMLElement | null;
+    expect(trendsChartSkeleton).toBeInTheDocument();
+    expect(trendsChartSkeleton?.style.height).toBe("160px");
+    expect(screen.getByText(/Loading weekly trends/)).toBeInTheDocument();
   });
 
   it("shows the week-by-week points chart once weekly stats load", async () => {
