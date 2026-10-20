@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
@@ -253,6 +253,32 @@ const BEST_AVAILABLE_POSITIONS = ["QB", "RB", "WR", "TE", "K"];
 const FREE_AGENT_LIST_PREVIEW_ROWS = 60;
 const FILTER_POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 
+/**
+ * Recommendation-compliance audit, Check 3 — CTA reachability: wraps any
+ * waiver row so the one a GM Plan/Dashboard tile's CTA named (?playerId=)
+ * scrolls into view and stays visually marked once this page loads, instead
+ * of leaving the user to manually re-find it among every other row here.
+ * `active` is simply false whenever there's no match (stale/absent id) —
+ * renders exactly as before, never breaks the page.
+ */
+function HighlightTarget({ active, children }: { active: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active && ref.current && typeof ref.current.scrollIntoView === "function") {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [active]);
+  return (
+    <div
+      ref={ref}
+      data-highlighted={active ? "true" : undefined}
+      style={active ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px", borderRadius: "0.25rem" } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 function SectionHeading({ children }: { children: ReactNode }) {
   return (
     <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
@@ -261,7 +287,17 @@ function SectionHeading({ children }: { children: ReactNode }) {
   );
 }
 
-export function WaiversContent({ leagueName, data }: { leagueName: string; data: WaiversResponse }) {
+export function WaiversContent({
+  leagueName,
+  data,
+  highlightPlayerId,
+}: {
+  leagueName: string;
+  data: WaiversResponse;
+  /** See HighlightTarget above — a GM Plan/Dashboard waiver tile's specific
+   * player, threaded through as ?playerId= (gamePlanTileHref). */
+  highlightPlayerId?: string;
+}) {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
 
@@ -289,7 +325,16 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
       .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query));
   }, [data.players, position, search]);
 
-  const visibleFreeAgents = filteredFreeAgents.slice(0, FREE_AGENT_LIST_PREVIEW_ROWS);
+  const visibleFreeAgents = useMemo(() => {
+    const base = filteredFreeAgents.slice(0, FREE_AGENT_LIST_PREVIEW_ROWS);
+    // A GM Plan tile's named player can be ranked below this list's preview
+    // cutoff (or momentarily excluded by whatever position/search filter is
+    // active) — guarantee it still surfaces rather than silently failing to
+    // find it, same fail-open principle as the rest of this page.
+    if (!highlightPlayerId || base.some((p) => p.player_id === highlightPlayerId)) return base;
+    const target = filteredFreeAgents.find((p) => p.player_id === highlightPlayerId);
+    return target ? [target, ...base] : base;
+  }, [filteredFreeAgents, highlightPlayerId]);
 
   if (notice) {
     return (
@@ -348,13 +393,17 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
           </p>
         ) : (
           <div className="flex flex-col gap-3">
-            <PriorityAddPrimaryCard player={topPriority} />
+            <HighlightTarget active={topPriority.player_id === highlightPlayerId}>
+              <PriorityAddPrimaryCard player={topPriority} />
+            </HighlightTarget>
             {secondaryPriority.length > 0 ? (
               <div
                 className="glass-surface flex flex-col px-3"
               >
                 {secondaryPriority.map((player, index) => (
-                  <PriorityAddCompactRow key={player.player_id} player={player} showDivider={index < secondaryPriority.length - 1} />
+                  <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                    <PriorityAddCompactRow player={player} showDivider={index < secondaryPriority.length - 1} />
+                  </HighlightTarget>
                 ))}
               </div>
             ) : null}
@@ -400,7 +449,9 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
                   className="glass-surface flex flex-col px-3"
                 >
                   {data.stash_candidates.map((player) => (
-                    <FreeAgentRow key={player.player_id} player={player} />
+                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                      <FreeAgentRow player={player} />
+                    </HighlightTarget>
                   ))}
                 </div>
               </div>
@@ -414,7 +465,9 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
                   className="glass-surface flex flex-col px-3"
                 >
                   {data.watchlist_candidates.map((player) => (
-                    <FreeAgentRow key={player.player_id} player={player} />
+                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                      <FreeAgentRow player={player} />
+                    </HighlightTarget>
                   ))}
                 </div>
               </div>
@@ -428,7 +481,9 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
                   className="glass-surface flex flex-col px-3"
                 >
                   {data.faab_targets.map((player) => (
-                    <FreeAgentRow key={player.player_id} player={player} />
+                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                      <FreeAgentRow player={player} />
+                    </HighlightTarget>
                   ))}
                 </div>
               </div>
@@ -491,7 +546,9 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
               className="glass-surface flex flex-col px-3"
             >
               {visibleFreeAgents.map((player) => (
-                <FreeAgentRow key={player.player_id} player={player} />
+                <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                  <FreeAgentRow player={player} />
+                </HighlightTarget>
               ))}
             </div>
             {filteredFreeAgents.length > visibleFreeAgents.length ? (

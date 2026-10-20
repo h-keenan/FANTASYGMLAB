@@ -18,6 +18,11 @@ export default function WaiversPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  // Recommendation-compliance audit, Check 3 — a GM Plan/Dashboard waiver
+  // tile's CTA now threads the specific player it's about through here (see
+  // gamePlanTileHref) instead of landing on this generic board with no way
+  // to tell which free agent the tile meant.
+  const highlightPlayerId = searchParams.get("playerId") || undefined;
   const { lens } = useValuationLens(leagueId);
 
   useEffect(() => {
@@ -66,5 +71,5 @@ export default function WaiversPage() {
     );
   }
 
-  return <WaiversContent leagueName={leagueName} data={waivers} />;
+  return <WaiversContent leagueName={leagueName} data={waivers} highlightPlayerId={highlightPlayerId} />;
 }

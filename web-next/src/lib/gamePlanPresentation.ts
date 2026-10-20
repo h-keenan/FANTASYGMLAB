@@ -54,3 +54,40 @@ export function formatGamePlanCategory(category: string): string {
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join(" ");
 }
+
+/** Recommendation-compliance audit, Check 3 — CTA reachability (2026-10-19):
+ * a tile's CTA used to link to the generic per-league landing page for its
+ * destination even when the tile is clearly about one specific player (e.g.
+ * "add this waiver player" / "consider this trade"), so the user had to
+ * manually re-find the exact thing the card just told them about. Every
+ * BriefingItem already carries `route_player_id` for that one unambiguous
+ * player (modules.dashboard_engine's build_waiver_tile/build_trade_tile/
+ * build_injury_tile/build_value_trend_tile) — this resolves which id to
+ * send, falling back to the trade package's own headline receive-side
+ * player for a trade tile that (per BriefingItemPlayers' same precedent)
+ * sometimes arrives with trade_package populated but route_player_id empty. */
+export function resolveGamePlanTargetPlayerId(item: {
+  route_player_id: string;
+  presentation?: { trade_package?: { receive: Array<{ player_id?: string }> } } | null;
+}): string {
+  if (item.route_player_id) return item.route_player_id;
+  const receive = item.presentation?.trade_package?.receive || [];
+  const headlinePlayer = receive.find((asset) => Boolean(asset.player_id));
+  return headlinePlayer?.player_id || "";
+}
+
+/** Builds the Link href for a Game Plan tile's CTA to one of this app's own
+ * internal routes (see GAME_PLAN_INTERNAL_ROUTES above). Appends `playerId`
+ * when a specific recommendation player is known so Waivers/Trade Hub (the
+ * only two destinations that currently read it — see those pages) can
+ * deep-link straight to it instead of their generic landing view. Every
+ * other destination simply ignores the extra query param if present —
+ * same fail-open principle as the rest of this app: a stale/absent id never
+ * breaks the page, it just means no highlight. */
+export function gamePlanTileHref(internalRoute: string, leagueId: string, leagueName: string, targetPlayerId: string): string {
+  const params = new URLSearchParams({ name: leagueName });
+  if (targetPlayerId) {
+    params.set("playerId", targetPlayerId);
+  }
+  return `/${internalRoute}/${encodeURIComponent(leagueId)}?${params.toString()}`;
+}

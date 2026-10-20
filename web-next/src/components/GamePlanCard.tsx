@@ -2,7 +2,12 @@ import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
 import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
-import { GAME_PLAN_INTERNAL_ROUTES, formatGamePlanCategory } from "@/lib/gamePlanPresentation";
+import {
+  GAME_PLAN_INTERNAL_ROUTES,
+  formatGamePlanCategory,
+  gamePlanTileHref,
+  resolveGamePlanTargetPlayerId,
+} from "@/lib/gamePlanPresentation";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
 
 /**
@@ -54,7 +59,7 @@ export function GamePlanCard({
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
       {internalRoute ? (
         <Link
-          href={`/${internalRoute}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+          href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
           className="self-start text-sm font-bold mt-1"
           style={{ color: "var(--color-accent)" }}
         >

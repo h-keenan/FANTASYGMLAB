@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type TradeIdea } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
@@ -159,13 +159,26 @@ export function TradeIdeaCardView({
   leagueId,
   strategy,
   lens,
+  highlighted = false,
 }: {
   idea: TradeIdea;
   leagueId?: string;
   strategy?: string;
   lens?: string;
+  /** Recommendation-compliance audit, Check 3 — true when a GM Plan/
+   * Dashboard trade tile named this exact idea (TradeHubContent matches its
+   * ?playerId= against this idea's give/get package). Auto-expands the
+   * package, scrolls it into view, and marks it, instead of leaving the
+   * user to find it among every other idea on the board. */
+  highlighted?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(highlighted);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (highlighted && ref.current && typeof ref.current.scrollIntoView === "function") {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
   const gain = idea.trade_gain;
   const deltaText = formatTradeGain(gain);
   const deltaColor = gain > 0 ? "var(--color-success)" : gain < 0 ? "var(--color-danger)" : "var(--color-text-secondary)";
@@ -181,8 +194,13 @@ export function TradeIdeaCardView({
 
   return (
     <article
+      ref={ref}
+      data-highlighted={highlighted ? "true" : undefined}
       className="glass-surface flex flex-col gap-3 p-4"
-      style={{ borderLeft: `3px solid ${accent}` }}
+      style={{
+        borderLeft: `3px solid ${accent}`,
+        ...(highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : {}),
+      }}
     >
       {idea.category || impact ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">

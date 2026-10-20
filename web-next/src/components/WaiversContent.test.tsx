@@ -142,4 +142,56 @@ describe("WaiversContent", () => {
 
     expect(screen.queryByText("Your FAAB")).not.toBeInTheDocument();
   });
+
+  // Recommendation-compliance audit, Check 3 — CTA reachability: a GM Plan/
+  // Dashboard waiver tile's CTA now carries ?playerId=, and this page must
+  // actually surface/highlight that specific player, not just avoid
+  // crashing when the param is present.
+  describe("highlightPlayerId (GM Plan deep link)", () => {
+    const withStash: WaiversResponse = {
+      ...BASE_RESPONSE,
+      stash_candidates: [player({ player_id: "stash1", name: "Stash Target" })],
+    };
+
+    it("marks no row as highlighted without a highlightPlayerId (current/before behavior)", () => {
+      const { container } = render(<WaiversContent leagueName="Dynasty Overlords" data={withStash} />);
+      expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
+    });
+
+    it("highlights the specific free agent a GM Plan tile named, even outside Priority Adds", () => {
+      const { container } = render(
+        <WaiversContent leagueName="Dynasty Overlords" data={withStash} highlightPlayerId="stash1" />,
+      );
+      const highlighted = container.querySelector('[data-highlighted="true"]');
+      expect(highlighted).not.toBeNull();
+      expect(highlighted?.textContent).toContain("Stash Target");
+    });
+
+    it("highlights the Priority Add primary card when it is the named player", () => {
+      const { container } = render(
+        <WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} highlightPlayerId="p1" />,
+      );
+      const highlighted = container.querySelector('[data-highlighted="true"]');
+      expect(highlighted).not.toBeNull();
+      expect(highlighted?.textContent).toContain("Test Free Agent");
+    });
+
+    it("surfaces a named free agent even when it would otherwise be cut from the visible preview list", () => {
+      const manyAgents = Array.from({ length: 65 }, (_, i) => player({ player_id: `fa${i}`, name: `Agent ${i}` }));
+      const targeted = player({ player_id: "deep1", name: "Deep Cut" });
+      const withDeepTarget: WaiversResponse = { ...BASE_RESPONSE, players: [...manyAgents, targeted] };
+
+      render(<WaiversContent leagueName="Dynasty Overlords" data={withDeepTarget} highlightPlayerId="deep1" />);
+
+      expect(screen.getByText("Deep Cut")).toBeInTheDocument();
+    });
+
+    it("falls back gracefully (no crash, no highlight) when the playerId matches nothing on the board", () => {
+      const { container } = render(
+        <WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} highlightPlayerId="does-not-exist" />,
+      );
+      expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
+      expect(screen.getAllByText("Test Free Agent").length).toBeGreaterThan(0);
+    });
+  });
 });

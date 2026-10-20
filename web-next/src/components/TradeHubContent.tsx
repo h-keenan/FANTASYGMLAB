@@ -88,6 +88,7 @@ export function TradeHubContent({
   leagueName,
   data,
   lens = "Dynasty",
+  highlightPlayerId,
 }: {
   leagueId: string;
   leagueName: string;
@@ -98,6 +99,12 @@ export function TradeHubContent({
    * idea-identity cache key — see services/mobile_api_service.py's
    * GET .../trade-hub/{id}/share-card.png docstring). */
   lens?: string;
+  /** Recommendation-compliance audit, Check 3 — a GM Plan/Dashboard trade
+   * tile's named player (?playerId=, see gamePlanTileHref), threaded down so
+   * whichever idea actually involves this player auto-expands, highlights,
+   * and scrolls into view instead of leaving the user to re-find it among
+   * every other idea on the board. Stale/absent ids simply match nothing. */
+  highlightPlayerId?: string;
 }) {
   const notice = data.reason ? tradeHubReasonMessage(data.reason) : null;
   if (notice) {
@@ -139,15 +146,22 @@ export function TradeHubContent({
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          {data.ideas.map((idea, index) => (
-            <TradeIdeaCardView
-              key={`${idea.partner_team_name}-${index}`}
-              idea={idea}
-              leagueId={leagueId}
-              strategy={data.team_strategy}
-              lens={lens}
-            />
-          ))}
+          {data.ideas.map((idea, index) => {
+            const highlighted = Boolean(
+              highlightPlayerId &&
+                [...idea.package.send, ...idea.package.receive].some((asset) => asset.player_id === highlightPlayerId),
+            );
+            return (
+              <TradeIdeaCardView
+                key={`${idea.partner_team_name}-${index}`}
+                idea={idea}
+                leagueId={leagueId}
+                strategy={data.team_strategy}
+                lens={lens}
+                highlighted={highlighted}
+              />
+            );
+          })}
         </div>
       )}
 

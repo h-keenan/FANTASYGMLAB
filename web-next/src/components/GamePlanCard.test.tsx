@@ -92,4 +92,49 @@ describe("GamePlanCard", () => {
     // render exactly once, not twice.
     expect(screen.getAllByText("Aaron Jones")).toHaveLength(1);
   });
+
+  // Recommendation-compliance audit, Check 3 — CTA reachability: the CTA
+  // used to link to a generic `/waivers/{leagueId}` with no way to tell
+  // which free agent this tile was about. It must now carry the tile's own
+  // route_player_id as a query param so Waivers can land directly on it.
+  it("encodes the tile's route_player_id into the waivers CTA link", () => {
+    const item: BriefingItem = {
+      ...BASE,
+      category: "waiver_opportunity",
+      destination: "waivers",
+      route_player_id: "4046",
+      route_player_name: "Jaylen Warren",
+    };
+    render(<GamePlanCard item={item} leagueId="abc" leagueName="Revivalry" />);
+
+    const link = screen.getByRole("link", { name: /Open Waivers/ });
+    expect(link).toHaveAttribute("href", "/waivers/abc?name=Revivalry&playerId=4046");
+  });
+
+  it("falls back to the trade package's headline receive player for the trade_hub CTA when route_player_id is empty", () => {
+    const item: BriefingItem = {
+      ...BASE,
+      destination: "trade_hub",
+      route_player_id: "",
+      presentation: {
+        trade_package: {
+          send: [{ asset_type: "player", player_id: "1", name: "Cade Otton", position: "TE", team: "TB", score: 4165 }],
+          receive: [{ asset_type: "player", player_id: "2", name: "Tony Pollard", position: "RB", team: "TEN", score: 4356 }],
+          value_edge: "Even",
+          confidence: "Medium",
+        },
+      },
+    };
+    render(<GamePlanCard item={item} leagueId="abc" leagueName="Revivalry" />);
+
+    const link = screen.getByRole("link", { name: /Review in Trade Hub/ });
+    expect(link).toHaveAttribute("href", "/trade-hub/abc?name=Revivalry&playerId=2");
+  });
+
+  it("omits playerId from the CTA link when no route player can be resolved", () => {
+    render(<GamePlanCard item={BASE} leagueId="abc" leagueName="Revivalry" />);
+
+    const link = screen.getByRole("link", { name: /Review in Trade Hub/ });
+    expect(link).toHaveAttribute("href", "/trade-hub/abc?name=Revivalry");
+  });
 });
