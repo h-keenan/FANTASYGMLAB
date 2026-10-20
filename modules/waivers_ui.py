@@ -1,6 +1,6 @@
 import time
 from html import escape
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 import pandas as pd
 import streamlit as st
@@ -9,6 +9,7 @@ from modules import canonical_recommendation_narrative
 from modules import compact_fantasy_assets
 from modules import deferred_rendering
 from modules import runtime_trace
+from modules import league_maturity
 from modules import league_workspace_ui
 from modules import football_assets, ui_primitives
 from modules import warm_route_render as _wrr
@@ -566,6 +567,8 @@ def select_top_waiver_opportunity(
     score_field: str,
     *,
     needed_positions: list[str] | None = None,
+    league: Mapping[str, Any] | None = None,
+    rosters: list[Mapping[str, Any]] | None = None,
 ):
     if free_agents is None or free_agents.empty:
         return pd.Series(dtype="object")
@@ -577,6 +580,8 @@ def select_top_waiver_opportunity(
         league_settings=league_settings or {},
         roster_df=roster_df if roster_df is not None else pd.DataFrame(),
         max_items=1,
+        league=league,
+        rosters=rosters,
     )
     if ranked.empty:
         return pd.Series(dtype="object")
@@ -659,12 +664,20 @@ def rank_priority_add_candidates(
     league_settings: dict | None,
     roster_df: pd.DataFrame | None,
     max_items: int = 6,
+    league: Mapping[str, Any] | None = None,
+    rosters: list[Mapping[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Order Priority Adds for THIS roster — not bare dynasty-score tops.
 
     Preserves Best Available as a separate Snapshot surface. Uses existing
     TeamNeedsAssessment outputs + score/injury flags. Does not invent a new
     opaque score.
+
+    `league`/`rosters` (both optional, for callers that already have them —
+    the real Waivers endpoint does) let this detect a pre-/mid-draft league
+    via modules.league_maturity.build_league_evidence's own
+    roster_population_ratio — see the kicker-suppression comment below for
+    why this matters specifically for the kicker-need signal.
     """
 
     if free_agents is None or free_agents.empty or max_items <= 0:
@@ -732,11 +745,38 @@ def rank_priority_add_candidates(
         == "blocked"
     )
 
+    # coridian_, 2026-10-20, screenshot: a league that "hasn't even
+    # drafted" surfaced 5 kickers at the top of Priority Adds.
+    # _roster_has_viable_kicker(roster_df) correctly returns False for a
+    # genuinely empty roster — but a pre-/mid-draft roster is ALSO empty,
+    # for a completely different reason (nothing's been picked yet, not
+    # "the user forgot a kicker"). A naive roster-SIZE cutoff (tried first,
+    # reverted) broke a real, intentional case: a roster that's otherwise
+    # mostly filled but genuinely missing only a kicker correctly gets
+    # recommended one regardless of its exact size. The real signal is
+    # LEAGUE-wide, not single-roster: modules.league_maturity's own
+    # roster_population_ratio (already shipped, already tested, already
+    # used by the Streamlit app's own startup-mode detection — just never
+    # wired into this endpoint) checks what fraction of EVERY roster in
+    # the league has any players at all, which correctly tells "the whole
+    # league hasn't drafted yet" apart from "my team specifically is
+    # missing just a kicker" without needing per-user draft-status
+    # plumbing. league/rosters are optional here so existing callers that
+    # don't have full league context keep their current behavior.
+    league_is_pre_draft = False
+    if league is not None or rosters is not None:
+        evidence = league_maturity.build_league_evidence(league=league, rosters=rosters)
+        league_is_pre_draft = bool(
+            evidence.get("roster_count")
+        ) and evidence.get("roster_population_ratio", 1.0) < 0.5
+
     kicker_required = int(settings.get("k_count") or 0) > 0
     has_viable_kicker = _roster_has_viable_kicker(
         roster_df if roster_df is not None else pd.DataFrame()
     )
-    suppress_kickers = not (kicker_required and not has_viable_kicker)
+    suppress_kickers = not (
+        kicker_required and not has_viable_kicker and not league_is_pre_draft
+    )
     qb_format = _qb_format(settings)
 
     positive = candidates[(~stale) & (~role_blocked) & (scores > 0)].copy()
