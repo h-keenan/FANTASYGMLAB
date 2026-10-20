@@ -73,6 +73,43 @@ class TestPlayerIdentity(unittest.TestCase):
 
         self.assertIsNone(player_identity.match_player_by_identity(df, "Duplicate Player"))
 
+    def test_normalize_player_name_strips_generational_suffixes(self):
+        # Found during live ESPN validation: ESPN's API returns full
+        # generational suffixes (e.g. "Kenneth Walker III", "James Cook III")
+        # while the shared player table stores the base name, so suffix-aware
+        # normalization is required for cross-platform name matching to work.
+        self.assertEqual(
+            player_identity.normalize_player_name("Kenneth Walker III"),
+            player_identity.normalize_player_name("Kenneth Walker"),
+        )
+        self.assertEqual(
+            player_identity.normalize_player_name("James Cook III"),
+            player_identity.normalize_player_name("James Cook"),
+        )
+        self.assertEqual(
+            player_identity.normalize_player_name("Travis Etienne Jr."),
+            player_identity.normalize_player_name("Travis Etienne"),
+        )
+        self.assertEqual(player_identity.normalize_player_name("Odell Beckham Jr."), "odell beckham")
+
+    def test_match_by_identity_resolves_despite_source_suffix_mismatch(self):
+        df = pd.DataFrame(
+            [
+                {"player_id": "1", "name": "Kenneth Walker", "team": "SEA", "position": "RB"},
+                {"player_id": "2", "name": "Other Player", "team": "NYG", "position": "WR"},
+            ]
+        )
+
+        self.assertEqual(
+            player_identity.match_player_by_identity(
+                df,
+                "Kenneth Walker III",
+                team="SEA",
+                position="RB",
+            ),
+            "1",
+        )
+
     def test_id_normalization_handles_ints_strings_and_none(self):
         self.assertEqual(player_identity.normalize_player_id(123.0), "123")
         self.assertEqual(player_identity.normalize_player_id("  abc "), "abc")
