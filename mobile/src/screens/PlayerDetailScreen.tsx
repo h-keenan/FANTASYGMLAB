@@ -983,10 +983,45 @@ function workloadTrendColor(colors: ThemeColors): Record<string, string> {
     rising: colors.success,
     climbing: colors.success,
     increasing: colors.success,
+    // modules/rankings.py's real workload_trend values for a role that is
+    // actually declining or has no live path to touches (a confirmed,
+    // multi-week recency read for "cooling"; depth-chart/competition
+    // pressure for "fragile"/"blocked") — these three used to miss this map
+    // entirely and fall back to the neutral textSecondary color below, so a
+    // player whose usage was genuinely cooling off rendered identically to
+    // one whose role was merely "Stable." "falling"/"declining"/"decreasing"
+    // are kept too in case the vocabulary ever changes, but the backend
+    // never actually emits them today.
+    cooling: colors.danger,
+    fragile: colors.danger,
+    blocked: colors.danger,
     falling: colors.danger,
     declining: colors.danger,
     decreasing: colors.danger,
   };
+}
+
+/**
+ * Up/down/flat read off the same workload_trend word workloadTrendColor
+ * keys on. "Stable"/"Contingent"/"Unknown"/"No Team" are deliberately flat:
+ * the previous caller logic only distinguished "rising" from everything
+ * else, so a Stable role rendered as "Role trending down" — the exact same
+ * false-decline headline a genuinely Cooling/Fragile/Blocked role got, with
+ * no way to tell them apart.
+ */
+function workloadTrendDirection(trendKey: string): 'up' | 'down' | 'flat' {
+  if (trendKey === 'rising' || trendKey === 'climbing' || trendKey === 'increasing') return 'up';
+  if (
+    trendKey === 'cooling' ||
+    trendKey === 'fragile' ||
+    trendKey === 'blocked' ||
+    trendKey === 'falling' ||
+    trendKey === 'declining' ||
+    trendKey === 'decreasing'
+  ) {
+    return 'down';
+  }
+  return 'flat';
 }
 
 /**
@@ -1029,15 +1064,20 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
-  const trendUp = trendKey === 'rising' || trendKey === 'climbing' || trendKey === 'increasing';
+  const trendDirection = workloadTrendDirection(trendKey);
   const rows: Array<{ key: string; icon: IoniconName; color: string; label: string; headline: string; detail: string }> = [];
   if (model.workload_trend) {
     rows.push({
       key: 'role',
-      icon: trendUp ? 'trending-up' : 'trending-down',
+      icon: trendDirection === 'up' ? 'trending-up' : trendDirection === 'down' ? 'trending-down' : 'remove-outline',
       color: trendColor,
       label: 'Role',
-      headline: `Role trending ${trendUp ? 'up' : 'down'}`,
+      headline:
+        trendDirection === 'up'
+          ? 'Role trending up'
+          : trendDirection === 'down'
+          ? 'Role trending down'
+          : 'Role holding steady',
       detail: model.workload_trend,
     });
   }
@@ -1107,6 +1147,7 @@ function ModelSection({ model }: { model: QuickViewModel }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
+  const trendDirection = workloadTrendDirection(trendKey);
   return (
     <View style={styles.card}>
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
@@ -1132,7 +1173,17 @@ function ModelSection({ model }: { model: QuickViewModel }) {
       />
       {model.workload_trend ? (
         <View style={styles.trendRow}>
-          <Ionicons name="trending-up-outline" size={14} color={trendColor} />
+          <Ionicons
+            name={
+              trendDirection === 'up'
+                ? 'trending-up-outline'
+                : trendDirection === 'down'
+                ? 'trending-down-outline'
+                : 'remove-outline'
+            }
+            size={14}
+            color={trendColor}
+          />
           <AppText style={[styles.trendText, { color: trendColor }]}>Workload trend: {model.workload_trend}</AppText>
         </View>
       ) : null}
