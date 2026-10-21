@@ -792,6 +792,366 @@ could add as a second corroborating factor in a future pass, but it is
 deliberately **not** included yet — the explanation only ever cites a
 signal that is directly, mechanically checkable today.
 
+## `GET /v1/external/players/{player_id}/background`
+
+Phase 4 addition: a "player background profile" for the external
+content-posting bot, in the bot developer's own stated priority order:
+contract-timeline context (always honestly unavailable — no licensed data
+source exists), real NFL team-situation context (teammates, Sleeper's own
+published depth chart, recent on-field workload), and real historical PPR
+production (with an honestly-unavailable standard-format/box-score
+sibling). All business logic lives in
+`modules/player_background_profile.py`
+(`build_player_background_profile`) — the route itself is a thin wrapper,
+gated by the same `require_external_api_key` dependency as every other
+`/v1/external/*` route above.
+
+**Query parameters**
+
+| Param | Required | Notes |
+|---|---|---|
+| `season` | no | Defaults to the current active season if omitted. |
+
+This endpoint always returns HTTP `200` once authenticated. An unknown
+player id is never a `4xx` — it returns the full documented shape with
+`status: "unknown_player"` and every section honestly `"unavailable"`,
+the same discipline every other endpoint in this contract already uses.
+
+### Top-level response fields
+
+| Field | Type | Meaning |
+|---|---|---|
+| `player_id` | string | Echoes the requested player id. |
+| `id_namespace` | string | Always `"sleeper"` — same canonical id space as every other endpoint in this contract. |
+| `display_name` | string \| null | Resolved from the same canonical Sleeper players row. `null` only when `player_id` itself is unknown. |
+| `team` | string \| null | This player's current NFL team (Sleeper's own team code). `null` for a free agent/released/retired player or an unknown player. |
+| `position` | string \| null | Sleeper's own position field, passed through honestly (not restricted to a projectable-position allowlist — this endpoint reports background context, not a projection). |
+| `as_of` | string | ISO 8601 UTC timestamp of when this response was computed. Nothing here is cached — this is always "now." |
+| `schema_version` | string | `"1.0"` today. Bumped only on a breaking change to this endpoint's own response shape (independent of every other endpoint's versioning). |
+| `status` | string | `"ok"` (player resolved — individual sections may still be `"unavailable"`) or `"unknown_player"` (the id didn't resolve at all). |
+| `contract` | object | See "Contract (Priority 1)" below. |
+| `team_situation` | object | See "Team situation (Priority 2)" below. |
+| `historical_production` | object | See "Historical production (Priority 3)" below. |
+
+### Contract (Priority 1) — always honestly `"unavailable"`
+
+**No licensed or official NFL player-contract data source is integrated
+anywhere in this codebase today.** This was verified, not assumed:
+`modules/`, `services/`, and `requirements.txt` were grepped for any
+contract-data provider or scraper before writing this section, and every
+hit for the word "contract" refers to an API/schema contract (e.g. this
+very document), never player employment-contract data. Per the same
+honesty-over-fabrication precedent `lineup_popularity` (Phase 1, above)
+already established, this section is never fabricated and never scraped
+from an unlicensed source — it ships with its full typed field shape
+below, every value explicitly `null`, under one `status: "unavailable"`.
+This is the correct, complete implementation of this section, not a
+placeholder for later.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | Always `"unavailable"` today. |
+| `unavailable_reason` | string | Explains exactly why (quoted above). |
+| `source` | null | Always `null` — no source exists to name. |
+| `checked_at` | null | Always `null` — nothing was checked. |
+| `signing_date` | string \| null | When the contract was signed. |
+| `effective_date` | string \| null | When the contract became effective. |
+| `current_contractual_team` | string \| null | The team this player is contracted to. |
+| `last_contracted_season` | integer \| null | The final season this contract covers. |
+| `remaining_seasons` | integer \| null | Seasons remaining as of `reference_season`/`reference_date`. |
+| `reference_season` | integer \| null | The season `remaining_seasons` is counted from. |
+| `reference_date` | string \| null | The date `remaining_seasons` is counted from. |
+| `current_season_included_in_remaining` | boolean \| null | Whether `remaining_seasons` counts the current season or only future ones. |
+| `free_agency_year` | integer \| null | The year this player would reach free agency. |
+| `free_agency_designation` | string \| null | `"UFA"` / `"RFA"` / `"ERFA"`. |
+| `options` | array \| null | `[{"season": int, "exercise_state": str}, ...]` — team/player option years. |
+| `void_years` | array \| null | Contract years that are void (salary-cap mechanism only, never actually played). |
+| `real_contract_years` | array \| null | Contract years that are "real" (not void). |
+| `guaranteed_years` | array \| null | Contract years with guaranteed money. |
+| `provenance` | string \| null | Which source produced this data, when real (e.g. a named licensed provider). |
+| `conflict_state` | string \| null | Whether two sources disagree, when real. |
+
+### Team situation (Priority 2)
+
+Three independent sub-objects — `teammates`, `depth_chart`,
+`recent_workload` — each carrying its own `status`/`source`/`checked_at`/
+`unavailable_reason`. Built entirely from real data already in this
+codebase: `modules.sleeper.get_players()` (the raw Sleeper players
+directory already consumed elsewhere, e.g. `modules/rankings.py`'s own use
+of `depth_chart_position`/`depth_chart_order`) and
+`modules.sleeper.cached_season_player_weekly()` (the same retained weekly
+cache the projections endpoints use, read without forcing a rebuild).
+
+#### `teammates`
+
+Real NFL roster membership — **explicitly not the same claim as "is a
+starter."** Two different players on the same real team can both appear
+here regardless of depth-chart order or snap share; see `depth_chart`
+below for Sleeper's own ordering (itself not a usage guarantee either).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | `"ok"` or `"unavailable"`. |
+| `unavailable_reason` | string \| null | Set when the player has no current team to compare against (free agent/released/retired) or is unknown. |
+| `team` | string \| null | The team being compared against. |
+| `teammates` | array \| null | `[{"player_id", "id_namespace", "display_name", "position"}, ...]`. `null` (not `[]`) when `status` is `"unavailable"` — roster membership is genuinely unknown, not confirmed empty. |
+| `note` | string | States the "on this roster" ≠ "is a starter" distinction explicitly. |
+| `source` | string \| null | `"sleeper_players_api"` when real. |
+| `checked_at` | string \| null | When this sub-section was computed. |
+
+#### `depth_chart`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | `"ok"` or `"unavailable"`. |
+| `unavailable_reason` | string \| null | Set when Sleeper has neither `depth_chart_position` nor `depth_chart_order` on record — never fabricated from workload or any other signal. |
+| `depth_chart_position` | string \| null | Sleeper's own published field, passed through honestly. |
+| `depth_chart_order` | integer \| null | Sleeper's own published field, passed through honestly. |
+| `note` | string | States explicitly that this is Sleeper's own published field, not a guarantee of future usage. |
+| `source` | string \| null | `"sleeper_players_api"` when real. |
+| `checked_at` | string \| null | When this sub-section was computed. |
+
+#### `recent_workload`
+
+Real per-week workload rows from the retained Sleeper weekly-stats cache.
+A field simply absent for a given week is reported `null` for that week —
+**never backfilled as 0.**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | `"ok"` or `"unavailable"` (no retained weekly data for this player/season at all). |
+| `season` | integer | The season these weeks belong to. |
+| `sample_size` | integer | How many usable weeks are included. |
+| `weeks` | array | `[{"week", "targets", "receptions", "rush_attempts", "pass_attempts", "snap_share", "opportunities", "touches"}, ...]`, each field `null` when Sleeper didn't publish it that week. `opportunities` = `rush_attempts + targets`; `touches` = `rush_attempts + receptions` — both `null` (never 0) whenever either addend is `null`. `snap_share` is Sleeper's own already-computed per-game, team-denominator offensive-snap rate (offensive snaps ÷ team offensive snaps) — reported as-is, never a separately invented raw count. "Routes run" is not tracked anywhere in this codebase and is never reported, not even as an estimate. |
+| `note` | string | Spells out the `opportunities`/`touches`/`snap_share`/"routes run" semantics above. |
+| `source` | string \| null | `"sleeper_weekly_stats"` when real. |
+| `checked_at` | string \| null | When this sub-section was computed. |
+
+### Historical production (Priority 3)
+
+Reuses the exact same retained weekly-stats cache as `recent_workload`
+above — no second scoring engine. Two sub-objects:
+
+#### `ppr` — real, per-week PPR fantasy points
+
+Sleeper's own already-computed `pts_ppr`, retained per week
+(`modules.sleeper.WEEKLY_RETAIN_FIELD_MAP`). A week is only ever reported
+if it actually appears in the retained weekly list — its presence there
+means Sleeper published a real stat line for it, which this endpoint
+treats as "played."
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | `"ok"` or `"unavailable"` (zero usable weeks). |
+| `scoring_format` | string | Always `"ppr"`. |
+| `season` | integer | The season these weeks belong to. |
+| `sample_size` | integer | How many weeks have a real `fantasy_points_ppr` value. |
+| `completed_games_count` | integer | Same count as `sample_size` — presence in the retained weekly list is itself treated as "played" (see above). |
+| `weeks` | array | `[{"week", "fantasy_points_ppr"}, ...]`, week-ordered. |
+| `schedule_reference_team` | string \| null | The team whose real schedule (`modules.nfl_schedule.team_schedule`) was used to compute `weeks_missing_data`/`weeks_in_progress` below. `null` when the player has no current team — a former team's schedule is never substituted for a released/retired player, since that would risk misattributing a week that happened after the player left. |
+| `weeks_missing_data` | array \| null | `[{"week", "reason"}, ...]` — real weeks where `modules.nfl_schedule.team_schedule` confirms a final score exists, but no weekly stat line was ever published for this player (DNP/inactive, or not on this team's roster that week). `null` only when `schedule_reference_team` is `null`. |
+| `weeks_in_progress` | array \| null | Week numbers where `modules.nfl_schedule.game_has_started` is `true` but the game isn't final and no stat line exists yet — distinguished from `weeks_missing_data` so a bot never treats an in-progress game as a confirmed no-show. `null` only when `schedule_reference_team` is `null`. |
+| `source` | string \| null | `"sleeper_weekly_stats"` when real. |
+| `checked_at` | string \| null | When this sub-section was computed. |
+
+#### `standard_and_box_score` — always honestly `"unavailable"` today
+
+Per-week standard (non-PPR) fantasy points and full box-score fields
+(receiving/rushing/passing yards and touchdowns) are **not retained at the
+per-week grain anywhere in this codebase today** — only season totals
+carry those (`modules.sleeper.PLAYER_STATS_SUM_FIELDS`); the per-week
+cache (`WEEKLY_RETAIN_SOURCE_FIELDS`/`WEEKLY_RETAIN_FIELD_MAP`) only
+retains `games_played`/`targets`/`receptions`/`rush_attempts`/
+`pass_attempts`/`fantasy_points_ppr`. This is the exact same gap already
+investigated and documented in this file's own "Weekly recap
+(completed-week actual production) — investigated, not yet built" section
+below, which names the documented `GET /v1/external/players/{player_id}/
+week-result` proposal and its box-score-retention prerequisite — that work
+is not re-proposed here, this section just points to it.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | Always `"unavailable"` today. |
+| `unavailable_reason` | string | Cites the "Weekly recap" section and its retention prerequisite by name (quoted above). |
+| `fantasy_points_standard` | null | Always `null` today. |
+| `receiving_yards` / `rushing_yards` / `passing_yards` | null | Always `null` today. |
+| `receiving_tds` / `rushing_tds` / `passing_tds` | null | Always `null` today. |
+| `source` | null | Always `null` today. |
+| `checked_at` | null | Always `null` today. |
+
+### Example: a normal player — real team-situation and production, unavailable contract
+
+`GET /v1/external/players/4046/background?season=2026`
+
+```json
+{
+  "player_id": "4046",
+  "id_namespace": "sleeper",
+  "display_name": "Nico Collins",
+  "team": "HOU",
+  "position": "WR",
+  "as_of": "2026-10-20T21:48:02.869000+00:00",
+  "schema_version": "1.0",
+  "status": "ok",
+  "contract": {
+    "status": "unavailable",
+    "unavailable_reason": "No licensed or official NFL player-contract data source ... is integrated anywhere in this codebase today.",
+    "source": null,
+    "checked_at": null,
+    "signing_date": null,
+    "effective_date": null,
+    "current_contractual_team": null,
+    "last_contracted_season": null,
+    "remaining_seasons": null,
+    "reference_season": null,
+    "reference_date": null,
+    "current_season_included_in_remaining": null,
+    "free_agency_year": null,
+    "free_agency_designation": null,
+    "options": null,
+    "void_years": null,
+    "real_contract_years": null,
+    "guaranteed_years": null,
+    "provenance": null,
+    "conflict_state": null
+  },
+  "team_situation": {
+    "teammates": {
+      "status": "ok",
+      "unavailable_reason": null,
+      "team": "HOU",
+      "teammates": [
+        {"player_id": "5001", "id_namespace": "sleeper", "display_name": "Same Team RB", "position": "RB"}
+      ],
+      "note": "This lists real NFL roster membership only ... NOT the same claim as \"is a starter\".",
+      "source": "sleeper_players_api",
+      "checked_at": "2026-10-20T21:48:02.869000+00:00"
+    },
+    "depth_chart": {
+      "status": "ok",
+      "unavailable_reason": null,
+      "depth_chart_position": "WR",
+      "depth_chart_order": 1,
+      "note": "depth_chart_position/depth_chart_order are Sleeper's own published depth-chart fields ... NOT a guarantee of future usage.",
+      "source": "sleeper_players_api",
+      "checked_at": "2026-10-20T21:48:02.869000+00:00"
+    },
+    "recent_workload": {
+      "status": "ok",
+      "unavailable_reason": null,
+      "season": 2026,
+      "sample_size": 1,
+      "weeks": [
+        {"week": 1, "targets": 8, "receptions": 6, "rush_attempts": 1, "pass_attempts": 0, "snap_share": 0.81, "opportunities": 9, "touches": 7}
+      ],
+      "note": "opportunities = rush_attempts + targets ...",
+      "source": "sleeper_weekly_stats",
+      "checked_at": "2026-10-20T21:48:02.869000+00:00"
+    }
+  },
+  "historical_production": {
+    "status": "ok",
+    "source": "sleeper_weekly_stats",
+    "checked_at": "2026-10-20T21:48:02.869000+00:00",
+    "ppr": {
+      "status": "ok",
+      "unavailable_reason": null,
+      "scoring_format": "ppr",
+      "season": 2026,
+      "sample_size": 1,
+      "completed_games_count": 1,
+      "weeks": [{"week": 1, "fantasy_points_ppr": 14.2}],
+      "schedule_reference_team": "HOU",
+      "weeks_missing_data": [],
+      "weeks_in_progress": [],
+      "source": "sleeper_weekly_stats",
+      "checked_at": "2026-10-20T21:48:02.869000+00:00"
+    },
+    "standard_and_box_score": {
+      "status": "unavailable",
+      "unavailable_reason": "Per-week standard (non-PPR) fantasy points and full box-score fields ... see the \"Weekly recap\" section.",
+      "fantasy_points_standard": null,
+      "receiving_yards": null,
+      "rushing_yards": null,
+      "passing_yards": null,
+      "receiving_tds": null,
+      "rushing_tds": null,
+      "passing_tds": null,
+      "source": null,
+      "checked_at": null
+    }
+  }
+}
+```
+
+### Example: an unknown player id
+
+`GET /v1/external/players/does-not-exist/background`
+
+```json
+{
+  "player_id": "does-not-exist",
+  "id_namespace": "sleeper",
+  "display_name": null,
+  "team": null,
+  "position": null,
+  "as_of": "2026-10-20T21:48:02.869000+00:00",
+  "schema_version": "1.0",
+  "status": "unknown_player",
+  "contract": { "status": "unavailable", "...": "every field null, same shape as above" },
+  "team_situation": {
+    "teammates": {"status": "unavailable", "unavailable_reason": "player_id did not resolve to any known Sleeper player.", "team": null, "teammates": null, "...": "..."},
+    "depth_chart": {"status": "unavailable", "unavailable_reason": "player_id did not resolve to any known Sleeper player.", "depth_chart_position": null, "depth_chart_order": null, "...": "..."},
+    "recent_workload": {"status": "unavailable", "unavailable_reason": "player_id did not resolve to any known Sleeper player.", "season": null, "sample_size": 0, "weeks": [], "...": "..."}
+  },
+  "historical_production": {
+    "status": "unavailable",
+    "ppr": {"status": "unavailable", "sample_size": 0, "weeks": [], "...": "..."},
+    "standard_and_box_score": {"status": "unavailable", "...": "..."}
+  }
+}
+```
+
+### Example: a sparse-history player (one usable week)
+
+A player with real team/position/depth-chart data but only one week of
+retained production — `sample_size: 1` throughout, and any other real,
+completed weeks for that team with no stat line published for this player
+are named explicitly in `weeks_missing_data` rather than silently skipped:
+
+```json
+{
+  "player_id": "4047",
+  "status": "ok",
+  "team_situation": {
+    "recent_workload": {"status": "ok", "sample_size": 1, "weeks": [{"week": 1, "targets": 8, "receptions": 6, "rush_attempts": null, "pass_attempts": null, "snap_share": null, "opportunities": null, "touches": null}]}
+  },
+  "historical_production": {
+    "ppr": {
+      "status": "ok",
+      "sample_size": 1,
+      "weeks": [{"week": 1, "fantasy_points_ppr": 14.2}],
+      "weeks_missing_data": [
+        {"week": 2, "reason": "The real schedule confirms this game has a final score, but Sleeper never published a weekly stat line for this player that week (DNP/inactive, or not on this team's roster that week) — not assumed to be a zero."},
+        {"week": 3, "reason": "..."}
+      ]
+    }
+  }
+}
+```
+
+### Null semantics, summarized
+
+- `contract` is **always** `status: "unavailable"` today — no licensed
+  source exists. Every field is still present and typed, `null`.
+- `standard_and_box_score` is **always** `status: "unavailable"` today —
+  the per-week retention gap documented in "Weekly recap" below. Every
+  field is still present and typed, `null`.
+- Every other section/field can genuinely be `"ok"` once real data exists
+  (a current team, retained weekly stats, a published depth chart), and
+  is honestly `"unavailable"` with a specific `unavailable_reason` when it
+  doesn't — never a guess, never a 0 standing in for "unknown."
+
 ## Weekly recap (completed-week actual production) — investigated, not yet built
 
 Phase 4's spec also asked for a bot-facing "weekly recap" — checked,
@@ -892,3 +1252,22 @@ buildable proposal here rather than implementing it in the same change:
   per the spec) a `GET /v1/external/players/{player_id}/week-result`
   proposal for completed-week actual production — see "Weekly recap"
   above.
+- `v1` (2026-10-20): added `GET /v1/external/players/{player_id}/background`
+  — a "player background profile": contract-timeline context (Priority 1,
+  always honestly `status: "unavailable"` since no licensed NFL
+  player-contract data source exists anywhere in this codebase, verified
+  by grepping `modules/`/`services/`/`requirements.txt` before writing
+  this section — the full typed field shape still ships, every value
+  `null`, the same precedent `lineup_popularity` already set), real NFL
+  team-situation context (Priority 2: teammates — explicitly distinct
+  from "is a starter" — Sleeper's own published depth chart, and recent
+  per-week workload with `opportunities`/`touches` derived honestly from
+  real retained fields, never backfilled as 0), and real historical PPR
+  production with an honestly-`"unavailable"` standard-format/box-score
+  sibling that cites this doc's own "Weekly recap" section and its
+  `GET /v1/external/players/{player_id}/week-result` proposal by name
+  (Priority 3). New module: `modules/player_background_profile.py`
+  (`build_player_background_profile`) — the route itself is a thin
+  wrapper, gated by the same `require_external_api_key` dependency as
+  every other `/v1/external/*` route. Purely additive — no existing
+  field, status value, or route changed.

@@ -171,6 +171,7 @@ from modules import (
     news_signal,
     nfl_schedule,
     player_awards,
+    player_background_profile,
     player_eligibility,
     performance,
     pick_flow,
@@ -6315,6 +6316,44 @@ def get_external_player_rating_history(player_id: str) -> dict[str, Any]:
         "effective_at": effective_at,
         "explanation": explanation,
     }
+
+
+# ---------------------------------------------------------------------------
+# External (bot) player background profile — Phase 4 addition to
+# coridian_'s external content-posting bot wish list (full contract:
+# docs/external-api-contract.md). Gated by the exact same
+# require_external_api_key dependency as Phases 1-3 above; this section
+# adds no new auth. All business logic lives in
+# modules.player_background_profile — this route handler is a thin wrapper,
+# the same split Phase 1's projections routes already established with
+# modules.player_projections.project_player_week.
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/v1/external/players/{player_id}/background",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_player_background(
+    player_id: str,
+    season: int | None = None,
+) -> dict[str, Any]:
+    """One player's background profile for the external content-posting
+    bot: contract-timeline context (Priority 1, always honestly
+    `status: "unavailable"` — no licensed contract-data source exists in
+    this codebase), real NFL team-situation context (Priority 2:
+    teammates, Sleeper's own published depth chart, recent workload), and
+    real historical PPR production with an honestly-unavailable standard/
+    box-score sibling (Priority 3) — see
+    `modules.player_background_profile.build_player_background_profile`
+    and `docs/external-api-contract.md` for the full field-by-field
+    contract. Always 200 once authenticated: an unknown player id returns
+    the full shape with every section `"unavailable"` rather than a 4xx,
+    the same honesty-over-error discipline every other `/v1/external/*`
+    route in this file already uses.
+    """
+
+    return player_background_profile.build_player_background_profile(str(player_id), season=season)
 
 
 @app.get("/v1/players/{player_id}/career")
