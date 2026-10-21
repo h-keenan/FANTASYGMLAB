@@ -500,6 +500,64 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertIn("on_conflict=user_id,league_id", post.call_args.args[0])
         self.assertNotIn("service", str(post.call_args).casefold())
 
+    def test_migrate_saved_league_upserts_new_id_then_deletes_the_old_row(self):
+        # Real production bug, 2026-10-21: a saved league whose Sleeper
+        # season rolled over (new league_id every season, linked via
+        # previous_league_id) kept pointing at the stale id forever. Real
+        # id pair, live-verified against Sleeper: league "Revivalry",
+        # 2025 league_id 1250325243881345024 rolled over to 2026 league_id
+        # 1325866097718620160.
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        patch_response = Mock(status_code=204)
+        patch_response.json.return_value = []
+        post_response = Mock(status_code=201)
+        post_response.json.return_value = []
+        delete_response = Mock(status_code=204)
+        delete_response.json.return_value = []
+        with patch.object(
+            account_store.requests, "patch", return_value=patch_response
+        ), patch.object(
+            account_store.requests, "post", return_value=post_response
+        ) as post, patch.object(
+            account_store.requests, "delete", return_value=delete_response
+        ) as delete:
+            ok, error = account_store.migrate_saved_league(
+                config,
+                "access-token",
+                user_id="user-1",
+                old_league_id="1250325243881345024",
+                new_league_id="1325866097718620160",
+                sleeper_username="lukamagic777777",
+                league_name="Revivalry",
+                is_default=True,
+            )
+
+        self.assertTrue(ok, error)
+        self.assertIn("on_conflict=user_id,league_id", post.call_args.args[0])
+        self.assertEqual(post.call_args.kwargs["json"]["league_id"], "1325866097718620160")
+        self.assertIn("/saved_leagues?", delete.call_args.args[0])
+        self.assertIn("user_id=eq.user-1", delete.call_args.args[0])
+        self.assertIn("league_id=eq.1250325243881345024", delete.call_args.args[0])
+
+    def test_migrate_saved_league_never_deletes_old_row_when_the_upsert_fails(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        post_response = Mock(status_code=500)
+        post_response.json.return_value = {"message": "boom"}
+        with patch.object(
+            account_store.requests, "post", return_value=post_response
+        ), patch.object(account_store.requests, "delete") as delete:
+            ok, error = account_store.migrate_saved_league(
+                config,
+                "access-token",
+                user_id="user-1",
+                old_league_id="1250325243881345024",
+                new_league_id="1325866097718620160",
+            )
+
+        self.assertFalse(ok)
+        self.assertTrue(error)
+        delete.assert_not_called()
+
     def test_missing_tables_return_friendly_setup_error(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
         response = Mock(status_code=404)

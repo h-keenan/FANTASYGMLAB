@@ -366,6 +366,67 @@ def upsert_saved_league(config: dict, access_token: str, payload: dict) -> tuple
     return upsert_row(config, access_token, "saved_leagues", payload, on_conflict="user_id,league_id")
 
 
+def migrate_saved_league(
+    config: dict,
+    access_token: str,
+    *,
+    user_id: str,
+    old_league_id: str,
+    new_league_id: str,
+    sleeper_username: str = "",
+    league_name: str = "",
+    owner_id: str = "",
+    roster_id=None,
+    team_id=None,
+    is_default: bool = False,
+) -> tuple[bool, str]:
+    """Move a saved_leagues row from a stale, rolled-over-away-from
+    league_id to its current-season continuation (see
+    modules.sleeper_leagues.resolve_saved_league_rollover and
+    services/mobile_api_service.py's _resolve_league_rollover_cached,
+    which is the only current caller).
+
+    Real production bug, 2026-10-21: Sleeper mints a brand-new league_id
+    every season a dynasty league rolls over; nothing in this codebase
+    re-pointed an already-saved league forward, so it kept resolving to
+    last season's frozen roster/league data forever. This is the write
+    half of that fix.
+
+    Best-effort and NOT atomic: Supabase's REST API has no cross-row
+    transaction, so this is a plain upsert of the new row followed by a
+    delete of the old one. If the delete fails, the user is left with
+    both rows (a harmless duplicate "saved league" entry, recoverable by
+    removing one later) rather than silently losing the save. Callers
+    must never let a failure here block using the resolved league_id for
+    the CURRENT request/response -- this only affects what is persisted
+    for next time.
+    """
+
+    ok, error = upsert_saved_league(
+        config,
+        access_token,
+        build_saved_league_payload(
+            user_id=user_id,
+            sleeper_username=sleeper_username,
+            league_id=new_league_id,
+            league_name=league_name,
+            owner_id=owner_id,
+            roster_id=roster_id,
+            team_id=team_id,
+            is_default=is_default,
+        ),
+    )
+    if not ok:
+        return False, error
+    return delete_rows(
+        config,
+        access_token,
+        "saved_leagues",
+        query=f"user_id=eq.{_safe_text(user_id)}&league_id=eq.{_safe_text(old_league_id)}",
+        timing_label="supabase_migrate_saved_league_delete_old",
+    )
+
+
 def upsert_user_settings(config: dict, access_token: str, payload: dict) -> tuple[bool, str]:
     return upsert_row(config, access_token, "user_settings", payload, on_conflict="user_id")
 
