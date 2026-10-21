@@ -53,7 +53,10 @@ export function streakCaption(streak: { current_streak: number; best_streak: num
   return `${current} · Best ${streak.best_streak}`;
 }
 
-export function GuessThePlayerCard({ leagueId }: { leagueId?: string } = {}) {
+export function GuessThePlayerCard({
+  leagueId,
+  leagueName,
+}: { leagueId?: string; leagueName?: string } = {}) {
   const [data, setData] = useState<GuessThePlayerResponse | null>(null);
   const [dismissedPickId, setDismissedPickId] = useState<string | null>(() => getDismissedGuessThePlayerPickId());
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -237,7 +240,9 @@ export function GuessThePlayerCard({ leagueId }: { leagueId?: string } = {}) {
         </p>
         {leagueId ? (
           <Link
-            href={`/guess-the-player-leaderboard/${encodeURIComponent(leagueId)}`}
+            href={`/guess-the-player-leaderboard/${encodeURIComponent(leagueId)}${
+              leagueName ? `?name=${encodeURIComponent(leagueName)}` : ""
+            }`}
             className="text-xs font-bold shrink-0"
             style={{ color: "var(--color-accent)" }}
           >

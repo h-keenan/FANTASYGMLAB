@@ -45,7 +45,10 @@ type RevealState = {
   correctPairing: GuessThePlayerNameMatchCorrectPairing;
 };
 
-export function GuessThePlayerNameMatchCard({ leagueId }: { leagueId?: string } = {}) {
+export function GuessThePlayerNameMatchCard({
+  leagueId,
+  leagueName,
+}: { leagueId?: string; leagueName?: string } = {}) {
   const [data, setData] = useState<GuessThePlayerNameMatchResponse | null>(null);
   const [dismissedPickId, setDismissedPickId] = useState<string | null>(() =>
     getDismissedGuessThePlayerNameMatchPickId(),
@@ -247,7 +250,9 @@ export function GuessThePlayerNameMatchCard({ leagueId }: { leagueId?: string } 
         </p>
         {leagueId ? (
           <Link
-            href={`/guess-the-player-leaderboard/${encodeURIComponent(leagueId)}`}
+            href={`/guess-the-player-leaderboard/${encodeURIComponent(leagueId)}${
+              leagueName ? `?name=${encodeURIComponent(leagueName)}` : ""
+            }`}
             className="text-xs font-bold shrink-0"
             style={{ color: "var(--color-accent)" }}
           >

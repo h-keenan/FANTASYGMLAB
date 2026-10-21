@@ -300,7 +300,13 @@ describe("PortfolioContent", () => {
 
     expect(screen.getByText(/Draft still in progress/)).toBeInTheDocument();
     expect(screen.getByText("Still Drafting")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Watch live draft/ })).toHaveAttribute("href", "/live-draft/league-3");
+    // Regression: this link used to omit `?name=`, so following it landed on
+    // the Header with no league-name source besides the raw id (coridian_
+    // screenshot: header showed the Sleeper league_id instead of a name).
+    expect(screen.getByRole("link", { name: /Watch live draft/ })).toHaveAttribute(
+      "href",
+      "/live-draft/league-3?name=Still%20Drafting",
+    );
     expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
   });
