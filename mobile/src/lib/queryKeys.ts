@@ -53,4 +53,8 @@ export const queryKeys = {
   // for the same player, or vice versa, on a shared device.
   playerQuickView: (playerId: string) =>
     [...userScopeKey(), 'player-quick-view', playerId] as const,
+  // PortfolioScreen's cross-league GET /v1/portfolio — no per-league params
+  // (the lens is server-defaulted), so this is a single flat key per user,
+  // same shape as any other user-scoped-but-otherwise-global query here.
+  portfolio: () => [...userScopeKey(), 'portfolio'] as const,
 };
