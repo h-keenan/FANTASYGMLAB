@@ -138,6 +138,18 @@ def pick_asset_from_mapping(
         score = 0
     return {
         "asset_type": "pick",
+        # Same `{season}:{round}:{original_roster_id}` format
+        # services/mobile_api_service.py's GET .../draft-picks and this
+        # module's own `picks_by_id` resolution key already use for
+        # DraftPickAsset.pick_id — stamping it here too (previously
+        # omitted) is what lets a caller round-trip a specific pick asset
+        # back to the exact DraftPickAsset it came from, the same way a
+        # player asset's `player_id` already does. See
+        # trade_offer_analyzer.build_counter_guidance's "Build the
+        # counter" action, which reads this to let web-next/mobile re-add
+        # or remove the *exact* pick a counter suggestion names instead of
+        # silently hiding the whole feature for pick-type suggestions.
+        "pick_id": f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}",
         "label": label,
         "name": label,
         "value_score": _int_score(pick.get("score", pick.get("value_score", 0))),

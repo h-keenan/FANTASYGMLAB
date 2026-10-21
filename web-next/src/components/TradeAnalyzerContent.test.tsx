@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TradeAnalyzerContent } from "./TradeAnalyzerContent";
-import type { MyRosterResponse, RankedPlayer, TeamProfile, TradeVerdict } from "@/lib/api";
+import type { DraftPickAsset, MyRosterResponse, RankedPlayer, TeamProfile, TradeVerdict } from "@/lib/api";
 import { api } from "@/lib/api";
 
 /**
@@ -103,6 +103,23 @@ const RANKINGS: RankedPlayer[] = [
   player({ player_id: "send-1", name: "My RB", position: "RB" }),
   player({ player_id: "receive-1", name: "Their WR", position: "WR" }),
 ];
+
+function pick(overrides: Partial<DraftPickAsset>): DraftPickAsset {
+  return {
+    pick_id: "2027:1:1",
+    label: "2027 Round 1",
+    score: 800,
+    season: 2027,
+    round: 1,
+    original_roster_id: "1",
+    owner_roster_id: "1",
+    original_team_name: "My Team",
+    owner_team_name: "My Team",
+    pick_tier: null,
+    projected_pick_range: null,
+    ...overrides,
+  };
+}
 
 function renderPage() {
   return render(
@@ -241,6 +258,55 @@ describe("TradeAnalyzerContent", () => {
 
       expect(screen.getByText("Queue send and receive assets, then Analyze.")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Build the counter for a pick-type counter_action (Revision 21)", () => {
+    it("renders the button and removes the exact pick from You send when the server suggests removing it", async () => {
+      const sendPick = pick({ pick_id: "2027:1:1", label: "2027 Round 1" });
+      const verdictWithPickCounter: TradeVerdict = {
+        ...VERDICT,
+        ui_verdict: "COUNTER",
+        tone: "counter",
+        counter_guidance: "Remove 2027 Round 1 from your outgoing side.",
+        counter_action: {
+          action: "remove_from_send",
+          player_id: sendPick.pick_id,
+          asset_type: "pick",
+          label: "2027 Round 1",
+        },
+        alternate_packages: [],
+      };
+      vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: verdictWithPickCounter, reason: "" });
+
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[sendPick]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+        />,
+      );
+
+      // Default active side is "send" — switch asset type to Picks and add it.
+      fireEvent.click(screen.getByRole("button", { name: "Picks" }));
+      fireEvent.click(screen.getByText("2027 Round 1"));
+      expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+      });
+
+      const counterButton = await screen.findByRole("button", { name: "Build the counter →" });
+      fireEvent.click(counterButton);
+
+      // The pick-type action used to be silently unsupported (the button
+      // only rendered/applied for asset_type "player") — this is the fix:
+      // the exact pick the server named is gone from You send afterward.
+      expect(screen.queryByRole("button", { name: "Remove 2027 Round 1" })).not.toBeInTheDocument();
     });
   });
 });

@@ -331,8 +331,20 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
 
   const applyCounterAction = () => {
     const action = verdict?.counter_action;
-    if (!action || action.asset_type !== 'player' || !action.player_id) return;
-    if (action.action === 'remove_from_send') {
+    if (!action || !action.player_id) return;
+    if (action.asset_type === 'pick') {
+      // Picks round-trip through `player_id` too (trade_analyzer_assembly.
+      // pick_asset_from_mapping's `pick_id`, the same DraftPickAsset.pick_id
+      // allPicks is already keyed on) — see the player branch below for
+      // the original player-only version of this.
+      if (action.action === 'remove_from_send') {
+        setSendPicks((prev) => prev.filter((p) => p.pick_id !== action.player_id));
+      } else if (action.action === 'add_to_receive') {
+        const pick = allPicks.find((p) => p.pick_id === action.player_id);
+        if (!pick) return;
+        setReceivePicks((prev) => (prev.some((p) => p.pick_id === pick.pick_id) ? prev : [...prev, pick]));
+      }
+    } else if (action.action === 'remove_from_send') {
       setSendIds((prev) => prev.filter((p) => p.player_id !== action.player_id));
     } else if (action.action === 'add_to_receive') {
       const player = rankings.find((p) => p.player_id === action.player_id);
@@ -762,7 +774,7 @@ function VerdictCard({
           ) : null}
         </>
       ) : null}
-      {verdict.counter_action && verdict.counter_action.asset_type === 'player' ? (
+      {verdict.counter_action ? (
         <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
           <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
           <AppText style={styles.counterButtonText}>Build the counter</AppText>

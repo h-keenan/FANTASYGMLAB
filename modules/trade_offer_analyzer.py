@@ -237,9 +237,15 @@ def build_counter_guidance(
         weak_score = int(weakest.get("score") or weakest.get("value_score") or 0)
         weak_label = str(weakest.get("name") or weakest.get("label") or "").strip()
         if weak_label and weak_score > 0 and gap > 0 and weak_score <= gap * 1.35:
+            # `player_id` is this action's generic "which exact asset"
+            # slot — for a pick-type asset there's no player_id, so this
+            # falls back to `pick_id` (trade_analyzer_assembly.
+            # pick_asset_from_mapping's own round-trip identifier) instead
+            # of leaving it blank and making a pick-type suggestion
+            # unresolvable by the caller.
             action = {
                 "action": "remove_from_send",
-                "player_id": str(weakest.get("player_id") or ""),
+                "player_id": str(weakest.get("player_id") or weakest.get("pick_id") or ""),
                 "asset_type": str(weakest.get("asset_type") or "player"),
                 "label": weak_label,
             }
@@ -262,9 +268,14 @@ def build_counter_guidance(
         if 0.55 * gap <= pick_score <= 1.6 * gap:
             label = str(pick.get("name") or pick.get("label") or "").strip()
             if label:
+                # Same pick_id fallback as the remove_from_send branch
+                # above — `partner_assets` is player-only today (see
+                # services/mobile_api_service.py's post_trade_analyzer),
+                # but this stays correct for whenever a partner's own pick
+                # is included in that pool too.
                 action = {
                     "action": "add_to_receive",
-                    "player_id": str(pick.get("player_id") or ""),
+                    "player_id": str(pick.get("player_id") or pick.get("pick_id") or ""),
                     "asset_type": str(pick.get("asset_type") or "player"),
                     "label": label,
                 }

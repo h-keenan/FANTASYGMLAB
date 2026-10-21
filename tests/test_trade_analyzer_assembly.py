@@ -205,6 +205,26 @@ def test_team_change_drops_only_stale_assets():
     assert state["trade_analyzer_analyzed_signature"] == ""
 
 
+def test_pick_asset_from_mapping_stamps_round_trippable_pick_id():
+    # Same `{season}:{round}:{original_roster_id}` format
+    # services/mobile_api_service.py's GET .../draft-picks already uses for
+    # DraftPickAsset.pick_id — a caller (trade_offer_analyzer's counter
+    # guidance) needs this to name the *exact* pick a suggestion is about,
+    # the same way a player asset's player_id already lets it.
+    asset = assembly.pick_asset_from_mapping(
+        {
+            "label": "2027 1st",
+            "season": 2027,
+            "round": 1,
+            "original_roster_id": "7",
+            "owner_roster_id": "3",
+            "owner_team_name": "Roster",
+            "score": 800,
+        }
+    )
+    assert asset["pick_id"] == "2027:1:7"
+
+
 def test_player_and_pick_catalog_and_identity():
     frame = pd.DataFrame(
         [
