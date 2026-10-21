@@ -1603,6 +1603,146 @@ def save_league(
     }
 
 
+# Sleeper leagues only ever grow a "next season" successor once the
+# current one is no longer being played -- see resolve_league_path_id's
+# own cost-control note below for why this status set gates whether it's
+# even worth attempting a live rollover check at all.
+_STALE_LEAGUE_STATUSES = frozenset({"complete"})
+
+
+def _candidate_sleeper_username_for_rollover(
+    config: dict, access_token: str, user_id: str, profile: dict[str, str]
+) -> str:
+    """Best-effort Sleeper username to resolve a raw path `league_id`
+    against (see resolve_league_path_id below). Prefers the signed-in
+    caller's own linked (profile) username -- the common case, and exactly
+    the one the real production repro used (save + link-sleeper, then hit
+    a path param directly) -- and falls back to any of their saved_leagues
+    rows' per-league username if the profile has none. Returns "" when the
+    caller has never linked Sleeper at all (e.g. a brand-new account, or
+    someone only ever viewing public league data with no Sleeper link of
+    their own), in which case resolution is skipped entirely."""
+
+    username = str(profile.get("sleeper_username") or "").strip()
+    if username or not user_id:
+        return username
+    try:
+        saved_rows, saved_error = _fetch_saved_leagues_cached(config, access_token, user_id)
+    except Exception:
+        return ""
+    if saved_error or not saved_rows:
+        return ""
+    for row in saved_rows:
+        candidate = str(row.get("sleeper_username") or "").strip()
+        if candidate:
+            return candidate
+    return ""
+
+
+def resolve_league_path_id(
+    league_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> str:
+    """Shared FastAPI dependency for (almost) every `/v1/leagues/{league_id}`
+    route below: resolves a raw path `league_id` forward across a Sleeper
+    season rollover BEFORE the route body runs, reusing the exact same
+    `resolve_saved_league_rollover` chain-walk (via `_resolve_league_rollover_
+    cached`) PR #1312 already added for the saved-leagues LIST endpoint.
+
+    Real production bug, 2026-10-21/22 (coridian_, live, confirmed with a
+    disposable test account against production): PR #1312's resolution only
+    ran inside `_fetch_saved_leagues_cached` -- i.e. when ENUMERATING a
+    user's saved leagues. It never touched the ~40 OTHER endpoints that take
+    `league_id` directly as a URL path parameter (my-roster, dashboard,
+    trade-hub, waivers, matchup, etc.). A client navigating with a
+    `league_id` it already had in hand from BEFORE a rollover was first
+    noticed (a saved-league row fetched earlier, a deep link, cached local
+    state) kept hitting every one of those endpoints with the stale id, with
+    no resolution check at all -- e.g. GET .../my-roster/{stale_id} kept
+    returning the prior season's roster verbatim, HTTP 200, no error.
+
+    Needs a sleeper_username to resolve against; a raw incoming path doesn't
+    carry one, so this borrows the signed-in caller's OWN linked username
+    (see `_candidate_sleeper_username_for_rollover`) as the resolution
+    candidate. This is deliberately safe even for a league_id the caller
+    hasn't saved and doesn't belong to (e.g. public league data shared by a
+    leaguemate's link): `resolve_current_season_league_id` only rewrites the
+    id when that candidate username's OWN Sleeper leagues contain a REAL
+    `previous_league_id` chain link back to this exact incoming id -- so for
+    a league this caller has no real connection to, resolution is an
+    unconditional no-op and the original id reaches the route unchanged,
+    same as before this dependency existed.
+
+    Fails open on every error path -- a missing link, a Supabase hiccup, an
+    unreachable Sleeper API -- by returning the original `league_id`
+    untouched; this must never turn a transport hiccup into a 500 or a wrong
+    league on an otherwise-healthy request.
+
+    NOT applied to several endpoints on purpose, each documented at its own
+    route (grep this file for "NOT resolved" to find every one):
+      - `DELETE /v1/leagues/{league_id}/save` -- removes a specific
+        already-stored `saved_leagues` row by the exact id the client
+        sent, which may still be the OLD, not-yet-migrated id; resolving
+        forward would make the delete silently match nothing, leaving the
+        stale row un-removable.
+      - `POST /v1/leagues/{league_id}/alerts/read`, `POST .../trade-
+        outcomes`, `POST/DELETE/PATCH .../gm-targets...`, `POST .../gm-
+        stance`, `POST .../team-stance` -- each writes a row whose identity
+        (or whose paired add/remove consistency) is keyed by the exact
+        `league_id` the client sent. The matching GET/read side of each of
+        these IS resolved, so a preference or watchlist entry written
+        under a stale id simply self-heals the next time it's read back
+        and re-declared under the current id -- never a wrong
+        roster/matchup/trade-data result, never an error, never silently
+        unflagged (every exclusion has an inline comment at its route).
+
+    A handful of the READ endpoints this dependency DOES cover (Dashboard,
+    Trade Hub, Trade Finder, GM Plan, the dedicated GM Stance/Team Stance/
+    GM Targets GETs, ...) separately read those same league-scoped user
+    preference tables, keyed by (user_id, league_id). Since those tables
+    are NOT migrated forward on rollover the way `saved_leagues` is (see
+    `_apply_league_rollover_resolution`), the first time a league's id
+    resolves forward here, a preference set under the OLD id will briefly
+    read back as unset/default until the caller re-declares it under the
+    new id. Same known, documented, self-healing, low-severity side effect
+    as above -- see the PR description for the follow-up to migrate those
+    tables the same way `saved_leagues` already is.
+
+    Cost control: resolution needs a live Sleeper leagues-list lookup for
+    the candidate username, which is too expensive to pay on every single
+    one of these ~40 endpoints' every single request. Sleeper only ever
+    mints a "next season" successor for a league once that league is no
+    longer being played, so this is gated on the INCOMING id's own league
+    `status` first -- "pre_draft" / "drafting" / "in_season" cannot
+    possibly be stale (no newer id can exist yet), so resolution is
+    skipped with zero extra network calls for the overwhelming common
+    case. Only a `status == "complete"` league (this season over, or
+    already rolled over) pays the one extra, 24h-cached lookup.
+    """
+
+    league_id_clean = str(league_id or "").strip()
+    if not league_id_clean:
+        return league_id
+    try:
+        user_id = str(user.get("id") or "")
+        if not user_id:
+            return league_id_clean
+        league = sleeper.get_league(league_id_clean)
+        status = str((league or {}).get("status") or "").strip()
+        if status not in _STALE_LEAGUE_STATUSES:
+            return league_id_clean
+        config = auth_supabase.get_supabase_config()
+        access_token = str(user.get("_access_token") or "")
+        profile = _fetch_profile_fields(config, user_id, access_token)
+        sleeper_username = _candidate_sleeper_username_for_rollover(config, access_token, user_id, profile)
+        if not sleeper_username:
+            return league_id_clean
+        resolved = _resolve_league_rollover_cached(league_id_clean, sleeper_username)
+        return resolved or league_id_clean
+    except Exception:
+        return league_id_clean
+
+
 @app.delete("/v1/leagues/{league_id}/save")
 def remove_saved_league(
     league_id: str,
@@ -1670,7 +1810,7 @@ def remove_saved_league(
 
 
 @app.get("/v1/leagues/{league_id}")
-def get_league(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
@@ -1678,17 +1818,17 @@ def get_league(league_id: str, _user: dict[str, Any] = Depends(require_user)) ->
 
 
 @app.get("/v1/leagues/{league_id}/users")
-def get_league_users(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league_users(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "users": sleeper.get_users(league_id)}
 
 
 @app.get("/v1/leagues/{league_id}/rosters")
-def get_league_rosters(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league_rosters(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "rosters": sleeper.get_rosters(league_id)}
 
 
 @app.get("/v1/leagues/{league_id}/team-profiles")
-def get_league_team_profiles(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league_team_profiles(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Team identity per roster (name/owner/avatar), keyed by roster_id.
 
     Reuses modules.sleeper.get_league_roster_profiles verbatim — the same
@@ -1701,7 +1841,7 @@ def get_league_team_profiles(league_id: str, _user: dict[str, Any] = Depends(req
 
 @app.get("/v1/leagues/{league_id}/team-rankings")
 def get_league_team_rankings(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2027,7 +2167,7 @@ def get_league_team_rankings(
 
 @app.get("/v1/leagues/{league_id}/playoff-odds")
 def get_league_playoff_odds(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2070,7 +2210,7 @@ def get_league_playoff_odds(
 
 @app.get("/v1/leagues/{league_id}/draft-center")
 def get_league_draft_center(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2216,7 +2356,7 @@ def get_league_draft_center(
 
 @app.get("/v1/leagues/{league_id}/draft-picks")
 def get_league_draft_picks(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2529,7 +2669,7 @@ def _resolve_my_roster(
 
 @app.get("/v1/leagues/{league_id}/live-draft")
 def get_league_live_draft_discovery(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Discover this league's Sleeper drafts so the client can gate the
@@ -2690,8 +2830,8 @@ LIVE_DRAFT_MAX_PICK_ROWS = 60
 
 @app.get("/v1/leagues/{league_id}/live-draft/{draft_id}")
 def get_league_live_draft_state(
-    league_id: str,
     draft_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2896,8 +3036,8 @@ def _load_active_live_draft(league_id: str, draft_id: str) -> tuple[dict[str, An
 
 @app.get("/v1/leagues/{league_id}/live-draft/{draft_id}/trade-evaluator")
 def get_live_draft_trade_evaluator_options(
-    league_id: str,
     draft_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """The one piece of data the hypothetical mid-draft Trade Evaluator
@@ -2974,9 +3114,9 @@ def _project_live_draft_trade_asset(asset: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/v1/leagues/{league_id}/live-draft/{draft_id}/trade-evaluator")
 def post_live_draft_trade_evaluator(
-    league_id: str,
     draft_id: str,
     body: LiveDraftTradeEvaluatorRequest,
+    league_id: str = Depends(resolve_league_path_id),
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Hypothetical mid-draft trade evaluator: totals + a Favorable / Fair /
@@ -3103,11 +3243,20 @@ def post_live_draft_trade_evaluator(
 
 
 @app.get("/v1/leagues/{league_id}/my-roster")
-def get_my_roster(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_my_roster(
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
     """Identify which of this league's rosters belongs to the signed-in user.
 
     Always returns 200 with a `reason` the client can act on instead of
     parsing HTTP status semantics — see `_resolve_my_roster`.
+
+    `league_id` is resolved forward across a Sleeper season rollover
+    before this body ever runs (see resolve_league_path_id) -- this is the
+    exact endpoint the 3rd real production repro of this bug (coridian_,
+    2026-10-21) reproduced against: a stale saved league_id kept returning
+    a full 200 with last season's frozen roster even after PR #1312.
     """
 
     roster, reason = _resolve_my_roster(user, league_id)
@@ -3370,7 +3519,7 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
 
 @app.get("/v1/leagues/{league_id}/rankings")
 def get_league_rankings(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     limit: int = 100,
     _user: dict[str, Any] = Depends(require_user),
@@ -3440,8 +3589,8 @@ def get_league_rankings(
 
 @app.get("/v1/leagues/{league_id}/players/{player_id}/rank")
 def get_player_rank_in_league(
-    league_id: str,
     player_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -3654,8 +3803,8 @@ class TradeAnalyzerRequest(BaseModel):
 
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
 def post_trade_analyzer(
-    league_id: str,
     body: TradeAnalyzerRequest,
+    league_id: str = Depends(resolve_league_path_id),
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Real accept/decline/counter verdict for a proposed trade package.
@@ -3877,7 +4026,7 @@ def post_trade_analyzer(
 
 @app.get("/v1/leagues/{league_id}/recap")
 def get_league_recap(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     week: int | None = None,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -3959,7 +4108,7 @@ def get_league_recap(
 
 @app.get("/v1/leagues/{league_id}/history")
 def get_league_history(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     season_league_id: str | None = None,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -4059,7 +4208,7 @@ def get_league_history(
 
 @app.get("/v1/leagues/{league_id}/storylines")
 def get_league_storylines(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Season-long storyline awards — shares the exact same builder as the
@@ -4234,7 +4383,7 @@ def _project_alert_item(
 
 @app.get("/v1/leagues/{league_id}/alerts")
 def get_league_alerts(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     limit: int = 12,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -4315,8 +4464,16 @@ class MarkAlertReadRequest(BaseModel):
 
 @app.post("/v1/leagues/{league_id}/alerts/read")
 def mark_league_alert_read(
-    league_id: str,
     body: MarkAlertReadRequest,
+    # NOT resolved (see resolve_league_path_id's docstring): this writes a
+    # read-state row keyed by (user_id, league_id, alert identity) -- an
+    # unresolved stale id here is self-correcting next time the caller's
+    # ALERTS LIST is fetched (via resolve_league_path_id on the GET above),
+    # at which point the alert re-renders under the current id and a fresh
+    # mark-read call lands on the right row. Resolving forward on the
+    # WRITE path instead risks marking the wrong (not-yet-existing-for-
+    # this-id) alert read, or silently no-op'ing.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Durably mark one alert read (see docs/supabase_mobile_alert_reads.sql).
@@ -4826,7 +4983,7 @@ def _guess_the_player_leaderboard_entries(
 
 @app.get("/v1/leagues/{league_id}/guess-the-player/leaderboard")
 def get_guess_the_player_leaderboard(
-    league_id: str, user: dict[str, Any] = Depends(require_user)
+    league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     """Both mini-games' real streaks, ranked among the other FantasyDesk
     accounts that have THIS league saved (see modules.guess_the_player_
@@ -4935,8 +5092,13 @@ class RecordTradeShareRequest(BaseModel):
 
 @app.post("/v1/leagues/{league_id}/trade-outcomes")
 def record_trade_share(
-    league_id: str,
     body: RecordTradeShareRequest,
+    # NOT resolved -- see resolve_league_path_id's docstring. This records
+    # a durable, user-facing history row; resolving the id forward on a
+    # write is a bigger risk (silently attributing the record to a
+    # different, if more "correct", league) than leaving an occasional
+    # stale league_id on a historical record a client explicitly sent.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Record that a trade was shared, to ask "did this happen?" later.
@@ -6581,7 +6743,7 @@ def _fetch_gm_target_player_ids_uncached(
 
 
 @app.get("/v1/leagues/{league_id}/gm-targets")
-def get_gm_targets(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_gm_targets(league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """The caller's durable watchlist for this league (GM Targets).
 
     Preference rows only, per modules.gm_targets' own contract (see
@@ -6612,8 +6774,14 @@ def get_gm_targets(league_id: str, user: dict[str, Any] = Depends(require_user))
 
 @app.post("/v1/leagues/{league_id}/gm-targets")
 def add_gm_target(
-    league_id: str,
     payload: AddGmTargetRequest,
+    # NOT resolved -- see resolve_league_path_id's docstring. GM Targets
+    # rows are keyed by (user_id, league_id, player_id); the paired DELETE
+    # below removes a row by that same exact key, so add/remove must keep
+    # using whatever id the client is currently operating under, or a
+    # remove issued right after an add (same session, id resolves forward
+    # in between) could silently miss the row it just created.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Add a player to the caller's watchlist for this league.
@@ -6663,8 +6831,11 @@ def add_gm_target(
 
 @app.delete("/v1/leagues/{league_id}/gm-targets/{player_id}")
 def remove_gm_target(
-    league_id: str,
     player_id: str,
+    # NOT resolved -- see add_gm_target above and resolve_league_path_id's
+    # docstring: must match on the exact (user_id, league_id, player_id)
+    # key the row was stored under.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     config = auth_supabase.get_supabase_config()
@@ -6688,9 +6859,12 @@ class SetGmTargetUntouchableRequest(BaseModel):
 
 @app.patch("/v1/leagues/{league_id}/gm-targets/{player_id}/untouchable")
 def set_gm_target_untouchable(
-    league_id: str,
     player_id: str,
     payload: SetGmTargetUntouchableRequest,
+    # NOT resolved -- see add_gm_target above and resolve_league_path_id's
+    # docstring: must match on the exact (user_id, league_id, player_id)
+    # key the row was stored under.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Mark/unmark an existing GM Target as untouchable.
@@ -7265,7 +7439,7 @@ def _fetch_gm_stance_with_set_flag(
 
 
 @app.get("/v1/leagues/{league_id}/gm-stance")
-def get_gm_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_gm_stance(league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """The caller's remembered team strategy for this league, so Trade Hub,
     Trade Analyzer, and the Dashboard's trade tile don't all separately
     default to "retool" every visit and make the user re-declare their
@@ -7292,8 +7466,12 @@ class UpdateGmStanceRequest(BaseModel):
 
 @app.post("/v1/leagues/{league_id}/gm-stance")
 def update_gm_stance(
-    league_id: str,
     body: UpdateGmStanceRequest,
+    # NOT resolved -- see resolve_league_path_id's docstring: this upserts
+    # a preference row keyed by (user_id, league_id). The matching GET
+    # above IS resolved, so a stance set under a stale id self-heals the
+    # next time it's read back and re-declared under the current id.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Deprecated write path, kept only so a pre-merge mobile build still
@@ -7404,7 +7582,7 @@ def _fetch_team_stance_uncached(config: dict, user_id: str, access_token: str, l
 
 
 @app.get("/v1/leagues/{league_id}/team-stance")
-def get_team_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_team_stance(league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """The caller's declared Team Situation for this league — "" when unset.
 
     Drives both trade-idea rationale framing AND real valuation adjustments
@@ -7434,8 +7612,11 @@ class SetTeamStanceRequest(BaseModel):
 
 @app.post("/v1/leagues/{league_id}/team-stance")
 def set_team_stance(
-    league_id: str,
     body: SetTeamStanceRequest,
+    # NOT resolved -- see update_gm_stance above and resolve_league_path_id's
+    # docstring. Same (user_id, league_id) preference-row shape, same
+    # self-healing-via-the-GET-endpoint argument.
+    league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Set (upsert) the caller's declared Team Situation for this league."""
@@ -7509,7 +7690,7 @@ FREE_DASHBOARD_VISIBLE_ITEMS = 4
 
 @app.get("/v1/leagues/{league_id}/dashboard")
 def get_league_dashboard(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -8369,7 +8550,7 @@ def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(req
 
 @app.get("/v1/leagues/{league_id}/gm-plan")
 def get_gm_plan(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -8812,7 +8993,7 @@ def _suggested_lineup_split(
 
 @app.get("/v1/leagues/{league_id}/my-team")
 def get_league_my_team(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -8899,7 +9080,7 @@ def _empty_my_team_needs_response(settings: dict[str, Any], *, reason: str) -> d
 
 @app.get("/v1/leagues/{league_id}/my-team-needs")
 def get_league_my_team_needs(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -9464,7 +9645,7 @@ def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
 
 @app.get("/v1/leagues/{league_id}/matchup")
 def get_league_matchup(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -9793,7 +9974,7 @@ def _project_priority_add(
 
 @app.get("/v1/leagues/{league_id}/waivers")
 def get_league_waivers(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     limit: int = 150,
     user: dict[str, Any] = Depends(require_user),
@@ -10164,7 +10345,7 @@ def _project_and_enrich_trade_idea_cards(
 
 @app.get("/v1/leagues/{league_id}/trade-hub")
 def get_trade_hub_ideas(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     strategy: str = "retool",
     lens: str = "Dynasty",
     ad_unlocks: int = 0,
@@ -10266,8 +10447,8 @@ def get_trade_hub_ideas(
 
 @app.get("/v1/leagues/{league_id}/trade-hub/{recommendation_id}/share-card.png")
 def get_trade_hub_idea_share_card(
-    league_id: str,
     recommendation_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     strategy: str = "retool",
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
@@ -10373,7 +10554,7 @@ def get_trade_hub_idea_share_card(
 
 @app.get("/v1/leagues/{league_id}/trade-finder")
 def get_trade_finder_ideas(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     player_ids: str = "",
     strategy: str = "retool",
     lens: str = "Dynasty",
@@ -10445,7 +10626,7 @@ def get_trade_finder_ideas(
 
 @app.get("/v1/leagues/{league_id}/all-trades")
 def get_league_all_trades(
-    league_id: str,
+    league_id: str = Depends(resolve_league_path_id),
     strategy: str = "retool",
     lens: str = "Dynasty",
     cursor: int = 0,
