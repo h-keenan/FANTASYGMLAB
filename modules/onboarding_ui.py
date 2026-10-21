@@ -1,6 +1,8 @@
 from html import escape
 from typing import Callable
 
+from modules.sleeper_leagues import resolve_current_season_league_id
+
 
 def _safe_text(value, default: str = "") -> str:
     if value is None:
@@ -20,41 +22,6 @@ def eligible_leagues(leagues) -> list[dict]:
         seen_ids.add(league_id)
         eligible.append(league)
     return eligible
-
-
-def _resolve_current_season_league_id(league_id: str, leagues: list[dict]) -> str:
-    """Walk Sleeper's previous_league_id chain forward from a saved/stale
-    league_id to this season's continuation of the same dynasty league.
-
-    Sleeper mints a brand-new league_id every time a league rolls over to a
-    new season (linked backward via previous_league_id); the old id keeps
-    resolving on Sleeper's API indefinitely, it just stops being "this
-    season's league." Without this resolution step, a saved league_id that
-    is still present in a freshly-fetched multi-season lookup (because
-    Sleeper still serves last season's league under its own old id) reads
-    as "still valid" even though a newer, current-season version of that
-    exact league now exists under a different id.
-    """
-    if not league_id:
-        return league_id
-    by_previous_id = {
-        _safe_text(league.get("previous_league_id")).strip(): _safe_text(
-            league.get("league_id")
-        ).strip()
-        for league in leagues
-        if isinstance(league, dict)
-        and _safe_text(league.get("previous_league_id")).strip()
-        and _safe_text(league.get("league_id")).strip()
-    }
-    resolved = league_id
-    seen = {resolved}
-    while resolved in by_previous_id:
-        next_id = by_previous_id[resolved]
-        if not next_id or next_id in seen:
-            break
-        resolved = next_id
-        seen.add(resolved)
-    return resolved
 
 
 def group_league_cards_by_season(cards: list[dict]) -> list[tuple[str, list[dict]]]:
@@ -103,7 +70,7 @@ def last_league_option(
         _safe_text(league.get("league_id")).strip() for league in eligible
     }
     if current_league_id and current_username.strip().casefold() == username.strip().casefold():
-        resolved = _resolve_current_season_league_id(current_league_id, eligible)
+        resolved = resolve_current_season_league_id(current_league_id, eligible)
         if resolved in valid_ids:
             return resolved
 
@@ -111,7 +78,7 @@ def last_league_option(
     account_username = _safe_text(account.get("username")).strip()
     account_league_id = _safe_text(account.get("league_id")).strip()
     if account_username.casefold() == username.strip().casefold() and account_league_id:
-        resolved = _resolve_current_season_league_id(account_league_id, eligible)
+        resolved = resolve_current_season_league_id(account_league_id, eligible)
         if resolved in valid_ids:
             return resolved
     return ""

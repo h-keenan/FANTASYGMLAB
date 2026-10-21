@@ -182,6 +182,80 @@ def get_user_leagues(username: str, season: Optional[int] = None) -> List[Dict]:
     return lookup_user_leagues(username, season=season).leagues
 
 
+def _safe_text(value, default: str = "") -> str:
+    if value is None:
+        return default
+    return str(value)
+
+
+def resolve_current_season_league_id(league_id: str, leagues: List[Dict]) -> str:
+    """Walk Sleeper's previous_league_id chain forward from a saved/stale
+    league_id to this season's continuation of the same dynasty league.
+
+    Sleeper mints a brand-new league_id every time a league rolls over to a
+    new season (linked backward via previous_league_id); the old id keeps
+    resolving on Sleeper's API indefinitely, it just stops being "this
+    season's league." Without this resolution step, a saved league_id that
+    is still present in a freshly-fetched multi-season lookup (because
+    Sleeper still serves last season's league under its own old id) reads
+    as "still valid" even though a newer, current-season version of that
+    exact league now exists under a different id.
+
+    Shared by modules.onboarding_ui (the onboarding picker's "last used"
+    shortcut) and resolve_saved_league_rollover below (an already-saved
+    league going stale after the fact) -- same chain-walk, two callers.
+    """
+    if not league_id:
+        return league_id
+    by_previous_id = {
+        _safe_text(league.get("previous_league_id")).strip(): _safe_text(
+            league.get("league_id")
+        ).strip()
+        for league in leagues
+        if isinstance(league, dict)
+        and _safe_text(league.get("previous_league_id")).strip()
+        and _safe_text(league.get("league_id")).strip()
+    }
+    resolved = league_id
+    seen = {resolved}
+    while resolved in by_previous_id:
+        next_id = by_previous_id[resolved]
+        if not next_id or next_id in seen:
+            break
+        resolved = next_id
+        seen.add(resolved)
+    return resolved
+
+
+def resolve_saved_league_rollover(
+    league_id: str, sleeper_username: str, *, season: Optional[int] = None
+) -> str:
+    """Given an already-saved league_id and the Sleeper username that saved
+    it, return this season's continuation of that league if one exists,
+    else the original league_id unchanged.
+
+    Real production bug, 2026-10-21 (coridian_, live): a user's saved
+    league keeps pointing at last season's now-frozen league_id forever
+    once their real league rolls over on Sleeper -- nothing re-points it,
+    so a stale roster view, and (via modules.guess_the_player_leaderboard's
+    own direct saved_leagues query) a leaderboard that only matches
+    leaguemates who happen to share that exact stale-or-fresh id, are both
+    direct downstream consequences. This is the read path for that fix
+    (see services/mobile_api_service.py's _resolve_league_rollover_cached);
+    never raises and never guesses -- a lookup failure or an unresolvable
+    chain returns the original id unchanged, so a transport hiccup can
+    never turn into a wrong league.
+    """
+    league_id_clean = _safe_text(league_id).strip()
+    username_clean = _safe_text(sleeper_username).strip()
+    if not league_id_clean or not username_clean:
+        return league_id_clean
+    lookup = lookup_user_leagues(username_clean, season=season)
+    if lookup.status != "ok":
+        return league_id_clean
+    return resolve_current_season_league_id(league_id_clean, lookup.leagues)
+
+
 def league_lookup_customer_message(status: LeagueLookupStatus) -> str:
     if status == "empty_username":
         return "Enter a Sleeper username first."

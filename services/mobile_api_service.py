@@ -2359,11 +2359,99 @@ def get_league_draft_picks(
 # a few seconds) down to effectively one real fetch.
 _SAVED_LEAGUES_TTL_SECONDS = 15
 
+# Real production bug, 2026-10-21 (coridian_, live, confirmed against a real
+# account): Sleeper mints a brand-new league_id every season a dynasty
+# league rolls over (linked backward via previous_league_id); nothing in
+# this codebase re-pointed an already-saved league forward once that
+# happened, so a saved_leagues row kept resolving to last season's frozen
+# league object forever. Downstream, that silently fed (a) a stale,
+# prior-season roster view from _resolve_my_roster below, and (b) a Guess
+# the Player leaderboard that only matches leaguemates sharing the exact
+# same (stale-or-fresh) league_id, since guess_the_player_leaderboard's
+# fetch_league_members queries saved_leagues directly by league_id.
+#
+# A day-long TTL is deliberate: season rollover is a once-a-year event per
+# league, so the only cost of a stale cache entry is a day's delay in
+# *noticing* a rollover that already happened -- not a wrong answer (an
+# unresolved stale id behaves exactly as it did before this fix: still
+# wrong, just not re-checked yet). Keyed by league_id alone, not per-user:
+# "is this league_id this season's version" is the same fact for every
+# saved_leagues row that points at it, so the first user to trigger the
+# check resolves it for every leaguemate, not just themselves.
+_LEAGUE_ROLLOVER_CACHE_TTL_SECONDS = 24 * 60 * 60
+
+
+def _resolve_league_rollover_cached(league_id: str, sleeper_username: str) -> str:
+    """Cached wrapper around sleeper_leagues.resolve_saved_league_rollover.
+    Fails open to the original league_id on any cache or lookup problem --
+    never raises, never blocks a request on this."""
+
+    if not league_id or not sleeper_username:
+        return league_id
+    cache_key = redis_cache.build_cache_key("league_rollover", league_id)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_LEAGUE_ROLLOVER_CACHE_TTL_SECONDS,
+            compute=lambda: sleeper_leagues.resolve_saved_league_rollover(league_id, sleeper_username),
+        )
+    except Exception:
+        try:
+            return sleeper_leagues.resolve_saved_league_rollover(league_id, sleeper_username)
+        except Exception:
+            return league_id
+
+
+def _apply_league_rollover_resolution(
+    config: dict, access_token: str, user_id: str, rows: list[dict]
+) -> list[dict]:
+    """Returns `rows` with any stale, rolled-over-away-from league_id
+    swapped for its current-season continuation. A resolved row is also
+    migrated in Supabase (account_store.migrate_saved_league) -- best
+    effort, a failed migration never blocks using the correct id for THIS
+    response -- so the next fetch, and any OTHER leaguemate's own
+    leaderboard/roster query, see the fixed row too, without each member
+    having to independently trigger a resolution."""
+
+    resolved_rows: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        old_league_id = str(row.get("league_id") or "").strip()
+        sleeper_username = str(row.get("sleeper_username") or "").strip()
+        if not old_league_id or not sleeper_username:
+            resolved_rows.append(row)
+            continue
+        resolved_league_id = _resolve_league_rollover_cached(old_league_id, sleeper_username)
+        if not resolved_league_id or resolved_league_id == old_league_id:
+            resolved_rows.append(row)
+            continue
+        try:
+            account_store.migrate_saved_league(
+                config,
+                access_token,
+                user_id=user_id,
+                old_league_id=old_league_id,
+                new_league_id=resolved_league_id,
+                sleeper_username=sleeper_username,
+                league_name=str(row.get("league_name") or ""),
+                owner_id=str(row.get("owner_id") or ""),
+                roster_id=row.get("roster_id"),
+                team_id=row.get("team_id"),
+                is_default=bool(row.get("is_default")),
+            )
+        except Exception:
+            pass
+        resolved_row = dict(row)
+        resolved_row["league_id"] = resolved_league_id
+        resolved_rows.append(resolved_row)
+    return resolved_rows
+
 
 def _fetch_saved_leagues_cached(config: dict, access_token: str, user_id: str) -> tuple[list[dict], str]:
     cache_key = redis_cache.build_cache_key("saved_leagues", user_id)
     try:
-        return redis_cache.redis_single_flight_cache(
+        rows, error = redis_cache.redis_single_flight_cache(
             cache_key=cache_key,
             ttl_seconds=_SAVED_LEAGUES_TTL_SECONDS,
             compute=lambda: account_store.fetch_saved_leagues(config, access_token, user_id=user_id),
@@ -2372,7 +2460,10 @@ def _fetch_saved_leagues_cached(config: dict, access_token: str, user_id: str) -
         # Same fail-open contract redis_single_flight_cache documents for a
         # Redis outage -- never let a cache-layer problem turn into a
         # roster-resolution failure.
-        return account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+        rows, error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+    if error or not rows:
+        return rows, error
+    return _apply_league_rollover_resolution(config, access_token, user_id, rows), error
 
 
 def _resolve_my_roster(
