@@ -6518,32 +6518,40 @@ def render_home_launch_screen(
                         product_copy.CHOOSE_LEAGUE_TITLE,
                         weight="secondary",
                     )
-                    for card in league_cards:
-                        st.markdown(
-                            onboarding_ui.league_card_html(
-                                card,
-                                team_logo_html=team_logo_html,
-                                selected=bool(
-                                    selected_league_id
-                                    and str(card.get("league_id")) == str(selected_league_id)
-                                ),
-                                last_used=str(card.get("league_id")) == last_league_id,
-                            ),
-                            unsafe_allow_html=True,
+                    for season_label, season_cards in onboarding_ui.group_league_cards_by_season(
+                        league_cards
+                    ):
+                        ui_primitives.render_section_header(
+                            f"{season_label} season",
+                            heading_level=4,
+                            weight="support",
                         )
-                        if st.button(
-                            product_copy.OPEN_LEAGUE_CTA,
-                            key=f"launch_open_league_{card.get('league_id')}",
-                            use_container_width=True,
-                            type="primary" if len(league_cards) == 1 else "secondary",
-                            disabled=bool(st.session_state.get("_opening_selected_league")),
-                        ):
-                            set_selected_league(
-                                str(card.get("league_id") or ""),
-                                _safe_text(card.get("league_name")),
-                                route_to_dashboard=True,
+                        for card in season_cards:
+                            st.markdown(
+                                onboarding_ui.league_card_html(
+                                    card,
+                                    team_logo_html=team_logo_html,
+                                    selected=bool(
+                                        selected_league_id
+                                        and str(card.get("league_id")) == str(selected_league_id)
+                                    ),
+                                    last_used=str(card.get("league_id")) == last_league_id,
+                                ),
+                                unsafe_allow_html=True,
                             )
-                            st.rerun()
+                            if st.button(
+                                product_copy.OPEN_LEAGUE_CTA,
+                                key=f"launch_open_league_{card.get('league_id')}",
+                                use_container_width=True,
+                                type="primary" if len(league_cards) == 1 else "secondary",
+                                disabled=bool(st.session_state.get("_opening_selected_league")),
+                            ):
+                                set_selected_league(
+                                    str(card.get("league_id") or ""),
+                                    _safe_text(card.get("league_name")),
+                                    route_to_dashboard=True,
+                                )
+                                st.rerun()
 
     def _render_launch_account() -> None:
         if skip_account_entry:

@@ -187,6 +187,35 @@ describe("SleeperImportForm", () => {
     expect(trackFeatureUse).toHaveBeenCalledWith("league_import_completed", { leagueId: "league-b" });
   });
 
+  // Bug report, 2026-10-21: a continuing dynasty league gets a new
+  // league_id each season it rolls over on Sleeper, so the SAME league can
+  // legitimately appear twice here (once per season) -- users were tapping
+  // the wrong year's card. The picker must group by season under a visible
+  // header, current season first, not render one flat list.
+  it("groups leagues by season with the current season first when the same league appears across years", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [
+        { league_id: "league-2025", name: "Dynasty Warriors", season: "2025", total_rosters: 12 },
+        { league_id: "league-2026", name: "Dynasty Warriors", season: "2026", total_rosters: 12 },
+      ],
+      message: "",
+    });
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+
+    await waitFor(() => expect(screen.getAllByText("Dynasty Warriors")).toHaveLength(2));
+    const seasonHeaders = [screen.getByText("2026 season"), screen.getByText("2025 season")];
+    // 2026 header must appear before 2025 header in document order.
+    expect(
+      seasonHeaders[0].compareDocumentPosition(seasonHeaders[1]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("fires league_import_failed when saving the chosen league throws", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
       ok: true,
