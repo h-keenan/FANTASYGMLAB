@@ -95,6 +95,32 @@ def test_counter_guidance_prefers_removing_weak_send():
     }
 
 
+def test_counter_guidance_removing_weak_send_resolves_a_pick_by_pick_id():
+    # Revision 21 ("add picks to all trade sections" audit): the weakest
+    # outgoing asset is frequently a cheap future pick, not a player — this
+    # used to come back with "player_id": "" (pick_asset_from_mapping never
+    # stamped an id a pick-type asset could be re-identified by), which is
+    # exactly what made web-next/mobile's "Build the counter" button a
+    # no-op/hidden for this case. `pick_id` (trade_analyzer_assembly.
+    # pick_asset_from_mapping's own round-trip id) is the fallback now.
+    send = [
+        {"asset_type": "pick", "label": "2027 4th", "pick_id": "2027:4:me", "score": 200, "owner_roster_id": "me"},
+        {"asset_type": "player", "name": "Star", "score": 5000, "owner_roster_id": "me"},
+    ]
+    guidance, action = toa.build_counter_guidance(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-220,
+        send_assets=send,
+    )
+    assert "2027 4th" in guidance
+    assert action == {
+        "action": "remove_from_send",
+        "player_id": "2027:4:me",
+        "asset_type": "pick",
+        "label": "2027 4th",
+    }
+
+
 def test_counter_specific_asset_requires_verified_ownership():
     guidance, action = toa.build_counter_guidance(
         band=toa.VERDICT_COUNTER,
@@ -116,6 +142,36 @@ def test_counter_specific_asset_requires_verified_ownership():
         "player_id": "partner-wr-1",
         "asset_type": "player",
         "label": "Partner WR",
+    }
+
+
+def test_counter_guidance_add_to_receive_resolves_a_partner_pick_by_pick_id():
+    # Same fix as the remove_from_send case above, for the "ask for X back"
+    # direction — forward-looking coverage: today's post_trade_analyzer
+    # endpoint only ever populates partner_assets with players (see
+    # services/mobile_api_service.py), so this path is pick-shaped but not
+    # yet reachable in production; still correct to cover since
+    # build_counter_guidance itself makes no such restriction.
+    guidance, action = toa.build_counter_guidance(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-900,
+        send_assets=[{"asset_type": "player", "name": "Expensive", "score": 4000}],
+        partner_assets=[
+            {
+                "asset_type": "pick",
+                "pick_id": "2026:1:partner-1",
+                "name": "2026 1st",
+                "score": 950,
+                "owner_roster_id": "partner-1",
+            }
+        ],
+    )
+    assert "2026 1st" in guidance
+    assert action == {
+        "action": "add_to_receive",
+        "player_id": "2026:1:partner-1",
+        "asset_type": "pick",
+        "label": "2026 1st",
     }
 
 

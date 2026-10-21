@@ -62,6 +62,19 @@ import {
  * "always receive" reading. Fails open silently (plain Trade Analyzer view,
  * no crash) when the id is missing, stale, or isn't on any roster in this
  * league — there is no toast/error state for "couldn't find that player".
+ *
+ * Revision 21 (coridian_, "add picks to all trade sections" audit): "Build
+ * the counter" used to only ever appear/apply for a counter_action whose
+ * asset_type was "player" — modules/trade_offer_analyzer.py's
+ * build_counter_guidance has always been able to name a pick as the asset
+ * to remove from your send side or ask for back (e.g. the weakest
+ * outgoing asset in an overpay is often a cheap future pick, not a
+ * player), the button just silently never rendered for that case. Fixed
+ * on both ends: pick_asset_from_mapping now stamps a pick_id (the same
+ * DraftPickAsset.pick_id format every picks list on this page already
+ * keys on) onto every pick-type trade asset, and this component's
+ * applyCounterAction branches on asset_type to mutate sendPicks/
+ * receivePicks instead of sendPlayers/receivePlayers when it's set.
  */
 
 const MAX_SEARCH_RESULTS = 40;
@@ -261,7 +274,7 @@ function VerdictCard({
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {verdict.counter_guidance}
           </p>
-          {verdict.counter_action && verdict.counter_action.asset_type === "player" ? (
+          {verdict.counter_action ? (
             <button
               type="button"
               onClick={onBuildCounter}
@@ -552,8 +565,20 @@ export function TradeAnalyzerContent({
 
   function applyCounterAction() {
     const action = verdict?.counter_action;
-    if (!action || action.asset_type !== "player" || !action.player_id) return;
-    if (action.action === "remove_from_send") {
+    if (!action || !action.player_id) return;
+    if (action.asset_type === "pick") {
+      // Picks round-trip through `player_id` too (trade_analyzer_assembly.
+      // pick_asset_from_mapping's `pick_id`, the same DraftPickAsset.pick_id
+      // every other picks list on this page already keys on) — see this
+      // function's player branch below for the original player-only version.
+      if (action.action === "remove_from_send") {
+        setSendPicks((prev) => prev.filter((p) => p.pick_id !== action.player_id));
+      } else if (action.action === "add_to_receive") {
+        const pick = picks.find((p) => p.pick_id === action.player_id);
+        if (!pick) return;
+        setReceivePicks((prev) => (prev.some((p) => p.pick_id === pick.pick_id) ? prev : [...prev, pick]));
+      }
+    } else if (action.action === "remove_from_send") {
       setSendPlayers((prev) => prev.filter((p) => p.player_id !== action.player_id));
     } else if (action.action === "add_to_receive") {
       const player = rankings.find((p) => p.player_id === action.player_id);
