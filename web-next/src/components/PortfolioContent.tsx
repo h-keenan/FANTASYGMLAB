@@ -171,7 +171,7 @@ function DraftingLeaguesNote({ leagues }: { leagues: PortfolioFailedLeague[] }) 
         <div key={league.league_id} className="flex items-center justify-between gap-2">
           <span style={{ color: "var(--color-text-secondary)" }}>{league.league_name}</span>
           <Link
-            href={`/live-draft/${league.league_id}`}
+            href={`/live-draft/${league.league_id}?name=${encodeURIComponent(league.league_name)}`}
             className="text-xs font-bold whitespace-nowrap"
             style={{ color: "var(--color-accent)" }}
           >

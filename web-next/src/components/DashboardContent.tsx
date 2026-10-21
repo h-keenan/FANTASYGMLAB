@@ -69,13 +69,13 @@ export function DashboardContent({
           Leaderboard" link (feature-brainstorm audit, 2026-10-19) — the
           leaderboard itself is league-scoped even though the daily pick
           isn't. */}
-      <GuessThePlayerCard leagueId={leagueId} />
+      <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
 
       {/* "Who is who?" name-match mini-game (coridian_, 2026-10-19) — a
           second, distinct daily mini-game alongside Guess the Player
           above; same league-independent, self-fetching, dismissible
           shape, own daily pick and own streak. */}
-      <GuessThePlayerNameMatchCard leagueId={leagueId} />
+      <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
 
       {/* League Pulse (coridian_'s brainstorm list, "do it all") — real
           league-wide activity/streak leaders off GET .../team-rankings.

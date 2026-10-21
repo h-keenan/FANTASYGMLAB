@@ -183,6 +183,29 @@ describe("GuessThePlayerCard", () => {
     await screen.findByText("Whose stats are these?");
   });
 
+  // Regression: this link used to omit `?name=`, so following it into the
+  // leaderboard left the Header with no league-name source besides the raw
+  // Sleeper league_id (coridian_ screenshot: header showed the id, not a
+  // name).
+  it("includes the real league name on the League Leaderboard link", async () => {
+    vi.mocked(api.getGuessThePlayer).mockResolvedValue(promptResponse());
+    render(<GuessThePlayerCard leagueId="league-7" leagueName="Dynasty Overlords" />);
+
+    const link = await screen.findByRole("link", { name: /League Leaderboard/ });
+    expect(link).toHaveAttribute(
+      "href",
+      "/guess-the-player-leaderboard/league-7?name=Dynasty%20Overlords",
+    );
+  });
+
+  it("omits the name query param when no leagueName is given", async () => {
+    vi.mocked(api.getGuessThePlayer).mockResolvedValue(promptResponse());
+    render(<GuessThePlayerCard leagueId="league-7" />);
+
+    const link = await screen.findByRole("link", { name: /League Leaderboard/ });
+    expect(link).toHaveAttribute("href", "/guess-the-player-leaderboard/league-7");
+  });
+
   it("disables options once answered so a second click cannot double-submit", async () => {
     vi.mocked(api.getGuessThePlayer).mockResolvedValue(promptResponse());
     vi.mocked(api.answerGuessThePlayer).mockResolvedValue(answerResponse());

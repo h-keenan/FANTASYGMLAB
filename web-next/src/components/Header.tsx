@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
@@ -25,25 +25,18 @@ interface SavedLeagueRow {
   league_name: string | null;
 }
 
-function LeagueSwitcherButton({ leagueId, leagueName }: { leagueId: string; leagueName: string | null }) {
+function LeagueSwitcherButton({
+  leagueId,
+  leagueName,
+  leagues,
+}: {
+  leagueId: string;
+  leagueName: string | null;
+  leagues: SavedLeagueRow[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [leagues, setLeagues] = useState<SavedLeagueRow[]>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    supabase
-      .from("saved_leagues")
-      .select("league_id, league_name")
-      .then(({ data }) => {
-        if (!cancelled) setLeagues(data ?? []);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
 
   return (
     <div className="relative">
@@ -115,16 +108,54 @@ function LeagueSwitcherButton({ leagueId, leagueName }: { leagueId: string; leag
   );
 }
 
-function EvaluationLensButton({ leagueId }: { leagueId: string }) {
+const LENS_PANEL_WIDTH_PX = 256; // w-64
+
+/**
+ * Neither a static `left-0` nor a static `right-0` is correct for this
+ * button in every layout: on most viewports the header's right-hand
+ * control cluster sits flush against the right edge (so the panel must
+ * grow leftward, `right-0`, or it clips off the right side of the screen —
+ * coridian_ screenshot), but on a narrow phone the header row can wrap and
+ * leave this button alone near the LEFT edge instead (the exact case
+ * e95fc345 fixed by switching to `left-0` — a static swap back to `right-0`
+ * would silently reintroduce that regression). Measuring the button's real
+ * position and picking whichever anchor keeps the panel on-screen is the
+ * only choice that's correct in both layouts.
+ */
+function chooseDropdownAnchor(buttonLeft: number, buttonRight: number, viewportWidth: number): "left-0" | "right-0" {
+  const spaceRight = viewportWidth - buttonLeft;
+  const spaceLeft = buttonRight;
+  if (spaceRight >= LENS_PANEL_WIDTH_PX) return "left-0";
+  if (spaceLeft >= LENS_PANEL_WIDTH_PX) return "right-0";
+  // Neither side fully fits — pick whichever has more room; the
+  // `maxWidth: calc(100vw - 2rem)` clamp below keeps it from overflowing.
+  return spaceRight >= spaceLeft ? "left-0" : "right-0";
+}
+
+export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
   const { lens, setLens } = useValuationLens(leagueId);
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<"left-0" | "right-0">("right-0");
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const current = VALUATION_LENS_OPTIONS.find((option) => option.value === lens);
+
+  function toggleOpen() {
+    setOpen((value) => {
+      const next = !value;
+      if (next && buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setAnchor(chooseDropdownAnchor(rect.left, rect.right, window.innerWidth));
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="menu"
         className="px-2.5 py-1.5 text-xs font-bold"
@@ -135,14 +166,11 @@ function EvaluationLensButton({ leagueId }: { leagueId: string }) {
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
-          {/* left-0, not right-0 — same fix as LeagueSwitcherButton's menu
-              above and for the same reason (coridian_: "Dynasty menu in
-              the header clips outside the view on mobile"). This button
-              sits right after the league switcher in the same flex-wrap
-              row, so on a narrow phone it can land near the left edge of
-              its own wrapped row — a right-0 anchored w-64 menu had
-              nowhere to grow but off the left edge of the viewport. */}
-          <div role="menu" className="glass-surface absolute left-0 top-full mt-1 flex flex-col py-1 w-64" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+          <div
+            role="menu"
+            className={`glass-surface absolute ${anchor} top-full mt-1 flex flex-col py-1 w-64`}
+            style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}
+          >
             {VALUATION_LENS_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -186,13 +214,39 @@ function HeaderLeagueControls() {
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || leagueId;
+  const nameParam = searchParams.get("name");
+  const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
+
+  // Fetches the user's saved leagues once per league-scoped page (not just
+  // lazily when the switcher dropdown opens, like before) so the header's
+  // own displayed name can resolve `leagueId` -> real league name from
+  // `saved_leagues` whenever a caller forgot to pass `?name=` on its link —
+  // the raw-league_id-in-the-header bug (coridian_ screenshot) was exactly
+  // that: `leagueName` had no fallback besides the URL query param. This
+  // also means LeagueSwitcherButton's dropdown list is ready the instant
+  // it's opened instead of flashing "No other saved leagues" first.
+  useEffect(() => {
+    if (!leagueId) return;
+    let cancelled = false;
+    supabase
+      .from("saved_leagues")
+      .select("league_id, league_name")
+      .then(({ data }) => {
+        if (!cancelled) setSavedLeagues(data ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
 
   if (!leagueId) return null;
 
+  const resolvedName = nameParam || savedLeagues.find((row) => row.league_id === leagueId)?.league_name || null;
+  const leagueName = resolvedName || leagueId;
+
   return (
     <>
-      <LeagueSwitcherButton leagueId={leagueId} leagueName={leagueName} />
+      <LeagueSwitcherButton leagueId={leagueId} leagueName={leagueName} leagues={savedLeagues} />
       <EvaluationLensButton leagueId={leagueId} />
     </>
   );
