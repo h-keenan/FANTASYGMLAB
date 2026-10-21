@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
@@ -12,9 +13,10 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioResponse } from '../lib/api';
+import { api, type PortfolioFailedLeague, type PortfolioLeague } from '../lib/api';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
+import { queryKeys } from '../lib/queryKeys';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -44,6 +46,25 @@ function recordLabel(league: PortfolioLeague): string {
  * opportunity" headline the Dashboard itself leads with, not a new summary.
  * Tapping a row jumps straight into that league's own Dashboard, the same
  * "switch and go manage it" behavior LeagueSwitcherHeaderButton already uses.
+ *
+ * coridian_, 2026-10-21: "portfolio still takes too long on mobile" — real
+ * cause, confirmed by measuring the actual engines this screen's endpoint
+ * runs (see the PR for timings): GET /v1/portfolio's own per-league compute
+ * is NOT the dominant cost once a request lands (every prior perf pass
+ * already fixed the hang-proofing/duplicate-work/cross-worker-caching parts
+ * of that). This screen was the one data-fetching screen in the whole app
+ * still on the RETIRED hand-rolled `useFocusEffect` fetch pattern (every
+ * other screen — Dashboard, MyTeam, Matchup, PlayerDetail, LeagueDetail,
+ * Alerts, Recap, Teams — already moved to the shared React Query client,
+ * see lib/queryClient.ts) instead of `useQuery`. That meant Portfolio paid
+ * a full, uncached GET /v1/portfolio — recomputing every saved league's
+ * summary from scratch server-side if its 30s Redis window had lapsed —
+ * on EVERY single focus (tab switch, or just backing out of a league's own
+ * Dashboard), with no "paint last-known-good instantly, refresh quietly
+ * behind it" behavior and no visible refresh indicator: the old data sat
+ * frozen on screen for the whole request instead of showing anything was
+ * happening. `useQuery` below gives it the exact same cache-first/
+ * background-refetch treatment the rest of the app already relies on.
  */
 export default function PortfolioScreen() {
   const orbClearance = useOrbClearance();
@@ -51,33 +72,28 @@ export default function PortfolioScreen() {
   const navigation = useNavigation<Navigation>();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [data, setData] = useState<PortfolioResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-
-      async function load() {
-        try {
-          const result = await api.getPortfolio();
-          if (!cancelled) setData(result);
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load your portfolio.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      }
-
-      setError(null);
-      void load();
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
+  // The persisted AsyncStorage cache restores asynchronously — gating on it
+  // (same convention as DashboardScreen) keeps this query from firing (and
+  // racing/overwriting) before last session's cached response has been
+  // hydrated back into the in-memory QueryClient.
+  const isRestoring = useIsRestoring();
+  const portfolioQuery = useQuery({
+    queryKey: queryKeys.portfolio(),
+    queryFn: () => api.getPortfolio(),
+    enabled: !isRestoring,
+  });
+  const data = portfolioQuery.data ?? null;
+  // No data at all yet (neither a persisted cache hit nor a prior in-memory
+  // fetch) is the one case that still needs a blank-slate spinner — once
+  // any data exists, it paints immediately and a failed background refetch
+  // (e.g. a focus refresh after the 30s staleTime window) never blanks it.
+  const loading = isRestoring || portfolioQuery.isPending;
+  const error =
+    portfolioQuery.isError && !data
+      ? toUserErrorMessage(portfolioQuery.error, 'Failed to load your portfolio.')
+      : null;
 
   const openLeague = useCallback(
     (league: PortfolioLeague) => {
