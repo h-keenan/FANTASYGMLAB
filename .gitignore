@@ -80,6 +80,12 @@ data/*.value-history.json
 # Runtime-fetched NFL schedule cache (modules.nfl_schedule) — refetched
 # periodically from nflverse, never a committed fixture.
 data/nfl_games.csv
+
+# Runtime-fetched nflverse historical_contracts cache + its dataset-as-of
+# timestamp (modules.nflverse_contracts) — same posture as nfl_games.csv
+# above, never a committed fixture.
+data/nflverse_historical_contracts.csv.gz
+data/nflverse_historical_contracts_timestamp.json
 .streamlit/cache/
 
 # Local measurement dumps (scripts default to artifacts/measurements/)

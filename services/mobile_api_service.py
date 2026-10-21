@@ -6592,12 +6592,14 @@ def get_external_player_background(
     season: int | None = None,
 ) -> dict[str, Any]:
     """One player's background profile for the external content-posting
-    bot: contract-timeline context (Priority 1, always honestly
-    `status: "unavailable"` — no licensed contract-data source exists in
-    this codebase), real NFL team-situation context (Priority 2:
-    teammates, Sleeper's own published depth chart, recent workload), and
-    real historical PPR production with an honestly-unavailable standard/
-    box-score sibling (Priority 3) — see
+    bot: real, non-monetary contract-timeline context sourced from
+    nflverse's public `historical_contracts` dataset (Priority 1 —
+    `status: "unavailable"` with a specific reason whenever this player
+    can't be matched to that dataset unambiguously, never a guess), real
+    NFL team-situation context (Priority 2: teammates, Sleeper's own
+    published depth chart, recent workload), and real historical PPR
+    production with an honestly-unavailable standard/box-score sibling
+    (Priority 3) — see
     `modules.player_background_profile.build_player_background_profile`
     and `docs/external-api-contract.md` for the full field-by-field
     contract. Always 200 once authenticated: an unknown player id returns

@@ -6187,20 +6187,27 @@ def test_external_background_route_returns_module_output_for_known_player(monkey
     status "ok" and the full documented top-level shape."""
 
     pytest.importorskip("httpx")
+    import pandas as pd
     from fastapi.testclient import TestClient
+    from modules import nflverse_contracts
     from services import mobile_api_service
 
     monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
     client = TestClient(mobile_api_service.app)
 
     fake_players = {"4046": {"full_name": "Nico Collins", "team": "HOU", "position": "WR"}}
+    # No real network/disk fetch of the nflverse contracts dataset in this
+    # route-wiring test — an empty dataset reports honestly "unavailable"
+    # (match_status "unmatched"), the contract-matching behavior itself is
+    # covered in full by tests/test_player_background_profile.py.
     with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
         with patch.object(mobile_api_service.sleeper, "cached_season_player_weekly", return_value=[]):
-            response = client.get(
-                "/v1/external/players/4046/background",
-                params={"season": 2026},
-                headers={"Authorization": "Bearer the-real-secret-key"},
-            )
+            with patch.object(nflverse_contracts, "load_contracts", return_value=pd.DataFrame()):
+                response = client.get(
+                    "/v1/external/players/4046/background",
+                    params={"season": 2026},
+                    headers={"Authorization": "Bearer the-real-secret-key"},
+                )
 
     assert response.status_code == 200
     body = response.json()
@@ -6212,6 +6219,7 @@ def test_external_background_route_returns_module_output_for_known_player(monkey
     assert body["status"] == "ok"
     assert body["schema_version"] == "1.0"
     assert body["contract"]["status"] == "unavailable"
+    assert body["contract"]["match_status"] == "unmatched"
     assert "teammates" in body["team_situation"]
     assert "depth_chart" in body["team_situation"]
     assert "recent_workload" in body["team_situation"]

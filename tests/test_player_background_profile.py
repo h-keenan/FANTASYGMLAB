@@ -7,10 +7,16 @@ traded/released player, sparse weekly history (0/1/a few usable weeks),
 a missing denominator (snap_share absent for a week) not crashing and not
 being backfilled as 0, an unsupported depth-chart claim (no
 depth_chart_position/depth_chart_order at all), and the full "ok" shape
-with every documented field present and correctly typed. Contract-timeline
-coverage is deliberately simple throughout: it is ALWAYS "unavailable" by
-design (no licensed source exists anywhere in this codebase) — these tests
-assert that, not that it ever becomes "ok".
+with every documented field present and correctly typed.
+
+Contract-timeline tests use the dedicated `contracts_df`/`no_contracts`
+fixtures below (monkeypatching `modules.nflverse_contracts.load_contracts`/
+`load_contracts_as_of`, the same style `houston_schedule` already uses for
+`modules.nfl_schedule.load_games`) so these tests never hit the real
+network and stay deterministic: unmatched name, ambiguous name (two
+distinct otc_id sharing a name), is_active=false (released player, most
+recent historical row chosen), a current-season-boundary remaining_seasons
+count, and a missing `years` value not crashing the date math.
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from modules import nfl_schedule, player_background_profile as pbp
+from modules import nfl_schedule, nflverse_contracts, player_background_profile as pbp, sleeper
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +48,67 @@ def houston_schedule(monkeypatch):
     games = _schedule_games()
     monkeypatch.setattr(nfl_schedule, "load_games", lambda **_: games)
     return games
+
+
+# ---------------------------------------------------------------------------
+# nflverse historical_contracts fixtures — every test in this file is
+# offline by default (no real network/disk fetch); contract-matching tests
+# below override the default empty dataset with their own fixture rows.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _no_real_contracts_network(monkeypatch):
+    monkeypatch.setattr(nflverse_contracts, "load_contracts", lambda **_: pd.DataFrame())
+    monkeypatch.setattr(nflverse_contracts, "load_contracts_as_of", lambda **_: "2026-10-21 08:51:29 EDT")
+
+
+def _contract_row(
+    *,
+    player: str,
+    otc_id: int,
+    is_active: bool,
+    year_signed,
+    years,
+    team: str = "Seahawks",
+    position: str = "WR",
+    player_page: str | None = None,
+) -> dict:
+    return {
+        "player": player,
+        "position": position,
+        "team": team,
+        "is_active": is_active,
+        "year_signed": year_signed,
+        "years": years,
+        "value": None,
+        "apy": None,
+        "guaranteed": None,
+        "apy_cap_pct": None,
+        "inflated_value": None,
+        "inflated_apy": None,
+        "inflated_guaranteed": None,
+        "player_page": player_page,
+        "otc_id": otc_id,
+        "date_of_birth": None,
+        "height": None,
+        "weight": None,
+        "college": None,
+        "draft_year": None,
+        "draft_round": None,
+        "draft_overall": None,
+        "draft_team": None,
+        "season_history": None,
+    }
+
+
+def _contracts_df(rows: list[dict]) -> pd.DataFrame:
+    return pd.DataFrame(rows)
+
+
+def _set_contracts(monkeypatch, rows: list[dict]) -> None:
+    df = _contracts_df(rows)
+    monkeypatch.setattr(nflverse_contracts, "load_contracts", lambda **_: df)
 
 
 # ---------------------------------------------------------------------------
@@ -352,17 +419,21 @@ def test_full_ok_shape_has_every_documented_field(houston_schedule):
     assert result["status"] == "ok"
     assert result["schema_version"] == "1.0"
 
-    # Contract — always unavailable, but every field present and typed.
+    # Contract — unmatched against the (empty, by the autouse fixture)
+    # nflverse dataset in this test, but every documented field present and
+    # typed regardless.
     contract = result["contract"]
     for key in (
-        "status", "unavailable_reason", "source", "checked_at", "signing_date", "effective_date",
-        "current_contractual_team", "last_contracted_season", "remaining_seasons", "reference_season",
-        "reference_date", "current_season_included_in_remaining", "free_agency_year",
-        "free_agency_designation", "options", "void_years", "real_contract_years",
-        "guaranteed_years", "provenance", "conflict_state",
+        "status", "unavailable_reason", "match_status", "source", "source_url", "source_as_of",
+        "checked_at", "is_active", "year_signed", "contract_length_seasons", "signing_date",
+        "effective_date", "current_contractual_team", "last_contracted_season", "remaining_seasons",
+        "reference_season", "reference_date", "current_season_included_in_remaining",
+        "free_agency_year", "free_agency_designation", "options", "void_years",
+        "real_contract_years", "guaranteed_years", "provenance", "conflict_state", "note",
     ):
         assert key in contract
     assert contract["status"] == "unavailable"
+    assert contract["match_status"] == "unmatched"
 
     # Team situation
     team_situation = result["team_situation"]
@@ -431,3 +502,190 @@ def test_reads_from_cached_season_player_weekly_when_weekly_stats_not_provided(m
 
     assert called == {"player_id": "4046", "season": 2026}
     assert result["historical_production"]["ppr"]["sample_size"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Contract timeline — nflverse historical_contracts matching (PR follow-up to
+# #1310's always-unavailable stub). All offline via the autouse
+# `_no_real_contracts_network` fixture / `_set_contracts` helper above.
+# ---------------------------------------------------------------------------
+
+
+def test_contract_unmatched_when_no_name_matches(monkeypatch, houston_schedule):
+    _set_contracts(monkeypatch, [_contract_row(player="Some Other Guy", otc_id=1, is_active=True, year_signed=2022, years=3)])
+    players = {"4046": {"full_name": "Totally Different Player", "team": "SEA", "position": "WR"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["status"] == "unavailable"
+    assert contract["match_status"] == "unmatched"
+    assert "Totally Different Player" in contract["unavailable_reason"]
+    assert contract["year_signed"] is None
+    assert contract["is_active"] is None
+
+
+def test_contract_ambiguous_when_two_distinct_players_share_a_name(monkeypatch, houston_schedule):
+    rows = [
+        _contract_row(player="Same Name Guy", otc_id=10, team="Packers", position="WR", is_active=True, year_signed=2024, years=2),
+        _contract_row(player="Same Name Guy", otc_id=20, team="Bears", position="RB", is_active=True, year_signed=2024, years=2),
+    ]
+    _set_contracts(monkeypatch, rows)
+    # Neither candidate's team/position matches this Sleeper player, so the
+    # tiebreaker cannot narrow the two distinct otc_id identities down to one.
+    players = {"4046": {"full_name": "Same Name Guy", "team": "SEA", "position": "TE"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["status"] == "unavailable"
+    assert contract["match_status"] == "ambiguous"
+    assert "distinct nflverse historical_contracts identities" in contract["unavailable_reason"]
+    assert contract["year_signed"] is None
+
+
+def test_contract_is_active_false_released_player_uses_most_recent_row(monkeypatch, houston_schedule):
+    ref = sleeper.default_player_stats_season()
+    rows = [
+        _contract_row(player="Released Guy", otc_id=30, is_active=False, year_signed=ref - 6, years=3),
+        _contract_row(player="Released Guy", otc_id=30, is_active=False, year_signed=ref - 3, years=2),
+    ]
+    _set_contracts(monkeypatch, rows)
+    players = {"4046": {"full_name": "Released Guy", "team": None, "position": "WR"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["status"] == "ok"
+    assert contract["match_status"] == "matched"
+    assert contract["is_active"] is False
+    # The more recent of the two historical rows (year_signed=ref-3) is
+    # chosen as "current" — not the older ref-6 row.
+    assert contract["year_signed"] == ref - 3
+    assert contract["last_contracted_season"] == (ref - 3) + 2 - 1
+
+
+def test_contract_remaining_seasons_counts_inclusive_from_reference_season(monkeypatch, houston_schedule):
+    ref = sleeper.default_player_stats_season()
+    # Contract covers [ref-1, ref] (2 seasons) — exactly one season
+    # (the current one) remains, inclusive of "now".
+    row = _contract_row(player="Boundary Guy", otc_id=40, is_active=True, year_signed=ref - 1, years=2)
+    _set_contracts(monkeypatch, [row])
+    players = {"4046": {"full_name": "Boundary Guy", "team": "SEA", "position": "WR"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["status"] == "ok"
+    assert contract["reference_season"] == ref
+    assert contract["current_season_included_in_remaining"] is True
+    assert contract["last_contracted_season"] == ref
+    assert contract["remaining_seasons"] == 1
+    assert contract["conflict_state"] is None
+
+
+def test_contract_conflict_state_when_active_flag_disagrees_with_year_math(monkeypatch, houston_schedule):
+    ref = sleeper.default_player_stats_season()
+    # is_active=True, but year_signed+years math says this contract expired
+    # three seasons ago — surfaced as an explicit conflict, not silently
+    # trusted either way, and remaining_seasons is clamped to 0 rather than
+    # going negative.
+    row = _contract_row(player="Conflicted Guy", otc_id=50, is_active=True, year_signed=ref - 5, years=3)
+    _set_contracts(monkeypatch, [row])
+    players = {"4046": {"full_name": "Conflicted Guy", "team": "SEA", "position": "WR"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["status"] == "ok"
+    assert contract["is_active"] is True
+    assert contract["remaining_seasons"] == 0
+    assert contract["conflict_state"]
+    assert "conflict" in contract["conflict_state"].lower() or "surfaced" in contract["conflict_state"].lower()
+
+
+def test_contract_missing_years_leaves_season_math_null_not_crashing(monkeypatch, houston_schedule):
+    ref = sleeper.default_player_stats_season()
+    row = _contract_row(player="No Years Guy", otc_id=60, is_active=True, year_signed=ref - 1, years=None)
+    _set_contracts(monkeypatch, [row])
+    players = {"4046": {"full_name": "No Years Guy", "team": "SEA", "position": "WR"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["status"] == "ok"
+    assert contract["match_status"] == "matched"
+    assert contract["year_signed"] == ref - 1
+    assert contract["is_active"] is True
+    assert contract["contract_length_seasons"] is None
+    assert contract["last_contracted_season"] is None
+    assert contract["remaining_seasons"] is None
+    assert contract["reference_season"] is None
+    assert contract["current_season_included_in_remaining"] is None
+
+
+def test_contract_no_dollar_fields_ever_present_in_response():
+    """The response shape must never carry a monetary field — the spec's
+    explicit "no dollar amounts" constraint — even though the source CSV
+    carries value/apy/guaranteed/apy_cap_pct/inflated_* columns."""
+
+    result = pbp.build_player_background_profile("does-not-exist", season=2026, players={})
+    contract_keys = set(result["contract"].keys())
+    forbidden = {"value", "apy", "guaranteed", "apy_cap_pct", "inflated_value", "inflated_apy", "inflated_guaranteed"}
+    assert contract_keys.isdisjoint(forbidden)
+
+
+def test_contract_reuses_player_identity_suffix_normalization(monkeypatch, houston_schedule):
+    """Same normalize_player_name reuse PR #1306 relied on for the ESPN
+    integration — a generational suffix on one side but not the other must
+    still match (e.g. "Kenneth Walker" in the source vs. "Kenneth Walker
+    III" on Sleeper's own roster)."""
+
+    ref = sleeper.default_player_stats_season()
+    row = _contract_row(player="Kenneth Walker", otc_id=70, team="Seahawks", position="RB", is_active=True, year_signed=ref - 1, years=3)
+    _set_contracts(monkeypatch, [row])
+    players = {"4046": {"full_name": "Kenneth Walker III", "team": "SEA", "position": "RB"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["match_status"] == "matched"
+    assert contract["is_active"] is True
+
+
+def test_contract_source_url_and_source_as_of_populated_from_real_fields(monkeypatch, houston_schedule):
+    ref = sleeper.default_player_stats_season()
+    row = _contract_row(
+        player="Sourced Guy",
+        otc_id=80,
+        is_active=True,
+        year_signed=ref - 1,
+        years=3,
+        player_page="https://overthecap.com/player/sourced-guy/80/",
+    )
+    _set_contracts(monkeypatch, [row])
+    players = {"4046": {"full_name": "Sourced Guy", "team": "SEA", "position": "WR"}}
+
+    result = pbp.build_player_background_profile(
+        "4046", season=2026, players=players, weekly_stats={"4046": {"weekly": []}}
+    )
+
+    contract = result["contract"]
+    assert contract["source"] == "nflverse_historical_contracts"
+    assert contract["source_url"] == "https://overthecap.com/player/sourced-guy/80/"
+    assert contract["source_as_of"] == "2026-10-21 08:51:29 EDT"
+    assert contract["provenance"] == "nflverse historical_contracts, derived from OverTheCap, CC BY 4.0"

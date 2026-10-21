@@ -796,15 +796,17 @@ signal that is directly, mechanically checkable today.
 
 Phase 4 addition: a "player background profile" for the external
 content-posting bot, in the bot developer's own stated priority order:
-contract-timeline context (always honestly unavailable — no licensed data
-source exists), real NFL team-situation context (teammates, Sleeper's own
+real, non-monetary contract-timeline context (sourced from nflverse's
+public `historical_contracts` dataset — see "Contract (Priority 1)"
+below), real NFL team-situation context (teammates, Sleeper's own
 published depth chart, recent on-field workload), and real historical PPR
 production (with an honestly-unavailable standard-format/box-score
 sibling). All business logic lives in
 `modules/player_background_profile.py`
-(`build_player_background_profile`) — the route itself is a thin wrapper,
-gated by the same `require_external_api_key` dependency as every other
-`/v1/external/*` route above.
+(`build_player_background_profile`) and `modules/nflverse_contracts.py`
+(the contract-timeline fetch/match logic) — the route itself is a thin
+wrapper, gated by the same `require_external_api_key` dependency as every
+other `/v1/external/*` route above.
 
 **Query parameters**
 
@@ -833,43 +835,83 @@ the same discipline every other endpoint in this contract already uses.
 | `team_situation` | object | See "Team situation (Priority 2)" below. |
 | `historical_production` | object | See "Historical production (Priority 3)" below. |
 
-### Contract (Priority 1) — always honestly `"unavailable"`
+### Contract (Priority 1) — real, non-monetary, from nflverse `historical_contracts`
 
-**No licensed or official NFL player-contract data source is integrated
-anywhere in this codebase today.** This was verified, not assumed:
-`modules/`, `services/`, and `requirements.txt` were grepped for any
-contract-data provider or scraper before writing this section, and every
-hit for the word "contract" refers to an API/schema contract (e.g. this
-very document), never player employment-contract data. Per the same
-honesty-over-fabrication precedent `lineup_popularity` (Phase 1, above)
-already established, this section is never fabricated and never scraped
-from an unlicensed source — it ships with its full typed field shape
-below, every value explicitly `null`, under one `status: "unavailable"`.
-This is the correct, complete implementation of this section, not a
-placeholder for later.
+Originally shipped (Phase 4 / PR #1310) as always `"unavailable"` because
+no licensed/public contract-data source was known to be integrated at the
+time. coridian_ pushed back — a public source does exist — and this is
+that fix: **nflverse's public `historical_contracts` dataset**
+(`github.com/nflverse/nflverse-data`, release tag `contracts`), itself
+derived from OverTheCap and published under **CC BY 4.0** (commercial use
+with attribution permitted). This is nflverse's own redistribution, not a
+direct scrape of OverTheCap/Spotrac, so it carries none of the ToS risk a
+direct scrape would. See `modules/nflverse_contracts.py` for the full
+fetch/cache/match implementation.
+
+**No dollar amounts are ever surfaced here, by design** — the source CSV
+carries `value`/`apy`/`guaranteed`/`apy_cap_pct`/`inflated_*` columns, but
+the bot's video-script consumer explicitly doesn't need them (per the
+original spec's "no dollar amounts are needed for our current video
+contract"), so none of those columns are even read.
+
+**Matching is inherently fragile and this is handled explicitly, never
+guessed.** There is no shared id between nflverse's own `otc_id` (an
+OverTheCap player id) and this app's canonical Sleeper `player_id` —
+matching is by normalized player name (reusing
+`modules.player_identity.normalize_player_name`, the same suffix-stripping
+normalization PR #1306 fixed for the ESPN integration), with current
+team/position as a tiebreaker when more than one distinct `otc_id` shares a
+name. `status` is `"ok"` only when exactly one contract identity — and,
+within it, exactly one "current" contract row — resolves unambiguously;
+otherwise `status` is `"unavailable"` with `match_status` naming exactly
+which kind of miss occurred:
+
+| `match_status` | Meaning |
+|---|---|
+| `"matched"` | Exactly one contract row resolved; `status` is `"ok"`. |
+| `"unmatched"` | No nflverse row's name normalizes to this player's name at all. |
+| `"ambiguous"` | More than one distinct contract identity (or, within one identity, more than one candidate "current" row) remained after every available tiebreaker. |
+| `null` | No match was even attempted (unknown player id, or no display name to match against). |
+
+This dataset records contract length in whole **seasons** only — there is
+no day-level signing/effective date anywhere in it. `signing_date`/
+`effective_date` are therefore deliberately left `null` rather than
+fabricating a day this source doesn't provide; the real, year-precision
+value is `year_signed` instead. `free_agency_year`, `free_agency_designation`,
+`options` (team/player/fifth-year/mutual exercise state), `void_years`,
+`real_contract_years`, and `guaranteed_years` are **not present in this
+data source at all** and are always `null` with `note` explaining why —
+never fabricated, and never silently dropped from the response shape.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `status` | string | Always `"unavailable"` today. |
-| `unavailable_reason` | string | Explains exactly why (quoted above). |
-| `source` | null | Always `null` — no source exists to name. |
-| `checked_at` | null | Always `null` — nothing was checked. |
-| `signing_date` | string \| null | When the contract was signed. |
-| `effective_date` | string \| null | When the contract became effective. |
-| `current_contractual_team` | string \| null | The team this player is contracted to. |
-| `last_contracted_season` | integer \| null | The final season this contract covers. |
-| `remaining_seasons` | integer \| null | Seasons remaining as of `reference_season`/`reference_date`. |
-| `reference_season` | integer \| null | The season `remaining_seasons` is counted from. |
-| `reference_date` | string \| null | The date `remaining_seasons` is counted from. |
-| `current_season_included_in_remaining` | boolean \| null | Whether `remaining_seasons` counts the current season or only future ones. |
-| `free_agency_year` | integer \| null | The year this player would reach free agency. |
-| `free_agency_designation` | string \| null | `"UFA"` / `"RFA"` / `"ERFA"`. |
-| `options` | array \| null | `[{"season": int, "exercise_state": str}, ...]` — team/player option years. |
-| `void_years` | array \| null | Contract years that are void (salary-cap mechanism only, never actually played). |
-| `real_contract_years` | array \| null | Contract years that are "real" (not void). |
-| `guaranteed_years` | array \| null | Contract years with guaranteed money. |
-| `provenance` | string \| null | Which source produced this data, when real (e.g. a named licensed provider). |
-| `conflict_state` | string \| null | Whether two sources disagree, when real. |
+| `status` | string | `"ok"` (exactly one current contract row resolved) or `"unavailable"`. |
+| `unavailable_reason` | string \| null | Set whenever `status` is `"unavailable"` — names the specific reason (no name match, ambiguous match, etc.). |
+| `match_status` | string \| null | `"matched"` / `"unmatched"` / `"ambiguous"` / `null` — see table above. |
+| `source` | string \| null | `"nflverse_historical_contracts"` when matched. |
+| `source_url` | string \| null | The matched row's own `player_page` (an OverTheCap profile URL), when present. |
+| `source_as_of` | string \| null | nflverse's own published `last_updated` time for the `contracts` release (its `timestamp.json` asset) — the dataset's real as-of time, not this app's. Published in US Eastern local time, exactly as nflverse writes it. |
+| `checked_at` | string \| null | When this app checked, only when matched (`null` on `"unavailable"`, the same convention every other section in this doc uses). |
+| `is_active` | boolean \| null | Passed through from nflverse's own `is_active` flag. |
+| `year_signed` | integer \| null | The real year this contract was signed (year precision only — see above). |
+| `contract_length_seasons` | integer \| null | The contract's length in whole seasons (nflverse's `years` column). `null` when the source row itself has no usable value — never defaulted to 0 or 1. |
+| `signing_date` | null | Always `null` — this source has no day-level date (see above). |
+| `effective_date` | null | Always `null` — same reason. |
+| `current_contractual_team` | string \| null | Resolved to this app's own Sleeper team code when the source row's `team` field maps cleanly to exactly one; otherwise the raw source value, unchanged, rather than guessing one team. |
+| `last_contracted_season` | integer \| null | `year_signed + contract_length_seasons - 1`. `null` whenever either input is `null`. |
+| `remaining_seasons` | integer \| null | `max(0, last_contracted_season - reference_season + 1)` — inclusive of the current season (see `current_season_included_in_remaining`). Never silently decremented from a stale cached number — always recomputed from `reference_season` on every call. |
+| `reference_season` | integer \| null | The season `remaining_seasons` is counted from — this app's own canonical active season (`modules.sleeper.default_player_stats_season`). |
+| `reference_date` | string \| null | The real timestamp `remaining_seasons` was computed at (same value as `checked_at`). |
+| `current_season_included_in_remaining` | boolean \| null | Always `true` when `remaining_seasons` is non-null — the current season counts as one of the remaining seasons. |
+| `free_agency_year` | null | Always `null` — not present in this data source. |
+| `free_agency_designation` | null | Always `null` — not present in this data source. |
+| `options` | null | Always `null` — not present in this data source. |
+| `void_years` | null | Always `null` — not present in this data source. |
+| `real_contract_years` | null | Always `null` — not present in this data source. |
+| `guaranteed_years` | null | Always `null` — not present in this data source (and would be monetary-adjacent regardless — see "no dollar amounts" above). |
+| `provenance` | string \| null | `"nflverse historical_contracts, derived from OverTheCap, CC BY 4.0"` when matched. |
+| `conflict_state` | string \| null | Set when nflverse's own `is_active: true` flag disagrees with the `year_signed`/`contract_length_seasons` math (the math says the contract already ended before `reference_season`) — surfaced as an explicit conflict rather than silently trusting one signal over the other. `null` when there's no such disagreement. |
+| `note` | string | Spells out the precision/not-present-in-source/no-dollar-amounts caveats above. |
 
 ### Team situation (Priority 2)
 
@@ -979,7 +1021,7 @@ is not re-proposed here, this section just points to it.
 | `source` | null | Always `null` today. |
 | `checked_at` | null | Always `null` today. |
 
-### Example: a normal player — real team-situation and production, unavailable contract
+### Example: a normal player — real team-situation, production, and a matched contract
 
 `GET /v1/external/players/4046/background?season=2026`
 
@@ -994,26 +1036,33 @@ is not re-proposed here, this section just points to it.
   "schema_version": "1.0",
   "status": "ok",
   "contract": {
-    "status": "unavailable",
-    "unavailable_reason": "No licensed or official NFL player-contract data source ... is integrated anywhere in this codebase today.",
-    "source": null,
-    "checked_at": null,
+    "status": "ok",
+    "unavailable_reason": null,
+    "match_status": "matched",
+    "source": "nflverse_historical_contracts",
+    "source_url": "https://overthecap.com/player/nico-collins/XXXX/",
+    "source_as_of": "2026-10-21 08:51:29 EDT",
+    "checked_at": "2026-10-20T21:48:02.869000+00:00",
+    "is_active": true,
+    "year_signed": 2025,
+    "contract_length_seasons": 3,
     "signing_date": null,
     "effective_date": null,
-    "current_contractual_team": null,
-    "last_contracted_season": null,
-    "remaining_seasons": null,
-    "reference_season": null,
-    "reference_date": null,
-    "current_season_included_in_remaining": null,
+    "current_contractual_team": "HOU",
+    "last_contracted_season": 2027,
+    "remaining_seasons": 2,
+    "reference_season": 2026,
+    "reference_date": "2026-10-20T21:48:02.869000+00:00",
+    "current_season_included_in_remaining": true,
     "free_agency_year": null,
     "free_agency_designation": null,
     "options": null,
     "void_years": null,
     "real_contract_years": null,
     "guaranteed_years": null,
-    "provenance": null,
-    "conflict_state": null
+    "provenance": "nflverse historical_contracts, derived from OverTheCap, CC BY 4.0",
+    "conflict_state": null,
+    "note": "year_signed/contract_length_seasons/... (see Contract (Priority 1) section above for the full caveat text)"
   },
   "team_situation": {
     "teammates": {
@@ -1084,6 +1133,42 @@ is not re-proposed here, this section just points to it.
 }
 ```
 
+### Example: a player who can't be matched to nflverse's contract dataset
+
+The rest of the response is unaffected — `team_situation`/
+`historical_production` are built entirely from this app's own Sleeper
+data and never depend on the contract match succeeding:
+
+```json
+{
+  "player_id": "9999",
+  "status": "ok",
+  "contract": {
+    "status": "unavailable",
+    "unavailable_reason": "No nflverse historical_contracts row has a name matching \"Some Player\" after normalization.",
+    "match_status": "unmatched",
+    "source": null,
+    "source_url": null,
+    "source_as_of": null,
+    "checked_at": null,
+    "is_active": null,
+    "year_signed": null,
+    "contract_length_seasons": null,
+    "current_contractual_team": null,
+    "last_contracted_season": null,
+    "remaining_seasons": null,
+    "provenance": null,
+    "conflict_state": null,
+    "...": "every other field null, same shape as the matched example above"
+  }
+}
+```
+
+An **ambiguous** match (two distinct nflverse contract identities share a
+normalized name, and team/position couldn't disambiguate them) looks
+identical except `match_status: "ambiguous"` and an `unavailable_reason`
+naming how many distinct identities were found.
+
 ### Example: an unknown player id
 
 `GET /v1/external/players/does-not-exist/background`
@@ -1098,7 +1183,7 @@ is not re-proposed here, this section just points to it.
   "as_of": "2026-10-20T21:48:02.869000+00:00",
   "schema_version": "1.0",
   "status": "unknown_player",
-  "contract": { "status": "unavailable", "...": "every field null, same shape as above" },
+  "contract": { "status": "unavailable", "match_status": null, "...": "every field null, same shape as above" },
   "team_situation": {
     "teammates": {"status": "unavailable", "unavailable_reason": "player_id did not resolve to any known Sleeper player.", "team": null, "teammates": null, "...": "..."},
     "depth_chart": {"status": "unavailable", "unavailable_reason": "player_id did not resolve to any known Sleeper player.", "depth_chart_position": null, "depth_chart_order": null, "...": "..."},
@@ -1142,8 +1227,15 @@ are named explicitly in `weeks_missing_data` rather than silently skipped:
 
 ### Null semantics, summarized
 
-- `contract` is **always** `status: "unavailable"` today — no licensed
-  source exists. Every field is still present and typed, `null`.
+- `contract` is `"ok"` whenever the player matches exactly one nflverse
+  `historical_contracts` identity unambiguously, and `"unavailable"`
+  (with `match_status` naming why — `"unmatched"` or `"ambiguous"`) when it
+  doesn't. `free_agency_year`/`free_agency_designation`/`options`/
+  `void_years`/`real_contract_years`/`guaranteed_years`/`signing_date`/
+  `effective_date` are **always** `null` regardless of match status — not
+  present in this data source (or, for the two date fields, not
+  expressible at the year-only precision this source provides). Every
+  field is still present and typed, `null` where genuinely unknown.
 - `standard_and_box_score` is **always** `status: "unavailable"` today —
   the per-week retention gap documented in "Weekly recap" below. Every
   field is still present and typed, `null`.
@@ -1271,3 +1363,22 @@ buildable proposal here rather than implementing it in the same change:
   wrapper, gated by the same `require_external_api_key` dependency as
   every other `/v1/external/*` route. Purely additive — no existing
   field, status value, or route changed.
+- `v1` (2026-10-21): the `contract` section of
+  `GET /v1/external/players/{player_id}/background` is no longer always
+  `status: "unavailable"`. coridian_ pushed back on the 2026-10-20 release
+  above — "we dont need licensed sources it should be publicly available"
+  — and nflverse's public `historical_contracts` dataset (CC BY 4.0,
+  derived from OverTheCap) is exactly that source. Real, non-monetary
+  `year_signed`/`contract_length_seasons`/`last_contracted_season`/
+  `remaining_seasons`/`is_active`/`current_contractual_team` now populate
+  whenever a player matches this dataset unambiguously by name (new
+  `match_status` field: `"matched"`/`"unmatched"`/`"ambiguous"`); no
+  dollar amounts are ever surfaced, and fields the source genuinely
+  doesn't have (`free_agency_year`/`free_agency_designation`/`options`/
+  `void_years`/`real_contract_years`/`guaranteed_years`/`signing_date`/
+  `effective_date`) stay `null` with that reason stated in the new
+  `note` field — never fabricated. New module:
+  `modules/nflverse_contracts.py` (fetch/cache/match). Purely additive —
+  no existing field, status value, or route removed; every new field is
+  `null`/absent-safe for a caller that only read the always-`"unavailable"`
+  shape before this version.
