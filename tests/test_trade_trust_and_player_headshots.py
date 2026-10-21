@@ -156,6 +156,25 @@ def test_third_round_pick_value_stays_low():
     assert details["score"] < trade_ideas.BASE_PICK_VALUES[2]
 
 
+def test_player_asset_carries_workload_trend_for_trade_hub_sell_high_tagging():
+    # trade_hub_engine._classify_impact_tag reads workload_trend off each
+    # send-side asset to tag a confirmed, multi-week usage decline
+    # ("Cooling") as sell_high — it never had this field to read until
+    # _player_asset started forwarding it.
+    row = pd.Series(
+        {
+            "name": "Test Player",
+            "player_id": "p1",
+            "position": "RB",
+            "value_score": 3900,
+            "player_tier": "Starter",
+            "workload_trend": "Cooling",
+        }
+    )
+    asset = trade_ideas._player_asset(row)
+    assert asset["workload_trend"] == "Cooling"
+
+
 def test_displayed_and_evaluated_player_scores_use_same_field():
     row = pd.Series(
         {

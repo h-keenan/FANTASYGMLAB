@@ -522,6 +522,31 @@ def test_project_trade_idea_card_tags_sell_high_from_send_side_opportunity_label
     assert card.to_dict()["impact_tag"] == "sell_high"
 
 
+def test_project_trade_idea_card_tags_sell_high_from_send_side_cooling_workload_trend():
+    # Real gap this covers: a player can be mid-tier opportunity (not
+    # "Starter At Risk") while workload_trend="Cooling" — rankings.py's
+    # weekly-recency read already confirmed a real, multi-week usage
+    # decline (not a one-bad-week blip; see compute_recency_features'
+    # own confidence gating). Before _player_asset carried workload_trend
+    # and _classify_impact_tag read it, shopping that player never got
+    # flagged sell_high unless it also happened to carry "Starter At Risk".
+    idea = _fake_idea(
+        trade_confidence_label="Low",
+        receive_assets=[{"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb"}],
+        send_assets=[
+            {
+                "asset_type": "player",
+                "player_id": "my-wr",
+                "name": "my-wr",
+                "opportunity_label": "Elite Opportunity",
+                "workload_trend": "Cooling",
+            }
+        ],
+    )
+    card = trade_hub_engine.project_trade_idea_card(idea)
+    assert card.to_dict()["impact_tag"] == "sell_high"
+
+
 def test_project_trade_idea_card_leaves_impact_tag_empty_with_no_matching_signal():
     idea = _fake_idea(
         trade_confidence_label="Low",

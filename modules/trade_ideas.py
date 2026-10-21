@@ -869,6 +869,11 @@ def _player_asset(
         "player_tier": str(row.get("player_tier") or ""),
         "opportunity_label": str(row.get("opportunity_label") or ""),
         "opportunity_explanation": str(row.get("opportunity_explanation") or ""),
+        # rankings.py's recency-backed role-direction read ("Cooling" means a
+        # confirmed, multi-week usage decline, not a one-game blip — see
+        # compute_recency_features/recency_trend_display). trade_hub_engine's
+        # sell_high classification keys on this alongside opportunity_label.
+        "workload_trend": str(row.get("workload_trend") or ""),
         "role": role,
         # 0-99 "OVR" badge alongside the tier ring — see
         # trade_hub_engine.generate_trade_idea_records' comment for how this

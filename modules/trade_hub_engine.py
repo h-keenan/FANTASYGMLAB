@@ -246,6 +246,15 @@ _BUY_LOW_OPPORTUNITY_LABELS = frozenset({"Backup With Upside", "Committee Back"}
 # established trade value from a starter reputation, but the opportunity
 # signal underneath is already softening.
 _SELL_HIGH_OPPORTUNITY_LABELS = frozenset({"Starter At Risk"})
+# workload_trend="Cooling" is rankings.py's weekly-recency read: a real,
+# multi-week usage decline (>=3 usable games, display-grade confidence),
+# never a one-bad-week blip (see compute_recency_features/
+# recency_trend_display's own gating). It fires across every opportunity
+# tier (an "Elite Opportunity" starter can still be cooling off), so without
+# this check a player whose role is genuinely shrinking never got flagged
+# sell_high unless they also happened to carry the separate "Starter At
+# Risk" label.
+_SELL_HIGH_WORKLOAD_TRENDS = frozenset({"Cooling"})
 
 
 def _classify_impact_tag(idea: Mapping[str, Any], confidence_label: str) -> str:
@@ -263,12 +272,10 @@ def _classify_impact_tag(idea: Mapping[str, Any], confidence_label: str) -> str:
     }
     if receive_labels & _BUY_LOW_OPPORTUNITY_LABELS:
         return "buy_low"
-    send_labels = {
-        str(asset.get("opportunity_label") or "")
-        for asset in (idea.get("send_assets") or [])
-        if isinstance(asset, Mapping)
-    }
-    if send_labels & _SELL_HIGH_OPPORTUNITY_LABELS:
+    send_assets = [asset for asset in (idea.get("send_assets") or []) if isinstance(asset, Mapping)]
+    send_labels = {str(asset.get("opportunity_label") or "") for asset in send_assets}
+    send_trends = {str(asset.get("workload_trend") or "") for asset in send_assets}
+    if (send_labels & _SELL_HIGH_OPPORTUNITY_LABELS) or (send_trends & _SELL_HIGH_WORKLOAD_TRENDS):
         return "sell_high"
     return ""
 
