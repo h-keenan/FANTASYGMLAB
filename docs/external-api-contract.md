@@ -3,9 +3,10 @@
 Phase 1 of coridian_'s external content-posting bot wish list: real API-key
 auth (not a per-user Supabase session — a bot has no user account) plus a
 documented weekly-projections endpoint. Phase 2 (structured news evidence
-with a conservative retraction/supersession signal) and Phase 3 (persisted
-rating-change history) are also covered below — this is now the complete
-wish list.
+with a conservative retraction/supersession signal), Phase 3 (persisted
+rating-change history), and Phase 4 (identity/completeness/evidence
+hardening of the Phase 1 projections endpoints, described in detail below)
+are also covered — this is now the complete wish list.
 
 All `/v1/external/*` routes live in `services/mobile_api_service.py` and are
 served by the same `fantasygm-lab-mobile-api` Render service as the mobile
@@ -52,6 +53,7 @@ One player's projection for one week.
 | Field | Type | Meaning |
 |---|---|---|
 | `player_id` | string | Echoes the requested player id. |
+| `id_namespace` | string | Always `"sleeper"` — `player_id` is a Sleeper player id, which already *is* this app's canonical player id (`modules.player_identity.SUPPORTED_DIRECT_PLATFORMS`). Never guessed, never a second id space. |
 | `season` | integer | The season the projection is for. |
 | `week` | integer | The week the projection is for. |
 | `scoring_format` | string | Always `"ppr"` — see "Scoring format" below. |
@@ -59,9 +61,22 @@ One player's projection for one week.
 | `projected_points` | number \| null | Point estimate (PPR). `null` unless `status` is `"ok"`. |
 | `low` | number \| null | Low end of the projection band. `null` unless `status` is `"ok"`. |
 | `high` | number \| null | High end of the projection band. `null` unless `status` is `"ok"`. |
-| `confidence` | string \| null | `"low"` / `"medium"` / `"high"`. `null` unless `status` is `"ok"`. |
+| `confidence` | string \| null | `"low"` / `"medium"` / `"high"`. `null` unless `status` is `"ok"`. See "What the band and confidence mean" below — this is **not** a calibrated statistical probability. |
 | `calculated_at` | string | ISO 8601 UTC timestamp of when this response was computed — nothing here is cached or persisted, so this is always "now." |
 | `model_version` | string | The projection formula version that produced this result (see "Versioning policy"). |
+| `display_name` | string \| null | Canonical display name, resolved from the same Sleeper player row `player_id` already identifies — never guessed by name-matching. `null` only when `player_id` itself is unknown, or Sleeper has no name on record. |
+| `team` | string \| null | This player's **current** NFL team (Sleeper's own team code, post-trade). `null` for a free agent/retired player (`status: "no_team"`) or an unknown player. |
+| `position` | string \| null | `QB`/`RB`/`WR`/`TE`/`K`, or the player's real position even when unsupported (e.g. `DEF`) — `status` will be `"unsupported_position"` in that case, never silently dropped. |
+| `position_group` | string \| null | `"skill"` (QB/RB/WR/TE) / `"kicker"` (K) / `"unsupported"` (anything else) / `null` when no position is known at all. Lets a caller tell a kicker apart from a skill-position player without hardcoding a position list. |
+| `active` | boolean \| null | Sleeper's own `active` flag. `null` only when unknown (e.g. unknown player id). |
+| `opponent` | string \| null | This week's real opponent (current team, schedule-derived team-code aliases already resolved — see `modules.nfl_schedule.TEAM_CODE_ALIASES`). `null` on a bye or when no schedule data exists — never fabricated. |
+| `is_home` | boolean \| null | Whether this player's team is the home team this week. `null` when no game is on record (bye / no schedule data). |
+| `bye` | boolean \| null | `true` on a real bye week, `false` when a real game exists, `null` only when it genuinely can't be determined (e.g. `no_team`/`no_schedule_data`/`unsupported_position`/`unknown_player` — there's no schedule lookup to even attempt). |
+| `game_id` | string \| null | nflverse's own published game identifier for this exact game (its `{season}_{week}_{away}_{home}` convention, in nflverse's own team codes). `null` on a bye, when no schedule data exists, or when the underlying games table has no `game_id` column for that row — never synthesized. |
+| `kickoff_at` | string \| null | ISO 8601 UTC real kickoff instant for this game (`modules.nfl_schedule`'s own timezone-aware conversion from nflverse's published Eastern-time kickoff). `null` whenever `game_id` is, plus for any older row missing the source gameday/gametime columns. |
+| `availability` | object | See "Availability" below (item 5). |
+| `factors` | array \| null | See "Structured explanation factors" below (item 3). `null` for any non-`"ok"` status. |
+| `lineup_popularity` | object | See "Lineup-popularity evidence" below (item 4). |
 
 This endpoint always returns HTTP `200` once authenticated — a bye week,
 an unknown player, etc. are not request errors, so they are never surfaced
@@ -75,6 +90,7 @@ status code.
 ```json
 {
   "player_id": "4046",
+  "id_namespace": "sleeper",
   "season": 2026,
   "week": 7,
   "scoring_format": "ppr",
@@ -84,7 +100,55 @@ status code.
   "high": 18.6,
   "confidence": "medium",
   "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-  "model_version": "v1"
+  "model_version": "v1",
+  "display_name": "Nico Collins",
+  "team": "HOU",
+  "position": "WR",
+  "position_group": "skill",
+  "active": true,
+  "opponent": "JAX",
+  "is_home": true,
+  "bye": false,
+  "game_id": "2026_07_JAX_HOU",
+  "kickoff_at": "2026-10-19T17:00:00+00:00",
+  "availability": {
+    "official_status": "Questionable",
+    "official_status_source": "sleeper_player_directory",
+    "official_status_source_url": null,
+    "checked_at": "2026-10-19T18:04:12.903112+00:00",
+    "game_status": "upcoming"
+  },
+  "factors": [
+    {
+      "code": "recent_scoring_trend",
+      "observed_value": 13.1,
+      "comparison_baseline": null,
+      "unit": "fantasy_points_ppr_per_game",
+      "period": "last 3 played week(s)",
+      "source": "fantasygmlab_weekly_stats",
+      "as_of": "2026-10-19T18:04:12.903112+00:00"
+    },
+    {
+      "code": "opponent_defense_strength",
+      "observed_value": 1.08,
+      "comparison_baseline": 1.0,
+      "unit": "multiplier_vs_league_average_points_allowed",
+      "period": "last 5 sampled game(s)",
+      "source": "nflverse_points_allowed_by_position",
+      "as_of": "2026-10-19T18:04:12.903112+00:00"
+    }
+  ],
+  "lineup_popularity": {
+    "available": false,
+    "unavailable_reason": "No licensed or otherwise available lineup-popularity/start-rate data source is integrated in this codebase. FantasyDesk's own roster-ownership data reflects ROSTERED percent, not STARTED percent, and is deliberately never substituted here — see docs/external-api-contract.md.",
+    "started_percent": null,
+    "platform": null,
+    "league_format": null,
+    "scoring_format": null,
+    "observed_at": null,
+    "source_url": null,
+    "population": null
+  }
 }
 ```
 
@@ -95,6 +159,7 @@ status code.
 ```json
 {
   "player_id": "4046",
+  "id_namespace": "sleeper",
   "season": 2026,
   "week": 9,
   "scoring_format": "ppr",
@@ -104,7 +169,36 @@ status code.
   "high": null,
   "confidence": null,
   "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-  "model_version": "v1"
+  "model_version": "v1",
+  "display_name": "Nico Collins",
+  "team": "HOU",
+  "position": "WR",
+  "position_group": "skill",
+  "active": true,
+  "opponent": null,
+  "is_home": null,
+  "bye": true,
+  "game_id": null,
+  "kickoff_at": null,
+  "availability": {
+    "official_status": null,
+    "official_status_source": null,
+    "official_status_source_url": null,
+    "checked_at": "2026-10-19T18:04:12.903112+00:00",
+    "game_status": "bye"
+  },
+  "factors": null,
+  "lineup_popularity": {
+    "available": false,
+    "unavailable_reason": "No licensed or otherwise available lineup-popularity/start-rate data source is integrated in this codebase. FantasyDesk's own roster-ownership data reflects ROSTERED percent, not STARTED percent, and is deliberately never substituted here — see docs/external-api-contract.md.",
+    "started_percent": null,
+    "platform": null,
+    "league_format": null,
+    "scoring_format": null,
+    "observed_at": null,
+    "source_url": null,
+    "population": null
+  }
 }
 ```
 
@@ -123,6 +217,22 @@ signal once for the whole request, not once per player.
 | `week` | yes | Integer week number. |
 | `season` | no | Defaults to the current active season if omitted. |
 | `position` | no | One of `QB`, `RB`, `WR`, `TE`, `K`. Unfiltered (all five) if omitted. An unsupported value returns `422`. |
+| `limit` | no | Max items returned. Omitted: every item is returned (unchanged, backward-compatible default). Must be `>= 1`; otherwise `422`. |
+| `offset` | no | Items to skip before the page starts. Defaults to `0`. Must be `>= 0`; otherwise `422`. |
+
+**Top-level response fields**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `season` / `week` / `scoring_format` / `model_version` | — | Same as before. |
+| `season_type` | string | Always `"regular"` today — `modules.nfl_schedule.team_schedule` only ever returns regular-season games. Not a guess; this is where postseason support would change the value. |
+| `generated_at` | string | ISO 8601 UTC timestamp this specific response was built. |
+| `source` | object | `{"players", "schedule", "weekly_stats", "as_of"}` — which real data source backed each part of this response, and when (`as_of` always equals `generated_at`: nothing here is a separately-tracked staleness clock). |
+| `position_scope` | array of string | The position(s) actually covered — `[position]` when the `position` filter was used, otherwise the full `["QB","RB","WR","TE","K"]`. |
+| `pagination` | object | `{"offset", "limit", "returned", "total", "has_more"}`. `total`/`has_more` describe the FULL slate regardless of `limit`/`offset` — see "Pagination" below. |
+| `completeness` | object | See "Completeness" below. Computed over the full slate, never just the returned page. |
+| `covered_game_ids` | array of string | Every distinct real `game_id` appearing among this slate's items (duplicates removed, sorted). |
+| `items` | array | Same per-item shape as the single-player endpoint above — identity, schedule, availability, factors, and lineup-popularity included on every row. |
 
 **Response**
 
@@ -130,23 +240,186 @@ signal once for the whole request, not once per player.
 {
   "season": 2026,
   "week": 7,
+  "season_type": "regular",
   "scoring_format": "ppr",
   "model_version": "v1",
+  "generated_at": "2026-10-19T18:04:12.903112+00:00",
+  "source": {
+    "players": "sleeper_player_directory",
+    "schedule": "nflverse_games_csv",
+    "weekly_stats": "sleeper_weekly_stats",
+    "as_of": "2026-10-19T18:04:12.903112+00:00"
+  },
+  "position_scope": ["QB", "RB", "WR", "TE", "K"],
+  "pagination": { "offset": 0, "limit": null, "returned": 612, "total": 612, "has_more": false },
+  "completeness": {
+    "skill_position_candidate_total": 440,
+    "skill_position_resolved_total": 440,
+    "skill_position_complete": true,
+    "kicker_candidate_total": 32,
+    "kicker_resolved_total": 32,
+    "kicker_complete": true,
+    "unresolved_player_ids": [],
+    "unresolved_player_id_count": 0,
+    "no_schedule_data_player_ids": [],
+    "no_schedule_data_player_id_count": 0,
+    "complete": true
+  },
+  "covered_game_ids": ["2026_07_JAX_HOU", "2026_07_NE_BUF"],
   "items": [
-    { "player_id": "4046", "season": 2026, "week": 7, "scoring_format": "ppr",
-      "status": "ok", "projected_points": 14.2, "low": 9.8, "high": 18.6,
-      "confidence": "medium", "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-      "model_version": "v1" },
-    { "player_id": "9002", "season": 2026, "week": 7, "scoring_format": "ppr",
-      "status": "bye_week", "projected_points": null, "low": null, "high": null,
-      "confidence": null, "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-      "model_version": "v1" }
+    { "player_id": "4046", "id_namespace": "sleeper", "season": 2026, "week": 7,
+      "scoring_format": "ppr", "status": "ok", "projected_points": 14.2, "low": 9.8,
+      "high": 18.6, "confidence": "medium", "calculated_at": "2026-10-19T18:04:12.903112+00:00",
+      "model_version": "v1", "display_name": "Nico Collins", "team": "HOU",
+      "position": "WR", "position_group": "skill", "active": true, "opponent": "JAX",
+      "is_home": true, "bye": false, "game_id": "2026_07_JAX_HOU",
+      "kickoff_at": "2026-10-19T17:00:00+00:00", "availability": { "...": "see single-player example above" },
+      "factors": [{ "...": "see single-player example above" }],
+      "lineup_popularity": { "available": false, "...": "see single-player example above" } },
+    { "player_id": "9002", "id_namespace": "sleeper", "season": 2026, "week": 7,
+      "scoring_format": "ppr", "status": "bye_week", "projected_points": null, "low": null,
+      "high": null, "confidence": null, "calculated_at": "2026-10-19T18:04:12.903112+00:00",
+      "model_version": "v1", "display_name": "Some Player", "team": "DEN",
+      "position": "RB", "position_group": "skill", "active": true, "opponent": null,
+      "is_home": null, "bye": true, "game_id": null, "kickoff_at": null,
+      "availability": { "...": "game_status: bye" }, "factors": null,
+      "lineup_popularity": { "available": false, "...": "see single-player example above" } }
   ]
 }
 ```
 
 Each entry in `items` has the exact same shape as the single-player
 endpoint above, including the same non-`"ok"` honesty discipline.
+
+### Pagination
+
+`limit`/`offset` are purely additive: omit both and every item is returned
+exactly as before this version shipped (no behavior change for an existing
+caller). `pagination.total`/`has_more` always describe the complete,
+unpaginated result — **an `ok` HTTP response, or the absence of a `limit`
+param, is never itself evidence that the full slate was returned**; a bot
+that cares should read `pagination.total` (and `completeness`, below)
+explicitly rather than inferring completeness from the response shape.
+
+### Completeness — what `complete` precisely means
+
+This directly answers the bug report that prompted this version: 4,234
+rows in one 2026 Week 7 bulk response, only 703 of them joined successfully
+to the bot's own separate player-identity snapshot, 60 `status: "ok"` rows
+left unmatched, and no way to tell from the response itself whether that
+was expected. The fix is twofold: (1) every row now carries its own
+canonical identity directly (no separate join needed at all — see
+`display_name`/`team`/`position` above), and (2) this `completeness` object
+states precisely, in the response itself, whether the slate is whole.
+
+**The candidate universe is real, team-affiliated players at a projectable
+position only.** A free agent or retired player at e.g. WR is a real
+Sleeper row at a projectable position, but was never a real lineup
+candidate this week — counting it as "missing" would make `complete`
+meaningless (this over-counting is the likely reason the original 4,234-row
+response looked far larger than any real slate). A player with no `team`
+on record is simply excluded from every count below, not flagged as
+unresolved.
+
+| Field | Meaning |
+|---|---|
+| `skill_position_candidate_total` | Real, team-affiliated QB/RB/WR/TE candidates within `position_scope`. |
+| `skill_position_resolved_total` | Of those, how many got a real `display_name` **and** `team` (i.e. resolved identity). |
+| `skill_position_complete` | `skill_position_candidate_total == skill_position_resolved_total`. Vacuously `true` (0 == 0) when `position_scope` excludes all skill positions (e.g. `position=K`) — completeness is judged only within what was actually requested. |
+| `kicker_candidate_total` / `kicker_resolved_total` / `kicker_complete` | The exact same accounting, kept in its own bucket — **a kicker never counts toward `skill_position_*`,** and a skill-position player never counts toward `kicker_*`. |
+| `unresolved_player_ids` | Up to 25 real, team-affiliated candidate ids that did NOT resolve a canonical identity (the direct fix for the original "60 unmatched" report — in practice this should be empty or near-empty, since identity is now read straight off the same canonical row every projection already uses). |
+| `unresolved_player_id_count` | The real total count, uncapped, even when `unresolved_player_ids` is truncated. |
+| `no_schedule_data_player_ids` / `no_schedule_data_player_id_count` | Real, team-affiliated candidates whose `status` came back `"no_schedule_data"` this week — an explicit, named schedule gap, not a silently-dropped row. |
+| `complete` | `skill_position_complete and kicker_complete and no_schedule_data_player_ids is empty`. The single boolean a bot should actually check before treating a slate as whole. |
+
+An `ok` HTTP response, a non-empty `items` array, or the mere absence of a
+`limit` param is **not** evidence of completeness on its own — `complete`
+is the one field that makes that claim, and only when it is actually
+`true`.
+
+### Structured explanation factors (item 3)
+
+`factors` (per item, both endpoints) is populated only from real,
+already-computed inputs `project_player_week` itself produced — never a
+generated narrative, never fabricated when a signal has no real sample.
+`null` (not `[]`) for any non-`"ok"` status, since there is no `basis` to
+report in the first place. Each entry:
+
+| Field | Meaning |
+|---|---|
+| `code` | Short stable identifier: `recent_scoring_trend`, `opponent_defense_strength`, or `team_starting_qb_quality` (WR/TE only). |
+| `observed_value` | The real computed number behind this factor. |
+| `comparison_baseline` | What it's measured against (e.g. `1.0` = league-average multiplier for the defense factor), or `null` when there is no natural baseline (the trend factor just reports a rate). |
+| `unit` | Explicit unit so a consumer never has to guess (`fantasy_points_ppr_per_game`, `multiplier_vs_league_average_points_allowed`, `team_qb_quality_score`). |
+| `period` | The real sample window this factor was computed over. |
+| `source` | Which internal signal produced it. |
+| `as_of` | Same instant as this response's own `calculated_at`. |
+
+`opponent_defense_strength` and `team_starting_qb_quality` are only
+included when the underlying signal actually has a real sample
+(`opponent_defense_has_signal`/`team_qb_quality_has_signal` in
+`project_player_week`'s own `basis`) — a neutral 1.0 fallback with no real
+data behind it is never surfaced as if it were a finding.
+
+### Availability (item 5)
+
+`availability` is a typed, structured status kept strictly separate from
+this response's own `status` field (never conflated with
+`"bye_week"`/`"insufficient_player_data"`/etc.):
+
+| Field | Meaning |
+|---|---|
+| `official_status` | Sleeper's own typed `injury_status` (e.g. `"Questionable"`/`"Out"`/`"IR"`/`"Sus"`), passed through honestly. `null` when healthy/unknown. Never a speculative diagnosis or medical conclusion — just Sleeper's own structured field. |
+| `official_status_source` | `"sleeper_player_directory"` when `official_status` is set, else `null`. |
+| `official_status_source_url` | Always `null` today — Sleeper's typed status carries no article URL of its own. A caller that wants a sourced, timestamped claim (with real `source_urls`) should call `GET /v1/external/players/{player_id}/news` (Phase 2) instead; this field is never a substitute for that endpoint. |
+| `checked_at` | Same instant as this response's own `calculated_at`. |
+| `game_status` | `"bye"` / `"upcoming"` / `"completed_or_in_progress"` / `"unknown"`. Reuses this same response's own `bye`/`played`/`kickoff_at` fields — never a second, independently-derived live-game signal. This app has no live in-game feed, so `"in_progress"` and `"final"` are deliberately never distinguished from each other (the same two-state honesty `modules.nfl_schedule.game_has_started` already uses elsewhere). |
+
+This is a freshness check, nothing more: it does not authorize any
+automatic injury or forecast content, and the Dropbox voiceover contract's
+existing forecast/injury-claim exclusion is unchanged by anything here.
+
+### Lineup-popularity evidence (item 4)
+
+`lineup_popularity` (per item, both endpoints) is optional, public
+start-rate evidence meant to help a bot avoid a meaningless "sit" post
+about a player nobody starts. **No licensed or otherwise available
+started-percent data source is integrated in this codebase today.**
+FantasyDesk's own roster-ownership data reflects ROSTERED percent, which is
+explicitly a different claim than STARTED percent — so it is never
+substituted here. Every response reports this field as correctly,
+explicitly unavailable rather than inventing or estimating a number:
+
+```json
+{
+  "available": false,
+  "unavailable_reason": "No licensed or otherwise available lineup-popularity/start-rate data source is integrated in this codebase. FantasyDesk's own roster-ownership data reflects ROSTERED percent, not STARTED percent, and is deliberately never substituted here — see docs/external-api-contract.md.",
+  "started_percent": null,
+  "platform": null,
+  "league_format": null,
+  "scoring_format": null,
+  "observed_at": null,
+  "source_url": null,
+  "population": null
+}
+```
+
+If a real, licensed start-rate source is ever integrated, `available`
+flips `true` and `started_percent`/`platform`/`league_format`/
+`scoring_format`/`observed_at`/`source_url`/`population` (sample size, when
+known) populate from that real source — never from this app's own roster
+data.
+
+### What the band and confidence mean
+
+`low`/`high` are a heuristic range around `projected_points`, widened when
+the underlying sample is thinner (fewer recent games, no reliable
+opponent-defense signal — see `modules.player_projections._band_half_width`).
+`confidence` (`"low"`/`"medium"`/`"high"`) is a plain-language label for how
+much real recent data backed the estimate, not a calibrated statistical
+confidence interval or probability — it has not been validated against
+real-world outcome frequencies, and no caller should present it to an end
+reader as one.
 
 ## Missing-data behavior, by status
 
@@ -519,6 +792,71 @@ could add as a second corroborating factor in a future pass, but it is
 deliberately **not** included yet — the explanation only ever cites a
 signal that is directly, mechanically checkable today.
 
+## Weekly recap (completed-week actual production) — investigated, not yet built
+
+Phase 4's spec also asked for a bot-facing "weekly recap" — checked,
+completed-week actual production, as distinct from a projection or this
+app's own overall rating. This was investigated before writing any code,
+per the spec's own instruction to check first:
+
+**No existing `/v1/external/*` (or any other) endpoint provides this
+today.** `GET /v1/players/{player_id}/schedule` (session-gated, not
+external) surfaces team-level schedule/score context only — it has no
+per-player box-score fields at all. The per-matchup `actual_points` logic
+in `services/mobile_api_service.py` (around `_matchup_player_identity_fields`)
+is real, but it is league/roster-scoped (a specific league's starters for a
+specific matchup), not a standalone per-player lookup a content bot could
+call.
+
+**The canonical weekly stats pipeline itself does not retain full box-score
+fields at the weekly grain yet**, which matters because the spec explicitly
+asked to reuse that pipeline rather than build a second scoring engine.
+`modules.sleeper.get_season_player_stats` retains per-week rows
+(`WEEKLY_RETAIN_SOURCE_FIELDS`/`WEEKLY_RETAIN_FIELD_MAP`) for only
+`games_played`/`targets`/`receptions`/`rush_attempts`/`pass_attempts`/
+`fantasy_points_ppr` — real season **totals** include receiving/rushing/
+passing yards and touchdowns and non-PPR point variants
+(`PLAYER_STATS_SUM_FIELDS`), but those are never retained per-week today.
+A recap endpoint that promises real "actual box-score fields, PPR and
+non-PPR points" at the per-week grain needs that retention set widened
+first — the raw Sleeper weekly payload already carries those fields (no
+new provider call), so this is additive to `WEEKLY_RETAIN_SOURCE_FIELDS`/
+`WEEKLY_RETAIN_FIELD_MAP`, but it is a real change to a cache schema nearly
+every weekly-stats consumer in this app shares, so it deserves its own
+focused change/test pass rather than riding in as a side effect of this
+one.
+
+Per the spec's own stated priority ("lower priority than identity/
+completeness and trustworthy start/sit explanations" — the bot already has
+its own checked nflverse production), this version ships the identity/
+completeness/evidence work above and documents the concrete, immediately
+buildable proposal here rather than implementing it in the same change:
+
+- **Route:** `GET /v1/external/players/{player_id}/week-result` (new,
+  read-only, additive, gated by the same `require_external_api_key`).
+- **Query params:** `week` (required), `season` (optional, same default as
+  every other endpoint here).
+- **Fields:** `player_id`, `id_namespace`, `season`, `week`, `status`
+  (`"ok"` / `"bye_week"` / `"not_yet_played"` / `"unknown_player"` / etc. —
+  the same honesty-over-error discipline as every endpoint above),
+  `team`, `position`, `opponent`, `game_id`, `game_status`
+  (`"final"`/etc., reusing `modules.nfl_schedule.game_has_started`),
+  `week_complete` (whether the real schedule confirms this game has a
+  final score), real box-score fields once the retention gap above is
+  closed (receiving/rushing/passing yards, receptions, touchdowns),
+  `fantasy_points_ppr` and `fantasy_points_standard` (both real, both
+  widened-retention fields — exact PPR/standard scoring rules documented
+  alongside, same as `scoring_format` elsewhere in this contract),
+  `source` (`"sleeper_weekly_stats"`), `as_of`, and a `correction_version`
+  (an integer a bot can use to detect a corrected box score — Sleeper does
+  occasionally revise a published stat line after the fact; this would be
+  a monotonically increasing counter bumped whenever this endpoint's own
+  values change for an already-"final" week, not a guess).
+- **Explicit non-goal, stated here deliberately:** this endpoint never
+  substitutes a projection or this app's own overall rating for actual
+  results — it is real, played-game data only, or an honest non-`"ok"`
+  status when the game hasn't finished (or started) yet.
+
 ## Change history
 
 - `v1` (2026-10-19): initial release — single-player and full-week-slate
@@ -534,3 +872,23 @@ signal that is directly, mechanically checkable today.
   snapshot table and scheduled job. Purely additive — no existing field,
   status value, or route changed. Real history only begins accumulating
   once the scheduled job has run for 2+ days post-merge (see above).
+- `v1` (2026-10-20): Phase 4 — identity/completeness/evidence hardening of
+  the Phase 1 projections endpoints, prompted by a real bug report (2026
+  Week 7 bulk response: 4,234 rows, only 703 joined to the bot's own
+  separate player-identity snapshot, 60 `status: "ok"` rows unmatched,
+  `population_complete=false`). Every item on both projections endpoints
+  now carries `id_namespace`/`display_name`/`team`/`position`/
+  `position_group`/`active`/`opponent`/`is_home`/`bye`/`game_id`/
+  `kickoff_at`/`availability`/`factors`/`lineup_popularity`; the bulk
+  endpoint additionally gained `generated_at`/`source`/`season_type`/
+  `position_scope`/`pagination` (`limit`/`offset` query params)/
+  `completeness`/`covered_game_ids`. All purely additive — no existing
+  field, status value, or route changed; every new field is `null`/absent-
+  safe for a caller that only reads the fields documented before this
+  version. `lineup_popularity` ships correctly `available: false` (no
+  licensed start-rate source exists); `factors` only ever surfaces a
+  signal `project_player_week`'s own `basis` actually computed. Also
+  investigated and documented (not yet built, explicitly lower priority
+  per the spec) a `GET /v1/external/players/{player_id}/week-result`
+  proposal for completed-week actual production — see "Weekly recap"
+  above.

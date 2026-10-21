@@ -120,6 +120,76 @@ def test_bye_week_has_no_matching_game():
     assert nfl_schedule.team_matchup_for_week("KC", 3, 2026, games=games) is None
 
 
+def test_game_id_is_none_when_source_has_no_game_id_column():
+    """`_games_frame()` (every other test in this file) has no `game_id`
+    column at all — must be an honest `None`, never a synthesized guess."""
+
+    games = _games_frame()
+
+    schedule = nfl_schedule.team_schedule("BUF", 2026, games=games)
+
+    assert all(row["game_id"] is None for row in schedule)
+
+
+def test_game_id_passes_through_nflverses_own_published_value():
+    """When the source CSV does have a real `game_id` column, it is read
+    straight through — never re-derived from our own (possibly aliased,
+    see TEAM_CODE_ALIASES) home_team/away_team columns."""
+
+    games = pd.DataFrame(
+        [
+            {
+                "season": 2026,
+                "game_type": "REG",
+                "week": 1,
+                "home_team": "KC",
+                "away_team": "BUF",
+                "home_score": 24.0,
+                "away_score": 20.0,
+                "game_id": "2026_01_BUF_KC",
+            },
+            {
+                "season": 2026,
+                "game_type": "REG",
+                "week": 2,
+                "home_team": "BUF",
+                "away_team": "LA",
+                "home_score": None,
+                "away_score": None,
+                # Historical "LA" code preserved in the real nflverse id even
+                # though our own home_team/away_team columns get remapped to
+                # "LAR" — this must NOT be reconstructed from the remapped
+                # code, only read through as-is.
+                "game_id": "2026_02_LA_BUF",
+            },
+            # KC's week 3 game — gives KC a real gap at week 2 (its bye),
+            # which `team_schedule` synthesizes a row for.
+            {
+                "season": 2026,
+                "game_type": "REG",
+                "week": 3,
+                "home_team": "KC",
+                "away_team": "NE",
+                "home_score": None,
+                "away_score": None,
+                "game_id": "2026_03_NE_KC",
+            },
+        ]
+    )
+
+    buf_schedule = nfl_schedule.team_schedule("BUF", 2026, games=games)
+    week1 = next(row for row in buf_schedule if row["week"] == 1)
+    week2 = next(row for row in buf_schedule if row["week"] == 2)
+
+    assert week1["game_id"] == "2026_01_BUF_KC"
+    assert week2["game_id"] == "2026_02_LA_BUF"
+
+    # The synthesized bye row (no real game at all) must never fabricate one.
+    kc_schedule = nfl_schedule.team_schedule("KC", 2026, games=games)
+    kc_bye = next(row for row in kc_schedule if row["bye"])
+    assert kc_bye["game_id"] is None
+
+
 def test_team_schedule_synthesizes_a_bye_row_for_a_gap_within_its_own_span():
     # NE has games in weeks 1 and 3 but nothing in week 2 — a real bye,
     # distinct from "this team has no game data past its last known week".
