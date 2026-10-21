@@ -5589,6 +5589,169 @@ EXTERNAL_API_KEY_ENV = "FANTASYDESK_EXTERNAL_API_KEY"
 # docs/external-api-contract.md's versioning policy for both.
 EXTERNAL_PROJECTIONS_MODEL_VERSION = "v1"
 
+# Sleeper's own player_id already *is* this app's canonical player id (see
+# modules.player_identity.SUPPORTED_DIRECT_PLATFORMS) — this is reported so
+# a caller never has to guess which id space `player_id` lives in.
+EXTERNAL_ID_NAMESPACE = "sleeper"
+
+# nfl_schedule.team_schedule only ever returns regular-season games (its own
+# docstring: "Playoff rounds (game_type != 'REG') are excluded"), so every
+# week this API can project is always a regular-season week today. A real
+# constant (not a guess) — if postseason projections are ever added, this is
+# where that would stop being a hardcoded value.
+EXTERNAL_PROJECTIONS_SEASON_TYPE = "regular"
+
+# Max number of player ids surfaced inline in `completeness.*_player_ids` —
+# this is diagnostic detail for a human/bot debugging a gap, not meant to
+# re-list the whole slate; `*_player_id_count` always reports the real total
+# regardless of how many ids are actually included.
+EXTERNAL_COMPLETENESS_ID_SAMPLE_LIMIT = 25
+
+# Phase 4 of coridian_'s wish list (docs/external-api-contract.md):
+# lineup-popularity ("started_percent") evidence is genuinely useful to a
+# posting bot deciding whether a "sit" post is even meaningful, but no
+# licensed or otherwise available started-percent data source is wired into
+# this codebase today — FantasyDesk's own roster data is ROSTERED percent,
+# which Phase 4's own spec explicitly warns is NOT the same claim as STARTED
+# percent. Per the same honesty discipline as every other `status`/`null`
+# field in this contract, this is a real, present, well-documented field
+# that is correctly unavailable rather than a fabricated or substituted
+# number. A fresh dict is returned per call so no caller can mutate the
+# shared default.
+def _external_lineup_popularity_unavailable() -> dict[str, Any]:
+    return {
+        "available": False,
+        "unavailable_reason": (
+            "No licensed or otherwise available lineup-popularity/start-rate "
+            "data source is integrated in this codebase. FantasyDesk's own "
+            "roster-ownership data reflects ROSTERED percent, not STARTED "
+            "percent, and is deliberately never substituted here — see "
+            "docs/external-api-contract.md."
+        ),
+        "started_percent": None,
+        "platform": None,
+        "league_format": None,
+        "scoring_format": None,
+        "observed_at": None,
+        "source_url": None,
+        "population": None,
+    }
+
+
+def _external_position_group(position: str | None) -> str | None:
+    """`"skill"` (QB/RB/WR/TE) / `"kicker"` (K) / `"unsupported"` (anything
+    else, e.g. DEF/IDP) / `None` when no position is known at all (e.g. an
+    unknown player id). Lets a bot tell a kicker apart from a skill-position
+    player without hardcoding its own position list — see
+    `player_projections.OFFENSIVE_POSITIONS`/`KICKER_POSITION`, the same
+    sets this endpoint's own completeness accounting uses below."""
+
+    if not position:
+        return None
+    normalized = str(position).strip().upper()
+    if normalized in player_projections.OFFENSIVE_POSITIONS:
+        return "skill"
+    if normalized == player_projections.KICKER_POSITION:
+        return "kicker"
+    return "unsupported"
+
+
+def _external_availability(result: dict[str, Any], *, checked_at: str) -> dict[str, Any]:
+    """Item 5 of coridian_'s wish list: a typed official status, kept
+    strictly separate from the model's own `status` field above (never
+    conflated with "bye_week"/"insufficient_player_data"/etc.). `injury_status`
+    is Sleeper's own typed field (e.g. "Questionable"/"Out"/"IR"/"Sus") —
+    official in the sense of being the structured status every other screen
+    in this app already reads, but it carries no article URL of its own, so
+    `official_status_source_url` is honestly `None` rather than a fabricated
+    link: a caller that wants sourced, timestamped news evidence (with real
+    `source_urls`) should call `GET /v1/external/players/{player_id}/news`
+    (Phase 2) instead — this field is never a substitute for that endpoint.
+    `game_status` reuses this same payload's own schedule fields (never a
+    second, independently-derived live-game signal) — "bye" when there's no
+    game, "completed_or_in_progress" once kickoff has passed or nflverse has
+    a final score (the same two-state honesty `nfl_schedule.game_has_started`
+    already uses elsewhere — this app has no live in-game feed, so
+    "in_progress" and "final" are never distinguished), "upcoming" when a
+    real kickoff is known and hasn't passed, "unknown" only when none of the
+    above could be determined (e.g. `no_schedule_data`).
+    """
+
+    injury_status = result.get("injury_status")
+    if result.get("bye"):
+        game_status = "bye"
+    elif result.get("played") is True:
+        game_status = "completed_or_in_progress"
+    elif result.get("kickoff_at"):
+        game_status = "upcoming"
+    else:
+        game_status = "unknown"
+    return {
+        "official_status": injury_status,
+        "official_status_source": "sleeper_player_directory" if injury_status else None,
+        "official_status_source_url": None,
+        "checked_at": checked_at,
+        "game_status": game_status,
+    }
+
+
+def _external_factors(result: dict[str, Any], *, as_of: str) -> list[dict[str, Any]] | None:
+    """Item 3 of coridian_'s wish list: structured explanation factors,
+    supplied only when a real, already-computed input actually backs them —
+    every value here is read straight off `project_player_week`'s own
+    `basis` dict (never a generated narrative, never fabricated when a
+    signal has no real sample). `None` (not `[]`) for any non-`"ok"` status,
+    since `basis` itself only exists when a real projection was produced.
+    """
+
+    if result.get("status") != "ok":
+        return None
+    basis = result.get("basis") or {}
+    factors: list[dict[str, Any]] = []
+    if basis.get("recent_games_played"):
+        weeks_used = basis.get("recent_weeks_used")
+        factors.append(
+            {
+                "code": "recent_scoring_trend",
+                "observed_value": basis.get("recent_weighted_avg_ppr"),
+                "comparison_baseline": None,
+                "unit": "fantasy_points_ppr_per_game",
+                "period": f"last {weeks_used} played week(s)" if weeks_used else "recent played weeks",
+                "source": "fantasygmlab_weekly_stats",
+                "as_of": as_of,
+            }
+        )
+    # Only when there's a REAL (non-neutral-fallback) opponent-defense
+    # signal — opponent_defense_has_signal is False whenever the opponent
+    # has too small a sample, and the multiplier is a neutral 1.0 in that
+    # case; surfacing that as a "factor" would misrepresent a non-finding as
+    # a finding.
+    if basis.get("opponent_defense_has_signal"):
+        factors.append(
+            {
+                "code": "opponent_defense_strength",
+                "observed_value": basis.get("opponent_multiplier"),
+                "comparison_baseline": 1.0,
+                "unit": "multiplier_vs_league_average_points_allowed",
+                "period": f"last {basis.get('opponent_defense_games_sampled')} sampled game(s)",
+                "source": "nflverse_points_allowed_by_position",
+                "as_of": as_of,
+            }
+        )
+    if basis.get("team_qb_quality_has_signal"):
+        factors.append(
+            {
+                "code": "team_starting_qb_quality",
+                "observed_value": basis.get("team_qb_quality_score"),
+                "comparison_baseline": None,
+                "unit": "team_qb_quality_score",
+                "period": "season to date",
+                "source": "fantasygmlab_team_qb_quality_model",
+                "as_of": as_of,
+            }
+        )
+    return factors
+
 
 def require_external_api_key(authorization: str | None = Header(default=None)) -> None:
     """Static bearer-token auth for `/v1/external/*` — a single shared
@@ -5620,11 +5783,23 @@ def _external_projection_payload(
     above (never fabricate a number for a bye week, unknown player, etc.).
     `scoring_format` is always `"ppr"`: `project_player_week` only ever
     computes PPR points — there is no multi-format support to report here.
+
+    Everything below `model_version` is additive (docs/external-api-
+    contract.md's own versioning policy: new fields are always safe) and
+    resolved straight from `project_player_week`'s own result dict — see
+    `modules.player_projections._player_identity_fields` and the schedule
+    context (`is_home`/`game_id`/`kickoff_at`/`bye`/`played`) that function
+    now threads through every status branch. No second fetch, no identity
+    guessing by name: this is the same canonical `players` row
+    `project_player_week` already resolved.
     """
 
     status = str(result.get("status") or "unknown_player")
+    position = result.get("position")
+    calculated_at = datetime.now(timezone.utc).isoformat()
     payload: dict[str, Any] = {
         "player_id": str(player_id),
+        "id_namespace": EXTERNAL_ID_NAMESPACE,
         "season": int(season),
         "week": int(week),
         "scoring_format": "ppr",
@@ -5633,8 +5808,29 @@ def _external_projection_payload(
         "low": None,
         "high": None,
         "confidence": None,
-        "calculated_at": datetime.now(timezone.utc).isoformat(),
+        "calculated_at": calculated_at,
         "model_version": EXTERNAL_PROJECTIONS_MODEL_VERSION,
+        # Identity (item 1): resolved from the same canonical players row
+        # project_player_week already has in hand — never guessed by name.
+        "display_name": result.get("display_name"),
+        "team": result.get("team"),
+        "position": position,
+        "position_group": _external_position_group(position),
+        "active": result.get("active"),
+        # Game/schedule context (item 1): explicit null for no-game/bye
+        # rather than a fabricated opponent — see modules.nfl_schedule.
+        "opponent": result.get("opponent"),
+        "is_home": result.get("is_home"),
+        "bye": result.get("bye"),
+        "game_id": result.get("game_id"),
+        "kickoff_at": result.get("kickoff_at"),
+        # Availability (item 5) and structured factors (item 3) — see their
+        # own docstrings for the honesty discipline each follows.
+        "availability": _external_availability(result, checked_at=calculated_at),
+        "factors": _external_factors(result, as_of=calculated_at),
+        # Lineup-popularity evidence (item 4) — correctly unavailable today;
+        # see `_external_lineup_popularity_unavailable`'s own docstring.
+        "lineup_popularity": _external_lineup_popularity_unavailable(),
     }
     if status == "ok":
         payload.update(
@@ -5678,6 +5874,8 @@ def get_external_week_projections(
     week: int,
     season: int | None = None,
     position: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> dict[str, Any]:
     """This week's full projectable slate (QB/RB/WR/TE/K), in one call — a
     posting bot deciding what to post about almost always wants "this
@@ -5687,13 +5885,25 @@ def get_external_week_projections(
     request, the same pattern `/v1/players/{id}/schedule` already uses via
     `_weekly_projection_for_player` above. Optional `position` filters to
     one of QB/RB/WR/TE/K.
+
+    `limit`/`offset` (item 2) are purely additive and backward-compatible:
+    omitted, every item is returned exactly as before. `completeness` and
+    `covered_game_ids` are always computed over the FULL slate (before any
+    pagination slice) — a paginated page is never itself evidence of
+    completeness, and completeness metadata must never look different
+    just because a caller happened to page through the response.
     """
 
     resolved_season = int(season) if season is not None else sleeper.default_player_stats_season()
     position_filter = str(position).strip().upper() if position else None
     if position_filter and position_filter not in player_projections.PROJECTABLE_POSITIONS:
         raise HTTPException(status_code=422, detail="position must be one of QB, RB, WR, TE, K.")
+    if offset < 0:
+        raise HTTPException(status_code=422, detail="offset must be >= 0.")
+    if limit is not None and limit < 1:
+        raise HTTPException(status_code=422, detail="limit must be >= 1.")
 
+    generated_at = datetime.now(timezone.utc).isoformat()
     players = sleeper.get_players()
     weekly_stats = sleeper.get_season_player_stats(season=resolved_season, retain_weekly=True)
     defense_strength = player_projections.team_defense_points_allowed_by_position(
@@ -5707,6 +5917,22 @@ def get_external_week_projections(
     # scratch via _team_starting_qb_changed_recently. See
     # team_qb_pass_attempts_by_week's own docstring.
     team_qb_pass_attempts = player_projections.team_qb_pass_attempts_by_week(players, weekly_stats)
+
+    # Completeness accounting (item 2) — see docs/external-api-contract.md
+    # for the exact, precise definition this implements. The "candidate"
+    # universe is deliberately narrowed to real, team-affiliated players at
+    # a projectable position: a free agent/retired player at e.g. WR is a
+    # real Sleeper row but was never a real lineup candidate this week, so
+    # counting it as "missing" would make completeness meaningless (this is
+    # the root cause behind the bug report that prompted this change — see
+    # the contract's own change history entry for this version).
+    skill_candidate_total = 0
+    skill_resolved_total = 0
+    kicker_candidate_total = 0
+    kicker_resolved_total = 0
+    unresolved_player_ids: list[str] = []
+    no_schedule_data_player_ids: list[str] = []
+    covered_game_ids: set[str] = set()
 
     items: list[dict[str, Any]] = []
     for player_id, player in players.items():
@@ -5726,14 +5952,79 @@ def get_external_week_projections(
             defense_strength=defense_strength,
             team_qb_pass_attempts_by_team=team_qb_pass_attempts,
         )
-        items.append(_external_projection_payload(player_id, resolved_season, int(week), result))
+        payload = _external_projection_payload(player_id, resolved_season, int(week), result)
+        items.append(payload)
+
+        is_skill = player_position in player_projections.OFFENSIVE_POSITIONS
+        has_team = bool((player or {}).get("team"))
+        if has_team:
+            identity_resolved = bool(payload.get("display_name")) and bool(payload.get("team"))
+            if identity_resolved:
+                if is_skill:
+                    skill_resolved_total += 1
+                else:
+                    kicker_resolved_total += 1
+            else:
+                unresolved_player_ids.append(str(player_id))
+            if is_skill:
+                skill_candidate_total += 1
+            else:
+                kicker_candidate_total += 1
+            if payload.get("status") == "no_schedule_data":
+                no_schedule_data_player_ids.append(str(player_id))
+        if payload.get("game_id"):
+            covered_game_ids.add(str(payload["game_id"]))
+
+    total_items = len(items)
+    page = items[offset : offset + limit] if limit is not None else (items[offset:] if offset else items)
+
+    # Vacuously true (0 == 0) when the requested position_scope excludes
+    # that bucket entirely (e.g. position=K never has any skill candidates)
+    # — "complete" is always judged only within what was actually requested.
+    skill_complete = skill_candidate_total == skill_resolved_total
+    kicker_complete = kicker_candidate_total == kicker_resolved_total
 
     return {
         "season": resolved_season,
         "week": int(week),
+        "season_type": EXTERNAL_PROJECTIONS_SEASON_TYPE,
         "scoring_format": "ppr",
         "model_version": EXTERNAL_PROJECTIONS_MODEL_VERSION,
-        "items": items,
+        "generated_at": generated_at,
+        "source": {
+            "players": "sleeper_player_directory",
+            "schedule": "nflverse_games_csv",
+            "weekly_stats": "sleeper_weekly_stats",
+            "as_of": generated_at,
+        },
+        "position_scope": [position_filter] if position_filter else list(player_projections.PROJECTABLE_POSITIONS),
+        "pagination": {
+            "offset": offset,
+            "limit": limit,
+            "returned": len(page),
+            "total": total_items,
+            "has_more": (offset + len(page)) < total_items,
+        },
+        "completeness": {
+            "skill_position_candidate_total": skill_candidate_total,
+            "skill_position_resolved_total": skill_resolved_total,
+            "skill_position_complete": skill_complete,
+            "kicker_candidate_total": kicker_candidate_total,
+            "kicker_resolved_total": kicker_resolved_total,
+            "kicker_complete": kicker_complete,
+            "unresolved_player_ids": unresolved_player_ids[:EXTERNAL_COMPLETENESS_ID_SAMPLE_LIMIT],
+            "unresolved_player_id_count": len(unresolved_player_ids),
+            "no_schedule_data_player_ids": no_schedule_data_player_ids[:EXTERNAL_COMPLETENESS_ID_SAMPLE_LIMIT],
+            "no_schedule_data_player_id_count": len(no_schedule_data_player_ids),
+            # True only when every real, team-affiliated candidate in the
+            # requested position_scope resolved a canonical identity AND
+            # had real schedule data this week — never inferred from "got a
+            # 200" or "no pagination was requested" (see this function's
+            # own docstring and docs/external-api-contract.md).
+            "complete": skill_complete and kicker_complete and not no_schedule_data_player_ids,
+        },
+        "covered_game_ids": sorted(covered_game_ids),
+        "items": page,
     }
 
 

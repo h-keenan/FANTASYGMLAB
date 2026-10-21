@@ -5235,6 +5235,529 @@ def test_external_week_projections_rejects_unsupported_position(monkeypatch):
     assert response.status_code == 422
 
 
+# ---------------------------------------------------------------------------
+# External projections enrichment: identity, completeness, pagination,
+# structured factors, availability, and lineup-popularity provenance.
+# coridian_'s content-bot developer reported the 2026 Week 7 bulk response
+# (4,234 rows, only 703 joined to the bot's own separate player-identity
+# snapshot, 60 status="ok" rows unmatched, population_complete=false) and
+# asked this API attach its own canonical identity directly to every row so
+# a bot never needs that separate join at all — see
+# docs/external-api-contract.md's change history for this version.
+# ---------------------------------------------------------------------------
+
+
+def test_external_player_projection_ok_case_includes_identity_availability_and_factors(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_projection = {
+        "status": "ok",
+        "player_id": "4046",
+        "position": "WR",
+        "team": "HOU",
+        "week": 7,
+        "season": 2026,
+        "opponent": "JAX",
+        "is_home": True,
+        "game_id": "2026_07_JAX_HOU",
+        "kickoff_at": "2026-10-19T17:00:00+00:00",
+        "bye": False,
+        "played": False,
+        "display_name": "Nico Collins",
+        "active": True,
+        "roster_status": "Active",
+        "injury_status": "Questionable",
+        "point_estimate": 14.2,
+        "low": 9.8,
+        "high": 18.6,
+        "confidence": "medium",
+        "basis": {
+            "recent_games_played": 3,
+            "recent_weeks_used": 3,
+            "recent_weighted_avg_ppr": 13.1,
+            "opponent_multiplier": 1.08,
+            "opponent_defense_has_signal": True,
+            "opponent_defense_games_sampled": 5,
+            "team_qb_quality_has_signal": True,
+            "team_qb_quality_score": 0.62,
+        },
+    }
+    with patch.object(mobile_api_service.player_projections, "project_player_week", return_value=fake_projection):
+        response = client.get(
+            "/v1/external/players/4046/projections",
+            params={"week": 7, "season": 2026},
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id_namespace"] == "sleeper"
+    assert body["display_name"] == "Nico Collins"
+    assert body["team"] == "HOU"
+    assert body["position"] == "WR"
+    assert body["position_group"] == "skill"
+    assert body["active"] is True
+    assert body["opponent"] == "JAX"
+    assert body["is_home"] is True
+    assert body["bye"] is False
+    assert body["game_id"] == "2026_07_JAX_HOU"
+    assert body["kickoff_at"] == "2026-10-19T17:00:00+00:00"
+
+    availability = body["availability"]
+    assert availability["official_status"] == "Questionable"
+    assert availability["official_status_source"] == "sleeper_player_directory"
+    # Sleeper's own typed status carries no article URL — a bot wanting a
+    # sourced claim must call the Phase 2 /news endpoint instead.
+    assert availability["official_status_source_url"] is None
+    assert availability["game_status"] == "upcoming"
+
+    factor_codes = {factor["code"] for factor in body["factors"]}
+    assert "recent_scoring_trend" in factor_codes
+    assert "opponent_defense_strength" in factor_codes
+    assert "team_starting_qb_quality" in factor_codes
+    for factor in body["factors"]:
+        assert factor["observed_value"] is not None
+        assert factor["source"]
+        assert factor["as_of"] == body["calculated_at"]
+
+    # Item 4: no licensed/available start-rate source exists — correctly
+    # null with an explicit reason, never fabricated.
+    popularity = body["lineup_popularity"]
+    assert popularity["available"] is False
+    assert popularity["started_percent"] is None
+    assert popularity["unavailable_reason"]
+
+
+def test_external_player_projection_non_ok_status_has_null_factors_and_availability_still_present(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    with patch.object(
+        mobile_api_service.player_projections,
+        "project_player_week",
+        return_value={
+            "status": "bye_week",
+            "player_id": "4046",
+            "week": 9,
+            "season": 2026,
+            "position": "WR",
+            "team": "HOU",
+            "display_name": "Nico Collins",
+            "active": True,
+            "opponent": None,
+            "is_home": None,
+            "game_id": None,
+            "kickoff_at": None,
+            "bye": True,
+            "played": False,
+        },
+    ):
+        response = client.get(
+            "/v1/external/players/4046/projections",
+            params={"week": 9, "season": 2026},
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    body = response.json()
+    assert body["status"] == "bye_week"
+    assert body["display_name"] == "Nico Collins"
+    assert body["bye"] is True
+    assert body["game_id"] is None
+    # No real projection was produced at all — `basis` never existed, so
+    # factors must be null (not an empty list masquerading as "nothing to
+    # report yet"), and lineup-popularity is still honestly unavailable.
+    assert body["factors"] is None
+    assert body["availability"]["game_status"] == "bye"
+    assert body["lineup_popularity"]["available"] is False
+
+
+def test_external_player_projection_unknown_player_has_null_identity(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    with patch.object(
+        mobile_api_service.player_projections,
+        "project_player_week",
+        return_value={"status": "unknown_player", "player_id": "does-not-exist"},
+    ):
+        response = client.get(
+            "/v1/external/players/does-not-exist/projections",
+            params={"week": 7, "season": 2026},
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    body = response.json()
+    assert body["status"] == "unknown_player"
+    assert body["display_name"] is None
+    assert body["team"] is None
+    assert body["position_group"] is None
+    assert body["factors"] is None
+    assert body["availability"]["game_status"] == "unknown"
+
+
+def _fake_week_projections_players(*, with_identity: bool = True) -> dict[str, dict]:
+    base = {
+        "4046": {"position": "WR", "team": "HOU"},
+        "4047": {"position": "RB", "team": "MIA"},
+        "4048": {"position": "K", "team": "BUF"},
+        "9999": {"position": "WR", "team": None},  # free agent — never a candidate
+        "4050": {"position": "DEF", "team": "DAL"},  # unsupported position — excluded entirely
+    }
+    if with_identity:
+        for pid in ("4046", "4047", "4048"):
+            base[pid]["full_name"] = f"Player {pid}"
+    return base
+
+
+def test_external_week_projections_completeness_true_when_every_candidate_resolves(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = _fake_week_projections_players(with_identity=True)
+
+    def fake_project(player_id, week, season, **kwargs):
+        player = fake_players[player_id]
+        if not player.get("team"):
+            return {"status": "no_team", "player_id": player_id, "position": player["position"]}
+        return {
+            "status": "ok",
+            "player_id": player_id,
+            "position": player["position"],
+            "team": player.get("team"),
+            "display_name": player.get("full_name"),
+            "active": True,
+            "opponent": "NE",
+            "is_home": True,
+            "game_id": f"2026_07_NE_{player.get('team')}",
+            "kickoff_at": "2026-10-19T17:00:00+00:00",
+            "bye": False,
+            "played": False,
+            "point_estimate": 1.0,
+            "low": 0.5,
+            "high": 1.5,
+            "confidence": "low",
+            "basis": {"recent_games_played": 1, "recent_weighted_avg_ppr": 1.0},
+        }
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "get_season_player_stats", return_value={}):
+            with patch.object(
+                mobile_api_service.player_projections, "team_defense_points_allowed_by_position", return_value={}
+            ):
+                with patch.object(
+                    mobile_api_service.player_projections, "project_player_week", side_effect=fake_project
+                ):
+                    response = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    body = response.json()
+    # The DEF row and the teamless free-agent WR are never real lineup
+    # candidates: 2 real candidates (WR, RB) + 1 kicker.
+    assert body["completeness"]["skill_position_candidate_total"] == 2
+    assert body["completeness"]["skill_position_resolved_total"] == 2
+    assert body["completeness"]["skill_position_complete"] is True
+    assert body["completeness"]["kicker_candidate_total"] == 1
+    assert body["completeness"]["kicker_resolved_total"] == 1
+    assert body["completeness"]["kicker_complete"] is True
+    assert body["completeness"]["complete"] is True
+    assert body["completeness"]["unresolved_player_ids"] == []
+    assert body["season_type"] == "regular"
+    assert body["position_scope"] == list(mobile_api_service.player_projections.PROJECTABLE_POSITIONS)
+    assert set(body["covered_game_ids"]) == {"2026_07_NE_HOU", "2026_07_NE_MIA", "2026_07_NE_BUF"}
+    from datetime import datetime
+
+    datetime.fromisoformat(body["generated_at"])
+    assert body["source"]["as_of"] == body["generated_at"]
+
+
+def test_external_week_projections_completeness_false_when_identity_unresolved(monkeypatch):
+    """This is the exact shape of the bug report that prompted this change:
+    a real, team-affiliated status="ok" candidate with no resolvable
+    identity must flip completeness to false and be named explicitly —
+    never silently dropped, never a false "complete"."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = _fake_week_projections_players(with_identity=False)
+
+    def fake_project(player_id, week, season, **kwargs):
+        player = fake_players[player_id]
+        return {
+            "status": "ok",
+            "player_id": player_id,
+            "position": player["position"],
+            "team": player.get("team"),
+            "display_name": None,  # unresolved on purpose
+            "point_estimate": 1.0,
+            "low": 0.5,
+            "high": 1.5,
+            "confidence": "low",
+            "basis": {"recent_games_played": 1, "recent_weighted_avg_ppr": 1.0},
+        }
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "get_season_player_stats", return_value={}):
+            with patch.object(
+                mobile_api_service.player_projections, "team_defense_points_allowed_by_position", return_value={}
+            ):
+                with patch.object(
+                    mobile_api_service.player_projections, "project_player_week", side_effect=fake_project
+                ):
+                    response = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    body = response.json()
+    assert body["completeness"]["skill_position_complete"] is False
+    assert body["completeness"]["kicker_complete"] is False
+    assert body["completeness"]["complete"] is False
+    assert set(body["completeness"]["unresolved_player_ids"]) == {"4046", "4047", "4048"}
+    assert body["completeness"]["unresolved_player_id_count"] == 3
+
+
+def test_external_week_projections_no_schedule_data_flips_completeness_false(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = {"4046": {"position": "WR", "team": "HOU", "full_name": "Nico Collins"}}
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "get_season_player_stats", return_value={}):
+            with patch.object(
+                mobile_api_service.player_projections, "team_defense_points_allowed_by_position", return_value={}
+            ):
+                with patch.object(
+                    mobile_api_service.player_projections,
+                    "project_player_week",
+                    return_value={
+                        "status": "no_schedule_data",
+                        "player_id": "4046",
+                        "position": "WR",
+                        "team": "HOU",
+                        "display_name": "Nico Collins",
+                    },
+                ):
+                    response = client.get(
+                        "/v1/external/projections",
+                        params={"week": 99, "season": 2026},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    body = response.json()
+    assert body["completeness"]["no_schedule_data_player_ids"] == ["4046"]
+    assert body["completeness"]["complete"] is False
+
+
+def test_external_week_projections_kicker_never_counted_toward_skill_position_completeness(monkeypatch):
+    """A kicker-only slate (position=K) must report skill_position_complete
+    vacuously true (nothing in scope) rather than false — completeness is
+    judged only within the requested position_scope."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = {"4048": {"position": "K", "team": "BUF", "full_name": "Some Kicker"}}
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "get_season_player_stats", return_value={}):
+            with patch.object(
+                mobile_api_service.player_projections, "team_defense_points_allowed_by_position", return_value={}
+            ):
+                with patch.object(
+                    mobile_api_service.player_projections,
+                    "project_player_week",
+                    return_value={
+                        "status": "ok",
+                        "player_id": "4048",
+                        "position": "K",
+                        "team": "BUF",
+                        "display_name": "Some Kicker",
+                        "point_estimate": 8.0,
+                        "low": 5.0,
+                        "high": 11.0,
+                        "confidence": "medium",
+                        "basis": {"recent_games_played": 2, "recent_weighted_avg_ppr": 8.0},
+                    },
+                ):
+                    response = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026, "position": "K"},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    body = response.json()
+    assert body["completeness"]["skill_position_candidate_total"] == 0
+    assert body["completeness"]["skill_position_complete"] is True
+    assert body["completeness"]["kicker_candidate_total"] == 1
+    assert body["completeness"]["kicker_complete"] is True
+    assert body["completeness"]["complete"] is True
+    assert body["position_scope"] == ["K"]
+
+
+def test_external_week_projections_pagination_slices_items_but_not_completeness(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = {
+        f"wr{i}": {"position": "WR", "team": "HOU", "full_name": f"WR {i}"} for i in range(5)
+    }
+
+    def fake_project(player_id, week, season, **kwargs):
+        return {
+            "status": "ok",
+            "player_id": player_id,
+            "position": "WR",
+            "team": "HOU",
+            "display_name": fake_players[player_id]["full_name"],
+            "point_estimate": 1.0,
+            "low": 0.5,
+            "high": 1.5,
+            "confidence": "low",
+            "basis": {"recent_games_played": 1, "recent_weighted_avg_ppr": 1.0},
+        }
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "get_season_player_stats", return_value={}):
+            with patch.object(
+                mobile_api_service.player_projections, "team_defense_points_allowed_by_position", return_value={}
+            ):
+                with patch.object(
+                    mobile_api_service.player_projections, "project_player_week", side_effect=fake_project
+                ):
+                    page_1 = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026, "limit": 2, "offset": 0},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    ).json()
+                    page_2 = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026, "limit": 2, "offset": 2},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    ).json()
+                    unpaginated = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    ).json()
+
+    assert len(page_1["items"]) == 2
+    assert page_1["pagination"] == {"offset": 0, "limit": 2, "returned": 2, "total": 5, "has_more": True}
+    assert len(page_2["items"]) == 2
+    assert page_2["pagination"]["has_more"] is True
+    # Completeness/covered_game_ids reflect the FULL slate regardless of
+    # which page was requested — a page is never itself evidence of
+    # (in)completeness.
+    assert page_1["completeness"] == unpaginated["completeness"]
+    assert page_2["completeness"] == unpaginated["completeness"]
+    assert len(unpaginated["items"]) == 5
+    assert unpaginated["pagination"] == {"offset": 0, "limit": None, "returned": 5, "total": 5, "has_more": False}
+
+
+def test_external_week_projections_rejects_invalid_pagination_params(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    bad_offset = client.get(
+        "/v1/external/projections",
+        params={"week": 7, "season": 2026, "offset": -1},
+        headers={"Authorization": "Bearer the-real-secret-key"},
+    )
+    bad_limit = client.get(
+        "/v1/external/projections",
+        params={"week": 7, "season": 2026, "limit": 0},
+        headers={"Authorization": "Bearer the-real-secret-key"},
+    )
+    assert bad_offset.status_code == 422
+    assert bad_limit.status_code == 422
+
+
+def test_external_week_projections_never_returns_duplicate_player_ids(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = _fake_week_projections_players(with_identity=True)
+
+    def fake_project(player_id, week, season, **kwargs):
+        player = fake_players[player_id]
+        return {
+            "status": "ok",
+            "player_id": player_id,
+            "position": player["position"],
+            "team": player.get("team"),
+            "display_name": player.get("full_name"),
+            "point_estimate": 1.0,
+            "low": 0.5,
+            "high": 1.5,
+            "confidence": "low",
+            "basis": {"recent_games_played": 1, "recent_weighted_avg_ppr": 1.0},
+        }
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "get_season_player_stats", return_value={}):
+            with patch.object(
+                mobile_api_service.player_projections, "team_defense_points_allowed_by_position", return_value={}
+            ):
+                with patch.object(
+                    mobile_api_service.player_projections, "project_player_week", side_effect=fake_project
+                ):
+                    response = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    body = response.json()
+    player_ids = [item["player_id"] for item in body["items"]]
+    assert len(player_ids) == len(set(player_ids))
+
+
 # Phase 2 of coridian_'s external content-posting bot wish list: structured
 # news evidence (docs/external-api-contract.md). Gated by the exact same
 # require_external_api_key dependency Phase 1's projections routes use

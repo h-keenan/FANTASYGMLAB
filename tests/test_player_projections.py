@@ -415,6 +415,141 @@ def test_project_player_week_unknown_player(round_robin_schedule):
     result = pp.project_player_week("does_not_exist", week=5, season=2099, players={})
 
     assert result["status"] == "unknown_player"
+    # Nothing is fabricated for a player that was never found at all — no
+    # identity fields of any kind, not even null ones.
+    assert "display_name" not in result
+    assert "team" not in result
+
+
+# ---------------------------------------------------------------------------
+# Identity + schedule context (external content-bot API, item 1 of
+# coridian_'s wish list — docs/external-api-contract.md): resolved straight
+# off the same `players`/`matchup` data this function already has in hand,
+# no second fetch, no guessing by name.
+# ---------------------------------------------------------------------------
+
+
+def test_project_player_week_ok_includes_identity_and_real_schedule_context(round_robin_schedule):
+    players = dict(_players_fixture())
+    players["qb_a1"] = {
+        **players["qb_a1"],
+        "full_name": "Pat Mahomes",
+        "active": True,
+        "status": "Active",
+        "injury_status": "Questionable",
+    }
+    weekly_stats = _weekly_stats_fixture()
+
+    result = pp.project_player_week(
+        "qb_a1", week=5, season=2099, players=players,
+        player_weekly_rows=weekly_stats["qb_a1"]["weekly"],
+        defense_strength=pp.team_defense_points_allowed_by_position(
+            2099, upto_week=4, weekly_stats=weekly_stats, players=players
+        ),
+    )
+
+    assert result["status"] == "ok"
+    assert result["display_name"] == "Pat Mahomes"
+    assert result["active"] is True
+    assert result["roster_status"] == "Active"
+    assert result["injury_status"] == "Questionable"
+    assert result["team"] == "AAA"
+    assert result["bye"] is False
+    assert result["is_home"] is True  # AAA is home vs DDD in week 5
+    assert result["played"] is True  # the round-robin fixture has a real score for week 5
+    # _round_robin_games() carries no `game_id`/`gameday`/`gametime` columns
+    # at all — both must be an honest None, never guessed.
+    assert result["game_id"] is None
+    assert result["kickoff_at"] is None
+
+
+def test_project_player_week_identity_falls_back_to_first_last_name(round_robin_schedule):
+    players = dict(_players_fixture())
+    players["qb_a1"] = {**players["qb_a1"], "first_name": "Pat", "last_name": "Mahomes"}
+    weekly_stats = _weekly_stats_fixture()
+
+    result = pp.project_player_week(
+        "qb_a1", week=5, season=2099, players=players,
+        player_weekly_rows=weekly_stats["qb_a1"]["weekly"],
+    )
+
+    assert result["display_name"] == "Pat Mahomes"
+
+
+def test_project_player_week_identity_is_null_when_sleeper_has_nothing(round_robin_schedule):
+    """No full_name/first_name/last_name/active/status/injury_status on the
+    player row at all (the existing fixture shape) — every identity field
+    must be an honest null, never fabricated."""
+
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+
+    result = pp.project_player_week(
+        "qb_a1", week=5, season=2099, players=players,
+        player_weekly_rows=weekly_stats["qb_a1"]["weekly"],
+    )
+
+    assert result["display_name"] is None
+    assert result["active"] is None
+    assert result["roster_status"] is None
+    assert result["injury_status"] is None
+
+
+def test_project_player_week_bye_week_includes_identity_but_null_game_fields(round_robin_schedule):
+    players = dict(_players_fixture())
+    players["qb_a1"] = {**players["qb_a1"], "full_name": "Pat Mahomes", "active": True}
+    weekly_stats = _weekly_stats_fixture()
+
+    # AAA has a synthesized bye in week 2.
+    result = pp.project_player_week(
+        "qb_a1", week=2, season=2099, players=players,
+        player_weekly_rows=weekly_stats["qb_a1"]["weekly"],
+    )
+
+    assert result["status"] == "bye_week"
+    assert result["display_name"] == "Pat Mahomes"
+    assert result["active"] is True
+    assert result["team"] == "AAA"
+    assert result["bye"] is True
+    assert result["opponent"] is None
+    assert result["game_id"] is None
+    assert result["kickoff_at"] is None
+
+
+def test_project_player_week_no_schedule_data_includes_identity(round_robin_schedule):
+    players = dict(_players_fixture())
+    players["qb_a1"] = {**players["qb_a1"], "full_name": "Pat Mahomes"}
+    weekly_stats = _weekly_stats_fixture()
+
+    result = pp.project_player_week(
+        "qb_a1", week=99, season=2099, players=players,
+        player_weekly_rows=weekly_stats["qb_a1"]["weekly"],
+    )
+
+    assert result["status"] == "no_schedule_data"
+    assert result["display_name"] == "Pat Mahomes"
+    assert result["team"] == "AAA"
+
+
+def test_project_player_week_no_team_includes_identity(round_robin_schedule):
+    players = dict(_players_fixture())
+    players["fa_1"] = {**players["fa_1"], "full_name": "Free Agent"}
+
+    result = pp.project_player_week("fa_1", week=5, season=2099, players=players)
+
+    assert result["status"] == "no_team"
+    assert result["display_name"] == "Free Agent"
+
+
+def test_project_player_week_unsupported_position_includes_identity_and_team(round_robin_schedule):
+    players = dict(_players_fixture())
+    players["lb_a1"] = {"position": "LB", "team": "AAA", "full_name": "Some Linebacker"}
+
+    result = pp.project_player_week("lb_a1", week=5, season=2099, players=players)
+
+    assert result["status"] == "unsupported_position"
+    assert result["display_name"] == "Some Linebacker"
+    assert result["team"] == "AAA"
 
 
 def test_project_player_week_trend_is_invariant_to_target_week_distance(extended_schedule):

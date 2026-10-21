@@ -861,6 +861,36 @@ def _player_recent_trend(
     }
 
 
+def _player_identity_fields(player: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonical identity context for one Sleeper player row — added so a
+    caller (the external content-bot API: ``services/mobile_api_service.py``'s
+    ``/v1/external/*`` routes) never has to run its own separate name/id
+    join against a second player index; Sleeper's own ``player_id`` already
+    *is* this app's canonical player id (see ``modules.player_identity``'s
+    ``SUPPORTED_DIRECT_PLATFORMS``), so every field below is read straight
+    off the same ``players`` dict ``project_player_week`` already has in
+    hand — no new fetch, no guessing by name.
+
+    ``display_name`` falls back to ``first_name``/``last_name`` only when
+    Sleeper's own ``full_name`` is missing. ``active``/``roster_status``/
+    ``injury_status`` are Sleeper's own typed fields, passed through
+    honestly (``None`` when Sleeper has nothing on record) — never inferred
+    from projection status.
+    """
+
+    full_name = player.get("full_name")
+    if not full_name:
+        first = str(player.get("first_name") or "").strip()
+        last = str(player.get("last_name") or "").strip()
+        full_name = f"{first} {last}".strip() or None
+    return {
+        "display_name": str(full_name) if full_name else None,
+        "active": player.get("active") if player.get("active") is not None else None,
+        "roster_status": player.get("status") or None,
+        "injury_status": player.get("injury_status") or None,
+    }
+
+
 def _confidence_label(games_played: int, defense_has_signal: bool) -> str:
     if games_played >= MIN_GAMES_FOR_FULL_CONFIDENCE and defense_has_signal:
         return "high"
@@ -969,12 +999,25 @@ def project_player_week(
 
     position = str(player.get("position") or "").strip().upper()
     team = player.get("team")
+    # Identity context (display name, active/roster/injury status) — same
+    # canonical ``players`` row already resolved above, no new fetch. See
+    # ``_player_identity_fields``'s own docstring for why this exists at
+    # all: the external content-bot API attaches this to every response
+    # branch below so a caller never has to run its own separate identity
+    # join against a second player index.
+    identity_fields = _player_identity_fields(player)
 
     if position not in PROJECTABLE_POSITIONS:
-        return {"status": "unsupported_position", "player_id": player_id, "position": position or None}
+        return {
+            "status": "unsupported_position",
+            "player_id": player_id,
+            "position": position or None,
+            "team": str(team) if team else None,
+            **identity_fields,
+        }
 
     if not team:
-        return {"status": "no_team", "player_id": player_id, "position": position}
+        return {"status": "no_team", "player_id": player_id, "position": position, **identity_fields}
 
     schedule = nfl_schedule.team_schedule(str(team), season)
     matchup = next((row for row in schedule if int(row["week"]) == week), None)
@@ -983,16 +1026,26 @@ def project_player_week(
             "status": "no_schedule_data",
             "player_id": player_id,
             "position": position,
+            "team": str(team),
             "week": week,
             "season": season,
+            **identity_fields,
         }
     if matchup.get("bye"):
         return {
             "status": "bye_week",
             "player_id": player_id,
             "position": position,
+            "team": str(team),
             "week": week,
             "season": season,
+            "opponent": None,
+            "is_home": None,
+            "game_id": None,
+            "kickoff_at": None,
+            "bye": True,
+            "played": False,
+            **identity_fields,
         }
     opponent = matchup.get("opponent")
     if not opponent:
@@ -1000,8 +1053,15 @@ def project_player_week(
             "status": "no_opponent",
             "player_id": player_id,
             "position": position,
+            "team": str(team),
             "week": week,
             "season": season,
+            "is_home": matchup.get("is_home"),
+            "game_id": matchup.get("game_id"),
+            "kickoff_at": matchup.get("kickoff_at"),
+            "bye": bool(matchup.get("bye")),
+            "played": bool(matchup.get("played")),
+            **identity_fields,
         }
 
     weekly_rows = (
@@ -1023,9 +1083,16 @@ def project_player_week(
             "status": "insufficient_player_data",
             "player_id": player_id,
             "position": position,
+            "team": str(team),
             "week": week,
             "season": season,
             "opponent": opponent,
+            "is_home": matchup.get("is_home"),
+            "game_id": matchup.get("game_id"),
+            "kickoff_at": matchup.get("kickoff_at"),
+            "bye": False,
+            "played": bool(matchup.get("played")),
+            **identity_fields,
         }
 
     defense_strength = (
@@ -1109,6 +1176,12 @@ def project_player_week(
         "week": week,
         "season": season,
         "opponent": str(opponent),
+        "is_home": matchup.get("is_home"),
+        "game_id": matchup.get("game_id"),
+        "kickoff_at": matchup.get("kickoff_at"),
+        "bye": False,
+        "played": bool(matchup.get("played")),
+        **identity_fields,
         "point_estimate": round(point_estimate, 1),
         "low": round(low, 1),
         "high": round(high, 1),

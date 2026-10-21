@@ -193,6 +193,7 @@ def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
         team_spread = float(raw_spread) if team_is_home else -float(raw_spread)
     total_line = game.get("total_line")
     played = team_score is not None and not pd.isna(team_score)
+    raw_game_id = game.get("game_id")
     return {
         "week": int(game["week"]),
         "opponent": str(opponent),
@@ -207,6 +208,13 @@ def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
         # `_kickoff_at_utc`/`game_has_started`. None for older seasons or
         # any row missing gameday/gametime.
         "kickoff_at": _kickoff_at_utc(game),
+        # nflverse's own published game identifier for this exact game
+        # (its own `{season}_{week}_{away}_{home}` convention, using ITS
+        # team codes, not re-derived from our own possibly-aliased
+        # home_team/away_team columns above — see TEAM_CODE_ALIASES).
+        # None only when the source CSV itself has no `game_id` column
+        # (e.g. an old cached fetch) — never a synthesized guess.
+        "game_id": str(raw_game_id) if raw_game_id is not None and not pd.isna(raw_game_id) else None,
     }
 
 
@@ -256,6 +264,7 @@ def team_schedule(
                         "opponent_score": None,
                         "bye": True,
                         "kickoff_at": None,
+                        "game_id": None,
                     }
                 )
     rows.sort(key=lambda row: row["week"])
