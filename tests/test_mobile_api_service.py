@@ -6135,6 +6135,110 @@ def test_external_rating_history_cites_real_corroborating_news_in_window(monkeyp
     assert "ruled out" in body["explanation"].lower()
 
 
+# ---------------------------------------------------------------------------
+# External (bot) player background profile — Phase 4 addition
+# (docs/external-api-contract.md): contract-timeline (always honestly
+# unavailable), real team-situation context, and real historical PPR
+# production. The pure building-block logic lives in
+# modules.player_background_profile and is covered in depth by
+# tests/test_player_background_profile.py; these tests only cover the HTTP
+# route itself — auth, status codes, and that the route wires the module's
+# real output straight through.
+# ---------------------------------------------------------------------------
+
+
+def test_external_background_requires_api_key(monkeypatch):
+    """Same generic-401/503 auth discipline as every other /v1/external/*
+    route — covered in full by test_external_projections_require_api_key_
+    configured/test_external_projections_reject_missing_and_wrong_api_key
+    above, so this is a single reuse of that pattern for the new route.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    no_header = client.get("/v1/external/players/4046/background")
+    assert no_header.status_code == 401
+
+    wrong_key = client.get(
+        "/v1/external/players/4046/background",
+        headers={"Authorization": "Bearer not-the-secret"},
+    )
+    assert wrong_key.status_code == 401
+
+
+def test_external_background_route_returns_module_output_for_known_player(monkeypatch):
+    """The route is a thin wrapper: a real, known player resolves with
+    status "ok" and the full documented top-level shape."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = {"4046": {"full_name": "Nico Collins", "team": "HOU", "position": "WR"}}
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(mobile_api_service.sleeper, "cached_season_player_weekly", return_value=[]):
+            response = client.get(
+                "/v1/external/players/4046/background",
+                params={"season": 2026},
+                headers={"Authorization": "Bearer the-real-secret-key"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["player_id"] == "4046"
+    assert body["id_namespace"] == "sleeper"
+    assert body["display_name"] == "Nico Collins"
+    assert body["team"] == "HOU"
+    assert body["position"] == "WR"
+    assert body["status"] == "ok"
+    assert body["schema_version"] == "1.0"
+    assert body["contract"]["status"] == "unavailable"
+    assert "teammates" in body["team_situation"]
+    assert "depth_chart" in body["team_situation"]
+    assert "recent_workload" in body["team_situation"]
+    assert "ppr" in body["historical_production"]
+    assert "standard_and_box_score" in body["historical_production"]
+
+
+def test_external_background_unknown_player_returns_200_with_full_unavailable_shape(monkeypatch):
+    """Per the shared honesty-over-error discipline, an unresolved player id
+    is never a 4xx — it's a 200 with status "unknown_player" and every
+    section explicitly unavailable."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value={}):
+        response = client.get(
+            "/v1/external/players/does-not-exist/background",
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "unknown_player"
+    assert body["display_name"] is None
+    assert body["team"] is None
+    assert body["contract"]["status"] == "unavailable"
+    assert body["team_situation"]["teammates"]["status"] == "unavailable"
+    assert body["team_situation"]["depth_chart"]["status"] == "unavailable"
+    assert body["team_situation"]["recent_workload"]["status"] == "unavailable"
+    assert body["historical_production"]["ppr"]["status"] == "unavailable"
+    assert body["historical_production"]["standard_and_box_score"]["status"] == "unavailable"
+
+
 def test_career_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/career")
