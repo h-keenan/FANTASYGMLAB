@@ -4,16 +4,17 @@ content-posting bot wish list (full contract: docs/external-api-contract.md,
 
 Three sections, in the bot developer's own stated priority order:
 
-1. ``contract`` — NO licensed/official NFL player-contract data source is
-   integrated anywhere in this codebase today (confirmed: grepped
-   ``modules/``, ``services/``, ``requirements.txt`` — the only hits for the
-   word "contract" are unrelated API/schema-contract usages, e.g. this very
-   external-API *contract* doc). This section is never fabricated and never
-   scraped from an unlicensed source; it ships with every field explicitly
-   typed and ``None`` under ``status: "unavailable"``, the same honesty
-   precedent ``lineup_popularity`` already set in the projections payload
-   (see ``services/mobile_api_service.py``'s
-   ``_external_lineup_popularity_unavailable``).
+1. ``contract`` — real, non-monetary contract-timeline context sourced from
+   nflverse's public ``historical_contracts`` dataset (CC BY 4.0, itself
+   derived from OverTheCap; see ``modules.nflverse_contracts`` for the full
+   fetch/match implementation). This originally shipped (PR #1310) as
+   always-``unavailable`` because no licensed/public source was known to be
+   integrated at the time; coridian_ pushed back that a public source does
+   exist, and this is that fix. No dollar amounts are ever surfaced here —
+   the consumer (video-script generation) explicitly doesn't need them, and
+   name-based matching against a separate dataset is inherently fragile, so
+   an unmatched/ambiguous player is reported honestly rather than guessed
+   (see ``CONTRACT_NOTE``/``modules.nflverse_contracts.find_contract_match``).
 2. ``team_situation`` — teammates (real NFL roster membership, never a
    fantasy-league roster), Sleeper's own published depth-chart fields, and
    recent on-field workload — built entirely from real data already in this
@@ -41,7 +42,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from modules import nfl_schedule, sleeper
+from modules import nfl_schedule, nflverse_contracts, sleeper
 
 # Sleeper's own player_id already *is* this app's canonical player id (see
 # modules.player_identity.SUPPORTED_DIRECT_PLATFORMS = {"sleeper"}) — a
@@ -58,20 +59,64 @@ SCHEMA_VERSION = "1.0"
 # names these specific literals.
 SOURCE_PLAYERS_API = "sleeper_players_api"
 SOURCE_WEEKLY_STATS = "sleeper_weekly_stats"
+SOURCE_NFLVERSE_CONTRACTS = "nflverse_historical_contracts"
 
-CONTRACT_UNAVAILABLE_REASON = (
-    "No licensed or official NFL player-contract data source (signing "
-    "dates, contract years, options, void years, guarantees, free-agency "
-    "designation, etc.) is integrated anywhere in this codebase today. "
-    "This was verified before writing this section: modules/, services/, "
-    "and requirements.txt were grepped for any contract-data provider or "
-    "scraper, and every hit for the word \"contract\" refers to an "
-    "API/schema contract (e.g. this very external-API contract doc), never "
-    "player employment-contract data. This section's full field shape is "
-    "defined and typed below regardless, with every value explicitly null, "
-    "rather than omitted — the same honesty-over-fabrication precedent "
-    "docs/external-api-contract.md's lineup_popularity field already set."
+CONTRACT_PROVENANCE = "nflverse historical_contracts, derived from OverTheCap, CC BY 4.0"
+
+# Fields the spec asks this section to carry but that genuinely don't exist
+# in nflverse's historical_contracts schema (verified against its real
+# columns: player, position, team, is_active, year_signed, years, value,
+# apy, guaranteed, apy_cap_pct, inflated_value, inflated_apy,
+# inflated_guaranteed, player_page, otc_id, date_of_birth, height, weight,
+# college, draft_year, draft_round, draft_overall, draft_team,
+# season_history). These are reported explicitly unavailable, never
+# fabricated or silently omitted from the response shape.
+CONTRACT_NOTE = (
+    "year_signed/contract_length_seasons/last_contracted_season/"
+    "remaining_seasons come from nflverse's public historical_contracts "
+    "dataset (derived from OverTheCap, CC BY 4.0) — see source_url/"
+    "source_as_of below. That dataset records contract length in whole "
+    "SEASONS only, never a day-level date, so signing_date/effective_date "
+    "are deliberately left null here rather than fabricating a day this "
+    "source doesn't provide. free_agency_year, free_agency_designation, "
+    "options (team/player/fifth-year/mutual exercise state), void_years, "
+    "real_contract_years, and guaranteed_years are not present in this "
+    "data source at all and are reported unavailable for that reason, "
+    "never guessed. No dollar amounts (contract value/APY/guarantees/cap "
+    "percentage) are included by design — the video-script consumer this "
+    "endpoint serves has no use for them. Name-based matching against a "
+    "separate dataset is inherently fragile (no shared id exists between "
+    "nflverse's own otc_id and this app's canonical Sleeper player_id); an "
+    "unmatched or ambiguous player reports status \"unavailable\" with a "
+    "specific reason rather than guessing."
 )
+
+_CONTRACT_NULL_FIELDS = {
+    "source": None,
+    "source_url": None,
+    "source_as_of": None,
+    "checked_at": None,
+    "match_status": None,
+    "is_active": None,
+    "year_signed": None,
+    "contract_length_seasons": None,
+    "signing_date": None,
+    "effective_date": None,
+    "current_contractual_team": None,
+    "last_contracted_season": None,
+    "remaining_seasons": None,
+    "reference_season": None,
+    "reference_date": None,
+    "current_season_included_in_remaining": None,
+    "free_agency_year": None,
+    "free_agency_designation": None,
+    "options": None,
+    "void_years": None,
+    "real_contract_years": None,
+    "guaranteed_years": None,
+    "provenance": None,
+    "conflict_state": None,
+}
 
 STANDARD_AND_BOX_SCORE_UNAVAILABLE_REASON = (
     "Per-week standard (non-PPR) fantasy points and full box-score fields "
@@ -128,35 +173,103 @@ def _display_name(player: dict[str, Any]) -> str | None:
     return str(full_name) if full_name else None
 
 
-def _contract_section() -> dict[str, Any]:
-    """Priority 1 — see module docstring and ``CONTRACT_UNAVAILABLE_REASON``.
+def _contract_unavailable(reason: str, *, match_status: str | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": "unavailable",
+        "unavailable_reason": reason,
+        "note": CONTRACT_NOTE,
+    }
+    payload.update(_CONTRACT_NULL_FIELDS)
+    payload["match_status"] = match_status
+    return payload
 
-    Every field below is a real, typed part of the response shape the spec
-    asked for; none is ever populated by a guess, a scrape, or a
-    substituted/estimated source.
+
+def _contract_section(
+    display_name: str | None,
+    team: str | None,
+    position: str | None,
+    *,
+    as_of: str,
+) -> dict[str, Any]:
+    """Priority 1 — real, non-monetary contract-timeline context sourced
+    from nflverse's public ``historical_contracts`` dataset (see module
+    docstring and ``modules.nflverse_contracts``). Every field is real and
+    typed; anything genuinely unknown, unmatched, ambiguous, or simply not
+    present in this data source is explicit ``None`` with a named reason —
+    never a guess.
     """
 
+    if not display_name:
+        return _contract_unavailable(
+            "No display name resolved for this player — cannot match against "
+            "nflverse historical_contracts by name.",
+            match_status=None,
+        )
+
+    match = nflverse_contracts.find_contract_match(display_name, team, position)
+    if match["match_status"] != "matched":
+        return _contract_unavailable(match["reason"], match_status=match["match_status"])
+
+    row = match["row"]
+    is_active = nflverse_contracts.row_is_active(row)
+    year_signed = nflverse_contracts.row_year_signed(row)
+    contract_length_seasons = nflverse_contracts.row_contract_length_seasons(row)
+
+    last_contracted_season: int | None = None
+    remaining_seasons: int | None = None
+    reference_season: int | None = None
+    current_season_included_in_remaining: bool | None = None
+    conflict_state: str | None = None
+
+    if year_signed is not None and contract_length_seasons is not None:
+        last_contracted_season = year_signed + contract_length_seasons - 1
+        reference_season = sleeper.default_player_stats_season()
+        current_season_included_in_remaining = True
+        remaining_seasons = max(0, last_contracted_season - reference_season + 1)
+        if is_active and last_contracted_season < reference_season:
+            conflict_state = (
+                f"nflverse marks this contract is_active=true, but year_signed "
+                f"({year_signed}) + years ({contract_length_seasons}) implies it "
+                f"only covered through {last_contracted_season}, before the "
+                f"{reference_season} reference season — surfaced as a conflict "
+                f"rather than silently trusting one signal over the other."
+            )
+
+    raw_page = row.get("player_page")
+    source_url: str | None = None
+    if raw_page is not None:
+        text = str(raw_page).strip()
+        if text and text.lower() != "nan":
+            source_url = text
+
     return {
-        "status": "unavailable",
-        "unavailable_reason": CONTRACT_UNAVAILABLE_REASON,
-        "source": None,
-        "checked_at": None,
+        "status": "ok",
+        "unavailable_reason": None,
+        "match_status": "matched",
+        "source": SOURCE_NFLVERSE_CONTRACTS,
+        "source_url": source_url,
+        "source_as_of": nflverse_contracts.load_contracts_as_of(),
+        "checked_at": as_of,
+        "is_active": is_active,
+        "year_signed": year_signed,
+        "contract_length_seasons": contract_length_seasons,
         "signing_date": None,
         "effective_date": None,
-        "current_contractual_team": None,
-        "last_contracted_season": None,
-        "remaining_seasons": None,
-        "reference_season": None,
-        "reference_date": None,
-        "current_season_included_in_remaining": None,
+        "current_contractual_team": nflverse_contracts.display_team_for_field(row.get("team")),
+        "last_contracted_season": last_contracted_season,
+        "remaining_seasons": remaining_seasons,
+        "reference_season": reference_season,
+        "reference_date": as_of,
+        "current_season_included_in_remaining": current_season_included_in_remaining,
         "free_agency_year": None,
-        "free_agency_designation": None,  # "UFA" / "RFA" / "ERFA" when real
-        "options": None,  # [{"season": int, "exercise_state": str}, ...] when real
-        "void_years": None,  # void (non-"real") contract years, when real
-        "real_contract_years": None,  # real (non-void) contract years, when real
+        "free_agency_designation": None,
+        "options": None,
+        "void_years": None,
+        "real_contract_years": None,
         "guaranteed_years": None,
-        "provenance": None,
-        "conflict_state": None,
+        "provenance": CONTRACT_PROVENANCE,
+        "conflict_state": conflict_state,
+        "note": CONTRACT_NOTE,
     }
 
 
@@ -427,7 +540,9 @@ def _historical_production_section(
 
 def _unknown_player_sections(*, as_of: str) -> dict[str, Any]:
     return {
-        "contract": _contract_section(),
+        "contract": _contract_unavailable(
+            "player_id did not resolve to any known Sleeper player.", match_status=None
+        ),
         "team_situation": {
             "teammates": {
                 "status": "unavailable",
@@ -537,6 +652,7 @@ def build_player_background_profile(
 
     team = player.get("team") or None
     position = player.get("position") or None
+    display_name = _display_name(player)
 
     if weekly_stats is not None:
         record = weekly_stats.get(player_id)
@@ -548,13 +664,13 @@ def build_player_background_profile(
     return {
         "player_id": player_id,
         "id_namespace": ID_NAMESPACE,
-        "display_name": _display_name(player),
+        "display_name": display_name,
         "team": str(team) if team else None,
         "position": position,
         "as_of": as_of,
         "schema_version": SCHEMA_VERSION,
         "status": "ok",
-        "contract": _contract_section(),
+        "contract": _contract_section(display_name, team, position, as_of=as_of),
         "team_situation": {
             "teammates": _teammates_section(player_id, team, players_lookup, as_of=as_of),
             "depth_chart": _depth_chart_section(player, as_of=as_of),
