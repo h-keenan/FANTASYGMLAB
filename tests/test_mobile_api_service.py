@@ -1249,6 +1249,7 @@ def test_my_roster_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
 
@@ -1266,6 +1267,7 @@ def test_my_roster_reports_sleeper_user_not_found(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "ghost_gm"}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value=None):
             response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
@@ -1284,6 +1286,7 @@ def test_my_roster_reports_not_a_member(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch("modules.sleeper.get_rosters", return_value=[{"roster_id": 1, "owner_id": "someone-else"}]):
@@ -1390,6 +1393,7 @@ def test_my_roster_returns_matching_roster(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
@@ -3582,6 +3586,7 @@ def test_alerts_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get("/v1/leagues/abc/alerts", headers={"Authorization": "Bearer good-token"})
 
@@ -3619,6 +3624,7 @@ def test_alerts_returns_real_roster_relevant_news(monkeypatch):
     read_keys_response = Mock(status_code=200)
     read_keys_response.json.return_value = []
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response, read_keys_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
@@ -3677,6 +3683,7 @@ def test_alerts_reports_the_real_roster_relationship_for_each_slot(monkeypatch):
     read_keys_response = Mock(status_code=200)
     read_keys_response.json.return_value = []
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response, read_keys_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
@@ -3735,6 +3742,7 @@ def test_alerts_marks_items_already_read(monkeypatch):
     saved_leagues_response = Mock(status_code=200)
     saved_leagues_response.json.return_value = []
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch(
         "requests.get",
         side_effect=[auth_user_response, profile_response, saved_leagues_response, read_keys_response],
@@ -6371,8 +6379,14 @@ def test_get_gm_targets_returns_watchlist(monkeypatch):
         },
     ]
 
-    with patch("requests.get", side_effect=[auth_user_response, targets_response]):
-        response = client.get("/v1/leagues/abc/gm-targets", headers={"Authorization": "Bearer good-token"})
+    # resolve_league_path_id's own rollover check calls sleeper.get_league
+    # before this route body runs -- pin it so it can't eat one of this
+    # test's own exact-ordered requests.get responses via a cold
+    # process-level lru_cache entry for "abc" (observed under CI's
+    # parallel xdist workers, each with independent cache state).
+    with patch("modules.sleeper.get_league", return_value={"status": "in_season"}):
+        with patch("requests.get", side_effect=[auth_user_response, targets_response]):
+            response = client.get("/v1/leagues/abc/gm-targets", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
     body = response.json()
@@ -6395,6 +6409,7 @@ def test_get_gm_targets_fails_soft_when_table_unreachable(monkeypatch):
     error_response = Mock(status_code=404)
     error_response.json.return_value = {"message": "relation does not exist"}
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, error_response]):
         response = client.get("/v1/leagues/abc/gm-targets", headers={"Authorization": "Bearer good-token"})
 
@@ -7204,6 +7219,7 @@ def test_get_team_stance_includes_the_backend_computed_strategy(monkeypatch):
     team_stance_response = Mock(status_code=200)
     team_stance_response.json.return_value = [{"stance": "rebuilding"}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
         response = client.get("/v1/leagues/abc/team-stance", headers={"Authorization": "Bearer good-token"})
 
@@ -7282,6 +7298,7 @@ def test_get_team_stance_defaults_to_retool_strategy_when_nothing_stored(monkeyp
     team_stance_response = Mock(status_code=200)
     team_stance_response.json.return_value = []
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
         response = client.get("/v1/leagues/abc/team-stance", headers={"Authorization": "Bearer good-token"})
 
@@ -7327,6 +7344,7 @@ def test_get_gm_stance_defaults_to_retool_when_nothing_stored(monkeypatch):
     team_stance_response = Mock(status_code=200)
     team_stance_response.json.return_value = []
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
         response = client.get("/v1/leagues/abc/gm-stance", headers={"Authorization": "Bearer good-token"})
 
@@ -7342,6 +7360,7 @@ def test_get_gm_stance_reads_the_declared_team_stance_through_the_mapping(monkey
     team_stance_response = Mock(status_code=200)
     team_stance_response.json.return_value = [{"stance": "rebuilding"}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
         response = client.get("/v1/leagues/abc/gm-stance", headers={"Authorization": "Bearer good-token"})
 
@@ -7538,6 +7557,7 @@ def test_dashboard_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/dashboard",
@@ -7633,6 +7653,7 @@ def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monke
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/dashboard",
@@ -8098,6 +8119,7 @@ def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/dashboard",
@@ -8634,6 +8656,7 @@ def test_portfolio_fanout_runs_concurrently_and_is_faster_than_sequential(monkey
     # regression this test guards against.
     sequential_baseline_s = NUM_LEAGUES * 3 * DELAY_S
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         started = time.perf_counter()
         response = client.get(
@@ -8678,6 +8701,7 @@ def test_gm_plan_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/gm-plan",
@@ -9113,6 +9137,7 @@ def test_trade_hub_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/trade-hub",
@@ -9691,6 +9716,7 @@ def test_trade_finder_is_gated_behind_premium(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/trade-finder?player_ids=p1",
@@ -9912,6 +9938,7 @@ def test_waivers_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/waivers",
@@ -10913,6 +10940,7 @@ def test_my_team_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
 
@@ -11446,6 +11474,7 @@ def test_my_team_needs_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/my-team-needs",
@@ -11660,6 +11689,7 @@ def test_matchup_reports_no_linked_username(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
 
@@ -12260,6 +12290,13 @@ def test_matchup_response_carries_a_live_win_probability(monkeypatch):
     }
 
     with _matchup_world(matchups):
+        # _matchup_world already patches modules.sleeper.get_league with a
+        # real-shaped league fixture (_MATCHUP_LEAGUE) that
+        # resolve_league_path_id's own rollover check also reads via that
+        # same patched call -- no separate pin needed here (and pinning it
+        # to a bare {"status": ...} stub would blow away the real
+        # scoring_settings/roster_positions this test's win-probability
+        # math depends on).
         with patch("modules.sleeper.get_players", return_value={}):
             with patch("modules.sleeper.get_season_player_stats", return_value={}):
                 with patch.object(player_projections, "team_defense_points_allowed_by_position", return_value={}):
