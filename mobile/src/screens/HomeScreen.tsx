@@ -6,6 +6,7 @@ import {
   Linking,
   Modal,
   RefreshControl,
+  SectionList,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -32,6 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
+import { groupLeagueOptionsBySeason } from '../lib/leagueSeasonGroups';
 import { glanceSectionState } from '../lib/leaguesGlance';
 import { useOrbClearance } from '../lib/orbLayout';
 import { lapsedTrialExpiration } from '../lib/revenuecat';
@@ -626,11 +628,22 @@ export default function HomeScreen({ navigation }: Props) {
             {addOptions && addOptions.length > 0 ? (
               <View style={styles.addOptions}>
                 <AppText style={styles.addOptionsLabel}>Tap a league to save it</AppText>
-                <FlatList
-                  data={addOptions}
+                {/* Bug report, 2026-10-21: "it keeps auto defaulting to
+                    2025" / "we need to be able to separate by year" -- a
+                    continuing dynasty league gets a new league_id every
+                    season it rolls over on Sleeper, so the SAME league can
+                    legitimately appear here twice (once per season). A flat
+                    list made it easy to tap the wrong year's row. Grouped
+                    by season, current season first, under a visible header. */}
+                <SectionList
+                  sections={groupLeagueOptionsBySeason(addOptions)}
                   keyExtractor={(item) => item.league_id}
                   style={styles.addOptionsList}
                   keyboardShouldPersistTaps="handled"
+                  stickySectionHeadersEnabled={false}
+                  renderSectionHeader={({ section }) => (
+                    <AppText style={styles.addOptionsSeasonHeader}>{section.title} season</AppText>
+                  )}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={styles.addOptionRow}
@@ -839,6 +852,13 @@ function createStyles(colors: ThemeColors) {
     ...typography.kicker,
     color: colors.textTertiary,
     textTransform: 'uppercase',
+    marginBottom: spacing.xs,
+  },
+  addOptionsSeasonHeader: {
+    ...typography.kicker,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },
   // Bounded so a manager with a dozen leagues still sees the action row

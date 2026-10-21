@@ -57,6 +57,39 @@ def _resolve_current_season_league_id(league_id: str, leagues: list[dict]) -> st
     return resolved
 
 
+def group_league_cards_by_season(cards: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Group league picker cards by season, most recent season first.
+
+    Bug report, 2026-10-21: "it keeps auto defaulting to 2025" / "we need
+    to be able to separate by year" — a continuing dynasty league gets a
+    brand-new league_id every season it rolls over on Sleeper's side, so
+    the exact same league can legitimately appear in this picker twice
+    (once per season, see last_league_option's docstring). A flat list
+    made it easy to tap the wrong year's card for "the same" league;
+    grouping by season under a visible year header, current season first,
+    makes the distinction impossible to miss.
+    """
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for card in cards if isinstance(cards, list) else []:
+        if not isinstance(card, dict):
+            continue
+        season = _safe_text(card.get("season")).strip() or "Unknown"
+        if season not in groups:
+            groups[season] = []
+            order.append(season)
+        groups[season].append(card)
+
+    def _season_sort_key(season: str) -> tuple[int, int]:
+        try:
+            return (0, -int(season))
+        except (TypeError, ValueError):
+            return (1, 0)
+
+    ordered_seasons = sorted(order, key=_season_sort_key)
+    return [(season, groups[season]) for season in ordered_seasons]
+
+
 def last_league_option(
     *,
     username: str,

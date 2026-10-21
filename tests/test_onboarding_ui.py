@@ -39,6 +39,32 @@ class TestOnboardingUI(unittest.TestCase):
             "",
         )
 
+    def test_group_league_cards_by_season_groups_current_season_first(self):
+        cards = [
+            {"league_id": "league-2025", "league_name": "Dynasty Warriors", "season": "2025"},
+            {"league_id": "other-2026", "league_name": "Other League", "season": "2026"},
+            {"league_id": "league-2026", "league_name": "Dynasty Warriors", "season": "2026"},
+        ]
+
+        groups = onboarding_ui.group_league_cards_by_season(cards)
+
+        self.assertEqual([season for season, _ in groups], ["2026", "2025"])
+        self.assertEqual(
+            [card["league_id"] for card in groups[0][1]],
+            ["other-2026", "league-2026"],
+        )
+        self.assertEqual([card["league_id"] for card in groups[1][1]], ["league-2025"])
+
+    def test_group_league_cards_by_season_handles_missing_season_without_crashing(self):
+        cards = [
+            {"league_id": "a", "league_name": "A", "season": ""},
+            {"league_id": "b", "league_name": "B", "season": "2026"},
+        ]
+
+        groups = onboarding_ui.group_league_cards_by_season(cards)
+
+        self.assertEqual([season for season, _ in groups], ["2026", "Unknown"])
+
     def test_last_league_option_resolves_rolled_over_account_league_to_current_season(self):
         # Real shape confirmed live against Sleeper's API (2026-10-21): a
         # continuing dynasty league gets a brand-new league_id each season

@@ -123,27 +123,47 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
   };
 
   if (leagues.length > 0) {
+    // Bug report, 2026-10-21: "it keeps auto defaulting to 2025" / "we need
+    // to be able to separate by year" — a continuing dynasty league gets a
+    // brand-new league_id every season it rolls over on Sleeper's side, so
+    // the SAME league can legitimately appear here twice (once per season).
+    // A flat list made it easy to tap the wrong year's card for "the same"
+    // league. Grouping by season under a visible year header, most recent
+    // season first, makes the distinction impossible to miss.
+    const seasons = Array.from(new Set(leagues.map((league) => league.season))).sort(
+      (a, b) => Number(b) - Number(a),
+    );
     return (
       <div className="flex flex-col gap-3">
         <h2 style={{ font: "var(--font-card-title)" }}>Choose a league</h2>
-        <div className="flex flex-col gap-2">
-          {leagues.map((league) => (
-            <button
-              key={league.league_id}
-              onClick={() => openLeague(league)}
-              className="glass-surface text-left px-4 py-3 flex items-center justify-between"
-              style={{ color: "var(--color-text-primary)" }}
+        {seasons.map((season) => (
+          <div key={season} className="flex flex-col gap-2">
+            <span
+              className="text-xs font-bold uppercase tracking-wide"
+              style={{ color: "var(--color-text-muted)" }}
             >
-              <span>
-                <span className="block font-bold">{league.name}</span>
-                <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {league.season} · {league.total_rosters} teams
-                </span>
-              </span>
-              <span style={{ color: "var(--color-accent)" }}>Open league →</span>
-            </button>
-          ))}
-        </div>
+              {season} season
+            </span>
+            {leagues
+              .filter((league) => league.season === season)
+              .map((league) => (
+                <button
+                  key={league.league_id}
+                  onClick={() => openLeague(league)}
+                  className="glass-surface text-left px-4 py-3 flex items-center justify-between"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  <span>
+                    <span className="block font-bold">{league.name}</span>
+                    <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      {league.season} · {league.total_rosters} teams
+                    </span>
+                  </span>
+                  <span style={{ color: "var(--color-accent)" }}>Open league →</span>
+                </button>
+              ))}
+          </div>
+        ))}
       </div>
     );
   }
