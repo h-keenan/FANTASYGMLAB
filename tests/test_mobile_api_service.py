@@ -1322,13 +1322,24 @@ def test_my_roster_prefers_the_leagues_own_saved_sleeper_username(monkeypatch):
     def resolve_user_id(username):
         return {"harryhard": "sleeper-user-1", "pitchworksx": "sleeper-user-2"}.get(username)
 
-    with patch("requests.get", side_effect=[auth_user_response, profile_response, saved_leagues_response]):
-        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", side_effect=resolve_user_id):
-            with patch(
-                "modules.sleeper.get_rosters",
-                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
-            ):
-                response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
+    # resolve_league_path_id's own rollover check calls sleeper.get_league
+    # before any of the above runs -- pin it explicitly so it can't
+    # silently steal one of this test's own exact-ordered requests.get
+    # responses via a cold process-level lru_cache entry for "abc" (which
+    # would otherwise still coincidentally "pass" here, since this test's
+    # own fixtures happen to reuse the key "sleeper_username" across two
+    # different mocked payloads -- a real, if currently harmless, fragility
+    # a fork review of this change flagged explicitly).
+    with patch("modules.sleeper.get_league", return_value={"status": "in_season"}):
+        with patch(
+            "requests.get", side_effect=[auth_user_response, profile_response, saved_leagues_response]
+        ):
+            with patch("modules.sleeper_leagues.resolve_sleeper_user_id", side_effect=resolve_user_id):
+                with patch(
+                    "modules.sleeper.get_rosters",
+                    return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                ):
+                    response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
     body = response.json()
@@ -7211,13 +7222,16 @@ def test_team_stance_caches_across_requests_for_the_same_user_and_league(monkeyp
 
     # Exactly 3 responses for 2 requests' worth of auth + 1 stance fetch —
     # if the cache failed to hit, the second request would exhaust this
-    # list.
-    with patch(
-        "requests.get",
-        side_effect=[auth_user_response, team_stance_response, auth_user_response],
-    ):
-        first = client.get("/v1/leagues/cache-league/team-stance", headers={"Authorization": "Bearer good-token"})
-        second = client.get("/v1/leagues/cache-league/team-stance", headers={"Authorization": "Bearer good-token"})
+    # list. resolve_league_path_id's own rollover check (sleeper.get_league)
+    # is pinned separately below so it can't eat one of these via a cold
+    # process-level lru_cache entry for "cache-league".
+    with patch("modules.sleeper.get_league", return_value={"status": "in_season"}):
+        with patch(
+            "requests.get",
+            side_effect=[auth_user_response, team_stance_response, auth_user_response],
+        ):
+            first = client.get("/v1/leagues/cache-league/team-stance", headers={"Authorization": "Bearer good-token"})
+            second = client.get("/v1/leagues/cache-league/team-stance", headers={"Authorization": "Bearer good-token"})
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -7560,7 +7574,14 @@ def test_dashboard_empty_roster_never_pays_for_the_full_valuation_pipeline(monke
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
-    get_league_mock = Mock(side_effect=AssertionError("sleeper.get_league must not run for an empty roster"))
+    # resolve_league_path_id's own cost-gated rollover check now calls
+    # sleeper.get_league(league_id) once, BEFORE this route body (or its
+    # empty-roster short-circuit) ever runs — so "must not run" no longer
+    # holds for get_league itself; call_count == 1 below still catches a
+    # REAL regression (the dashboard body calling it again on top of that).
+    # build_valued_players_frame_cached -- the actually expensive step this
+    # test exists to guard -- must still never run.
+    get_league_mock = Mock(return_value={"status": "in_season"})
     build_valued_mock = Mock(
         side_effect=AssertionError("build_valued_players_frame_cached must not run for an empty roster")
     )
@@ -7588,7 +7609,7 @@ def test_dashboard_empty_roster_never_pays_for_the_full_valuation_pipeline(monke
     assert body["quiet"] is True
     assert body["reason"] == "empty_roster"
     assert body["quiet_reason"] == "empty_roster"
-    get_league_mock.assert_not_called()
+    assert get_league_mock.call_count == 1
     build_valued_mock.assert_not_called()
 
 
@@ -9631,11 +9652,17 @@ def test_trade_finder_returns_empty_without_a_player_selection(monkeypatch):
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
-    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
-        response = client.get(
-            "/v1/leagues/abc/trade-finder",
-            headers={"Authorization": "Bearer good-token"},
-        )
+    # resolve_league_path_id's own cost-gated rollover check calls
+    # sleeper.get_league(league_id) before this route body ever runs --
+    # pin it to a non-"complete" status (a deterministic no-op) so it
+    # can't eat one of this test's own exact-ordered requests.get
+    # responses via a cold process-level lru_cache entry.
+    with patch("modules.sleeper.get_league", return_value={"status": "in_season"}):
+        with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+            response = client.get(
+                "/v1/leagues/abc/trade-finder",
+                headers={"Authorization": "Bearer good-token"},
+            )
 
     assert response.status_code == 200
     body = response.json()
