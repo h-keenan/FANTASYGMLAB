@@ -663,6 +663,8 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
   );
 }
 
+import { GuillotineCard, useGuillotine } from "@/components/GuillotineCard";
+
 export function MatchupContent({
   leagueName,
   matchup,
@@ -674,6 +676,8 @@ export function MatchupContent({
   leagueId?: string;
   lens?: string;
 }) {
+  const guillotineData = useGuillotine(leagueId, lens);
+  const guillotine = guillotineData?.is_guillotine ? guillotineData : null;
   const ready = matchup.ok && matchup.my_team && matchup.opponent && matchup.comparison;
   const defaultView: LineupView = matchup.my_team?.has_live_data ? "actual" : "suggested";
   const [view, setView] = useState<LineupView>(defaultView);
@@ -695,6 +699,16 @@ export function MatchupContent({
         : matchup,
     [matchup, edited],
   );
+
+  if (guillotine) {
+    // No head-to-head in guillotine leagues: survival replaces win probability.
+    return (
+      <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
+        <MatchupHeader week={guillotine.week ?? matchup.week} live={false} leagueName={leagueName} />
+        <GuillotineCard data={guillotine} />
+      </main>
+    );
+  }
 
   if (!ready) {
     return (

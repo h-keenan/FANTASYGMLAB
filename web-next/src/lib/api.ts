@@ -555,6 +555,25 @@ export interface KeeperCandidate {
   reason: string;
 }
 
+export interface GuillotineResponse {
+  ok: boolean;
+  is_guillotine: boolean;
+  reason: string;
+  source?: string;
+  week?: number | null;
+  alive?: boolean;
+  weeks_survived?: number;
+  teams_alive?: number;
+  teams_total?: number;
+  /** Null unless every alive roster has a real projection. */
+  chop_line?: {
+    line: number;
+    my_projected: number | null;
+    margin: number | null;
+    at_risk: boolean;
+  } | null;
+}
+
 export interface KeepersResponse {
   ok: boolean;
   is_keeper_league: boolean;
@@ -3096,6 +3115,17 @@ export const api = {
   getMyTeam: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<MyTeamResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/my-team?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getGuillotine: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<GuillotineResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/guillotine?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  setLeagueType: (leagueId: string, leagueType: "guillotine" | "standard" | "auto") =>
+    authorizedRequest<{ ok: boolean; league_type: string | null }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/league-type`,
+      { method: "POST", jsonBody: { league_type: leagueType } },
     ),
 
   getKeepers: (leagueId: string, lens: string = "Dynasty") =>

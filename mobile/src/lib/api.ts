@@ -495,6 +495,25 @@ export interface KeeperCandidate {
   reason: string;
 }
 
+export interface GuillotineResponse {
+  ok: boolean;
+  is_guillotine: boolean;
+  reason: string;
+  source?: string;
+  week?: number | null;
+  alive?: boolean;
+  weeks_survived?: number;
+  teams_alive?: number;
+  teams_total?: number;
+  /** Null unless every alive roster has a real projection. */
+  chop_line?: {
+    line: number;
+    my_projected: number | null;
+    margin: number | null;
+    at_risk: boolean;
+  } | null;
+}
+
 export interface KeepersResponse {
   ok: boolean;
   is_keeper_league: boolean;
@@ -2452,6 +2471,19 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/my-team-needs${query ? `?${query}` : ''}`,
     );
   },
+  getLeagueGuillotine: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<GuillotineResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/guillotine${query ? `?${query}` : ''}`,
+    );
+  },
+  setLeagueType: (leagueId: string, leagueType: 'guillotine' | 'standard' | 'auto') =>
+    authorizedPost<{ ok: boolean; league_type: string | null }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/league-type`,
+      { league_type: leagueType },
+    ),
   getLeagueKeepers: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

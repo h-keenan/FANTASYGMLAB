@@ -14,6 +14,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPlanner';
+import GuillotineCard from '../components/GuillotineCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -129,6 +130,12 @@ export default function MatchupScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueMatchup(leagueId),
     enabled: !isRestoring,
   });
+  const guillotineQuery = useQuery({
+    queryKey: queryKeys.guillotine(leagueId),
+    queryFn: () => api.getLeagueGuillotine(leagueId),
+    enabled: !isRestoring,
+  });
+  const guillotine = guillotineQuery.data?.is_guillotine ? guillotineQuery.data : null;
   const matchup: MatchupResponse | null = matchupQuery.data ?? null;
   const loading = isRestoring || matchupQuery.isPending;
   const error =
@@ -167,6 +174,26 @@ export default function MatchupScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
+      </View>
+    );
+  }
+
+  if (guillotine) {
+    // Guillotine leagues have no head-to-head: survival replaces win probability.
+    return (
+      <View style={styles.root}>
+        <GridBackground />
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+        >
+          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+          <View style={styles.titleRow}>
+            <AppText style={styles.title}>Matchup</AppText>
+            {guillotine.week != null ? <AppText style={styles.weekLabel}>Week {guillotine.week}</AppText> : null}
+          </View>
+          <GuillotineCard data={guillotine} />
+        </ScrollView>
       </View>
     );
   }

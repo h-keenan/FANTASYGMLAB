@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { GamePlanCard } from "@/components/GamePlanCard";
+import { GuillotineCard, useGuillotine } from "@/components/GuillotineCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
@@ -49,6 +50,7 @@ export function DashboardContent({
   teamRankings?: Promise<LeagueTeamRankingsResponse>;
 }) {
   const snapshot = data.team_snapshot;
+  const guillotine = useGuillotine(leagueId);
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
@@ -68,6 +70,8 @@ export function DashboardContent({
           alerts); the league name stays here as the page's <h1> for screen
           readers and is already in the header's league switcher. */}
       <h1 className="sr-only">{leagueName}</h1>
+
+      <GuillotineCard data={guillotine} />
 
       {snapshot ? (
         <section className="flex flex-col gap-2" aria-label="Team summary">
