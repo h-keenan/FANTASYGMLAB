@@ -206,6 +206,9 @@ _MIN_TEAMS_FOR_QB_QUALITY_LEAGUE_AVERAGE = 2
 # suspiciously tight band.
 _MIN_BAND_HALF_WIDTH = 2.5
 
+# Bumped whenever the estimator changes; surfaced in ``basis.model_version``.
+PROJECTION_MODEL_VERSION = "v2-usage-eb-2026-10"
+
 
 def _recency_weight(weeks_ago: int, half_life_weeks: float) -> float:
     """Exponential recency weight — more recent weeks count more.
@@ -924,6 +927,226 @@ def _band_half_width(trend: Dict[str, Any], *, defense_has_signal: bool) -> floa
 
 
 # ---------------------------------------------------------------------------
+# Projections v2 (2026-10): usage-based empirical-Bayes baseline
+# ---------------------------------------------------------------------------
+#
+# Built bottom-up from our own player data; Sleeper's projections are never an
+# input (they are only the benchmark in the backtest). Every constant below was
+# fit or tuned on the 2024 season of point-in-time backtest data and then
+# validated, untouched, on 2025 (see docs/projections-v2-backtest.md).
+#
+# 1. Volume-implied points. A per-position linear map from a game's opportunity
+#    (pass attempts, carries, targets) to PPR points, fit on 2024 games
+#    (``_V2_USAGE_COEF``: intercept, then one coefficient per usage feature in
+#    ``_V2_USAGE_FEATURES`` order). The player's expected opportunity is the
+#    recency-weighted mean of his prior games' volume-implied points.
+# 2. Efficiency, regressed. What a player scored above/below his volume-implied
+#    points (TDs, yards per touch, ...) is mostly noise over a few games, so
+#    only ``n / (n + k)`` of the recency-weighted residual is kept, with
+#    ``n`` = games played and ``k`` tuned per position (empirical-Bayes
+#    shrinkage toward "average efficiency"). One game cannot swing the number.
+# 3. Honest range. Half-widths come from the observed absolute error of this
+#    exact estimator in 2024, as a piecewise-linear function of the estimate
+#    (per position), times empirical 16th/84th percentile multipliers per
+#    sample-size bucket, so the low-high range is a 68% interval.
+#
+# Layers that were backtested and did NOT beat the plain estimator out of
+# sample, and so are not applied: the opponent-defense multiplier, the
+# team-QB-quality multiplier, a small-sample uplift, a returning-from-absence
+# ramp-up, and an affine bias correction. The opponent/QB-quality signals are
+# still computed and returned in ``basis`` as context, flagged
+# ``*_applied: False``.
+
+_V2_USAGE_FEATURES: Dict[str, tuple] = {
+    "QB": ("pass_attempts", "rush_attempts"),
+    "RB": ("rush_attempts", "targets"),
+    "WR": ("targets", "rush_attempts"),
+    "TE": ("targets", "rush_attempts"),
+    "K": (),
+}
+_V2_USAGE_COEF: Dict[str, tuple] = {
+    "QB": (-0.0593, 0.3995, 1.0498),
+    "RB": (-0.2703, 0.7115, 1.3692),
+    "WR": (-0.0125, 1.7488, 0.8074),
+    "TE": (0.0920, 1.6841, 1.5814),
+    "K": (8.0847,),
+}
+# (usage half-life weeks | None, efficiency-residual half-life weeks | None, k)
+_V2_SHRINKAGE: Dict[str, tuple] = {
+    "QB": (2.0, None, 4.0),
+    "RB": (3.0, 3.0, 6.0),
+    "WR": (6.0, None, 3.0),
+    "TE": (4.0, None, 3.0),
+    "K": (2.0, None, 32.0),
+}
+# Per position: (estimate knots, mean absolute error at those knots).
+_V2_ERROR_SCALE: Dict[str, tuple] = {
+    "QB": ((10.96, 15.12, 16.6, 18.24, 21.35), (6.61, 5.51, 5.55, 5.93, 6.57)),
+    "RB": ((0.57, 3.13, 6.02, 11.61, 17.17), (1.53, 3.25, 4.23, 5.83, 6.5)),
+    "WR": ((0.87, 3.19, 6.44, 10.14, 15.35), (1.77, 3.21, 4.54, 5.88, 6.87)),
+    "TE": ((0.56, 1.83, 3.59, 6.43, 11.26), (1.28, 2.16, 3.13, 4.55, 5.76)),
+    "K": ((7.63, 7.93, 8.09, 8.28, 8.73), (4.22, 3.8, 3.35, 4.29, 3.5)),
+}
+# Confidence label -> (16th percentile, 84th percentile) of error / scale.
+_V2_INTERVAL_Z: Dict[str, tuple] = {
+    "high": (-1.031, 1.26),
+    "medium": (-1.004, 1.15),
+    "low": (-0.801, 1.521),
+}
+# Availability multipliers for the player's NEXT game. Out/IR/PUP/NFI/
+# Suspended are certain zeros; Doubtful/Questionable are prior-based play
+# probabilities (NOT backtested: Sleeper does not publish point-in-time injury
+# history, so these two cannot be validated and are flagged ``calibrated: False``).
+_V2_DOUBTFUL_MULTIPLIER = 0.15
+_V2_QUESTIONABLE_MULTIPLIER = 0.85
+# NFL injured reserve keeps a player out at least four games.
+_V2_RESERVE_MIN_GAMES_OUT = 4
+
+
+def _interp(x: float, xs: tuple, ys: tuple) -> float:
+    if x <= xs[0]:
+        return float(ys[0])
+    if x >= xs[-1]:
+        return float(ys[-1])
+    for index in range(1, len(xs)):
+        if x <= xs[index]:
+            span = xs[index] - xs[index - 1]
+            frac = (x - xs[index - 1]) / span if span else 0.0
+            return float(ys[index - 1] + frac * (ys[index] - ys[index - 1]))
+    return float(ys[-1])
+
+
+def _v2_weight(age: int, half_life: Optional[float]) -> float:
+    return 1.0 if not half_life else 0.5 ** (age / float(half_life))
+
+
+def _row_number(row: Dict[str, Any], key: str) -> float:
+    # Sleeper omits zero-valued stat keys, so an absent usage key is a real 0.
+    try:
+        value = float(row.get(key) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    return value if value == value else 0.0
+
+
+def _player_usage_trend(
+    weekly_rows: List[Dict[str, Any]],
+    *,
+    position: str,
+    upto_week: Optional[int],
+) -> Optional[Dict[str, Any]]:
+    """v2 baseline for one player from played weeks ``<= upto_week`` only."""
+
+    played: Dict[int, Dict[str, Any]] = {}
+    for row in weekly_rows or []:
+        if not isinstance(row, dict) or row.get("week") is None:
+            continue
+        if upto_week is not None and int(row["week"]) > int(upto_week):
+            continue
+        if sleeper.week_row_fantasy_points_ppr(row) is None:
+            continue
+        played[int(row["week"])] = row
+    if not played:
+        return None
+    features = _V2_USAGE_FEATURES[position]
+    coef = _V2_USAGE_COEF[position]
+    usage_half_life, residual_half_life, k = _V2_SHRINKAGE[position]
+    weeks = sorted(played)
+    reference = int(upto_week) if upto_week is not None else weeks[-1]
+    sum_u = sum_ru = sum_r = sum_rr = 0.0
+    points: List[float] = []
+    for week in weeks:
+        row = played[week]
+        actual = float(sleeper.week_row_fantasy_points_ppr(row))
+        implied = coef[0] + sum(c * _row_number(row, f) for c, f in zip(coef[1:], features))
+        age = max(0, reference - week)
+        wu = _v2_weight(age, usage_half_life)
+        wr = _v2_weight(age, residual_half_life)
+        sum_u += wu
+        sum_ru += wu * implied
+        sum_r += wr
+        sum_rr += wr * (actual - implied)
+        points.append(actual)
+    games = len(weeks)
+    implied_mean = sum_ru / sum_u
+    residual_mean = sum_rr / sum_r
+    shrink = games / (games + k)
+    baseline = implied_mean + shrink * residual_mean
+    recent_weeks = weeks[-PLAYER_MAX_WEEKS_BACK:]
+    recent_weights = [_v2_weight(max(0, reference - w), PLAYER_HALF_LIFE_WEEKS) for w in recent_weeks]
+    recent_values = [float(sleeper.week_row_fantasy_points_ppr(played[w])) for w in recent_weeks]
+    return {
+        "baseline_ppr": baseline,
+        "usage_implied_ppr": implied_mean,
+        "efficiency_adjustment_ppr": shrink * residual_mean,
+        "efficiency_weight": shrink,
+        "weighted_avg_ppr": sum(w * v for w, v in zip(recent_weights, recent_values)) / sum(recent_weights),
+        "simple_avg_ppr": sum(points) / games,
+        "games_played": games,
+        "recent_games": len(recent_weeks),
+        "stdev_ppr": _stdev(points),
+        "weeks_used": recent_weeks,
+    }
+
+
+def _v2_confidence(games_played: int) -> str:
+    if games_played >= 4:
+        return "high"
+    if games_played >= 2:
+        return "medium"
+    return "low"
+
+
+def _v2_range(estimate: float, position: str, confidence: str) -> tuple:
+    knots, errors = _V2_ERROR_SCALE[position]
+    scale = _interp(estimate, knots, errors)
+    z_low, z_high = _V2_INTERVAL_Z[confidence]
+    return max(0.0, estimate + z_low * scale), max(0.0, estimate + z_high * scale)
+
+
+def _games_ahead(schedule: List[Dict[str, Any]], week: int) -> int:
+    """Unplayed games on this team's schedule strictly before ``week``."""
+
+    return sum(
+        1
+        for row in schedule
+        if int(row["week"]) < int(week) and not row.get("bye") and not row.get("played")
+    )
+
+
+def _availability_adjustment(player: Dict[str, Any], games_ahead: int) -> Dict[str, Any]:
+    """Availability layer: roster/injury status -> multiplier on the estimate."""
+
+    status = str(player.get("status") or "")
+    injury = str(player.get("injury_status") or "")
+    label = rankings.injury_display_label(status, injury) or None
+    multiplier = 1.0
+    reason = None
+    level = rankings.injury_level(status, injury)
+    suspended = rankings.is_suspended(status, injury)
+    reserve = level == "major" and not suspended
+    if rankings.is_ruled_out(status, injury):
+        if reserve:
+            if games_ahead < _V2_RESERVE_MIN_GAMES_OUT:
+                multiplier, reason = 0.0, "reserve_list"
+        elif games_ahead == 0:
+            multiplier, reason = 0.0, "suspended" if suspended else "ruled_out"
+    elif games_ahead == 0 and level == "moderate":
+        multiplier, reason = _V2_DOUBTFUL_MULTIPLIER, "doubtful"
+    elif games_ahead == 0 and injury.strip().casefold() == "questionable":
+        multiplier, reason = _V2_QUESTIONABLE_MULTIPLIER, "questionable"
+    return {
+        "injury_label": label,
+        "multiplier": multiplier,
+        "reason": reason,
+        "applied": multiplier != 1.0,
+        # Zeros for confirmed-out statuses are certain; Doubtful/Questionable
+        # are priors that could not be backtested (no point-in-time injury data).
+        "calibrated": reason in (None, "reserve_list", "ruled_out", "suspended"),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Public projection entry point
 # ---------------------------------------------------------------------------
 
@@ -1079,7 +1302,7 @@ def project_player_week(
     # "insufficient_player_data" entirely) even though zero real time has
     # passed since those games. See ``_most_recent_played_week``.
     as_of_week = _most_recent_played_week(weekly_rows, before_week=week)
-    trend = _player_recent_trend(weekly_rows, upto_week=as_of_week)
+    trend = _player_usage_trend(weekly_rows, position=position, upto_week=as_of_week)
     if trend is None:
         return {
             "status": "insufficient_player_data",
@@ -1161,12 +1384,24 @@ def project_player_week(
     # estimate/range here, at the output layer — never mutate ``trend``
     # itself (preserved below in ``basis.recent_weighted_avg_ppr`` so the
     # real underlying negative data stays visible/auditable).
-    raw_point_estimate = trend["weighted_avg_ppr"] * multiplier * team_qb_quality_multiplier
-    point_estimate = max(0.0, raw_point_estimate)
-    half_width = _band_half_width(trend, defense_has_signal=defense_has_signal)
-    low = max(0.0, point_estimate - half_width)
-    high = max(low, point_estimate + half_width)
-    confidence = _confidence_label(trend["games_played"], defense_has_signal)
+    # v2: the usage-based empirical-Bayes baseline is the estimate. The
+    # opponent and team-QB multipliers are computed above as context but NOT
+    # applied: neither improved out-of-sample error in the 2024->2025 backtest
+    # (docs/projections-v2-backtest.md).
+    raw_point_estimate = trend["baseline_ppr"]
+    availability = _availability_adjustment(player, _games_ahead(schedule, week))
+    point_estimate = max(0.0, raw_point_estimate) * availability["multiplier"]
+    confidence = _v2_confidence(trend["games_played"])
+    low, high = _v2_range(max(0.0, raw_point_estimate), position, confidence)
+    if availability["multiplier"] == 0.0:
+        low = high = 0.0
+        confidence = "high"
+    elif availability["applied"]:
+        # Doubtful/Questionable: he may sit (0) or play a full game (the
+        # unadjusted high), and the play probability itself is an uncalibrated
+        # prior, so the label drops to "low".
+        low = 0.0
+        confidence = "low"
 
     defense_entry = (defense_strength.get(str(opponent)) or {}).get(position)
 
@@ -1189,9 +1424,19 @@ def project_player_week(
         "high": round(high, 1),
         "confidence": confidence,
         "basis": {
-            "recent_games_played": trend["games_played"],
+            "model_version": PROJECTION_MODEL_VERSION,
+            "recent_games_played": trend["recent_games"],
+            "season_games_played": trend["games_played"],
             "recent_weeks_used": trend["weeks_used"],
             "recent_weighted_avg_ppr": round(trend["weighted_avg_ppr"], 2),
+            "season_avg_ppr": round(trend["simple_avg_ppr"], 2),
+            "usage_implied_ppr": round(trend["usage_implied_ppr"], 2),
+            "efficiency_adjustment_ppr": round(trend["efficiency_adjustment_ppr"], 2),
+            "efficiency_weight": round(trend["efficiency_weight"], 3),
+            "interval_nominal_coverage": 0.68,
+            "availability": availability,
+            "opponent_multiplier_applied": False,
+            "team_qb_quality_multiplier_applied": False,
             "opponent_multiplier": round(multiplier, 3),
             "opponent_defense_has_signal": defense_has_signal,
             "opponent_defense_games_sampled": (defense_entry or {}).get("games_sampled", 0),
