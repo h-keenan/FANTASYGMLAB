@@ -40,6 +40,8 @@ describe("AppContentShell", () => {
     );
     const wrapper = screen.getByText("Dashboard").parentElement as HTMLElement;
     expect(wrapper.className).toContain("md:pl-60");
+    // Phone: clears the floating GM orb (52px + 12px offset) so it never covers the last content.
+    expect(wrapper.className).toContain("pb-12");
   });
 
   it("shows the ESPN not-available state instead of a page ESPN leagues can't feed", () => {

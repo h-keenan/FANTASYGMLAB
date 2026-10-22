@@ -30,7 +30,7 @@ export function AppContentShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const espnLeagueId = espnUnavailableLeagueId(pathname);
   return (
-    <div className={`flex flex-col flex-1 ${session ? "md:pl-60" : ""}`}>
+    <div className={`flex flex-col flex-1 ${session ? "md:pl-60 pb-12 md:pb-0" : ""}`}>
       {espnLeagueId ? (
         // EspnUnavailableState reads ?name= (useSearchParams), which Next
         // requires to sit under a Suspense boundary.

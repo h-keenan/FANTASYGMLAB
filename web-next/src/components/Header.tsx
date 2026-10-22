@@ -47,7 +47,7 @@ function LeagueSwitcherButton({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-1.5 text-xs font-bold max-w-[9rem] truncate"
+        className="px-2.5 py-2.5 text-xs font-bold max-w-[9rem] truncate"
         style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
         {/* coridian_, 2026-10-18: "where it says dashboard and revivalary...
@@ -69,7 +69,7 @@ function LeagueSwitcherButton({
               rightward into the header's own open space instead. */}
           <div role="menu" className="glass-surface absolute left-0 top-full mt-1 flex flex-col py-1 w-56" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {leagues.length === 0 ? (
-              <span className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              <span className="px-3 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 No other saved leagues
               </span>
             ) : (
@@ -83,7 +83,7 @@ function LeagueSwitcherButton({
                     const newPath = swapLeagueIdInPath(pathname || "", leagueId, row.league_id);
                     router.push(`${newPath}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
                   }}
-                  className="px-3 py-2 text-xs font-semibold text-left"
+                  className="px-3 py-3 text-xs font-semibold text-left"
                   style={{ color: row.league_id === leagueId ? "var(--color-accent)" : "var(--color-text-secondary)" }}
                 >
                   {row.league_name || row.league_id}
@@ -98,7 +98,7 @@ function LeagueSwitcherButton({
               href="/connect-league"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="px-3 py-2 text-xs font-bold text-left"
+              className="px-3 py-3 text-xs font-bold text-left"
               style={{ color: "var(--color-accent)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
             >
               + Add another league
@@ -160,7 +160,7 @@ export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
         onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-1.5 text-xs font-bold"
+        className="px-2.5 py-2.5 text-xs font-bold"
         style={{ color: "var(--color-premium)", border: "var(--border-width-default) solid var(--color-premium)" }}
       >
         {current?.label ?? "Dynasty"} ▾
@@ -272,7 +272,7 @@ function HeaderPageTitle() {
   const title = PAGE_TITLE_BY_SEGMENT[segment];
   if (!title) return null;
   return (
-    <span className="text-xs font-bold uppercase truncate" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
+    <span className="text-xs font-bold uppercase break-words leading-tight" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
       {title}
     </span>
   );
@@ -282,8 +282,8 @@ const ICON_BUTTON_STYLE = {
   color: "var(--color-text-secondary)",
   border: "var(--border-width-default) solid var(--color-border)",
   borderRadius: "var(--radius-control)",
-  width: "2.25rem",
-  height: "2.25rem",
+  width: "2.5rem",
+  height: "2.5rem",
 } as const;
 
 /**
@@ -348,7 +348,7 @@ export function Header() {
     >
       <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 p-2 -m-2">
           <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="hidden sm:inline text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
             {BRAND_NAME}
@@ -368,7 +368,7 @@ export function Header() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            className="px-3 py-1.5 text-xs font-bold uppercase"
+            className="px-3 py-2.5 text-xs font-bold uppercase"
             style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", letterSpacing: "0.03em" }}
           >
             Menu
@@ -403,7 +403,7 @@ export function Header() {
                   href="/methodology"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="px-3 py-2 text-xs font-semibold"
+                  className="px-3 py-3 text-xs font-semibold"
                   style={{ color: "var(--color-text-secondary)" }}
                 >
                   How We Evaluate
@@ -417,7 +417,7 @@ export function Header() {
                     href="/account"
                     role="menuitem"
                     onClick={() => setMenuOpen(false)}
-                    className="px-3 py-2 text-xs font-semibold"
+                    className="px-3 py-3 text-xs font-semibold"
                     style={{ color: "var(--color-text-secondary)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
                   >
                     Account
@@ -429,7 +429,7 @@ export function Header() {
                     href={`/legal/${item.pageKey}`}
                     role="menuitem"
                     onClick={() => setMenuOpen(false)}
-                    className="px-3 py-2 text-xs font-semibold"
+                    className="px-3 py-3 text-xs font-semibold"
                     style={{ color: "var(--color-text-secondary)" }}
                   >
                     {item.label}
@@ -443,7 +443,7 @@ export function Header() {
                       setMenuOpen(false);
                       void signOut().then(() => router.replace("/"));
                     }}
-                    className="px-3 py-2 text-xs font-semibold text-left"
+                    className="px-3 py-3 text-xs font-semibold text-left"
                     style={{ color: "var(--color-danger)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
                   >
                     Sign out
