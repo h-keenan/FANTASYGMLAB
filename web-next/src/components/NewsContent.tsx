@@ -40,7 +40,7 @@ function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
     <>
       <PositionBadge position={identity.matched_player_position} />
       <PlayerAvatar playerId={identity.matched_player_id} size={28} />
-      <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+      <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
         {identity.matched_player}
       </span>
       {identity.matched_player_team ? (

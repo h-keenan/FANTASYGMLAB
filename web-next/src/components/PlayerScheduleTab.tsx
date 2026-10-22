@@ -66,7 +66,7 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
           </span>
         ) : (
           <span
-            className="text-sm font-bold truncate"
+            className="text-sm font-bold break-words"
             style={{ color: defenseTierColorVar(week.opponent_defense_tier) }}
           >
             {week.is_home ? "vs" : "@"} {week.opponent}

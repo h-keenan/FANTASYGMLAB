@@ -46,7 +46,7 @@ function LeaderboardRow({ entry }: { entry: GuessThePlayerLeaderboardEntry }) {
         {entry.rank}
       </span>
       <div className="flex-1 flex items-center gap-2 min-w-0">
-        <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+        <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
           {entry.display_name}
         </span>
         {entry.is_viewer ? (

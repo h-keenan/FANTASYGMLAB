@@ -48,7 +48,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col min-w-0">
-          <h3 className="truncate" style={{ font: "var(--font-card-title)" }}>
+          <h3 className="break-words" style={{ font: "var(--font-card-title)" }}>
             {partner}
           </h3>
           {date ? (

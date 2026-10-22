@@ -59,7 +59,7 @@ export function WatchListCard({
             {playerId ? <PlayerAvatar playerId={playerId} tier={tier} size={36} /> : null}
             <span className="flex flex-col gap-0.5 min-w-0 flex-1">
               <span className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
                   {name || item.headline}
                 </span>
                 {team ? (

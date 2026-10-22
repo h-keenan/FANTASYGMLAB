@@ -60,7 +60,7 @@ function AlertIdentityChip({ alert }: { alert: AlertItem }) {
     <>
       <PositionBadge position={alert.matched_player_position} />
       <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={28} />
-      <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+      <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
         {alert.matched_player}
       </span>
       {alert.matched_player_team ? (

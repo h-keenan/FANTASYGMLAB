@@ -56,7 +56,7 @@ export function PlayerIdentity({
       <PlayerAvatar playerId={playerId ?? undefined} tier={tier ?? undefined} size={avatarSize} />
       <div className="flex flex-col gap-0.5 min-w-0">
         <span
-          className="text-sm font-bold truncate"
+          className="text-sm font-bold break-words"
           style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}
         >
           {name}

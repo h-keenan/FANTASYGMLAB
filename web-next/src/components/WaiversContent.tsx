@@ -247,7 +247,7 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <span className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
             {player.name || "Unknown player"}
           </span>
           <PlayerMetaLine injuryStatus={injury.label}>
@@ -306,7 +306,7 @@ function PlayerTile({ position, player, note }: { position: string; player: Waiv
         <PositionBadge position={position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="md" />
-        <span className="text-sm font-extrabold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
+        <span className="text-sm font-extrabold break-words max-w-full" style={{ color: "var(--color-text-primary)" }}>
           {player.name || "Unknown"}
         </span>
         <div className="flex flex-col items-center gap-0.5">

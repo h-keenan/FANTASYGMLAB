@@ -65,11 +65,11 @@ export function TradeAssetRow({
       <div className="flex items-center gap-3 py-1.5">
         <PickPlate round={asset.round} pickNo={asset.pick_no} />
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
             {asset.label || "Draft pick"}
           </span>
           {asset.owner_team_name || asset.projected_range ? (
-            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+            <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
               {[asset.projected_range, asset.owner_team_name].filter(Boolean).join(" · ")}
             </span>
           ) : null}
