@@ -506,6 +506,8 @@ export interface KeepersResponse {
   keep_count?: number;
   keep_count_basis?: 'league_setting' | 'previous_draft' | 'declared_keepers' | 'unknown';
   unpriced_count?: number;
+  /** Rounds added to each keeper's cost (user-set per league, 0-3). */
+  round_penalty?: number;
 }
 
 export interface PositionNeedGroup {
@@ -2434,6 +2436,11 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/keepers${query ? `?${query}` : ''}`,
     );
   },
+  setKeeperRoundPenalty: (leagueId: string, roundPenalty: number) =>
+    authorizedPost<{ ok: boolean; round_penalty: number }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/keeper-settings`,
+      { round_penalty: roundPenalty },
+    ),
   getLeagueMatchup: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

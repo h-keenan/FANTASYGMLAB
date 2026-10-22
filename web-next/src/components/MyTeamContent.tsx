@@ -5,6 +5,7 @@ import { StatStrip, type StatStripItem } from "@/components/StatStrip";
 import { RosterCompositionBar, RosterTabs, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
 import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnalysis";
 import type { ReactNode } from "react";
+import { PillRow } from "@/components/PillRow";
 import type { KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { SectionHeading } from "@/components/SectionHeading";
 import { formatRank } from "@/components/SnapshotTile";
@@ -78,6 +79,7 @@ export function MyTeamContent({
   leagueSize,
   highlightPlayerId,
   keepers = null,
+  onKeeperRoundPenalty,
 }: {
   leagueName: string;
   myTeam: MyTeamResponse;
@@ -90,6 +92,8 @@ export function MyTeamContent({
   highlightPlayerId?: string;
   /** GET .../keepers (keeper leagues only); null/absent renders nothing. */
   keepers?: KeepersResponse | null;
+  /** Persist the per-league keeper round penalty; omit to hide the control. */
+  onKeeperRoundPenalty?: (penalty: number) => void;
 }) {
   const notice = myTeam.reason ? myTeamReasonMessage(myTeam.reason) : null;
   if (notice) {
@@ -338,6 +342,18 @@ export function MyTeamContent({
             Keep up to {keepers.keep_count} {KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ""] ?? ""}. Rounds and
             surplus are estimates.
           </p>
+          {onKeeperRoundPenalty ? (
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Round penalty
+              </span>
+              <PillRow
+                options={[0, 1, 2, 3].map((n) => ({ label: String(n), value: String(n) }))}
+                active={String(keepers.round_penalty ?? 0)}
+                onSelect={(value) => onKeeperRoundPenalty(Number(value))}
+              />
+            </div>
+          ) : null}
           <div>
             {keepers.candidates!.map((c) => (
               <div

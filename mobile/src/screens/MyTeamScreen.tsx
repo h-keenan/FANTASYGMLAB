@@ -328,7 +328,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
             ))}
           </AnimatedCard>
         )}
-        <KeeperCandidatesSection keepers={keepers} />
+        <KeeperCandidatesSection keepers={keepers} leagueId={leagueId} />
 
         {composition.length > 0 ? (
           <>
@@ -549,9 +549,21 @@ const KEEPER_BASIS_LABEL: Record<string, string> = {
 };
 
 /** Keep-or-cut candidates ranked by estimated surplus (keeper leagues only). */
-function KeeperCandidatesSection({ keepers }: { keepers: KeepersResponse | null }) {
+function KeeperCandidatesSection({ keepers, leagueId }: { keepers: KeepersResponse | null; leagueId: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const queryClient = useQueryClient();
+  const onPenalty = useCallback(
+    (key: string) => {
+      const penalty = Number(key);
+      queryClient.setQueryData<KeepersResponse>(queryKeys.keepers(leagueId), (prev) =>
+        prev ? { ...prev, round_penalty: penalty } : prev,
+      );
+      const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.keepers(leagueId) });
+      api.setKeeperRoundPenalty(leagueId, penalty).then(refresh).catch(refresh);
+    },
+    [leagueId, queryClient],
+  );
   const candidates = keepers?.candidates ?? [];
   if (!keepers || candidates.length === 0) return null;
   return (
@@ -560,6 +572,12 @@ function KeeperCandidatesSection({ keepers }: { keepers: KeepersResponse | null 
       <AppText style={styles.disclaimer}>
         {`Keep up to ${keepers.keep_count} ${KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ''] ?? ''}. Rounds and surplus are estimates.`}
       </AppText>
+      <AppText style={styles.disclaimer}>Round penalty</AppText>
+      <SegmentedTabBar
+        options={['0', '1', '2', '3'].map((n) => ({ key: n, label: n }))}
+        active={String(keepers.round_penalty ?? 0)}
+        onChange={onPenalty}
+      />
       <AnimatedCard style={styles.groupCard}>
         {candidates.map((c, index) => (
           <View

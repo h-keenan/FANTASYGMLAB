@@ -82,7 +82,7 @@ def build_keeper_report(
     previous_picks: list[Mapping[str, Any]],
     round_penalty: int = 0,
 ) -> dict[str, Any]:
-    round_penalty = max(0, min(MAX_ROUND_PENALTY, _int(round_penalty)))
+    round_penalty = clamp_round_penalty(round_penalty)
     declared = [str(p) for p in (roster.get("keepers") or []) if p]
     roster_id = str(roster.get("roster_id") or "")
     roster_ids = {str(p) for p in (roster.get("players") or []) if p}
@@ -161,3 +161,65 @@ def _reason(cost_round: int, source: str, surplus: int, penalty: int) -> str:
     )
     verdict = "worth more than a pick there" if surplus > 0 else "a pick there is worth more"
     return f"{where}; {verdict} ({surplus:+d})"
+
+
+# Share of the estimated keeper surplus folded into a player's trade value, and
+# the cap on that swing (as a fraction of the base value). Surplus is itself an
+# estimate, so it nudges value rather than replacing it.
+KEEPER_SURPLUS_WEIGHT = 0.5
+KEEPER_MAX_SWING = 0.25
+
+
+def clamp_round_penalty(value: Any) -> int:
+    return max(0, min(MAX_ROUND_PENALTY, _int(value)))
+
+
+def keeper_adjusted_values(
+    *,
+    valued: pd.DataFrame,
+    score_field: str,
+    num_teams: int,
+    current_picks: list[Mapping[str, Any]],
+    previous_picks: list[Mapping[str, Any]],
+    round_penalty: int = 0,
+) -> dict[str, float]:
+    """League-wide ``{player_id: adjusted trade value}`` for players with a known cost.
+
+    Cost is the round a keeper pick was assigned this year, else the player's
+    last draft round shifted by ``round_penalty``. Players with no known cost
+    are omitted so callers fall back to their normal value. Years remaining
+    are not exposed by Sleeper, so they are not modelled.
+    """
+    if valued is None or valued.empty or score_field not in valued.columns:
+        return {}
+    penalty = clamp_round_penalty(round_penalty)
+    ids = valued["player_id"].astype(str)
+    vals = pd.to_numeric(valued[score_field], errors="coerce").fillna(0.0)
+    sorted_values = sorted(vals.tolist(), reverse=True)
+    kept_now = {
+        str(p.get("player_id")): _int(p.get("round"))
+        for p in current_picks
+        if p.get("is_keeper") and p.get("player_id")
+    }
+    last_round = {str(p.get("player_id")): _int(p.get("round")) for p in previous_picks if p.get("player_id")}
+    out: dict[str, float] = {}
+    for pid, value in zip(ids, vals):
+        cost_round = kept_now.get(pid) or (
+            max(1, last_round[pid] - penalty) if last_round.get(pid) else None
+        )
+        if not cost_round or value <= 0:
+            continue
+        surplus = value - slot_value(sorted_values, cost_round, num_teams)
+        swing = max(-KEEPER_MAX_SWING * value, min(KEEPER_MAX_SWING * value, KEEPER_SURPLUS_WEIGHT * surplus))
+        out[pid] = float(value + swing)
+    return out
+
+
+def apply_keeper_values(valued: pd.DataFrame, score_field: str, adjusted: Mapping[str, float]) -> pd.DataFrame:
+    """Copy of ``valued`` with ``score_field`` replaced for players in ``adjusted``."""
+    if not adjusted or valued is None or valued.empty:
+        return valued
+    frame = valued.copy()
+    ids = frame["player_id"].astype(str)
+    frame[score_field] = [adjusted.get(pid, v) for pid, v in zip(ids, frame[score_field])]
+    return frame
