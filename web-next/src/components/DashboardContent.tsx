@@ -149,7 +149,7 @@ export function DashboardContent({
           phone-narrow viewport, where the playable game needs the width).
           Both self-fetch and render nothing on failure; a lone card takes
           the full row. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 [&>*:only-child]:sm:col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 [&>*:only-child]:sm:col-span-2">
         <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
         <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
       </div>
