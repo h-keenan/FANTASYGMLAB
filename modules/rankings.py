@@ -4265,12 +4265,70 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     )
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    # Persist the universe a load would reconcile to anyway. Otherwise every
+    # load after this write finds the "current but filtered out" identities
+    # missing and rewrites players.db again (_persist_reconciled_player_universe),
+    # so each refresh cycle rewrote the file twice and a later build always
+    # differed from what was on disk.
+    persisted, stored_form = _persistable_players_frame(df, players)
+    if _persisted_players_are_identical(db_path, stored_form):
+        # A rewrite would change the file's size/mtime, which is part of the
+        # public-player fingerprint, and so rebuild every derived frame for
+        # content that did not change. Re-stamp the sidecar only.
+        _stamp_player_universe_sidecar(db_path)
+        return ensure_identity_columns(df)
     conn = sqlite3.connect(db_path)
-    df.to_sql("players", conn, if_exists="replace", index=False)
+    persisted.to_sql("players", conn, if_exists="replace", index=False)
     _write_player_universe_cache_metadata(conn, db_path=db_path)
     conn.close()
 
     return ensure_identity_columns(df)
+
+
+def _sqlite_round_trip(frame: pd.DataFrame) -> pd.DataFrame:
+    probe = sqlite3.connect(":memory:")
+    try:
+        frame.to_sql("players", probe, if_exists="replace", index=False)
+        return pd.read_sql_query("SELECT * FROM players", probe)
+    finally:
+        probe.close()
+
+
+def _persistable_players_frame(
+    df: pd.DataFrame,
+    players: Any,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(frame to write, what reading it back from SQLite yields).
+
+    The frame to write is ``df`` plus the reconciled unmodeled rows that
+    ``reconcile_current_player_universe`` would add on the first load.
+    """
+
+    try:
+        from modules.structured_player_refresh import reconcile_current_player_universe
+
+        reconciled = reconcile_current_player_universe(_sqlite_round_trip(df), players)
+        return reconciled, _sqlite_round_trip(reconciled)
+    except Exception:
+        return df, _sqlite_round_trip(df)
+
+
+def _persisted_players_are_identical(db_path: str, stored_form: pd.DataFrame) -> bool:
+    """True when ``db_path`` already holds exactly ``stored_form`` (the frame as
+    read back from SQLite) and the current metadata."""
+
+    if not os.path.exists(db_path):
+        return False
+    try:
+        with sqlite3.connect(db_path) as existing_conn:
+            existing = pd.read_sql_query("SELECT * FROM players", existing_conn)
+            stored_meta = _read_player_universe_metadata_row(db_path)
+        expected_meta = _player_universe_metadata_payload()
+        if any(stored_meta.get(key) != str(value or "") for key, value in expected_meta.items()):
+            return False
+        return bool(list(existing.columns) == list(stored_form.columns) and existing.equals(stored_form))
+    except Exception:
+        return False
 
 
 def _public_result(frame):
