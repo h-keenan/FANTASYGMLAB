@@ -585,19 +585,6 @@ body {
     background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
   }
 }
-.gm-orb-drag-handle {
-  display: flex;
-  justify-content: center;
-  padding-top: var(--space-sm);
-  touch-action: none;
-  cursor: grab;
-}
-.gm-orb-drag-handle-bar {
-  width: 2.5rem;
-  height: 0.25rem;
-  background: var(--color-border-strong);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -1000,6 +987,7 @@ a {
   z-index: 1;
   max-height: min(88vh, 900px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-xl);
   display: flex;
   flex-direction: column;
@@ -1409,29 +1397,37 @@ a {
     max-height: 92vh;
     border-radius: var(--radius-panel);
   }
-  .pqv-drag-handle {
-    display: flex;
-  }
 }
 
-/* Drag handle — visual affordance that this is a swipeable bottom sheet on
-   narrow viewports (coridian_, 2026-10-17: "I would like for the PQV and
-   other pop-ups to be a window that pops up from the bottom of the screen
-   that you can easily swipe down or X out"). Hidden by default (desktop's
-   centered modal isn't a sheet); shown only in the mobile breakpoint above,
-   alongside the swipe-to-dismiss gesture the dialog itself implements. */
-.pqv-drag-handle {
+/* Shared grab bar for every swipe-to-dismiss sheet (components/
+   SheetHandle.tsx + lib/useSheetDragDismiss.ts): PQV, the GM orb sheet,
+   checkout and the trade follow-up card. Owner, 2026-10-21: "I would still
+   like a gesture to swipe down out of the PQV, or any other pop-up
+   windows." The old per-sheet handles never showed on the PQV: its
+   `display: none` rule came after the 480px media query that was meant to
+   show it, so it always won. Shown on touch (coarse-pointer) devices only,
+   where the gesture exists. */
+.sheet-handle {
+  position: relative;
+  z-index: 1;
   display: none;
   justify-content: center;
-  padding-top: var(--space-sm);
-  margin: calc(var(--space-xl) * -1) calc(var(--space-xl) * -1) var(--space-sm);
+  align-items: center;
+  height: 1.25rem;
+  flex-shrink: 0;
   touch-action: none;
   cursor: grab;
 }
-.pqv-drag-handle-bar {
+.sheet-handle-bar {
   width: 2.5rem;
-  height: 0.25rem;
+  height: 0.3rem;
+  border-radius: var(--radius-pill);
   background: var(--color-border-strong);
+}
+@media (pointer: coarse) {
+  .sheet-handle {
+    display: flex;
+  }
 }
 
 /* LoadingScreen's brand-mark pulse — matches mobile's LoadingScreen.tsx

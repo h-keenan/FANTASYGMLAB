@@ -10,6 +10,8 @@ import {
   setTradeOutcomePromptDismissed,
 } from "@/lib/tradeOutcomePromptDismissed";
 import { emitTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { SheetHandle } from "@/components/SheetHandle";
 
 // "/" is the signed-out landing page and the signup/Sleeper-import/paywall
 // flow (same rule GmOrb.tsx uses); "/premium" is the standalone paywall.
@@ -104,8 +106,12 @@ export function TradeOutcomePrompt() {
     setDismissed(true);
   };
 
-  if (!session || !current || dismissed) return null;
-  if (pathname && HIDDEN_PATHS.has(pathname)) return null;
+  const visible = Boolean(session && current && !dismissed && !(pathname && HIDDEN_PATHS.has(pathname)));
+  // Swipe down on touch devices does the same as the close button: hide it
+  // for this browser session without answering (lib/useSheetDragDismiss.ts).
+  const { sheetRef, sheetStyle } = useSheetDragDismiss<HTMLElement>({ onDismiss: dismiss, enabled: visible });
+
+  if (!visible || !current) return null;
 
   const summary = current.trade_summary ?? { send: [], receive: [], partner_team_name: "", value_edge_label: "" };
   const sendNames = (summary.send ?? []).map((a) => a.name).join(", ") || "Nothing";
@@ -118,13 +124,15 @@ export function TradeOutcomePrompt() {
     <section
       role="region"
       aria-label="Did this trade happen?"
+      ref={sheetRef}
       data-testid="trade-outcome-prompt"
       // Bottom-right on desktop; on phone-width it sits above the GM orb
       // (bottom-3, 3.25rem tall) so the two never overlap. z-30 keeps it
       // under the orb (40) and every sheet/modal (50).
       className="glass-surface fixed right-4 left-4 bottom-20 md:left-auto md:bottom-6 md:right-6 md:w-96 flex flex-col gap-3 p-4"
-      style={{ zIndex: 30, maxWidth: "24rem", marginLeft: "auto" }}
+      style={{ zIndex: 30, maxWidth: "24rem", marginLeft: "auto", ...sheetStyle }}
     >
+      <SheetHandle className="-mt-2 -mb-1" />
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5">
           <h2 style={{ font: "var(--font-card-title)", color: "var(--color-text-primary)" }}>Did this trade happen?</h2>
