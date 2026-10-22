@@ -42,6 +42,7 @@ import { valueDirectionLabel } from '../lib/tradeValue';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
+import ValuesCredit from '../components/ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -575,6 +576,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
     >
       <GridBackground />
       <FlatList
+      ListFooterComponent={<ValuesCredit />}
       style={styles.container}
       data={searchResults}
       keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : item.pick.pick_id)}

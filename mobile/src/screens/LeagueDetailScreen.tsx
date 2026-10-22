@@ -27,6 +27,7 @@ import StorylineSummaryCard from '../components/StorylineSummaryCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
+import ValuesCredit from '../components/ValuesCredit';
 import {
   api,
   type DashboardItem,
@@ -476,6 +477,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}
+        <ValuesCredit />
       </ScrollView>
     </View>
   );

@@ -10,6 +10,7 @@ import {
   verdictDetailText,
   verdictToneColorVar,
 } from "@/lib/tradeHistoryPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports modules/trade_outcomes_page.py's render_trade_history_page — the
@@ -97,6 +98,7 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
           ))}
         </div>
       )}
+      <ValuesCredit />
     </main>
   );
 }

@@ -33,6 +33,7 @@ import { gmPlanReasonMessage } from "@/lib/gmPlanPresentation";
 import { buildProtectRows, splitProtectRows, type ProtectRow } from "@/lib/teamStancePresentation";
 import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTargetsPresentation";
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -683,6 +684,7 @@ export function GmPlanContent({
           )}
         </section>
       ) : null}
+      <ValuesCredit />
     </main>
   );
 }

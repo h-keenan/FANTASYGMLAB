@@ -20,6 +20,7 @@ import {
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -358,6 +359,7 @@ export function LeagueRankingsContent({
           <RankBoardSection board="bench" teams={data.teams} myRosterId={myRosterId} />
         </>
       )}
+      <ValuesCredit />
     </main>
   );
 }

@@ -13,6 +13,7 @@ import {
   visibleDraftPicks,
   type PickScope,
 } from "@/lib/draftCenterPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports mobile's DraftCenterScreen.tsx (the GM_TOOLS "Draft Center" nav
@@ -186,6 +187,7 @@ export function DraftCenterContent({
           Open classic Draft Center
         </a>
       </section>
+      <ValuesCredit />
     </main>
   );
 }

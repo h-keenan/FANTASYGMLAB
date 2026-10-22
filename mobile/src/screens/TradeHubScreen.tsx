@@ -20,6 +20,7 @@ import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
+import ValuesCredit from '../components/ValuesCredit';
 import {
   type AllTradesEntitlement,
   type DraftPickAsset,
@@ -422,24 +423,27 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
         ) : null
       }
       ListFooterComponent={
-        isForYou ? (
-          !activeLoading && !activeError && !notReadyReason && entitlement && entitlement.hidden_count > 0 ? (
-            <TradeHubGateCard
-              entitlement={entitlement}
-              watchingAd={watchingAd}
-              onWatchAd={onWatchAd}
+        <>
+          {isForYou ? (
+            !activeLoading && !activeError && !notReadyReason && entitlement && entitlement.hidden_count > 0 ? (
+              <TradeHubGateCard
+                entitlement={entitlement}
+                watchingAd={watchingAd}
+                onWatchAd={onWatchAd}
+                onUpgrade={() => navigation.navigate('Paywall')}
+              />
+            ) : null
+          ) : (
+            <AllTradesFooter
+              loadingMore={allTradesLoadingMore}
+              hasMore={allTradesHasMore}
+              entitlement={allTradesEntitlement}
+              onLoadMore={() => void loadAllTrades({ reset: false })}
               onUpgrade={() => navigation.navigate('Paywall')}
             />
-          ) : null
-        ) : (
-          <AllTradesFooter
-            loadingMore={allTradesLoadingMore}
-            hasMore={allTradesHasMore}
-            entitlement={allTradesEntitlement}
-            onLoadMore={() => void loadAllTrades({ reset: false })}
-            onUpgrade={() => navigation.navigate('Paywall')}
-          />
-        )
+          )}
+          <ValuesCredit />
+        </>
       }
       />
     </View>

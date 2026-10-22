@@ -15,6 +15,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -290,6 +291,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             ))}
           </AnimatedCard>
         ) : null}
+        <ValuesCredit />
       </ScrollView>
     </View>
   );

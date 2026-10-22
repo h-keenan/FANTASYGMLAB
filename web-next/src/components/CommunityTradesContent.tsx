@@ -7,6 +7,7 @@ import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { VerdictCallout } from "@/components/VerdictCallout";
 import { toCommunityTradeAssets, formatCommunityTradeDate } from "@/lib/communityTradesPresentation";
 import { verdictDetailText, verdictToneColorVar } from "@/lib/tradeHistoryPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Social/community layer (docs/roadmap.md), coridian_ 2026-10-19: an
@@ -185,6 +186,7 @@ export function CommunityTradesContent({
           ))}
         </div>
       )}
+      <ValuesCredit />
     </main>
   );
 }

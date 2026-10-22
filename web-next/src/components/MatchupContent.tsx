@@ -15,6 +15,7 @@ import {
   realStarterPointsDisplay,
   recordLabel,
 } from "@/lib/matchupPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports modules/web_matchup_ui.py's render_matchup_page for Revision 5 — the
@@ -414,6 +415,7 @@ export function MatchupContent({ leagueName, matchup }: { leagueName: string; ma
 
       <SuggestedLineupSection title="Your suggested starters" side={mine} />
       <SuggestedLineupSection title={`${opponent.team_name}'s best lineup`} side={opponent} />
+      <ValuesCredit />
     </main>
   );
 }

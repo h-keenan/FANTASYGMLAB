@@ -19,6 +19,7 @@ import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -243,6 +244,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
             ))}
           </>
         )}
+        <ValuesCredit />
       </ScrollView>
     </View>
   );

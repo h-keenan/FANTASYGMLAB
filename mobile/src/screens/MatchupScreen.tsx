@@ -19,6 +19,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
+import ValuesCredit from '../components/ValuesCredit';
 import {
   api,
   type MatchupComparison,
@@ -472,6 +473,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
           onPressPlayer={openPlayer}
           accent={colors.violet}
         />
+        <ValuesCredit />
       </ScrollView>
     </View>
   );

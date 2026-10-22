@@ -17,6 +17,7 @@ import {
   sumScore,
 } from "@/lib/myTeamPresentation";
 import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports modules/my_team_ui.py's render_my_team_workspace for Revision 2 —
@@ -391,6 +392,7 @@ export function MyTeamContent({
           </div>
         )}
       </section>
+      <ValuesCredit />
     </main>
   );
 }

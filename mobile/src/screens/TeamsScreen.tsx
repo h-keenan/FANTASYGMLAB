@@ -16,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -360,6 +361,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
         <SegmentedTabBar options={METRIC_TABS} active={metric} onChange={setMetric} />
       </View>
       <FlatList
+        ListFooterComponent={<ValuesCredit />}
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         data={teams}

@@ -16,6 +16,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import TradeValueHero from '../components/TradeValueHero';
+import ValuesCredit from '../components/ValuesCredit';
 import {
   api,
   type DraftPickAsset,
@@ -591,25 +592,28 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
           </View>
         }
         ListFooterComponent={
-          ownedPicks.length > 0 ? (
-            <View>
-              <AppText style={styles.sectionLabel}>Your Picks (up to {TRADE_FINDER_MAX_PICKS})</AppText>
-              {ownedPicks.map((pick, index) => {
-                const selected = selectedPickIds.has(pick.pick_id);
-                return (
-                  <PickSelectRow
-                    key={pick.pick_id}
-                    pick={pick}
-                    selected={selected}
-                    disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
-                    onToggle={() => togglePick(pick.pick_id)}
-                    isFirst={index === 0}
-                    isLast={index === ownedPicks.length - 1}
-                  />
-                );
-              })}
-            </View>
-          ) : null
+          <>
+            {ownedPicks.length > 0 ? (
+              <View>
+                <AppText style={styles.sectionLabel}>Your Picks (up to {TRADE_FINDER_MAX_PICKS})</AppText>
+                {ownedPicks.map((pick, index) => {
+                  const selected = selectedPickIds.has(pick.pick_id);
+                  return (
+                    <PickSelectRow
+                      key={pick.pick_id}
+                      pick={pick}
+                      selected={selected}
+                      disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
+                      onToggle={() => togglePick(pick.pick_id)}
+                      isFirst={index === 0}
+                      isLast={index === ownedPicks.length - 1}
+                    />
+                  );
+                })}
+              </View>
+            ) : null}
+            <ValuesCredit />
+          </>
         }
         ListEmptyComponent={
           <EmptyState icon="people-outline" title="No roster found" subtitle="Nothing to shop yet in this league." />

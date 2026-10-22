@@ -25,6 +25,7 @@ import {
   waiverInjuryDisplay,
   waiversReasonMessage,
 } from "@/lib/waiversPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports modules/waivers_ui.py's render_waiver_workspace_sections for
@@ -521,6 +522,7 @@ export function WaiversContent({
           </>
         )}
       </section>
+      <ValuesCredit />
     </main>
   );
 }

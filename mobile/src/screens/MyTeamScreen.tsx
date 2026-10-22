@@ -25,6 +25,7 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
 import TeamAvatar from '../components/TeamAvatar';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -281,6 +282,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
             />
           )
         ) : null}
+        <ValuesCredit />
       </ScrollView>
     </View>
   );
