@@ -57,5 +57,5 @@ export default function MatchupPage() {
     );
   }
 
-  return <MatchupContent leagueName={leagueName} matchup={matchup} />;
+  return <MatchupContent leagueName={leagueName} matchup={matchup} leagueId={leagueId} lens={lens} />;
 }

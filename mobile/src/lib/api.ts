@@ -735,6 +735,47 @@ export interface MatchupResponse {
   lineup_advice_message?: string;
 }
 
+/** One slot of a proposed lineup sent to POST .../matchup/what-if. */
+export interface MatchupWhatIfSlot {
+  slot: string;
+  player_id: string | null;
+}
+
+export interface MatchupWhatIfBullet {
+  tone: 'pro' | 'con' | 'neutral';
+  text: string;
+}
+
+/** One roster player who could fill the slot being edited, with pros and cons
+ * computed server-side (modules.matchup_what_if). Bye / out / locked players
+ * come back with `selectable: false`. */
+export interface MatchupWhatIfCandidate {
+  player: MatchupStarter;
+  selectable: boolean;
+  blocked_reason: 'bye' | 'out' | 'locked' | null;
+  points_delta: number | null;
+  /** Whole-percent change in this matchup's win probability. */
+  win_probability_delta: number | null;
+  win_probability_after: MatchupWinProbability | null;
+  bullets: MatchupWhatIfBullet[];
+}
+
+export interface MatchupWhatIfResponse {
+  ok: boolean;
+  reason: string;
+  best_ball?: boolean;
+  /** The edited lineup's starters (empty slots omitted). */
+  lineup?: MatchupStarter[];
+  win_probability?: MatchupWinProbability;
+  position_edges?: MatchupPositionEdge[];
+  candidates?: {
+    slot: string;
+    slot_locked: boolean;
+    current_player_id: string | null;
+    candidates: MatchupWhatIfCandidate[];
+  } | null;
+}
+
 export interface PlayerSummary {
   full_name: string | null;
   first_name: string | null;
@@ -2355,6 +2396,10 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/matchup${query ? `?${query}` : ''}`,
     );
   },
+  postMatchupWhatIf: (
+    leagueId: string,
+    body: { lineup: MatchupWhatIfSlot[]; edit_index?: number | null },
+  ) => authorizedPost<MatchupWhatIfResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/matchup/what-if`, body),
   getLeagueIdpValues: (leagueId: string) =>
     authorizedFetch<LeagueIdpValuesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/idp/values`),
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
