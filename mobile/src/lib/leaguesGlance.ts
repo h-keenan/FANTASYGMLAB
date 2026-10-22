@@ -189,10 +189,22 @@ export function glanceDestination(module: GlanceModule): GlanceDestination {
  * "Couldn't load 2 leagues right now: A, B."
  */
 export function glanceFailedNote(failed: LeagueGlanceFailedLeague[]): string {
-  const real = failed.filter((league) => league.reason !== 'empty_roster');
+  const real = failed.filter((league) => league.reason !== 'empty_roster' && league.reason !== ESPN_NOT_SUPPORTED);
   if (real.length === 0) return '';
   const names = real.map((league) => league.league_name).join(', ');
   return `Couldn't load ${real.length} ${real.length === 1 ? 'league' : 'leagues'} right now: ${names}.`;
+}
+
+/** ESPN leagues (modules/espn_leagues.py) have no glance card or Portfolio
+ * summary yet. Not a failure, so kept out of glanceFailedNote. */
+export const ESPN_NOT_SUPPORTED = 'espn_not_supported';
+
+/** "Not available for ESPN leagues yet: A. Open them from My Team." */
+export function glanceEspnNote(failed: LeagueGlanceFailedLeague[]): string {
+  const espn = failed.filter((league) => league.reason === ESPN_NOT_SUPPORTED);
+  if (espn.length === 0) return '';
+  const names = espn.map((league) => league.league_name).join(', ');
+  return `Not available for ESPN leagues yet: ${names}. Open ${espn.length === 1 ? 'it' : 'them'} from My Team.`;
 }
 
 /** "Draft still in progress for 1 league: A." */

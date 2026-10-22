@@ -843,10 +843,31 @@ def _get_users_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
         return []
 
 
+def _is_espn_league(league_id: Any) -> bool:
+    """ESPN leagues are keyed "espn:{id}:{season}" (modules.espn_leagues).
+
+    The league getters below hand those keys to the ESPN snapshot, which is
+    already shaped like Sleeper's payloads, so every engine that reads a
+    league through this module runs unchanged on an ESPN roster. The
+    Sleeper-only getters (drafts, traded picks, transactions, matchups)
+    return empty for an ESPN key instead of sending it to Sleeper's API;
+    the API refuses the features that depend on them for ESPN leagues."""
+
+    return isinstance(league_id, str) and league_id.startswith("espn:")
+
+
+def _espn_leagues():
+    from modules import espn_leagues
+
+    return espn_leagues
+
+
 def get_users(league_id: str) -> List[Dict[str, Any]]:
     """
     Get all users in a league.[web:4]
     """
+    if _is_espn_league(league_id):
+        return _espn_leagues().users_payload(league_id)
     return _get_users_cached(league_id, _live_league_cache_bucket())
 
 
@@ -866,6 +887,8 @@ def get_rosters(league_id: str) -> List[Dict[str, Any]]:
     """
     Get all rosters in a league.[web:4]
     """
+    if _is_espn_league(league_id):
+        return _espn_leagues().rosters_payload(league_id)
     return _get_rosters_cached(league_id, _live_league_cache_bucket())
 
 
@@ -885,6 +908,8 @@ def get_league(league_id: str) -> Dict[str, Any]:
     """
     Get league metadata/settings from Sleeper.
     """
+    if _is_espn_league(league_id):
+        return _espn_leagues().league_payload(league_id)
     return _get_league_cached(league_id, _live_league_cache_bucket())
 
 
@@ -893,7 +918,7 @@ def get_league_drafts(league_id: str) -> List[Dict[str, Any]]:
     """
     Get all draft objects attached to a league.
     """
-    if not league_id:
+    if not league_id or _is_espn_league(league_id):
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/drafts"
     try:
@@ -935,7 +960,7 @@ def get_draft_picks(draft_id: str) -> List[Dict[str, Any]]:
 
 @lru_cache(maxsize=128)
 def _get_traded_picks_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
-    if not league_id:
+    if not league_id or _is_espn_league(league_id):
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/traded_picks"
     try:
@@ -959,7 +984,7 @@ def get_traded_picks(league_id: str) -> List[Dict[str, Any]]:
 
 @lru_cache(maxsize=512)
 def _get_transactions_cached(league_id: str, round_num: int, _bucket: int) -> List[Dict[str, Any]]:
-    if not league_id or round_num is None:
+    if not league_id or round_num is None or _is_espn_league(league_id):
         return []
     try:
         round_num = int(round_num)
@@ -1007,7 +1032,7 @@ def clear_live_league_endpoint_caches() -> None:
 
 @lru_cache(maxsize=512)
 def _get_matchups_cached(league_id: str, round_num: int, _bucket: int) -> List[Dict[str, Any]]:
-    if not league_id or round_num is None:
+    if not league_id or round_num is None or _is_espn_league(league_id):
         return []
     try:
         round_num = int(round_num)

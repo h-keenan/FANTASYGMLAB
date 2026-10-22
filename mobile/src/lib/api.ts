@@ -180,7 +180,40 @@ export interface SleeperLeagueLookupResponse {
   message: string;
 }
 
-export type SaveLeagueReason = '' | 'at_cap' | 'league_not_found' | 'not_available';
+export type SaveLeagueReason =
+  | ''
+  | 'at_cap'
+  | 'league_not_found'
+  | 'not_available'
+  // ESPN leagues only (modules/espn_leagues.py).
+  | 'espn_team_not_selected'
+  | 'mapping_too_low';
+
+/** POST /v1/espn/leagues/preview. Public ESPN leagues only;
+ * `league.league_key` is the id POST /v1/leagues/save takes. */
+export interface EspnLeagueTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string;
+  player_count: number;
+  matched_player_count: number;
+}
+
+export interface EspnLeaguePreviewResponse {
+  ok: boolean;
+  reason: string;
+  message: string;
+  league?: { league_key: string; espn_league_id: string; season: string; name: string; team_count: number };
+  teams?: EspnLeagueTeam[];
+  diagnostics?: {
+    teams_found: number;
+    total_espn_players_seen: number;
+    canonical_matched_count: number;
+    unmatched_count: number;
+    matched_rate: number;
+  };
+  features?: Array<{ feature: string; status: 'available' | 'not_available'; note: string }>;
+}
 
 export interface SaveLeagueResponse {
   ok: boolean;
@@ -2186,13 +2219,18 @@ export const api = {
     sleeperUsername?: string;
     leagueName?: string;
     makeDefault?: boolean;
+    /** ESPN leagues only: the team the user picked as theirs. */
+    rosterId?: string;
   }) =>
     authorizedPost<SaveLeagueResponse>('/v1/leagues/save', {
       league_id: input.leagueId,
       sleeper_username: input.sleeperUsername ?? '',
       league_name: input.leagueName ?? '',
       make_default: input.makeDefault ?? false,
+      roster_id: input.rosterId ?? '',
     }),
+  previewEspnLeague: (leagueId: string, season: number) =>
+    authorizedPost<EspnLeaguePreviewResponse>('/v1/espn/leagues/preview', { league_id: leagueId, season }),
   getGmTargets: (leagueId: string) =>
     authorizedFetch<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
   addGmTarget: (leagueId: string, playerId: string, sourceSurface = 'gm_targets') =>

@@ -150,6 +150,7 @@ from modules import (
     dashboard_engine,
     draft_assistant,
     draft_center_ui,
+    espn_leagues,
     faab,
     founder_analytics,
     gm_plan,
@@ -512,6 +513,36 @@ app = FastAPI(
 # 1KB minimum so tiny responses (health checks, single-player lookups)
 # aren't paying gzip's per-request CPU cost for no bandwidth benefit.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+class _EspnLeagueRouteGate:
+    """Refuses Sleeper-only features for ESPN leagues, in one place.
+
+    ESPN leagues (league_id "espn:{id}:{season}", modules.espn_leagues) can
+    serve only the routes in espn_leagues.ESPN_SUPPORTED_LEAGUE_ROUTES. Any
+    other /v1/leagues/{espn key}/... request gets a 409 with a stable
+    `reason` ("espn_not_supported") and the message clients show, instead of
+    running a Sleeper-only engine on empty data. Pure ASGI (no
+    BaseHTTPMiddleware) so non-ESPN requests pay one string check. Added
+    before CORSMiddleware so the refusal still carries CORS headers."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope.get("type") == "http"
+            and scope.get("method") != "OPTIONS"
+            and "espn:" in (scope.get("path") or "")
+            and espn_leagues.gated_league_path(scope.get("path") or "")
+        ):
+            response = JSONResponse(status_code=409, content=espn_leagues.not_available_payload())
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(_EspnLeagueRouteGate)
 # Added after GZip so it wraps outermost and runs before any other work
 # (including gzip'ing a response nobody should have gotten) on a throttled
 # request.
@@ -1525,6 +1556,46 @@ class SaveLeagueRequest(BaseModel):
     sleeper_username: str = ""
     league_name: str = ""
     make_default: bool = False
+    # ESPN leagues only (league_id "espn:{id}:{season}"): the team the user
+    # picked as theirs in the import step. Sleeper leagues resolve this
+    # from the username instead.
+    roster_id: str = ""
+
+
+class EspnLeaguePreviewRequest(BaseModel):
+    league_id: str
+    season: int
+
+
+@app.post("/v1/espn/leagues/preview")
+def preview_espn_league(
+    body: EspnLeaguePreviewRequest,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Load a public ESPN league and show what importing it would give.
+
+    Read-only (saves nothing): league name, every team (so the user can
+    pick theirs), how many roster players matched FantasyDesk's player
+    list, and which features work for ESPN leagues today
+    (modules.espn_leagues.ESPN_FEATURE_SUPPORT). The returned
+    `league.league_key` is what POST /v1/leagues/save takes as league_id.
+
+    Public leagues only. This endpoint takes no espn_s2/SWID cookies, and a
+    private league answers `private_league` (see modules.espn_leagues for
+    why private leagues are out of scope). Everyday failures are a 200 with
+    `ok: false` and a `reason`, like GET /v1/sleeper/leagues."""
+
+    league_key = espn_leagues.build_espn_league_key(body.league_id, body.season)
+    if not league_key:
+        return {"ok": False, "reason": "invalid_input", "message": espn_leagues.ERROR_MESSAGES["invalid_input"]}
+    try:
+        snapshot = espn_leagues.load_league_snapshot(league_key)
+    except espn_leagues.ESPNLeagueError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    # Saving right after previewing (the normal flow) reuses this load
+    # instead of calling ESPN again.
+    espn_leagues.store_snapshot(league_key, snapshot)
+    return espn_leagues.preview_payload(snapshot)
 
 
 @app.post("/v1/leagues/save")
@@ -1547,11 +1618,24 @@ def save_league(
     if not league_id:
         raise HTTPException(status_code=422, detail="league_id is required.")
 
-    # Verify against Sleeper before writing: a typo'd or private league id
-    # would otherwise become a permanent dead row on the user's Home screen.
-    league = sleeper.get_league(league_id)
-    if not league:
-        return {"ok": False, "reason": "league_not_found", "cap": 0}
+    is_espn = espn_leagues.is_espn_league_key(league_id)
+    espn_roster_id = str(payload.roster_id or "").strip()
+    if is_espn:
+        # Same "verify before writing" rule as Sleeper below, against ESPN.
+        espn_snapshot = espn_leagues.get_league_snapshot(league_id)
+        if not espn_snapshot:
+            return {"ok": False, "reason": "league_not_found", "cap": 0}
+        if espn_leagues.mapping_blocks_import(espn_snapshot):
+            return {"ok": False, "reason": "mapping_too_low", "cap": 0}
+        if not any(str(roster.get("roster_id")) == espn_roster_id for roster in espn_snapshot["rosters"]):
+            return {"ok": False, "reason": "espn_team_not_selected", "cap": 0}
+        league = espn_snapshot["league"]
+    else:
+        # Verify against Sleeper before writing: a typo'd or private league id
+        # would otherwise become a permanent dead row on the user's Home screen.
+        league = sleeper.get_league(league_id)
+        if not league:
+            return {"ok": False, "reason": "league_not_found", "cap": 0}
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
@@ -1578,8 +1662,14 @@ def save_league(
     if saved_leagues.is_at_cap(existing, league_id=league_id, cap=cap):
         return {"ok": False, "reason": "at_cap", "cap": cap}
 
-    username = str(payload.sleeper_username or "").strip() or profile.get("sleeper_username", "")
-    roster_id = sleeper.get_user_roster_id(league_id, username) if username else None
+    if is_espn:
+        # No Sleeper username on an ESPN row: it would make the Sleeper
+        # season-rollover check treat this league as a Sleeper one.
+        username = ""
+        roster_id = espn_roster_id
+    else:
+        username = str(payload.sleeper_username or "").strip() or profile.get("sleeper_username", "")
+        roster_id = sleeper.get_user_roster_id(league_id, username) if username else None
     league_name = str(payload.league_name or "").strip() or str(league.get("name") or "")
     # First league saved becomes the default so Home has something to open.
     is_default = bool(payload.make_default) or not saved_leagues.saved_league_ids(existing)
@@ -1599,6 +1689,10 @@ def save_league(
     )
     if not ok:
         return {"ok": False, "reason": "not_available", "cap": cap}
+    if is_espn:
+        # ESPN roster resolution reads roster_id from this row, so the very
+        # next My Team request must not see a pre-save cached copy.
+        _forget_saved_leagues_cache(user_id)
     return {
         "ok": True,
         "reason": "",
@@ -1607,6 +1701,7 @@ def save_league(
             "league_id": league_id,
             "league_name": league_name,
             "is_default": is_default,
+            "platform": espn_leagues.league_platform(league_id),
         },
     }
 
@@ -1734,6 +1829,11 @@ def resolve_league_path_id(
     league_id_clean = str(league_id or "").strip()
     if not league_id_clean:
         return league_id
+    if espn_leagues.is_espn_league_key(league_id_clean):
+        # ESPN league ids don't change between seasons, and the season is
+        # part of the key, so there is nothing to resolve (and no reason to
+        # load the league just to read a Sleeper status).
+        return league_id_clean
     try:
         user_id = str(user.get("id") or "")
         if not user_id:
@@ -2073,7 +2173,9 @@ def get_league_team_rankings(
         activity_badge = manager_activity.classify_activity_level(
             transaction_count=activity_count, tx_high=tx_high, tx_low=tx_low
         )
-        if activity_badge:
+        # ESPN leagues have no transaction feed here (modules.espn_leagues),
+        # so a zero count means "unknown", not a "Quiet Manager".
+        if activity_badge and not espn_leagues.is_espn_league_key(league_id):
             team_badges.append(activity_badge)
         pick_flow_badge = pick_flow.classify_pick_flow(firsts_acquired, firsts_sent)
         if pick_flow_badge:
@@ -2394,6 +2496,12 @@ def get_league_draft_picks(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
+    if espn_leagues.is_espn_league_key(league_id):
+        # ESPN's API doesn't expose who owns which future picks, so listing
+        # every team's own picks would be a guess. Trade Analyzer runs
+        # players-only for ESPN leagues instead.
+        return {"ok": True, "picks": [], "reason": espn_leagues.ESPN_NOT_AVAILABLE_REASON}
+
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
@@ -2632,6 +2740,13 @@ def _apply_league_rollover_resolution(
     return resolved_rows
 
 
+def _forget_saved_leagues_cache(user_id: str) -> None:
+    try:
+        redis_cache.get_redis_client().delete(redis_cache.build_cache_key("saved_leagues", user_id))
+    except Exception:
+        pass
+
+
 def _fetch_saved_leagues_cached(config: dict, access_token: str, user_id: str) -> tuple[list[dict], str]:
     cache_key = redis_cache.build_cache_key("saved_leagues", user_id)
     try:
@@ -2683,6 +2798,8 @@ def _resolve_my_roster(
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
+    if espn_leagues.is_espn_league_key(league_id):
+        return _resolve_my_espn_roster(config, access_token, user_id, league_id)
     if profile is None:
         profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
 
@@ -2708,6 +2825,34 @@ def _resolve_my_roster(
         if str(roster.get("owner_id") or "") == sleeper_user_id:
             return roster, ""
 
+    return None, "not_a_member_of_league"
+
+
+def _resolve_my_espn_roster(
+    config: dict, access_token: str, user_id: str, league_id: str
+) -> tuple[dict[str, Any] | None, str]:
+    """ESPN has no username to match on (public ESPN leagues only expose
+    team names), so the user picks their team at import time and it is
+    stored as this league's saved_leagues.roster_id. No saved row (or no
+    team on it) is `espn_team_not_selected`; a team that has since left the
+    league is `not_a_member_of_league`."""
+
+    roster_id = ""
+    if user_id:
+        saved_rows, saved_error = _fetch_saved_leagues_cached(config, access_token, user_id)
+        if not saved_error:
+            for row in saved_rows:
+                if saved_leagues.normalize_league_id(row.get("league_id")) == league_id:
+                    roster_id = str(row.get("roster_id") or row.get("team_id") or "").strip()
+                    break
+    if not roster_id:
+        return None, "espn_team_not_selected"
+    rosters = sleeper.get_rosters(league_id)
+    if not rosters:
+        return None, "league_not_found"
+    for roster in rosters:
+        if str(roster.get("roster_id") or "") == roster_id:
+            return roster, ""
     return None, "not_a_member_of_league"
 
 
@@ -8312,6 +8457,15 @@ def _build_portfolio_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
+    if espn_leagues.is_espn_league_key(league_id):
+        # Portfolio's Next Move briefing is the Dashboard engine, which ESPN
+        # leagues can't feed yet (see modules.espn_leagues).
+        return {
+            "status": "failed",
+            "league_id": league_id,
+            "league_name": league_name,
+            "reason": espn_leagues.ESPN_NOT_AVAILABLE_REASON,
+        }
     # Same fix as _resolve_my_roster: this row's OWN sleeper_username
     # (captured when this specific league was saved) over the account-wide
     # `sleeper_username` param, which only reflects whichever Sleeper
@@ -8810,6 +8964,13 @@ def _build_league_glance_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
+    if espn_leagues.is_espn_league_key(league_id):
+        return {
+            "status": "failed",
+            "league_id": league_id,
+            "league_name": league_name,
+            "reason": espn_leagues.ESPN_NOT_AVAILABLE_REASON,
+        }
     # Same fix as _resolve_my_roster/_build_portfolio_row: this row's OWN
     # sleeper_username (captured when this specific league was saved) over
     # the account-wide `sleeper_username` param, which only reflects

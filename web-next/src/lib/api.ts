@@ -187,7 +187,40 @@ export interface SaveLeagueResponse {
   ok: boolean;
   reason: string;
   cap: number;
-  league?: { league_id: string; league_name: string; is_default: boolean };
+  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" };
+}
+
+/** POST /v1/espn/leagues/preview (modules/espn_leagues.py). Public ESPN
+ * leagues only; `league.league_key` is the id POST /v1/leagues/save takes. */
+export interface EspnLeagueTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string;
+  player_count: number;
+  matched_player_count: number;
+}
+
+export interface EspnFeatureSupport {
+  feature: string;
+  status: "available" | "not_available";
+  note: string;
+}
+
+export interface EspnLeaguePreviewResponse {
+  ok: boolean;
+  reason: string;
+  message: string;
+  league?: { league_key: string; espn_league_id: string; season: string; name: string; team_count: number };
+  teams?: EspnLeagueTeam[];
+  diagnostics?: {
+    teams_found: number;
+    total_espn_players_seen: number;
+    canonical_matched_count: number;
+    unmatched_count: number;
+    matched_rate: number;
+    unmatched_examples: Array<{ name: string; position: string; team: string }>;
+  };
+  features?: EspnFeatureSupport[];
 }
 
 export interface MyRosterResponse {
@@ -2532,7 +2565,14 @@ export const api = {
       `/v1/sleeper/leagues?username=${encodeURIComponent(username)}`,
     ),
 
-  saveLeague: (input: { leagueId: string; sleeperUsername?: string; leagueName?: string; makeDefault?: boolean }) =>
+  saveLeague: (input: {
+    leagueId: string;
+    sleeperUsername?: string;
+    leagueName?: string;
+    makeDefault?: boolean;
+    /** ESPN leagues only: the team the user picked as theirs. */
+    rosterId?: string;
+  }) =>
     authorizedRequest<SaveLeagueResponse>("/v1/leagues/save", {
       method: "POST",
       jsonBody: {
@@ -2540,7 +2580,14 @@ export const api = {
         sleeper_username: input.sleeperUsername ?? "",
         league_name: input.leagueName ?? "",
         make_default: input.makeDefault ?? false,
+        roster_id: input.rosterId ?? "",
       },
+    }),
+
+  previewEspnLeague: (leagueId: string, season: number) =>
+    authorizedRequest<EspnLeaguePreviewResponse>("/v1/espn/leagues/preview", {
+      method: "POST",
+      jsonBody: { league_id: leagueId, season },
     }),
 
   // coridian_, 2026-10-19: "need a way once signed in to add more leauges

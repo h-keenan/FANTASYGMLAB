@@ -220,8 +220,13 @@ def test_real_public_player_snapshot_is_field_for_field_equivalent(tmp_path):
     )
 
 
-def test_missing_or_failed_snapshot_uses_existing_hydration_fallback():
+def test_missing_or_failed_snapshot_uses_existing_hydration_fallback(tmp_path):
     source = _hydrated_frame()
+    # Under tmp_path, not the repo root: hydration writes a
+    # "<db>.universe-meta.json" sidecar next to the db path, which otherwise
+    # lands in the working directory and fails test_repository_root_hygiene
+    # whenever the two tests share an xdist worker.
+    db_path = str(tmp_path / "missing-fixture.db")
     with patch(
         "modules.rankings._load_players_from_snapshot",
         return_value=None,
@@ -231,9 +236,9 @@ def test_missing_or_failed_snapshot_uses_existing_hydration_fallback():
     ) as fallback, patch(
         "modules.rankings._save_players_snapshot",
     ) as save:
-        loaded = rankings._load_players_uncached("missing-fixture.db")
+        loaded = rankings._load_players_uncached(db_path)
 
-    fallback.assert_called_once_with("missing-fixture.db")
+    fallback.assert_called_once_with(db_path)
     save.assert_called_once()
     # Hydration now appends the canonical valuation-provenance contract even
     # when the source snapshot itself does not carry those derived columns.

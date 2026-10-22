@@ -13281,7 +13281,7 @@ def test_save_league_makes_a_first_league_the_default(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert body["league"] == {"league_id": "first", "league_name": "Dynasty", "is_default": True}
+    assert body["league"] == {"league_id": "first", "league_name": "Dynasty", "is_default": True, "platform": "sleeper"}
     assert mock_post.call_args.kwargs["json"]["sleeper_username"] == "gm_dynasty"
 
 

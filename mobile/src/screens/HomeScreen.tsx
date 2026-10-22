@@ -28,6 +28,9 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
+import EspnLeagueImport from '../components/EspnLeagueImport';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -74,6 +77,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [addBusy, setAddBusy] = useState(false);
   const [addOptions, setAddOptions] = useState<SleeperLeagueOption[] | null>(null);
   const [addMessage, setAddMessage] = useState<string | null>(null);
+  // Which platform the Add League sheet is importing from. Sleeper is the
+  // default; ESPN is EspnLeagueImport (public leagues, a subset of
+  // features — see lib/leaguePlatform.ts).
+  const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn'>('sleeper');
   // Fix (welcome audit, tester feedback "I don't even know where to start"):
   // a brand-new user with no existing Sleeper account/league has no path
   // forward on this screen otherwise — this toggles the honest "we don't
@@ -115,6 +122,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const closeAddLeague = () => {
     setAddOpen(false);
+    setAddPlatform('sleeper');
     setAddQuery('');
     setAddOptions(null);
     setAddMessage(null);
@@ -200,6 +208,21 @@ export default function HomeScreen({ navigation }: Props) {
   // purely numeric entry skips the username lookup and saves directly.
   const looksLikeLeagueId = (value: string) => /^\d{6,}$/.test(value);
 
+  const capMessageFor = (cap: number) =>
+    cap === 1
+      ? 'Your plan keeps 1 saved league. Upgrade to Premium to manage all of your leagues here.'
+      : `Your plan keeps ${cap} saved leagues. Upgrade to Premium to manage all of your leagues here.`;
+
+  // Dashboard for Sleeper leagues, My Team for ESPN leagues (which have no
+  // Dashboard yet — lib/leaguePlatform.ts).
+  const openLeague = (leagueId: string, leagueName: string) => {
+    if (isEspnLeagueId(leagueId)) {
+      navigation.navigate('MyTeam', { leagueId, leagueName });
+    } else {
+      navigation.navigate('Dashboard', { leagueId, leagueName });
+    }
+  };
+
   const saveLeague = async (input: { leagueId: string; leagueName?: string; username?: string }) => {
     setAddBusy(true);
     setAddMessage(null);
@@ -235,11 +258,7 @@ export default function HomeScreen({ navigation }: Props) {
         // Not an error state: the plan's league limit. Swap the picker for
         // the same upgrade card every other withheld-content surface uses.
         setAddOptions(null);
-        setAddCapMessage(
-          result.cap === 1
-            ? 'Your plan keeps 1 saved league. Upgrade to Premium to manage all of your leagues here.'
-            : `Your plan keeps ${result.cap} saved leagues. Upgrade to Premium to manage all of your leagues here.`,
-        );
+        setAddCapMessage(capMessageFor(result.cap));
         return;
       }
       setAddMessage(
@@ -335,10 +354,7 @@ export default function HomeScreen({ navigation }: Props) {
         leagues.find((league) => league.is_default) ??
         null;
       if (target) {
-        navigation.navigate('Dashboard', {
-          leagueId: target.league_id,
-          leagueName: target.league_name || 'League',
-        });
+        openLeague(target.league_id, target.league_name || 'League');
       }
     })();
   }, [leagues, navigation]);
@@ -413,12 +429,7 @@ export default function HomeScreen({ navigation }: Props) {
               {defaultLeague ? (
                 <AnimatedCard
                   style={styles.quickActionPrimary}
-                  onPress={() =>
-                    navigation.navigate('Dashboard', {
-                      leagueId: defaultLeague.league_id,
-                      leagueName: defaultLeague.league_name || 'League',
-                    })
-                  }
+                  onPress={() => openLeague(defaultLeague.league_id, defaultLeague.league_name || 'League')}
                 >
                   <View style={styles.quickActionPrimaryRow}>
                     <Ionicons name="grid-outline" size={16} color={colors.accentSoft} />
@@ -522,12 +533,7 @@ export default function HomeScreen({ navigation }: Props) {
                 isLast && styles.leagueRowLast,
                 !isLast && styles.leagueRowDivider,
               ]}
-              onPress={() =>
-                navigation.navigate('Dashboard', {
-                  leagueId: item.league_id,
-                  leagueName: item.league_name || 'League',
-                })
-              }
+              onPress={() => openLeague(item.league_id, item.league_name || 'League')}
             >
               <IconCircle name="shield-outline" color={colors.accent} size={36} iconSize={17} style={styles.leagueIcon} />
               <View style={styles.leagueTextGroup}>
@@ -567,6 +573,40 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.renameBackdrop}>
           <View style={styles.renameCard}>
             <AppText style={styles.renameTitle}>Add a league</AppText>
+            <View style={styles.platformTabs}>
+              <SegmentedTabBar<'sleeper' | 'espn'>
+                options={[
+                  { key: 'sleeper', label: 'Sleeper' },
+                  { key: 'espn', label: 'ESPN' },
+                ]}
+                active={addPlatform}
+                onChange={(platform) => {
+                  setAddPlatform(platform);
+                  setAddMessage(null);
+                  setAddCapMessage(null);
+                }}
+              />
+            </View>
+            {addPlatform === 'espn' ? (
+              addCapMessage ? (
+                <View style={styles.capLockInModal}>
+                  <PremiumLock title="League limit reached" description={addCapMessage} />
+                </View>
+              ) : (
+                <EspnLeagueImport
+                  onCancel={closeAddLeague}
+                  onCapReached={(cap) => setAddCapMessage(capMessageFor(cap))}
+                  onSaved={(leagueId, leagueName) => {
+                    autoNavigated.current = true;
+                    closeAddLeague();
+                    void load();
+                    // ESPN leagues have no Dashboard yet (lib/leaguePlatform.ts).
+                    navigation.navigate('MyTeam', { leagueId, leagueName });
+                  }}
+                />
+              )
+            ) : (
+            <>
             <AppText style={styles.renameHint}>
               Enter your Sleeper username to pick from your leagues — or paste a league ID directly.
             </AppText>
@@ -693,6 +733,8 @@ export default function HomeScreen({ navigation }: Props) {
                 )}
               </TouchableOpacity>
             </View>
+            </>
+            )}
           </View>
         </View>
       </Modal>
@@ -821,6 +863,7 @@ function createStyles(colors: ThemeColors) {
   capLock: { marginBottom: spacing.sm },
   glanceTeaser: { marginTop: spacing.xl },
   capLockInModal: { marginTop: spacing.md },
+  platformTabs: { marginBottom: spacing.md },
   addError: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
   noLeagueToggle: {
     flexDirection: 'row',

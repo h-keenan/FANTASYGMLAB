@@ -18,6 +18,7 @@ import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSa
 import { composePortfolio, type PortfolioLeagueState } from '../lib/portfolioProgress';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
+import { ESPN_NOT_SUPPORTED, glanceEspnNote } from '../lib/leaguesGlance';
 import { queryKeys } from '../lib/queryKeys';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -165,7 +166,12 @@ export default function PortfolioScreen() {
   // league gone, Sleeper down). Split the two so a drafting league gets a
   // calm, informational note instead.
   const draftingLeagues = composed.failedLeagues.filter((league) => league.reason === 'empty_roster');
-  const realFailedLeagues = composed.failedLeagues.filter((league) => league.reason !== 'empty_roster');
+  // ESPN leagues have no Portfolio summary yet (modules/espn_leagues.py) —
+  // informational, not a failure.
+  const espnNote = glanceEspnNote(composed.failedLeagues);
+  const realFailedLeagues = composed.failedLeagues.filter(
+    (league) => league.reason !== 'empty_roster' && league.reason !== ESPN_NOT_SUPPORTED,
+  );
   const rows = composed.rows;
 
   if (rows.length === 0 && composed.failedLeagues.length === 0) {
@@ -209,6 +215,12 @@ export default function PortfolioScreen() {
             </View>
             {draftingLeagues.length > 0 ? (
               <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} />
+            ) : null}
+            {espnNote ? (
+              <View style={styles.failedNote}>
+                <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} style={styles.failedNoteIcon} />
+                <AppText style={styles.failedNoteText}>{espnNote}</AppText>
+              </View>
             ) : null}
             {realFailedLeagues.length > 0 ? (
               <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} />

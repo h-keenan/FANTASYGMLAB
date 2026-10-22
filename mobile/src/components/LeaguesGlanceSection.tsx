@@ -14,6 +14,7 @@ import { setLastLeague } from '../lib/lastLeague';
 import {
   glanceDestination,
   glanceDraftingNote,
+  glanceEspnNote,
   glanceFailedNote,
   glanceLayout,
   glanceNewsBadge,
@@ -138,6 +139,7 @@ export default function LeaguesGlanceSection({
   const layout = glanceLayout(cards.length);
   const failedNote = glanceFailedNote(data?.failed_leagues ?? []);
   const draftingNote = glanceDraftingNote(data?.failed_leagues ?? []);
+  const espnNote = glanceEspnNote(data?.failed_leagues ?? []);
 
   return (
     <View style={styles.section}>
@@ -167,6 +169,12 @@ export default function LeaguesGlanceSection({
             <View style={styles.failedNote}>
               <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
               <AppText style={styles.failedNoteText}>{draftingNote}</AppText>
+            </View>
+          ) : null}
+          {espnNote ? (
+            <View style={styles.failedNote}>
+              <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} />
+              <AppText style={styles.failedNoteText}>{espnNote}</AppText>
             </View>
           ) : null}
           {failedNote ? (

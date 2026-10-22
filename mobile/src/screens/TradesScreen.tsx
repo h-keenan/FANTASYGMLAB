@@ -13,6 +13,7 @@ import TradeAnalyzerScreen from './TradeAnalyzerScreen';
 import TradeFinderScreen from './TradeFinderScreen';
 import TradeHubScreen from './TradeHubScreen';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -49,10 +50,14 @@ export default function TradesScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [activeTab, setActiveTab] = useState<TradesTab>(initialTab ?? 'block');
-  const [visitedTabs, setVisitedTabs] = useState<Set<TradesTab>>(
-    () => new Set<TradesTab>([initialTab ?? 'block']),
-  );
+  // ESPN leagues (lib/leaguePlatform.ts) only have Trade Analyzer: Trade
+  // Block and Search need Sleeper-only league data, so their tabs aren't
+  // offered at all rather than opening onto an error.
+  const espn = isEspnLeagueId(leagueId);
+  const tabOptions = espn ? TAB_OPTIONS.filter((option) => option.key === 'make') : TAB_OPTIONS;
+  const firstTab: TradesTab = espn ? 'make' : (initialTab ?? 'block');
+  const [activeTab, setActiveTab] = useState<TradesTab>(firstTab);
+  const [visitedTabs, setVisitedTabs] = useState<Set<TradesTab>>(() => new Set<TradesTab>([firstTab]));
 
   const onChangeTab = useCallback((tab: TradesTab) => {
     setActiveTab(tab);
@@ -67,7 +72,7 @@ export default function TradesScreen({ route, navigation }: Props) {
         <View style={styles.headerButtonRow}>
           <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
+          {espn ? null : <GmStanceHeaderButton leagueId={leagueId} />}
           {/* Same Trade History affordance Trade Hub used to carry on its own
               header (discoverability audit, 2026-09-26) — now lives on the
               shared Trades header instead of just one of the three tabs. */}
@@ -83,14 +88,14 @@ export default function TradesScreen({ route, navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, leagueId, leagueName, colors.textSecondary]);
+  }, [navigation, leagueId, leagueName, colors.textSecondary, espn]);
 
   return (
     <View style={styles.root}>
       <View style={[styles.topSection, { paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <View style={styles.tabBarWrap}>
-          <SegmentedTabBar<TradesTab> options={TAB_OPTIONS} active={activeTab} onChange={onChangeTab} />
+          <SegmentedTabBar<TradesTab> options={tabOptions} active={activeTab} onChange={onChangeTab} />
         </View>
       </View>
       <View style={styles.contentArea}>

@@ -21,6 +21,11 @@ export function notReadyReasonMessage(
   reason: string,
   copy: { linkAccount: string; emptyRoster?: string },
 ): string | null {
+  // ESPN leagues (modules/espn_leagues.py) know "my roster" from the team
+  // picked at import, not a Sleeper link.
+  if (reason === "espn_team_not_selected") {
+    return "We don't know which team is yours in this ESPN league. Add it again from Add a league and pick your team.";
+  }
   if (LEAGUE_LINK_REASONS.has(reason)) return copy.linkAccount;
   if (reason === "empty_roster" && copy.emptyRoster) return copy.emptyRoster;
   if (reason === "no_player_data") {

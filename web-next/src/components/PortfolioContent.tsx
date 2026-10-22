@@ -179,6 +179,34 @@ function DraftingLeaguesNote({ leagues }: { leagues: PortfolioFailedLeague[] }) 
   );
 }
 
+/** ESPN leagues (reason "espn_not_supported", modules/espn_leagues.py) have no
+ * Portfolio summary yet. Not a failure, so not in FailedLeaguesNote's
+ * "Couldn't load / Not your league? Remove" list. */
+function EspnLeaguesNote({ leagues }: { leagues: PortfolioFailedLeague[] }) {
+  return (
+    <div
+      className="flex flex-col gap-1.5 px-3 py-2 text-sm"
+      style={{ background: "var(--color-surface-muted)", border: "var(--border-width-default) solid var(--color-border)" }}
+    >
+      <span style={{ color: "var(--color-text-secondary)" }}>
+        Portfolio isn&apos;t available for ESPN leagues yet. Open them from My Team instead.
+      </span>
+      {leagues.map((league) => (
+        <div key={league.league_id} className="flex items-center justify-between gap-2">
+          <span style={{ color: "var(--color-text-secondary)" }}>{league.league_name}</span>
+          <Link
+            href={`/my-team/${encodeURIComponent(league.league_id)}?name=${encodeURIComponent(league.league_name)}`}
+            className="text-xs font-bold whitespace-nowrap"
+            style={{ color: "var(--color-accent)" }}
+          >
+            Open My Team →
+          </Link>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FailedLeaguesNote({
   leagues,
   busyLeagueId,
@@ -354,7 +382,10 @@ export function PortfolioContent({
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
   const allFailedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
   const draftingLeagues = allFailedLeagues.filter((league) => league.reason === "empty_roster");
-  const failedLeagues = allFailedLeagues.filter((league) => league.reason !== "empty_roster");
+  const espnLeagues = allFailedLeagues.filter((league) => league.reason === "espn_not_supported");
+  const failedLeagues = allFailedLeagues.filter(
+    (league) => league.reason !== "empty_roster" && league.reason !== "espn_not_supported",
+  );
 
   const removeFailedLeague = (leagueId: string) => {
     setBusyLeagueId(leagueId);
@@ -406,6 +437,8 @@ export function PortfolioContent({
       </header>
 
       {draftingLeagues.length > 0 ? <DraftingLeaguesNote leagues={draftingLeagues} /> : null}
+
+      {espnLeagues.length > 0 ? <EspnLeaguesNote leagues={espnLeagues} /> : null}
 
       {failedLeagues.length > 0 ? (
         <FailedLeaguesNote leagues={failedLeagues} busyLeagueId={busyLeagueId} onRemove={removeFailedLeague} />
