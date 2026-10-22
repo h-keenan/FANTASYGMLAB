@@ -19,6 +19,8 @@ import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { BRAND_NAME } from "@/lib/brand";
+import { shareImageOrText } from "@/lib/shareImage";
 
 /**
  * Player Profile — the real, full "Open Profile" destination
@@ -80,14 +82,51 @@ function StatsTab({ stats }: { stats: QuickViewStats | null }) {
   );
 }
 
+/** Shares the branded player card PNG (app/share-card/player) through the
+ * same image -> text -> clipboard flow as Trade Hub's Share button. */
+function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; leagueId: string; lens: string }) {
+  const [preparing, setPreparing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const name = player.name || `Player ${player.player_id}`;
+
+  const onShare = async () => {
+    const facts = [
+      player.position && player.position_rank ? `${player.position}${player.position_rank}` : player.position,
+      player.overall_rank ? `#${player.overall_rank} overall` : null,
+      player.score != null ? `${Math.round(player.score).toLocaleString("en-US")} value` : null,
+    ].filter(Boolean);
+    const outcome = await shareImageOrText({
+      fetchImage: () => api.getPlayerShareCardBlob(leagueId, player.player_id, lens),
+      filename: `fantasydesk-player-${player.player_id}.png`,
+      text: `${name}${facts.length ? ` · ${facts.join(" · ")}` : ""} on ${BRAND_NAME}`,
+      title: `${name} on ${BRAND_NAME}`,
+      onPreparingImage: setPreparing,
+    });
+    if (outcome === "copied") {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button type="button" className="pqv-action-link" onClick={onShare} disabled={preparing}>
+      {preparing ? "Preparing…" : copied ? "Copied!" : "Share card"}
+    </button>
+  );
+}
+
 export function PlayerProfileContent({
   player,
   leagueId,
   leagueName,
+  lens = "Dynasty",
 }: {
   player: RankedPlayer;
   leagueId: string;
   leagueName: string;
+  /** The valuation lens the page's rankings were loaded under, so the
+   * share card shows the same value. */
+  lens?: string;
 }) {
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
@@ -208,6 +247,7 @@ export function PlayerProfileContent({
           playerId={player.player_id}
           sourceSurface="player_profile"
         />
+        <SharePlayerButton player={player} leagueId={leagueId} lens={lens} />
         <a
           className="pqv-action-link"
           href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}

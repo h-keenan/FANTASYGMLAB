@@ -8,6 +8,7 @@ import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
+import { shareImageOrText } from "@/lib/shareImage";
 import {
   LOW_CONFIDENCE_USER_NOTE,
   categoryColor,
@@ -24,13 +25,10 @@ import {
 } from "@/lib/tradeHubPresentation";
 
 /**
- * Shares a branded PNG (modules.share_card_renderer — QR code to the site,
- * FantasyDesk branding — the same mature pipeline the legacy Streamlit app
- * already uses for its player-quick-view share card) via the Files-capable
- * Web Share API when this idea/league/browser supports it. Falls back to
- * the original text-only navigator.share, then a clipboard copy, for any
- * idea/browser/OS that can't produce or share a file — never regresses the
- * prior text-only behavior.
+ * Shares the branded trade card PNG (app/share-card/trade, drawn by
+ * web-next from the app's design tokens) via the Files-capable Web Share
+ * API when this idea/league/browser supports it, falling back to the text
+ * share, then a clipboard copy (lib/shareImage).
  */
 export function ShareTradeButton({
   idea,
@@ -58,67 +56,23 @@ export function ShareTradeButton({
     void api.recordTradeShare(leagueId, tradeIdeaShareRecord(idea, lens)).catch(() => {});
   };
 
-  const shareTextOnly = async (text: string, title: string) => {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ text, title });
-        recordShare();
-        return;
-      } catch {
-        // User cancelled the share sheet, or the platform rejected it —
-        // either way, fall through to clipboard so the action never just
-        // silently does nothing.
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      recordShare();
+  const onShare = async () => {
+    const recommendationId = idea.recommendation_id;
+    const outcome = await shareImageOrText({
+      fetchImage:
+        leagueId && recommendationId
+          ? () => api.getTradeHubIdeaShareCardBlob(leagueId, recommendationId, strategy, lens)
+          : undefined,
+      filename: `fantasydesk-trade-${recommendationId ?? "idea"}.png`,
+      text: tradeIdeaShareText(idea),
+      title: `Trade idea vs. ${idea.partner_team_name}`,
+      onPreparingImage: setPreparingImage,
+    });
+    if (outcome === "shared-image" || outcome === "shared-text" || outcome === "copied") recordShare();
+    if (outcome === "copied") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // No Share API and no clipboard permission — nothing more to do.
     }
-  };
-
-  const onShare = async () => {
-    const text = tradeIdeaShareText(idea);
-    const title = `Trade idea vs. ${idea.partner_team_name}`;
-
-    const filesCapable =
-      typeof navigator !== "undefined" &&
-      typeof navigator.share === "function" &&
-      typeof navigator.canShare === "function";
-
-    if (filesCapable && leagueId && idea.recommendation_id) {
-      setPreparingImage(true);
-      try {
-        const blob = await api.getTradeHubIdeaShareCardBlob(leagueId, idea.recommendation_id, strategy, lens);
-        const file = new File([blob], `fantasydesk-trade-${idea.recommendation_id}.png`, {
-          type: "image/png",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text, title });
-          recordShare();
-          setPreparingImage(false);
-          return;
-        }
-        // This browser/OS can share text but rejected this file — fall
-        // through to the text-only path below rather than erroring.
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          // User cancelled the native share sheet — a deliberate no-op,
-          // not a failure to fall back from.
-          setPreparingImage(false);
-          return;
-        }
-        // The PNG fetch failed (network, 404 on a stale recommendation_id,
-        // etc.) or the platform otherwise rejected the file share — fall
-        // through to the existing text-only path, same as always.
-      }
-      setPreparingImage(false);
-    }
-
-    await shareTextOnly(text, title);
   };
 
   return (
