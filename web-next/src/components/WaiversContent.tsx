@@ -16,6 +16,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import {
   confidenceColor,
+  faabIsBid,
   faabRangeText,
   formatWaiverScore,
   freeAgentContextLine,
@@ -80,11 +81,12 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
 
 function FaabRange({ player, prominent = false }: { player: WaiverPriorityAdd; prominent?: boolean }) {
   const { primary, secondary } = faabRangeText(player.faab);
+  const isBid = faabIsBid(player.faab);
   return (
-    <div className="flex flex-col items-end gap-0.5">
+    <div className="flex flex-col items-end gap-0.5" title={player.faab?.why || undefined}>
       <span
         className={prominent ? "text-lg font-extrabold" : "text-sm font-bold"}
-        style={{ color: "var(--color-success)" }}
+        style={{ color: isBid ? "var(--color-success)" : "var(--color-text-secondary)" }}
       >
         {primary}
       </span>
@@ -124,6 +126,12 @@ function PriorityAddPrimaryCard({ player }: { player: WaiverPriorityAdd }) {
         </div>
         <FaabRange player={player} prominent />
       </div>
+      {player.faab?.why ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          <span className="font-bold">Why: </span>
+          {player.faab.why}
+        </p>
+      ) : null}
       <BeginnerHelp term="waiverValue" />
       {player.confidence_label ? (
         <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
@@ -323,6 +331,14 @@ export function WaiversContent({
             label={copy.label("yourFaab", "Your FAAB")}
             value={`$${data.faab_remaining}`}
             note={copy.help("faab") ?? undefined}
+            wrapNote
+          />
+        ) : null}
+        {data.faab_enabled === false ? (
+          <SnapshotTile
+            label="Waivers"
+            value={data.waiver_mode === "reverse_standings" ? "Reverse standings" : "Rolling"}
+            note="This league doesn't use FAAB — claims follow waiver priority, no bids."
             wrapNote
           />
         ) : null}

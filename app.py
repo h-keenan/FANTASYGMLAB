@@ -115,6 +115,7 @@ from modules.faab import (
     recommend_faab_guidance,
     format_faab_block_html,
     sleeper_faab_budget_context,
+    sleeper_waiver_mode,
 )
 from modules.feedback import (
     append_feedback_report,
@@ -19522,6 +19523,9 @@ def main():
                     waiver_rosters,
                     roster_id=my_roster_id,
                 )
+                # Sleeper settings.waiver_type: non-FAAB leagues get claim
+                # guidance, never dollar bids (modules/faab.py).
+                st.session_state["faab_waiver_mode"] = sleeper_waiver_mode(waiver_league)
                 waiver_faab_key = f"faab_remaining_budget_{selected_league_id}"
                 if waiver_faab_context.remaining is not None:
                     st.session_state[waiver_faab_key] = waiver_faab_context.remaining
@@ -19890,6 +19894,10 @@ def main():
                         st.caption("Use this after choosing a bid target from the priority adds or secondary waiver board.")
                         if not selected_league_id:
                             st.info("Select a league before using the FAAB helper.")
+                        elif st.session_state.get("faab_waiver_mode") in {"rolling", "reverse_standings"}:
+                            st.info(
+                                "This league doesn't use FAAB — claims follow waiver priority, so there is no bid to size."
+                            )
                         else:
                             faab_injury_positions = set(free_agent_injury_positions)
                             faab_injured_starters = int(free_agent_injured_starters or 0)
