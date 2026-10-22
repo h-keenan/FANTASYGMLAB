@@ -12476,6 +12476,60 @@ def test_matchup_response_carries_a_live_win_probability(monkeypatch):
     assert win_probability["coverage"] == {"my": 1.0, "opponent": 1.0}
 
 
+def test_matchup_win_probability_treats_an_in_progress_game_as_partial_not_final(monkeypatch):
+    """Both starters project 20 +/- 5. Mine kicked off 5 minutes ago and has
+    0.4 real points; the opponent's hasn't kicked off. The old model froze my
+    0.4 as a final score (probability ~0). Now each real starter row carries
+    its game's kickoff/final state and mine is 0.4 + ~97% of his projection,
+    so the matchup stays close to even."""
+
+    from datetime import datetime, timedelta, timezone
+
+    from modules import player_projections
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [0.4], "points": 0.4},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [0.0], "points": 0.0},
+    ]
+    fake_projection = {
+        "status": "ok",
+        "point_estimate": 20.0,
+        "low": 15.0,
+        "high": 25.0,
+        "confidence": "high",
+        "opponent": "BUF",
+    }
+    kickoff = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+
+    with _matchup_world(matchups):
+        with patch("modules.sleeper.get_players", return_value={}):
+            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                with patch.object(player_projections, "team_defense_points_allowed_by_position", return_value={}):
+                    with patch.object(player_projections, "project_player_week", return_value=fake_projection):
+                        with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
+                            with patch(
+                                "modules.nfl_schedule.team_matchup_for_week",
+                                return_value={"week": 5, "opponent": "BUF", "kickoff_at": kickoff, "played": False},
+                            ):
+                                with patch(
+                                    "modules.nfl_schedule.game_has_started", side_effect=[True, False]
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                                    )
+
+    body = response.json()
+    mine = body["my_team"]["real_starters"][0]
+    assert mine["game_started"] is True
+    assert mine["game_final"] is False
+    assert mine["game_kickoff_at"] == kickoff
+    win_probability = body["win_probability"]
+    assert win_probability["available"] is True
+    assert 0.45 < win_probability["probability"] < 0.55
+    assert win_probability["my_projected_total"] > 19.0
+
+
 def test_matchup_win_probability_is_honestly_unavailable_before_real_lineups_lock(monkeypatch):
     """Neither side has a real lineup yet (has_live_data false on both) —
     `win_probability` is honestly unavailable, never a guessed 50/50."""

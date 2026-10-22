@@ -898,6 +898,11 @@ export interface MatchupRealStarter {
    * when the signal isn't available (no resolvable team, bye, schedule
    * fetch hiccup) — treat as unknown, never as "started". */
   game_started: boolean | null;
+  /** True once nflverse has a final score for this player's game. Null when
+   * unknown. Used by the live win probability. */
+  game_final?: boolean | null;
+  /** Real kickoff instant (ISO-8601 UTC) for this player's game, or null. */
+  game_kickoff_at?: string | null;
 }
 
 export interface MatchupSide {
