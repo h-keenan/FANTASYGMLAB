@@ -496,8 +496,23 @@ def _warm_players_cache_at_startup() -> None:
     executor.shutdown(wait=False)
 
 
+def _enable_background_sleeper_players_refresh() -> None:
+    """Serve an aged sleeper_players.json while one thread re-downloads it.
+
+    Before this, the first request after the 5-minute TTL lapsed downloaded
+    Sleeper's ~16MB dump inline (in every worker that hit it). Same test
+    gate as _maybe_schedule_players_refresh: a background thread making
+    live requests.get calls would collide with tests' requests mocks.
+    """
+
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DYNASTYGM_TEST_MODE"):
+        return
+    sleeper.PLAYERS_BACKGROUND_REFRESH = True
+
+
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
+    _enable_background_sleeper_players_refresh()
     _warm_players_cache_at_startup()
     yield
 

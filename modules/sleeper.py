@@ -9,6 +9,7 @@ from urllib.parse import quote
 import requests
 
 from modules import performance
+from modules.file_lock import ExclusiveFileLock
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 PLAYERS_CACHE_PATH = "data/sleeper_players.json"
@@ -597,8 +598,8 @@ def normalize_username(username: str) -> str:
 
 
 def _ensure_data_dir():
-    if not os.path.exists("data"):
-        os.makedirs("data")
+    # exist_ok: several worker processes can get here at the same moment.
+    os.makedirs("data", exist_ok=True)
 
 
 def _provider_category(label: str) -> str:
@@ -789,6 +790,210 @@ _season_stats_memo_mtime_ns: Dict[str, int] = {}
 _season_stats_memo_has_weekly: Dict[str, bool] = {}
 
 
+# Cross-process single flight for the ~16MB players dump: every mobile-API
+# worker and the players.db rebuild subprocess share one
+# data/sleeper_players.json, so refreshes take an flock on a sibling
+# ``<cache>.lock`` (modules.file_lock). Without flock (Windows dev) the
+# atomic replace below still keeps readers safe; only the dedupe is lost.
+
+# How long a synchronous caller (missing cache file, or refresh=True) waits
+# for another process's in-flight download before fetching itself. Covers the
+# 20s request timeout plus parse/write time.
+PLAYERS_REFRESH_LOCK_WAIT_SECONDS = 30.0
+# After a failed background download, don't re-attempt on every request.
+PLAYERS_BACKGROUND_REFRESH_FAILURE_COOLDOWN_SECONDS = 30.0
+# Long-lived servers opt in (services/mobile_api_service.py): an aged cache is
+# then served as-is while one background thread re-downloads it, so a request
+# never waits on Sleeper for this. Off by default because one-shot scripts
+# (e.g. scripts/sync_injury_status.py) exit before a daemon thread finishes
+# and so must keep the synchronous refresh-on-stale behavior.
+PLAYERS_BACKGROUND_REFRESH = False
+
+_players_bg_guard = threading.Lock()
+_players_bg_in_flight = False
+_players_bg_last_failure_mono = 0.0
+
+
+def _players_refresh_lock(*, wait_seconds: float) -> ExclusiveFileLock:
+    return ExclusiveFileLock(f"{PLAYERS_CACHE_PATH}.lock", wait_seconds=wait_seconds)
+
+
+def _players_cache_mtime_ns() -> int:
+    try:
+        return int(os.stat(PLAYERS_CACHE_PATH).st_mtime_ns)
+    except OSError:
+        return -1
+
+
+def _players_cache_is_fresh() -> bool:
+    try:
+        return (time.time() - os.path.getmtime(PLAYERS_CACHE_PATH)) < PLAYERS_CACHE_TTL_SECONDS
+    except OSError:
+        return False
+
+
+def _read_players_cache_file(*, label: str) -> Optional[Dict[str, Any]]:
+    """Memo-aware read of the on-disk dump; None when missing/unreadable."""
+
+    global _players_memo, _players_memo_mtime_ns
+    mtime_ns = _players_cache_mtime_ns()
+    if mtime_ns == -1:
+        return None
+    with _players_memo_lock:
+        if _players_memo is not None and mtime_ns == _players_memo_mtime_ns:
+            _note_provider_timing("sleeper_players_memo", 0.0, cache_status="hit")
+            return _players_memo
+    try:
+        with open(PLAYERS_CACHE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    _note_provider_timing(label, 0.0, cache_status="hit")
+    with _players_memo_lock:
+        _players_memo = data
+        _players_memo_mtime_ns = mtime_ns
+    return data
+
+
+def _write_players_cache_atomically(players: Dict[str, Any]) -> None:
+    """Write to a sibling temp file, then ``os.replace`` it into place.
+
+    The old in-place ``open(path, "w")`` truncated the live file first, so a
+    concurrent reader (another worker, or the players.db rebuild) could parse
+    an empty or half-written dump. ``os.replace`` is atomic on POSIX and
+    Windows: readers see either the old file or the complete new one.
+    """
+
+    global _players_memo, _players_memo_mtime_ns
+    directory = os.path.dirname(os.path.abspath(PLAYERS_CACHE_PATH))
+    tmp_path = os.path.join(
+        directory,
+        f".{os.path.basename(PLAYERS_CACHE_PATH)}.{os.getpid()}.{threading.get_ident()}.tmp",
+    )
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(players, f)
+        os.replace(tmp_path, PLAYERS_CACHE_PATH)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+    fresh_mtime_ns = _players_cache_mtime_ns()
+    with _players_memo_lock:
+        _players_memo = players
+        _players_memo_mtime_ns = fresh_mtime_ns
+
+
+def _download_players() -> Dict[str, Any]:
+    """Fetch the dump and persist it atomically. Raises on fetch failure."""
+
+    url = f"{SLEEPER_BASE}/players/nfl"
+    started = time.perf_counter()
+    try:
+        with performance.time_block("sleeper_players_fetch", category="sleeper"):
+            resp = requests.get(url, timeout=20)
+            resp.raise_for_status()
+            players = resp.json()
+    except Exception:
+        _note_provider_timing(
+            "sleeper_players_fetch",
+            (time.perf_counter() - started) * 1000.0,
+            cache_status="error",
+        )
+        raise
+    if not isinstance(players, dict) or not players:
+        # Never replace a good dump with an empty/garbage one; callers fall
+        # back to the existing file (or {} when there is none, as before).
+        _note_provider_timing(
+            "sleeper_players_fetch",
+            (time.perf_counter() - started) * 1000.0,
+            cache_status="error",
+        )
+        raise ValueError("Sleeper players dump was empty or not an object")
+    try:
+        _write_players_cache_atomically(players)
+    except Exception:
+        pass
+    _note_provider_timing(
+        "sleeper_players_fetch",
+        (time.perf_counter() - started) * 1000.0,
+        cache_status="miss",
+    )
+    return players
+
+
+def _refresh_players_blocking() -> Dict[str, Any]:
+    """Synchronous single-flight refresh (missing cache or ``refresh=True``).
+
+    Waits for another process's in-flight download instead of starting a
+    second one; if that download replaced the file while we waited, its
+    result is used (it is newer than this call). Waiting past
+    ``PLAYERS_REFRESH_LOCK_WAIT_SECONDS`` fails open to fetching directly.
+    """
+
+    observed_mtime_ns = _players_cache_mtime_ns()
+    try:
+        with _players_refresh_lock(wait_seconds=PLAYERS_REFRESH_LOCK_WAIT_SECONDS):
+            current_mtime_ns = _players_cache_mtime_ns()
+            if current_mtime_ns != -1 and current_mtime_ns != observed_mtime_ns:
+                fresh = _read_players_cache_file(label="sleeper_players_disk")
+                if fresh is not None:
+                    return fresh
+            return _download_players()
+    except Exception:
+        fallback = _read_players_cache_file(label="sleeper_players_disk")
+        return fallback if fallback is not None else {}
+
+
+def _background_players_refresh_worker() -> None:
+    global _players_bg_in_flight, _players_bg_last_failure_mono
+    failed = False
+    try:
+        with _players_refresh_lock(wait_seconds=0.0) as lock:
+            # Lock held elsewhere: that process is already downloading and
+            # will replace the file, so this one has nothing to do.
+            if lock.acquired and not _players_cache_is_fresh():
+                _download_players()
+    except Exception:
+        failed = True
+    finally:
+        with _players_bg_guard:
+            _players_bg_in_flight = False
+            if failed:
+                _players_bg_last_failure_mono = time.monotonic()
+
+
+def _schedule_background_players_refresh() -> bool:
+    """Start at most one background download per process; never blocks."""
+
+    global _players_bg_in_flight
+    with _players_bg_guard:
+        if _players_bg_in_flight:
+            return False
+        if (
+            _players_bg_last_failure_mono
+            and time.monotonic() - _players_bg_last_failure_mono
+            < PLAYERS_BACKGROUND_REFRESH_FAILURE_COOLDOWN_SECONDS
+        ):
+            return False
+        _players_bg_in_flight = True
+    try:
+        threading.Thread(
+            target=_background_players_refresh_worker,
+            name="dgm-sleeper-players-refresh",
+            daemon=True,
+        ).start()
+    except Exception:
+        with _players_bg_guard:
+            _players_bg_in_flight = False
+        return False
+    return True
+
+
 def get_players(refresh: bool = False) -> Dict[str, Any]:
     """
     Fetch all NFL players from Sleeper, with basic local caching.
@@ -806,80 +1011,24 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
     request can still call this multiple times (e.g. the matchup endpoint
     calls it twice) and now pays for the parse at most once per process
     between refreshes.
+
+    Refreshes are atomic (temp file + ``os.replace``) and single-flight
+    across processes (flock on ``<cache>.lock``). With
+    ``PLAYERS_BACKGROUND_REFRESH`` on, an aged cache is returned immediately
+    and one background thread re-downloads it.
     """
-    global _players_memo, _players_memo_mtime_ns
     _ensure_data_dir()
 
-    cache_ok = False
     if not refresh and os.path.exists(PLAYERS_CACHE_PATH):
-        try:
-            age = time.time() - os.path.getmtime(PLAYERS_CACHE_PATH)
-            if age < PLAYERS_CACHE_TTL_SECONDS:
-                cache_ok = True
-        except Exception:
-            cache_ok = False
+        fresh = _players_cache_is_fresh()
+        if fresh or PLAYERS_BACKGROUND_REFRESH:
+            cached = _read_players_cache_file(label="sleeper_players_disk")
+            if cached is not None:
+                if not fresh:
+                    _schedule_background_players_refresh()
+                return cached
 
-    if cache_ok:
-        try:
-            mtime_ns = os.stat(PLAYERS_CACHE_PATH).st_mtime_ns
-        except Exception:
-            mtime_ns = -1
-        with _players_memo_lock:
-            if _players_memo is not None and mtime_ns != -1 and mtime_ns == _players_memo_mtime_ns:
-                _note_provider_timing("sleeper_players_memo", 0.0, cache_status="hit")
-                return _players_memo
-        try:
-            with open(PLAYERS_CACHE_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                _note_provider_timing("sleeper_players_disk", 0.0, cache_status="hit")
-                if mtime_ns != -1:
-                    with _players_memo_lock:
-                        _players_memo = data
-                        _players_memo_mtime_ns = mtime_ns
-                return data
-        except Exception:
-            pass
-
-    url = f"{SLEEPER_BASE}/players/nfl"
-    started = time.perf_counter()
-    try:
-        with performance.time_block("sleeper_players_fetch", category="sleeper"):
-            resp = requests.get(url, timeout=20)
-            resp.raise_for_status()
-            players = resp.json()
-        if not isinstance(players, dict):
-            players = {}
-        try:
-            with open(PLAYERS_CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump(players, f)
-            fresh_mtime_ns = os.stat(PLAYERS_CACHE_PATH).st_mtime_ns
-            with _players_memo_lock:
-                _players_memo = players
-                _players_memo_mtime_ns = fresh_mtime_ns
-        except Exception:
-            pass
-        _note_provider_timing(
-            "sleeper_players_fetch",
-            (time.perf_counter() - started) * 1000.0,
-            cache_status="miss",
-        )
-        return players
-    except Exception:
-        _note_provider_timing(
-            "sleeper_players_fetch",
-            (time.perf_counter() - started) * 1000.0,
-            cache_status="error",
-        )
-        if os.path.exists(PLAYERS_CACHE_PATH):
-            try:
-                with open(PLAYERS_CACHE_PATH, "r", encoding="utf-8") as f:
-                    players = json.load(f)
-                if isinstance(players, dict):
-                    return players
-            except Exception:
-                pass
-        return {}
+    return _refresh_players_blocking()
 
 
 @lru_cache(maxsize=256)

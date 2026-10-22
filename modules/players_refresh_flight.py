@@ -195,17 +195,27 @@ def build_players_table_out_of_process(db_path: str, refresh: bool = True):
     """
 
     from modules import rankings
+    from modules.file_lock import ExclusiveFileLock
 
-    try:
-        completed = subprocess.run(
-            [sys.executable, str(_REFRESH_SUBPROCESS_SCRIPT), db_path],
-            timeout=_REFRESH_SUBPROCESS_TIMEOUT_S,
-            capture_output=True,
-            text=True,
-            cwd=str(_REPO_ROOT),
-        )
-    except Exception:
-        return rankings.empty_players_table()
+    # The flight state above is per process, and every uvicorn worker sees
+    # the same aged Sleeper cache, so without this each worker ran its own
+    # rebuild subprocess (and download) for the same 5-minute window. A
+    # worker that finds another process's rebuild in flight keeps the
+    # last-known-good players.db, same as an in-process follower.
+    with ExclusiveFileLock(f"{db_path}.refresh.lock", wait_seconds=0.0) as lock:
+        if not lock.acquired:
+            runtime_trace.count("public_players_refresh_cross_process_follower")
+            return rankings.load_players(db_path)
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(_REFRESH_SUBPROCESS_SCRIPT), db_path],
+                timeout=_REFRESH_SUBPROCESS_TIMEOUT_S,
+                capture_output=True,
+                text=True,
+                cwd=str(_REPO_ROOT),
+            )
+        except Exception:
+            return rankings.empty_players_table()
     if completed.returncode != 0:
         return rankings.empty_players_table()
     return rankings.load_players(db_path)

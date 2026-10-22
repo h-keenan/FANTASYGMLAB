@@ -44,7 +44,14 @@ def main(argv: list[str]) -> int:
         print("usage: refresh_players_db_subprocess.py <db_path>", file=sys.stderr)
         return 2
     db_path = argv[1]
-    frame = rankings.build_players_table(db_path, refresh=True)
+    # This runs because the parent saw data/sleeper_players.json past its
+    # 5-minute TTL, and the parent's own background refresh
+    # (modules.sleeper.PLAYERS_BACKGROUND_REFRESH) usually replaces it while
+    # this interpreter is still importing. refresh=False keeps the same
+    # freshness contract: a still-aged dump is re-downloaded synchronously
+    # (single-flight, waiting on any in-flight download), a fresh one is
+    # used as-is instead of fetching the same ~16MB again.
+    frame = rankings.build_players_table(db_path, refresh=False)
     empty = bool(getattr(frame, "empty", frame is None))
     print(f"rows={0 if empty else len(frame)}")
     return 1 if empty else 0
