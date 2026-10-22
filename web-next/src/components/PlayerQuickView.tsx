@@ -146,8 +146,9 @@ export function PlayerQuickView({
   const bio = detail?.bio ?? null;
   const model = detail?.model ?? null;
   const injury = waiverInjuryDisplay(identity.injury_status);
-  const overallRating = identity.overall_rating ?? stats?.overall_rating ?? null;
-  const name = identity.name || `Player ${identity.player_id}`;
+  const resolved = detail?.identity ?? null;
+  const overallRating = identity.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
+  const name = identity.name || resolved?.name || `Player ${identity.player_id}`;
 
   return (
     <div
@@ -192,11 +193,13 @@ export function PlayerQuickView({
           name={name}
           nameId="pqv-name"
           contextLabel={identity.sourceLabel}
-          position={identity.position}
-          team={identity.team}
-          age={identity.age}
+          position={identity.position || resolved?.position}
+          team={identity.team || resolved?.team}
+          age={identity.age ?? resolved?.age ?? null}
           tier={identity.tier}
-          score={identity.score}
+          score={identity.score ?? resolved?.value_score ?? null}
+          valueNote={resolved?.value_note}
+          loadingIdentity={loading}
           overallRating={overallRating}
           overallRank={identity.overall_rank}
           positionRank={identity.position_rank}

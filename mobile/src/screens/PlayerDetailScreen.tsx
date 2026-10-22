@@ -1620,11 +1620,12 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       tier={player.tier}
       tierLabel={player.tier ? tierIdentity.semanticLabel : null}
       tierColor={tierIdentity.color}
-      name={player.name ?? 'Unknown player'}
-      position={player.position}
-      team={player.team}
-      age={player.age}
-      score={player.score}
+      name={player.name || quickViewQuery.data?.identity?.name || 'Unknown player'}
+      position={player.position || quickViewQuery.data?.identity?.position}
+      team={player.team || quickViewQuery.data?.identity?.team}
+      age={player.age ?? quickViewQuery.data?.identity?.age ?? null}
+      score={player.score ?? quickViewQuery.data?.identity?.value_score ?? null}
+      valueNote={quickViewQuery.data?.identity?.value_note}
       overallRating={overallRating}
       ringColor={overallRating !== null ? percentileColor(overallRating, colors) : colors.accent}
       usageTrend={model?.usage_trend ?? null}

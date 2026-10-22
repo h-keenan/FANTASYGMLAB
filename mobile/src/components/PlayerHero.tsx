@@ -43,6 +43,7 @@ export default function PlayerHero({
   ringColor,
   usageTrend,
   usageLoading = false,
+  valueNote,
   expanded,
   onToggleExpand,
   children,
@@ -64,6 +65,8 @@ export default function PlayerHero({
   ringColor: string;
   usageTrend: UsageTrend | null;
   usageLoading?: boolean;
+  /** Server-provided reason the Value tile is empty (e.g. "No market value yet"). */
+  valueNote?: string | null;
   /** Whether the caller's Snapshot detail is currently shown. */
   expanded?: boolean;
   /** Supplying this turns the score tile into the expand toggle for the
@@ -120,9 +123,9 @@ export default function PlayerHero({
           <View style={styles.metaRow}>
             <PositionBadge position={position} size="md" />
             <View style={styles.metaPill}>
-              <AppText style={styles.metaPillText}>{team || 'FA'}</AppText>
+              <AppText style={styles.metaPillText}>{team || (usageLoading ? '—' : 'FA')}</AppText>
               <AppText style={styles.metaPillDot}>•</AppText>
-              <AppText style={styles.metaPillText}>Age {age ?? 'N/A'}</AppText>
+              <AppText style={styles.metaPillText}>Age {age ?? (usageLoading ? '—' : 'N/A')}</AppText>
             </View>
           </View>
         </View>
@@ -147,6 +150,9 @@ export default function PlayerHero({
           <AppText style={[styles.tileValue, score == null && styles.tileValueEmpty]} numberOfLines={1} adjustsFontSizeToFit>
             {score != null ? Math.round(score).toLocaleString() : '—'}
           </AppText>
+          {score == null && !usageLoading ? (
+            <AppText style={styles.tileNote}>{valueNote || 'No market value yet'}</AppText>
+          ) : null}
         </View>
         <UsageTile trend={usageTrend} loading={usageLoading} />
       </View>
