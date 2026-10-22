@@ -257,11 +257,17 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
             settings["_sources"][key] = "Sleeper"
 
     bench_count = sum(1 for pos in roster_positions if pos in bench_positions)
-    taxi_count = sum(1 for pos in roster_positions if pos == "TAXI")
+    # Sleeper never lists TAXI in ``roster_positions``; the taxi squad size is
+    # ``settings.taxi_slots`` (verified on live dynasty leagues). Counting only
+    # roster_positions left taxi_count at 0 so the designed taxi boost never fired.
+    taxi_count = max(
+        sum(1 for pos in roster_positions if pos == "TAXI"),
+        _safe_nonnegative_int(league_settings.get("taxi_slots"), 0),
+    )
     ir_count = _safe_nonnegative_int(league_settings.get("reserve_slots"), 0)
     if not ir_count:
         ir_count = sum(1 for pos in roster_positions if pos == "IR")
-    if roster_positions or ir_count:
+    if roster_positions or ir_count or taxi_count:
         settings["bench_count"] = bench_count
         settings["taxi_count"] = taxi_count
         settings["ir_count"] = ir_count
