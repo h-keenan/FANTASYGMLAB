@@ -68,5 +68,5 @@ export default function WaiversPage() {
     );
   }
 
-  return <WaiversContent leagueName={leagueName} data={waivers} highlightPlayerId={highlightPlayerId} />;
+  return <WaiversContent leagueName={leagueName} data={waivers} highlightPlayerId={highlightPlayerId} leagueId={leagueId} />;
 }

@@ -7,9 +7,11 @@ import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { confidenceLevelFor } from './ConfidenceMeter';
 import FAABGuidance from './FAABGuidance';
+import OverallRatingBadge from './OverallRatingBadge';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { WaiverPriorityAdd } from '../lib/api';
+import { waiverReasonChips } from '../lib/waiverChips';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 const INJURY_RISK_STATUSES = new Set(['out', 'ir', 'doubtful', 'pup', 'suspended']);
@@ -122,6 +124,31 @@ const pillStyles = StyleSheet.create({
   text: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
 });
 
+/** Up to two reason chips from real, already-computed signals only
+ * (lib/waiverChips.ts); renders nothing when none apply. */
+function ReasonChips({ player }: { player: WaiverPriorityAdd }) {
+  const { colors } = useThemeMode();
+  const chips = waiverReasonChips(player);
+  if (chips.length === 0) return null;
+  return (
+    <View style={chipStyles.row}>
+      {chips.map((chip) => (
+        <View key={chip} style={[chipStyles.chip, { borderColor: `${colors.accent}70`, backgroundColor: `${colors.accent}1A` }]}>
+          <AppText style={[chipStyles.text, { color: colors.accent }]} numberOfLines={1}>
+            {chip}
+          </AppText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const chipStyles = StyleSheet.create({
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chip: { borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  text: { fontSize: 11, fontWeight: '700' },
+});
+
 /**
  * Canonical waiver recommendation card — backs both the single "Top Waiver
  * Target" (variant="primary": full glowing AnimatedCard, the loudest thing
@@ -137,11 +164,14 @@ export default function WaiverRecommendationCard({
   onPress,
   variant = 'compact',
   showDivider = false,
+  rank,
 }: {
   player: WaiverPriorityAdd;
   onPress: () => void;
   variant?: 'primary' | 'compact';
   showDivider?: boolean;
+  /** Position in the recommendation list (compact rows: 2, 3, ...). */
+  rank?: number;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -163,6 +193,7 @@ export default function WaiverRecommendationCard({
       contextLine={contextLine}
       contextLineColor={contextLineColor}
       trendingAddLabel={waiverTrendingAddLabel(player)}
+      slot={rank != null ? String(rank) : undefined}
       showDivider={false}
     />
   );
@@ -175,11 +206,13 @@ export default function WaiverRecommendationCard({
           <AppText style={styles.actionLabel}>{player.recommendation_label} · Top Waiver Target</AppText>
         </View>
         <View style={styles.identityWrap}>{identity}</View>
+        <ReasonChips player={player} />
         <View style={styles.metricsRow}>
           <View style={styles.scoreBlock}>
             <AppText style={styles.scoreNumberPrimary}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
             <AppText style={styles.scoreLabel}>VALUE</AppText>
           </View>
+          <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} size="md" />
           <View style={styles.metricsDivider} />
           <FAABGuidance faab={player.faab} size="prominent" />
         </View>
@@ -199,21 +232,31 @@ export default function WaiverRecommendationCard({
             (modules.waivers_ui.waiver_confidence_label) — the same signals
             that ranked it into Priority Adds, shown with the exact same
             segmented-meter pattern Trade Hub's own confidence display uses. */}
-        {player.confidence_label ? (
-          <View style={styles.confidenceRow}>
-            <MeterRow
-              label="CONFIDENCE"
-              value={player.confidence_label}
-              level={confidenceLevelFor(player.confidence_label)}
-              color={colors.premium}
-            />
-            <BeginnerHelp term="waiverConfidence" style={styles.beginnerHelp} />
-          </View>
-        ) : null}
-        <View style={styles.breakdownRow}>
-          <AppText style={styles.breakdownText}>Full breakdown</AppText>
-          <Ionicons name="chevron-forward" size={14} color={colors.accentSoft} />
+        <View style={styles.confidenceRow}>
+          {player.confidence_label ? (
+            <View style={styles.confidenceMeter}>
+              <MeterRow
+                label="CONFIDENCE"
+                value={player.confidence_label}
+                level={confidenceLevelFor(player.confidence_label)}
+                color={colors.premium}
+              />
+            </View>
+          ) : (
+            <View style={styles.confidenceMeter} />
+          )}
+          <TouchableOpacity
+            style={styles.detailsButton}
+            onPress={onPress}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`View details for ${player.name ?? 'player'}`}
+          >
+            <AppText style={styles.detailsButtonText}>View details</AppText>
+            <Ionicons name="arrow-forward" size={14} color={colors.accent} />
+          </TouchableOpacity>
         </View>
+        {player.confidence_label ? <BeginnerHelp term="waiverConfidence" style={styles.beginnerHelp} /> : null}
       </AnimatedCard>
     );
   }
@@ -224,24 +267,20 @@ export default function WaiverRecommendationCard({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {/* Line 1: identity gets the full row width so names never truncate
-          to "Ja…"; line 2: value, pill, confidence, bid, breakdown chevron. */}
+      {/* Line 1: identity (rank slot, name, team/opponent) gets the full row
+          width so names never truncate; then reason chips; then value, ring,
+          bid and the chevron that opens the player. */}
       <View style={styles.compactIdentity}>{identity}</View>
+      <ReasonChips player={player} />
       <View style={styles.compactMetaRow}>
-        <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-        <RecommendationPill label={player.recommendation_label} tone={player.recommendation_tone} />
-        <View style={styles.compactConfidence}>
-          {player.confidence_label ? (
-            <MeterRow
-              label="CONFIDENCE"
-              value={player.confidence_label}
-              level={confidenceLevelFor(player.confidence_label)}
-              color={colors.premium}
-            />
-          ) : null}
+        <View style={styles.scoreBlock}>
+          <AppText style={styles.scoreLabel}>VALUE</AppText>
+          <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
         </View>
+        <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+        <View style={styles.compactSpacer} />
         <FAABGuidance faab={player.faab} size="compact" />
-        <Ionicons name="chevron-forward" size={14} color={colors.accentSoft} />
+        <Ionicons name="chevron-forward" size={16} color={colors.accentSoft} />
       </View>
     </TouchableOpacity>
   );
@@ -267,7 +306,19 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
-    confidenceRow: { marginTop: spacing.sm },
+    confidenceRow: { marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    confidenceMeter: { flex: 1, minWidth: 0 },
+    detailsButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 36,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    detailsButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
     beginnerHelp: { marginTop: spacing.xs },
     faabWhy: { marginTop: spacing.sm, fontSize: 12, lineHeight: 16, color: colors.textSecondary },
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
@@ -288,7 +339,7 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
     },
     compactMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs },
-    compactConfidence: { flex: 1, minWidth: 0 },
+    compactSpacer: { flex: 1 },
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     compactIdentity: { alignSelf: 'stretch' },
     // A bare chevron read as an unlabeled affordance — the concept image

@@ -130,3 +130,54 @@ export function freeAgentContextLine(player: WaiverPlayer): string | null {
 export function formatWaiverScore(score: number | null | undefined): string {
   return score !== null && score !== undefined ? String(Math.round(score)) : "—";
 }
+
+/** Short chips for a recommendation, mapped ONLY from signals the server
+ * already computed (modules/faab.py `reasons`: breakout, usage/role trend,
+ * depth-chart move, Sleeper trending adds, own need, wire depth,
+ * competition; plus injury_replacement_fit). Nothing is invented: a signal
+ * that isn't present produces no chip. Catalyst signals come first. */
+const CHIP_RULES: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+  [/^Trending on Sleeper/i, () => "Trending"],
+  [/^Usage up (\d+)%/i, (m) => `Usage +${m[1]}%`],
+  [/^Breakout/i, () => "Breakout"],
+  [/^Role rising/i, () => "Role rising"],
+  [/^Moved up/i, () => "Depth chart up"],
+  [/^Fills a starting/i, () => "Fills need"],
+  [/^Would start/i, () => "Would start"],
+  [/^Clear best/i, () => "Best on wire"],
+  [/^\d+ teams? (need|needs) /i, () => "Rival demand"],
+];
+
+export function waiverReasonChips(
+  player: {
+    faab?: { reasons?: string[] } | null;
+    sleeper_trending_add?: boolean;
+    injury_replacement_fit?: boolean;
+  },
+  max = 2,
+): string[] {
+  // Rule order is the display priority (catalysts before own-need), not the
+  // order the server listed the reasons in.
+  const hits = new Map<string, number>();
+  if (player.sleeper_trending_add) hits.set("Trending", 0);
+  for (const reason of player.faab?.reasons ?? []) {
+    CHIP_RULES.some(([pattern, toChip], index) => {
+      const match = reason.match(pattern);
+      if (match) hits.set(toChip(match), Math.min(index, hits.get(toChip(match)) ?? index));
+      return Boolean(match);
+    });
+  }
+  if (player.injury_replacement_fit) hits.set("Injury cover", CHIP_RULES.length);
+  return [...hits.entries()].sort((x, y) => x[1] - y[1]).map(([chip]) => chip).slice(0, max);
+}
+
+export type WaiverRecFilter = "all" | "Add" | "Stash" | "Watch";
+
+/** Filter pills for "More recommended adds" — by the server's own
+ * recommendation_label (waiver_recommendation_label: Add / Stash / Watch). */
+export function filterByRecommendation<T extends { recommendation_label: string }>(
+  rows: T[],
+  filter: WaiverRecFilter,
+): T[] {
+  return filter === "all" ? rows : rows.filter((row) => row.recommendation_label === filter);
+}
