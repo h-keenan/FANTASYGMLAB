@@ -3071,13 +3071,16 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
 
+    import time as _time
+
+    _NOW = _time.time()
     fake_pool = [
         {
             "title": "Star RB (knee) questionable for Sunday",
             "summary": "The team's RB1 was limited in practice with a knee issue.",
             "link": "https://example.com/injury-1",
             "source": "https://www.espn.com/espn/rss/nfl/news",
-            "published_ts": 1000.0,
+            "published_ts": _NOW - 3000.0,
         },
         # Off-topic — no injury/role/transaction/off-field signal, should be dropped.
         {
@@ -3085,7 +3088,7 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
             "summary": "A celebrity wore a hat at the game.",
             "link": "https://example.com/celebrity",
             "source": "https://www.espn.com/espn/rss/nfl/news",
-            "published_ts": 2000.0,
+            "published_ts": _NOW - 2000.0,
         },
         # Duplicate link of the injury item above (different casing) — deduped.
         {
@@ -3093,14 +3096,14 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
             "summary": "The team's RB1 was limited in practice with a knee issue.",
             "link": "HTTPS://EXAMPLE.COM/injury-1",
             "source": "https://www.espn.com/espn/rss/nfl/news",
-            "published_ts": 1000.0,
+            "published_ts": _NOW - 3000.0,
         },
         {
             "title": "Team trades WR to division rival",
             "summary": "A trade sends a wide receiver across the division.",
             "link": "https://example.com/trade-1",
             "source": "https://www.espn.com/espn/rss/nfl/news",
-            "published_ts": 3000.0,
+            "published_ts": _NOW - 1000.0,
         },
     ]
 
@@ -3120,7 +3123,7 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
     assert body["ok"] is True
     items = body["items"]
     # Celebrity item dropped (no actionable signal); injury duplicate deduped;
-    # most-recent-first ordering (trade at 3000 before injury at 1000).
+    # most-recent-first ordering (trade is newer than the injury).
     assert len(items) == 2
     assert items[0]["title"] == "Team trades WR to division rival"
     assert items[0]["event_type"] == "transaction"
@@ -3131,6 +3134,90 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
         assert "summary" in item
         assert "speculative" in item
 
+
+
+def test_news_endpoint_drops_articles_older_than_the_max_age(monkeypatch):
+    """A refresh that keeps failing must not leave month-old headlines on the
+    News tab (the committed fallback cache dates from July)."""
+
+    import time as _time
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    now = _time.time()
+    stale_pool = [
+        {
+            "title": "Team trades WR to division rival",
+            "summary": "A trade sends a wide receiver across the division.",
+            "link": "https://example.com/old-trade",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 107 * 86400,
+        },
+        {
+            "title": "Star RB (knee) questionable for Sunday",
+            "summary": "The team's RB1 was limited in practice with a knee issue.",
+            "link": "https://example.com/fresh-injury",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 3600,
+        },
+    ]
+
+    from modules import news as news_module
+
+    news_module.clear_enriched_news_pool_cache()
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+            with patch("modules.news.load_cached_news_pool", return_value=stale_pool):
+                response = client.get("/v1/news", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    titles = [item["title"] for item in response.json()["items"]]
+    assert titles == ["Star RB (knee) questionable for Sunday"]
+
+
+def test_news_refresh_replaces_a_stuck_thread(monkeypatch):
+    import threading
+    import time as _time
+
+    from modules import news as news_module
+
+    started = []
+
+    class _Hung:
+        def is_alive(self):
+            return True
+
+    monkeypatch.setattr(news_module, "_NEWS_REFRESH_THREAD", _Hung())
+    monkeypatch.setattr(news_module, "_cache_is_fresh", lambda *a, **k: False)
+    monkeypatch.setattr(news_module, "fetch_news", lambda **k: started.append(1) or [])
+
+    # Recently started: still treated as in flight.
+    monkeypatch.setattr(news_module, "_NEWS_REFRESH_STARTED_AT", _time.time())
+    assert news_module.schedule_news_cache_refresh() is False
+
+    # Running far longer than the stuck threshold: replaced.
+    monkeypatch.setattr(
+        news_module, "_NEWS_REFRESH_STARTED_AT", _time.time() - news_module.NEWS_REFRESH_STUCK_SECONDS - 1
+    )
+    assert news_module.schedule_news_cache_refresh() is True
+    news_module._NEWS_REFRESH_THREAD.join(timeout=5)
+    assert started == [1]
+
+
+def test_news_feed_fetch_has_a_timeout(monkeypatch):
+    from modules import news as news_module
+
+    seen = {}
+
+    def _fake_get(url, **kwargs):
+        seen.update(kwargs)
+        raise TimeoutError("host never answered")
+
+    monkeypatch.setattr(news_module.requests, "get", _fake_get)
+    feed = news_module._parse_feed("https://example.test/feed")
+    assert seen["timeout"] == news_module.FEED_FETCH_TIMEOUT_SECONDS
+    assert feed.get("bozo") and not feed.get("entries")
 
 def test_friendly_news_source_maps_known_feed_domains(monkeypatch):
     from services.mobile_api_service import _friendly_news_source

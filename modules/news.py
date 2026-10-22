@@ -16,6 +16,7 @@ from functools import lru_cache
 from urllib.parse import quote_plus
 
 import feedparser
+import requests
 
 from modules import news_signal
 from modules import runtime_trace
@@ -50,6 +51,7 @@ PLAYER_NEWS_TERMS = [
 LAST_FETCH_STATUS = {"source": "none", "errors": []}
 _NEWS_REFRESH_LOCK = threading.Lock()
 _NEWS_REFRESH_THREAD = None
+_NEWS_REFRESH_STARTED_AT = 0.0
 NEWS_REASON_WEIGHTS = {
     "injury/status": 36,
     "transaction/drama": 28,
@@ -105,8 +107,42 @@ def _load_json(path, default):
 
 def _save_json(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp_path = f"{path}.{os.getpid()}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp_path, path)
+
+
+FEED_FETCH_TIMEOUT_SECONDS = 12
+# A refresh thread that has been running longer than this is presumed hung
+# (a feed host that accepts the connection and never answers) and is replaced.
+NEWS_REFRESH_STUCK_SECONDS = 180
+# The general News feed never shows articles older than this, so a refresh
+# that keeps failing shows an honest empty state instead of month-old items.
+GENERAL_NEWS_MAX_AGE_DAYS = 21
+
+
+def _parse_feed(feed_url: str):
+    """Fetch a feed with a hard timeout, then parse the bytes.
+
+    ``feedparser.parse(url)`` has no timeout, so one unresponsive host could
+    hang the single background refresh thread forever and leave the on-disk
+    (possibly months-old) cache in place.
+    """
+
+    try:
+        response = requests.get(
+            feed_url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=FEED_FETCH_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return feedparser.parse(response.content)
+    except Exception as exc:  # noqa: BLE001 - any network/parse failure is a feed error
+        failed = feedparser.parse(b"")
+        failed["bozo"] = True
+        failed["bozo_exception"] = exc
+        return failed
 
 
 def _load_cache():
@@ -156,12 +192,14 @@ def schedule_news_cache_refresh(*, force: bool = False) -> bool:
     existing ``fetch_news`` owner updates the same cache for the next rerun.
     """
 
-    global _NEWS_REFRESH_THREAD
+    global _NEWS_REFRESH_THREAD, _NEWS_REFRESH_STARTED_AT
     if not force and _cache_is_fresh(NEWS_CACHE_PATH):
         return False
     with _NEWS_REFRESH_LOCK:
         if _NEWS_REFRESH_THREAD is not None and _NEWS_REFRESH_THREAD.is_alive():
-            return False
+            if time.time() - _NEWS_REFRESH_STARTED_AT < NEWS_REFRESH_STUCK_SECONDS:
+                return False
+            # Presumed hung: abandon it (daemon thread) and start a fresh one.
 
         def _refresh() -> None:
             try:
@@ -175,6 +213,7 @@ def schedule_news_cache_refresh(*, force: bool = False) -> bool:
             name="dynastygm-news-cache-refresh",
             daemon=True,
         )
+        _NEWS_REFRESH_STARTED_AT = time.time()
         _NEWS_REFRESH_THREAD.start()
         return True
 
@@ -378,10 +417,13 @@ def general_news_feed(limit: int = 30, *, players_df=None) -> list:
 
     limit = max(1, min(int(limit or 1), MAX_GENERAL_NEWS_LIMIT))
     enriched = enriched_news_pool()
+    oldest_allowed = time.time() - GENERAL_NEWS_MAX_AGE_DAYS * 86400
     actionable = [
         item
         for item in enriched
-        if isinstance(item, dict) and item.get("signal_primary_event") in GENERAL_NEWS_ACTIONABLE_EVENTS
+        if isinstance(item, dict)
+        and item.get("signal_primary_event") in GENERAL_NEWS_ACTIONABLE_EVENTS
+        and _news_item_timestamp(item) >= oldest_allowed
     ]
     actionable.sort(key=_news_item_timestamp, reverse=True)
 
@@ -535,10 +577,7 @@ def fetch_roster_news(player_names, max_players=28, max_items=24, force_refresh=
     errors = []
     for player_name in usable_names[:max_players]:
         feed_url = _player_news_query(player_name)
-        feed = feedparser.parse(
-            feed_url,
-            request_headers={"User-Agent": "Mozilla/5.0"},
-        )
+        feed = _parse_feed(feed_url)
         if getattr(feed, "bozo", False) and not getattr(feed, "entries", []):
             errors.append(f"{player_name}: {getattr(feed, 'bozo_exception', 'unknown error')}")
             continue
@@ -621,10 +660,7 @@ def fetch_news(*, force_refresh: bool = False):
     seen_links = set()
     errors = []
     for feed_url in NEWS_FEEDS:
-        feed = feedparser.parse(
-            feed_url,
-            request_headers={"User-Agent": "Mozilla/5.0"},
-        )
+        feed = _parse_feed(feed_url)
         if getattr(feed, "bozo", False) and not getattr(feed, "entries", []):
             errors.append(f"{feed_url}: {getattr(feed, 'bozo_exception', 'unknown error')}")
         for entry in feed.entries:
