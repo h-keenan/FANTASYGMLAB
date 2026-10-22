@@ -50,6 +50,7 @@ if _SENTRY_DSN:
             "Sentry initialization failed; continuing without it."
         )
 
+from modules import league_format_context
 from modules import rankings as rankings_module
 from modules.league_rankings import add_rank_tie_metadata, build_roster_health_metrics_frame
 from modules import player_asset_explorer_ui
@@ -773,11 +774,13 @@ def draft_pick_score_multiplier(valuation_lens: str, league_settings: dict | Non
     # historical _pick_format_multiplier redraft haircuts).
     if settings.get("league_format") == "Redraft":
         multiplier = min(float(multiplier), 0.45)
-    if valuation_lens in {"Dynasty", "Rebuild"} and settings.get("league_format") != "Redraft":
-        multiplier *= 1 + max(-4, min(8, league_size - 12)) * 0.015
-    elif valuation_lens in {"Dynasty", "Rebuild"} and settings.get("_keeper_mode"):
-        # Keeper: mild size sensitivity between redraft freeze and full dynasty.
+    if valuation_lens in {"Dynasty", "Rebuild"} and settings.get("_keeper_mode"):
+        # Keeper (Sleeper type 1, stored as league_format "Dynasty" + _keeper_mode):
+        # mild size sensitivity between redraft freeze and full dynasty. This must be
+        # checked before the dynasty branch, which keeper leagues also satisfy.
         multiplier *= 1 + max(-4, min(8, league_size - 12)) * 0.008
+    elif valuation_lens in {"Dynasty", "Rebuild"} and settings.get("league_format") != "Redraft":
+        multiplier *= 1 + max(-4, min(8, league_size - 12)) * 0.015
     return multiplier
 
 
@@ -6292,7 +6295,7 @@ def cached_user_league_launch_cards(
                 if isinstance(row, dict)
             )
             settings_snapshot = detect_league_value_settings(league_id)
-            format_label = "Redraft" if settings_snapshot.get("league_format") == "Redraft" else "Dynasty"
+            format_label = league_format_context.format_display_name(settings_snapshot)
             cards.append(
                 {
                     "league_id": league_id,
