@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,6 +7,7 @@ import type { ValuationLens } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
   { value: 'Dynasty', label: 'Dynasty', hint: 'Values future upside alongside this year.' },
@@ -46,9 +47,9 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
         </AppText>
         <Ionicons name="chevron-down" size={12} color={colors.premium} />
       </TouchableOpacity>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
             <AppText style={styles.title}>Evaluation Lens</AppText>
             <AppText style={styles.subtitle}>
               Which score field decides value in these trades — a second axis from Team Situation, not a replacement for it.
@@ -72,9 +73,9 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
                 </TouchableOpacity>
               );
             })}
-          </Pressable>
+          </SwipeDismissCard>
         </Pressable>
-      </Modal>
+      </SheetModal>
     </>
   );
 }

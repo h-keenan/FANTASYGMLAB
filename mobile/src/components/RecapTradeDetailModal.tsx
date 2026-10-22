@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,6 +9,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import CompactPlayerModule from './CompactPlayerModule';
 import IconCircle from './IconCircle';
 import TeamAvatar from './TeamAvatar';
+import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 
 interface Props {
   visible: boolean;
@@ -38,9 +39,9 @@ export default function RecapTradeDetailModal({ visible, onClose, story, primary
   const rightAssets = story.right_assets ?? [];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <SheetModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <SwipeDismissCard style={styles.sheet} onDismiss={onClose}>
           <View style={styles.headerRow}>
             <AppText style={styles.title} numberOfLines={1}>
               {story.title || 'Trade detail'}
@@ -50,7 +51,7 @@ export default function RecapTradeDetailModal({ visible, onClose, story, primary
             </Pressable>
           </View>
           {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          <SheetScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
             <TeamAssetColumn teamName={story.primary_team} avatarId={primaryAvatarId} assets={leftAssets} />
             <View style={styles.divider}>
               <Ionicons name="swap-horizontal" size={16} color={colors.textTertiary} />
@@ -65,10 +66,10 @@ export default function RecapTradeDetailModal({ visible, onClose, story, primary
                 <AppText style={styles.lensNote}>{lens.note}</AppText>
               </View>
             ))}
-          </ScrollView>
-        </Pressable>
+          </SheetScrollView>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 

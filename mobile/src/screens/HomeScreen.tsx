@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Linking,
-  Modal,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -46,6 +45,7 @@ import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -587,9 +587,9 @@ export default function HomeScreen({ navigation, route }: Props) {
         }}
       />
 
-      <Modal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
+      <SheetModal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
         <View style={styles.renameBackdrop}>
-          <View style={styles.renameCard}>
+          <SwipeDismissCard style={styles.renameCard} onDismiss={closeAddLeague} handleOnly>
             <AppText style={styles.renameTitle}>Add a league</AppText>
             <View style={styles.platformTabs}>
               <SegmentedTabBar<'sleeper' | 'espn'>
@@ -753,13 +753,13 @@ export default function HomeScreen({ navigation, route }: Props) {
             </View>
             </>
             )}
-          </View>
+          </SwipeDismissCard>
         </View>
-      </Modal>
+      </SheetModal>
 
-      <Modal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
+      <SheetModal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
         <View style={styles.renameBackdrop}>
-          <View style={styles.renameCard}>
+          <SwipeDismissCard style={styles.renameCard} onDismiss={() => setRenamingLeague(null)}>
             <AppText style={styles.renameTitle}>Rename League</AppText>
             <AppText style={styles.renameHint}>
               Only changes what you see here — the real league name in Sleeper stays the same.
@@ -789,9 +789,9 @@ export default function HomeScreen({ navigation, route }: Props) {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </SwipeDismissCard>
         </View>
-      </Modal>
+      </SheetModal>
     </View>
   );
 }

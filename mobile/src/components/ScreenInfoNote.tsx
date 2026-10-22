@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 /**
  * A compact "ⓘ About this screen" affordance that replaces a screen's old
@@ -46,9 +47,9 @@ export default function ScreenInfoNote({
         <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
         <AppText style={styles.label}>{label}</AppText>
       </TouchableOpacity>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+          <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
             <View style={styles.sheetHeaderRow}>
               <Ionicons name="information-circle-outline" size={18} color={colors.accent} />
               <AppText style={styles.sheetTitle}>{label}</AppText>
@@ -68,9 +69,9 @@ export default function ScreenInfoNote({
                 ))}
               </View>
             ) : null}
-          </Pressable>
+          </SwipeDismissCard>
         </Pressable>
-      </Modal>
+      </SheetModal>
     </>
   );
 }

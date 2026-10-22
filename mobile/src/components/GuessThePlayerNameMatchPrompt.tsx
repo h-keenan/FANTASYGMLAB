@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, TouchableOpacity, View, StyleSheet } from 'react-native';
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
@@ -20,6 +20,7 @@ import {
 } from '../lib/guessThePlayerNameMatchPrompt';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 type RevealState = {
   correct: boolean;
@@ -131,9 +132,9 @@ export default function GuessThePlayerNameMatchPrompt() {
   }
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={dismiss}>
+    <SheetModal visible transparent animationType="fade" onRequestClose={dismiss}>
       <Pressable style={styles.backdrop}>
-        <View style={styles.sheet} testID="guess-the-player-name-match-prompt">
+        <SwipeDismissCard style={styles.sheet} onDismiss={dismiss} testID="guess-the-player-name-match-prompt">
           <View style={styles.headerRow}>
             <View style={styles.headerText}>
               <AppText style={styles.kicker}>Name Match</AppText>
@@ -220,9 +221,9 @@ export default function GuessThePlayerNameMatchPrompt() {
           {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
           <AppText style={styles.streakText}>{guessThePlayerStreakCaption(response.streak)}</AppText>
-        </View>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 

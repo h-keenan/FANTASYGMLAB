@@ -2,10 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -27,6 +25,7 @@ import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
+import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
@@ -270,8 +269,8 @@ export default function LoginScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      <Modal visible={legalPageKey !== null} animationType="slide" onRequestClose={() => setLegalPageKey(null)}>
-        <View style={styles.root}>
+      <SheetModal visible={legalPageKey !== null} animationType="slide" onRequestClose={() => setLegalPageKey(null)}>
+        <SwipeDismissCard style={styles.root} onDismiss={() => setLegalPageKey(null)}>
           <GridBackground />
           <View style={[styles.legalModalHeader, { paddingTop: insets.top + spacing.md }]}>
             <AppText style={styles.legalModalTitle}>{legalPageKey ? LEGAL_PAGES[legalPageKey]?.title : ''}</AppText>
@@ -279,11 +278,11 @@ export default function LoginScreen() {
               <AppText style={styles.legalModalClose}>Done</AppText>
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.legalModalContent}>
+          <SheetScrollView contentContainerStyle={styles.legalModalContent}>
             {legalPageKey ? <ContentSections sections={LEGAL_PAGES[legalPageKey]?.sections ?? []} /> : null}
-          </ScrollView>
-        </View>
-      </Modal>
+          </SheetScrollView>
+        </SwipeDismissCard>
+      </SheetModal>
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -44,6 +44,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { setSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
 // PlayerDetail's route param still expects the /rankings RankedPlayer shape;
 // Trade Hub only ever has the idea's own lean PresentationAsset, and
@@ -847,9 +848,9 @@ function RationaleDetailModal({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <SheetModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.rationaleBackdrop} onPress={onClose}>
-        <Pressable style={styles.rationaleSheet} onPress={(e) => e.stopPropagation()}>
+        <SwipeDismissCard style={styles.rationaleSheet} onDismiss={onClose}>
           <View style={styles.rationaleSheetHeader}>
             <AppText style={styles.rationaleSheetTitle} numberOfLines={1}>
               Why this works
@@ -861,12 +862,12 @@ function RationaleDetailModal({
           <AppText style={styles.rationaleSheetPartner} numberOfLines={1}>
             vs. {partnerTeamName}
           </AppText>
-          <ScrollView style={styles.rationaleSheetBody}>
+          <SheetScrollView style={styles.rationaleSheetBody}>
             <AppText style={styles.rationaleSheetText}>{rationale}</AppText>
-          </ScrollView>
-        </Pressable>
+          </SheetScrollView>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 

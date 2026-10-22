@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, TouchableOpacity, View, StyleSheet } from 'react-native';
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
@@ -18,6 +18,7 @@ import {
 import { guessThePlayerStreakCaption, shouldShowGuessThePlayerPrompt } from '../lib/guessThePlayerPrompt';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 type RevealState = {
   correct: boolean;
@@ -136,9 +137,9 @@ export default function GuessThePlayerPrompt() {
   }
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={dismiss}>
+    <SheetModal visible transparent animationType="fade" onRequestClose={dismiss}>
       <Pressable style={styles.backdrop}>
-        <View style={styles.sheet} testID="guess-the-player-prompt">
+        <SwipeDismissCard style={styles.sheet} onDismiss={dismiss} testID="guess-the-player-prompt">
           <View style={styles.headerRow}>
             <View style={styles.headerText}>
               <AppText style={styles.kicker}>Guess the Player</AppText>
@@ -222,9 +223,9 @@ export default function GuessThePlayerPrompt() {
           {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
           <AppText style={styles.streakText}>{guessThePlayerStreakCaption(response.streak)}</AppText>
-        </View>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 

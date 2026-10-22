@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Linking,
-  Modal,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -62,6 +61,7 @@ import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
 type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model';
 const TABS: Array<{ key: DetailTab; label: string }> = [
@@ -132,16 +132,16 @@ function NewsImpactModal({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <SheetModal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+        <SwipeDismissCard style={styles.modalCard} onDismiss={onClose}>
           <View style={styles.modalHeaderRow}>
             <AppText style={styles.modalTitle}>In The News</AppText>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalScroll}>
+          <SheetScrollView style={styles.modalScroll}>
             {items.map((item, index) => (
               <TouchableOpacity
                 key={item.link ?? `${item.title}-${index}`}
@@ -156,10 +156,10 @@ function NewsImpactModal({
                 {item.source ? <AppText style={styles.modalArticleSource}>Source: {item.source}</AppText> : null}
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
+          </SheetScrollView>
+        </SwipeDismissCard>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

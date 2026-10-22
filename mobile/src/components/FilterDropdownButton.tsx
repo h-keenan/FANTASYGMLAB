@@ -5,6 +5,7 @@ import AppText from './AppText';
 
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 /**
  * One labeled categorical filter — a compact pill that opens a bottom sheet
@@ -58,9 +59,9 @@ export default function FilterDropdownButton<T extends string>({
         </AppText>
         <Ionicons name="chevron-down" size={12} color={isActive ? colors.accentOnTint : colors.textTertiary} />
       </TouchableOpacity>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
             <AppText style={styles.title}>{label}</AppText>
             {options.map((option) => {
               const active = option === value;
@@ -78,9 +79,9 @@ export default function FilterDropdownButton<T extends string>({
                 </TouchableOpacity>
               );
             })}
-          </Pressable>
+          </SwipeDismissCard>
         </Pressable>
-      </Modal>
+      </SheetModal>
     </>
   );
 }
