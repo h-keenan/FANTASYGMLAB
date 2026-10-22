@@ -11,6 +11,7 @@ import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { GmOrb } from "@/components/GmOrb";
 import { Header } from "@/components/Header";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
+import { TradeOutcomePrompt } from "@/components/TradeOutcomePrompt";
 import { BRAND_NAME } from "@/lib/brand";
 
 // Launch-readiness pass, 2026-10-18: no Open Graph/Twitter Card tags meant
@@ -79,6 +80,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Suspense fallback={null}>
                   <GmOrb />
                 </Suspense>
+                {/* "Did this trade happen?" follow-up, mounted once at the root
+                    like mobile's RootNavigator does. Decides for itself
+                    whether to show; see that component's doc comment. */}
+                <TradeOutcomePrompt />
               </PlayerQuickViewProvider>
             </ValuationLensProvider>
           </ExperienceLevelProvider>

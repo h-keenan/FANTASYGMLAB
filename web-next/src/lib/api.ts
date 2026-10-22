@@ -2103,6 +2103,26 @@ export interface PastTradeOutcome {
   result_computed_at: string | null;
 }
 
+/** "Did this trade happen?" follow-up — GET /v1/trade-outcomes/pending and
+ * POST /v1/trade-outcomes/{id}/answer, mirrored from mobile/src/lib/api.ts
+ * (PendingTradeOutcome/TradeOutcomeAnswer). Both platforms read and write
+ * the same server-side `trade_outcomes` row, so an answer on one device is
+ * never asked again on the other. */
+export interface PendingTradeOutcome {
+  id: string;
+  league_id: string;
+  partner_team_name: string;
+  trade_summary: TradeOutcomeSummary;
+  shared_at: string;
+}
+
+export interface PendingTradeOutcomesResponse {
+  ok: boolean;
+  outcomes: PendingTradeOutcome[];
+}
+
+export type TradeOutcomeAnswer = "yes" | "no" | "didnt_send" | "still_pending";
+
 export interface TradeOutcomeHistoryResponse {
   ok: boolean;
   outcomes: PastTradeOutcome[];
@@ -2856,6 +2876,13 @@ export const api = {
   // League-independent like getPortfolio/getNews above: no leagueId param.
   getTradeOutcomeHistory: () =>
     authorizedRequest<TradeOutcomeHistoryResponse>("/v1/trade-outcomes/history"),
+  getPendingTradeOutcomes: () =>
+    authorizedRequest<PendingTradeOutcomesResponse>("/v1/trade-outcomes/pending"),
+  answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>
+    authorizedRequest<{ ok: boolean; reason: string }>(
+      `/v1/trade-outcomes/${encodeURIComponent(outcomeId)}/answer`,
+      { method: "POST", jsonBody: { outcome } },
+    ),
 
   // Community Trade Feed (Social/community layer) — same GET
   // /v1/community/trades every signed-in user reads (never scoped to one
