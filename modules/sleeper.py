@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 import requests
 
-from modules import performance
+from modules import performance, sleeper_budget
 from modules.file_lock import ExclusiveFileLock
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
@@ -811,10 +811,33 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
     timed_out = False
     cache_status = "miss"
     attempt = 0
+
+    # Over the soft call-rate threshold: pausable work (warm-ups, background
+    # refresh, free-tier requests) serves the last real payload instead of
+    # spending budget; background work with nothing cached just skips.
+    if sleeper_budget.should_defer():
+        known = sleeper_budget.last_known(url)
+        sleeper_budget.note_deferred()
+        if known is not None:
+            sleeper_budget.note_stale_served(url, known[1])
+            _note_provider_timing(label, 0.0, cache_status="stale_deferred")
+            return known[0]
+        if sleeper_budget.should_skip_outright():
+            _note_provider_timing(label, 0.0, cache_status="skipped_budget")
+            return None
+
+    def _last_known_or_none():
+        known = sleeper_budget.last_known(url)
+        if known is None:
+            return None
+        sleeper_budget.note_stale_served(url, known[1])
+        return known[0]
+
     try:
         while True:
             timed_out = False
             try:
+                sleeper_budget.record_call()
                 with performance.time_block(label, category="sleeper"):
                     response = requests.get(url, timeout=timeout)
             except requests.Timeout:
@@ -824,7 +847,7 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                     time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
                     continue
                 cache_status = "timeout"
-                return None
+                return _last_known_or_none()
             except requests.RequestException:
                 # Network-level failure (connection error, etc.) — same
                 # transient treatment as a timeout.
@@ -833,16 +856,21 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                     time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
                     continue
                 cache_status = "error"
-                return None
+                return _last_known_or_none()
 
             if response.status_code == 200:
-                return response.json()
+                payload = response.json()
+                sleeper_budget.remember(url, payload)
+                return payload
             if response.status_code in _RETRYABLE_STATUS_CODES and attempt < retries:
                 attempt += 1
                 time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
                 continue
-            # Genuine 4xx (or a non-retryable/exhausted 5xx/429): fail fast,
-            # same as before this fix.
+            # Exhausted 429/5xx: serve the last real payload (with its
+            # fetch time) when we have one. A genuine 4xx fails fast.
+            if response.status_code in _RETRYABLE_STATUS_CODES:
+                cache_status = "rate_limited" if response.status_code == 429 else "error"
+                return _last_known_or_none()
             return None
     finally:
         _note_provider_timing(
@@ -1088,6 +1116,7 @@ def _download_players() -> Dict[str, Any]:
         ):
             headers["If-None-Match"] = str(info["etag"])
     try:
+        sleeper_budget.record_call()
         with performance.time_block("sleeper_players_fetch", category="sleeper"):
             resp = (
                 requests.get(url, timeout=20, headers=headers)
@@ -1170,11 +1199,17 @@ def _background_players_refresh_worker() -> None:
     global _players_bg_in_flight, _players_bg_last_failure_mono
     failed = False
     try:
-        with _players_refresh_lock(wait_seconds=0.0) as lock:
-            # Lock held elsewhere: that process is already downloading and
-            # will replace the file, so this one has nothing to do.
-            if lock.acquired and not _players_cache_is_fresh():
-                _download_players()
+        with sleeper_budget.low_priority():
+            if sleeper_budget.should_skip_outright():
+                # Over the soft call-rate threshold: the dump is only a
+                # background refresh; the on-disk copy keeps serving.
+                sleeper_budget.note_deferred()
+                return
+            with _players_refresh_lock(wait_seconds=0.0) as lock:
+                # Lock held elsewhere: that process is already downloading
+                # and will replace the file, so this one has nothing to do.
+                if lock.acquired and not _players_cache_is_fresh():
+                    _download_players()
     except Exception:
         failed = True
     finally:

@@ -214,6 +214,7 @@ from modules import (
     share_card_renderer,
     share_recommendation_cards,
     sleeper,
+    sleeper_budget,
     sleeper_leagues,
     startup_cold_path,
     stripe_billing,
@@ -649,6 +650,24 @@ def root() -> dict[str, str]:
     }
 
 
+def _with_sleeper_as_of(fn):
+    """Adds `sleeper_data_as_of` (ISO time of the OLDEST last-known Sleeper
+    payload served) to a dict response ONLY when a 429/timeout/paused refresh
+    made this request fall back to last-known data. Absent on live data, so
+    clients that ignore it are unaffected (no UI change)."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        sleeper_budget.begin_request()
+        result = fn(*args, **kwargs)
+        as_of = sleeper_budget.stale_as_of()
+        if as_of and isinstance(result, dict):
+            result = {**result, "sleeper_data_as_of": as_of}
+        return result
+
+    return wrapper
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     """Liveness only — must not depend on Supabase reachability.
@@ -747,6 +766,11 @@ def _maybe_schedule_players_refresh() -> None:
     if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DYNASTYGM_TEST_MODE"):
         return
     try:
+        if sleeper_budget.over_soft_threshold():
+            # Background refresh pauses while Sleeper budget is tight; the
+            # next request re-checks, and the on-disk copy keeps serving.
+            sleeper_budget.note_deferred()
+            return
         if not startup_cold_path.sleeper_players_cache_stale():
             return
         session_state: dict[str, Any] = {startup_cold_path.PLAYERS_REFRESH_PENDING_KEY: True}
@@ -875,13 +899,23 @@ _PROFILE_FIELDS_TTL_SECONDS = 15
 def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict[str, str]:
     cache_key = redis_cache.build_cache_key("profile_fields", user_id)
     try:
-        return redis_cache.redis_single_flight_cache(
+        fields = redis_cache.redis_single_flight_cache(
             cache_key=cache_key,
             ttl_seconds=_PROFILE_FIELDS_TTL_SECONDS,
             compute=lambda: _fetch_profile_fields_uncached(config, user_id, access_token),
         )
     except Exception:
-        return _fetch_profile_fields_uncached(config, user_id, access_token)
+        fields = _fetch_profile_fields_uncached(config, user_id, access_token)
+    # Sleeper call-rate budget priority (modules.sleeper_budget): paid tiers
+    # always proceed; free-tier requests serve last-known data once the soft
+    # threshold is crossed. A profile read that failed ("error") is not
+    # proof of a free user, so it is left untagged (never deferred).
+    try:
+        if isinstance(fields, dict) and fields.get("status") == "ok":
+            sleeper_budget.set_request_tier(fields.get("entitlement"))
+    except Exception:
+        pass
+    return fields
 
 
 def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str) -> dict[str, str]:
@@ -2386,6 +2420,7 @@ def get_league_team_rankings(
 
 
 @app.get("/v1/leagues/{league_id}/playoff-odds")
+@_with_sleeper_as_of
 def get_league_playoff_odds(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
@@ -8517,6 +8552,7 @@ FREE_DASHBOARD_VISIBLE_ITEMS = 4
 
 
 @app.get("/v1/leagues/{league_id}/dashboard")
+@_with_sleeper_as_of
 def get_league_dashboard(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
@@ -10365,6 +10401,7 @@ _PROJECTION_STATUSES_WITH_RESOLVED_GAME = frozenset({"insufficient_player_data",
 
 
 @app.get("/v1/leagues/{league_id}/my-team")
+@_with_sleeper_as_of
 def get_league_my_team(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
@@ -11668,6 +11705,7 @@ def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
 
 
 @app.get("/v1/leagues/{league_id}/matchup")
+@_with_sleeper_as_of
 def get_league_matchup(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
@@ -12137,6 +12175,7 @@ def _project_priority_add(
 
 
 @app.get("/v1/leagues/{league_id}/waivers")
+@_with_sleeper_as_of
 def get_league_waivers(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
@@ -12560,6 +12599,7 @@ TRADE_HUB_AUTO_STRATEGY = "auto"
 
 
 @app.get("/v1/leagues/{league_id}/trade-hub")
+@_with_sleeper_as_of
 def get_trade_hub_ideas(
     league_id: str = Depends(resolve_league_path_id),
     strategy: str = "retool",

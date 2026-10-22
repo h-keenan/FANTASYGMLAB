@@ -5,6 +5,7 @@ from typing import Dict, List, Literal, Optional
 from urllib.parse import quote
 
 from modules import sleeper as _sleeper
+from modules import sleeper_budget
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 
@@ -60,6 +61,7 @@ def _resolve_user_id(username: str) -> tuple[Optional[str], bool]:
     for candidate in _username_candidates(username):
         url = f"{SLEEPER_BASE}/user/{quote(candidate, safe='')}"
         try:
+            sleeper_budget.record_call()
             response = requests.get(url, timeout=5)
         except Exception:
             transport_error = True
@@ -133,6 +135,7 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
     for yr in seasons_to_try:
         url = f"{SLEEPER_BASE}/user/{user_id}/leagues/nfl/{yr}"
         try:
+            sleeper_budget.record_call()
             resp = requests.get(url, timeout=8)
         except Exception:
             transport_error = True

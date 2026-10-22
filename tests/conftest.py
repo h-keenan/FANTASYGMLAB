@@ -49,6 +49,19 @@ def _fake_redis_for_tests():
 
 
 @pytest.fixture(autouse=True)
+def _reset_sleeper_budget_for_tests():
+    """modules.sleeper_budget keeps process-global last-known payloads and a
+    call counter; without a reset one test's successful fetch would be served
+    as last-known data to a later test that expects a failure."""
+
+    from modules import sleeper_budget
+
+    sleeper_budget.reset_for_tests()
+    yield
+    sleeper_budget.reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
 def _reset_college_scouting_cache_for_tests():
     """modules.college_scouting's in-process prospects/reports/class-strength
     caches are module-level dicts shared across the whole test process (the
