@@ -183,11 +183,9 @@ def players_cache_synced_at(path: str | None = None) -> float:
 
     from modules.sleeper import PLAYERS_CACHE_PATH
 
-    target = path or PLAYERS_CACHE_PATH
-    try:
-        return float(os.path.getmtime(target))
-    except OSError:
-        return 0.0
+    from modules.sleeper import players_cache_validated_at
+
+    return players_cache_validated_at(path or PLAYERS_CACHE_PATH)
 
 
 def status_sync_freshness(

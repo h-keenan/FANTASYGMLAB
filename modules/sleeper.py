@@ -825,11 +825,73 @@ def _players_cache_mtime_ns() -> int:
         return -1
 
 
-def _players_cache_is_fresh() -> bool:
+def _players_validation_path(cache_path: str | None = None) -> str:
+    return f"{cache_path or PLAYERS_CACHE_PATH}.validation.json"
+
+
+def _read_players_validation(cache_path: str | None = None) -> Dict[str, Any]:
     try:
-        return (time.time() - os.path.getmtime(PLAYERS_CACHE_PATH)) < PLAYERS_CACHE_TTL_SECONDS
+        with open(_players_validation_path(cache_path), "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_players_validation(etag: str, *, cache_path: str | None = None) -> None:
+    """Record the dump's ETag together with the exact file it describes.
+
+    The file's own mtime must not move when Sleeper confirms nothing changed
+    (it is part of the public-player cache fingerprint, so touching it would
+    rebuild every derived frame for identical data). This sidecar's mtime is
+    the "last confirmed current" time instead.
+    """
+
+    target = cache_path or PLAYERS_CACHE_PATH
+    try:
+        stat = os.stat(target)
     except OSError:
+        return
+    path = _players_validation_path(target)
+    tmp_path = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            json.dump(
+                {"etag": etag, "size": int(stat.st_size), "mtime_ns": int(stat.st_mtime_ns)},
+                handle,
+            )
+        os.replace(tmp_path, path)
+    except OSError:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def players_cache_validated_at(cache_path: str | None = None) -> float:
+    """Newest of: the dump's mtime, or a later conditional-GET confirmation
+    (HTTP 304) that the dump is still what Sleeper serves. 0.0 when missing."""
+
+    target = cache_path or PLAYERS_CACHE_PATH
+    try:
+        stat = os.stat(target)
+    except OSError:
+        return 0.0
+    validated = float(stat.st_mtime)
+    info = _read_players_validation(target)
+    if info.get("size") == int(stat.st_size) and info.get("mtime_ns") == int(stat.st_mtime_ns):
+        try:
+            validated = max(validated, float(os.path.getmtime(_players_validation_path(target))))
+        except OSError:
+            pass
+    return validated
+
+
+def _players_cache_is_fresh() -> bool:
+    validated_at = players_cache_validated_at()
+    if validated_at <= 0:
         return False
+    return (time.time() - validated_at) < PLAYERS_CACHE_TTL_SECONDS
 
 
 def _read_players_cache_file(*, label: str) -> Optional[Dict[str, Any]]:
@@ -893,9 +955,41 @@ def _download_players() -> Dict[str, Any]:
 
     url = f"{SLEEPER_BASE}/players/nfl"
     started = time.perf_counter()
+    # Conditional GET: when the on-disk dump is exactly the one this ETag
+    # described, Sleeper answers 304 with no body, so nothing is downloaded,
+    # parsed, rewritten or re-derived. The dump is no staler than a full
+    # download would have been: the server just confirmed it is current.
+    headers: Dict[str, str] = {}
+    info = _read_players_validation()
+    if info.get("etag"):
+        try:
+            stat = os.stat(PLAYERS_CACHE_PATH)
+        except OSError:
+            stat = None
+        if (
+            stat is not None
+            and info.get("size") == int(stat.st_size)
+            and info.get("mtime_ns") == int(stat.st_mtime_ns)
+        ):
+            headers["If-None-Match"] = str(info["etag"])
     try:
         with performance.time_block("sleeper_players_fetch", category="sleeper"):
-            resp = requests.get(url, timeout=20)
+            resp = (
+                requests.get(url, timeout=20, headers=headers)
+                if headers
+                else requests.get(url, timeout=20)
+            )
+            if headers and getattr(resp, "status_code", None) == 304:
+                current = _read_players_cache_file(label="sleeper_players_disk")
+                if current is not None:
+                    _write_players_validation(headers["If-None-Match"])
+                    _note_provider_timing(
+                        "sleeper_players_fetch",
+                        (time.perf_counter() - started) * 1000.0,
+                        cache_status="not_modified",
+                    )
+                    return current
+                resp = requests.get(url, timeout=20)
             resp.raise_for_status()
             players = resp.json()
     except Exception:
@@ -916,6 +1010,14 @@ def _download_players() -> Dict[str, Any]:
         raise ValueError("Sleeper players dump was empty or not an object")
     try:
         _write_players_cache_atomically(players)
+        etag = ""
+        try:
+            raw_etag = resp.headers.get("ETag")
+            etag = raw_etag if isinstance(raw_etag, str) else ""
+        except Exception:
+            etag = ""
+        if etag:
+            _write_players_validation(etag)
     except Exception:
         pass
     _note_provider_timing(

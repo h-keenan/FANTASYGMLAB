@@ -198,11 +198,10 @@ def sleeper_players_cache_stale(
 ) -> bool:
     if not os.path.exists(cache_path):
         return True
-    try:
-        age = time.time() - os.path.getmtime(cache_path)
-    except OSError:
+    validated_at = sleeper_module.players_cache_validated_at(cache_path)
+    if validated_at <= 0:
         return True
-    return age > float(ttl_seconds)
+    return (time.time() - validated_at) > float(ttl_seconds)
 
 
 def ensure_players_for_startup(
