@@ -355,3 +355,23 @@ def test_monkeypatched_process_never_shares_through_redis(real_frame, monkeypatc
     monkeypatch.setattr(pe, "VETERAN_UNSIGNED_MIN_AGE", 99)
     _assert_parity(small)
     assert not any(key.startswith(pe._REDIS_MEMO_PREFIX) for key in _fake_redis_for_tests.keys())
+
+
+@pytest.mark.parametrize("name", ["De'Von Achane", "Davante Adams", "Travis Etienne Jr."])
+def test_inactive_status_with_ir_injury_stays_eligible_and_not_blocked(name):
+    """Sleeper sends rostered IR players as status "Inactive" + injury_status "IR"."""
+    with open(ROOT / "data" / "sleeper_players.json", encoding="utf-8") as handle:
+        dump = json.load(handle)
+    pid, player = next((k, v) for k, v in dump.items() if v.get("full_name") == name)
+    assert player["status"] == "Inactive" and player["injury_status"] == "IR"
+    record = normalize_player_record(pid, player)
+    record.update(sport=player.get("sport"), active=player.get("active"), fantasycalc_value=1000.0, stats_season=2025)
+    record["injury_status"] = player.get("injury_status")
+    frame = pd.DataFrame.from_records([record])
+    row = _assert_parity(frame).iloc[0]
+    assert bool(row["is_current_fantasy_eligible"]) is True
+    assert row["trust_enforcement"] != "blocked"
+    # A bare Inactive (no injury designation) is still excluded.
+    bare = frame.copy()
+    bare["injury_status"] = None
+    assert bool(_assert_parity(bare).iloc[0]["is_current_fantasy_eligible"]) is False

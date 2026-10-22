@@ -65,6 +65,10 @@ RESERVE_STATUS_TERMS = {
     "non football injury",
     "non-football injury",
 }
+# Sleeper reports some rostered injured players as `status: "Inactive"` with
+# `injury_status: "IR"` (and `active: true`). The injury designation is the
+# reserve signal; a bare Inactive with no injury status stays excluded.
+RESERVE_INJURY_STATUS_TERMS = RESERVE_STATUS_TERMS | {"out"}
 FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
 NEWS_FRESHNESS_DAYS = 730
 UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS = 180
@@ -192,6 +196,22 @@ def _trust_validation_fingerprint(
     )
 
 
+def _enforcement_view(row: Mapping[str, Any] | pd.Series) -> Mapping[str, Any] | pd.Series:
+    """Present Sleeper's Inactive+IR/PUP/NFI/Out players to the trust layer as reserve.
+
+    The trust layer reads a literal "Inactive" status on an active player as a
+    contradiction; with a reserve injury designation it is not.
+    """
+    if (
+        _safe_text(row.get("injury_status")).casefold() in RESERVE_INJURY_STATUS_TERMS
+        and _safe_text(row.get("status")).casefold() in INELIGIBLE_STATUS_TERMS
+    ):
+        view = row.to_dict() if hasattr(row, "to_dict") else dict(row)
+        view["status"] = "Injured Reserve"
+        return view
+    return row
+
+
 def player_eligibility(
     row: Mapping[str, Any] | pd.Series,
     *,
@@ -217,9 +237,10 @@ def player_eligibility(
     # says this is a reserve designation rather than a real inactive/retired
     # one. Fall through to the normal status + current-signal corroboration
     # below instead of auto-disqualifying.
-    if active is False and status not in RESERVE_STATUS_TERMS:
+    reserve_injury = _safe_text(row.get("injury_status")).casefold() in RESERVE_INJURY_STATUS_TERMS
+    if active is False and status not in RESERVE_STATUS_TERMS and not reserve_injury:
         return {"eligible": False, "reason": "explicitly_inactive", "current_signal": False}
-    if any(term in status for term in INELIGIBLE_STATUS_TERMS):
+    if not reserve_injury and any(term in status for term in INELIGIBLE_STATUS_TERMS):
         return {"eligible": False, "reason": "retired_or_inactive_status", "current_signal": False}
 
     years_exp = _safe_number(row.get("years_exp"))
@@ -365,7 +386,7 @@ def _annotate_player_eligibility_full(
     canonical_ids = frozenset(player_id for player_id in player_ids if player_id)
     enforcement = [
         enforce_player_record(
-            row,
+            _enforcement_view(row),
             eligible=bool(evaluation["eligible"]),
             eligibility_reason=str(evaluation["reason"]),
             duplicate_ids=duplicate_ids,
@@ -430,7 +451,7 @@ def _annotate_one_row(
 ) -> tuple[bool, str, str, str, str, str]:
     evaluation = player_eligibility(row, now=now)
     result = enforce_player_record(
-        row,
+        _enforcement_view(row),
         eligible=bool(evaluation["eligible"]),
         eligibility_reason=str(evaluation["reason"]),
         duplicate_ids=duplicate_ids,
@@ -563,6 +584,7 @@ def _constants_repr() -> str:
             sorted(INELIGIBLE_STATUS_TERMS),
             sorted(CURRENT_STATUS_TERMS),
             sorted(RESERVE_STATUS_TERMS),
+            sorted(RESERVE_INJURY_STATUS_TERMS),
             sorted(FREE_AGENT_TEAM_MARKERS),
             NEWS_FRESHNESS_DAYS,
             UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS,

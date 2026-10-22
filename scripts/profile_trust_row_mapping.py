@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from modules import trust_engine
 from modules.player_eligibility import (
     TRUST_ANNOTATION_COLUMNS,
+    _enforcement_view,
     _trust_validation_fingerprint,
     annotate_player_eligibility,
     eligibility_diagnostics,
@@ -79,7 +80,7 @@ def _finish_annotation(
     canonical_ids = frozenset(player_id for player_id in player_ids if player_id)
     enforcement = [
         enforce_player_record(
-            row,
+            _enforcement_view(row),
             eligible=bool(evaluation["eligible"]),
             eligibility_reason=str(evaluation["reason"]),
             duplicate_ids=duplicate_ids,
@@ -150,7 +151,7 @@ def reference_annotate(
     canonical_ids = frozenset(player_id for player_id in player_ids if player_id)
     enforcement = [
         enforce_player_record(
-            row,
+            _enforcement_view(row),
             eligible=bool(evaluation["eligible"]),
             eligibility_reason=str(evaluation["reason"]),
             duplicate_ids=duplicate_ids,
