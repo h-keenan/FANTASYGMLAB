@@ -50,6 +50,7 @@ import { getLastOpenedRecapId } from '../lib/recapSeen';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -493,7 +494,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : null}
       <View style={styles.quickActionsSection}>
         <SectionHeading title="Quick Actions" icon="apps-outline" />
-        <DashboardQuickActions leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+        <DashboardQuickActions
+          leagueId={leagueId}
+          leagueName={leagueName}
+          navigation={navigation}
+          // Sleeper's current week off the matchup this screen already
+          // loads, bucketed by the same rule as the server's
+          // gm_plan.derive_season_phase (lib/seasonPhase.ts) — no dates.
+          inSeason={isInSeason(matchup?.week)}
+        />
       </View>
       {teamRankings && teamRankings.length > 0 ? (
         entitlement && !entitlement.is_premium ? (
@@ -556,9 +565,18 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 // — IconCircle's own docstring is "a list of rows scans by color before it
 // scans by label," which only holds if the same destination always gets
 // the same color everywhere, not a fresh one invented per screen.
-function quickActions(colors: ThemeColors): Array<{
+//
+// Season-aware 4th slot (tap-depth audit #8): during the NFL regular season
+// and playoffs it's My Team (lineup / start-sit is the weekly job; shirt
+// icon + success green, same as the orb's My Team row) instead of Draft
+// Picks, which keeps its orb row and My Team's own draft link. Offseason
+// (or no current week known yet) keeps Draft Picks. Same 4 slots either way.
+function quickActions(
+  colors: ThemeColors,
+  inSeason: boolean,
+): Array<{
   label: string;
-  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter';
+  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter' | 'MyTeam';
   icon: React.ComponentProps<typeof IconCircle>['name'];
   color: string;
 }> {
@@ -566,7 +584,9 @@ function quickActions(colors: ThemeColors): Array<{
     { label: 'Trades', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
     { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
     { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
-    { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
+    inSeason
+      ? { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', color: colors.success }
+      : { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
   ];
 }
 
@@ -579,14 +599,16 @@ function DashboardQuickActions({
   leagueId,
   leagueName,
   navigation,
+  inSeason,
 }: {
   leagueId: string;
   leagueName: string;
   navigation: DashboardNavigation;
+  inSeason: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const actions: QuickAction[] = quickActions(colors).map((action) => ({
+  const actions: QuickAction[] = quickActions(colors, inSeason).map((action) => ({
     key: action.route,
     label: action.label,
     icon: action.icon,

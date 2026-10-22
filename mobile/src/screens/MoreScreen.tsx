@@ -2,9 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Modal,
-  Platform,
   ScrollView,
   Share,
   StyleSheet,
@@ -23,6 +21,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import IconCircle from '../components/IconCircle';
 import { api, type PushCategory } from '../lib/api';
+import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
@@ -195,13 +194,7 @@ export default function MoreScreen({ navigation }: Props) {
   // settings, not a custom in-app flow (Apple/Google require this) — this
   // just saves the "your device's account settings" instruction on the
   // Paywall from being a manual hunt.
-  const onManageSubscription = () => {
-    const url =
-      Platform.OS === 'ios'
-        ? 'https://apps.apple.com/account/subscriptions'
-        : 'https://play.google.com/store/account/subscriptions';
-    void Linking.openURL(url);
-  };
+  const onManageSubscription = openStoreSubscriptionSettings;
 
   const onOpenTeamStance = () => {
     const league = currentLeagueContext();
