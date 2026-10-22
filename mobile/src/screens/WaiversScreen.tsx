@@ -25,6 +25,8 @@ import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import StatStrip from '../components/StatStrip';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -39,6 +41,7 @@ import WaiverRecommendationCard, {
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { filterByRecommendation, type WaiverRecFilter } from '../lib/waiverChips';
 import { useOrbClearance } from '../lib/orbLayout';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
 import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
@@ -59,6 +62,19 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
 // would always render an empty list.
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'];
 const BEST_AVAILABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K'];
+
+type WaiverTab = 'recommended' | 'explore' | 'watchlist';
+const TAB_OPTIONS: Array<{ key: WaiverTab; label: string }> = [
+  { key: 'recommended', label: 'Recommended' },
+  { key: 'explore', label: 'Explore' },
+  { key: 'watchlist', label: 'Watchlist' },
+];
+const REC_FILTER_OPTIONS: Array<{ key: WaiverRecFilter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'Add', label: 'Add' },
+  { key: 'Stash', label: 'Stash' },
+  { key: 'Watch', label: 'Watch' },
+];
 
 const NO_LEAGUE_REASONS = new Set([
   'no_sleeper_username_linked',
@@ -108,6 +124,15 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [watchlistCandidates, setWatchlistCandidates] = useState<WaiverPlayer[]>([]);
   const [faabTargets, setFaabTargets] = useState<WaiverPlayer[]>([]);
   const [isPremium, setIsPremium] = useState(true);
+  const [stats, setStats] = useState<{ available: number | null; faab: string; faabLabel: string }>({
+    available: null,
+    faab: '—',
+    faabLabel: 'FAAB',
+  });
+  const [tab, setTab] = useState<WaiverTab>('recommended');
+  const [recFilter, setRecFilter] = useState<WaiverRecFilter>('all');
+  const [targetIds, setTargetIds] = useState<string[] | null>(null);
+  const [targetsFailed, setTargetsFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -143,6 +168,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
           setWatchlistCandidates(result.watchlist_candidates);
           setFaabTargets(result.faab_targets);
           setIsPremium(result.entitlement.is_premium);
+          setStats({
+            available: result.available_count ?? result.players.length,
+            ...(result.faab_enabled === false
+              ? { faab: result.waiver_mode === 'reverse_standings' ? 'Reverse' : 'Rolling', faabLabel: 'Waivers' }
+              : { faab: result.faab_remaining != null ? `$${result.faab_remaining}` : '—', faabLabel: 'FAAB' }),
+          });
           setNotice(result.reason ? reasonMessage(result.reason) : null);
         } catch (err) {
           if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load waivers.'));
@@ -181,6 +212,30 @@ export default function WaiversScreen({ route, navigation }: Props) {
     }).filter((entry): entry is { position: string; player: WaiverPlayer; count: number } => entry !== null);
   }, [freeAgents]);
 
+  // Watchlist = the user's GM Targets that are currently free agents here.
+  // Fetched lazily the first time the tab opens.
+  useEffect(() => {
+    if (tab !== 'watchlist' || targetIds !== null) return;
+    let cancelled = false;
+    api
+      .getGmTargets(leagueId)
+      .then((result) => {
+        if (!cancelled) setTargetIds(result.targets.map((t) => t.player_id));
+      })
+      .catch(() => {
+        if (!cancelled) setTargetsFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, targetIds, leagueId]);
+
+  const watchlistPlayers = useMemo(() => {
+    if (!freeAgents || !targetIds) return [];
+    const ids = new Set(targetIds);
+    return freeAgents.filter((p) => ids.has(p.player_id));
+  }, [freeAgents, targetIds]);
+
   const openPlayer = useCallback(
     (player: WaiverPlayer) =>
       navigation.navigate('PlayerDetail', { player: rankedPlayerFromWaiverPlayer(player), leagueId, leagueName }),
@@ -189,6 +244,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
   const topPriority = priorityAdds[0] ?? null;
   const secondaryPriority = priorityAdds.length > 1 ? priorityAdds.slice(1) : [];
+  const visibleSecondary = filterByRecommendation(secondaryPriority, recFilter);
   const priorityCaption =
     neededPositions.length > 0
       ? `Personalized for your needs at ${neededPositions.join(', ')}`
@@ -213,27 +269,23 @@ export default function WaiversScreen({ route, navigation }: Props) {
           neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
         }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyDesk doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
       />
+      <View style={styles.headerRow}>
+        <AppText style={styles.headerSubtitle}>Ranked by fit for your team.</AppText>
+        <StatStrip
+          items={[
+            { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
+            { label: stats.faabLabel, value: stats.faab },
+            { label: 'Team need', value: neededPositions.length > 0 ? neededPositions.join('/') : 'None' },
+          ]}
+        />
+      </View>
       <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
-      <View style={styles.discoveryCard}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search free agents"
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-          placeholderTextColor={colors.textTertiary}
-        />
-        <View style={styles.filterRow}>
-          <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
-          {/* Governs only "All Free Agents" below — Priority Adds, Best
-              Available, and the Stash/Watchlist/FAAB boards keep their own
-              existing card treatments regardless of this toggle. */}
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
-        </View>
+      <View style={styles.tabWrap}>
+        <SegmentedTabBar options={TAB_OPTIONS} active={tab} onChange={setTab} />
       </View>
 
       {loading ? (
@@ -241,70 +293,99 @@ export default function WaiversScreen({ route, navigation }: Props) {
       ) : (
         <FlatList
           ListFooterComponent={<ValuesCredit />}
-          key={viewMode}
-          data={filtered}
+          key={`${tab}-${viewMode}`}
+          data={tab === 'explore' ? filtered : tab === 'watchlist' ? watchlistPlayers : []}
           keyExtractor={(item) => item.player_id}
-          numColumns={viewMode === 'grid' ? 2 : 1}
-          columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
+          numColumns={tab === 'explore' && viewMode === 'grid' ? 2 : 1}
+          columnWrapperStyle={tab === 'explore' && viewMode === 'grid' ? styles.gridRow : undefined}
           ListHeaderComponent={
-            <View>
-              {topPriority ? (
-                <View style={styles.sectionBlock}>
-                  <SectionHeader label="Priority Adds" caption={priorityCaption} />
-                  <WaiverRecommendationCard
-                    player={topPriority}
-                    variant="primary"
-                    onPress={() => openPlayer(topPriority)}
-                  />
-                  {secondaryPriority.length > 0 ? (
-                    <AnimatedCard style={styles.compactGroupCard}>
-                      {secondaryPriority.map((player, index) => (
-                        <WaiverRecommendationCard
-                          key={player.player_id}
+            tab === 'recommended' ? (
+              <View>
+                {topPriority ? (
+                  <View style={styles.sectionBlock}>
+                    <SectionHeader label="Top Waiver Target" caption={priorityCaption} />
+                    <WaiverRecommendationCard
+                      player={topPriority}
+                      variant="primary"
+                      onPress={() => openPlayer(topPriority)}
+                    />
+                  </View>
+                ) : (
+                  <AppText style={styles.secondaryCaption}>No waiver option clearly helps right now.</AppText>
+                )}
+                {secondaryPriority.length > 0 ? (
+                  <View style={styles.sectionBlock}>
+                    <SectionHeader label="More recommended adds" />
+                    <View style={styles.filterPills}>
+                      <SegmentedTabBar options={REC_FILTER_OPTIONS} active={recFilter} onChange={setRecFilter} />
+                    </View>
+                    {visibleSecondary.length === 0 ? (
+                      <AppText style={styles.secondaryCaption}>None in this group.</AppText>
+                    ) : (
+                      <AnimatedCard style={styles.compactGroupCard}>
+                        {visibleSecondary.map((player, index) => (
+                          <WaiverRecommendationCard
+                            key={player.player_id}
+                            player={player}
+                            variant="compact"
+                            rank={index + 2}
+                            showDivider={index < visibleSecondary.length - 1}
+                            onPress={() => openPlayer(player)}
+                          />
+                        ))}
+                      </AnimatedCard>
+                    )}
+                  </View>
+                ) : null}
+                {bestAvailable.length > 0 ? (
+                  <View style={styles.sectionBlock}>
+                    <SectionHeader label="Position Snapshot" />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
+                      {bestAvailable.map(({ position: pos, player, count }) => (
+                        <BestAvailableCard
+                          key={pos}
+                          position={pos}
                           player={player}
-                          variant="compact"
-                          showDivider={index < secondaryPriority.length - 1}
+                          note={`${count} active`}
                           onPress={() => openPlayer(player)}
                         />
                       ))}
-                    </AnimatedCard>
-                  ) : null}
+                    </ScrollView>
+                  </View>
+                ) : null}
+                <SecondaryWaiverBoard
+                  isPremium={isPremium}
+                  stashCandidates={stashCandidates}
+                  watchlistCandidates={watchlistCandidates}
+                  faabTargets={faabTargets}
+                  onPressPlayer={openPlayer}
+                />
+              </View>
+            ) : tab === 'explore' ? (
+              <View>
+                <View style={styles.discoveryCard}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search free agents"
+                    value={search}
+                    onChangeText={setSearch}
+                    autoCapitalize="none"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                  <View style={styles.filterRow}>
+                    <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+                    <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                  </View>
                 </View>
-              ) : null}
-              {/* Structural reorder (this pass): Stash Candidates / Watchlist
-                  Depth / FAAB Shortlist — and the Free-tier upsell for them —
-                  used to render as the very last thing on the whole screen,
-                  after the full "All Free Agents" table (see the ListFooterComponent
-                  this replaced). That buried genuinely personalized,
-                  roster-aware recommendations behind a page of generic
-                  browsing, contradicting both Magna Carta §31 ("Personalized
-                  Priority Adds should normally appear before generic Best
-                  Available browsing") and this board's own caption text below
-                  ("check these after Priority Adds" — which wasn't true of
-                  its old position). Moved here, immediately after Priority
-                  Adds, so every personalized recommendation lives in one
-                  place before the market-snapshot/generic-browsing sections
-                  that follow. No content, gating, or data changed — only
-                  where it renders. */}
-              <SecondaryWaiverBoard
-                isPremium={isPremium}
-                stashCandidates={stashCandidates}
-                watchlistCandidates={watchlistCandidates}
-                faabTargets={faabTargets}
-                onPressPlayer={openPlayer}
-              />
-              {bestAvailable.length > 0 ? (
-                <View style={styles.sectionBlock}>
-                  <SectionHeader label="Best Available by Position" />
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
-                    {bestAvailable.map(({ position: pos, player, count }) => (
-                      <BestAvailableCard key={pos} position={pos} player={player} count={count} onPress={() => openPlayer(player)} />
-                    ))}
-                  </ScrollView>
-                </View>
-              ) : null}
-              <SectionHeader label="All Free Agents" />
-            </View>
+                <SectionHeader label="All Free Agents" />
+              </View>
+            ) : (
+              <View>
+                <SectionHeader label="Your GM Targets on the wire" />
+                {targetsFailed ? <AppText style={styles.secondaryCaption}>Couldn't load your GM Targets.</AppText> : null}
+                {!targetsFailed && targetIds === null ? <AppText style={styles.secondaryCaption}>Loading…</AppText> : null}
+              </View>
+            )
           }
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
           renderItem={({ item, index }) => (
@@ -318,11 +399,19 @@ export default function WaiversScreen({ route, navigation }: Props) {
             />
           )}
           ListEmptyComponent={
-            <EmptyState
-              icon="search-outline"
-              title="No free agents match"
-              subtitle="Try a different search term or position filter."
-            />
+            tab === 'explore' ? (
+              <EmptyState
+                icon="search-outline"
+                title="No free agents match"
+                subtitle="Try a different search term or position filter."
+              />
+            ) : tab === 'watchlist' && targetIds !== null && !targetsFailed ? (
+              <EmptyState
+                icon="bookmark-outline"
+                title="No GM Targets on the wire"
+                subtitle="None of your GM Targets are free agents right now."
+              />
+            ) : null
           }
         />
       )}
@@ -367,29 +456,30 @@ function SecondaryWaiverBoard({
     return null;
   }
   const groups: Array<{ label: string; players: WaiverPlayer[] }> = [
-    { label: 'Stash Candidates', players: stashCandidates },
-    { label: 'Watchlist Depth', players: watchlistCandidates },
+    { label: 'Top Stash Candidates', players: stashCandidates },
+    { label: 'Bench Depth', players: watchlistCandidates },
     { label: 'FAAB Shortlist', players: faabTargets },
   ].filter((group) => group.players.length > 0);
   return (
     <View style={styles.secondaryBoard}>
-      <AppText style={styles.secondaryCaption}>Ranked by raw value, after Priority Adds.</AppText>
+      <ScreenInfoNote
+        label="Stash, depth and FAAB: ranked by raw value"
+        text="Includes positions you don't currently need, so a higher number here can still rank below a lower one in Priority Adds above. Kickers and defenses are never stash candidates."
+      />
       {groups.map((group) => (
         <View key={group.label} style={styles.sectionBlock}>
           <SectionHeader label={group.label} />
-          <AnimatedCard style={styles.compactGroupCard}>
-            {group.players.map((player, index) => (
-              <FreeAgentRow
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
+            {group.players.map((player) => (
+              <BestAvailableCard
                 key={player.player_id}
+                position={player.position ?? ''}
                 player={player}
-                rank={index + 1}
-                isFirst={index === 0}
-                isLast={index === group.players.length - 1}
-                bare
+                note={player.team ?? undefined}
                 onPress={() => onPressPlayer(player)}
               />
             ))}
-          </AnimatedCard>
+          </ScrollView>
         </View>
       ))}
     </View>
@@ -426,12 +516,12 @@ function SecondaryWaiverBoard({
 function BestAvailableCard({
   position,
   player,
-  count,
+  note,
   onPress,
 }: {
   position: string;
   player: WaiverPlayer;
-  count: number;
+  note?: string;
   onPress: () => void;
 }) {
   const { colors, isDark } = useThemeMode();
@@ -471,7 +561,7 @@ function BestAvailableCard({
       </AppText>
       <View style={styles.bestAvailableFooterRow}>
         <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-        <AppText style={styles.bestAvailableCount}>{count} active</AppText>
+        {note ? <AppText style={styles.bestAvailableCount}>{note}</AppText> : null}
       </View>
     </AnimatedCard>
   );
@@ -723,6 +813,18 @@ function createStyles(colors: ThemeColors) {
   freeAgentTrailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs, paddingBottom: spacing.xs },
   freeAgentValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
   beginnerIntro: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  headerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  headerSubtitle: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
+  tabWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  filterPills: { marginBottom: spacing.sm },
   freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
   positionRankPill: {
     backgroundColor: colors.backgroundElevated,

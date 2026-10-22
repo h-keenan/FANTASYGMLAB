@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { WaiversContent } from "./WaiversContent";
+import { api } from "@/lib/api";
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 
 function player(overrides: Partial<WaiverPlayer>): WaiverPlayer {
@@ -64,7 +65,8 @@ describe("WaiversContent", () => {
   it("renders the league name, stat tiles, and the top Priority Add with FAAB range and confidence", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByText("Dynasty Overlords")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Waivers" })).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getAllByText("Test Free Agent").length).toBeGreaterThan(0);
     expect(screen.getByText("$8–$14")).toBeInTheDocument();
@@ -110,7 +112,7 @@ describe("WaiversContent", () => {
     };
     render(<WaiversContent leagueName="Dynasty Overlords" data={premium} />);
 
-    expect(screen.getByText("Stash Candidates")).toBeInTheDocument();
+    expect(screen.getByText("Top Stash Candidates")).toBeInTheDocument();
     expect(screen.getByText("Stash Target")).toBeInTheDocument();
   });
 
@@ -135,7 +137,7 @@ describe("WaiversContent", () => {
     const withFaab: WaiversResponse = { ...BASE_RESPONSE, faab_remaining: 94, faab_initial: 100 };
     render(<WaiversContent leagueName="Dynasty Overlords" data={withFaab} />);
 
-    expect(screen.getByText("Your FAAB")).toBeInTheDocument();
+    expect(screen.getByText("FAAB")).toBeInTheDocument();
     expect(screen.getByText("$94")).toBeInTheDocument();
   });
 
@@ -194,10 +196,10 @@ describe("WaiversContent", () => {
     expect(container.textContent).not.toMatch(/0–0%/);
   });
 
-  it("omits the Your FAAB tile when the backend has no balance to report", () => {
+  it("omits the FAAB balance when the backend has no balance to report", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    expect(screen.queryByText("Your FAAB")).not.toBeInTheDocument();
+    expect(screen.queryByText("$94")).not.toBeInTheDocument();
   });
 
   // Recommendation-compliance audit, Check 3 — CTA reachability: a GM Plan/
@@ -250,5 +252,28 @@ describe("WaiversContent", () => {
       expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
       expect(screen.getAllByText("Test Free Agent").length).toBeGreaterThan(0);
     });
+  });
+
+  it("Explore tab shows the searchable free-agent list", () => {
+    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    expect(screen.queryByPlaceholderText("Search free agents")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    expect(screen.getByPlaceholderText("Search free agents")).toBeInTheDocument();
+  });
+
+  it("Watchlist tab lists GM Targets that are free agents", async () => {
+    const spy = vi.spyOn(api, "getGmTargets").mockResolvedValue({
+      ok: true,
+      targets: [{ player_id: "fa1", source_surface: "x", created_at: null, untouchable: false }],
+    } as Awaited<ReturnType<typeof api.getGmTargets>>);
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      players: [player({ player_id: "fa1", name: "Target Guy" }), player({ player_id: "fa2", name: "Other Guy" })],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} leagueId="L1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Watchlist" }));
+    expect(await screen.findByText("Target Guy")).toBeInTheDocument();
+    expect(screen.queryByText("Other Guy")).not.toBeInTheDocument();
+    spy.mockRestore();
   });
 });
