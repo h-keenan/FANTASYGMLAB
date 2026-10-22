@@ -141,9 +141,9 @@ noted for each field.
 
 **Google Play short description (80 max):**
 
-> Dynasty GM in your pocket: next moves, trade ideas that fit your plan and league.
+> Your dynasty GM: next moves and trade ideas that fit your plan and your league.
 
-That's 81 characters. Check the count again after any edit.
+That's 79 characters. Check the count again after any edit.
 
 **App Store promotional text (170 max):**
 
