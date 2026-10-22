@@ -245,6 +245,27 @@ def team_schedule(
     return [dict(row) for row in _season_schedule_index(df, season).get(team_code, ())]
 
 
+def team_bye_week(
+    team: str,
+    season: int,
+    *,
+    games: pd.DataFrame | None = None,
+) -> int | None:
+    """The regular-season week this team has no game, or None.
+
+    None for an unknown team / no schedule rather than a guess. Reads the
+    per-(games frame, season) schedule index, which is the in-process cache:
+    keyed on the frame object, so it cannot go stale across seasons.
+    """
+
+    if not team:
+        return None
+    for row in team_schedule(team, season, games=games):
+        if row.get("bye"):
+            return int(row["week"])
+    return None
+
+
 # Performance audit, 2026-10-21: team_schedule used to filter the season,
 # copy and alias-map every team code, and iterrows the result on EVERY call.
 # The Matchup screen alone calls it ~60 times per request (once per starter,

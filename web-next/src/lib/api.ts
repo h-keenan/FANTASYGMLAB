@@ -1766,6 +1766,10 @@ export interface QuickViewIdentity {
   value_score: number | null;
   overall_rating: number | null;
   value_note: string;
+  /** Team bye week for the current season; null for a free agent or no schedule. */
+  bye_week?: number | null;
+  /** True only in season, during that bye week. */
+  on_bye_this_week?: boolean;
 }
 
 /** GET /v1/players/{id}/awards' response — mirrors
