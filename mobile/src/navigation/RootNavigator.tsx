@@ -78,8 +78,16 @@ export type RootStackParamList = {
   Dashboard: { leagueId: string; leagueName: string };
   // Single consolidated host for Trade Hub ("Trade Block"), Trade Finder
   // ("Search"), and Trade Analyzer ("Make a Trade") — see TradesScreen.
-  // `initialTab` defaults to 'block' when omitted.
-  Trades: { leagueId: string; leagueName: string; initialTab?: 'block' | 'search' | 'make' };
+  // `initialTab` defaults to 'block' when omitted. `tradePlayer` is the
+  // player a PlayerDetail / Players "Add to Trade" or "Find trades" shortcut
+  // started from: 'make' files them on the right side of Trade Analyzer,
+  // 'search' pre-selects them in Trade Finder and runs the search.
+  Trades: {
+    leagueId: string;
+    leagueName: string;
+    initialTab?: 'block' | 'search' | 'make';
+    tradePlayer?: RankedPlayer;
+  };
   // `metric` picks which TeamRanking rank field the leaderboard sorts/labels
   // by (defaults to 'power' when omitted, matching every pre-existing
   // caller) — added so My Team's Age tile (TeamAnalysisPanel) can drill

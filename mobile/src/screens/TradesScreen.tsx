@@ -45,7 +45,7 @@ const TAB_OPTIONS: Array<{ key: TradesTab; label: string }> = [
  * calls up front, but switching tabs back and forth doesn't re-fetch either.
  */
 export default function TradesScreen({ route, navigation }: Props) {
-  const { leagueId, leagueName, initialTab } = route.params;
+  const { leagueId, leagueName, initialTab, tradePlayer } = route.params;
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -106,12 +106,22 @@ export default function TradesScreen({ route, navigation }: Props) {
         ) : null}
         {visitedTabs.has('search') ? (
           <View style={[styles.tabPane, activeTab !== 'search' && styles.tabPaneHidden]}>
-            <TradeFinderScreen leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+            <TradeFinderScreen
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+              presetPlayerId={initialTab === 'search' ? tradePlayer?.player_id : undefined}
+            />
           </View>
         ) : null}
         {visitedTabs.has('make') ? (
           <View style={[styles.tabPane, activeTab !== 'make' && styles.tabPaneHidden]}>
-            <TradeAnalyzerScreen leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+            <TradeAnalyzerScreen
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+              quickAddPlayer={initialTab === 'make' ? tradePlayer : undefined}
+            />
           </View>
         ) : null}
       </View>

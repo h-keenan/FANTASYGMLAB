@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -39,6 +39,7 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
+import { quickAddPlacement } from '../lib/tradeShortcuts';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -58,6 +59,10 @@ interface Props {
   leagueId: string;
   leagueName: string;
   navigation: TradeAnalyzerNavigation;
+  /** PlayerDetail / Players "Add to Trade" (tap-depth audit #1): filed on
+   * the right side once rosters load, owning team selected, and the active
+   * side moved to the empty one. */
+  quickAddPlayer?: RankedPlayer;
 }
 type Side = 'send' | 'receive';
 type AssetType = 'players' | 'picks';
@@ -120,7 +125,7 @@ interface OtherTeam {
 
 const ALL_TEAMS_ID = '__all__';
 
-export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }: Props) {
+export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, quickAddPlayer }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -237,6 +242,33 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
       cancelled = true;
     };
   }, [leagueId, lens]);
+
+  // "Add to Trade" quick-add — once per player id, after the first load
+  // (needs myRosterIds/otherTeams to know whose player this is). Mirrors web
+  // TradeAnalyzerContent's quickAddPlayerId; a player on no roster here is
+  // simply not added (fail open). Prefers the freshly ranked row (current
+  // lens score) over the one handed in by the caller.
+  const appliedQuickAddId = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || !quickAddPlayer?.player_id) return;
+    if (appliedQuickAddId.current === quickAddPlayer.player_id) return;
+    appliedQuickAddId.current = quickAddPlayer.player_id;
+    const placement = quickAddPlacement(quickAddPlayer.player_id, myRosterIds, otherTeams);
+    if (!placement) return;
+    const player = rankings.find((p) => p.player_id === quickAddPlayer.player_id) ?? quickAddPlayer;
+    const addOnce = (prev: RankedPlayer[]) =>
+      prev.some((p) => p.player_id === player.player_id) ? prev : [...prev, player];
+    if (placement.side === 'send') {
+      setSendIds(addOnce);
+    } else {
+      setReceiveIds(addOnce);
+      if (placement.partnerRosterId) setSelectedTeamId(placement.partnerRosterId);
+    }
+    setActiveSide(placement.focusSide);
+    setSearch('');
+    setPositionFilter(null);
+    setVerdict(null);
+  }, [loading, quickAddPlayer, myRosterIds, otherTeams, rankings]);
 
   const selectedIds = useMemo(
     () => new Set([...sendIds, ...receiveIds].map((p) => p.player_id)),

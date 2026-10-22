@@ -54,6 +54,8 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { tradeShortcutsFor } from '../lib/tradeShortcuts';
+import { useRosterOwnership } from '../lib/useRosterOwnership';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
@@ -1263,6 +1265,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsModalOpen, setNewsModalOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // "Add to Trade" / "Find trades" (tap-depth audit #1/#2) — shown only once
+  // ownership is known: Add to Trade for any rostered player, Find trades
+  // only for the user's own.
+  const tradeShortcuts = tradeShortcutsFor(player.player_id, useRosterOwnership(leagueId));
   // Overall + Snapshot module: collapsed by default, tapping the hero's OVR
   // ring reveals the Snapshot detail in place (coridian_, Discord — "if you
   // tap on the overall, it gives you the expanded information") instead of
@@ -1578,6 +1584,34 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
             <AppText style={styles.compareButtonText}>Compare</AppText>
           </TouchableOpacity>
+        </View>
+      ) : null}
+      {tradeShortcuts.canAddToTrade ? (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={styles.compareButton}
+            onPress={() =>
+              navigation.push('Trades', { leagueId, leagueName, initialTab: 'make', tradePlayer: player })
+            }
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${player.name ?? 'this player'} to a trade`}
+          >
+            <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />
+            <AppText style={styles.compareButtonText}>Add to Trade</AppText>
+          </TouchableOpacity>
+          {tradeShortcuts.canFindTrades ? (
+            <TouchableOpacity
+              style={styles.compareButton}
+              onPress={() =>
+                navigation.push('Trades', { leagueId, leagueName, initialTab: 'search', tradePlayer: player })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`Find trades for ${player.name ?? 'this player'}`}
+            >
+              <Ionicons name="search-outline" size={14} color={colors.accent} />
+              <AppText style={styles.compareButtonText}>Find trades</AppText>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
     </>

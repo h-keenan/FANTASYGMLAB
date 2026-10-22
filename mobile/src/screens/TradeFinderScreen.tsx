@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
@@ -46,6 +46,9 @@ interface Props {
   leagueId: string;
   leagueName: string;
   navigation: TradeFinderNavigation;
+  /** PlayerDetail / Players "Find trades" (tap-depth audit #2): pre-selects
+   * this player of yours once the roster loads and runs the search. */
+  presetPlayerId?: string;
 }
 
 // Button height (paddingVertical * 2 + line height) plus its own gap above
@@ -432,7 +435,7 @@ function ResultCard({
  * modules.trade_hub_engine.generate_trade_finder_records), just restricted
  * to whatever the caller picks here instead of the unrestricted pool.
  */
-export default function TradeFinderScreen({ leagueId, leagueName, navigation }: Props) {
+export default function TradeFinderScreen({ leagueId, leagueName, navigation, presetPlayerId }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -503,11 +506,11 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
 
   const selectionCount = selectedIds.size + selectedPickIds.size;
 
-  const search = async () => {
+  const search = async (playerIds: string[] = Array.from(selectedIds)) => {
     setSearchError(null);
     setSearching(true);
     try {
-      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens, {
+      const result = await api.getTradeFinderIdeas(leagueId, playerIds, strategy, lens, {
         pickIds: Array.from(selectedPickIds),
         returnPicks: returnScope === 'picks',
       });
@@ -525,6 +528,22 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
       setSearching(false);
     }
   };
+
+  // "Find trades" preset — once per player id, after the roster loads, and
+  // only when the player really is on your roster (otherwise this is just
+  // the normal empty builder). Free users get the same server response a
+  // manual search would (this screen's existing gating, unchanged).
+  const appliedPresetId = useRef<string | null>(null);
+  useEffect(() => {
+    if (loadingRoster || !presetPlayerId || appliedPresetId.current === presetPlayerId) return;
+    appliedPresetId.current = presetPlayerId;
+    if (!roster.some((p) => p.player_id === presetPlayerId)) return;
+    setSelectedIds(new Set([presetPlayerId]));
+    setSelectedPickIds(new Set());
+    void search([presetPlayerId]);
+    // `search` is recreated every render; the ref guard makes this one-shot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingRoster, presetPlayerId, roster]);
 
   const openPlayer = (asset: PresentationAsset) =>
     navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
@@ -649,7 +668,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
             // read as one muddy double-treatment at the bottom of the screen.
             { bottom: orbClearance + spacing.sm },
           ]}
-          onPress={search}
+          onPress={() => search()}
           disabled={searching}
           accessibilityRole="button"
           accessibilityLabel="Find Trades"

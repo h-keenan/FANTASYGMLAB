@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-n
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import EmptyState from '../components/EmptyState';
@@ -24,6 +25,8 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { usePlayerListViewMode } from '../lib/viewModePreference';
+import { tradeShortcutsFor } from '../lib/tradeShortcuts';
+import { useRosterOwnership } from '../lib/useRosterOwnership';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -61,6 +64,52 @@ function matchesAvailability(injuryStatus: string | null, filter: AvailabilityFi
 }
 
 /**
+ * Compact icon actions for a Players row (tap-depth audit #1/#2) — web's
+ * Players rows carry "Add to Trade" too. Rendered only when the caller
+ * passes a handler, i.e. once ownership is known: Add to Trade for any
+ * rostered player, Find trades only for the user's own.
+ */
+function RowTradeActions({
+  playerName,
+  onAddToTrade,
+  onFindTrades,
+}: {
+  playerName: string;
+  onAddToTrade?: () => void;
+  onFindTrades?: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (!onAddToTrade && !onFindTrades) return null;
+  return (
+    <View style={styles.rowActions}>
+      {onAddToTrade ? (
+        <TouchableOpacity
+          onPress={onAddToTrade}
+          hitSlop={6}
+          style={styles.rowActionButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${playerName} to a trade`}
+        >
+          <Ionicons name="swap-horizontal-outline" size={18} color={colors.accent} />
+        </TouchableOpacity>
+      ) : null}
+      {onFindTrades ? (
+        <TouchableOpacity
+          onPress={onFindTrades}
+          hitSlop={6}
+          style={styles.rowActionButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Find trades for ${playerName}`}
+        >
+          <Ionicons name="search-outline" size={18} color={colors.accent} />
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * Dense grouped-table row for the ranked player list — canonical
  * PlayerIdentityRow for identity (rank as the leading slot chip, tier +
  * opportunity classification, injury pill), plus a trailing value column
@@ -83,17 +132,24 @@ function PlayerRankRow({
   isLast,
   grid = false,
   onPress,
+  onAddToTrade,
+  onFindTrades,
 }: {
   player: RankedPlayer;
   isFirst: boolean;
   isLast: boolean;
   grid?: boolean;
   onPress: () => void;
+  onAddToTrade?: () => void;
+  onFindTrades?: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const injury = waiverInjuryDisplay(player.injury_status);
   const scoreText = player.score != null ? String(Math.round(player.score)) : '—';
+  const tradeActions = (
+    <RowTradeActions playerName={player.name ?? 'this player'} onAddToTrade={onAddToTrade} onFindTrades={onFindTrades} />
+  );
 
   if (grid) {
     return (
@@ -116,6 +172,7 @@ function PlayerRankRow({
             footer strip rather than through PlayerIdentityRow's own
             trailingValue prop, matching how the list-mode row above composes
             its own trailing block beside (not inside) PlayerIdentityRow. */}
+        <View style={styles.gridFooterRow}>
         <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.gridTrailingFooter}>
           <AppText style={styles.playerScore}>{scoreText}</AppText>
           <View style={styles.playerTrailingChips}>
@@ -131,6 +188,8 @@ function PlayerRankRow({
             {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
           </View>
         </TouchableOpacity>
+        {tradeActions}
+        </View>
       </View>
     );
   }
@@ -175,6 +234,7 @@ function PlayerRankRow({
           {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
         </View>
       </TouchableOpacity>
+      {tradeActions}
     </View>
   );
 }
@@ -195,6 +255,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { viewMode, setViewMode } = usePlayerListViewMode('players');
+  const ownership = useRosterOwnership(leagueId);
 
   useScreenHeaderTitle(navigation, 'Players', leagueName);
 
@@ -287,15 +348,28 @@ export default function PlayersScreen({ route, navigation }: Props) {
           initialNumToRender={16}
           maxToRenderPerBatch={16}
           windowSize={9}
-          renderItem={({ item, index }) => (
-            <PlayerRankRow
-              player={item}
-              isFirst={index === 0}
-              isLast={index === filtered.length - 1}
-              grid={viewMode === 'grid'}
-              onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
-            />
-          )}
+          renderItem={({ item, index }) => {
+            const shortcuts = tradeShortcutsFor(item.player_id, ownership);
+            return (
+              <PlayerRankRow
+                player={item}
+                isFirst={index === 0}
+                isLast={index === filtered.length - 1}
+                grid={viewMode === 'grid'}
+                onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
+                onAddToTrade={
+                  shortcuts.canAddToTrade
+                    ? () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'make', tradePlayer: item })
+                    : undefined
+                }
+                onFindTrades={
+                  shortcuts.canFindTrades
+                    ? () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'search', tradePlayer: item })
+                    : undefined
+                }
+              />
+            );
+          }}
           ListFooterComponent={filtered.length > 0 ? <ValuesCredit /> : null}
           ListEmptyComponent={
             <EmptyState
@@ -391,15 +465,22 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.cardBorder,
     padding: spacing.sm,
   },
-  gridTrailingFooter: {
+  gridFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: spacing.xs,
     paddingTop: spacing.xs,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  gridTrailingFooter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: spacing.xs },
+  rowActionButton: { padding: spacing.xs },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }
