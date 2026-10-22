@@ -507,6 +507,41 @@ export interface TradeWindow {
   message: string;
 }
 
+export interface KeeperPlayerInfo {
+  is_keeper: boolean;
+  kept_round: number | null;
+  cost_round: number | null;
+  cost_source: "keeper_pick" | "last_draft_round" | null;
+  /** Estimated: player value minus the typical value at the cost round. */
+  surplus: number | null;
+}
+
+export interface KeeperCandidate {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  value: number;
+  cost_round: number;
+  cost_source: string;
+  surplus: number;
+  is_keeper: boolean;
+  reason: string;
+}
+
+export interface KeepersResponse {
+  ok: boolean;
+  is_keeper_league: boolean;
+  reason?: string;
+  estimate_note?: string;
+  players?: Record<string, KeeperPlayerInfo>;
+  candidates?: KeeperCandidate[];
+  recommended_ids?: string[];
+  keep_count?: number;
+  keep_count_basis?: "league_setting" | "previous_draft" | "declared_keepers" | "unknown";
+  unpriced_count?: number;
+}
+
 export interface MyTeamResponse {
   ok: boolean;
   starters: LineupPlayer[];
@@ -2778,6 +2813,11 @@ export const api = {
   getMyTeam: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<MyTeamResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/my-team?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getKeepers: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<KeepersResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/keepers?lens=${encodeURIComponent(lens)}`,
     ),
 
   getMyTeamNeeds: (leagueId: string, lens: string = "Dynasty") =>
