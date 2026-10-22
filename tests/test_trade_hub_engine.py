@@ -661,3 +661,67 @@ def test_generate_trade_idea_records_forwards_trade_finder_pick_controls():
     assert mock_build.call_args.kwargs["trade_block_pick_ids"] == ["2027:1:1"]
     assert mock_build.call_args.kwargs["require_receive_picks"] is True
     assert mock_build.call_args.kwargs["trade_block_names"] == []
+
+
+def _keeper_players_df():
+    return pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=60), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=40)]
+    )
+
+
+def _run_with_keeper_context(keeper_context):
+    summary = pd.DataFrame(
+        [{"league_id": "league-1", "roster_id": 1, "owner_id": "u1", "team_name": "Mine", "total_score": 80}]
+    )
+    with patch("modules.trade_ideas.build_trade_ideas", return_value=[]) as mock_build:
+        trade_hub_engine.generate_trade_idea_records(
+            league_id="league-1",
+            my_roster_id=1,
+            players_df=_keeper_players_df(),
+            rosters=_rosters(),
+            league_settings=SETTINGS,
+            score_field="dynasty_score",
+            df_summary=summary,
+            keeper_context=keeper_context,
+        )
+    return mock_build.call_args.kwargs["df_players"].set_index("player_id")["dynasty_score"]
+
+
+def test_generate_trade_idea_records_applies_keeper_surplus_and_skips_unknown_cost():
+    base = _run_with_keeper_context(None)
+    adj = _run_with_keeper_context(
+        {
+            "num_teams": 2,
+            "current_picks": [{"player_id": "my-rb", "round": 10, "is_keeper": True}],
+            "previous_picks": [],
+            "round_penalty": 0,
+        }
+    )
+    assert adj["my-rb"] > base["my-rb"]
+    for pid in ("my-qb", "opp-rb", "opp-wr"):
+        assert adj[pid] == base[pid]
+
+
+def test_keeper_context_failure_falls_back_silently():
+    with patch("modules.keepers.keeper_adjusted_values", side_effect=RuntimeError("boom")):
+        out = _run_with_keeper_context({"num_teams": 2, "current_picks": [], "previous_picks": []})
+    assert out.to_dict() == _run_with_keeper_context(None).to_dict()
+
+
+def test_cached_ideas_only_pass_keeper_context_for_keeper_leagues():
+    for keeper_mode in (True, False):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "L"}), patch(
+            "modules.sleeper.get_rosters", return_value=_rosters()
+        ), patch(
+            "modules.league_value_settings.detect_league_value_settings_from_payload",
+            return_value={"_keeper_mode": keeper_mode},
+        ), patch(
+            "modules.league_value_settings.build_valued_players_frame_cached", return_value=_keeper_players_df()
+        ), patch(
+            "modules.league_rankings.build_league_summary_and_draft_capital_cached",
+            return_value=(pd.DataFrame(), None),
+        ), patch.object(
+            trade_hub_engine, "_keeper_context_for_league", return_value={"num_teams": 12, "round_penalty": 2}
+        ), patch.object(trade_hub_engine, "generate_trade_idea_records", return_value=[]) as gen:
+            trade_hub_engine._generate_trade_idea_records_cached("L", 1, "retool", "dynasty", "x.db", (), (), 2, 0)
+        assert (gen.call_args.kwargs["keeper_context"] is not None) is keeper_mode
