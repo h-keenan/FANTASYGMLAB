@@ -90,7 +90,7 @@ function AlertIdentityChip({ alert }: { alert: AlertItem }) {
   );
 }
 
-function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertItem) => void }) {
+export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertItem) => void }) {
   const relationship = alert.roster_relationship;
   const sourceBit = alert.source ? `Source: ${alert.source}` : null;
   const time = relativeTime(alert.published_ts);

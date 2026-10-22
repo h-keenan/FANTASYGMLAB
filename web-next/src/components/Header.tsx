@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
+import { AlertsBell } from "@/components/AlertsDropdown";
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
@@ -287,8 +288,8 @@ const ICON_BUTTON_STYLE = {
 
 /**
  * Search and alerts, level with the page title. Search opens the GM orb's
- * destination and player search (no second search UI); the bell goes to the
- * league's Alerts page. Alerts only exists inside a league, so the bell is
+ * destination and player search (no second search UI); the bell opens an
+ * alerts dropdown (AlertsDropdown.tsx) that links to the Alerts page. Alerts only exists inside a league, so the bell is
  * hidden elsewhere. Rendered only when signed in.
  */
 function HeaderIconActions() {
@@ -316,13 +317,8 @@ function HeaderIconActions() {
           <path d="m20 20-3.5-3.5" />
         </svg>
       </button>
-      {alertsHref ? (
-        <Link href={alertsHref} aria-label="Alerts" className="inline-flex items-center justify-center" style={ICON_BUTTON_STYLE}>
-          <svg {...svg}>
-            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>
-        </Link>
+      {alertsHref && leagueId ? (
+        <AlertsBell key={leagueId} leagueId={leagueId} alertsHref={alertsHref} iconProps={svg} buttonStyle={ICON_BUTTON_STYLE} />
       ) : null}
     </>
   );
