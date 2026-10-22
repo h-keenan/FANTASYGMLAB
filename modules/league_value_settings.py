@@ -27,6 +27,7 @@ import time
 import weakref
 from typing import Any, Mapping
 
+import numpy as np
 import pandas as pd
 
 from modules import player_eligibility, rankings, redis_cache, sleeper
@@ -501,6 +502,64 @@ def _passing_intensity_series(df: pd.DataFrame) -> pd.Series:
     return usage.where(has_usage, fallback).clip(0.0, 1.0)
 
 
+# Anchor uplift for an average-tier, prime-age QB (the old flat constants).
+QB_FORMAT_UPLIFT = {"Superflex": 0.35, "2QB": 0.55}
+# Share of the anchor uplift by the QB's own score: replacement-level QBs gain
+# the most from an extra starting slot (they become startable), elite QBs gain
+# the least (already starters in 1QB).
+QB_UPLIFT_TIER_POINTS = ((2000.0, 1.20), (5000.0, 1.0), (8000.0, 0.80))
+# Older QBs have fewer remaining seasons of the extra-slot scarcity, so the
+# uplift tapers linearly from age 33 to 40.
+QB_UPLIFT_AGE_POINTS = ((33.0, 1.0), (40.0, 0.5))
+
+
+def smooth_decline(ages: pd.Series, start_age: float, floor: float, width: float = 2.0) -> pd.Series:
+    """Linear ramp from 1.0 at ``start_age - 1`` to ``floor`` at ``start_age - 1 + width``.
+
+    Replaces an ``age >= start_age -> floor`` cliff. Missing ages are neutral.
+    """
+
+    progress = ((ages - (start_age - 1.0)) / width).clip(lower=0.0, upper=1.0)
+    return (1.0 - (1.0 - floor) * progress).where(ages.notna(), 1.0)
+
+
+def smooth_youth_bonus(ages: pd.Series, points: tuple[tuple[float, float], ...]) -> pd.Series:
+    """Piecewise-linear youth multiplier (flat outside the first/last point)."""
+
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    out = pd.Series(np.interp(ages.fillna(99.0).to_numpy(dtype=float), xs, ys), index=ages.index)
+    return out.where(ages.notna(), 1.0)
+
+
+def qb_scarcity_multiplier(df: pd.DataFrame, anchor_uplift: float) -> pd.Series:
+    """Per-QB Superflex/2QB multiplier: anchor uplift scaled by tier and age."""
+
+    index = df.index
+    scores = pd.to_numeric(
+        df["base_score"] if "base_score" in df.columns else df.get("dynasty_score", pd.Series(float("nan"), index=index)),
+        errors="coerce",
+    )
+    ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=index)), errors="coerce")
+    tier = pd.Series(
+        np.interp(
+            scores.fillna(5000.0).to_numpy(dtype=float),
+            [p[0] for p in QB_UPLIFT_TIER_POINTS],
+            [p[1] for p in QB_UPLIFT_TIER_POINTS],
+        ),
+        index=index,
+    )
+    age_shape = pd.Series(
+        np.interp(
+            ages.fillna(30.0).to_numpy(dtype=float),
+            [p[0] for p in QB_UPLIFT_AGE_POINTS],
+            [p[1] for p in QB_UPLIFT_AGE_POINTS],
+        ),
+        index=index,
+    )
+    return 1.0 + anchor_uplift * tier * age_shape
+
+
 def league_settings_adjustment_components(
     df: pd.DataFrame, league_settings: dict | None
 ) -> dict[str, pd.Series]:
@@ -540,10 +599,9 @@ def league_settings_adjustment_components(
 
     qb_scarcity = ones.copy()
     qb_format = str(settings.get("qb_format") or "1QB")
-    if qb_format == "Superflex":
-        qb_scarcity = qb_scarcity.mask(positions == "QB", 1.35)
-    elif qb_format == "2QB":
-        qb_scarcity = qb_scarcity.mask(positions == "QB", 1.55)
+    qb_uplift = QB_FORMAT_UPLIFT.get(qb_format)
+    if qb_uplift:
+        qb_scarcity = qb_scarcity.mask(positions == "QB", qb_scarcity_multiplier(df, qb_uplift))
 
     te_premium = ones.copy()
     if settings.get("te_premium"):
@@ -729,14 +787,11 @@ def apply_valuation_lens(
         dynasty_pre_league = base_scores.astype(float)
 
     rebuild_base = (dynasty_pre_league * 0.82) + (value_pre_league * 0.18)
-    rebuild_multiplier = pd.Series(1.0, index=df.index, dtype="float64")
-    rebuild_multiplier = rebuild_multiplier.mask(ages.le(22), 1.18)
-    rebuild_multiplier = rebuild_multiplier.mask(ages.gt(22) & ages.le(24), 1.10)
-    rebuild_multiplier = rebuild_multiplier.mask(ages.gt(24) & ages.le(26), 1.04)
-    rebuild_multiplier = rebuild_multiplier.mask((positions == "RB") & ages.ge(28), 0.72)
-    rebuild_multiplier = rebuild_multiplier.mask((positions == "WR") & ages.ge(30), 0.82)
-    rebuild_multiplier = rebuild_multiplier.mask((positions == "TE") & ages.ge(31), 0.86)
-    rebuild_multiplier = rebuild_multiplier.mask((positions == "QB") & ages.ge(34), 0.90)
+    # Youth bonus interpolates between age anchors; decline ramps over two
+    # years per position (no birthday cliffs).
+    rebuild_multiplier = smooth_youth_bonus(ages, ((22.0, 1.18), (24.0, 1.10), (26.0, 1.04), (28.0, 1.0)))
+    for _pos, _start, _floor in (("RB", 28, 0.72), ("WR", 30, 0.82), ("TE", 31, 0.86), ("QB", 34, 0.90)):
+        rebuild_multiplier = rebuild_multiplier * smooth_decline(ages, _start, _floor).where(positions == _pos, 1.0)
 
     rookie_bonus = pd.Series(0.0, index=df.index, dtype="float64")
     rookie_bonus = rookie_bonus.mask(years_exp.le(1) & dynasty_pre_league.ge(1800), 180.0)
