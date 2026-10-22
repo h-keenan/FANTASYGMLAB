@@ -19,6 +19,9 @@ STARTER_SLOTS = {
     "SUPER_FLEX": 0,
     "K": 0,
 }
+# start_ineligible_reason for a player whose own NFL game has already kicked
+# off but who is not in the real lineup: Sleeper locks him on the bench.
+GAME_LOCKED_REASON = "Game started"
 BENCH_WEIGHT = 0.18
 MAX_BENCH_PLAYERS = 4
 TEAM_STRATEGY_LABELS = {
@@ -396,12 +399,16 @@ def _assign_weekly_lineup(
     *,
     weekly_points: Mapping[str, Any],
     bye_player_ids: Iterable[Any],
+    started_player_ids: Iterable[Any] = (),
+    locked_starter_ids: Iterable[Any] = (),
 ) -> pd.DataFrame:
     """Weekly-mode slot assignment (see suggest_optimal_lineup). ``df`` is
     already value-sorted with a 0..n-1 index, ``sort_score`` and
     ``ruled_out`` attached."""
 
     bye_ids = {str(pid) for pid in bye_player_ids if pid not in (None, "")}
+    started_ids = {str(pid) for pid in started_player_ids if pid not in (None, "")}
+    locked_starters = {str(pid) for pid in locked_starter_ids if pid not in (None, "")} & started_ids
     points_by_id = {str(pid): _weekly_point_or_none(pts) for pid, pts in weekly_points.items()}
     n = len(df)
     ids = df["player_id"].astype(str).tolist() if "player_id" in df.columns else [""] * n
@@ -410,10 +417,19 @@ def _assign_weekly_lineup(
     ruled_out = df["ruled_out"].tolist()
 
     on_bye = [pid in bye_ids for pid in ids]
+    # Sleeper locks a player the moment his own game kicks off: a started
+    # player already in the lineup cannot be benched, and a started player
+    # on the bench cannot be started. Suggesting either is impossible advice.
+    locked_in = [ids[i] in locked_starters and not on_bye[i] for i in range(n)]
+    game_locked = [ids[i] in started_ids and not on_bye[i] for i in range(n)]
     reasons: List[Optional[str]] = []
     for i in range(n):
         if on_bye[i]:
             reasons.append("Bye")
+        elif locked_in[i]:
+            reasons.append(None)
+        elif game_locked[i]:
+            reasons.append(GAME_LOCKED_REASON)
         elif ruled_out[i]:
             reasons.append(_ineligible_injury_reason(_cell_text(statuses[i]), _cell_text(injuries[i])))
         else:
@@ -431,12 +447,15 @@ def _assign_weekly_lineup(
         ]
         eligible = [i for i in range(n) if reasons[i] is None]
         # Stable on value order, so equal projections keep season value as
-        # the tiebreak.
-        selection_order = sorted(eligible, key=lambda i: -float(estimates[i]))
+        # the tiebreak. Locked-in starters are placed first: they keep their
+        # slots no matter what this week's projections say.
+        selection_order = sorted(eligible, key=lambda i: (not locked_in[i], -float(estimates[i])))
     else:
         df["lineup_points"] = None
         df["lineup_points_basis"] = [None if on_bye[i] else "value" for i in range(n)]
-        selection_order = [i for i in value_order if reasons[i] is None]
+        selection_order = sorted(
+            (i for i in value_order if reasons[i] is None), key=lambda i: not locked_in[i]
+        )
 
     assigned = assign_slots(selection_order)
     # Who the bye/injury actually cost a starting spot: he'd have started
@@ -444,10 +463,12 @@ def _assign_weekly_lineup(
     value_assigned = assign_slots(value_order)
 
     df["on_bye"] = on_bye
+    df["game_locked"] = game_locked
     df["start_ineligible_reason"] = reasons
     df["slot"] = [assigned.get(i, "BENCH") for i in range(n)]
     df["displaced_by_injury"] = [
-        bool(ruled_out[i]) and not on_bye[i] and i in value_assigned and i not in assigned for i in range(n)
+        bool(ruled_out[i]) and not on_bye[i] and not locked_in[i] and i in value_assigned and i not in assigned
+        for i in range(n)
     ]
     df["displaced_by_bye"] = [on_bye[i] and i in value_assigned for i in range(n)]
     df["suggested_starter"] = df["slot"] != "BENCH"
@@ -480,6 +501,8 @@ def suggest_optimal_lineup(
     score_field: Optional[str] = None,
     weekly_points: Optional[Mapping[str, Any]] = None,
     bye_player_ids: Optional[Iterable[Any]] = None,
+    started_player_ids: Optional[Iterable[Any]] = None,
+    locked_starter_ids: Optional[Iterable[Any]] = None,
 ) -> pd.DataFrame:
     """Best lineup for a roster frame.
 
@@ -511,6 +534,7 @@ def suggest_optimal_lineup(
                 on_bye=False,
                 start_ineligible_reason=None,
                 displaced_by_bye=False,
+                game_locked=False,
                 lineup_points=None,
                 lineup_points_basis=None,
             )
@@ -589,6 +613,8 @@ def suggest_optimal_lineup(
             value_order,
             weekly_points=weekly_points or {},
             bye_player_ids=bye_player_ids or (),
+            started_player_ids=started_player_ids or (),
+            locked_starter_ids=locked_starter_ids or (),
         )
 
     if any(ruled_out):
