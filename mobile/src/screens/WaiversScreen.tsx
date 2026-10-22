@@ -208,6 +208,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           breakdown, then place the claim in Sleeper — this app never submits
           it for you. */}
       <ScreenInfoNote
+        label="How waivers are ranked"
         text={`Free agents ranked for your roster — ordered by fit for ${
           neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
         }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyDesk doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
@@ -372,9 +373,7 @@ function SecondaryWaiverBoard({
   ].filter((group) => group.players.length > 0);
   return (
     <View style={styles.secondaryBoard}>
-      <AppText style={styles.secondaryCaption}>
-        Upside stashes, watchlist depth, and a quick FAAB shortlist — check these after Priority Adds.
-      </AppText>
+      <AppText style={styles.secondaryCaption}>Ranked by raw value, after Priority Adds.</AppText>
       {groups.map((group) => (
         <View key={group.label} style={styles.sectionBlock}>
           <SectionHeader label={group.label} />
@@ -693,9 +692,11 @@ function createStyles(colors: ThemeColors) {
   secondaryLockWrap: { marginTop: 0, marginBottom: spacing.lg },
   secondaryBoard: { marginTop: 0 },
   secondaryCaption: { fontSize: 12, color: colors.textSecondary, lineHeight: 16, marginBottom: spacing.md },
+  // Name line first (full width), value + chips on a second line, so names
+  // never truncate to "Ja…" on phones.
   freeAgentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
@@ -703,8 +704,8 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.cardBorder,
   },
   freeAgentRowBare: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   freeAgentRowFirst: {
     borderTopWidth: StyleSheet.hairlineWidth * 1.5,
@@ -718,8 +719,8 @@ function createStyles(colors: ThemeColors) {
   },
   freeAgentDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   freeAgentStale: { opacity: 0.55 },
-  freeAgentIdentity: { flex: 1 },
-  freeAgentTrailing: { alignItems: 'flex-end', gap: 2, paddingLeft: spacing.sm },
+  freeAgentIdentity: { alignSelf: 'stretch' },
+  freeAgentTrailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs, paddingBottom: spacing.xs },
   freeAgentValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
   beginnerIntro: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },

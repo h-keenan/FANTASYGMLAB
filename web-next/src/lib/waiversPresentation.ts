@@ -85,7 +85,7 @@ export function priorityNeedNote(neededPositions: string[]): string {
   if (positions.length > 0) {
     return `Current need: ${positions.join(" / ")}.`;
   }
-  return "No primary positional need — high-value dynasty adds can still be worth a claim.";
+  return "No primary need — high-value adds can still be worth a claim.";
 }
 
 /** Raw Sleeper injury_status ("questionable"/"out"/"ir"/...) -> a display

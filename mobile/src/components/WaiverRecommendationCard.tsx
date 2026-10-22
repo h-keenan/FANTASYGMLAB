@@ -224,26 +224,23 @@ export default function WaiverRecommendationCard({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.compactIdentity}>
-        {identity}
-        {player.confidence_label ? (
-          <MeterRow
-            label="CONFIDENCE"
-            value={player.confidence_label}
-            level={confidenceLevelFor(player.confidence_label)}
-            color={colors.premium}
-          />
-        ) : null}
-      </View>
-      <View style={styles.compactTrailing}>
-        <View style={styles.compactValueRow}>
-          <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-          <RecommendationPill label={player.recommendation_label} tone={player.recommendation_tone} />
+      {/* Line 1: identity gets the full row width so names never truncate
+          to "Ja…"; line 2: value, pill, confidence, bid, breakdown chevron. */}
+      <View style={styles.compactIdentity}>{identity}</View>
+      <View style={styles.compactMetaRow}>
+        <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <RecommendationPill label={player.recommendation_label} tone={player.recommendation_tone} />
+        <View style={styles.compactConfidence}>
+          {player.confidence_label ? (
+            <MeterRow
+              label="CONFIDENCE"
+              value={player.confidence_label}
+              level={confidenceLevelFor(player.confidence_label)}
+              color={colors.premium}
+            />
+          ) : null}
         </View>
         <FAABGuidance faab={player.faab} size="compact" />
-      </View>
-      <View style={styles.compactBreakdown}>
-        <AppText style={styles.compactBreakdownText}>Full breakdown</AppText>
         <Ionicons name="chevron-forward" size={14} color={colors.accentSoft} />
       </View>
     </TouchableOpacity>
@@ -277,7 +274,6 @@ function createStyles(colors: ThemeColors) {
     scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
     scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },
     scoreLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
-    compactValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     metricsDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: colors.border },
     breakdownRow: {
       flexDirection: 'row',
@@ -288,14 +284,13 @@ function createStyles(colors: ThemeColors) {
     },
     breakdownText: { fontSize: 12, fontWeight: '700', color: colors.accentSoft },
     compactRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
       paddingVertical: spacing.xs,
-      gap: spacing.sm,
+      gap: spacing.xs,
     },
+    compactMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs },
+    compactConfidence: { flex: 1, minWidth: 0 },
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    compactIdentity: { flex: 1 },
-    compactTrailing: { alignItems: 'flex-end', gap: 2 },
+    compactIdentity: { alignSelf: 'stretch' },
     // A bare chevron read as an unlabeled affordance — the concept image
     // and the redesign brief (§7: "Preserve the current Full Breakdown
     // functionality... treat it as a secondary detail action rather than a
@@ -316,7 +311,5 @@ function createStyles(colors: ThemeColors) {
     // tone the primary card's own breakdownRow already uses) without
     // changing size/weight/shape, so it stays a quiet secondary control,
     // just no longer indistinguishable from static metadata.
-    compactBreakdown: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: spacing.xs },
-    compactBreakdownText: { fontSize: 10.5, fontWeight: '700', color: colors.accentSoft },
   });
 }

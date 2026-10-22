@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { WaiversContent } from "./WaiversContent";
@@ -74,9 +74,11 @@ describe("WaiversContent", () => {
   it("preserves the exact waiver-claim disclosure", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
+    expect(screen.getByText("Place claims in Sleeper — we don't submit them.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /How Priority Adds rank/ }));
     expect(
       screen.getByText(
-        "FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.",
+        /FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided\./,
       ),
     ).toBeInTheDocument();
   });
@@ -91,7 +93,7 @@ describe("WaiversContent", () => {
     const noNeed: WaiversResponse = { ...BASE_RESPONSE, needed_positions: [] };
     render(<WaiversContent leagueName="Dynasty Overlords" data={noNeed} />);
 
-    expect(screen.getByText(/No primary positional need/)).toBeInTheDocument();
+    expect(screen.getByText(/No primary need/)).toBeInTheDocument();
   });
 
   it("shows the Premium upsell instead of the secondary board when not premium", () => {
@@ -123,7 +125,7 @@ describe("WaiversContent", () => {
     const empty: WaiversResponse = { ...BASE_RESPONSE, priority_adds: [] };
     render(<WaiversContent leagueName="Dynasty Overlords" data={empty} />);
 
-    expect(screen.getByText(/No waiver option materially improves/)).toBeInTheDocument();
+    expect(screen.getByText(/No waiver option clearly helps/)).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-18: "our backend can read current ffa balance!"
