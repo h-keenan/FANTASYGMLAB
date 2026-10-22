@@ -247,7 +247,7 @@ _BUY_LOW_OPPORTUNITY_LABELS = frozenset({"Backup With Upside", "Committee Back"}
 # signal underneath is already softening.
 _SELL_HIGH_OPPORTUNITY_LABELS = frozenset({"Starter At Risk"})
 # workload_trend="Cooling" is rankings.py's weekly-recency read: a real,
-# multi-week usage decline (>=3 usable games, display-grade confidence),
+# multi-week usage decline (>=4 played games, display-grade confidence),
 # never a one-bad-week blip (see compute_recency_features/
 # recency_trend_display's own gating). It fires across every opportunity
 # tier (an "Elite Opportunity" starter can still be cooling off), so without

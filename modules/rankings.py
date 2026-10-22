@@ -93,6 +93,12 @@ NO_USAGE_SIGNAL_POSITIONS = {"K", "DEF"}
 
 # Capped weekly-recency authority applied inside opportunity (not a new weight).
 RECENCY_MIN_SAMPLE = 3
+# "Cooling" / sell-high and the reader-facing usage-trend badge are stricter
+# than the valuation blend: they need 4+ played games of baseline. A backtest
+# (2024-25, as-of weeks 4-12) showed 3-game declining-role flags did not beat
+# the base rate (next-4-week PPG drop >20% hit 22% vs 34% base) because one big
+# game can trigger them.
+RECENCY_COOLING_MIN_GAMES = 4
 RECENCY_WINDOW = 4
 RECENCY_WEIGHTS = (0.4, 0.3, 0.2, 0.1)  # newest → oldest inside the window
 RECENCY_TREND_CLIP = 0.40
@@ -770,7 +776,7 @@ def recency_trend_display(row: Any) -> Dict[str, Any] | None:
     sample_n = int(_recency_float(row, "recency_sample_n", 0.0))
     trend = _recency_float(row, "recency_trend", 0.0)
     confidence = _recency_float(row, "recency_confidence", 0.0)
-    if sample_n < RECENCY_MIN_SAMPLE:
+    if sample_n < RECENCY_COOLING_MIN_GAMES:
         return None
     if confidence < RECENCY_DISPLAY_MIN_CONFIDENCE:
         return None
@@ -2088,7 +2094,7 @@ def opportunity_profile(
         workload_trend = "Contingent"
     else:
         workload_trend = "Blocked"
-    if r_n >= RECENCY_MIN_SAMPLE and r_conf > 0 and r_trend <= -0.12:
+    if r_n >= RECENCY_COOLING_MIN_GAMES and r_conf > 0 and r_trend <= -0.12:
         workload_trend = "Cooling"
 
     def _passthrough_share(raw) -> float | None:

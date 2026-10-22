@@ -442,3 +442,30 @@ def test_display_is_the_only_gate_both_surfaces_use():
         assert "usage_trend" in client
         assert "sample_n" not in client
         assert "confidence >" not in client
+
+
+def _cooling_trend(usages: list[float]) -> str:
+    weekly = _weeks_from_usage("RB", usages)
+    row = _score(
+        weekly=weekly,
+        depth_chart_position="RB1",
+        depth_chart_order=1,
+        rush_attempts=60,
+        targets=10,
+        games_played=len(usages),
+    )
+    return str(row["workload_trend"])
+
+
+def test_cooling_needs_four_played_games_of_baseline():
+    assert rankings.RECENCY_COOLING_MIN_GAMES == 4
+    # Three games with a collapsing role: scored, but never labelled Cooling.
+    three = _weeks_from_usage("RB", [22, 6, 4])
+    f3 = rankings.compute_recency_features("RB", three, status="Active")
+    assert f3["recency_sample_n"] == 3 and f3["recency_trend"] < -0.12
+    assert _cooling_trend([22, 6, 4]) != "Cooling"
+    assert rankings.recency_trend_display(f3) is None
+    # Four games with the same collapse is eligible.
+    f4 = rankings.compute_recency_features("RB", _weeks_from_usage("RB", [22, 20, 6, 4]), status="Active")
+    assert f4["recency_sample_n"] == 4 and f4["recency_trend"] <= -0.12
+    assert _cooling_trend([22, 20, 6, 4]) == "Cooling"
