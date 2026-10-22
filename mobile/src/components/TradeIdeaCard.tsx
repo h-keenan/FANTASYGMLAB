@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
-import AnimatedCard from './AnimatedCard';
+import AccentCard from './AccentCard';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import DraftPickAssetRow from './DraftPickAssetRow';
@@ -168,7 +168,7 @@ const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thi
  * 2-3 assets, and a card stretched to the full exchange column's width
  * would read as oversized stacked repeatedly.
  */
-function ExchangeAssetList({
+export function ExchangeAssetList({
   assets,
   onPressPlayer,
   onPressPick,
@@ -286,17 +286,9 @@ export function impactTagConfig(
 
 function ImpactBadge({ impactTag }: { impactTag: string }) {
   const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const config = impactTagConfig(colors)[impactTag];
   if (!config) return null;
-  return (
-    <View style={[styles.impactBadge, { borderColor: `${config.color}80` }]}>
-      <Ionicons name={config.icon} size={11} color={config.color} />
-      <AppText style={[styles.impactBadgeText, { color: config.color }]} numberOfLines={1}>
-        {config.label.toUpperCase()}
-      </AppText>
-    </View>
-  );
+  return <ToneBadge label={config.label} color={config.color} />;
 }
 
 
@@ -380,7 +372,7 @@ export default function TradeIdeaCard({
     .filter((name): name is string => Boolean(name));
 
   return (
-    <AnimatedCard style={{ ...styles.card, borderLeftWidth: 3, borderLeftColor: categoryAccent }}>
+    <AccentCard accent={categoryAccent} compact style={styles.card}>
       {idea.category || idea.impact_tag ? (
         <View style={[styles.categoryRow, styles.categoryRowSpread]}>
           <CategoryBadge category={idea.category} />
@@ -436,7 +428,7 @@ export default function TradeIdeaCard({
         )}
         <View style={styles.partnerTextGroup}>
           <View style={styles.partnerNameRow}>
-            <AppText style={styles.partnerName} numberOfLines={1}>
+            <AppText style={styles.partnerName} numberOfLines={2}>
               {idea.partner_team_name}
             </AppText>
           </View>
@@ -592,7 +584,7 @@ export default function TradeIdeaCard({
         <Ionicons name="paper-plane-outline" size={15} color={colors.background} />
         <AppText style={styles.proposeButtonText}>Share to Propose</AppText>
       </TouchableOpacity>
-    </AnimatedCard>
+    </AccentCard>
   );
 }
 
@@ -600,19 +592,9 @@ export default function TradeIdeaCard({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     beginnerHelp: { marginBottom: spacing.xs },
-  card: { padding: 0, marginBottom: spacing.md },
+  card: { padding: 0, gap: 0, marginBottom: spacing.md },
   categoryRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   categoryRowSpread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  impactBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  impactBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   // Both concept mockups show this as a quiet, thin-bordered box (no fill,
   // no title inside) rather than the hairline-top-rule-only treatment this
   // screen originally shipped with tonight — "keep the section visually

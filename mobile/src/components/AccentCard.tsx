@@ -13,15 +13,22 @@ export default function AccentCard({
   compact = false,
   style,
   children,
+  glow,
+  onPress,
 }: {
   accent: string;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
+  /** Glow rim for the one hero card on a screen (see AnimatedCard). */
+  glow?: boolean;
+  onPress?: () => void;
 }) {
   return (
     <AnimatedCard
-      style={StyleSheet.flatten([
+      glow={glow}
+      onPress={onPress}
+      style={StyleSheet.flatten<ViewStyle>([
         { borderLeftWidth: 3, borderLeftColor: accent, padding: compact ? spacing.md : spacing.lg },
         styles.gap,
         style,

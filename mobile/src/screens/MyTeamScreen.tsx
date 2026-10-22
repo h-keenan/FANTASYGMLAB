@@ -19,8 +19,8 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
 import DashboardStatRow from '../components/DashboardStatRow';
 import PositionBadge from '../components/PositionBadge';
-import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
 import ToneBadge from '../components/ToneBadge';
@@ -215,9 +215,12 @@ export default function MyTeamScreen({ route, navigation }: Props) {
           style={styles.container}
           contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
         >
-          {[190, 230, 420, 110].map((height) => (
-            <View key={height} style={[styles.skeletonBlock, { height }]} />
-          ))}
+          <SkeletonCard rows={4} />
+          <SkeletonCard rows={4} />
+          <AnimatedCard style={styles.skeletonList}>
+            <SkeletonRows count={7} />
+          </AnimatedCard>
+          <SkeletonCard rows={2} />
         </ScrollView>
       </View>
     );
@@ -504,44 +507,38 @@ function LineupRow({
   // "Bye" pill in the calmer watch tone; a real injury label always wins.
   const injuryTone = isByeOnlyLabel(player) ? 'watch' : waiverInjuryDisplay(player.injury_status).tone;
   return (
-    <TouchableOpacity
-      style={[styles.compactRow, showDivider && styles.compactDivider]}
+    <PlayerIdentityRow
+      playerId={player.player_id}
+      name={player.name}
+      position={player.position}
+      team={player.team}
+      tier={player.tier}
+      overallRating={player.overall_rating}
+      slot={player.slot === 'BENCH' ? player.position : player.slot}
+      opportunityLabel={player.opportunity_label}
+      // injury_label, not injury_status: IR/PUP/season-ending arrives on
+      // `status` with `injury_status` blank, and an injury_status-driven
+      // pill hides exactly those players. See LineupPlayer.injury_label.
+      injuryLabel={lineupStatusLabel(player)}
+      ruledOut={player.ruled_out}
+      injuryTone={injuryTone}
+      trailingValue={player.score != null ? String(Math.round(player.score)) : '\u2014'}
+      trailingCaption="VALUE"
+      trailingTone={muted ? 'muted' : 'accent'}
+      trailingExtra={
+        <>
+          {keeper?.is_keeper ? <ToneBadge label="Keeper" color={colors.accent} /> : null}
+          {keeper?.surplus != null && keeper.cost_round != null ? (
+            <AppText style={styles.valueLabel}>
+              {`${keeper.kept_round ? 'R' : '~R'}${keeper.cost_round} ${keeper.surplus > 0 ? '+' : ''}${keeper.surplus}`}
+            </AppText>
+          ) : null}
+        </>
+      }
+      chevron
+      showDivider={showDivider}
       onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.compactIdentity}>
-        <PlayerIdentityRow
-          playerId={player.player_id}
-          name={player.name}
-          position={player.position}
-          team={player.team}
-          tier={player.tier}
-          slot={player.slot === 'BENCH' ? player.position : player.slot}
-          opportunityLabel={player.opportunity_label}
-          // injury_label, not injury_status: IR/PUP/season-ending arrives on
-          // `status` with `injury_status` blank, and an injury_status-driven
-          // pill hides exactly those players. See LineupPlayer.injury_label.
-          injuryLabel={lineupStatusLabel(player)}
-          ruledOut={player.ruled_out}
-          injuryTone={injuryTone}
-          showDivider={false}
-        />
-      </View>
-      <View style={styles.valueColumn}>
-        <AppText style={[styles.valueNumber, muted && styles.valueNumberMuted]}>
-          {player.score != null ? Math.round(player.score) : '—'}
-        </AppText>
-        <AppText style={styles.valueLabel}>VALUE</AppText>
-        <OverallRatingBadge rating={player.overall_rating} />
-        {keeper?.is_keeper ? <ToneBadge label="Keeper" color={colors.accent} /> : null}
-        {keeper?.surplus != null && keeper.cost_round != null ? (
-          <AppText style={styles.valueLabel}>
-            {`${keeper.kept_round ? 'R' : '~R'}${keeper.cost_round} ${keeper.surplus > 0 ? '+' : ''}${keeper.surplus}`}
-          </AppText>
-        ) : null}
-      </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-    </TouchableOpacity>
+    />
   );
 }
 
@@ -596,7 +593,7 @@ function createStyles(colors: ThemeColors) {
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   tabBar: { marginBottom: spacing.sm },
-  skeletonBlock: { backgroundColor: colors.border, borderRadius: radii.md, marginBottom: spacing.lg, opacity: 0.5 },
+  skeletonList: { padding: spacing.md, marginTop: spacing.sm, marginBottom: spacing.sm },
   analysisRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   analysisDot: { width: 10, height: 10, borderRadius: 5 },
   analysisStatus: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
@@ -658,29 +655,6 @@ function createStyles(colors: ThemeColors) {
   // of MetricCard's default `minWidth: '46%'`, which is tuned for a 2-up
   // grid and would wrap a 3rd tile onto its own oversized row here.
   analyticsMetricTile: { flexBasis: 0, flexGrow: 1, minWidth: 0, paddingHorizontal: spacing.sm },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionHeaderLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
   sectionTotal: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
   headerLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   // One grouped surface per lineup section (Starters, Bench) with a
@@ -697,9 +671,6 @@ function createStyles(colors: ThemeColors) {
   },
   compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   compactIdentity: { flex: 1 },
-  valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
-  valueNumber: { fontSize: 19, fontWeight: '800', color: colors.accent },
-  valueNumberMuted: { color: colors.textSecondary },
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   linkRowText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,11 +7,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
+import Button from '../components/Button';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
+import { ExchangeAssetList } from '../components/TradeIdeaCard';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -124,59 +126,6 @@ function assetToDraftPick(asset: PresentationAsset): DraftPickAsset {
     projection_source: asset.projection_source ?? null,
     is_current_year_pick: asset.is_current_year_pick ?? null,
   };
-}
-
-/**
- * One side (You Send / You Receive) of a proposed trade — same treatment as
- * Trade Hub's idea feed: players via the shared PlayerIdentityRow (no
- * `slot`, trade assets have no lineup slot), picks via DraftPickAssetRow.
- */
-function ExchangeAssetList({
-  assets,
-  onPressPlayer,
-  onPressPick,
-}: {
-  assets: PresentationAsset[];
-  onPressPlayer: (asset: PresentationAsset) => void;
-  onPressPick: (asset: PresentationAsset) => void;
-}) {
-  return (
-    <>
-      {assets.map((asset, index) => {
-        const showDivider = index < assets.length - 1;
-        if (asset.asset_type === 'pick') {
-          return (
-            <DraftPickAssetRow
-              key={`pick-${asset.pick_id ?? index}`}
-              pickId={asset.pick_id}
-              round={asset.round ? Number(asset.round) : null}
-              label={asset.label}
-              projectedRange={asset.projected_range}
-              pickTier={asset.pick_tier}
-              onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
-              showDivider={showDivider}
-            />
-          );
-        }
-        return (
-          <PlayerIdentityRow
-            key={`player-${asset.player_id ?? index}`}
-            playerId={asset.player_id}
-            name={asset.name}
-            position={asset.position}
-            team={asset.team}
-            tier={asset.tier}
-            overallRating={asset.overall_rating}
-            opportunityLabel={asset.role}
-            contextLine={asset.age != null ? `Age ${asset.age}` : null}
-            injuryLabel={asset.injury_status}
-            onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
-            showDivider={showDivider}
-          />
-        );
-      })}
-    </>
-  );
 }
 
 function MeterRow({ label, value, level, color }: { label: string; value: string; level: number; color: string }) {
@@ -368,7 +317,7 @@ function ResultCard({
         )}
         <View style={styles.partnerTextGroup}>
           <View style={styles.partnerNameRow}>
-            <AppText style={styles.partnerName} numberOfLines={1}>
+            <AppText style={styles.partnerName} numberOfLines={2}>
               {idea.partner_team_name}
             </AppText>
             {idea.value_edge_band ? (
@@ -665,7 +614,10 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
           keeps this screen inside Magna Carta's "no content hidden beneath
           overlays" rule. */}
       {selectionCount > 0 ? (
-        <TouchableOpacity
+        <Button
+          label={`Find Trades (${selectionCount})`}
+          loading={searching}
+          onPress={() => search()}
           style={[
             styles.searchButton,
             // Sits above GM Orb's own darkening scrim rather than inside it —
@@ -673,17 +625,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
             // read as one muddy double-treatment at the bottom of the screen.
             { bottom: orbClearance + spacing.sm },
           ]}
-          onPress={() => search()}
-          disabled={searching}
-          accessibilityRole="button"
-          accessibilityLabel="Find Trades"
-        >
-          {searching ? (
-            <ActivityIndicator color={colors.onAccent} />
-          ) : (
-            <AppText style={styles.searchButtonText}>Find Trades ({selectionCount})</AppText>
-          )}
-        </TouchableOpacity>
+        />
       ) : null}
     </View>
   );
@@ -838,17 +780,7 @@ function createStyles(colors: ThemeColors) {
     meterSegments: { flexDirection: 'row', gap: 3 },
     meterSegment: { width: 14, height: 4, borderRadius: 2 },
     meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-    searchButton: {
-      position: 'absolute',
-      left: spacing.lg,
-      right: spacing.lg,
-      backgroundColor: colors.accent,
-      borderRadius: radii.md,
-      paddingVertical: spacing.md,
-      alignItems: 'center',
-      ...shadows.resting,
-    },
-    searchButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
+    searchButton: { position: 'absolute', left: spacing.lg, right: spacing.lg, ...shadows.resting },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
 }

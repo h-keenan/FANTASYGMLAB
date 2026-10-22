@@ -231,6 +231,7 @@ function PlayerRankRow({
           injuryLabel={injury.label}
           injuryTone={injury.tone}
           ruledOut={injury.ruledOut}
+          wrapName
           onPress={onPress}
           showDivider={false}
         />
@@ -529,7 +530,8 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'space-between',
   },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: spacing.xs },
-  rowActionButton: { padding: spacing.xs },
+  // 40pt tap target (phone layout audit).
+  rowActionButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   idpNote: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.md },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });

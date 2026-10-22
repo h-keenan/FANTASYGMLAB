@@ -92,6 +92,8 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
+    minHeight: 40,
+    justifyContent: 'center',
     maxWidth: 150,
   },
   // accentOnTint: sits on this button's own accentMuted fill, where plain

@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
+import Button from '../components/Button';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -405,7 +406,7 @@ function AllTradesFooter({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (loadingMore) {
-    return <ActivityIndicator style={styles.loading} color={colors.accent} />;
+    return <TradeIdeaSkeletonCard />;
   }
   if (!hasMore) return null;
   const freeGated = Boolean(entitlement && !entitlement.is_premium && entitlement.remaining_free <= 0);
@@ -419,16 +420,12 @@ function AllTradesFooter({
         <AppText style={styles.gateBody}>
           Free shows {entitlement?.free_limit} ideas across All Trades. Go Pro to browse every team.
         </AppText>
-        <TouchableOpacity style={styles.gatePrimaryButton} onPress={onUpgrade}>
-          <AppText style={styles.gatePrimaryButtonText}>Upgrade to Pro</AppText>
-        </TouchableOpacity>
+        <Button label="Upgrade to Pro" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </AnimatedCard>
     );
   }
   return (
-    <TouchableOpacity style={styles.loadMoreButton} onPress={onLoadMore}>
-      <AppText style={styles.loadMoreButtonText}>Load More Teams</AppText>
-    </TouchableOpacity>
+    <Button label="Load More Teams" variant="secondary" onPress={onLoadMore} style={styles.loadMoreButton} />
   );
 }
 
@@ -473,9 +470,7 @@ function TradeHubGateCard({
             )}
           </TouchableOpacity>
         ) : null}
-        <TouchableOpacity style={styles.gatePrimaryButton} onPress={onUpgrade}>
-          <AppText style={styles.gatePrimaryButtonText}>Upgrade to Pro</AppText>
-        </TouchableOpacity>
+        <Button label="Upgrade to Pro" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </View>
     </AnimatedCard>
   );
@@ -681,32 +676,13 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.backgroundElevated,
   },
   gateSecondaryButtonText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  gatePrimaryButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-  },
-  gatePrimaryButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
+  gatePrimaryButton: { flex: 1 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },
   viewModeRow: { marginBottom: spacing.sm },
-  loadMoreButton: {
-    alignSelf: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.surface,
-  },
-  loadMoreButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
+  loadMoreButton: { alignSelf: 'center', marginTop: spacing.sm, marginBottom: spacing.xl, paddingHorizontal: spacing.xl },
   loading: { marginVertical: spacing.xl },
   skeletonWrap: { marginTop: spacing.sm },
   skeletonCard: { padding: spacing.md },

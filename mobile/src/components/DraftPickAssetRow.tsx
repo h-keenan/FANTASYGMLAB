@@ -100,7 +100,7 @@ export default function DraftPickAssetRow({
     >
       <PickPlate round={round} pickNo={pickNo} />
       <View style={styles.body}>
-        <AppText style={styles.label} numberOfLines={1}>
+        <AppText style={styles.label} numberOfLines={2}>
           {label || 'Draft pick'}
         </AppText>
         {metaLine ? (
