@@ -8645,6 +8645,7 @@ def get_league_dashboard(
                 untouchable_player_ids=gm_untouchable_ids,
                 gm_target_player_ids=gm_target_ids,
                 team_stance=declared_team_stance,
+                keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
             )
         except (TypeError, ValueError):
             pass
@@ -9840,6 +9841,7 @@ def get_gm_plan(
                 untouchable_player_ids=gm_untouchable_ids,
                 gm_target_player_ids=gm_target_ids,
                 team_stance=declared_team_stance,
+                keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
             )
         except (TypeError, ValueError):
             trade_idea_records = []
@@ -10542,6 +10544,24 @@ def _stored_keeper_round_penalty(config: dict, user_id: str, access_token: str, 
             return 0
         stored = (current.get("settings") or {}).get("keeper_round_penalty_by_league") or {}
         return keepers_module.clamp_round_penalty(stored.get(league_id))
+    except Exception:
+        return 0
+
+
+def _trade_idea_keeper_round_penalty(user: dict[str, Any], league_id: str) -> int:
+    """The user's stored keeper round penalty for trade-idea pricing; 0 for
+    non-keeper leagues or on any failure (no extra storage read in that case)."""
+
+    try:
+        league = sleeper.get_league(league_id)
+        if not league or not league_value_settings.detect_league_value_settings_from_payload(league).get("_keeper_mode"):
+            return 0
+        return _stored_keeper_round_penalty(
+            auth_supabase.get_supabase_config(),
+            str(user.get("id") or ""),
+            str(user.get("_access_token") or ""),
+            league_id,
+        )
     except Exception:
         return 0
 
@@ -12618,6 +12638,7 @@ def get_trade_hub_ideas(
         untouchable_player_ids=gm_untouchable_ids,
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
+        keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
     )
 
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
@@ -12732,6 +12753,7 @@ def get_trade_hub_idea_share_card(
         untouchable_player_ids=gm_untouchable_ids,
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
+        keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
     )
     idea = next(
         (record for record in records if trade_hub_ui.idea_recommendation_id(record) == recommendation_id),
@@ -13027,6 +13049,7 @@ def get_league_all_trades(
                 untouchable_player_ids=gm_untouchable_ids if is_my_roster else (),
                 gm_target_player_ids=gm_target_ids if is_my_roster else (),
                 team_stance=declared_team_stance if is_my_roster else "",
+                keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
             )
         except Exception:
             continue

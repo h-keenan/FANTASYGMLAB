@@ -29,6 +29,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from modules import keepers as keepers_module
 from modules import league_rankings
 from modules import league_value_settings
 from modules import player_quick_view
@@ -402,6 +403,48 @@ def _tag_landed_gm_targets(
     return ideas
 
 
+def _apply_keeper_context(
+    frame: pd.DataFrame, score_field: str, keeper_context: Mapping[str, Any] | None
+) -> pd.DataFrame:
+    """Fold keeper surplus into player values (same adjustment the Trade
+    Analyzer uses, applied after the strategy age curve). Unknown cost or any
+    failure silently keeps the normal values."""
+
+    if not keeper_context:
+        return frame
+    try:
+        adjusted = keepers_module.keeper_adjusted_values(
+            valued=frame,
+            score_field=score_field,
+            num_teams=int(keeper_context.get("num_teams") or 12),
+            current_picks=list(keeper_context.get("current_picks") or []),
+            previous_picks=list(keeper_context.get("previous_picks") or []),
+            round_penalty=int(keeper_context.get("round_penalty") or 0),
+        )
+        return keepers_module.apply_keeper_values(frame, score_field, adjusted) if adjusted else frame
+    except Exception:
+        return frame
+
+
+def _keeper_context_for_league(league: Mapping[str, Any], league_id: str, round_penalty: int) -> dict[str, Any] | None:
+    try:
+        current_picks = keepers_module.latest_draft_picks(sleeper.get_league_drafts(league_id), sleeper.get_draft_picks)
+        previous_id = str(league.get("previous_league_id") or "")
+        previous_picks = (
+            keepers_module.latest_draft_picks(sleeper.get_league_drafts(previous_id), sleeper.get_draft_picks)
+            if previous_id and previous_id != "0"
+            else []
+        )
+        return {
+            "num_teams": int(league.get("total_rosters") or (league.get("settings") or {}).get("num_teams") or 12),
+            "current_picks": current_picks,
+            "previous_picks": previous_picks,
+            "round_penalty": int(round_penalty or 0),
+        }
+    except Exception:
+        return None
+
+
 def generate_trade_idea_records(
     *,
     league_id: str,
@@ -419,6 +462,7 @@ def generate_trade_idea_records(
     df_summary: pd.DataFrame | None = None,
     trade_block_pick_ids: tuple[str, ...] = (),
     require_receive_picks: bool = False,
+    keeper_context: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_ui already work with (trade_confidence_label,
@@ -503,6 +547,7 @@ def generate_trade_idea_records(
         return []
 
     strategy_df = apply_strategy_age_curve(players_df, team_strategy, score_field)
+    strategy_df = _apply_keeper_context(strategy_df, score_field, keeper_context)
     roster_owner_items = tuple(
         sorted(
             (str(roster.get("roster_id")), tuple(str(pid) for pid in (roster.get("players") or []) if pid is not None))
@@ -597,6 +642,7 @@ def _generate_trade_idea_records_cached(
     players_db_path: str,
     untouchable_player_ids: tuple[str, ...],
     gm_target_player_ids: tuple[str, ...],
+    keeper_round_penalty: int,
     _bucket: int,
 ) -> list[dict[str, Any]]:
     league = sleeper.get_league(league_id)
@@ -644,6 +690,11 @@ def _generate_trade_idea_records_cached(
         score_field=score_field,
         team_strategy=strategy,
         df_summary=df_summary,
+        keeper_context=(
+            _keeper_context_for_league(league, league_id, keeper_round_penalty)
+            if settings.get("_keeper_mode")
+            else None
+        ),
     )
 
 
@@ -681,6 +732,7 @@ def generate_trade_idea_records_cached(
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
     team_stance: str = "",
+    keeper_round_penalty: int = 0,
 ) -> list[dict[str, Any]]:
     """Cached front door for `generate_trade_idea_records` — resolves its
     own players_df/settings/rosters from just (league_id, lens) rather than
@@ -711,6 +763,7 @@ def generate_trade_idea_records_cached(
         players_db_path,
         tuple(sorted({str(pid) for pid in untouchable_player_ids if str(pid)})),
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
+        keepers_module.clamp_round_penalty(keeper_round_penalty),
         _trade_hub_ideas_cache_bucket(),
     )
     cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
