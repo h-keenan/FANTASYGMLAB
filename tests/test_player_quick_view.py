@@ -775,3 +775,31 @@ def test_schedule_table_html_includes_disclaimer_and_all_rows():
 
 def test_schedule_table_html_empty_when_no_weeks():
     assert player_quick_view.schedule_table_html([]) == ""
+
+
+def test_numeric_or_none_fast_path_matches_the_pandas_coercion_for_every_value_kind():
+    """Perf audit 2026-10-21: plain numbers skip the one-element Series; the
+    result must be identical to the original pd.to_numeric(errors="coerce")
+    path for every kind of value a stat column can hold."""
+
+    import math
+
+    import numpy as np
+
+    def _reference(value):
+        numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+        return None if pd.isna(numeric) else float(numeric)
+
+    values = [
+        None, float("nan"), np.nan, pd.NA, pd.NaT, 0, 7, -3, 2**40, 12.5, -0.0, float("inf"),
+        True, False, np.True_, np.int64(9), np.int32(-4), np.float32(1.25), np.float64(0.333),
+        np.float64("nan"), "12.5", "7", "abc", "", object(),
+    ]
+    for value in values:
+        expected = _reference(value)
+        actual = player_quick_view._numeric_or_none(value)
+        if expected is None:
+            assert actual is None, value
+        else:
+            assert isinstance(actual, float), value
+            assert actual == expected or (math.isinf(actual) and math.isinf(expected)), value
