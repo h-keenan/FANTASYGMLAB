@@ -2135,10 +2135,12 @@ a {
 .onboarding-benefit {
   margin: var(--space-sm) 0 0;
   max-width: 20rem;
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-section-title);
   font-weight: var(--font-weight-metadata);
   line-height: var(--line-height-body);
-  color: var(--color-text-secondary);
+  /* Inherit the shell's fixed light-on-black text color (this screen is
+     always dark regardless of the theme toggle). */
+  color: inherit;
 }
 .onboarding-steps {
   margin-top: var(--space-lg);

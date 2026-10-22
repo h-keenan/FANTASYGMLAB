@@ -329,9 +329,11 @@ function createStyles(colors: ThemeColors) {
     phoneImage: { width: '100%', height: '100%' },
     benefit: {
       ...typography.body,
-      color: colors.textSecondary,
+      fontSize: 17,
+      fontWeight: '600',
+      color: colors.textPrimary,
       textAlign: 'center',
-      lineHeight: 22,
+      lineHeight: 24,
       maxWidth: 320,
       marginTop: spacing.md,
     },
