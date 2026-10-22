@@ -222,6 +222,7 @@ from modules import (
 from modules.team_eval import (
     build_league_summary,
     get_team_vs_league,
+    lineup_open_slots,
     refine_team_directions,
     suggest_optimal_lineup,
 )
@@ -9392,6 +9393,18 @@ def _project_lineup_row(
             "roster_slot": _roster_slot_for_player(
                 player_id, reserve_ids=reserve_ids, taxi_ids=taxi_ids, is_starter=suggested_starter
             ),
+            # Weekly lineup gate (additive): "Bye" / "Out" / "IR" / "PUP" /
+            # "Suspended" when this player can't start this week, else null.
+            # Null everywhere when there's no current week (offseason).
+            "start_ineligible_reason": _clean_json_value(row.get("start_ineligible_reason")),
+            "on_bye": bool(row.get("on_bye") or False),
+            # The points figure this week's lineup was ranked on, and where
+            # it came from: "projection" (this week's real projection),
+            # "value_estimate" (no projection — matched to the projected
+            # player nearest in season value), "value" (no projections at
+            # all, season-value order), or null.
+            "lineup_points": _clean_json_value(row.get("lineup_points")),
+            "lineup_points_basis": _clean_json_value(row.get("lineup_points_basis")),
         }
     )
     return fields
@@ -9593,8 +9606,18 @@ def _suggested_lineup_split(
     score_field: str,
     *,
     players_lookup: dict[str, Any] | None = None,
+    projection_context: "_ProjectionContext | None" = None,
+    meta: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """One roster's suggested starters (slot-ordered) and bench.
+
+    With a `projection_context` (a current NFL week exists) this is THIS
+    WEEK's lineup: players on bye or ruled out never start (their slot
+    stays open, listed in `meta["open_slots"]`), and starters rank by this
+    week's projected points, falling back to season value only where no
+    projection exists (see suggest_optimal_lineup's weekly mode). Every row
+    then also carries its `projection`. Without one (offseason, or the
+    projection inputs failed to load) it's the season-value lineup.
 
     The single place /my-team and /matchup both run
     modules.team_eval.suggest_optimal_lineup and project its rows, so the
@@ -9641,18 +9664,115 @@ def _suggested_lineup_split(
         if reinstated_rows:
             roster_df = pd.concat([roster_df, pd.DataFrame(reinstated_rows)], ignore_index=True, sort=False)
 
-    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    projections_by_id: dict[str, dict[str, Any]] = {}
+    if projection_context is not None:
+        projections_by_id, weekly_points, bye_ids = _weekly_lineup_inputs(roster_df, projection_context)
+        lineup_df = suggest_optimal_lineup(
+            roster_df,
+            settings,
+            score_field=score_field,
+            weekly_points=weekly_points,
+            bye_player_ids=bye_ids,
+        )
+    else:
+        lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
 
     players = [
         _project_lineup_row(row, score_field, reserve_ids=reserve_ids, taxi_ids=taxi_ids)
         for _, row in lineup_df.iterrows()
     ]
+    if projection_context is not None:
+        for player in players:
+            player["projection"] = projections_by_id.get(str(player.get("player_id") or ""))
     starters = [p for p in players if p["suggested_starter"]]
     starters.sort(
         key=lambda p: _LINEUP_SLOT_ORDER.index(p["slot"]) if p["slot"] in _LINEUP_SLOT_ORDER else len(_LINEUP_SLOT_ORDER)
     )
     bench = [p for p in players if not p["suggested_starter"]]
+    if meta is not None:
+        meta["open_slots"] = lineup_open_slots(lineup_df, settings)
+        basis = SEASON_VALUE_BASIS
+        if projection_context is not None:
+            basis = (
+                WEEKLY_PROJECTION_BASIS
+                if any(p.get("lineup_points_basis") in ("projection", "value_estimate") for p in players)
+                else WEEKLY_AVAILABILITY_BASIS
+            )
+        meta["lineup_basis"] = basis
+        meta["week"] = projection_context.week if projection_context is not None else None
     return starters, bench
+
+
+def _weekly_lineup_inputs(
+    roster_df: pd.DataFrame, projection_context: "_ProjectionContext"
+) -> tuple[dict[str, dict[str, Any]], dict[str, float], set[str]]:
+    """This week's projection summary, rankable points and bye flag for
+    every player on one roster, from the request's shared
+    `_ProjectionContext` (nothing refetched per player).
+
+    A player is on bye when his projection says so (`bye_week`) or his
+    team's real schedule (modules.nfl_schedule) shows a bye that week —
+    the schedule check covers players the projection can't resolve.
+    """
+
+    projections: dict[str, dict[str, Any]] = {}
+    weekly_points: dict[str, float] = {}
+    bye_ids: set[str] = set()
+    if roster_df.empty or "player_id" not in roster_df.columns:
+        return projections, weekly_points, bye_ids
+
+    bye_by_team: dict[str, bool] = {}
+
+    def team_on_bye(team: str) -> bool:
+        if not team or projection_context.games is None:
+            return False
+        if team not in bye_by_team:
+            try:
+                matchup = nfl_schedule.team_matchup_for_week(
+                    team, projection_context.week, projection_context.season, games=projection_context.games
+                )
+            except Exception:
+                matchup = None
+            bye_by_team[team] = bool(matchup and matchup.get("bye"))
+        return bye_by_team[team]
+
+    teams = roster_df["team"].tolist() if "team" in roster_df.columns else [None] * len(roster_df)
+    for player_id, team in zip(roster_df["player_id"].astype(str).tolist(), teams):
+        if not player_id or player_id in projections:
+            continue
+        try:
+            projection = _weekly_projection_for_player(
+                player_id,
+                projection_context.week,
+                projection_context.season,
+                players_lookup=projection_context.players_lookup,
+                weekly_stats=projection_context.weekly_stats,
+                defense_strength=projection_context.defense_strength,
+                team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            )
+        except Exception:
+            projection = None
+        projections[player_id] = projection
+        status = str((projection or {}).get("status") or "")
+        team_code = str(team or "").strip().upper() if isinstance(team, str) else ""
+        if status == "bye_week":
+            bye_ids.add(player_id)
+        elif status == "ok":
+            if isinstance((projection or {}).get("point_estimate"), (int, float)):
+                weekly_points[player_id] = float(projection["point_estimate"])
+        elif status in _PROJECTION_STATUSES_WITH_RESOLVED_GAME:
+            # The projection already found this player's real game this
+            # week (just no usable trend), so he isn't on bye.
+            continue
+        elif team_on_bye(team_code):
+            # The projection couldn't resolve his team/schedule (unknown
+            # player, unsupported position like K/DEF, no schedule row):
+            # fall back to the roster frame's team.
+            bye_ids.add(player_id)
+    return projections, weekly_points, bye_ids
+
+
+_PROJECTION_STATUSES_WITH_RESOLVED_GAME = frozenset({"insufficient_player_data", "no_opponent"})
 
 
 @app.get("/v1/leagues/{league_id}/my-team")
@@ -9715,9 +9835,20 @@ def get_league_my_team(
         my_team_players_lookup = sleeper.get_players()
     except Exception:
         my_team_players_lookup = {}
+    # This week's lineup while the league is in season: byes and ruled-out
+    # players never start, weekly projections rank the rest (see
+    # _suggested_lineup_split). Offseason / no week: season-value lineup.
+    lineup_meta: dict[str, Any] = {}
     starters, bench = _suggested_lineup_split(
-        valued, my_roster, settings, score_field, players_lookup=my_team_players_lookup
+        valued,
+        my_roster,
+        settings,
+        score_field,
+        players_lookup=my_team_players_lookup,
+        projection_context=_build_projection_context(_league_current_lineup_week(league)),
+        meta=lineup_meta,
     )
+    lineup_basis = lineup_meta.get("lineup_basis", SEASON_VALUE_BASIS)
 
     return {
         "ok": True,
@@ -9725,6 +9856,11 @@ def get_league_my_team(
         "bench": bench,
         "reason": "",
         "roster_id": str(my_roster.get("roster_id") or ""),
+        # Additive (older clients ignore these).
+        "week": lineup_meta.get("week"),
+        "lineup_basis": lineup_basis,
+        "lineup_basis_label": _LINEUP_BASIS_LABELS.get(lineup_basis, SEASON_VALUE_BASIS_LABEL),
+        "open_slots": lineup_meta.get("open_slots", []),
     }
 
 
@@ -9884,6 +10020,27 @@ def get_league_my_team_needs(
 SEASON_VALUE_BASIS = "season_value"
 SEASON_VALUE_BASIS_LABEL = "Season-long value & opportunity signal — not a weekly points projection."
 
+# Product owner approved (2026-10-21 logic audit): during the season the
+# SUGGESTED lineup is a lineup for THIS week. Players on bye or ruled out
+# (Out/IR/PUP/Suspended) never start, and starters rank by this week's
+# projected points, using season value only where no projection exists.
+# WEEKLY_AVAILABILITY_BASIS is the same weekly gate when no roster player
+# has a usable projection (season-value order, byes/outs still excluded).
+WEEKLY_PROJECTION_BASIS = "weekly_projection"
+WEEKLY_PROJECTION_BASIS_LABEL = (
+    "This week's lineup: ranked by projected points (season value where no projection exists); "
+    "players on bye or ruled out don't start."
+)
+WEEKLY_AVAILABILITY_BASIS = "weekly_availability"
+WEEKLY_AVAILABILITY_BASIS_LABEL = (
+    "This week's lineup by season value; players on bye or ruled out don't start."
+)
+_LINEUP_BASIS_LABELS = {
+    SEASON_VALUE_BASIS: SEASON_VALUE_BASIS_LABEL,
+    WEEKLY_PROJECTION_BASIS: WEEKLY_PROJECTION_BASIS_LABEL,
+    WEEKLY_AVAILABILITY_BASIS: WEEKLY_AVAILABILITY_BASIS_LABEL,
+}
+
 # The label for the OTHER matchup view: Sleeper's own real current-week
 # lineup and live points (modules.sleeper.get_matchups' `starters` /
 # `starters_points` / `points` fields), as opposed to SEASON_VALUE_BASIS
@@ -9912,6 +10069,15 @@ def _matchup_starter_why(player: dict[str, Any], best_score_by_position: dict[st
     """
 
     bits: list[str] = []
+    # Weekly lineup (in season): lead with the number this start was
+    # actually ranked on.
+    projection = player.get("projection") if isinstance(player.get("projection"), dict) else {}
+    points = projection.get("point_estimate")
+    if player.get("lineup_points_basis") == "projection" and isinstance(points, (int, float)):
+        opponent = str(projection.get("opponent") or "").strip()
+        bits.append(f"Projected {points:.1f} pts" + (f" vs {opponent}" if opponent else ""))
+    elif player.get("lineup_points_basis") == "value_estimate":
+        bits.append("No projection yet — ranked on season value")
     tier = str(player.get("tier") or "").strip()
     if tier:
         bits.append(f"{tier} tier")
@@ -9975,8 +10141,15 @@ def _matchup_side(
     is then `None` too, same honest-absence contract as everywhere else.
     """
 
+    lineup_meta: dict[str, Any] = {}
     starters, _bench = _suggested_lineup_split(
-        valued, roster, settings, score_field, players_lookup=players_lookup
+        valued,
+        roster,
+        settings,
+        score_field,
+        players_lookup=players_lookup,
+        projection_context=projection_context,
+        meta=lineup_meta,
     )
 
     best_score_by_position: dict[str, float] = {}
@@ -9989,19 +10162,10 @@ def _matchup_side(
 
     for player in starters:
         player["why"] = _matchup_starter_why(player, best_score_by_position)
-        player["projection"] = (
-            _weekly_projection_for_player(
-                str(player.get("player_id") or ""),
-                projection_context.week,
-                projection_context.season,
-                players_lookup=projection_context.players_lookup,
-                weekly_stats=projection_context.weekly_stats,
-                defense_strength=projection_context.defense_strength,
-                team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
-            )
-            if projection_context is not None
-            else None
-        )
+        # _suggested_lineup_split already attached this week's projection to
+        # every row when a projection context exists (one computation per
+        # player, reused here).
+        player.setdefault("projection", None)
 
     season_value_total = round(
         sum(float(p["score"]) for p in starters if isinstance(p.get("score"), (int, float))), 1
@@ -10018,6 +10182,14 @@ def _matchup_side(
         "starters": starters,
         "season_value_total": season_value_total,
         "starters_basis": "suggested_optimal_lineup",
+        # Additive: what this side's suggested lineup was ranked on, and any
+        # starting slots left open because nobody eligible could fill them
+        # (bye / ruled out). See _suggested_lineup_split.
+        "lineup_basis": lineup_meta.get("lineup_basis", SEASON_VALUE_BASIS),
+        "lineup_basis_label": _LINEUP_BASIS_LABELS.get(
+            lineup_meta.get("lineup_basis", SEASON_VALUE_BASIS), SEASON_VALUE_BASIS_LABEL
+        ),
+        "open_slots": lineup_meta.get("open_slots", []),
     }
 
 
@@ -10109,6 +10281,53 @@ class _ProjectionContext:
     defense_strength: dict[str, Any]
     games: pd.DataFrame | None = None
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None
+
+
+def _build_projection_context(week: int) -> "_ProjectionContext | None":
+    """The shared per-request projection inputs for one NFL week, or None
+    when there's no week or anything fails to load (fails soft: callers
+    fall back to the season-value lineup with no per-player projection)."""
+
+    if week <= 0:
+        return None
+    try:
+        season = sleeper.default_player_stats_season()
+        players_lookup = sleeper.get_players()
+        weekly_stats = sleeper.get_season_player_stats(season=season, retain_weekly=True)
+        return _ProjectionContext(
+            week=week,
+            season=season,
+            players_lookup=players_lookup,
+            weekly_stats=weekly_stats,
+            defense_strength=player_projections.team_defense_points_allowed_by_position(
+                season,
+                upto_week=week - 1,
+                weekly_stats=weekly_stats,
+                players=players_lookup,
+            ),
+            games=nfl_schedule.load_games(),
+            # Built ONCE per request: every projected player would otherwise
+            # redo the same full players_lookup scan. See
+            # team_qb_pass_attempts_by_week's own docstring.
+            team_qb_pass_attempts_by_team=player_projections.team_qb_pass_attempts_by_week(
+                players_lookup, weekly_stats
+            ),
+        )
+    except Exception:
+        return None
+
+
+def _league_current_lineup_week(league: dict[str, Any]) -> int:
+    """The NFL week a suggested lineup is for: the league's own
+    `settings.leg` while the league is in season, else 0 (no weekly gate)."""
+
+    if str(league.get("status") or "") != "in_season":
+        return 0
+    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    try:
+        return max(0, int((league_settings or {}).get("leg") or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _real_current_lineup(
@@ -10430,42 +10649,12 @@ def get_league_matchup(
     except Exception:
         matchup_players_lookup = {}
 
-    # Built BEFORE _matchup_side (not just _real_current_lineup below) so
-    # the suggested season-value lineup also gets each starter's this-week
-    # `projection` — see _matchup_side's own docstring for why. Best-effort,
-    # same "fails soft" contract as everywhere else in this file.
-    projection_context = None
-    has_any_real_starters = bool(my_entry.get("starters")) or bool(opponent_entry.get("starters"))
-    if has_any_real_starters:
-        try:
-            projection_season = sleeper.default_player_stats_season()
-            projection_players_lookup = sleeper.get_players()
-            projection_weekly_stats = sleeper.get_season_player_stats(
-                season=projection_season, retain_weekly=True
-            )
-            projection_context = _ProjectionContext(
-                week=current_week,
-                season=projection_season,
-                players_lookup=projection_players_lookup,
-                weekly_stats=projection_weekly_stats,
-                defense_strength=player_projections.team_defense_points_allowed_by_position(
-                    projection_season,
-                    upto_week=current_week - 1,
-                    weekly_stats=projection_weekly_stats,
-                    players=projection_players_lookup,
-                ),
-                games=nfl_schedule.load_games(),
-                # Built ONCE for the whole matchup request, same reason as
-                # every other field here — up to ~20 starters across both
-                # rosters would otherwise each redo the same full
-                # projection_players_lookup scan. See
-                # team_qb_pass_attempts_by_week's own docstring.
-                team_qb_pass_attempts_by_team=player_projections.team_qb_pass_attempts_by_week(
-                    projection_players_lookup, projection_weekly_stats
-                ),
-            )
-        except Exception:
-            projection_context = None
+    # Built BEFORE _matchup_side (not just _real_current_lineup below):
+    # the suggested lineup is THIS week's lineup, so it needs every roster
+    # player's projection and bye status, even before Sleeper has locked
+    # either side's real starters. Best-effort, same "fails soft" contract
+    # as everywhere else in this file.
+    projection_context = _build_projection_context(current_week)
 
     my_side = _matchup_side(
         my_roster_id,

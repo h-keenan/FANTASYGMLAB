@@ -270,4 +270,40 @@ describe("MyTeamContent", () => {
       expect(screen.getByText("Test Quarterback")).toBeInTheDocument();
     });
   });
+
+  // Logic audit 2026-10-21: in-season lineups never start a player on bye;
+  // the server benches him with start_ineligible_reason "Bye" and lists any
+  // slot nobody eligible could fill.
+  it("tags a bye-week bench player and names open lineup slots", () => {
+    const weekly: MyTeamResponse = {
+      ...MY_TEAM,
+      week: 7,
+      lineup_basis: "weekly_projection",
+      lineup_basis_label: "This week's lineup: ranked by projected points.",
+      open_slots: ["TE"],
+      bench: [
+        player({
+          player_id: "rb9",
+          name: "Test Bye Back",
+          slot: "BENCH",
+          suggested_starter: false,
+          roster_slot: "bench",
+          on_bye: true,
+          start_ineligible_reason: "Bye",
+        }),
+      ],
+    };
+    render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={weekly} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+
+    expect(screen.getByText("· BYE")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Open slot this week: TE");
+    expect(screen.getByText(/Week 7\. This week's lineup/)).toBeInTheDocument();
+  });
+
+  it("shows no weekly notes for an older API response without the weekly fields", () => {
+    render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+
+    expect(screen.queryByText("· BYE")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
 });

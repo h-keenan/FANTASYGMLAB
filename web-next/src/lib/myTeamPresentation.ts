@@ -268,3 +268,24 @@ export function myTeamReasonMessage(reason: string): string | null {
     emptyRoster: "Your roster in this league looks empty.",
   });
 }
+
+/** Starting slots the server left open this week because nobody eligible
+ * could fill them (everyone at that spot is on bye or ruled out). Shared by
+ * My Team and Matchup. Null when every slot is filled, or for an older API
+ * build that doesn't send `open_slots`. */
+export function openSlotsMessage(openSlots: string[] | null | undefined): string | null {
+  if (!openSlots || openSlots.length === 0) return null;
+  const label = openSlots.length === 1 ? "slot" : "slots";
+  return `Open ${label} this week: ${openSlots.join(", ")}. Nobody on the roster can start there (bye or ruled out).`;
+}
+
+/** Short row tag for a player who can't start this week because of a bye,
+ * or null. Out/IR already render through the injury badge, so only a bye
+ * needs its own tag. */
+export function lineupIneligibleTag(player: {
+  on_bye?: boolean;
+  start_ineligible_reason?: string | null;
+}): string | null {
+  if (player.on_bye || player.start_ineligible_reason === "Bye") return "BYE";
+  return null;
+}

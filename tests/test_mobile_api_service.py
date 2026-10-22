@@ -11810,6 +11810,11 @@ def _matchup_world(matchups, league=None, rosters=None, players=None):
         stack.enter_context(
             patch("modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kwargs: df)
         )
+        # The suggested lineup now checks this week's byes against the real
+        # NFL schedule. Never read whatever data/nfl_games.csv happens to be
+        # cached on disk (the fixture's "KC" could be on bye that week);
+        # tests that need a bye patch one in explicitly.
+        stack.enter_context(patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()))
         yield
 
 
@@ -12004,16 +12009,20 @@ def test_matchup_benches_season_ending_status_even_with_no_injury_status_tag(mon
 
 
 def test_matchup_flags_a_ruled_out_starter_when_no_alternative_exists(monkeypatch):
-    """Availability is a preference, not a hard filter: with no other TE on
-    the roster the Out player still fills the slot, and the response says so
-    in both the pill field and the reasoning line — never silently."""
+    """Season-value fallback (no weekly projection context): availability
+    is a preference, not a hard filter. With no other TE on the roster the
+    Out player still fills the slot, and the response says so in both the
+    pill field and the reasoning line — never silently. (With a current
+    week he is ineligible instead: see
+    test_matchup_weekly_lineup_leaves_slot_open_for_out_player.)"""
 
     client = _client(monkeypatch)
     # mine7 is the roster's only TE.
     frame = _matchup_frame_with("mine7", injury_status="Out")
 
     with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}], players=frame):
-        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+        with patch("services.mobile_api_service._build_projection_context", return_value=None):
+            response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
 
     mine = response.json()["my_team"]
     te = next(player for player in mine["starters"] if player["player_id"] == "mine7")
@@ -12024,6 +12033,144 @@ def test_matchup_flags_a_ruled_out_starter_when_no_alternative_exists(monkeypatc
     assert te["injury_label"] == "Out"
     assert "ruled out" in te["why"]
     assert "no available alternative" in te["why"]
+
+
+def _weekly_projection_context(week=5):
+    from services import mobile_api_service as service
+
+    return service._ProjectionContext(
+        week=week,
+        season=2026,
+        players_lookup={},
+        weekly_stats={},
+        defense_strength={},
+        games=None,
+    )
+
+
+def _fake_week_projection(points_by_id, bye_ids=()):
+    def fake(player_id, week, season, **kwargs):
+        if player_id in bye_ids:
+            return {"status": "bye_week", "opponent": None}
+        if player_id in points_by_id:
+            return {
+                "status": "ok",
+                "point_estimate": points_by_id[player_id],
+                "low": points_by_id[player_id] - 4,
+                "high": points_by_id[player_id] + 4,
+                "confidence": "medium",
+                "opponent": "BUF",
+            }
+        return {"status": "insufficient_player_data", "opponent": "BUF"}
+
+    return fake
+
+
+def test_matchup_weekly_lineup_never_starts_a_player_on_bye(monkeypatch):
+    """Logic audit 2026-10-21: the suggested lineup ranked by season value
+    and started players on bye. With a current week, a bye player is
+    benched with start_ineligible_reason="Bye" and starters rank by this
+    week's projection."""
+
+    client = _client(monkeypatch)
+    points = {f"mine{i}": 10.0 for i in range(1, 10)}
+    points["mine8"] = 25.0  # the bench RB is projected best among RBs this week
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}]):
+        with patch(
+            "services.mobile_api_service._build_projection_context", return_value=_weekly_projection_context()
+        ):
+            with patch(
+                "modules.player_projections.project_player_week",
+                side_effect=_fake_week_projection(points, bye_ids={"mine1", "mine2"}),
+            ):
+                response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine = response.json()["my_team"]
+    starter_ids = {p["player_id"] for p in mine["starters"]}
+    # mine1 is the only QB and on bye: QB slot stays open rather than
+    # starting him. mine2 (RB) on bye too.
+    assert "mine1" not in starter_ids
+    assert "mine2" not in starter_ids
+    assert mine["open_slots"] == ["QB"]
+    assert mine["lineup_basis"] == "weekly_projection"
+    assert "bye" in mine["lineup_basis_label"]
+    # Projection, not equal season value, picks mine8 into the lineup.
+    rb8 = next(p for p in mine["starters"] if p["player_id"] == "mine8")
+    assert rb8["lineup_points_basis"] == "projection"
+    assert rb8["lineup_points"] == 25.0
+    assert rb8["why"].startswith("Projected 25.0 pts vs BUF")
+    # Existing per-starter projection field is still populated.
+    assert rb8["projection"]["point_estimate"] == 25.0
+
+
+def test_matchup_weekly_lineup_leaves_slot_open_for_out_player(monkeypatch):
+    client = _client(monkeypatch)
+    # mine7 is the roster's only TE.
+    frame = _matchup_frame_with("mine7", injury_status="Out")
+    points = {f"mine{i}": 10.0 for i in range(1, 10)}
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}], players=frame):
+        with patch(
+            "services.mobile_api_service._build_projection_context", return_value=_weekly_projection_context()
+        ):
+            with patch(
+                "modules.player_projections.project_player_week", side_effect=_fake_week_projection(points)
+            ):
+                response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine = response.json()["my_team"]
+    assert "mine7" not in {p["player_id"] for p in mine["starters"]}
+    assert mine["open_slots"] == ["TE"]
+
+
+def test_my_team_weekly_lineup_flags_bye_and_out_players(monkeypatch):
+    client = _client(monkeypatch)
+    frame = _matchup_frame_with("mine4", injury_status="IR")
+    league = dict(_MATCHUP_LEAGUE, status="in_season")
+    points = {f"mine{i}": 10.0 + i for i in range(1, 10)}
+    with _matchup_world([], league=league, players=frame):
+        with patch(
+            "services.mobile_api_service._build_projection_context", return_value=_weekly_projection_context()
+        ) as mock_context:
+            with patch(
+                "modules.player_projections.project_player_week",
+                side_effect=_fake_week_projection(points, bye_ids={"mine2"}),
+            ):
+                response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    mock_context.assert_called_once_with(5)
+    assert body["week"] == 5
+    assert body["lineup_basis"] == "weekly_projection"
+    bench = {p["player_id"]: p for p in body["bench"]}
+    assert bench["mine2"]["start_ineligible_reason"] == "Bye"
+    assert bench["mine2"]["on_bye"] is True
+    assert bench["mine4"]["start_ineligible_reason"] == "IR"
+    for starter in body["starters"]:
+        assert starter["start_ineligible_reason"] is None
+
+
+def test_my_team_offseason_keeps_the_season_value_lineup(monkeypatch):
+    client = _client(monkeypatch)
+    league = dict(_MATCHUP_LEAGUE, status="complete")
+    with _matchup_world([], league=league):
+        with patch("services.mobile_api_service._build_projection_context", return_value=None) as mock_context:
+            response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    mock_context.assert_called_once_with(0)
+    assert body["lineup_basis"] == "season_value"
+    assert body["week"] is None
+    assert body["open_slots"] == []
+    assert len(body["starters"]) == 8
+
+
+def test_build_projection_context_requires_a_week():
+    from services import mobile_api_service as service
+
+    assert service._build_projection_context(0) is None
+    assert service._league_current_lineup_week({"status": "in_season", "settings": {"leg": 7}}) == 7
+    assert service._league_current_lineup_week({"status": "complete", "settings": {"leg": 17}}) == 0
+    assert service._league_current_lineup_week({"status": "pre_draft", "settings": {"leg": 0}}) == 0
 
 
 def test_matchup_starters_all_carry_a_renderable_injury_field(monkeypatch):
@@ -12258,12 +12405,13 @@ def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
     suggested_starter = body["my_team"]["starters"][0]
     assert suggested_starter["projection"] == fake_projection
 
-    # Computed once for the whole request (both rosters), not once per
-    # starter — see _ProjectionContext/_weekly_projection_for_player.
-    # 1 real starter + 8 suggested-lineup starters (QB/RB/RB/WR/WR/WR/TE/FLEX)
-    # per side, both sides: (1 + 8) * 2 = 18.
+    # Shared inputs computed once for the whole request (both rosters).
+    # The suggested lineup is this week's lineup, so every roster player is
+    # projected once (to rank starters and catch byes), and that projection
+    # is reused on the starter row: 1 real starter + 9 roster players per
+    # side, both sides: (1 + 9) * 2 = 20.
     assert mock_defense.call_count == 1
-    assert mock_project.call_count == 18
+    assert mock_project.call_count == 20
 
 
 def test_matchup_real_starter_with_inactive_status_is_reinstated_not_unknown(monkeypatch):
