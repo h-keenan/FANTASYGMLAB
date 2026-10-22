@@ -633,6 +633,9 @@ def test_project_player_week_recent_trend_still_drops_old_games_for_actively_pla
     # weeks 1 and 2 (7 and 6 weeks before week 8) must still be excluded.
     assert result["basis"]["recent_weeks_used"] == [3, 4, 5, 6, 7, 8]
     assert result["basis"]["recent_games_played"] == 6
+    # v2: the descriptive "recent" window is unchanged, but the estimate itself
+    # uses every prior game (empirical-Bayes), so the sample size is 8.
+    assert result["basis"]["season_games_played"] == 8
 
 
 def test_opponent_multiplier_is_bounded():
@@ -770,9 +773,10 @@ def test_project_player_week_wr_projection_moves_both_directions_with_team_qb_qu
     assert low <= better["basis"]["team_qb_quality_multiplier"] <= high
     assert low <= worse["basis"]["team_qb_quality_multiplier"] <= high
 
-    # Both directions of the audit's ask: a better team QB situation must
-    # raise the point estimate above neutral, a worse one must lower it.
-    assert better["point_estimate"] > neutral["point_estimate"] > worse["point_estimate"]
+    # v2: the team-QB multiplier is computed as context but NOT applied; the
+    # 2024->2025 backtest showed it worsened out-of-sample WR/TE MAE.
+    assert better["point_estimate"] == neutral["point_estimate"] == worse["point_estimate"]
+    assert better["basis"]["team_qb_quality_multiplier_applied"] is False
     assert better["basis"]["team_starting_qb_player_id"] == "qb_c1"
 
 

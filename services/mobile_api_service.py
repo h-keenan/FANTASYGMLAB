@@ -6365,7 +6365,8 @@ def _external_factors(result: dict[str, Any], *, as_of: str) -> list[dict[str, A
     # has too small a sample, and the multiplier is a neutral 1.0 in that
     # case; surfacing that as a "factor" would misrepresent a non-finding as
     # a finding.
-    if basis.get("opponent_defense_has_signal"):
+    # v2: a signal only counts as a factor when it actually moved the number.
+    if basis.get("opponent_defense_has_signal") and basis.get("opponent_multiplier_applied", True):
         factors.append(
             {
                 "code": "opponent_defense_strength",
@@ -6377,7 +6378,7 @@ def _external_factors(result: dict[str, Any], *, as_of: str) -> list[dict[str, A
                 "as_of": as_of,
             }
         )
-    if basis.get("team_qb_quality_has_signal"):
+    if basis.get("team_qb_quality_has_signal") and basis.get("team_qb_quality_multiplier_applied", True):
         factors.append(
             {
                 "code": "team_starting_qb_quality",
@@ -6386,6 +6387,31 @@ def _external_factors(result: dict[str, Any], *, as_of: str) -> list[dict[str, A
                 "unit": "team_qb_quality_score",
                 "period": "season to date",
                 "source": "fantasygmlab_team_qb_quality_model",
+                "as_of": as_of,
+            }
+        )
+    if basis.get("usage_implied_ppr") is not None:
+        factors.append(
+            {
+                "code": "usage_implied_scoring",
+                "observed_value": basis.get("usage_implied_ppr"),
+                "comparison_baseline": basis.get("season_avg_ppr"),
+                "unit": "fantasy_points_ppr_per_game",
+                "period": f"{basis.get('season_games_played')} played game(s) this season",
+                "source": "fantasygmlab_weekly_stats",
+                "as_of": as_of,
+            }
+        )
+    availability = basis.get("availability") or {}
+    if availability.get("applied"):
+        factors.append(
+            {
+                "code": "availability",
+                "observed_value": availability.get("multiplier"),
+                "comparison_baseline": 1.0,
+                "unit": "multiplier_on_projection",
+                "period": str(availability.get("reason") or ""),
+                "source": "sleeper_injury_status",
                 "as_of": as_of,
             }
         )
