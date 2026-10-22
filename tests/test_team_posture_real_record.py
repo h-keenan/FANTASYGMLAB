@@ -213,3 +213,31 @@ def test_build_league_summary_ignores_record_before_any_games_played():
 
     strategies = set(summary["strategy"])
     assert len(strategies) == 1, "identical rosters with no games played must classify identically"
+
+
+def test_one_game_cannot_flip_posture_for_a_strong_roster():
+    """Round-2 audit: the record weight had a 0.30 floor from game 1, so a
+    90th-percentile roster fell from Contender to Retool after ONE loss (and a
+    median roster to Rebuild). A single result must barely move the blend."""
+
+    one_game = 1 / 14
+    base = team_eval._classify_team_strategy(0.9, 25, 25, season_progress=0.0)
+    after_loss = team_eval._classify_team_strategy(
+        0.9, 25, 25, roster_record={"wins": 0, "losses": 1, "ties": 0}, season_progress=one_game
+    )
+    assert base == "contender"
+    assert after_loss == "contender"
+    median_after_loss = team_eval._classify_team_strategy(
+        0.5, 25, 25, roster_record={"wins": 0, "losses": 1, "ties": 0}, season_progress=one_game
+    )
+    assert median_after_loss == "retool"
+
+
+def test_record_weight_ramps_with_games_played_then_matches_season_weight():
+    blended_1, w1 = record_signal.blend_percentile_with_record(0.5, {"wins": 1, "losses": 0}, 1 / 14)
+    _, w2 = record_signal.blend_percentile_with_record(0.5, {"wins": 2, "losses": 0}, 2 / 14)
+    _, w4 = record_signal.blend_percentile_with_record(0.5, {"wins": 4, "losses": 0}, 4 / 14)
+    assert w1 < w2 < w4
+    assert w4 == pytest.approx(record_signal.record_signal_weight(4 / 14))
+    assert w1 == pytest.approx(record_signal.record_signal_weight(1 / 14) * 0.25)
+    assert 0.5 < blended_1 < 0.56
