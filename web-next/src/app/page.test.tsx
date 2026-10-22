@@ -158,3 +158,17 @@ describe("LandingPage welcome-page analytics", () => {
     expect(trackFeatureUse).toHaveBeenCalledWith("landing_viewed", { props: { source_surface: "landing_hero" } });
   });
 });
+
+describe("LandingPage app store modules", () => {
+  it("shows App Store coming soon and a live Google Play link to a signed-out visitor", async () => {
+    mockAuth(null);
+    render(<LandingPage />);
+
+    expect(await screen.findByText("SignInForm")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
+      "href",
+      "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
+    );
+  });
+});

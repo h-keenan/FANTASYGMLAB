@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { AppStoreModules } from "@/components/AppStoreModules";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
@@ -187,6 +188,11 @@ function LandingPageContent() {
           <SignInForm onSignedIn={() => setAccountReady(true)} />
         )}
       </div>
+
+      {/* Native app store slots, below the primary sign-in action so they
+          never compete with it. Each slot is "Coming soon" until its URL
+          is set in lib/appStoreLinks.ts (the one-line go-live switch). */}
+      <AppStoreModules />
     </main>
   );
 }
