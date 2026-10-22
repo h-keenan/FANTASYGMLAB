@@ -708,3 +708,108 @@ def test_need_filling_trade_unaffected_when_no_better_waiver_option_exists(monke
             assert idea["waiver_alternative_available"] is False
             assert idea["waiver_alternative"] is None
             assert idea["waiver_alternative_summary"] == ""
+
+
+# --- Trade Finder draft-pick selection -------------------------------------
+# Real (unmocked) engine over scripts/profile_trade_hub.py's synthetic
+# fixture, where every roster owns its own real pick assets.
+
+
+def _pick_fixture(strategy="contender"):
+    from scripts.profile_trade_hub import FixtureSpec, build_fixture
+
+    return build_fixture(FixtureSpec("trade-finder-picks", 12, 14, "1 QB", strategy=strategy))
+
+
+_PICK_DRAFT_STATUS = {"draft_year": 2026, "current_year_picks_active": True}
+
+
+def _finder_ideas(fixture, *, names=(), pick_ids=None, return_picks=False, strategy="contender"):
+    return trade_ideas.build_trade_ideas(
+        fixture["players"],
+        "fixture-league",
+        fixture["summary"],
+        1,
+        list(names),
+        [],
+        {},
+        max_ideas=12,
+        score_field="value_score",
+        team_strategy=strategy,
+        league_settings=fixture["settings"],
+        draft_status=_PICK_DRAFT_STATUS,
+        adapter=fixture["adapter"],
+        allow_protected_focus=bool(names),
+        trade_block_pick_ids=pick_ids,
+        require_receive_picks=return_picks,
+    )
+
+
+def _my_pick_ids(fixture):
+    picks = trade_ideas.list_draft_pick_assets(
+        "fixture-league",
+        fixture["summary"],
+        league_settings=fixture["settings"],
+        draft_status=_PICK_DRAFT_STATUS,
+        adapter=fixture["adapter"],
+    )
+    return [trade_ideas.trade_block_pick_key(p) for p in picks if int(p["owner_roster_id"]) == 1]
+
+
+def test_trade_finder_picks_only_selection_offers_exactly_the_selected_owned_picks():
+    fixture = _pick_fixture()
+    selected = _my_pick_ids(fixture)[:3]
+    assert len(selected) == 3
+
+    ideas = _finder_ideas(fixture, pick_ids=selected)
+
+    assert ideas
+    for idea in ideas:
+        assert all(asset["asset_type"] == "pick" for asset in idea["send_assets"])
+        assert {trade_ideas.trade_block_pick_key(a) for a in idea["send_assets"]} <= set(selected)
+        assert all(int(a["owner_roster_id"]) == 1 for a in idea["send_assets"])
+
+
+def test_trade_finder_drops_pick_ids_the_team_does_not_own():
+    fixture = _pick_fixture()
+    # 2026:1:2 is roster 2's own pick; 2099 is not a real season.
+    assert _finder_ideas(fixture, pick_ids=["2026:1:2", "2099:1:1"]) == []
+
+
+def test_trade_finder_return_picks_keeps_only_packages_that_bring_back_a_real_partner_pick():
+    fixture = _pick_fixture()
+    selected = _my_pick_ids(fixture)[:3]
+
+    for kwargs in ({"pick_ids": selected}, {"names": ["F01-08"]}):
+        ideas = _finder_ideas(fixture, return_picks=True, **kwargs)
+        assert ideas, kwargs
+        for idea in ideas:
+            receive_picks = [a for a in idea["receive_assets"] if a["asset_type"] == "pick"]
+            assert receive_picks
+            assert all(int(a["owner_roster_id"]) != 1 for a in receive_picks)
+            # Never a like-for-like same-season/same-round swap.
+            if all(a["asset_type"] == "pick" for a in idea["send_assets"] + idea["receive_assets"]):
+                assert sorted((a["season"], a["round"]) for a in idea["send_assets"]) != sorted(
+                    (a["season"], a["round"]) for a in idea["receive_assets"]
+                )
+
+
+def test_trade_finder_caps_the_selected_pick_pool():
+    fixture = _pick_fixture()
+    owned = _my_pick_ids(fixture)
+    assert len(owned) > trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS
+    allowed = set(owned[: trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS])
+
+    ideas = _finder_ideas(fixture, pick_ids=owned, return_picks=True)
+
+    for idea in ideas:
+        for asset in idea["send_assets"]:
+            if asset["asset_type"] == "pick":
+                assert trade_ideas.trade_block_pick_key(asset) in allowed
+
+
+def test_trade_finder_pick_controls_default_off_leave_the_board_unchanged():
+    fixture = _pick_fixture()
+    baseline = _finder_ideas(fixture)
+    explicit_off = _finder_ideas(fixture, pick_ids=[], return_picks=False)
+    assert baseline == explicit_off

@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TradeFinderContent } from "./TradeFinderContent";
 import { api } from "@/lib/api";
-import type { LineupPlayer, MyTeamResponse, TradeAsset, TradeFinderResponse, TradeIdea } from "@/lib/api";
+import type {
+  DraftPickAsset,
+  LineupPlayer,
+  MyTeamResponse,
+  TradeAsset,
+  TradeFinderResponse,
+  TradeIdea,
+} from "@/lib/api";
 
 /**
  * jsdom/testing-library substitute for live E2E (no Supabase/Sleeper
@@ -23,6 +30,7 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getTradeFinderIdeas: vi.fn(),
       getTeamStance: vi.fn(),
+      getLeagueDraftPicks: vi.fn(),
     },
   };
 });
@@ -90,6 +98,23 @@ function idea(overrides: Partial<TradeIdea>): TradeIdea {
   };
 }
 
+function pick(overrides: Partial<DraftPickAsset>): DraftPickAsset {
+  return {
+    pick_id: "2027:1:1",
+    label: "2027 Round 1",
+    score: 4000,
+    season: 2027,
+    round: 1,
+    original_roster_id: "1",
+    owner_roster_id: "1",
+    original_team_name: "Me",
+    owner_team_name: "Me",
+    pick_tier: "Mid 1st",
+    projected_pick_range: "Mid 1st",
+    ...overrides,
+  };
+}
+
 function myTeam(overrides: Partial<MyTeamResponse>): MyTeamResponse {
   return {
     ok: true,
@@ -107,6 +132,7 @@ describe("TradeFinderContent", () => {
     // overrides this to assert a declared stance's real strategy flows
     // through to the search call instead.
     vi.mocked(api.getTeamStance).mockResolvedValue({ ok: true, stance: "" });
+    vi.mocked(api.getLeagueDraftPicks).mockResolvedValue({ ok: true, picks: [], reason: "" });
   });
 
   it("renders every roster player (starters + bench) in the picker", () => {
@@ -137,7 +163,7 @@ describe("TradeFinderContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
     });
 
-    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty");
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty", { pickIds: [], returnPicks: false });
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("Favorable")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
@@ -163,7 +189,79 @@ describe("TradeFinderContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
     });
 
-    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "contender", "Dynasty");
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "contender", "Dynasty", { pickIds: [], returnPicks: false });
+  });
+
+  it("lists only the caller's own picks and searches with a picks-only selection plus Picks back", async () => {
+    vi.mocked(api.getLeagueDraftPicks).mockResolvedValue({
+      ok: true,
+      reason: "",
+      picks: [
+        pick({ pick_id: "2027:1:1", label: "2027 Round 1", owner_roster_id: "1", round: 1 }),
+        pick({ pick_id: "2027:2:4", label: "2027 Round 2 (Other Team)", owner_roster_id: "1", round: 2 }),
+        pick({ pick_id: "2027:1:2", label: "2027 Round 1 Rival", owner_roster_id: "2", round: 1 }),
+      ],
+    });
+    const pickIdea = idea({
+      package: {
+        send: [asset({ asset_type: "pick", player_id: undefined, label: "2027 Round 1", round: "1" })],
+        receive: [asset({})],
+        value_edge: "+100",
+        confidence: "High",
+      },
+    });
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue({
+      ok: true,
+      ideas: [pickIdea],
+      reason: "",
+      is_premium: true,
+      upsell: null,
+    });
+
+    render(
+      <TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({ roster_id: "1" })} />,
+    );
+    await act(async () => {});
+
+    expect(api.getLeagueDraftPicks).toHaveBeenCalledWith("123", "Dynasty");
+    expect(screen.getByText("2027 Round 2 (Other Team)")).toBeInTheDocument();
+    expect(screen.queryByText("2027 Round 1 Rival")).not.toBeInTheDocument();
+
+    const button = screen.getByRole("button", { name: /Find Realistic Trades/ });
+    expect(button).toBeDisabled();
+    fireEvent.click(screen.getByText("2027 Round 1"));
+    expect(button).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Picks back" }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", [], "retool", "Dynasty", {
+      pickIds: ["2027:1:1"],
+      returnPicks: true,
+    });
+    expect(screen.getByText("Rival GM")).toBeInTheDocument();
+  });
+
+  it("caps the pick selection at the server's per-search limit", async () => {
+    vi.mocked(api.getLeagueDraftPicks).mockResolvedValue({
+      ok: true,
+      reason: "",
+      picks: [1, 2, 3, 4, 5].map((n) =>
+        pick({ pick_id: `202${n}:1:1`, label: `Pick ${n}`, season: 2020 + n, owner_roster_id: "1" }),
+      ),
+    });
+
+    render(
+      <TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({ roster_id: "1" })} />,
+    );
+    await act(async () => {});
+
+    for (const n of [1, 2, 3, 4]) fireEvent.click(screen.getByText(`Pick ${n}`));
+    const fifth = screen.getByText("Pick 5").closest("button");
+    expect(fifth).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Find Realistic Trades \(4\)/ })).toBeInTheDocument();
   });
 
   it("shows a no-results message when the search returns an empty idea list", async () => {

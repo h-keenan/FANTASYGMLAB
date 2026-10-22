@@ -943,6 +943,27 @@ def _first_player_asset(assets: List[Dict[str, Any]]):
     return None
 
 
+# Trade Finder pick-search bounds (see _build_trade_ideas_impl pattern 5):
+# at most 4 selected picks -> C(4,1)+C(4,2) = 10 send packages; partner
+# return pick packages drawn from that partner's top 4 picks, max 2 per
+# package, capped at 6.
+TRADE_FINDER_MAX_SELECTED_PICKS = 4
+TRADE_FINDER_SEND_PICK_PACKAGES = 10
+TRADE_FINDER_RECEIVE_PICK_PACKAGES = 6
+
+
+def trade_block_pick_key(pick: Mapping[str, Any]) -> str:
+    """The stable "season:round:original_roster_id" pick id -- identical to
+    GET .../draft-picks' pick_id and compact_package's pick_id."""
+
+    season = _safe_int(pick.get("season"), 0)
+    round_num = _safe_int(pick.get("round"), 0)
+    original = _safe_int(pick.get("original_roster_id"), 0)
+    if not (season and round_num and original):
+        return ""
+    return f"{season}:{round_num}:{original}"
+
+
 def _has_pick(assets: List[Dict[str, Any]]) -> bool:
     return any(asset.get("asset_type") == "pick" for asset in assets)
 
@@ -3684,6 +3705,8 @@ def build_trade_ideas(
     _pipeline_cache_enabled: bool = True,
     search_budget: str = "",
     prefetched_rosters: List[Dict[str, Any]] | None = None,
+    trade_block_pick_ids: List[str] | None = None,
+    require_receive_picks: bool = False,
 ) -> List[Dict[str, Any]]:
     profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
     try:
@@ -3707,6 +3730,8 @@ def build_trade_ideas(
             _pipeline_profile=profile,
             search_budget=search_budget,
             prefetched_rosters=prefetched_rosters,
+            trade_block_pick_ids=trade_block_pick_ids,
+            require_receive_picks=require_receive_picks,
         )
     finally:
         profile.emit()
@@ -3732,6 +3757,8 @@ def _build_trade_ideas_impl(
     _pipeline_profile: _TradePipelineProfile | None = None,
     search_budget: str = "",
     prefetched_rosters: List[Dict[str, Any]] | None = None,
+    trade_block_pick_ids: List[str] | None = None,
+    require_receive_picks: bool = False,
 ) -> List[Dict[str, Any]]:
     profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
@@ -3799,6 +3826,19 @@ def _build_trade_ideas_impl(
             if _is_core_or_protected_starter(asset):
                 keeper_names.add(str(row["name"]).strip().casefold())
 
+    # Trade Finder's pick selection: the caller's own explicitly chosen
+    # outgoing picks, keyed by trade_block_pick_key (the same
+    # "season:round:original_roster_id" pick_id GET .../draft-picks and the
+    # Trade Analyzer already use). Resolved ONLY against the picks this
+    # roster actually owns in roster_pick_assets (Sleeper traded-picks data)
+    # -- an id for a pick this team doesn't hold is silently dropped, never
+    # fabricated into an asset. Capped at TRADE_FINDER_MAX_SELECTED_PICKS so
+    # the pick-package fan-out below stays bounded.
+    selected_pick_ids = list(
+        dict.fromkeys(str(pick_id).strip() for pick_id in (trade_block_pick_ids or ()) if str(pick_id).strip())
+    )[:TRADE_FINDER_MAX_SELECTED_PICKS]
+    explicit_pick_focus = bool(selected_pick_ids)
+
     name_keys = my_team_df["name"].fillna("").astype(str).str.strip().str.casefold()
     requested_names = {str(name).strip().casefold() for name in trade_block_names if str(name).strip()}
     if trade_block_names:
@@ -3807,10 +3847,13 @@ def _build_trade_ideas_impl(
         my_trade_block_df = my_team_df[
             requested_mask & (~protected_mask | bool(allow_protected_focus))
         ].copy()
+    elif explicit_pick_focus:
+        # A picks-only selection offers no players at all.
+        my_trade_block_df = my_team_df.iloc[0:0].copy()
     else:
         my_trade_block_df = my_team_df[~name_keys.isin(keeper_names)].copy()
 
-    if my_trade_block_df.empty:
+    if my_trade_block_df.empty and not explicit_pick_focus:
         return []
 
     metrics = get_team_vs_league(df_summary, my_roster_key)
@@ -3878,7 +3921,15 @@ def _build_trade_ideas_impl(
         _pick_asset(pick, score_multiplier=pick_score_multiplier)
         for pick in roster_pick_assets.get(my_roster_key, [])
     ]
-    my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
+    if explicit_pick_focus:
+        selected_pick_set = set(selected_pick_ids)
+        my_pick_assets = [
+            pick for pick in my_pick_assets if trade_block_pick_key(pick) in selected_pick_set
+        ]
+        if my_trade_block_df.empty and not my_pick_assets:
+            return []
+    else:
+        my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
 
     # Trade Finder's explicit "search around exactly this selection" intent
     # — the same flag that already lets `_automatic_outgoing_asset_allowed`
@@ -4226,7 +4277,9 @@ def _build_trade_ideas_impl(
                     break
 
         # 2. Buy a need-position upgrade with one player plus one owned pick.
-        if active_strategy in {"contender", "fringe_contender", "retool"} and my_pick_assets:
+        # An explicit Trade Finder pick selection opts in regardless of
+        # strategy -- the caller said they'd move these picks.
+        if (active_strategy in {"contender", "fringe_contender", "retool"} or explicit_pick_focus) and my_pick_assets:
             for target in partner_target_players[:target_cap]:
                 if target["score"] < 3500:
                     continue
@@ -4325,8 +4378,11 @@ def _build_trade_ideas_impl(
                             add_idea(idea)
                             break
 
-        # 4. Convert a movable player directly into owned picks.
-        if active_strategy in {"rebuild", "tank"} and partner_pick_assets:
+        # 4. Convert a movable player directly into owned picks. A Trade
+        # Finder "picks back" request opts in regardless of strategy and
+        # drops the young-player guard (the caller explicitly asked what
+        # this player fetches in picks).
+        if (active_strategy in {"rebuild", "tank"} or require_receive_picks) and partner_pick_assets:
             useful_picks = partner_pick_assets[:6]
             for player in my_player_assets[:outgoing_cap]:
                 player_pos = str(player.get("position") or "").upper()
@@ -4336,7 +4392,7 @@ def _build_trade_ideas_impl(
                     player_age = float(player.get("age"))
                 except Exception:
                     player_age = 0
-                if player_age < 26 and player["score"] > 3000:
+                if not require_receive_picks and player_age < 26 and player["score"] > 3000:
                     continue
                 pick_packages = [make_package(pick) for pick in useful_picks]
                 for i, first in enumerate(useful_picks):
@@ -4369,6 +4425,92 @@ def _build_trade_ideas_impl(
                     if idea:
                         add_idea(idea)
                         break
+
+        # 5. Trade Finder pick selection: the selected picks alone (1-2 at
+        # a time) for a partner player, and -- when the caller asked for
+        # picks back -- for a partner pick package. Bounded:
+        # _bounded_pick_packages over at most TRADE_FINDER_MAX_SELECTED_PICKS
+        # picks yields <= TRADE_FINDER_SEND_PICK_PACKAGES send packages, each
+        # tried against <= target_cap partner players and <=
+        # TRADE_FINDER_RECEIVE_PICK_PACKAGES partner pick packages, with a
+        # cheap value-band gate before any fit/realism scoring and a break
+        # after the first accepted idea per send package.
+        if explicit_pick_focus and my_pick_assets:
+            send_pick_packages = _bounded_pick_packages(
+                my_pick_assets, max_size=2, limit=TRADE_FINDER_SEND_PICK_PACKAGES
+            )
+            for send_picks in send_pick_packages:
+                for target in gated_partner_players[:target_cap]:
+                    if target["score"] < 1500:
+                        continue
+                    send_assets = make_package(*send_picks)
+                    receive_assets = make_package(target)
+                    if not _value_fits(profile.score(send_assets), target["score"], low=-1500, high=1200):
+                        continue
+                    fit_bonus = package_fit_priority(send_assets, receive_assets)
+                    if fit_bonus < 0:
+                        continue
+                    fit_context = package_fit_context(send_assets, receive_assets)
+                    if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                        continue
+                    idea = make_reasoned_idea(
+                        send_assets,
+                        receive_assets,
+                        "Picks for a player",
+                        (
+                            "Turns draft capital you chose to shop into a playable roster piece. "
+                            f"{fit_context['rationale']}"
+                        ).strip(),
+                        70 + fit_bonus + fit_context["score"],
+                        min_reason_score=8,
+                        min_acceptance_score=54,
+                        fit_context=fit_context,
+                    )
+                    if idea:
+                        add_idea(idea)
+                        break
+            if require_receive_picks and partner_pick_assets:
+                receive_pick_packages = _bounded_pick_packages(
+                    partner_pick_assets[:4], max_size=2, limit=TRADE_FINDER_RECEIVE_PICK_PACKAGES
+                )
+                for send_picks in send_pick_packages:
+                    for receive_picks in receive_pick_packages:
+                        send_assets = make_package(*send_picks)
+                        receive_assets = make_package(*receive_picks)
+                        # A like-for-like swap (same seasons/rounds both
+                        # ways) is noise, not a trade idea.
+                        if sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in send_assets) == sorted(
+                            (_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in receive_assets
+                        ):
+                            continue
+                        if not _value_fits(profile.score(send_assets), profile.score(receive_assets), low=-900, high=900):
+                            continue
+                        fit_bonus = package_fit_priority(send_assets, receive_assets)
+                        if fit_bonus < 0:
+                            continue
+                        fit_context = package_fit_context(send_assets, receive_assets)
+                        if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                            continue
+                        idea = make_reasoned_idea(
+                            send_assets,
+                            receive_assets,
+                            "Pick swap",
+                            (
+                                "Reshapes your draft capital without touching your roster. "
+                                f"{fit_context['rationale']}"
+                            ).strip(),
+                            64 + fit_bonus + fit_context["score"],
+                            min_reason_score=8,
+                            min_acceptance_score=54,
+                            fit_context=fit_context,
+                        )
+                        if idea:
+                            add_idea(idea)
+                            break
+
+    if require_receive_picks:
+        # "Picks back" is a hard filter on the return, not a ranking nudge.
+        ideas = [idea for idea in ideas if _has_pick(idea.get("receive_assets") or [])]
 
     with profile.stage("final_sorting"):
         ideas.sort(key=_trade_surface_sort_key, reverse=True)

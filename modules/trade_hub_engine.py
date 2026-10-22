@@ -412,6 +412,8 @@ def generate_trade_idea_records(
     trade_block_player_ids: tuple[str, ...] = (),
     team_stance: str = "",
     df_summary: pd.DataFrame | None = None,
+    trade_block_pick_ids: tuple[str, ...] = (),
+    require_receive_picks: bool = False,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_ui already work with (trade_confidence_label,
@@ -432,6 +434,13 @@ def generate_trade_idea_records(
     build_trade_ideas' own `trade_block_names` parameter already supports
     this restriction, it just wasn't wired up outside the web app before.
     Resolved to names for the same reason untouchables are.
+
+    `trade_block_pick_ids` / `require_receive_picks` are Trade Finder's pick
+    controls: the caller's own picks to offer (GET .../draft-picks pick_id
+    format, "season:round:original_roster_id"), resolved inside
+    build_trade_ideas against only the picks this roster really owns per
+    Sleeper's traded-picks data, and a "must get picks back" filter on the
+    return side. Both default off, leaving the passive board unchanged.
 
     `team_stance` is the caller's OWN declared Team Situation
     (modules.team_stance: "rebuilding"/"competing"/"balanced", or "" for
@@ -534,6 +543,8 @@ def generate_trade_idea_records(
         draft_status=None,
         search_budget="",
         prefetched_rosters=prefetched_rosters or None,
+        trade_block_pick_ids=[str(pid) for pid in trade_block_pick_ids if str(pid)],
+        require_receive_picks=bool(require_receive_picks),
     )
     enforced = enforce_generated_trade_ideas(
         raw_ideas,
@@ -718,6 +729,8 @@ def generate_trade_finder_records(
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
     team_stance: str = "",
+    trade_block_pick_ids: tuple[str, ...] = (),
+    require_receive_picks: bool = False,
 ) -> list[dict[str, Any]]:
     """Trade Finder: "select these specific players/picks, find who'd want
     them" — the same idea-generation engine as the passive Trade Hub board
@@ -731,9 +744,12 @@ def generate_trade_finder_records(
     mean one more dimension (the selection itself) in the cache key for no
     real benefit.
 
-    Picks aren't handled here (build_trade_ideas' trade_block_names is
-    player-name-keyed only) — a selected pick simply doesn't narrow the
-    search the way a selected player does yet.
+    Picks: `trade_block_pick_ids` offers the caller's selected picks
+    (players-only, picks-only, or both), and `require_receive_picks` keeps
+    only packages whose return includes at least one of the partner's real
+    owned picks. Pick valuation is the engine's own (_build_roster_pick_assets,
+    the same per-pick model GET .../draft-picks and Trade Analyzer use) —
+    see generate_trade_idea_records' docstring.
     """
     league = sleeper.get_league(league_id)
     if not league:
@@ -766,6 +782,8 @@ def generate_trade_finder_records(
         score_field=score_field,
         team_strategy=strategy,
         team_stance=team_stance,
+        trade_block_pick_ids=trade_block_pick_ids,
+        require_receive_picks=require_receive_picks,
     )
 
 

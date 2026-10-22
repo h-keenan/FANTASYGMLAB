@@ -2594,14 +2594,20 @@ export const api = {
   // returns `reason: "no_players_selected"` rather than erroring), but the
   // UI never actually calls this with an empty selection — see
   // TradeFinderContent's disabled-button gate.
+  //
+  // Draft picks: `pickIds` are the caller's own DraftPickAsset.pick_id
+  // values (GET .../draft-picks) to offer — a picks-only selection is a
+  // valid search. `returnPicks` keeps only packages that bring a partner
+  // pick back. The server resolves both against picks the team really owns.
   getTradeFinderIdeas: (
     leagueId: string,
     playerIds: string[],
     strategy: string = "retool",
     lens: string = "Dynasty",
+    options: { pickIds?: string[]; returnPicks?: boolean } = {},
   ) =>
     authorizedRequest<TradeFinderResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(","))}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(","))}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}${options.pickIds && options.pickIds.length > 0 ? `&pick_ids=${encodeURIComponent(options.pickIds.join(","))}` : ""}${options.returnPicks ? "&return_picks=true" : ""}`,
     ),
 
   getLeagueWaivers: (leagueId: string, lens: string = "Dynasty", limit: number = 150) =>
