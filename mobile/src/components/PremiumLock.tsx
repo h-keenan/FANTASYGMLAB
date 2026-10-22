@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { trackUse } from '../lib/analytics';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import { useNavigation } from '@react-navigation/native';
@@ -13,6 +14,8 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 interface Props {
   title: string;
   description: string;
+  /** Stable analytics id of the gated feature (defaults to a slug of title). */
+  feature?: string;
 }
 
 /**
@@ -22,13 +25,25 @@ interface Props {
  * behind it. Tapping goes straight to Paywall, matching web's direct
  * begin_upgrade_flow behavior (no intermediate explanation screen).
  */
-export default function PremiumLock({ title, description }: Props) {
+export default function PremiumLock({ title, description, feature }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // Conversion-by-feature: locked card seen / upsell tapped (same events as web).
+  const gateFeature =
+    feature ?? (title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'premium');
+  useEffect(() => {
+    trackUse(gateFeature, 'gate_seen', { tier: 'free' });
+  }, [gateFeature]);
 
   return (
-    <AnimatedCard style={styles.card} onPress={() => navigation.navigate('Paywall')}>
+    <AnimatedCard
+      style={styles.card}
+      onPress={() => {
+        trackUse(gateFeature, 'upsell_tapped', { tier: 'free' });
+        navigation.navigate('Paywall');
+      }}
+    >
       <View style={styles.iconWrap}>
         <Ionicons name="lock-closed" size={18} color={colors.premium} />
       </View>

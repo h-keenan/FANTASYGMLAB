@@ -3,6 +3,7 @@ import { ActivityIndicator, AppState, Pressable, StyleSheet, TouchableOpacity, V
 import AppText from './AppText';
 
 import { api, type PendingTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
@@ -51,6 +52,7 @@ export default function TradeOutcomePrompt() {
     setAnswering(true);
     try {
       await api.answerTradeOutcome(current.id, outcome);
+      trackUse('trade_outcome_prompt', 'answered', { props: { result: outcome } });
       setQueue((prev) => prev.slice(1));
     } catch {
       // Leave it in the queue — they'll be asked again next foreground check.

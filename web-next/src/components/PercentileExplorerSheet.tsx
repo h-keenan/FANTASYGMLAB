@@ -8,6 +8,7 @@ import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { SheetHandle } from "@/components/SheetHandle";
 import { api } from "@/lib/api";
+import { trackUse } from "@/lib/analytics";
 import {
   assignMarkerLanes,
   defaultComparison,
@@ -100,6 +101,9 @@ export function PercentileExplorerSheet({
 
   useEffect(() => {
     closeRef.current?.focus();
+    trackUse("percentile_explorer", "opened", { props: { item_kind: statKey } });
+    // once per sheet mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const data = state.status === "ready" ? state.data : null;
@@ -118,6 +122,7 @@ export function PercentileExplorerSheet({
   const positionLabel = data?.position || "";
 
   function changePool(next: string) {
+    trackUse("percentile_explorer", "pool_changed", { props: { item_kind: statKey, result: next === "all" ? "all" : "position" } });
     setPool(next === "all" ? "all" : "position");
     setState({ status: "loading" });
     setPickedId(null);
@@ -202,6 +207,7 @@ export function PercentileExplorerSheet({
                         aria-pressed={isPicked}
                         disabled={isMe}
                         onClick={() => {
+                          trackUse("percentile_explorer", "compare_picked", { props: { item_kind: statKey } });
                           setPickedId(marker.player_id);
                           setSwapped(false);
                         }}

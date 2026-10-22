@@ -137,6 +137,70 @@ describe("lib/analytics", () => {
     expect(init.headers.Authorization).toBe("Bearer real-token");
   });
 
+  it("trackPageView strips id-like path segments", async () => {
+    const mockFetch = mockFetchOk();
+    const { trackPageView } = await import("./analytics");
+
+    trackPageView("/trade-hub/1234567890123456");
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.props.route).toBe("/trade-hub/:id");
+    expect(body.props.platform).toBe("web");
+  });
+
+  it("trackUse sends feature_use with feature/action/tier, platform web and no dedupe", async () => {
+    const mockFetch = mockFetchOk();
+    const { trackUse } = await import("./analytics");
+
+    trackUse("percentile_explorer", "opened", { tier: "pro", props: { item_kind: "rush_yds" } });
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.event).toBe("feature_use");
+    expect(body.props).toMatchObject({
+      feature: "percentile_explorer",
+      action: "opened",
+      tier: "pro",
+      item_kind: "rush_yds",
+      platform: "web",
+    });
+    expect(body).not.toHaveProperty("once_key");
+  });
+
+  it("trackClientError sends a sanitized class and route, de-dupes and rate limits", async () => {
+    const mockFetch = mockFetchOk();
+    const { trackClientError, resetErrorRateLimit } = await import("./analytics");
+    resetErrorRateLimit();
+
+    const err = new TypeError("secret token abc in message");
+    trackClientError("application_error", err, { route: "/my-team/1234567890123456?token=abc" });
+    trackClientError("application_error", err, { route: "/my-team/1234567890123456" }); // duplicate
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.event).toBe("application_error");
+    expect(body.props.error_class).toBe("typeerror");
+    expect(body.props.route).toBe("/my-team/:id");
+    expect(JSON.stringify(body)).not.toContain("secret");
+    expect(JSON.stringify(body)).not.toContain("token=abc");
+
+    for (let status = 500; status < 520; status += 1) {
+      trackClientError("provider_error", null, { route: `/r${status}`, status });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // 1 (above) + at most 4 more in the same window.
+    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(5);
+  });
+
+  it("errorClassOf buckets statuses", async () => {
+    const { errorClassOf } = await import("./analytics");
+    expect(errorClassOf(null, 0)).toBe("network");
+    expect(errorClassOf(null, 503)).toBe("http_5xx");
+    expect(errorClassOf({ status: 404 })).toBe("http_404");
+    expect(errorClassOf("weird")).toBe("unknown");
+  });
+
   it("never throws when fetch itself rejects", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
     const { trackPageView } = await import("./analytics");

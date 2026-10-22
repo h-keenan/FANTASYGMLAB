@@ -87,7 +87,10 @@ interface AnalyticsEventBody {
  * backend endpoint allows both (most TRACKED_EVENTS are guest/pre-auth
  * events).
  */
-function postEvent(body: AnalyticsEventBody): void {
+function postEvent(input: AnalyticsEventBody): void {
+  // `platform` lets the founder dashboard split web vs mobile; the backend
+  // also defaults a missing platform to "web".
+  const body: AnalyticsEventBody = { ...input, props: { platform: "web", ...(input.props || {}) } };
   void (async () => {
     try {
       let accessToken: string | undefined;
@@ -123,8 +126,10 @@ function postEvent(body: AnalyticsEventBody): void {
  * here on the client.
  */
 export function trackPageView(route: string): void {
-  const path = (route || "").trim();
-  if (!path) return;
+  const trimmed = (route || "").trim();
+  if (!trimmed) return;
+  // Long/numeric path segments are league or user ids -- never ship them.
+  const path = sanitizeRoute(trimmed);
   postEvent({
     event: "page_view",
     props: { route: path, source_surface: "navigation" },
@@ -159,4 +164,111 @@ export function trackFeatureUse(
     anon_id: getOrCreateAnonId(),
     ...(dedupe ? { once_key: leagueId || "once" } : {}),
   });
+}
+
+/**
+ * Generic "someone used feature X" event (`feature_use`), the same shape the
+ * mobile client sends so the founder dashboard can combine platforms:
+ * props `feature` (stable snake_case id), `action` (opened/applied/tapped/...),
+ * optional `tier` ("free" | "pro"), plus caller props. Never dedupes: every
+ * real interaction is countable. Never put names, ids, emails or free text in
+ * props -- the backend allowlist drops unknown keys anyway.
+ */
+export function trackUse(
+  feature: string,
+  action: string = "used",
+  options?: { leagueId?: string; tier?: "free" | "pro"; props?: Record<string, unknown> },
+): void {
+  const name = (feature || "").trim();
+  if (!name) return;
+  trackFeatureUse("feature_use", {
+    leagueId: options?.leagueId,
+    dedupe: false,
+    props: {
+      ...(options?.props || {}),
+      feature: name,
+      action,
+      ...(options?.tier ? { tier: options.tier } : {}),
+    },
+  });
+}
+
+/** Collapse id-like path segments so a route never identifies a league/user. */
+export function sanitizeRoute(path: string): string {
+  const clean = (path || "").split(/[?#]/)[0];
+  return clean
+    .split("/")
+    .map((seg) => (/^\d+$/.test(seg) || seg.length > 24 || /\d{4,}/.test(seg) ? ":id" : seg))
+    .join("/")
+    .slice(0, 80);
+}
+
+/** Non-sensitive error class: HTTP bucket, network, or the JS error
+ * constructor name -- never the message, stack, URL or token. */
+export function errorClassOf(error: unknown, status?: number): string {
+  if (typeof status === "number") {
+    if (status === 0) return "network";
+    if (status >= 500) return "http_5xx";
+    if (status >= 400) return `http_${status}`;
+  }
+  if (error && typeof error === "object" && "status" in error) {
+    const s = (error as { status?: unknown }).status;
+    if (typeof s === "number") return errorClassOf(null, s);
+  }
+  if (error instanceof Error && /^[A-Za-z]{2,40}$/.test(error.name)) return error.name.toLowerCase();
+  return "unknown";
+}
+
+const ERROR_WINDOW_MS = 60_000;
+const ERROR_MAX_PER_WINDOW = 5;
+let errorWindowStart = 0;
+let errorWindowCount = 0;
+const seenErrorFingerprints = new Set<string>();
+
+/** Test hook. */
+export function resetErrorRateLimit(): void {
+  errorWindowStart = 0;
+  errorWindowCount = 0;
+  seenErrorFingerprints.clear();
+}
+
+/**
+ * Report a client-side failure to the backend's application_error /
+ * route_error / provider_error events. Rate limited (5 per minute per tab)
+ * and de-duplicated per (kind, class, route, status) so a failure loop cannot
+ * flood the pipeline. Never throws.
+ */
+export function trackClientError(
+  kind: "application_error" | "route_error" | "provider_error",
+  error: unknown,
+  options?: { route?: string; status?: number },
+): void {
+  try {
+    const route = sanitizeRoute(
+      options?.route ?? (typeof window !== "undefined" ? window.location.pathname : ""),
+    );
+    const errorClass = errorClassOf(error, options?.status);
+    const fingerprint = `${kind}:${errorClass}:${route}:${options?.status ?? ""}`;
+    if (seenErrorFingerprints.has(fingerprint)) return;
+    const now = Date.now();
+    if (now - errorWindowStart > ERROR_WINDOW_MS) {
+      errorWindowStart = now;
+      errorWindowCount = 0;
+    }
+    if (errorWindowCount >= ERROR_MAX_PER_WINDOW) return;
+    errorWindowCount += 1;
+    seenErrorFingerprints.add(fingerprint);
+    postEvent({
+      event: kind,
+      props: {
+        route,
+        source_surface: "error",
+        error_class: errorClass,
+        ...(typeof options?.status === "number" ? { reason: `status_${options.status}` } : {}),
+      },
+      anon_id: getOrCreateAnonId(),
+    });
+  } catch {
+    // never surfaces
+  }
 }

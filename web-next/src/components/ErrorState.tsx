@@ -1,4 +1,9 @@
+"use client";
+
+import { useEffect } from "react";
+
 import { Button } from "@/components/Button";
+import { trackClientError } from "@/lib/analytics";
 
 /**
  * Shared "couldn't load" state with a real way back — coridian_, 2026-10-18,
@@ -16,6 +21,11 @@ import { Button } from "@/components/Button";
  * fetch effect has no retry token can pass `reloadPage`.
  */
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  // Team-visible error signal (route_error): only a coarse class derived from
+  // the message, never the message itself. Rate limited in trackClientError.
+  useEffect(() => {
+    trackClientError("route_error", null, { status: /timed out|could not reach/i.test(message) ? 0 : undefined });
+  }, [message]);
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
       <p role="alert" style={{ color: "var(--color-danger)" }}>

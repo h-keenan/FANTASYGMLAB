@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { trackUse } from "@/lib/analytics";
 import type { ManagerTendenciesSummaryResponse } from "@/lib/api";
 import { findManagerRow, headlineChips, loadLeagueTendencies } from "@/lib/managerTendencies";
 
@@ -35,16 +36,27 @@ export function ManagerTendenciesCard({
     };
   }, [leagueId]);
 
+  const row = data?.is_premium ? findManagerRow(data, { rosterId, teamName }) : null;
+  const chips = headlineChips(row?.headline);
+  const state = !data ? null : !data.is_premium ? "locked" : chips.length > 0 ? "chips" : null;
+  useEffect(() => {
+    if (state === "chips") trackUse("manager_tendencies", "viewed", { leagueId, tier: "pro" });
+    else if (state === "locked") trackUse("manager_tendencies", "gate_seen", { leagueId, tier: "free" });
+  }, [state, leagueId]);
+
   if (!data) return null;
   if (!data.is_premium) {
     return (
-      <Link href="/premium" className="text-xs font-bold self-start" style={{ color: "var(--color-premium)" }}>
+      <Link
+        href="/premium"
+        onClick={() => trackUse("manager_tendencies", "upsell_tapped", { leagueId, tier: "free" })}
+        className="text-xs font-bold self-start"
+        style={{ color: "var(--color-premium)" }}
+      >
         How this manager trades · Premium →
       </Link>
     );
   }
-  const row = findManagerRow(data, { rosterId, teamName });
-  const chips = headlineChips(row?.headline);
   if (chips.length === 0) return null;
 
   return (

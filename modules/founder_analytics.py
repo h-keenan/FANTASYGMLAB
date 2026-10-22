@@ -86,6 +86,53 @@ def _interval_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
     return counted
 
 
+def _row_platform(row: Mapping[str, Any]) -> str:
+    props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+    value = str(props.get("platform") or "").strip().casefold()
+    # Rows written before the platform property existed are web traffic.
+    return value if value in la.CLIENT_PLATFORMS else "web"
+
+
+def _platform_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {name: 0 for name in sorted(la.CLIENT_PLATFORMS)}
+    for row in rows:
+        counts[_row_platform(row)] += 1
+    return counts
+
+
+def _feature_use_table(rows: list[dict[str, Any]], *, limit: int = 40) -> list[dict[str, Any]]:
+    """feature_use events grouped by (feature, action) with a platform split
+    and the Free/Pro tier split (props.tier), most used first."""
+
+    table: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if la.normalize_event_name(str(row.get("event") or "")) != "feature_use":
+            continue
+        props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+        feature = str(props.get("feature") or "unknown").strip()[:60] or "unknown"
+        action = str(props.get("action") or "used").strip()[:40] or "used"
+        entry = table.setdefault(
+            (feature, action),
+            {
+                "feature": feature,
+                "action": action,
+                "total": 0,
+                "web": 0,
+                "ios": 0,
+                "android": 0,
+                "free": 0,
+                "pro": 0,
+            },
+        )
+        entry["total"] += 1
+        entry[_row_platform(row)] += 1
+        tier = str(props.get("tier") or "").strip().casefold()
+        if tier in {"free", "pro"}:
+            entry[tier] += 1
+    ordered = sorted(table.values(), key=lambda e: (-e["total"], e["feature"], e["action"]))
+    return ordered[:limit]
+
+
 def _unique_ids(rows: list[dict[str, Any]], *, field: str) -> int:
     values = {str(row.get(field) or "").strip() for row in rows}
     values.discard("")
@@ -174,6 +221,8 @@ def build_report(
         "decision_engagement": _count_named(rows, DECISION_EVENTS),
         "premium": _count_named(rows, PREMIUM_EVENTS),
         "checkout_intervals": _interval_counts(rows),
+        "platforms": _platform_counts(rows),
+        "feature_use": _feature_use_table(rows),
         "errors": health.get("errors_by_class") or {},
         "error_sessions": health.get("error_sessions") or 0,
         "performance": health.get("performance") or {},

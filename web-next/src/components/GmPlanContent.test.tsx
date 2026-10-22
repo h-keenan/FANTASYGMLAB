@@ -21,6 +21,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
+  trackUse: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {

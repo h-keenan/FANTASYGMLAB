@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import AppText from './AppText';
 import { api } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { findManagerRow, headlineChips } from '../lib/managerTendencies';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -36,11 +37,23 @@ export default function ManagerTendenciesChips({
     retry: false,
   });
   const data = query.data;
+  const chipList = data?.is_premium ? headlineChips(findManagerRow(data, teamName, rosterId)?.headline) : [];
+  const state = !data ? null : !data.is_premium ? 'locked' : chipList.length > 0 ? 'chips' : null;
+  useEffect(() => {
+    if (state === 'chips') trackUse('manager_tendencies', 'viewed', { leagueId, tier: 'pro' });
+    else if (state === 'locked') trackUse('manager_tendencies', 'gate_seen', { leagueId, tier: 'free' });
+  }, [state, leagueId]);
   if (!data) return null;
 
   if (!data.is_premium) {
     return (
-      <TouchableOpacity onPress={() => navigation.navigate('Paywall')} hitSlop={6}>
+      <TouchableOpacity
+        onPress={() => {
+          trackUse('manager_tendencies', 'upsell_tapped', { leagueId, tier: 'free' });
+          navigation.navigate('Paywall');
+        }}
+        hitSlop={6}
+      >
         <AppText style={styles.upsell}>How this manager trades · Premium</AppText>
       </TouchableOpacity>
     );

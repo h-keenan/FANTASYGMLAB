@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -50,6 +50,7 @@ import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScree
 import PortfolioScreen from '../screens/PortfolioScreen';
 import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
+import { trackScreen } from '../lib/analytics';
 
 export type RootStackParamList = {
   /** `openAddLeague`: opens Home's Add League sheet on arrival (the header
@@ -161,7 +162,16 @@ export default function RootNavigator() {
   // duplicate of what the screen is teaching. Neither GmOrb nor
   // TradeOutcomePrompt is otherwise touched.
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(undefined);
-  const updateCurrentRoute = () => setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+  const lastTrackedRoute = useRef<string | undefined>(undefined);
+  const updateCurrentRoute = () => {
+    const name = navigationRef.getCurrentRoute()?.name;
+    setCurrentRouteName(name);
+    // Screen NAME only (never params, which carry league ids).
+    if (name && name !== lastTrackedRoute.current) {
+      lastTrackedRoute.current = name;
+      trackScreen(name);
+    }
+  };
 
   const navigationTheme: Theme = {
     ...(isDark ? DarkTheme : DefaultTheme),

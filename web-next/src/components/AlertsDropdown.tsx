@@ -9,6 +9,7 @@ import { SheetHandle } from "@/components/SheetHandle";
 import { useAuth } from "@/context/AuthContext";
 import { markAlertReadSynced, overlayPendingAlertReads, reconcileAlertReads } from "@/lib/alertReadSync";
 import { alertsReasonMessage } from "@/lib/alertsPresentation";
+import { trackUse } from "@/lib/analytics";
 import { api, type AlertItem, type AlertsResponse } from "@/lib/api";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
@@ -87,6 +88,7 @@ export function AlertsBell({
       close();
       return;
     }
+    trackUse("alerts_dropdown", "opened", { leagueId });
     setOpen(true);
     load();
   };

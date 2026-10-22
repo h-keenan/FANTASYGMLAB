@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import SegmentedTabBar from './SegmentedTabBar';
 import { ApiError, api, type EspnLeaguePreviewResponse } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { ESPN_SAVE_FAILURE_COPY, espnSeasonOptions } from '../lib/leaguePlatform';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
@@ -69,6 +70,7 @@ export default function EspnLeagueImport({
     setMessage(null);
     try {
       const result = await api.saveLeague({ leagueId: key, leagueName: name, rosterId, makeDefault: true });
+      trackUse('league_connect', result.ok ? 'completed' : 'failed', { props: { source_surface: 'espn' } });
       if (result.ok) {
         onSaved(key, name);
         return;

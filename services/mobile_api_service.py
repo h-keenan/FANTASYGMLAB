@@ -1077,6 +1077,10 @@ def record_analytics_event(
         if not anon_id:
             return {"ok": False}
         raw_props = dict(body.props) if isinstance(body.props, dict) else {}
+        # Platform split for the founder dashboard: web clients historically
+        # sent none, so a missing/unknown value means "web".
+        platform = str(raw_props.get("platform") or "").strip().casefold()
+        raw_props["platform"] = platform if platform in launch_analytics.CLIENT_PLATFORMS else "web"
 
         user_id = str((user or {}).get("id") or "").strip()
         state_shim: dict[str, Any] = {launch_analytics.SESSION_ANON_KEY: anon_id}
@@ -1091,6 +1095,7 @@ def record_analytics_event(
                 route,
                 state=state_shim,
                 source_surface=str(raw_props.get("source_surface") or "navigation"),
+                extra={"platform": raw_props["platform"]},
             )
             return {"ok": True}
 

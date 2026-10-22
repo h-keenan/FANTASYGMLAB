@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { useOrbClearance } from '../lib/orbLayout';
 import {
   getCurrentOffering,
@@ -239,11 +240,19 @@ export default function PaywallScreen({ navigation, route }: Props) {
   // package (RevenueCat introPrice / Play free phase), never a hardcoded one.
   const trial = freeTrialFor(selected?.product);
 
+  useEffect(() => {
+    trackUse('paywall', 'viewed', { tier: 'free' });
+  }, []);
+
   const onPurchase = async (pack: PurchasesPackage) => {
     setPurchaseError(null);
     setPurchasing(true);
+    trackUse('paywall', 'purchase_started', { tier: 'free' });
     const outcome = await purchasePackage(pack);
     setPurchasing(false);
+    trackUse('paywall', 'purchase_finished', {
+      props: { result: outcome.purchased ? 'purchased' : outcome.cancelled ? 'cancelled' : 'error' },
+    });
     if (outcome.purchased) {
       setPurchased(true);
       return;
@@ -257,6 +266,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
     setRestoring(true);
     const active = await restorePurchases();
     setRestoring(false);
+    trackUse('paywall', 'restore', { props: { result: active ? 'restored' : 'none' } });
     if (active) {
       setPurchased(true);
     } else {

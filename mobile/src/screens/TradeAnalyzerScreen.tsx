@@ -39,6 +39,7 @@ import {
 import { useGmStance } from '../context/GmStanceContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
+import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
@@ -416,6 +417,10 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
       setPlanningNote(result.planning_note ?? '');
+      trackUse('trade_analyzer', 'evaluated', {
+        leagueId,
+        props: { result: result.verdict ? 'verdict' : 'no_verdict' },
+      });
       if (result.verdict) {
         setVerdict(result.verdict);
       } else {

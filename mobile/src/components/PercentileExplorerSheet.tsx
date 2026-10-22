@@ -9,6 +9,7 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import {
   assignMarkerLanes,
   defaultComparison,
@@ -81,7 +82,16 @@ export default function PercentileExplorerSheet({
   const maxCount = Math.max(1, ...(data?.bins ?? []).map((b) => b.count));
   const positionLabel = data?.position ?? '';
 
+  useEffect(() => {
+    trackUse('percentile_explorer', 'opened', { props: { item_kind: statKey } });
+    // once per sheet mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const changePool = (key: string) => {
+    trackUse('percentile_explorer', 'pool_changed', {
+      props: { item_kind: statKey, result: key === 'all' ? 'all' : 'position' },
+    });
     setPool(key === 'all' ? 'all' : 'position');
     setState({ status: 'loading' });
     setPickedId(null);

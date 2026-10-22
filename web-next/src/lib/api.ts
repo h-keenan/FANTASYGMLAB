@@ -1,5 +1,6 @@
 import { env } from "./env";
 import { supabase } from "./supabase";
+import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
 
 /**
@@ -18,6 +19,18 @@ export class ApiError extends Error {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Failed-API-call telemetry: only server faults (5xx) and transport failures
+ * (status 0); expected 4xx are normal control flow. Reports the page route +
+ * status class only, never the API path or ids. */
+function reportApiFailure(status: number): void {
+  if (status !== 0 && status < 500) return;
+  try {
+    trackClientError("provider_error", null, { status });
+  } catch {
+    // telemetry must never change request behavior
+  }
+}
 
 async function performRequest<T>(
   path: string,
@@ -39,6 +52,7 @@ async function performRequest<T>(
       signal: controller.signal,
     });
   } catch (error) {
+    reportApiFailure(0);
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError(0, "The request timed out. Check your connection and try again.");
     }
@@ -59,6 +73,7 @@ async function performRequest<T>(
       body && typeof body === "object" && "detail" in body
         ? String((body as { detail?: unknown }).detail ?? "")
         : "";
+    reportApiFailure(response.status);
     throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
   }
 
@@ -2083,6 +2098,17 @@ export interface FounderAnalyticsNamedCount {
   count: number;
 }
 
+export interface FounderAnalyticsFeatureUse {
+  feature: string;
+  action: string;
+  total: number;
+  web: number;
+  ios: number;
+  android: number;
+  free: number;
+  pro: number;
+}
+
 export interface FounderAnalyticsLatencyStat {
   p50: number | null;
   p90: number | null;
@@ -2115,6 +2141,10 @@ export interface FounderAnalyticsReport {
   decision_engagement: FounderAnalyticsNamedCount[];
   premium: FounderAnalyticsNamedCount[];
   checkout_intervals: Record<string, number>;
+  /** Event counts by client platform (web / ios / android). */
+  platforms?: Record<string, number>;
+  /** feature_use events by (feature, action) with platform and Free/Pro split. */
+  feature_use?: FounderAnalyticsFeatureUse[];
   errors: Record<string, number>;
   error_sessions: number;
   performance: Record<string, FounderAnalyticsLatencyStat>;

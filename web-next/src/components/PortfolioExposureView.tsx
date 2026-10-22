@@ -7,6 +7,7 @@ import {
   type PortfolioExposureResponse,
   type PortfolioExposurePlayer,
 } from "@/lib/api";
+import { trackUse } from "@/lib/analytics";
 import { PillRow } from "@/components/PillRow";
 import { PlayerRow } from "@/components/PlayerRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -125,6 +126,11 @@ export function PortfolioExposureView({ lens = "Dynasty" }: { lens?: string }) {
     () => sortExposurePlayers(data?.exposure?.players ?? [], sort),
     [data, sort],
   );
+
+  const exposureTier = data ? (data.is_premium ? "pro" : "free") : null;
+  useEffect(() => {
+    if (exposureTier) trackUse("player_exposure", "viewed", { tier: exposureTier });
+  }, [exposureTier]);
 
   if (error) {
     return (

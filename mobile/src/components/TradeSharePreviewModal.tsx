@@ -6,6 +6,7 @@ import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
 import { api, type RankedPlayer, type TradeVerdict } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import TradeShareCard, { CARD_HEIGHT, CARD_WIDTH } from './TradeShareCard';
@@ -68,6 +69,7 @@ export default function TradeSharePreviewModal({
   // for exactly this ambiguity — most share APIs don't reliably report
   // completion, so recording optimistically beats not asking at all).
   const recordShare = () => {
+    trackUse('share_card', 'shared', { leagueId, props: { item_kind: 'trade' } });
     // player_id/score travel through only for real tracked players — a
     // hand-built lean RankedPlayer (Trade Hub's draft-pick-filtered rows,
     // etc.) with an empty player_id is dropped to '' -> undefined server-side,
