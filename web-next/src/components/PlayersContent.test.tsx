@@ -103,7 +103,7 @@ describe("PlayersContent", () => {
 
     fireEvent.change(screen.getByPlaceholderText("Search players"), { target: { value: "nonexistent" } });
 
-    expect(screen.getByText("No players match this search and filter combination.")).toBeInTheDocument();
+    expect(screen.getByText("No players match")).toBeInTheDocument();
   });
 
   it("hides the Players/Picks toggle and roster-status facet when no picks or rosters are given", () => {

@@ -1,9 +1,7 @@
 import type { TradeAsset } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
-import { PositionBadge } from "@/components/PositionBadge";
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
 
 /**
  * Shared give/get asset row + labeled exchange-side column — extracted
@@ -17,6 +15,33 @@ import { PositionBadge } from "@/components/PositionBadge";
 function formatValue(raw: number | null | undefined): string {
   if (raw === null || raw === undefined) return "";
   return Math.round(raw).toLocaleString();
+}
+
+/**
+ * The square draft-pick plate ("R1" over "#3"). One look for every pick row:
+ * TradeAssetRow's pick branch and PickRow both render it.
+ */
+export function PickPlate({ round, pickNo }: { round?: number | string | null; pickNo?: number | string | null }) {
+  const top = round ? `R${round}` : pickNo ? `#${pickNo}` : "PICK";
+  const bottom = round && pickNo ? `#${pickNo}` : null;
+  return (
+    <div
+      className="flex flex-col items-center justify-center font-extrabold uppercase leading-none"
+      style={{
+        width: "2.25rem",
+        height: "2.25rem",
+        flex: "0 0 2.25rem",
+        fontSize: "0.6875rem",
+        gap: 2,
+        background: "var(--color-surface-muted)",
+        border: "var(--border-width-default) solid var(--color-border)",
+        color: "var(--color-accent)",
+      }}
+    >
+      <span>{top}</span>
+      {bottom ? <span>{bottom}</span> : null}
+    </div>
+  );
 }
 
 export function TradeAssetRow({
@@ -36,22 +61,9 @@ export function TradeAssetRow({
   disableQuickView?: boolean;
 }) {
   if (asset.asset_type === "pick") {
-    const plate = asset.pick_no ? `#${asset.pick_no}` : asset.round ? `R${asset.round}` : "PICK";
     return (
       <div className="flex items-center gap-3 py-1.5">
-        <div
-          className="flex items-center justify-center text-xs font-extrabold uppercase"
-          style={{
-            width: "2.25rem",
-            height: "2.25rem",
-            flex: "0 0 2.25rem",
-            background: "var(--color-surface-muted)",
-            border: "var(--border-width-default) solid var(--color-border)",
-            color: "var(--color-accent)",
-          }}
-        >
-          {plate}
-        </div>
+        <PickPlate round={asset.round} pickNo={asset.pick_no} />
         <div className="flex flex-col min-w-0">
           <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
             {asset.label || "Draft pick"}
@@ -68,46 +80,21 @@ export function TradeAssetRow({
 
   return (
     <div className="flex items-center gap-3 py-1.5">
-      {asset.player_id && !disableQuickView ? (
-        <PlayerIdentityTrigger
-          identity={{ ...asset, player_id: asset.player_id, sourceLabel: "Trade Board" }}
-          className="flex items-center gap-3 min-w-0"
-        >
-          <PositionBadge position={asset.position} />
-          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} size={40} />
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {asset.name || "Player"}
-            </span>
-            <PlayerMetaLine injuryStatus={asset.injury_status}>
-              {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
-            </PlayerMetaLine>
-          </div>
-        </PlayerIdentityTrigger>
-      ) : (
-        <>
-          <PositionBadge position={asset.position} />
-          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} size={40} />
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {asset.name || "Player"}
-            </span>
-            <PlayerMetaLine injuryStatus={asset.injury_status}>
-              {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
-            </PlayerMetaLine>
-          </div>
-        </>
-      )}
+      <PlayerIdentity
+        identity={asset.player_id ? { ...asset, player_id: asset.player_id, sourceLabel: "Trade Board" } : null}
+        playerId={asset.player_id}
+        name={asset.name || "Player"}
+        position={asset.position}
+        tier={asset.tier}
+        injuryStatus={asset.injury_status}
+        disableQuickView={disableQuickView}
+      >
+        {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
+      </PlayerIdentity>
       {asset.score !== null && asset.score !== undefined ? (
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
-          {/* coridian_, 2026-10-18: "the value on the far right should not
-              be gray" — this is the player's actual trade value, not a
-              muted caption, so it reads at full text-primary strength like
-              the name beside it. */}
-          <span className="text-xs font-bold" style={{ color: "var(--color-text-primary)" }}>
-            {formatValue(asset.score)}
-          </span>
+          <ValueStat value={formatValue(asset.score)} />
         </div>
       ) : null}
     </div>

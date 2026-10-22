@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/Button";
+import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type LiveDraftPickOption, type LiveDraftPickRow } from "@/lib/api";
@@ -231,7 +233,7 @@ export function LiveDraftTradeEvaluator({
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-0.5">
-          <h2 style={{ font: "var(--type-section-title)" }}>Trade Evaluator</h2>
+          <SectionHeading>Trade Evaluator</SectionHeading>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Hypothetical only — nothing is sent to Sleeper.
           </span>
@@ -316,18 +318,9 @@ export function LiveDraftTradeEvaluator({
               </p>
             ) : null}
 
-            <button
-              type="button"
-              onClick={evaluate}
-              disabled={!canEvaluate || evaluating}
-              className="self-start px-4 py-2 text-sm font-bold"
-              style={{
-                background: canEvaluate ? "var(--color-accent)" : "var(--color-surface-muted)",
-                color: canEvaluate ? "#fff" : "var(--color-text-muted)",
-              }}
-            >
+            <Button onClick={evaluate} disabled={!canEvaluate || evaluating}>
               {evaluating ? "Evaluating…" : "Evaluate Trade"}
-            </button>
+            </Button>
 
             {staleKeys.length > 0 ? (
               <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>

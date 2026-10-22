@@ -1,3 +1,4 @@
+import { AccentCard } from "@/components/AccentCard";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import { useEffect, useRef, useState } from "react";
 import { api, type TradeIdea } from "@/lib/api";
@@ -175,14 +176,11 @@ export function TradeIdeaCardView({
   const copy = useExperienceCopy();
 
   return (
-    <article
+    <AccentCard
+      accent={accent}
       ref={ref}
       data-highlighted={highlighted ? "true" : undefined}
-      className="glass-surface flex flex-col gap-3 p-4"
-      style={{
-        borderLeft: `var(--border-width-semantic) solid ${accent}`,
-        ...(highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : {}),
-      }}
+      style={highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : undefined}
     >
       {idea.category || impact ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -333,6 +331,6 @@ export function TradeIdeaCardView({
           <ReasoningTags tags={idea.reasoning_tags} />
         </div>
       ) : null}
-    </article>
+    </AccentCard>
   );
 }

@@ -1,3 +1,4 @@
+import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
 
 import type { DashboardResponse } from "@/lib/api";
@@ -90,9 +91,9 @@ export function DashboardContent({
       <LeaguePulseCard leagueId={leagueId} />
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
-        <h2 id="game-plan-heading" style={{ font: "var(--type-section-title)" }}>
+        <SectionHeading id="game-plan-heading">
           Today&apos;s Game Plan
-        </h2>
+        </SectionHeading>
         <BeginnerHelp term="dashboardGamePlan" />
 
         {data.quiet || data.items.length === 0 ? (
@@ -152,9 +153,9 @@ export function DashboardContent({
 
       {snapshot ? (
         <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true">
-          <h2 id="snapshot-heading" style={{ font: "var(--type-section-title)" }}>
+          <SectionHeading id="snapshot-heading">
             Team Snapshot
-          </h2>
+          </SectionHeading>
           <BeginnerHelp term="dashboardSnapshot" />
           <div className="flex flex-wrap gap-3">
             <SnapshotTile

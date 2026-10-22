@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useMemo, useState } from "react";
 
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
@@ -52,21 +53,6 @@ function draftFromProspect(prospect: CollegeProspect): ReportDraft {
     roundProjection: prospect.my_report?.round_projection ?? null,
     note: prospect.my_report?.note ?? "",
   };
-}
-
-function EmptyState({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div
-      className="glass-surface flex flex-col gap-1 items-start px-4 py-6"
-    >
-      <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-        {title}
-      </p>
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {subtitle}
-      </p>
-    </div>
-  );
 }
 
 function ProspectCard({

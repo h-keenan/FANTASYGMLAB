@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { PortfolioLeague } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import PortfolioShareCard, { CARD_HEIGHT, CARD_WIDTH, portfolioHeadlineStat } from './PortfolioShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
@@ -123,7 +123,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: scrim,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,

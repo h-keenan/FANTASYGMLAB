@@ -9,30 +9,56 @@ import { spacing, type ThemeColors } from '../theme';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
- * Small accent-icon + Title Case label row that introduces a group of cards
- * (Player Detail's "Bio"/"Model Breakdown"/"Points By Week"/schedule-week
- * headings; Dashboard's "League Snapshot"). Promoted out of
- * PlayerDetailScreen's own private SectionHeading so both screens render the
- * exact same section-heading treatment instead of two near-identical copies
- * (Dashboard previously had its own uppercase/smaller variant) — per the
- * app-wide UI consistency rule, "section headings" are one of the shared
- * patterns every screen should agree on.
+ * The one section title: UPPERCASE with tight tracking (owner decision 1).
+ * Optional accent icon, a muted `caption` line under it, and a `right` slot
+ * (a total, a link). Replaces the seven screen-local uppercase kicker
+ * restyles (DraftCenter, TeamRoster, MyTeam, TradeFinder, More, Waivers) and
+ * the old Title Case icon heading. `topGap` is the space above it inside a
+ * scroll column.
  */
-export default function SectionHeading({ title, icon }: { title: string; icon: IconName }) {
+export default function SectionHeading({
+  title,
+  icon,
+  caption,
+  right,
+  topGap = 0,
+}: {
+  title: string;
+  icon?: IconName;
+  caption?: string | null;
+  right?: React.ReactNode;
+  topGap?: number;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.row}>
-      <Ionicons name={icon} size={15} color={colors.accent} style={styles.icon} />
-      <AppText style={styles.title}>{title}</AppText>
+    <View style={[styles.wrap, { marginTop: topGap }]}>
+      <View style={styles.row}>
+        {icon ? <Ionicons name={icon} size={14} color={colors.accent} style={styles.icon} /> : null}
+        <AppText style={styles.title} numberOfLines={1} accessibilityRole="header">
+          {title}
+        </AppText>
+        {right ? <View style={styles.right}>{right}</View> : null}
+      </View>
+      {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
     </View>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+    wrap: { marginBottom: spacing.sm, gap: 2 },
+    row: { flexDirection: 'row', alignItems: 'center' },
     icon: { marginRight: spacing.xs },
-    title: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    title: {
+      flexShrink: 1,
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    right: { marginLeft: 'auto' },
+    caption: { fontSize: 11.5, color: colors.textTertiary },
   });
 }

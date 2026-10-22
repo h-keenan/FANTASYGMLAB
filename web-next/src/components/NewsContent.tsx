@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/EmptyState";
 import type { NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -179,9 +180,7 @@ export function NewsContent({ data }: { data: NewsResponse }) {
       </header>
 
       {sections.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No news right now. Check back later for injury, role, transaction, and off-field updates.
-        </p>
+        <EmptyState title="No news right now." subtitle="Check back later for injury, role, transaction, and off-field updates." />
       ) : (
         <div className="flex flex-col gap-6">
           {sections.map((section) => (

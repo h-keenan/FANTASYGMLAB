@@ -35,7 +35,7 @@ export function PillRow({
               aria-pressed={isActive}
               className="flex-1 py-2.5 text-xs font-bold uppercase"
               style={{
-                letterSpacing: "var(--letter-spacing-badge)",
+                letterSpacing: "0.03em",
                 background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
                 color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
                 boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",

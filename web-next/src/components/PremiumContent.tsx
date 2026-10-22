@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionHeading } from "@/components/SectionHeading";
 import { useState } from "react";
 
 import { api, type BillingPlan } from "@/lib/api";
@@ -168,9 +169,9 @@ export function PremiumContent({
       {entitlement === "premium" ? <ManageBilling /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="plans-heading">
-        <h2 id="plans-heading" style={{ font: "var(--type-section-title)" }}>
+        <SectionHeading id="plans-heading">
           Plans
-        </h2>
+        </SectionHeading>
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => (
             <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} publishableKey={publishableKey} />

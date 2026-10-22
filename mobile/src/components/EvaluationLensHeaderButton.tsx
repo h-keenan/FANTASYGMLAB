@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ValuationLens } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
@@ -95,7 +95,7 @@ function createStyles(colors: ThemeColors) {
   buttonText: { fontSize: 12, fontWeight: '700', color: colors.premium, flexShrink: 1 },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: scrim,
     justifyContent: 'flex-end',
   },
   sheet: {

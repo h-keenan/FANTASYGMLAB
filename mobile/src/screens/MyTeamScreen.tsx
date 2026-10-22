@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -474,7 +475,7 @@ function StartersSection({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View>
-      <SectionHeaderRow label={label} total={formatTotalStartersValue(totalValue)} />
+      <SectionHeading title={label} topGap={12} right={<AppText style={styles.sectionTotal}>{formatTotalStartersValue(totalValue)}</AppText>} />
       {openSlotsNote ? <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsNote}</AppText> : null}
       {starters.length === 0 ? (
         <EmptyState icon="people-outline" title="No suggested starters yet." />
@@ -526,7 +527,7 @@ function BenchFullSection({
   const taxiBench = bench.filter((p) => p.roster_slot === 'taxi');
   return (
     <View>
-      <SectionHeaderRow label="Bench" />
+      <SectionHeading title="Bench" topGap={12} />
       {bench.length === 0 ? (
         <EmptyState icon="people-outline" title="No bench players." />
       ) : (
@@ -569,7 +570,7 @@ function BenchSlotGroup({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View>
-      <AppText style={styles.sectionLabel}>{label}</AppText>
+      <SectionHeading title={label} topGap={12} />
       <AnimatedCard style={styles.groupCard}>
         {players.map((player, index) => (
           <LineupRow
@@ -581,17 +582,6 @@ function BenchSlotGroup({
           />
         ))}
       </AnimatedCard>
-    </View>
-  );
-}
-
-function SectionHeaderRow({ label, total }: { label: string; total?: string | null }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.sectionHeaderRow}>
-      <AppText style={styles.sectionHeaderLabel}>{label}</AppText>
-      {total ? <AppText style={styles.sectionTotal}>{total}</AppText> : null}
     </View>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -583,7 +584,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
             <ScreenInfoNote
               text={`Pick the players and draft picks you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
             />
-            <AppText style={styles.sectionLabel}>What You Want Back</AppText>
+            <SectionHeading title="What You Want Back" topGap={12} />
             <SegmentedTabBar<'any' | 'picks'>
               options={[
                 { key: 'any', label: 'Any return' },
@@ -597,9 +598,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
             />
             {ideas !== null ? (
               <View style={styles.resultsSection}>
-                <AppText style={styles.sectionLabel}>
-                  {searching ? 'Searching…' : `${ideas.length} plausible trade${ideas.length === 1 ? '' : 's'} found`}
-                </AppText>
+                <SectionHeading title={searching ? 'Searching…' : `${ideas.length} plausible trade${ideas.length === 1 ? '' : 's'} found`} topGap={12} />
                 {searchError ? <AppText style={styles.error}>{searchError}</AppText> : null}
                 {ideas.map((idea, index) => (
                   <ResultCard
@@ -613,14 +612,14 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
             ) : searchError ? (
               <AppText style={styles.error}>{searchError}</AppText>
             ) : null}
-            <AppText style={styles.sectionLabel}>Your Roster</AppText>
+            <SectionHeading title="Your Roster" topGap={12} />
           </View>
         }
         ListFooterComponent={
           <>
             {ownedPicks.length > 0 ? (
               <View>
-                <AppText style={styles.sectionLabel}>Your Picks (up to {TRADE_FINDER_MAX_PICKS})</AppText>
+                <SectionHeading title={`Your Picks (up to ${TRADE_FINDER_MAX_PICKS})`} topGap={12} />
                 {ownedPicks.map((pick, index) => {
                   const selected = selectedPickIds.has(pick.pick_id);
                   return (

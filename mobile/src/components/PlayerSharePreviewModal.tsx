@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { SubRating } from '../lib/subRatings';
 import type { UsageTrend } from '../lib/api';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import PlayerShareCard, { CARD_HEIGHT, CARD_WIDTH } from './PlayerShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
@@ -155,7 +155,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: scrim,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,

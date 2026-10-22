@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionHeading } from "@/components/SectionHeading";
 import { useMemo, useState } from "react";
 
 import type { DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
@@ -65,9 +66,9 @@ export function DraftCenterContent({
       </header>
 
       <section className="flex flex-col gap-3" aria-labelledby="posture-heading">
-        <h2 id="posture-heading" style={{ font: "var(--type-section-title)" }}>
+        <SectionHeading id="posture-heading">
           Your Draft Posture
-        </h2>
+        </SectionHeading>
         {posture ? (
           <>
             <div className="flex flex-wrap gap-3">
@@ -120,9 +121,9 @@ export function DraftCenterContent({
 
       {picks.length > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="pick-values-heading">
-          <h2 id="pick-values-heading" style={{ font: "var(--type-section-title)" }}>
+          <SectionHeading id="pick-values-heading">
             Pick Values
-          </h2>
+          </SectionHeading>
           {myRosterId ? (
             <PillRow
               options={[
@@ -170,9 +171,9 @@ export function DraftCenterContent({
       <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} />
 
       <section className="flex flex-col gap-2" aria-labelledby="classic-draft-heading">
-        <h2 id="classic-draft-heading" style={{ font: "var(--type-section-title)" }}>
+        <SectionHeading id="classic-draft-heading">
           More Draft Tools
-        </h2>
+        </SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Live board, draft history and scouting are on the classic page.
         </p>
@@ -202,9 +203,9 @@ function DraftCardSection({ id, title, cards }: { id: string; title: string; car
   if (cards.length === 0) return null;
   return (
     <section className="flex flex-col gap-3" aria-labelledby={id}>
-      <h2 id={id} style={{ font: "var(--type-section-title)" }}>
+      <SectionHeading id={id}>
         {title}
-      </h2>
+      </SectionHeading>
       <div className="flex flex-col gap-3">
         {cards.map((card) => (
           <div key={card.label} className={`tone-${card.tone} p-4 flex flex-col gap-2`}>

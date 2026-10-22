@@ -62,7 +62,7 @@ export function EmbeddedCheckoutModal({
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: "rgba(0, 0, 0, 0.6)", zIndex: 60 }}
+      style={{ background: "var(--color-scrim)", zIndex: 60 }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

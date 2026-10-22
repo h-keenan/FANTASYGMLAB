@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { PlayerAward } from '../lib/api';
-import { awardTierColor, radii, spacing, type ThemeColors } from '../theme';
+import { awardTierColor, radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 
 // Tier -> color mapping (gold/silver/bronze, with a visible neutral-accent
@@ -212,7 +212,7 @@ function createStyles(colors: ThemeColors) {
     chipTextGroup: { flexShrink: 1 },
     chipLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
     chipSeason: { fontSize: 10, color: colors.textTertiary, fontWeight: '600', marginTop: 1 },
-    sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    sheetBackdrop: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
     sheet: {
       backgroundColor: colors.backgroundElevated,
       borderTopLeftRadius: radii.lg,

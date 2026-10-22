@@ -1,4 +1,6 @@
 import type { DraftPickAsset } from "@/lib/api";
+import { PickPlate } from "@/components/TradeAssetExchange";
+import { ValueStat } from "@/components/ValueStat";
 
 /**
  * Single draft-pick row (label, tier/range/owner context, score, projection
@@ -24,10 +26,11 @@ export function PickRow({
 
   return (
     <div
-      className="flex items-center justify-between gap-3 px-3 py-2"
+      className="flex items-center gap-3 px-3 py-2"
       style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined}
     >
-      <div className="flex flex-col gap-0.5 min-w-0">
+      <PickPlate round={pick.round} />
+      <div className="flex flex-col gap-0.5 min-w-0 mr-auto">
         <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
           {pick.label || `Round ${pick.round ?? "?"}`}
         </span>
@@ -38,9 +41,7 @@ export function PickRow({
         ) : null}
       </div>
       <div className="flex flex-col items-end gap-0.5 shrink-0">
-        <span className="text-sm font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          {pick.score != null ? Math.round(pick.score) : "—"}
-        </span>
+        <ValueStat value={pick.score != null ? Math.round(pick.score) : "—"} />
         {confidence !== null ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {confidence}% conf

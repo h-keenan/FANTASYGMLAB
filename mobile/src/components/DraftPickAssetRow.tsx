@@ -3,6 +3,7 @@ import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
+import PickPlate from './PickPlate';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -13,6 +14,8 @@ export interface DraftPickAssetRowProps {
    * generic "PICK" badge when absent (e.g. a pick whose round isn't known
    * yet). */
   round?: number | null;
+  /** Overall pick number, shown under the round on the plate. */
+  pickNo?: number | null;
   /** Primary line, e.g. "2026 Round 3" — the pick's own display label,
    * never derived/formatted here. */
   label?: string | null;
@@ -72,6 +75,7 @@ export interface DraftPickAssetRowProps {
  */
 export default function DraftPickAssetRow({
   round,
+  pickNo,
   label,
   projectedRange,
   pickTier,
@@ -94,11 +98,7 @@ export default function DraftPickAssetRow({
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
     >
-      <View style={styles.badge}>
-        <AppText style={styles.badgeText} numberOfLines={1}>
-          {round ? `R${round}` : 'PICK'}
-        </AppText>
-      </View>
+      <PickPlate round={round} pickNo={pickNo} />
       <View style={styles.body}>
         <AppText style={styles.label} numberOfLines={1}>
           {label || 'Draft pick'}
@@ -137,18 +137,6 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm + 2 },
     divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    badge: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: colors.premiumMuted,
-      borderWidth: 1.5,
-      borderColor: colors.premium,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.sm,
-    },
-    badgeText: { fontSize: 11, fontWeight: '800', color: colors.premium },
     body: { flex: 1, gap: 1 },
     label: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     meta: { fontSize: 11, color: colors.textSecondary },

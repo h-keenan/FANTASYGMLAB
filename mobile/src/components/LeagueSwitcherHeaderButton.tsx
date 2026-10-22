@@ -9,7 +9,7 @@ import { setLastLeague } from '../lib/lastLeague';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 
 interface SavedLeagueRow {
@@ -134,7 +134,7 @@ function createStyles(colors: ThemeColors) {
     },
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
+      backgroundColor: scrim,
       justifyContent: 'flex-end',
     },
     sheet: {

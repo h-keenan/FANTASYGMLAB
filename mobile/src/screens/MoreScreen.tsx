@@ -13,6 +13,7 @@ import {
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -24,7 +25,7 @@ import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { currentLeagueContext } from '../navigation/navigationRef';
 import { useAuth } from '../context/AuthContext';
@@ -261,7 +262,7 @@ export default function MoreScreen({ navigation }: Props) {
         style={styles.container}
         contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}
       >
-        <AppText style={[styles.sectionLabel, styles.sectionLabelFirst]}>Preferences</AppText>
+        <SectionHeading title="Preferences" />
         <AppText style={styles.groupCaption}>Density</AppText>
         <View style={styles.optionRow}>
           {DENSITY_OPTIONS.map((option) => (
@@ -299,7 +300,7 @@ export default function MoreScreen({ navigation }: Props) {
           ))}
         </View>
 
-        <AppText style={styles.sectionLabel}>Your Team</AppText>
+        <SectionHeading title="Your Team" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           <SettingsRow
             icon="compass-outline"
@@ -321,7 +322,7 @@ export default function MoreScreen({ navigation }: Props) {
 
         {collegeInterestStatus === 'yes' ? (
           <>
-            <AppText style={styles.sectionLabel}>Scouting</AppText>
+            <SectionHeading title="Scouting" topGap={16} />
             <AnimatedCard style={styles.groupCard}>
               <SettingsRow
                 icon="school-outline"
@@ -344,7 +345,7 @@ export default function MoreScreen({ navigation }: Props) {
             instead of inventing a new mechanism. */}
         {collegeInterestStatus === 'no' ? (
           <>
-            <AppText style={styles.sectionLabel}>Scouting</AppText>
+            <SectionHeading title="Scouting" topGap={16} />
             <AnimatedCard style={styles.groupCard}>
               <SettingsRow
                 icon="school-outline"
@@ -358,7 +359,7 @@ export default function MoreScreen({ navigation }: Props) {
           </>
         ) : null}
 
-        <AppText style={styles.sectionLabel}>Notifications</AppText>
+        <SectionHeading title="Notifications" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           <SettingsRow
             icon="notifications-outline"
@@ -389,7 +390,7 @@ export default function MoreScreen({ navigation }: Props) {
             : null}
         </AnimatedCard>
 
-        <AppText style={styles.sectionLabel}>About</AppText>
+        <SectionHeading title="About" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           <SettingsRow
             icon="school-outline"
@@ -410,7 +411,7 @@ export default function MoreScreen({ navigation }: Props) {
 
         {showcaseAvailable ? (
           <>
-            <AppText style={styles.sectionLabel}>Developer</AppText>
+            <SectionHeading title="Developer" topGap={16} />
             <AnimatedCard style={styles.groupCard}>
               <SettingsRow
                 icon="videocam-outline"
@@ -430,7 +431,7 @@ export default function MoreScreen({ navigation }: Props) {
           </>
         ) : null}
 
-        <AppText style={styles.sectionLabel}>Legal</AppText>
+        <SectionHeading title="Legal" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           {LEGAL_ITEMS.map((item, index) => (
             <SettingsRow
@@ -444,7 +445,7 @@ export default function MoreScreen({ navigation }: Props) {
           ))}
         </AnimatedCard>
 
-        <AppText style={styles.sectionLabel}>Account</AppText>
+        <SectionHeading title="Account" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           {isGuest ? (
             <SettingsRow
@@ -733,7 +734,7 @@ function createStyles(colors: ThemeColors) {
     // card/input/action tokens) rather than inventing a new form pattern.
     guestUpgradeBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
+      backgroundColor: scrim,
       justifyContent: 'center',
       padding: spacing.xl,
     },

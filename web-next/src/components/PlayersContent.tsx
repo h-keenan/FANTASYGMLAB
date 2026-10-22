@@ -1,15 +1,14 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
 import { useMemo, useState } from "react";
 
 import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
-import { PositionBadge } from "@/components/PositionBadge";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
 import { waiverInjuryDisplay, formatWaiverScore } from "@/lib/waiversPresentation";
@@ -150,32 +149,22 @@ function PlayerRow({
       className="flex items-center justify-between gap-3 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <PlayerIdentityTrigger
+      <PlayerIdentity
         identity={{ ...player, sourceLabel: "Players", leagueId, leagueName }}
-        className="flex items-center gap-3 min-w-0"
+        playerId={player.player_id}
+        name={player.name || `Player ${player.player_id}`}
+        position={player.position}
+        tier={player.tier}
+        injuryStatus={injury.label}
       >
-        <PositionBadge position={player.position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || `Player ${player.player_id}`}
-          </span>
-          <PlayerMetaLine injuryStatus={injury.label}>{player.team || "—"}</PlayerMetaLine>
-        </div>
-      </PlayerIdentityTrigger>
+        {player.team || "—"}
+      </PlayerIdentity>
       <div className="flex items-center gap-2 shrink-0">
         <SortedStatTile player={player} sortOption={sortOption} sortMode={sortMode} />
         {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
             should say in small print value above it so its not glaring
             but its there in case someone gets confused" */}
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-            Value
-          </span>
-          <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-            {formatWaiverScore(player.score)}
-          </span>
-        </div>
+        <ValueStat value={formatWaiverScore(player.score)} />
         <OvrGauge rating={player.overall_rating ?? null} size="sm" />
         {player.position && player.position_rank ? (
           <span
@@ -413,9 +402,19 @@ export function PlayersContent({
           </div>
 
           {visible.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              No players match this search and filter combination.
-            </p>
+            <EmptyState
+              title="No players match"
+              subtitle="Try a different search or filter."
+              actionLabel="Clear filters"
+              onAction={() => {
+                setSearch("");
+                setPosition("ALL");
+                setAgeFilter("ALL");
+                setStatusFilter("ALL");
+                setAvailabilityFilter("ALL");
+                setRosterFilter("ALL");
+              }}
+            />
           ) : (
             <div className="flex flex-col">
               {visible.map((player) => (
@@ -442,9 +441,7 @@ export function PlayersContent({
           )}
         </>
       ) : pickSeasons.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No draft-pick assets are available for this league yet.
-        </p>
+        <EmptyState title="No draft-pick assets are available for this league yet." />
       ) : (
         <div className="flex flex-col gap-4">
           {pickSeasons.map(([season, seasonPicks]) => (

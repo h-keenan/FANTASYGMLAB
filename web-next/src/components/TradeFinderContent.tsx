@@ -1,3 +1,6 @@
+import { EmptyState } from "@/components/EmptyState";
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -10,8 +13,6 @@ import {
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { TradeAssetRow } from "@/components/TradeAssetExchange";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
@@ -160,21 +161,19 @@ function RosterPickRow({
       style={selectableRowStyle(selected)}
     >
       <SelectionCheck selected={selected} />
-      <PositionBadge position={player.position} />
-      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-        <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-          {player.name || "Unknown player"}
-        </span>
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {player.team || "FA"}
-        </span>
-      </div>
+      <PlayerIdentity
+        playerId={player.player_id}
+        name={player.name || "Unknown player"}
+        position={player.position}
+        tier={player.tier}
+        injuryStatus={player.injury_label}
+        className="flex-1 min-w-0"
+      >
+        {player.team || "FA"}
+      </PlayerIdentity>
       <div className="flex items-center gap-2 shrink-0">
         <OvrGauge rating={player.overall_rating} size="sm" />
-        <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-          {player.score != null ? Math.round(player.score) : "—"}
-        </span>
+        <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
       </div>
     </button>
   );
@@ -368,9 +367,7 @@ export function TradeFinderContent({
       </header>
 
       {roster.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No eligible roster players are available for Trade Finder right now.
-        </p>
+        <EmptyState title="No eligible roster players are available for Trade Finder right now." />
       ) : (
         <>
           <section className="flex flex-col gap-2">
@@ -468,9 +465,7 @@ export function TradeFinderContent({
 
           {ideas !== null && !searchError ? (
             ideas.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                No realistic trades found for this selection right now.
-              </p>
+              <EmptyState title="No realistic trades found for this selection right now." />
             ) : (
               <div className="flex flex-col gap-4">
                 {ideas.map((idea, index) => (

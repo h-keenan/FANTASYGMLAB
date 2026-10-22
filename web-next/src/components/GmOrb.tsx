@@ -175,7 +175,7 @@ export function GmOrb() {
             type="button"
             aria-label="Close menu"
             className="absolute inset-0"
-            style={{ background: "rgba(0,0,0,0.55)" }}
+            style={{ background: "var(--color-scrim)" }}
             onClick={() => setOpen(false)}
           />
           <div

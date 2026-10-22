@@ -1,5 +1,9 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
+import { SectionHeading } from "@/components/SectionHeading";
 import { useMemo, useState } from "react";
 
 import type {
@@ -134,25 +138,22 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
   return (
     <div className="py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
       <div className="flex items-center justify-between gap-3">
-        <PlayerIdentityTrigger
+        <PlayerIdentity
           identity={{ ...row, leagueId, leagueName, sourceLabel: "Live Draft" }}
-          className="flex items-center gap-3 min-w-0"
+          playerId={row.player_id}
+          name={row.name || `Player ${row.player_id}`}
+          position={row.position}
+          tier={row.tier}
+          leading={
+            <span className="text-xs font-bold w-8 shrink-0" style={{ color: "var(--color-text-muted)" }}>
+              #{row.overall_rank ?? "—"}
+            </span>
+          }
         >
-          <span className="text-xs font-bold w-8 shrink-0" style={{ color: "var(--color-text-muted)" }}>
-            #{row.overall_rank ?? "—"}
-          </span>
-          <PositionBadge position={row.position} />
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {row.name || `Player ${row.player_id}`}
-            </span>
-            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
-              {row.team || "—"}
-              {row.position && row.position_rank ? ` · ${row.position}${row.position_rank}` : ""}
-              {row.recommendation_label ? ` · ${row.recommendation_label}` : ""}
-            </span>
-          </div>
-        </PlayerIdentityTrigger>
+          {row.team || "—"}
+          {row.position && row.position_rank ? ` · ${row.position}${row.position_rank}` : ""}
+          {row.recommendation_label ? ` · ${row.recommendation_label}` : ""}
+        </PlayerIdentity>
         <div className="flex items-center gap-2 shrink-0">
           <span
             className="text-xs font-bold w-10 text-right"
@@ -163,16 +164,18 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
           {/* coridian_: "another redirect to the classic website to view
               the full live draft" — this tap-to-reveal breakdown is what
               that link used to send people to a separate page for. */}
-          <button
-            type="button"
-            onClick={() => setShowBreakdown((value) => !value)}
-            aria-expanded={showBreakdown}
-            aria-label="Score breakdown"
-            className="text-sm font-extrabold underline decoration-dotted"
-            style={{ color: "var(--color-accent)" }}
-          >
-            {formatLiveDraftScore(row.league_adjusted_draft_score)}
-          </button>
+          <ValueStat value="">
+            <button
+              type="button"
+              onClick={() => setShowBreakdown((value) => !value)}
+              aria-expanded={showBreakdown}
+              aria-label="Score breakdown"
+              className="text-sm font-extrabold underline decoration-dotted"
+              style={{ color: "var(--color-accent)" }}
+            >
+              {formatLiveDraftScore(row.league_adjusted_draft_score)}
+            </button>
+          </ValueStat>
           <OvrGauge rating={row.overall_rating} size="sm" />
           <a
             href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(row.player_id)}&name=${encodeURIComponent(leagueName)}`}
@@ -286,9 +289,9 @@ function RankingsBoard({
   return (
     <section className="flex flex-col gap-3" aria-labelledby="live-draft-rankings-heading">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="live-draft-rankings-heading" style={{ font: "var(--type-section-title)" }}>
+        <SectionHeading id="live-draft-rankings-heading">
           Available Player Rankings
-        </h2>
+        </SectionHeading>
         <select
           value={options.includes(filter) ? filter : "Overall"}
           onChange={(event) => setFilter(event.target.value as LiveDraftRankFilter)}
@@ -305,9 +308,7 @@ function RankingsBoard({
         Every undrafted player, reranked for this league and your roster. Tap Compare for the full breakdown.
       </p>
       {visible.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No available players are loaded yet.
-        </p>
+        <EmptyState title="No available players are loaded yet." />
       ) : (
         <div className="flex flex-col">
           {visible.map((row) => (
@@ -492,13 +493,11 @@ export function LiveDraftContent({
               </section>
 
               <section className="flex flex-col gap-3" aria-labelledby="live-draft-recs-heading">
-                <h2 id="live-draft-recs-heading" style={{ font: "var(--type-section-title)" }}>
+                <SectionHeading id="live-draft-recs-heading">
                   Who should I draft next?
-                </h2>
+                </SectionHeading>
                 {state.recommendations.length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                    No recommendations are available yet.
-                  </p>
+                  <EmptyState title="No recommendations are available yet." />
                 ) : (
                   <div className="flex flex-col gap-3">
                     <RecommendationCard rec={state.recommendations[0]} primary />
@@ -521,9 +520,9 @@ export function LiveDraftContent({
               <RankingsBoard rows={state.rankings} leagueId={leagueId} leagueName={leagueName} />
 
               <section className="flex flex-col gap-3" aria-labelledby="live-draft-teams-heading">
-                <h2 id="live-draft-teams-heading" style={{ font: "var(--type-section-title)" }}>
+                <SectionHeading id="live-draft-teams-heading">
                   Live Team Rankings
-                </h2>
+                </SectionHeading>
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Every fantasy roster reranked as Sleeper reports each pick: 60% starter strength, 30% total roster
                   value, 7% usable depth, 3% lineup coverage.
@@ -542,16 +541,14 @@ export function LiveDraftContent({
               </section>
 
               <section className="flex flex-col gap-3" aria-labelledby="live-draft-board-heading">
-                <h2 id="live-draft-board-heading" style={{ font: "var(--type-section-title)" }}>
+                <SectionHeading id="live-draft-board-heading">
                   Draft Board
-                </h2>
+                </SectionHeading>
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Latest pick and your picks are highlighted.
                 </p>
                 {state.pick_rows.length === 0 ? (
-                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                    No picks have been logged yet. This board will fill as Sleeper reports selections.
-                  </p>
+                  <EmptyState title="No picks have been logged yet." subtitle="This board will fill as Sleeper reports selections." />
                 ) : (
                   <div className="flex flex-col">
                     {[...state.pick_rows].reverse().map((row) => (

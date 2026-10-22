@@ -1,3 +1,5 @@
+import { AccentCard } from "@/components/AccentCard";
+import { Button } from "@/components/Button";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -301,10 +303,7 @@ function VerdictCard({
   const copy = useExperienceCopy();
 
   return (
-    <section
-      className="glass-surface flex flex-col gap-3 p-4"
-      style={{ borderLeft: `var(--border-width-semantic) solid ${toneColor}` }}
-    >
+    <AccentCard accent={toneColor} as="section">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span
           className="text-xs uppercase font-bold"
@@ -477,7 +476,7 @@ function VerdictCard({
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         Reply to your partner directly — no in-app accept.
       </p>
-    </section>
+    </AccentCard>
   );
 }
 
@@ -861,18 +860,9 @@ export function TradeAnalyzerContent({
             Queue send and receive assets, then Analyze.
           </p>
         ) : null}
-        <button
-          type="button"
-          onClick={analyze}
-          disabled={!hasAnyAssets || analyzing}
-          className="self-start px-4 py-2 text-sm font-bold"
-          style={{
-            background: hasAnyAssets ? "var(--color-accent)" : "var(--color-surface-muted)",
-            color: hasAnyAssets ? "#fff" : "var(--color-text-muted)",
-          }}
-        >
+        <Button onClick={analyze} disabled={!hasAnyAssets || analyzing}>
           {analyzing ? "Analyzing…" : "Analyze Trade"}
-        </button>
+        </Button>
         {analyzeError ? (
           <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
             {analyzeError}

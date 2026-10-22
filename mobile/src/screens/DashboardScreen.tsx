@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, type ViewStyle } from 'react-native';
 import AppText from '../components/AppText';
+import PickPlate from '../components/PickPlate';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -653,9 +654,7 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   if (asset.asset_type === 'pick') {
     return (
       <View style={styles.assetRow}>
-        <View style={styles.pickDisc}>
-          <Ionicons name="ticket-outline" size={16} color={colors.premium} />
-        </View>
+        <PickPlate round={asset.round ? Number(asset.round) : null} pickNo={asset.pick_no ? Number(asset.pick_no) : null} />
         <AppText style={styles.assetName} numberOfLines={1}>
           {asset.label || 'Draft pick'}
         </AppText>
