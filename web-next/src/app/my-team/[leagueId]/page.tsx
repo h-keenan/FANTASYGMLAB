@@ -26,7 +26,7 @@ export default function MyTeamPage() {
   // by gamePlanTileHref (same as Waivers/Trade Hub, #1293) — this page just
   // wasn't reading it yet.
   const highlightPlayerId = searchParams.get("playerId") || undefined;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   useEffect(() => {
     if (!session) return;
@@ -39,8 +39,10 @@ export default function MyTeamPage() {
   // block the lineup" contract the mobile MyTeamScreen follows for its own
   // bonus Team Analytics section.
   const [needs, setNeeds] = useState<MyTeamNeedsResponse | null>(null);
-  const [teamRanking, setTeamRanking] = useState<TeamRanking | null>(null);
-  const [leagueSize, setLeagueSize] = useState(0);
+  // GET .../team-rankings starts alongside the My Team request (it used to
+  // wait for `myTeam.roster_id`); this page picks its own team out of the
+  // result once both have landed.
+  const [teamRankings, setTeamRankings] = useState<TeamRanking[] | null>(null);
   const [keepers, setKeepers] = useState<KeepersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +52,9 @@ export default function MyTeamPage() {
       router.replace("/");
       return;
     }
+    // First fetch waits only for the league type, so a redraft league is
+    // requested once (as Non-Dynasty), not once as Dynasty and again.
+    if (!lensReady) return;
     let cancelled = false;
 
     api
@@ -79,32 +84,26 @@ export default function MyTeamPage() {
         /* best-effort: keeper tags/candidates just don't render */
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, session, leagueId, lens, router]);
-
-  // Team Snapshot's ring/archetype/rank tiles — a separate effect because
-  // the match-up needs `myTeam.roster_id`, which only arrives once the
-  // fetch above resolves.
-  useEffect(() => {
-    if (!myTeam?.roster_id) return;
-    let cancelled = false;
+    // Team Snapshot's ring/archetype/rank tiles.
     api
       .getTeamRankings(leagueId, lens)
       .then((result) => {
-        if (cancelled) return;
-        setLeagueSize(result.teams.length);
-        const mine = result.teams.find((team) => team.roster_id === myTeam.roster_id) ?? null;
-        setTeamRanking(mine);
+        if (!cancelled) setTeamRankings(result.teams);
       })
       .catch(() => {
         /* best-effort */
       });
+
     return () => {
       cancelled = true;
     };
-  }, [leagueId, lens, myTeam?.roster_id]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
+
+  const teamRanking: TeamRanking | null =
+    myTeam?.roster_id && teamRankings
+      ? (teamRankings.find((team) => team.roster_id === myTeam.roster_id) ?? null)
+      : null;
+  const leagueSize = myTeam?.roster_id && teamRankings ? teamRankings.length : 0;
 
   if (authLoading || (!myTeam && !error)) {
     return (
