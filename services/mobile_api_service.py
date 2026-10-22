@@ -51,6 +51,8 @@ Deployment topology (Render):
   - GET  /v1/portfolio              — cross-league standing/needs/opportunities, one row per saved league (Premium)
   - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
+  - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
+  - GET  /v1/leagues/{id}/managers/{roster_id}/tendencies — one manager's full tendency profile + evidence (Premium)
   - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
   - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
   - GET  /v1/trade-outcomes/pending             — this user's shared trades ready to be asked about
@@ -168,6 +170,7 @@ from modules import (
     live_draft,
     live_draft_trade_evaluator,
     manager_activity,
+    manager_tendencies,
     matchup_win_probability,
     my_news,
     news as news_cache,
@@ -4293,6 +4296,105 @@ def get_league_storylines(
         normalized, profiles=profiles, season=season
     )
     return {"ok": True, "storylines": report, "reason": ""}
+
+
+_MANAGER_TENDENCIES_UPSELL = {
+    "title": "How every manager in your league trades",
+    "body": (
+        "Manager Tendencies is a Premium feature: each manager's real trade "
+        "and waiver history across past seasons, with the trades behind "
+        "every read. Upgrade to Premium to unlock it."
+    ),
+}
+
+
+def _manager_tendencies_gate(user: dict[str, Any]) -> bool:
+    """Premium (PRO) gate, same tier and same check as GM Plan / Live Draft
+    / the full League Pulse and Trade Hub lists. Checked before any Sleeper
+    scan so a Free caller never pays for the multi-season transaction read."""
+
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return False
+    config = auth_supabase.get_supabase_config()
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
+    return premium.is_at_least(profile.get("entitlement"), premium.PRO)
+
+
+@app.get("/v1/leagues/{league_id}/managers/tendencies")
+def get_league_manager_tendencies(
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """League-wide Manager Tendencies summary: one short, evidence-backed
+    line per manager plus each signal's label (modules.manager_tendencies).
+    Built from the league's real Sleeper transactions across its
+    previous_league_id season chain; managers below a signal's minimum
+    sample get "Not enough trades yet" rather than a guessed label."""
+
+    if not _manager_tendencies_gate(user):
+        return {
+            "ok": True,
+            "reason": "",
+            "is_premium": False,
+            "upsell": _MANAGER_TENDENCIES_UPSELL,
+            "managers": [],
+            "seasons": [],
+        }
+    if not sleeper.get_league(league_id):
+        raise HTTPException(status_code=404, detail="League not found.")
+    profile = manager_tendencies.league_tendencies_cached(league_id)
+    return {
+        "ok": True,
+        "reason": "" if profile.get("managers") else "no_history",
+        "is_premium": True,
+        "upsell": None,
+        "league_id": league_id,
+        "seasons": profile.get("seasons") or [],
+        "league": profile.get("league") or {},
+        "managers": manager_tendencies.league_summary(profile),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/managers/{roster_id}/tendencies")
+def get_manager_tendencies(
+    roster_id: int,
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """One manager's full Manager Tendencies profile: every signal with its
+    value, sample size, minimum sample, and evidence (transaction ids),
+    plus the referenced transactions themselves so each read can be checked
+    against the real trades. Same data, cache, and gate as the league
+    summary above."""
+
+    if not _manager_tendencies_gate(user):
+        return {
+            "ok": True,
+            "reason": "",
+            "is_premium": False,
+            "upsell": _MANAGER_TENDENCIES_UPSELL,
+            "manager": None,
+            "transactions": {},
+        }
+    if not sleeper.get_league(league_id):
+        raise HTTPException(status_code=404, detail="League not found.")
+    profile = manager_tendencies.league_tendencies_cached(league_id)
+    detail = manager_tendencies.manager_detail(profile, int(roster_id))
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Roster not found in this league.")
+    return {
+        "ok": True,
+        "reason": "",
+        "is_premium": True,
+        "upsell": None,
+        "league_id": league_id,
+        "seasons": profile.get("seasons") or [],
+        "league": profile.get("league") or {},
+        "thresholds": profile.get("thresholds") or {},
+        "manager": detail["manager"],
+        "transactions": detail["transactions"],
+    }
 
 
 def _alert_key_for_link(link: str) -> str:
