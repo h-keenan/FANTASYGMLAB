@@ -107,7 +107,7 @@ function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertIt
           />
         ) : null}
         {relationship ? (
-          <ToneBadge variant="pill" label={ROSTER_RELATIONSHIP_LABEL[relationship]} color={rosterRelationshipColorVar(relationship)} />
+          <ToneBadge label={ROSTER_RELATIONSHIP_LABEL[relationship]} color={rosterRelationshipColorVar(relationship)} />
         ) : null}
         <span className="flex-1" />
         {time ? (

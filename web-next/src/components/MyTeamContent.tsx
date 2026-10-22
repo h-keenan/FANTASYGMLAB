@@ -1,11 +1,10 @@
+import { EmptyState } from "@/components/EmptyState";
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
 import type { ReactNode } from "react";
 import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
-import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { ValueRing } from "@/components/ValueRing";
@@ -72,36 +71,26 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
       className="flex items-center gap-3 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <PlayerIdentityTrigger
+      <PlayerIdentity
         identity={{ ...player, sourceLabel: "My Team" }}
-        className="flex-1 flex items-center gap-3 min-w-0"
+        playerId={player.player_id}
+        name={player.name || "Unknown player"}
+        position={player.position}
+        tier={player.tier}
+        injuryStatus={player.injury_label}
+        muted={muted}
+        className="flex-1 min-w-0"
       >
-        <PositionBadge position={player.position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
+        {player.team || "FA"} {player.slot && player.slot !== "BENCH" ? `· ${player.slot}` : ""}
+        {ineligibleTag ? (
+          <span className="font-bold" style={{ color: "var(--color-warning)" }}>
+            {` · ${ineligibleTag}`}
           </span>
-          <PlayerMetaLine injuryStatus={player.injury_label}>
-            {player.team || "FA"} {player.slot && player.slot !== "BENCH" ? `· ${player.slot}` : ""}
-            {ineligibleTag ? (
-              <span className="font-bold" style={{ color: "var(--color-warning)" }}>
-                {` · ${ineligibleTag}`}
-              </span>
-            ) : null}
-          </PlayerMetaLine>
-        </div>
-      </PlayerIdentityTrigger>
+        ) : null}
+      </PlayerIdentity>
       <div className="flex items-center gap-2 shrink-0">
         <OvrGauge rating={player.overall_rating} size="sm" />
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-sm font-extrabold" style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-accent)" }}>
-            {player.score != null ? Math.round(player.score) : "—"}
-          </span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            VALUE
-          </span>
-        </div>
+        <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
       </div>
     </div>
   );
@@ -358,9 +347,7 @@ export function MyTeamContent({
           </p>
         ) : null}
         {starters.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            No suggested starters yet.
-          </p>
+          <EmptyState title="No suggested starters yet." />
         ) : (
           <div className="glass-surface flex flex-col">
             {starters.map((player) => (
@@ -378,9 +365,7 @@ export function MyTeamContent({
           <span id="bench-heading">{bestBall ? "Roster" : "Bench"}</span>
         </SectionHeading>
         {activeBench.length + irBench.length + taxiBench.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            No bench players.
-          </p>
+          <EmptyState title="No bench players." />
         ) : (
           <div className="flex flex-col gap-4">
             {activeBench.length > 0 ? (

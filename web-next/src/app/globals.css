@@ -55,6 +55,9 @@
   --color-brand-surface: #1f2226;
   --color-brand-mark-ink: #0b1220;
 
+  /* One modal backdrop darkness for every sheet and dialog (web GmOrb, checkout; mobile theme.colors.scrim). */
+  --color-scrim: rgba(0, 0, 0, 0.6);
+
   /* Interaction and meaning */
   --color-accent: #67e8f9;
   --color-accent-strong: #22d3ee;

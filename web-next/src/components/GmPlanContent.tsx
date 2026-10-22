@@ -1,5 +1,10 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
+import { AccentCard } from "@/components/AccentCard";
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
+import { SectionHeading } from "@/components/SectionHeading";
 import { InfoTip } from "@/components/InfoTip";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -23,9 +28,8 @@ import {
 import { trackFeatureUse } from "@/lib/analytics";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge, PlayerMetaLine } from "@/components/PlayerInjuryBadge";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
@@ -70,9 +74,9 @@ function focusItemKey(item: GmPlanFocusItem, index: number): string {
 
 function FactCard({ accent, children }: { accent: string; children: ReactNode }) {
   return (
-    <article className="glass-surface flex flex-col gap-1 p-3" style={{ borderLeft: `var(--border-width-semantic) solid ${accent}` }}>
+    <AccentCard accent={accent} compact>
       {children}
-    </article>
+    </AccentCard>
   );
 }
 
@@ -164,10 +168,7 @@ function TradeOpportunityCard({ item }: { item: GmPlanTradeItem }) {
   const theirLabel = injuryDisplay ? `${item.their_player} (${injuryDisplay})` : item.their_player;
 
   return (
-    <article
-      className="glass-surface flex flex-col gap-3 p-4"
-      style={{ borderLeft: `var(--border-width-semantic) solid ${accent}` }}
-    >
+    <AccentCard accent={accent}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
           {item.partner_team_name || "Trade idea"}
@@ -202,7 +203,7 @@ function TradeOpportunityCard({ item }: { item: GmPlanTradeItem }) {
           {item.rationale || item.trade_confidence_label}
         </p>
       ) : null}
-    </article>
+    </AccentCard>
   );
 }
 
@@ -219,7 +220,7 @@ function FocusAreaSection({ area }: { area: GmPlanFocusArea }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
-        <h2 style={{ font: "var(--type-section-title)" }}>{area.title}</h2>
+        <SectionHeading>{area.title}</SectionHeading>
         {area.framing ? (
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {area.framing}
@@ -258,20 +259,18 @@ function ProtectPlayerRow({
       className="flex items-center gap-3 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <PlayerIdentityTrigger
+      <PlayerIdentity
         identity={{ ...player, sourceLabel: "Team Situation" }}
-        className="flex-1 flex items-center gap-3 min-w-0"
+        playerId={player.player_id}
+        name={player.name || "Unknown player"}
+        position={player.position}
+        tier={player.tier}
+        injuryStatus={player.injury_label}
+        className="flex-1 min-w-0"
       >
-        <PositionBadge position={player.position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-        <OvrGauge rating={player.overall_rating} size="sm" />
-        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
-          <PlayerMetaLine injuryStatus={player.injury_label}>{player.team || "FA"}</PlayerMetaLine>
-        </div>
-      </PlayerIdentityTrigger>
+        {player.team || "FA"}
+      </PlayerIdentity>
+      <OvrGauge rating={player.overall_rating} size="sm" />
       <button
         type="button"
         disabled={busy}
@@ -314,31 +313,20 @@ function TargetRowView({
   return (
     <div className="flex flex-col gap-2 py-3" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
       <div className="flex items-center justify-between gap-3">
-        <PlayerIdentityTrigger
+        <PlayerIdentity
           identity={{ ...player, player_id: target.player_id, name, sourceLabel: "GM Targets", leagueId, leagueName }}
-          className="flex items-center gap-3 min-w-0"
+          playerId={target.player_id}
+          name={name}
+          position={player?.position}
+          tier={player?.tier}
+          injuryStatus={injury.label}
         >
-          <PositionBadge position={player?.position} />
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {name}
-            </span>
-            <PlayerMetaLine injuryStatus={injury.label}>
-              {player?.team || "—"}
-              {contextLine ? ` · ${contextLine}` : ""}
-            </PlayerMetaLine>
-          </div>
-        </PlayerIdentityTrigger>
+          {player?.team || "—"}
+          {contextLine ? ` · ${contextLine}` : ""}
+        </PlayerIdentity>
         <div className="flex items-center gap-2 shrink-0">
           {player?.score !== null && player?.score !== undefined ? (
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                Value
-              </span>
-              <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-                {formatWaiverScore(player.score)}
-              </span>
-            </div>
+            <ValueStat value={formatWaiverScore(player.score)} />
           ) : null}
           {player?.position_rank ? (
             <span
@@ -521,7 +509,7 @@ export function GmPlanContent({
 
       {teamStance ? (
         <section className="flex flex-col gap-2">
-          <h2 style={{ font: "var(--type-section-title)" }}>Team Situation</h2>
+          <SectionHeading>Team Situation</SectionHeading>
           <InfoTip label="How you see this team">
             Tell us how you see this team right now. We&apos;ll lean trade-idea language toward that stance, and use
             it to shape your trade and lineup value adjustments too.
@@ -601,16 +589,14 @@ export function GmPlanContent({
 
       {myTeam && leagueId ? (
         <section className="flex flex-col gap-2">
-          <h2 style={{ font: "var(--type-section-title)" }}>Protected Players</h2>
+          <SectionHeading>Protected Players</SectionHeading>
           <InfoTip label="Players you won&apos;t trade">
             Mark players you don&apos;t want traded away. This is the same protection the Watching list below uses
             — toggling it here or there shows up in both places.
           </InfoTip>
 
           {noRoster ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              No roster players found for this league.
-            </p>
+            <EmptyState title="No roster players found for this league." />
           ) : (
             <div
               className="glass-surface flex flex-col px-3"
@@ -646,7 +632,7 @@ export function GmPlanContent({
 
       {rankings && leagueId ? (
         <section className="flex flex-col gap-2">
-          <h2 style={{ font: "var(--type-section-title)" }}>Watching</h2>
+          <SectionHeading>Watching</SectionHeading>
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Considering or monitoring; not trade-protected.
           </p>

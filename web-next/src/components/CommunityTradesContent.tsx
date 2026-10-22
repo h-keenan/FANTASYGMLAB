@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useState } from "react";
 
 import type { CommunityTradeItem } from "@/lib/api";
@@ -175,10 +176,7 @@ export function CommunityTradesContent({
       </header>
 
       {trades.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No standout trades yet. Check back once more confirmed trades across the app have had a few weeks to play
-          out.
-        </p>
+        <EmptyState title="No standout trades yet." subtitle="Check back once more confirmed trades across the app have had a few weeks to play out." />
       ) : (
         <div className="flex flex-col gap-4">
           {trades.map((item) => (

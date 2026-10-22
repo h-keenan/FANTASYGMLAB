@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState } from "react";
 
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
@@ -97,7 +98,7 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-center">
-        <h2 style={{ font: "var(--type-section-title)" }}>Start your 7-day free trial</h2>
+        <SectionHeading>Start your 7-day free trial</SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
           Full access to the GM toolkit. Cancel anytime before it ends and you&apos;re never charged.
         </p>

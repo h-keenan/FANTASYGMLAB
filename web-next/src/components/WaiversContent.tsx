@@ -1,3 +1,5 @@
+import { PlayerIdentity } from "@/components/PlayerRow";
+import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -69,24 +71,25 @@ function WaiverIdentity({ player, avatarSize = 40 }: { player: WaiverPlayer; ava
   const contextLine = freeAgentContextLine(player);
   const trending = trendingAddLabel(player);
   return (
-    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="flex items-center gap-3 min-w-0">
-      <PositionBadge position={player.position} />
-      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={avatarSize} />
-      <div className="flex flex-col min-w-0">
-        <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-          {player.name || "Unknown player"}
-        </span>
-        <PlayerMetaLine injuryStatus={injury.label}>
-          {player.team || "FA"}
-          {contextLine ? ` · ${contextLine}` : ""}
-        </PlayerMetaLine>
-        {trending ? (
+    <PlayerIdentity
+      identity={{ ...player, sourceLabel: "Waivers" }}
+      playerId={player.player_id}
+      name={player.name || "Unknown player"}
+      position={player.position}
+      tier={player.tier}
+      injuryStatus={injury.label}
+      avatarSize={avatarSize}
+      after={
+        trending ? (
           <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
             {trending}
           </span>
-        ) : null}
-      </div>
-    </PlayerIdentityTrigger>
+        ) : null
+      }
+    >
+      {player.team || "FA"}
+      {contextLine ? ` · ${contextLine}` : ""}
+    </PlayerIdentity>
   );
 }
 
@@ -120,7 +123,7 @@ function ReasonChips({ chips }: { chips: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {chips.map((chip) => (
-        <ToneBadge key={chip} label={chip} color="var(--color-accent)" variant="pill" />
+        <ToneBadge key={chip} label={chip} color="var(--color-accent)" />
       ))}
     </div>
   );
@@ -278,14 +281,7 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
     >
       <WaiverIdentity player={player} />
       <div className="flex items-center gap-3 pl-1">
-        <div className="flex items-baseline gap-1">
-          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-            Value
-          </span>
-          <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-            {formatWaiverScore(player.score)}
-          </span>
-        </div>
+        <ValueStat value={formatWaiverScore(player.score)} align="left" />
         <OvrGauge rating={player.overall_rating} size="sm" />
         {player.position_rank ? (
           <span
@@ -314,14 +310,7 @@ function PlayerTile({ position, player, note }: { position: string; player: Waiv
           {player.name || "Unknown"}
         </span>
         <div className="flex flex-col items-center gap-0.5">
-          <div className="flex items-center gap-1">
-            <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-              Value
-            </span>
-            <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-              {formatWaiverScore(player.score)}
-            </span>
-          </div>
+          <ValueStat value={formatWaiverScore(player.score)} align="center" />
           {note ? (
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               {note}

@@ -23,6 +23,33 @@ The changes added four shared modules (`SectionHeading`,
 `HighlightTarget`, `ToneBadge`, `VerdictCallout`) and moved 23 page error
 blocks onto `ErrorState`.
 
+## 0. Owner decisions (2026-10-22) and the shared module list
+
+The owner chose option A on all 11 questions. Each decision now lives in one
+module; pages import it instead of restating it. Web is `web-next/src/components`,
+mobile is `mobile/src/components`.
+
+| # | Decision | Module (web / mobile) | Props |
+|---|---|---|---|
+| 1 | Section titles UPPERCASE, tight tracking | `SectionHeading` / `SectionHeading` | web: `kicker`, `note`, `id`, `className`. mobile: `title`, `icon?`, `caption?`, `right?`, `topGap?` |
+| 2 | One standard player row | `PlayerRow` + `PlayerIdentity` (web, built on `PlayerIdentityTrigger`, `PositionBadge`, `PlayerAvatar`, `PlayerMetaLine`) / `PlayerIdentityRow` (mobile, already the shared row) | `identity`, `playerId`, `name`, `position`, `tier`, `injuryStatus`, `muted`, `avatarSize`, `leading`, `after`, `trailing`, `bordered`, `disableQuickView`, children = subline |
+| 3 | Small "Value" label above the number | `ValueStat` / `ValueStat` | `value`, `label="Value"`, `align`, children (replaces the number) |
+| 4 | Square "R1 #3" pick plate | `PickPlate` (in `TradeAssetExchange.tsx`, used by `TradeAssetRow` and `PickRow`) / `PickPlate` (used by `DraftPickAssetRow`, Dashboard) | `round`, `pickNo` |
+| 5 | Rounded pill badge; position badges excepted | `ToneBadge` (single pill shape, `variant` removed) / `ToneBadge`; `PositionBadge` untouched, single shared component | `label`, `color` |
+| 6 | One empty state with a next-step button | `EmptyState` (new, web) / `EmptyState` (existing, mobile) | web: `title`, `subtitle`, `actionLabel`, `onAction`, children |
+| 7 | Tab bars: tight tracking | `PillRow` (both forms 0.03em) / `SegmentedTabBar` | unchanged |
+| 8 | One accent-left-edge card | `AccentCard` / `AccentCard` | `accent`, `compact`, `as`, `className`, `style`, `ref` (web) |
+| 9 | Primary button: dark ink on cyan | `Button` / `Button` | `variant` primary/secondary/ghost, `size`, `fullWidth` (web); `label`, `onPress`, `variant`, `disabled`, `loading` (mobile) |
+| 10 | Sign-in uses standard tokens/radii | `SignInForm` uses `.glass-surface`, `.glass-input`, `--radius-control` | n/a |
+| 11 | One modal backdrop | `--color-scrim` (0.6) / `scrim` export in `theme.ts` | n/a |
+
+Not yet migrated (follow-ups): web `MatchupContent` rows (being redesigned
+separately), `LeagueRecapsContent.RecapStoryCard` (different lead/non-lead
+card), `LiveDraftContent.PickRowView` (pick result, not an asset), mobile
+local duplicates (`TradeFinderScreen`/`TradeHubScreen` `ExchangeAssetList`,
+`TradeHubScreen.CategoryBadge`/`ImpactBadge`, Dashboard `TradeAssetRow`
+player half), mobile `ValueStat`/`ToneBadge`/`AccentCard` call sites.
+
 ## 1. Canonical modules (use these, don't re-create them)
 
 ### Cards / panels

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 /**
@@ -82,7 +82,7 @@ function createStyles(colors: ThemeColors) {
     label: { fontSize: 12, fontWeight: '600', color: colors.textTertiary },
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.55)',
+      backgroundColor: scrim,
       justifyContent: 'center',
       padding: spacing.xl,
     },

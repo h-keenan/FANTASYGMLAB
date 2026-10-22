@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TEAM_STANCE_OPTIONS } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 /**
@@ -99,7 +99,7 @@ function createStyles(colors: ThemeColors) {
   buttonText: { fontSize: 12, fontWeight: '700', color: colors.accentOnTint, flexShrink: 1 },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: scrim,
     justifyContent: 'flex-end',
   },
   sheet: {

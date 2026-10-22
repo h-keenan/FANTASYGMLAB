@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -170,7 +171,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <AppText style={styles.sectionLabel}>Your Draft Posture</AppText>
+        <SectionHeading title="Your Draft Posture" topGap={16} />
         {posture ? (
           <>
             <View style={styles.tileRow}>
@@ -216,7 +217,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
 
         {picks.length ? (
           <>
-            <AppText style={styles.sectionLabel}>Pick Values</AppText>
+            <SectionHeading title="Pick Values" topGap={16} />
             {/* Only worth a toggle once there's a resolved roster to scope
                 to — otherwise pickScope is already pinned to 'league' and a
                 one-option control would just be dead chrome. */}
@@ -274,7 +275,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           </>
         ) : null}
 
-        <AppText style={styles.sectionLabel}>League Draft Decision Signals</AppText>
+        <SectionHeading title="League Draft Decision Signals" topGap={16} />
         {decisionCards.length ? (
           <AnimatedCard style={styles.insightGroupCard}>
             {decisionCards.map((card, index) => (
@@ -283,7 +284,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           </AnimatedCard>
         ) : null}
 
-        <AppText style={styles.sectionLabel}>Draft Partner Discovery</AppText>
+        <SectionHeading title="Draft Partner Discovery" topGap={16} />
         {partnerCards.length ? (
           <AnimatedCard style={styles.insightGroupCard}>
             {partnerCards.map((card, index) => (

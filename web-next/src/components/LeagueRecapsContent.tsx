@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
@@ -273,9 +274,9 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
         <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           League Memory
         </span>
-        <h2 className="uppercase font-extrabold" style={{ font: "var(--type-section-title)" }}>
+        <SectionHeading>
           Week {data.recap.week} recap
-        </h2>
+        </SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
           {data.recap.headline}
         </p>

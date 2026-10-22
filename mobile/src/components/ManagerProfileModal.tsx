@@ -10,7 +10,7 @@ import { api } from '../lib/api';
 import { TENDENCY_SIGNALS } from '../lib/managerTendencies';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 interface Props {
@@ -91,7 +91,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
+      backgroundColor: scrim,
       alignItems: 'center',
       justifyContent: 'center',
       padding: spacing.lg,

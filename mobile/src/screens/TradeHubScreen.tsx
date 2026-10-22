@@ -43,7 +43,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { setSeenTradeIdeaCount } from '../lib/tradeHubSeen';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
@@ -1381,7 +1381,7 @@ function createStyles(colors: ThemeColors) {
   },
   rationaleBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: scrim,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,

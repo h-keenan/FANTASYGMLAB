@@ -77,7 +77,7 @@ function SignalRow({ item, showDivider }: { item: BriefingItem; showDivider: boo
   const showReasonText =
     showReason && !(item.category === "watch" && hasPlayerVisual && (reasonText.includes(" | ") || reasonText.includes(" - ")));
 
-  const badge = <ToneBadge variant="pill" label={label} color={color} />;
+  const badge = <ToneBadge label={label} color={color} />;
   const text = (
     <div className="flex flex-col flex-1 min-w-0">
       {headlineText ? (

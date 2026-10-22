@@ -5,22 +5,6 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
 
-const GLASS_CARD_STYLE: React.CSSProperties = {
-  background: "rgba(255, 255, 255, 0.045)",
-  backdropFilter: "blur(22px) saturate(160%)",
-  WebkitBackdropFilter: "blur(22px) saturate(160%)",
-  border: "1px solid rgba(255, 255, 255, 0.09)",
-  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 36px rgba(0, 0, 0, 0.45)",
-  borderRadius: "22px",
-};
-
-const FIELD_STYLE: React.CSSProperties = {
-  background: "rgba(255, 255, 255, 0.06)",
-  color: "var(--color-text-primary)",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "12px",
-};
-
 /**
  * Ports modules/account_ui.py's render_mobile_auth_entry sign-in/create-
  * account forms, using Supabase JS directly like mobile/src/context/
@@ -164,7 +148,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (step === "check-email") {
     return (
-      <div className="flex flex-col gap-4 p-6 text-center items-center" style={GLASS_CARD_STYLE}>
+      <div className="glass-surface flex flex-col gap-4 p-6 text-center items-center">
         <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           Check your email
         </h2>
@@ -184,7 +168,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             background: "var(--color-accent-strong)",
             color: "var(--color-brand-mark-ink)",
             fontWeight: "var(--font-weight-button)",
-            borderRadius: "12px",
+            borderRadius: "var(--radius-control)",
           }}
         >
           Back to sign in
@@ -195,7 +179,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (step === "email") {
     return (
-      <div className="flex flex-col gap-4 p-6" style={GLASS_CARD_STYLE}>
+      <div className="glass-surface flex flex-col gap-4 p-6">
         <form onSubmit={handleEmailContinue} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
@@ -213,8 +197,8 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               autoFocus
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="px-3 py-2.5"
-              style={FIELD_STYLE}
+              className="glass-input px-3 py-2.5"
+              style={{ color: "var(--color-text-primary)" }}
             />
           </label>
           {error ? (
@@ -229,7 +213,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               background: "var(--color-accent-strong)",
               color: "var(--color-brand-mark-ink)",
               fontWeight: "var(--font-weight-button)",
-              borderRadius: "12px",
+              borderRadius: "var(--radius-control)",
             }}
           >
             Continue
@@ -237,22 +221,20 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         </form>
 
         <div className="flex items-center gap-3">
-          <div className="flex-1" style={{ height: "1px", background: "rgba(255, 255, 255, 0.12)" }} />
+          <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             or
           </span>
-          <div className="flex-1" style={{ height: "1px", background: "rgba(255, 255, 255, 0.12)" }} />
+          <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
         </div>
         <button
           type="button"
           onClick={() => handleOAuth("google")}
           disabled={oauthBusy !== null}
-          className="px-4 py-2.5 text-sm font-bold"
+          className="glass-input px-4 py-2.5 text-sm font-bold"
           style={{
-            background: "rgba(255, 255, 255, 0.06)",
             color: "var(--color-text-primary)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            borderRadius: "12px",
+            borderRadius: "var(--radius-control)",
             opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
@@ -262,12 +244,10 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           type="button"
           onClick={() => handleOAuth("apple")}
           disabled={oauthBusy !== null}
-          className="px-4 py-2.5 text-sm font-bold"
+          className="glass-input px-4 py-2.5 text-sm font-bold"
           style={{
-            background: "rgba(255, 255, 255, 0.06)",
             color: "var(--color-text-primary)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            borderRadius: "12px",
+            borderRadius: "var(--radius-control)",
             opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
@@ -278,7 +258,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6" style={GLASS_CARD_STYLE}>
+    <div className="glass-surface flex flex-col gap-4 p-6">
       <button
         type="button"
         onClick={() => {
@@ -315,8 +295,8 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               minLength={6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="px-3 py-2.5"
-              style={FIELD_STYLE}
+              className="glass-input px-3 py-2.5"
+              style={{ color: "var(--color-text-primary)" }}
             />
           </label>
 
@@ -334,7 +314,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               color: "var(--color-brand-mark-ink)",
               fontWeight: "var(--font-weight-button)",
               opacity: busy ? "var(--opacity-disabled)" : 1,
-              borderRadius: "12px",
+              borderRadius: "var(--radius-control)",
             }}
           >
             {busy ? "Continuing…" : "Continue"}

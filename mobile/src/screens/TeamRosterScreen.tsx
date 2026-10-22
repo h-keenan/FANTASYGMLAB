@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -226,7 +227,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
           />
         ) : (
           <>
-            <AppText style={styles.sectionLabel}>Roster</AppText>
+            <SectionHeading title="Roster" topGap={12} />
             {sections.map((section) => (
               <View key={section.title} style={styles.positionGroup}>
                 <AppText style={styles.positionLabel}>{section.title}</AppText>

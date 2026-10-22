@@ -57,7 +57,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
             </span>
           ) : null}
         </div>
-        <ToneBadge variant="pill" label={outcomeLabel(outcome.outcome)} color={outcomeToneColorVar(outcome.outcome)} />
+        <ToneBadge label={outcomeLabel(outcome.outcome)} color={outcomeToneColorVar(outcome.outcome)} />
       </div>
 
       {verdict && result ? (

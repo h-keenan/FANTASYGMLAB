@@ -193,6 +193,12 @@ const lightColors = {
 };
 
 export type ThemeColors = typeof darkColors;
+
+/**
+ * The one modal backdrop darkness, shared by every sheet and dialog (web:
+ * --color-scrim). Not themed: a scrim is black in both themes.
+ */
+export const scrim = 'rgba(0, 0, 0, 0.6)';
 export { darkColors, lightColors };
 
 /**

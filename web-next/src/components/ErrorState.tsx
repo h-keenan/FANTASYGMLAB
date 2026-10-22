@@ -1,3 +1,5 @@
+import { Button } from "@/components/Button";
+
 /**
  * Shared "couldn't load" state with a real way back — coridian_, 2026-10-18,
  * screenshot: backgrounding Safari and returning to the app left a bare
@@ -20,18 +22,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         {message}
       </p>
       {onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="px-4 py-2 text-sm font-bold"
-          style={{
-            background: "var(--color-accent-strong)",
-            color: "var(--color-brand-mark-ink)",
-            fontWeight: "var(--font-weight-button)",
-          }}
-        >
-          Try again
-        </button>
+        <Button onClick={onRetry}>Try again</Button>
       ) : null}
     </main>
   );

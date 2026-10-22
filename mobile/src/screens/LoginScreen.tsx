@@ -202,7 +202,7 @@ export default function LoginScreen() {
               disabled={resetSubmitting || !email}
             >
               {resetSubmitting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
                 <AppText style={styles.buttonText}>Send reset link</AppText>
               )}
@@ -226,7 +226,7 @@ export default function LoginScreen() {
               disabled={submitting || !email || !password}
             >
               {submitting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
                 <AppText style={styles.buttonText}>
                   {mode === 'signIn' ? 'Sign in' : 'Sign up'}
@@ -345,14 +345,14 @@ function createStyles(colors: ThemeColors) {
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
     marginTop: spacing.xs,
   },
   buttonDisabled: { opacity: disabledOpacity },
   buttonText: {
-    color: '#fff',
+    color: colors.onAccent,
     fontSize: 16,
     fontWeight: '600',
   },

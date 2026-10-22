@@ -43,7 +43,7 @@ import { getShownTrialLapseExpiration, setShownTrialLapseExpiration } from '../l
 import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
@@ -979,7 +979,7 @@ function createStyles(colors: ThemeColors) {
   renameButton: { marginLeft: spacing.sm, marginRight: spacing.sm, padding: 2 },
   renameBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: scrim,
     justifyContent: 'center',
     padding: spacing.xl,
   },

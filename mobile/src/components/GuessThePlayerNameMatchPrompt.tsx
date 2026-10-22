@@ -19,7 +19,7 @@ import {
   shouldShowGuessThePlayerNameMatchPrompt,
 } from '../lib/guessThePlayerNameMatchPrompt';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 type RevealState = {
@@ -231,7 +231,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
+      backgroundColor: scrim,
       alignItems: 'center',
       justifyContent: 'center',
       padding: spacing.lg,

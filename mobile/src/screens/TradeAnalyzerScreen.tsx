@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import Button from '../components/Button';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -568,17 +569,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         ) : null
       ) : (
         <>
-          <TouchableOpacity
-            style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
-            onPress={analyze}
-            disabled={analyzing || !hasAnyAssets}
-          >
-            {analyzing ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : (
-              <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>
-            )}
-          </TouchableOpacity>
+          <Button label="Analyze Trade" onPress={analyze} disabled={!hasAnyAssets} loading={analyzing} style={styles.analyzeButton} />
 
           {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
           {/* Past the trade deadline the analyzer stays open for offseason
@@ -1004,15 +995,7 @@ function createStyles(colors: ThemeColors) {
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: colors.onAccent },
-  analyzeButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  analyzeButtonDisabled: { opacity: disabledOpacity },
-  analyzeButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
+  analyzeButton: { marginBottom: spacing.md },
   // Quick Compare's instant readout — same label + bar shape as the full
   // verdict's value strip (below), just driven by a client-computed delta.
   quickCompareSection: { marginBottom: spacing.md },

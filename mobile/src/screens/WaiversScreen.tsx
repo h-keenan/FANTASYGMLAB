@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -99,17 +100,6 @@ function reasonMessage(reason: string): string | null {
  * uppercase kicker plus an optional one-line caption underneath, replacing
  * a mix of ad hoc labels so "Priority Adds," "Best Available by Position,"
  * and "All Free Agents" all read as one family of section boundary. */
-function SectionHeader({ label, caption }: { label: string; caption?: string | null }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.sectionHeaderWrap}>
-      <AppText style={styles.sectionLabel}>{label}</AppText>
-      {caption ? <AppText style={styles.sectionCaption}>{caption}</AppText> : null}
-    </View>
-  );
-}
-
 export default function WaiversScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
@@ -303,7 +293,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               <View>
                 {topPriority ? (
                   <View style={styles.sectionBlock}>
-                    <SectionHeader label="Top Waiver Target" caption={priorityCaption} />
+                    <SectionHeading title="Top Waiver Target" caption={priorityCaption} />
                     <WaiverRecommendationCard
                       player={topPriority}
                       variant="primary"
@@ -315,7 +305,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 )}
                 {secondaryPriority.length > 0 ? (
                   <View style={styles.sectionBlock}>
-                    <SectionHeader label="More recommended adds" />
+                    <SectionHeading title="More recommended adds" />
                     <View style={styles.filterPills}>
                       <SegmentedTabBar options={REC_FILTER_OPTIONS} active={recFilter} onChange={setRecFilter} />
                     </View>
@@ -339,7 +329,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 ) : null}
                 {bestAvailable.length > 0 ? (
                   <View style={styles.sectionBlock}>
-                    <SectionHeader label="Position Snapshot" />
+                    <SectionHeading title="Position Snapshot" />
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
                       {bestAvailable.map(({ position: pos, player, count }) => (
                         <BestAvailableCard
@@ -377,11 +367,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     <ViewModeToggle value={viewMode} onChange={setViewMode} />
                   </View>
                 </View>
-                <SectionHeader label="All Free Agents" />
+                <SectionHeading title="All Free Agents" />
               </View>
             ) : (
               <View>
-                <SectionHeader label="Your GM Targets on the wire" />
+                <SectionHeading title="Your GM Targets on the wire" />
                 {targetsFailed ? <AppText style={styles.secondaryCaption}>Couldn't load your GM Targets.</AppText> : null}
                 {!targetsFailed && targetIds === null ? <AppText style={styles.secondaryCaption}>Loading…</AppText> : null}
               </View>
@@ -468,7 +458,7 @@ function SecondaryWaiverBoard({
       />
       {groups.map((group) => (
         <View key={group.label} style={styles.sectionBlock}>
-          <SectionHeader label={group.label} />
+          <SectionHeading title={group.label} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
             {group.players.map((player) => (
               <BestAvailableCard
