@@ -23,11 +23,14 @@ All three live in `modules.trade_grade`, which documents the weights.
 
 from __future__ import annotations
 
+import threading
+import weakref
 from typing import Any
 
 import pandas as pd
 
 from modules import runtime_trace
+from modules.frame_records import frame_records
 from modules import trade_grade
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
@@ -158,6 +161,60 @@ def _starter_lineup_snapshot(
     }
 
 
+# Every candidate package evaluated for a roster looks the same few players up
+# in the same league-wide frame; converting the whole player_id column to str
+# and scanning it per package dominated that lookup. The frames are treated as
+# immutable by their callers (see current_context's identity check below), so
+# the id -> row-position map is kept per frame object, guarded by a weak
+# reference, the length and a three-point sample of the ids.
+_PID_INDEX_LOCK = threading.Lock()
+_PID_INDEX_CACHE: dict[int, tuple[Any, int, tuple[str, ...], dict[str, list[int]]]] = {}
+_PID_INDEX_MAX = 8
+
+
+def _player_id_sample(column: pd.Series) -> tuple[str, ...]:
+    size = len(column)
+    if size == 0:
+        return ()
+    return (str(column.iloc[0]), str(column.iloc[size // 2]), str(column.iloc[size - 1]))
+
+
+def _player_id_positions(frame: pd.DataFrame) -> dict[str, list[int]]:
+    column = frame["player_id"]
+    size = len(column)
+    sample = _player_id_sample(column)
+    key = id(frame)
+    with _PID_INDEX_LOCK:
+        entry = _PID_INDEX_CACHE.get(key)
+        if entry is not None and entry[0]() is frame and entry[1] == size and entry[2] == sample:
+            return entry[3]
+    positions: dict[str, list[int]] = {}
+    for position, player_id in enumerate(column.astype(str).tolist()):
+        positions.setdefault(player_id, []).append(position)
+    try:
+        ref = weakref.ref(frame)
+    except TypeError:
+        return positions
+    with _PID_INDEX_LOCK:
+        for stale in [k for k, v in _PID_INDEX_CACHE.items() if v[0]() is None]:
+            _PID_INDEX_CACHE.pop(stale, None)
+        while len(_PID_INDEX_CACHE) >= _PID_INDEX_MAX:
+            _PID_INDEX_CACHE.pop(next(iter(_PID_INDEX_CACHE)), None)
+        _PID_INDEX_CACHE[key] = (ref, size, sample, positions)
+    return positions
+
+
+def _rows_for_player_ids(frame: pd.DataFrame, wanted) -> pd.DataFrame:
+    """Same rows, in frame order, as ``frame[frame["player_id"].astype(str).isin(wanted)]``."""
+
+    mapping = _player_id_positions(frame)
+    selected: list[int] = []
+    for player_id in wanted:
+        selected.extend(mapping.get(player_id, ()))
+    selected.sort()
+    return frame.iloc[selected]
+
+
 def _simulate_post_trade_roster(
     my_team_df: pd.DataFrame,
     all_players_df: pd.DataFrame,
@@ -190,7 +247,7 @@ def _simulate_post_trade_roster(
     # Select the received rows before copying: copying the whole player pool
     # for every evaluated package was the dominant cost of a fit call.
     if all_players_df is not None and not all_players_df.empty and "player_id" in all_players_df.columns:
-        receive_df = all_players_df[all_players_df["player_id"].astype(str).isin(receive_ids)].copy()
+        receive_df = _rows_for_player_ids(all_players_df, receive_ids).copy()
         receive_df["player_id"] = receive_df["player_id"].astype(str)
     else:
         receive_df = pd.DataFrame()
@@ -311,8 +368,8 @@ def _asset_rows_by_id(
     for frame in (my_team_df, all_players_df):
         if frame is None or frame.empty or "player_id" not in frame.columns or not wanted:
             continue
-        matches = frame[frame["player_id"].astype(str).isin(wanted - set(rows))]
-        for record in matches.to_dict("records"):
+        matches = _rows_for_player_ids(frame, wanted - set(rows))
+        for record in frame_records(matches):
             rows.setdefault(str(record.get("player_id")), record)
     return rows
 

@@ -19,6 +19,7 @@ from modules import redis_cache
 from modules import runtime_trace
 from modules import sleeper as sleeper_module
 from modules.fantasycalc import FANTASYCALC_CACHE_PATH, get_dynasty_values
+from modules.frame_records import frame_records
 from modules.player_identity import ensure_identity_columns
 from modules.valuation_authority import (
     AUTHORITATIVE_COLUMN,
@@ -2965,7 +2966,7 @@ def build_player_injury_index(
     if players_df is None or getattr(players_df, "empty", True):
         return index
     clock = time.time() if now is None else now
-    for mapping in players_df.to_dict("records"):
+    for mapping in frame_records(players_df):
         player_id = str(mapping.get("player_id") or "").strip()
         if not player_id:
             continue

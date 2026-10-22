@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 # --- Taxonomies ----------------------------------------------------------------
@@ -262,16 +263,42 @@ class NewsSignal:
         return asdict(self)
 
 
+# Callers test one article against dozens of phrases in a row, so lowercasing
+# the same (large) string for every phrase dominated the cost. Remember the
+# last one by identity; the tuple holds a reference so the id cannot be reused.
+_LOWERED_LAST: tuple[object, str] = (None, "")
+
+
+def _lowered(text: object) -> str:
+    global _LOWERED_LAST
+    last = _LOWERED_LAST
+    if last[0] is text:
+        return last[1]
+    lowered = str(text or "").lower()
+    if isinstance(text, str):
+        _LOWERED_LAST = (text, lowered)
+    return lowered
+
+
 def contains_phrase(text: str, phrase: str) -> bool:
     """Word-boundary-safe phrase match (multi-word uses substring)."""
 
     phrase = str(phrase or "").lower().strip()
     if not phrase:
         return False
-    haystack = str(text or "").lower()
+    haystack = _lowered(text)
     if " " in phrase or "-" in phrase:
         return phrase in haystack
-    return re.search(rf"\b{re.escape(phrase)}\b", haystack) is not None
+    # A word-boundary match implies the substring is present, and almost every
+    # (item, name) pair misses, so test the cheap substring first.
+    if phrase not in haystack:
+        return False
+    return _word_pattern(phrase).search(haystack) is not None
+
+
+@lru_cache(maxsize=4096)
+def _word_pattern(phrase: str) -> "re.Pattern[str]":
+    return re.compile(rf"\b{re.escape(phrase)}\b")
 
 
 def normalize_player_name(name: str) -> str:
