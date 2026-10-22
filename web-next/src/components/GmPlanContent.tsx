@@ -1,16 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { AccentCard } from "@/components/AccentCard";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { SectionHeading } from "@/components/SectionHeading";
 import { InfoTip } from "@/components/InfoTip";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { GM_PLAN_TABS, type GmPlanTab, isGmPlanTab, PlanSnapshotGrid, TeamSituationCard } from "@/components/GmPlanSections";
+import { deadlineBanner, type PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
 import type { ReactNode } from "react";
 import {
   api,
-  TEAM_STANCE_OPTIONS,
   type GmPlanFocusArea,
   type GmPlanFocusItem,
   type GmPlanInjuryItem,
@@ -158,7 +161,7 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
   );
 }
 
-function TradeOpportunityCard({ item }: { item: GmPlanTradeItem }) {
+function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; detailsHref?: string }) {
   const hasAssets = item.send_assets.length > 0 || item.receive_assets.length > 0;
   const injuryDisplay = item.their_player_injury_display || "";
   const accent = injuryDisplay ? "var(--color-danger)" : "var(--color-accent)";
@@ -198,17 +201,26 @@ function TradeOpportunityCard({ item }: { item: GmPlanTradeItem }) {
         </p>
       )}
 
-      {item.rationale || item.trade_confidence_label ? (
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+      <div className="flex items-end justify-between gap-3">
+        <p className="text-xs flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>
           {item.rationale || item.trade_confidence_label}
         </p>
-      ) : null}
+        {detailsHref ? (
+          <Link
+            href={detailsHref}
+            className="inline-flex items-center px-3 text-xs font-bold shrink-0"
+            style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)", minHeight: "2.25rem" }}
+          >
+            View details
+          </Link>
+        ) : null}
+      </div>
     </AccentCard>
   );
 }
 
-function FocusItem({ item }: { item: GmPlanFocusItem }) {
-  if ("partner_team_name" in item) return <TradeOpportunityCard item={item} />;
+function FocusItem({ item, detailsHref }: { item: GmPlanFocusItem; detailsHref?: (item: GmPlanTradeItem) => string }) {
+  if ("partner_team_name" in item) return <TradeOpportunityCard item={item} detailsHref={detailsHref?.(item)} />;
   if ("injury_need_positions" in item) return <InjuryExposureFact item={item} />;
   if ("rank" in item) return <RankFact item={item} />;
   if ("wins" in item) return <RecordFact item={item} />;
@@ -216,7 +228,7 @@ function FocusItem({ item }: { item: GmPlanFocusItem }) {
   return null;
 }
 
-function FocusAreaSection({ area }: { area: GmPlanFocusArea }) {
+function FocusAreaSection({ area, detailsHref }: { area: GmPlanFocusArea; detailsHref?: (item: GmPlanTradeItem) => string }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
@@ -235,7 +247,7 @@ function FocusAreaSection({ area }: { area: GmPlanFocusArea }) {
       ) : (
         <div className="flex flex-col gap-3">
           {area.items.map((item, index) => (
-            <FocusItem key={focusItemKey(item, index)} item={item} />
+            <FocusItem key={focusItemKey(item, index)} item={item} detailsHref={detailsHref} />
           ))}
         </div>
       )}
@@ -382,6 +394,8 @@ export function GmPlanContent({
   myTeam,
   targets,
   rankings,
+  snapshot,
+  initialTab,
 }: {
   /** Optional only so this component's existing unit tests (which predate
    * the Revision 20 merge below) don't all need the full data set —
@@ -393,7 +407,13 @@ export function GmPlanContent({
   myTeam?: MyTeamResponse;
   targets?: GmTarget[];
   rankings?: LeagueRankingsResponse;
+  /** Plan Snapshot tiles (lib/gmPlanSnapshot); omitted tiles never render. */
+  snapshot?: PlanSnapshotTile[];
+  initialTab?: GmPlanTab;
 }) {
+  const router = useRouter();
+  const [tab, setTab] = useState<GmPlanTab>(initialTab ?? "overview");
+  const [showRoster, setShowRoster] = useState(false);
   const [stance, setStanceState] = useState<TeamStance | "">(teamStance?.stance ?? "");
   const [trackedRows, setTrackedRows] = useState<GmTarget[]>(targets ?? []);
   const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
@@ -489,14 +509,99 @@ export function GmPlanContent({
     });
   };
 
-  const selectedStanceOption = TEAM_STANCE_OPTIONS.find((option) => option.value === stance);
   const noRoster = protectRows.length === 0;
 
   const notice = data.reason ? gmPlanReasonMessage(data.reason) : null;
   const quiet = data.quiet || !data.focus_areas || data.focus_areas.length === 0;
 
+  const tradeWindow = data.trade_window ?? myTeam?.trade_window;
+  const banner = deadlineBanner(tradeWindow);
+  const pastDeadline = Boolean(tradeWindow?.trade_deadline_passed);
+  const q = `name=${encodeURIComponent(leagueName)}`;
+  const base = leagueId ? encodeURIComponent(leagueId) : "";
+  const tradeHubHref = leagueId ? `/trade-hub/${base}?${q}` : undefined;
+  const detailsHref = leagueId
+    ? (item: GmPlanTradeItem) =>
+        `/trade-hub/${base}?${q}${item.their_player_id ? `&playerId=${encodeURIComponent(item.their_player_id)}` : ""}`
+    : undefined;
+
+  const tradeArea = data.focus_areas?.find((area) => area.key === "trade_opportunities");
+  const tradeItems = (tradeArea?.items ?? []).filter((item): item is GmPlanTradeItem => "partner_team_name" in item);
+  const otherAreas = (data.focus_areas ?? []).filter((area) => area.key !== "trade_opportunities");
+
+  const planGate = notice ? (
+    <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
+      {notice}
+    </p>
+  ) : !data.is_premium ? (
+    <PremiumUpsellCard
+      kicker="GM Plan"
+      upsell={data.upsell}
+      fallbackTitle="Your season-arc roadmap"
+      fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
+      bare
+    />
+  ) : quiet ? (
+    <EmptyState title="Not enough to build a GM Plan yet." subtitle="We need more of this league's data first." />
+  ) : null;
+
+  const rosterLine = (
+    <button
+      type="button"
+      onClick={() => {
+        setTab("core");
+        setShowRoster(true);
+      }}
+      className="glass-surface flex items-center justify-between gap-2 px-3 py-2 text-sm"
+      style={{ color: "var(--color-text-secondary)" }}
+    >
+      <span>
+        {otherRows.length} more player{otherRows.length === 1 ? "" : "s"} on your roster
+      </span>
+      <span aria-hidden="true">›</span>
+    </button>
+  );
+
+  const protectedList = (rows: ProtectRow[]) => (
+    <div className="glass-surface flex flex-col px-3">
+      {rows.map((row) => (
+        <ProtectPlayerRow
+          key={row.player.player_id}
+          row={row}
+          busy={busyPlayerId === row.player.player_id}
+          onToggle={onToggleProtect}
+        />
+      ))}
+    </div>
+  );
+
+  const linkAction = (label: string, href?: string) =>
+    href ? (
+      <Link href={href} className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+        {label}
+      </Link>
+    ) : undefined;
+
+  const tradesBlock = (items: GmPlanTradeItem[], limit?: number) =>
+    planGate ? (
+      planGate
+    ) : items.length === 0 ? (
+      <EmptyState
+        title="No trade ideas right now."
+        subtitle={tradeArea?.watch_for || "Check back as rosters change."}
+        actionLabel={tradeHubHref ? "Open Trade Hub" : undefined}
+        onAction={tradeHubHref ? () => router.push(tradeHubHref) : undefined}
+      />
+    ) : (
+      <div className="flex flex-col gap-3">
+        {(limit ? items.slice(0, limit) : items).map((item, index) => (
+          <TradeOpportunityCard key={focusItemKey(item, index)} item={item} detailsHref={detailsHref?.(item)} />
+        ))}
+      </div>
+    );
+
   return (
-    <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           GM Plan
@@ -507,144 +612,160 @@ export function GmPlanContent({
         </p>
       </header>
 
-      {teamStance ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>Team Situation</SectionHeading>
-          <InfoTip label="How you see this team">
-            Tell us how you see this team right now. We&apos;ll lean trade-idea language toward that stance, and use
-            it to shape your trade and lineup value adjustments too.
-          </InfoTip>
-          <PillRow
-            options={TEAM_STANCE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
-            active={stance}
-            onSelect={onPickStance}
-          />
-          {selectedStanceOption ? (
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {selectedStanceOption.description}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+      <PillRow
+        fullWidth
+        options={GM_PLAN_TABS.map((t) => ({ label: t.label, value: t.value }))}
+        active={tab}
+        onSelect={(value) => isGmPlanTab(value) && setTab(value)}
+      />
 
-      {notice ? (
-        <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
-          {notice}
-        </p>
-      ) : !data.is_premium ? (
-        <PremiumUpsellCard
-          kicker="GM Plan"
-          upsell={data.upsell}
-          fallbackTitle="Your season-arc roadmap"
-          fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
-          bare
-        />
-      ) : quiet ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          We don&apos;t have enough to build a GM Plan for this league yet.
-        </p>
-      ) : (
+      {tab === "overview" ? (
         <>
-          <section className="glass-surface flex flex-col gap-2 p-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              {data.season_phase_label ? (
-                <span
-                  className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
-                  style={{
-                    color: "var(--color-information)",
-                    background: "var(--color-information-soft)",
-                    letterSpacing: "var(--letter-spacing-badge)",
-                  }}
-                >
-                  {data.season_phase_label}
-                </span>
+          {teamStance ? (
+            <TeamSituationCard
+              stance={stance}
+              onPick={onPickStance}
+              banner={banner}
+              pastDeadline={pastDeadline}
+              tradeHubHref={tradeHubHref}
+            />
+          ) : null}
+
+          <PlanSnapshotGrid
+            tiles={snapshot ?? []}
+            analysisHref={leagueId ? `/my-team/${base}?${q}` : undefined}
+          />
+
+          {!planGate && (data.season_phase_label || data.team_stance_label || data.headline) ? (
+            <section className="glass-surface flex flex-col gap-2 p-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {data.season_phase_label ? (
+                  <span
+                    className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
+                    style={{
+                      color: "var(--color-information)",
+                      background: "var(--color-information-soft)",
+                      letterSpacing: "var(--letter-spacing-badge)",
+                    }}
+                  >
+                    {data.season_phase_label}
+                  </span>
+                ) : null}
+                {data.team_stance_label ? (
+                  <span
+                    className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
+                    style={{
+                      color: "var(--color-premium)",
+                      background: "var(--color-action-soft)",
+                      letterSpacing: "var(--letter-spacing-badge)",
+                    }}
+                  >
+                    {data.team_stance_label}
+                  </span>
+                ) : null}
+              </div>
+              {data.headline ? (
+                <p className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>
+                  {data.headline}
+                </p>
               ) : null}
-              {data.team_stance_label ? (
-                <span
-                  className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
-                  style={{
-                    color: "var(--color-premium)",
-                    background: "var(--color-action-soft)",
-                    letterSpacing: "var(--letter-spacing-badge)",
-                  }}
-                >
-                  {data.team_stance_label}
-                </span>
-              ) : null}
-            </div>
-            {data.headline ? (
-              <p className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>
-                {data.headline}
-              </p>
-            ) : null}
+            </section>
+          ) : null}
+
+          <section className="flex flex-col gap-2">
+            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade Opportunities</SectionHeading>
+            {tradesBlock(tradeItems, 2)}
           </section>
 
-          <div className="flex flex-col gap-6">
-            {data.focus_areas.map((area) => (
-              <FocusAreaSection key={area.key} area={area} />
-            ))}
-          </div>
+          {myTeam && leagueId && !noRoster ? (
+            <section className="flex flex-col gap-2">
+              <SectionHeading
+                action={
+                  <button type="button" onClick={() => setTab("core")} className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+                    View all
+                  </button>
+                }
+              >
+                Protected Core
+              </SectionHeading>
+              {protectedRows.length > 0 ? protectedList(protectedRows.slice(0, 3)) : null}
+              {otherRows.length > 0 ? rosterLine : null}
+            </section>
+          ) : null}
         </>
-      )}
+      ) : null}
 
-      {myTeam && leagueId ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>Protected Players</SectionHeading>
-          <InfoTip label="Players you won&apos;t trade">
-            Mark players you don&apos;t want traded away. This is the same protection the Watching list below uses
-            — toggling it here or there shows up in both places.
-          </InfoTip>
-
-          {noRoster ? (
-            <EmptyState title="No roster players found for this league." />
-          ) : (
-            <div
-              className="glass-surface flex flex-col px-3"
-            >
-              {protectedRows.map((row) => (
-                <ProtectPlayerRow
-                  key={row.player.player_id}
-                  row={row}
-                  busy={busyPlayerId === row.player.player_id}
-                  onToggle={onToggleProtect}
-                />
-              ))}
-              {protectedRows.length > 0 && otherRows.length > 0 ? (
-                <h3
-                  className="text-xs font-bold uppercase pt-3"
-                  style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
-                >
-                  Rest of Roster
-                </h3>
-              ) : null}
-              {otherRows.map((row) => (
-                <ProtectPlayerRow
-                  key={row.player.player_id}
-                  row={row}
-                  busy={busyPlayerId === row.player.player_id}
-                  onToggle={onToggleProtect}
-                />
+      {tab === "trades" ? (
+        <>
+          <section className="flex flex-col gap-2">
+            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade Opportunities</SectionHeading>
+            {tradesBlock(tradeItems)}
+          </section>
+          {!planGate ? (
+            <div className="flex flex-col gap-6">
+              {otherAreas.map((area) => (
+                <FocusAreaSection key={area.key} area={area} />
               ))}
             </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "core" ? (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <SectionHeading>Protected Core</SectionHeading>
+            <InfoTip label="Players you won't trade">
+              Mark players you don&apos;t want traded away. This is the same protection the Watching list uses —
+              toggling it here or there shows up in both places.
+            </InfoTip>
+          </div>
+          {!myTeam || !leagueId ? null : noRoster ? (
+            <EmptyState title="No roster players found for this league." />
+          ) : (
+            <>
+              {protectedRows.length > 0 ? (
+                protectedList(protectedRows)
+              ) : (
+                <EmptyState
+                  title="No protected players yet."
+                  subtitle="Protect the players you won't trade."
+                  actionLabel={showRoster ? undefined : "Show roster"}
+                  onAction={() => setShowRoster(true)}
+                />
+              )}
+              {otherRows.length > 0 ? (
+                showRoster ? (
+                  <>
+                    <h3
+                      className="text-xs font-bold uppercase pt-2"
+                      style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
+                    >
+                      Rest of Roster
+                    </h3>
+                    {protectedList(otherRows)}
+                  </>
+                ) : (
+                  rosterLine
+                )
+              ) : null}
+            </>
           )}
         </section>
       ) : null}
 
-      {rankings && leagueId ? (
+      {tab === "watching" ? (
         <section className="flex flex-col gap-2">
-          <SectionHeading>Watching</SectionHeading>
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Considering or monitoring; not trade-protected.
-          </p>
-          {watching.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Nothing here yet. Add players you&apos;re considering from a player&apos;s profile to start watching
-              them.
-            </p>
+          <SectionHeading note="Considering or monitoring; not trade-protected.">Watching</SectionHeading>
+          {!rankings || !leagueId ? null : watching.length === 0 ? (
+            <EmptyState
+              title="Nothing here yet."
+              subtitle="Add players you're considering from a player's profile."
+              actionLabel="Browse players"
+              onAction={() => router.push(`/players/${base}?${q}`)}
+            />
           ) : (
-            <div
-              className="glass-surface flex flex-col px-3"
-            >
+            <div className="glass-surface flex flex-col px-3">
               {watching.map((row) => (
                 <TargetRowView
                   key={row.target.player_id}

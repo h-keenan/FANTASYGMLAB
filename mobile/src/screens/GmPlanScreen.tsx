@@ -1,19 +1,40 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
+import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import CircularProgressRing from '../components/CircularProgressRing';
+import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
+import OverallRatingBadge from '../components/OverallRatingBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
-import { api, type GmPlanFocusArea, type GmPlanResponse } from '../lib/api';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import SkeletonBlock from '../components/SkeletonBlock';
+import { TradeAssetRow } from './DashboardScreen';
+import {
+  api,
+  TEAM_STANCE_OPTIONS,
+  type GmPlanFocusArea,
+  type GmPlanResponse,
+  type GmPlanTradeItem,
+  type GmTarget,
+  type LineupPlayer,
+  type PlayoffOddsTeam,
+  type RankedPlayer,
+  type TeamRanking,
+} from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { buildPlanSnapshot, deadlineWeek, type PlanSnapshotTile } from '../lib/gmPlanSnapshot';
+import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
@@ -23,6 +44,14 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type Tab = 'overview' | 'trades' | 'core' | 'watching';
+
+const TABS: Array<{ key: Tab; label: string }> = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'trades', label: 'Trades' },
+  { key: 'core', label: 'Core' },
+  { key: 'watching', label: 'Watching' },
+];
 
 const FOCUS_META: Record<string, { icon: IconName }> = {
   standing: { icon: 'stats-chart-outline' },
@@ -30,20 +59,25 @@ const FOCUS_META: Record<string, { icon: IconName }> = {
   roster_construction: { icon: 'layers-outline' },
 };
 
+const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
+  power: 'stats-chart-outline',
+  capital: 'layers-outline',
+  odds: 'trophy-outline',
+  record: 'document-text-outline',
+  starter: 'people-outline',
+  bench: 'albums-outline',
+  age: 'person-outline',
+};
+
 /**
- * GM Plan — a season-arc roadmap: where the season currently sits (real
- * week -> phase), the caller's declared Team Situation stance, and what
- * that combination means for how to read the ALREADY-COMPUTED signals
- * below (a real power/draft-capital rank, real trade ideas, real roster
- * construction ranks). A complement to Dashboard's one-off "Next Move"
- * tile, not a replacement — this is the slower, season-level view; Next
- * Move stays the single top tactical action.
- *
- * Deliberately does not read or affect the older "GM Stance" team-strategy
- * system (see /v1/leagues/{id}/gm-stance) — that's a separate, unresolved
- * product question. Every item here traces to a real signal; when a focus
- * area has none, it says so honestly instead of inventing advice (see
- * modules.gm_plan on the backend).
+ * GM Plan — the owner's concept structure: Overview | Trades | Core |
+ * Watching. Overview is Team Situation (the declared stance, through the
+ * shared GmStanceContext, plus the real trade-deadline banner), the Plan
+ * Snapshot tiles and the top trade ideas; Trades adds the rest of the
+ * season-arc roadmap; Core is the protected (untouchable) players; Watching
+ * is the GM Targets list. Everything traces to a real signal; a tile or
+ * section with no data is omitted or says so honestly. Mirrors web-next's
+ * GmPlanContent.
  */
 export default function GmPlanScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
@@ -51,11 +85,20 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
+  const { stance, setStance } = useGmStance(leagueId);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<GmPlanResponse | null>(null);
+  const [tab, setTab] = useState<Tab>('overview');
+  const [showRoster, setShowRoster] = useState(false);
+  const [snapshot, setSnapshot] = useState<PlanSnapshotTile[]>([]);
+  const [roster, setRoster] = useState<LineupPlayer[]>([]);
+  const [targets, setTargets] = useState<GmTarget[]>([]);
+  const [ranked, setRanked] = useState<Map<string, RankedPlayer>>(new Map());
+  const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
+  const [tradeWindow, setTradeWindow] = useState<GmPlanResponse['trade_window']>(undefined);
 
   useScreenHeaderTitle(navigation, 'GM Plan', leagueName);
 
@@ -64,8 +107,30 @@ export default function GmPlanScreen({ route, navigation }: Props) {
       setError(null);
       if (isRefresh) setRefreshing(true);
       try {
-        const result = await api.getGmPlan(leagueId, { lens: 'Dynasty' });
-        setPlan(result);
+        const [planResult, myTeam, targetsResult, rankings] = await Promise.all([
+          api.getGmPlan(leagueId, { lens: 'Dynasty' }),
+          api.getLeagueMyTeam(leagueId),
+          api.getGmTargets(leagueId),
+          api.getLeagueRankings(leagueId),
+        ]);
+        setPlan(planResult);
+        setTradeWindow(planResult.trade_window ?? myTeam.trade_window);
+        const seen = new Set<string>();
+        setRoster(
+          [...myTeam.starters, ...myTeam.bench].filter((p) => (seen.has(p.player_id) ? false : (seen.add(p.player_id), true))),
+        );
+        setTargets(targetsResult.targets);
+        setRanked(new Map(rankings.players.map((p) => [p.player_id, p])));
+
+        // Best-effort snapshot sources: a tile just doesn't render if a call fails.
+        const [teamsResult, oddsResult] = await Promise.all([
+          api.getLeagueTeamRankings(leagueId).catch(() => null),
+          api.getLeaguePlayoffOdds(leagueId).catch(() => null),
+        ]);
+        const teams: TeamRanking[] = teamsResult?.teams ?? [];
+        const rosterId = myTeam.roster_id;
+        const odds: PlayoffOddsTeam | null = oddsResult?.teams?.find((t) => t.roster_id === rosterId) ?? null;
+        setSnapshot(buildPlanSnapshot(teams.find((t) => t.roster_id === rosterId) ?? null, teams.length, odds));
       } catch (err) {
         setError(toUserErrorMessage(err, 'Failed to load GM Plan.'));
       } finally {
@@ -82,11 +147,172 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     }, [load]),
   );
 
+  const protectedIds = useMemo(() => new Set(targets.filter((t) => t.untouchable).map((t) => t.player_id)), [targets]);
+  const protectedRows = useMemo(() => roster.filter((p) => protectedIds.has(p.player_id)), [roster, protectedIds]);
+  const otherRows = useMemo(() => roster.filter((p) => !protectedIds.has(p.player_id)), [roster, protectedIds]);
+  const watching = useMemo(() => targets.filter((t) => !t.untouchable), [targets]);
+
+  const onToggleProtect = useCallback(
+    async (playerId: string, next: boolean) => {
+      setBusyPlayerId(playerId);
+      const previous = targets;
+      const tracked = targets.some((t) => t.player_id === playerId);
+      setTargets((prev) =>
+        tracked
+          ? prev.map((t) => (t.player_id === playerId ? { ...t, untouchable: next } : t))
+          : [...prev, { player_id: playerId, source_surface: 'team_stance', created_at: null, untouchable: next }],
+      );
+      try {
+        if (next && !tracked) {
+          const added = await api.addGmTarget(leagueId, playerId, 'team_stance');
+          if (!added.ok) throw new Error(added.reason || 'not_available');
+        }
+        if (next || tracked) {
+          const result = await api.setGmTargetUntouchable(leagueId, playerId, next);
+          if (!result.ok) throw new Error(result.reason || 'not_available');
+        }
+      } catch {
+        setTargets(previous);
+      } finally {
+        setBusyPlayerId(null);
+      }
+    },
+    [leagueId, targets],
+  );
+
+  const onRemoveTarget = useCallback(
+    (playerId: string) => {
+      const previous = targets;
+      setTargets((prev) => prev.filter((t) => t.player_id !== playerId));
+      api.removeGmTarget(leagueId, playerId).catch(() => setTargets(previous));
+    },
+    [leagueId, targets],
+  );
+
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return (
+      <View style={[styles.container, { paddingTop: headerHeight }]}>
+        <GridBackground />
+        <View style={styles.scrollContent}>
+          <SkeletonBlock height={44} style={styles.skeleton} />
+          <SkeletonBlock height={170} style={styles.skeleton} />
+          <SkeletonBlock height={230} style={styles.skeleton} />
+          <SkeletonBlock height={300} style={styles.skeleton} />
+        </View>
+      </View>
+    );
   }
 
-  const quiet = !plan || plan.quiet || plan.focus_areas.length === 0;
+  if (error && !plan) {
+    return (
+      <View style={[styles.container, { paddingTop: headerHeight }]}>
+        <GridBackground />
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Couldn't load GM Plan"
+          subtitle={error}
+          actionLabel="Try again"
+          onPressAction={() => {
+            setLoading(true);
+            void load(false);
+          }}
+        />
+      </View>
+    );
+  }
+
+  const gated = !plan || plan.quiet || plan.focus_areas.length === 0;
+  const locked = plan?.is_premium === false;
+  const weekAhead = deadlineWeek(tradeWindow);
+  const pastDeadline = Boolean(tradeWindow?.trade_deadline_passed);
+  const tradeArea = plan?.focus_areas.find((a) => a.key === 'trade_opportunities');
+  const tradeItems = (tradeArea?.items ?? []).filter((i): i is GmPlanTradeItem => 'partner_team_name' in i);
+  const otherAreas = (plan?.focus_areas ?? []).filter((a) => a.key !== 'trade_opportunities');
+  const openTradeHub = () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'block' });
+
+  const gateNotice = locked ? (
+    <PremiumLock
+      title={plan?.upsell?.title || 'Your season-arc roadmap'}
+      description={plan?.upsell?.body || 'GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction.'}
+    />
+  ) : gated ? (
+    <AnimatedCard style={styles.hero}>
+      <AppText style={styles.quietText}>
+        {plan?.reason === 'no_sleeper_username_linked'
+          ? 'Link your Sleeper account to see a GM Plan for this league.'
+          : 'Not enough to build a GM Plan yet.'}
+      </AppText>
+    </AnimatedCard>
+  ) : null;
+
+  const tradeCards = (limit?: number) =>
+    gateNotice ??
+    (tradeItems.length === 0 ? (
+      <EmptyState
+        icon="swap-horizontal-outline"
+        title="No trade ideas right now"
+        subtitle={tradeArea?.watch_for || 'Check back as rosters change.'}
+        actionLabel="Open Trade Hub"
+        onPressAction={openTradeHub}
+      />
+    ) : (
+      <View style={styles.stack}>
+        {(limit ? tradeItems.slice(0, limit) : tradeItems).map((item, index) => (
+          <TradeIdeaCard key={`trade-${index}`} item={item} onViewDetails={openTradeHub} />
+        ))}
+      </View>
+    ));
+
+  const protectRow = (player: LineupPlayer, isLast: boolean) => (
+    <View key={player.player_id} style={[styles.row, !isLast && styles.rowDivider]}>
+      <View style={styles.identity}>
+        <PlayerIdentityRow
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          showDivider={false}
+        />
+      </View>
+      <OverallRatingBadge rating={ranked.get(player.player_id)?.overall_rating ?? null} />
+      <TouchableOpacity
+        style={[styles.tag, protectedIds.has(player.player_id) && styles.tagActive]}
+        onPress={() => onToggleProtect(player.player_id, !protectedIds.has(player.player_id))}
+        disabled={busyPlayerId === player.player_id}
+        accessibilityLabel={protectedIds.has(player.player_id) ? 'Remove protected flag' : 'Mark protected'}
+      >
+        {busyPlayerId === player.player_id ? (
+          <ActivityIndicator size="small" color={colors.textSecondary} />
+        ) : (
+          <AppText style={[styles.tagText, protectedIds.has(player.player_id) && styles.tagTextActive]}>
+            {protectedIds.has(player.player_id) ? 'Protected' : 'Protect'}
+          </AppText>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const rosterLine = (
+    <TouchableOpacity
+      style={styles.moreRow}
+      onPress={() => {
+        setTab('core');
+        setShowRoster(true);
+      }}
+    >
+      <AppText style={styles.moreText}>
+        {otherRows.length} more player{otherRows.length === 1 ? '' : 's'} on your roster
+      </AppText>
+      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
+  const link = (label: string, onPress: () => void) => (
+    <TouchableOpacity onPress={onPress} hitSlop={8}>
+      <AppText style={styles.link}>{label}</AppText>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
@@ -98,51 +324,293 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
         {error ? <AppText style={styles.error}>{error}</AppText> : null}
+        <View style={styles.tabs}>
+          <SegmentedTabBar options={TABS} active={tab} onChange={setTab} />
+        </View>
 
-        {quiet ? (
-          <AnimatedCard style={styles.hero}>
-            <AppText style={styles.quietText}>
-              {plan?.reason === 'no_sleeper_username_linked'
-                ? 'Link your Sleeper account to see a GM Plan for this league.'
-                : "We don't have enough to build a GM Plan for this league yet."}
-            </AppText>
-          </AnimatedCard>
-        ) : (
+        {tab === 'overview' ? (
           <>
-            <AnimatedCard style={styles.hero} glow>
-              <AppText style={styles.phaseLabel}>{(plan!.season_phase_label || '').toUpperCase()}</AppText>
-              <AppText style={styles.headline}>{plan!.headline}</AppText>
-              {plan!.team_stance_label ? (
-                <View style={styles.stancePill}>
-                  <Ionicons name="compass-outline" size={12} color={colors.premium} />
-                  <AppText style={styles.stancePillText}>{plan!.team_stance_label}</AppText>
-                </View>
+            <SectionHeading title="Team Situation" icon="compass-outline" />
+            <AnimatedCard style={styles.situation}>
+              <View style={styles.stanceRow}>
+                {TEAM_STANCE_OPTIONS.map((option) => {
+                  const active = stance === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.stanceChip, active && styles.stanceChipActive]}
+                      onPress={() => {
+                        if (!active) setStance(option.value);
+                      }}
+                      accessibilityState={{ selected: active }}
+                    >
+                      <AppText style={[styles.stanceLabel, active && styles.stanceLabelActive]}>{option.label}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {TEAM_STANCE_OPTIONS.find((o) => o.value === stance) ? (
+                <AppText style={styles.caption}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
+              ) : null}
+              {weekAhead !== null ? (
+                <TouchableOpacity style={styles.banner} onPress={openTradeHub}>
+                  <Ionicons name="megaphone-outline" size={18} color={colors.accent} />
+                  <View style={styles.bannerText}>
+                    <AppText style={styles.bannerTitle}>Trade deadline: Week {weekAhead}</AppText>
+                    <AppText style={styles.caption}>Declaring a stance sharpens your recommendations.</AppText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              ) : pastDeadline ? (
+                <AppText style={styles.caption}>Past the trade deadline</AppText>
               ) : null}
             </AnimatedCard>
 
-            {plan!.focus_areas.map((focusArea) => (
-              <FocusAreaSection key={focusArea.key} focusArea={focusArea} />
-            ))}
+            {snapshot.length > 0 ? (
+              <>
+                <SectionHeading
+                  title="Plan Snapshot"
+                  icon="speedometer-outline"
+                  right={link('Full analysis', () => navigation.navigate('MyTeam', { leagueId, leagueName }))}
+                />
+                <View style={styles.grid}>
+                  {snapshot.map((tile) => (
+                    <SnapshotCell key={tile.key} tile={tile} styles={styles} colors={colors} />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {!gateNotice && (plan?.season_phase_label || plan?.headline) ? (
+              <AnimatedCard style={styles.hero} glow>
+                {plan?.season_phase_label ? (
+                  <AppText style={styles.phaseLabel}>{plan.season_phase_label.toUpperCase()}</AppText>
+                ) : null}
+                {plan?.headline ? <AppText style={styles.headline}>{plan.headline}</AppText> : null}
+              </AnimatedCard>
+            ) : null}
+
+            <SectionHeading title="Trade Opportunities" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
+            {tradeCards(2)}
+
+            {roster.length > 0 ? (
+              <>
+                <SectionHeading title="Protected Core" icon="lock-closed-outline" right={link('View all', () => setTab('core'))} />
+                {protectedRows.length > 0 ? (
+                  <AnimatedCard style={styles.listCard}>
+                    {protectedRows.slice(0, 3).map((p, i, arr) => protectRow(p, i === arr.length - 1))}
+                  </AnimatedCard>
+                ) : null}
+                {otherRows.length > 0 ? rosterLine : null}
+              </>
+            ) : null}
           </>
-        )}
+        ) : null}
+
+        {tab === 'trades' ? (
+          <>
+            <SectionHeading title="Trade Opportunities" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
+            {tradeCards()}
+            {!gateNotice ? otherAreas.map((area) => <FocusAreaSection key={area.key} focusArea={area} />) : null}
+          </>
+        ) : null}
+
+        {tab === 'core' ? (
+          <>
+            <SectionHeading
+              title="Protected Core"
+              icon="lock-closed-outline"
+              caption="Players you won't trade. Same flag as Watching's untouchable."
+            />
+            {roster.length === 0 ? (
+              <EmptyState icon="people-outline" title="No roster players found for this league" />
+            ) : (
+              <>
+                {protectedRows.length > 0 ? (
+                  <AnimatedCard style={styles.listCard}>
+                    {protectedRows.map((p, i) => protectRow(p, i === protectedRows.length - 1))}
+                  </AnimatedCard>
+                ) : (
+                  <EmptyState
+                    icon="lock-open-outline"
+                    title="No protected players yet"
+                    subtitle="Protect the players you won't trade."
+                    actionLabel={showRoster ? undefined : 'Show roster'}
+                    onPressAction={() => setShowRoster(true)}
+                  />
+                )}
+                {otherRows.length > 0 ? (
+                  showRoster ? (
+                    <>
+                      <SectionHeading title="Rest of Roster" icon="people-outline" topGap={spacing.md} />
+                      <AnimatedCard style={styles.listCard}>
+                        {otherRows.map((p, i) => protectRow(p, i === otherRows.length - 1))}
+                      </AnimatedCard>
+                    </>
+                  ) : (
+                    rosterLine
+                  )
+                ) : null}
+              </>
+            )}
+          </>
+        ) : null}
+
+        {tab === 'watching' ? (
+          <>
+            <SectionHeading title="Watching" icon="eye-outline" caption="Considering or monitoring; not trade-protected." />
+            {watching.length === 0 ? (
+              <EmptyState
+                icon="eye-outline"
+                title="Nothing here yet"
+                subtitle="Add players you're considering from a player's profile."
+                actionLabel="Browse players"
+                onPressAction={() => navigation.navigate('Players', { leagueId, leagueName })}
+              />
+            ) : (
+              <View style={styles.stack}>
+                {watching.map((target) => {
+                  const player = ranked.get(target.player_id) ?? null;
+                  return (
+                    <AnimatedCard key={target.player_id} style={styles.watchCard}>
+                      <PlayerIdentityRow
+                        playerId={target.player_id}
+                        name={player?.name ?? `Player ${target.player_id}`}
+                        position={player?.position}
+                        team={player?.team}
+                        tier={player?.tier}
+                        showDivider={false}
+                        onPress={player ? () => navigation.navigate('PlayerDetail', { player, leagueId, leagueName }) : undefined}
+                      />
+                      <View style={styles.watchMeta}>
+                        {player?.score != null ? (
+                          <View>
+                            <AppText style={styles.valueLabel}>Value</AppText>
+                            <AppText style={styles.valueText}>{Math.round(player.score).toLocaleString()}</AppText>
+                          </View>
+                        ) : null}
+                        <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
+                      </View>
+                      <View style={styles.actions}>
+                        <TouchableOpacity
+                          style={styles.action}
+                          disabled={!player}
+                          onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
+                        >
+                          <AppText style={styles.actionText}>Compare</AppText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
+                          <AppText style={styles.actionText}>Mark untouchable</AppText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
+                          <AppText style={[styles.actionText, { color: colors.danger }]}>Remove</AppText>
+                        </TouchableOpacity>
+                      </View>
+                    </AnimatedCard>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
-function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
+function SnapshotCell({
+  tile,
+  styles,
+  colors,
+}: {
+  tile: PlanSnapshotTile;
+  styles: ReturnType<typeof createStyles>;
+  colors: ThemeColors;
+}) {
+  const percent = tile.fill === null ? null : Math.round(tile.fill * 100);
+  return (
+    <View style={styles.cell}>
+      <View style={styles.cellBody}>
+        <View style={styles.cellLabelRow}>
+          <Ionicons name={TILE_ICON[tile.key]} size={13} color={colors.textTertiary} />
+          <AppText style={styles.cellLabel} numberOfLines={1}>
+            {tile.label}
+          </AppText>
+        </View>
+        <AppText style={styles.cellValue}>{tile.value}</AppText>
+        {tile.note ? <AppText style={styles.cellNote}>{tile.note}</AppText> : null}
+        {tile.key !== 'odds' && percent !== null ? (
+          <View style={styles.bar}>
+            <View style={[styles.barFill, { width: `${percent}%` }]} />
+          </View>
+        ) : null}
+      </View>
+      {tile.key === 'odds' && percent !== null ? <CircularProgressRing percent={percent} size={44} strokeWidth={5} /> : null}
+    </View>
+  );
+}
+
+function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewDetails: () => void }) {
   const { colors } = useThemeMode();
   const { showExplanations } = useDensity();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const injury = item.their_player_injury_display || '';
+  const gain = item.trade_gain;
+  const send = item.send_assets ?? [];
+  const receive = item.receive_assets ?? [];
+  return (
+    <AccentCard accent={injury ? colors.danger : colors.accent}>
+      <View style={styles.tradeHeader}>
+        <AppText style={styles.tradeTitle} numberOfLines={1}>
+          {item.partner_team_name || 'Trade idea'}
+        </AppText>
+        {gain != null ? (
+          <AppText style={[styles.gain, { color: gain > 0 ? colors.success : gain < 0 ? colors.danger : colors.textSecondary }]}>
+            {gain > 0 ? '+' : ''}
+            {Math.round(gain).toLocaleString()}
+          </AppText>
+        ) : null}
+      </View>
+      {send.length > 0 || receive.length > 0 ? (
+        <View style={styles.stack}>
+          <AppText style={styles.sideLabel}>YOU SEND</AppText>
+          {send.map((asset, i) => (
+            <TradeAssetRow key={`s${i}`} asset={asset} />
+          ))}
+          <AppText style={styles.sideLabel}>YOU GET</AppText>
+          {receive.map((asset, i) => (
+            <TradeAssetRow key={`r${i}`} asset={asset} />
+          ))}
+        </View>
+      ) : (
+        <AppText style={styles.caption}>
+          {item.my_player} → {injury ? `${item.their_player} (${injury})` : item.their_player}
+        </AppText>
+      )}
+      <View style={styles.tradeFooter}>
+        <AppText style={[styles.caption, styles.flex]}>
+          {showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
+        </AppText>
+        <TouchableOpacity style={styles.action} onPress={onViewDetails}>
+          <AppText style={styles.actionText}>View details</AppText>
+        </TouchableOpacity>
+      </View>
+    </AccentCard>
+  );
+}
+
+function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
+  const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const icon = FOCUS_META[focusArea.key]?.icon ?? 'ellipse-outline';
 
   return (
     <View style={styles.section}>
       <SectionHeading title={focusArea.title} icon={icon} />
-      {focusArea.framing ? <AppText style={styles.framing}>{focusArea.framing}</AppText> : null}
+      {focusArea.framing ? <AppText style={styles.caption}>{focusArea.framing}</AppText> : null}
 
       {focusArea.status === 'no_signal' ? (
-        <AnimatedCard style={styles.card}>
+        <AnimatedCard style={styles.listCard}>
           <InsightRow
             icon="information-circle-outline"
             color={colors.textSecondary}
@@ -152,34 +620,10 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
           />
         </AnimatedCard>
       ) : (
-        <AnimatedCard style={styles.card}>
+        <AnimatedCard style={styles.listCard}>
           {focusArea.items.map((item, index) => {
             const last = index === focusArea.items.length - 1;
-            if (focusArea.key === 'trade_opportunities' && 'partner_team_name' in item) {
-              // Real injury signal now reaches this item (gm_plan data-contract
-              // fix) — never let an injured receive-side player read as a clean
-              // opportunity. Same risk/accent semantic this screen already uses
-              // for Roster Construction's weak-spot rows (below), not a new
-              // color convention.
-              const injuryDisplay = item.their_player_injury_display || '';
-              const theirPlayerLabel = injuryDisplay ? `${item.their_player} (${injuryDisplay})` : item.their_player;
-              return (
-                <InsightRow
-                  key={`${focusArea.key}-${index}`}
-                  icon="swap-horizontal-outline"
-                  color={injuryDisplay ? colors.danger : colors.premium}
-                  headline={`${item.my_player} → ${theirPlayerLabel} (${item.partner_team_name})`}
-                  detail={showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
-                  last={last}
-                />
-              );
-            }
             if ('injury_need_positions' in item) {
-              // GM Plan's injury-awareness fix: this fact only ever appears
-              // when modules.gm_plan found a significant injury at an
-              // active/starting position with no healthy bench cover, so it
-              // always reads as a risk flag, same danger-accent convention
-              // Roster Construction's weak-spot rows use above.
               const positions = item.injury_need_positions.join(', ');
               return (
                 <InsightRow
@@ -218,11 +662,6 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
               );
             }
             if ('playoff_probability' in item) {
-              // Same real Monte Carlo simulation the standalone Playoff
-              // Odds screen renders (modules.playoff_simulator) — "Where
-              // You Stand" previously showed Power Rank/Draft Capital
-              // Rank/record but never checked this already-cached answer
-              // to exactly the question this section asks.
               const statusNote = item.clinched ? ' · Clinched' : item.eliminated ? ' · Eliminated' : '';
               const seedNote = item.median_seed ? `, projected ${item.median_seed}-seed` : '';
               return (
@@ -246,27 +685,109 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
     scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl },
+    skeleton: { marginBottom: spacing.md },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
+    tabs: { marginBottom: spacing.md },
+    stack: { gap: spacing.sm },
+    flex: { flex: 1 },
     hero: { marginBottom: spacing.lg, gap: spacing.xs },
     quietText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
     phaseLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: colors.premium },
     headline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, lineHeight: 22 },
-    stancePill: {
+    caption: { fontSize: 12, color: colors.textSecondary },
+    link: { fontSize: 12, fontWeight: '700', color: colors.accent },
+    situation: { gap: spacing.sm, marginBottom: spacing.lg },
+    stanceRow: { flexDirection: 'row', gap: spacing.sm },
+    stanceChip: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+    },
+    stanceChipActive: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+    stanceLabel: { fontSize: 12, fontWeight: '700', color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    stanceLabelActive: { color: colors.accentOnTint },
+    banner: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      alignSelf: 'flex-start',
-      marginTop: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 4,
-      borderRadius: radii.pill,
-      backgroundColor: colors.premiumMuted,
+      gap: spacing.sm,
+      padding: spacing.sm,
+      borderRadius: radii.md,
+      backgroundColor: colors.accentMuted,
     },
-    stancePillText: { fontSize: 11, fontWeight: '700', color: colors.premium },
+    bannerText: { flex: 1, gap: 2 },
+    bannerTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+    cell: {
+      width: '48.5%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+    },
+    cellBody: { flex: 1, gap: 4 },
+    cellLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    cellLabel: { flexShrink: 1, fontSize: 11.5, color: colors.textTertiary },
+    cellValue: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+    cellNote: { fontSize: 11.5, color: colors.textTertiary },
+    bar: { height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
+    barFill: { height: 5, backgroundColor: colors.accent },
+    tradeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
+    tradeTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+    gain: { fontSize: 15, fontWeight: '800' },
+    sideLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textTertiary },
+    tradeFooter: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+    action: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.sm,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      alignItems: 'center',
+    },
+    actionText: { fontSize: 12, fontWeight: '700', color: colors.accent },
+    actionDanger: { borderColor: colors.danger },
     section: { marginBottom: spacing.lg },
-    framing: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm },
-    card: { paddingVertical: spacing.xs },
+    listCard: { paddingVertical: spacing.xs, marginBottom: spacing.sm },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    identity: { flex: 1 },
+    tag: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radii.sm,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      minWidth: 78,
+      alignItems: 'center',
+    },
+    tagActive: { backgroundColor: colors.premium, borderColor: colors.premium },
+    tagText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    tagTextActive: { color: colors.background },
+    moreRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+      marginBottom: spacing.lg,
+    },
+    moreText: { fontSize: 13, color: colors.textSecondary },
+    watchCard: { gap: spacing.sm },
+    watchMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    valueLabel: { fontSize: 10, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    valueText: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+    actions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   });
 }
