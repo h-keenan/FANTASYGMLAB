@@ -14,23 +14,34 @@ import { useState } from "react";
  */
 export function TeamAvatar({
   avatarUrl,
+  name,
   size = 32,
   ringColor = "var(--color-border)",
 }: {
   avatarUrl?: string | null;
+  /** Name for the initials fallback when there is no (or a broken) avatar. */
+  name?: string | null;
   size?: number;
   ringColor?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  const initials = parts.length === 0 ? "" : (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   const dimension = { width: size, height: size, borderRadius: "50%" };
 
   if (!avatarUrl || failed) {
     return (
       <span
         className="shrink-0"
-        style={{ ...dimension, display: "inline-block", border: `2px solid ${ringColor}`, background: "var(--color-surface-muted)" }}
+        style={{ ...dimension, display: "inline-block", overflow: "hidden", border: `2px solid ${ringColor}`, background: "var(--color-surface-muted)" }}
         aria-hidden
-      />
+      >
+        {initials ? (
+          <span className="flex h-full w-full items-center justify-center font-extrabold" style={{ fontSize: size * 0.38, color: "var(--color-text-secondary)" }}>
+            {initials}
+          </span>
+        ) : null}
+      </span>
     );
   }
 
