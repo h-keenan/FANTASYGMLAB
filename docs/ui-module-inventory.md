@@ -290,6 +290,12 @@ compare-grid rows/`IdentityCard`/`OpponentPicker`,
 
 ## 3. Share cards (input for the pending redesign; not changed here)
 
+> **Update, share-card redesign:** web no longer uses the server PNG. web-next
+> draws its own trade and player cards (`web-next/src/lib/shareCard/`,
+> routes `/share-card/trade` and `/share-card/player`) with next/og, from the
+> same tokens as `globals.css` (a test fails if they drift). The audit below
+> describes the state before that change.
+
 There are two pipelines and they share no tokens. web-next renders no share
 card itself. It only fetches the server trade PNG
 (`TradeIdeaCard.tsx` `ShareTradeButton` → `api.getTradeHubIdeaShareCardBlob`

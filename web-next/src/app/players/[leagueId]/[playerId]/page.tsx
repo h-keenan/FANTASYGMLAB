@@ -79,5 +79,5 @@ export default function PlayerProfilePage() {
     );
   }
 
-  return <PlayerProfileContent player={player} leagueId={leagueId} leagueName={leagueName} />;
+  return <PlayerProfileContent player={player} leagueId={leagueId} leagueName={leagueName} lens={lens} />;
 }

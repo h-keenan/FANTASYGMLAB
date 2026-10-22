@@ -12,15 +12,9 @@ import {
 } from "react";
 
 import { api } from "@/lib/api";
+import { DEFAULT_LENS, VALUATION_LENS_OPTIONS, type ValuationLens } from "@/lib/valuationLens";
 
-export const VALUATION_LENS_OPTIONS = [
-  { value: "Dynasty", label: "Dynasty", hint: "Values future upside alongside this year." },
-  { value: "Rebuild", label: "Rebuild", hint: "Weights youth and draft capital most heavily." },
-  { value: "Non-Dynasty", label: "Redraft", hint: "Values this season only — future picks discounted." },
-] as const;
-
-export type ValuationLens = (typeof VALUATION_LENS_OPTIONS)[number]["value"];
-export const DEFAULT_LENS: ValuationLens = "Dynasty";
+export { DEFAULT_LENS, VALUATION_LENS_OPTIONS, type ValuationLens };
 
 interface ValuationLensContextValue {
   getLens: (leagueId: string) => ValuationLens;
