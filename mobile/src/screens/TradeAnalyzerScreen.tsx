@@ -1,3 +1,5 @@
+import ShareToCommunityToggle from '../components/ShareToCommunityToggle';
+import type { SharedTradeAssetInput } from '../lib/sharedTrades';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -585,6 +587,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
               verdict={verdict}
               sendIds={sendIds}
               receiveIds={receiveIds}
+              sendPicks={sendPicks}
+              receivePicks={receivePicks}
               leagueId={leagueId}
               leagueName={leagueName}
               partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
@@ -710,10 +714,24 @@ function VerdictSection({
   );
 }
 
+function toShareAssets(players: RankedPlayer[], picks: DraftPickAsset[]): SharedTradeAssetInput[] {
+  return [
+    ...players.map((p): SharedTradeAssetInput => ({
+      asset_type: 'player',
+      name: p.name ?? '',
+      position: p.position ?? undefined,
+      player_id: p.player_id,
+    })),
+    ...picks.map((p): SharedTradeAssetInput => ({ asset_type: 'pick', name: p.label ?? 'Draft pick' })),
+  ];
+}
+
 function VerdictCard({
   verdict,
   sendIds,
   receiveIds,
+  sendPicks,
+  receivePicks,
   leagueId,
   leagueName,
   partnerTeamName,
@@ -722,6 +740,8 @@ function VerdictCard({
   verdict: TradeVerdict;
   sendIds: RankedPlayer[];
   receiveIds: RankedPlayer[];
+  sendPicks: DraftPickAsset[];
+  receivePicks: DraftPickAsset[];
   leagueId: string;
   leagueName: string;
   partnerTeamName: string;
@@ -836,6 +856,13 @@ function VerdictCard({
           <AppText style={styles.counterButtonText}>Build the counter</AppText>
         </TouchableOpacity>
       ) : null}
+
+      <ShareToCommunityToggle
+        key={[...sendIds, ...receiveIds].map((p) => p.player_id).join('|') + [...sendPicks, ...receivePicks].map((p) => p.pick_id).join('|') + verdict.band}
+        verdict={verdict}
+        send={toShareAssets(sendIds, sendPicks)}
+        receive={toShareAssets(receiveIds, receivePicks)}
+      />
 
       <TradeSharePreviewModal
         visible={shareOpen}

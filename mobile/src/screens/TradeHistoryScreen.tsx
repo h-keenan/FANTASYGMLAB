@@ -11,8 +11,9 @@ import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SharedTradesFeed from '../components/SharedTradesFeed';
 import ValuesCredit from '../components/ValuesCredit';
-import { api, type PastTradeOutcome, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
+import { api, type PastTradeOutcome, type SharedCommunityTrade, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -58,6 +59,10 @@ export default function TradeHistoryScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [outcomes, setOutcomes] = useState<PastTradeOutcome[] | null>(null);
+  const [shared, setShared] = useState<{ available: boolean; trades: SharedCommunityTrade[] }>({
+    available: false,
+    trades: [],
+  });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +71,11 @@ export default function TradeHistoryScreen({ navigation }: Props) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
+    // Fail soft: a missing shared-trades table must never break this screen.
+    api
+      .getSharedCommunityTrades()
+      .then((r) => setShared({ available: Boolean(r.available), trades: r.trades }))
+      .catch(() => {});
     try {
       const result = await api.getTradeOutcomeHistory();
       setOutcomes(result.outcomes);
@@ -110,6 +120,15 @@ export default function TradeHistoryScreen({ navigation }: Props) {
         ListFooterComponent={
           <>
             {error ? <AppText style={styles.error}>{error}</AppText> : null}
+            <SharedTradesFeed
+              available={shared.available}
+              trades={shared.trades}
+              onDelete={(id) => {
+                setShared((cur) => ({ ...cur, trades: cur.trades.filter((t) => t.id !== id) }));
+                void api.deleteSharedCommunityTrade(id).catch(() => {});
+              }}
+              onReport={(id) => void api.reportSharedCommunityTrade(id).catch(() => {})}
+            />
             <ValuesCredit />
           </>
         }

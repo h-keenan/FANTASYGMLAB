@@ -151,6 +151,7 @@ from modules import (
     build_identity,
     canonical_player_ranking,
     college_scouting,
+    community_shared_trades,
     community_trades,
     dashboard_engine,
     draft_assistant,
@@ -1189,6 +1190,7 @@ _EXPORTABLE_USER_TABLES = (
     "guess_the_player_streaks",
     "guess_the_player_name_match_streaks",
     "community_trade_reactions",
+    "community_shared_trades",
 )
 
 
@@ -6068,6 +6070,107 @@ def update_community_preferences(
     if not ok:
         return {"ok": False, **_community_preferences_from_settings(settings)}
     return {"ok": True, **_community_preferences_from_settings(settings)}
+
+
+# ---------------------------------------------------------------------------
+# Opt-in shared trades (docs/supabase_community_trades.sql). A user explicitly
+# shares a Trade Analyzer result; everything runs on the caller's own token
+# (RLS), never service role. Missing table -> {"available": false}.
+# ---------------------------------------------------------------------------
+
+_SHARED_TRADE_ID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
+
+
+def _shared_trade_id_or_422(trade_id: str) -> str:
+    if not _SHARED_TRADE_ID_RE.match(trade_id or ""):
+        raise HTTPException(status_code=422, detail="Invalid trade id.")
+    return trade_id
+
+
+@app.get("/v1/community/shared-trades")
+def list_shared_community_trades(
+    limit: int = 30, user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Feed of opted-in shared trades. available=false when storage is not
+    set up (or unreachable): clients hide the feed and the share toggle."""
+
+    config = auth_supabase.get_supabase_config()
+    if not auth_supabase.is_configured(config):
+        return {"ok": True, "available": False, "trades": []}
+    try:
+        trades = community_shared_trades.fetch_feed(
+            config, str(user.get("_access_token") or ""), str(user.get("id") or ""), limit
+        )
+    except community_shared_trades.Unavailable:
+        return {"ok": True, "available": False, "trades": []}
+    return {"ok": True, "available": True, "trades": trades}
+
+
+class ShareCommunityTradeRequest(BaseModel):
+    send: list[dict[str, Any]] = Field(default_factory=list, max_length=community_shared_trades.ASSET_MAX)
+    receive: list[dict[str, Any]] = Field(default_factory=list, max_length=community_shared_trades.ASSET_MAX)
+    grade: str = Field(default="", max_length=24)
+    band: str = Field(default="", max_length=64)
+    why: str = Field(default="", max_length=1000)
+    display_name: str = Field(default="", max_length=100)
+
+
+@app.post("/v1/community/shared-trades")
+def share_community_trade(
+    body: ShareCommunityTradeRequest, user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    user_id = str(user.get("id") or "")
+    token = str(user.get("_access_token") or "")
+    config = auth_supabase.get_supabase_config()
+    if not user_id or not auth_supabase.is_configured(config):
+        return {"ok": False, "available": False, "reason": "not_available"}
+    try:
+        row = community_shared_trades.build_share_row(user_id, body.model_dump())
+    except community_shared_trades.ShareError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    try:
+        recent = community_shared_trades.count_recent_shares(config, token, user_id)
+        if recent >= community_shared_trades.SHARES_PER_HOUR:
+            raise HTTPException(status_code=429, detail="You're sharing too fast. Try again later.")
+        trade = community_shared_trades.insert_share(config, token, row, user_id)
+    except community_shared_trades.Unavailable:
+        return {"ok": False, "available": False, "reason": "not_available"}
+    return {"ok": True, "available": True, "trade": trade}
+
+
+@app.delete("/v1/community/shared-trades/{trade_id}")
+def delete_shared_community_trade(trade_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    trade_id = _shared_trade_id_or_422(trade_id)
+    config = auth_supabase.get_supabase_config()
+    try:
+        community_shared_trades.delete_share(
+            config, str(user.get("_access_token") or ""), trade_id, str(user.get("id") or "")
+        )
+    except community_shared_trades.Unavailable:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True}
+
+
+class ReportSharedTradeRequest(BaseModel):
+    reason: str = Field(default="", max_length=200)
+
+
+@app.post("/v1/community/shared-trades/{trade_id}/report")
+def report_shared_community_trade(
+    trade_id: str, body: ReportSharedTradeRequest, user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Store a report (one per user per trade). The database trigger hides the
+    trade once it reaches community_shared_trades.HIDE_AFTER_REPORTS."""
+
+    trade_id = _shared_trade_id_or_422(trade_id)
+    config = auth_supabase.get_supabase_config()
+    try:
+        community_shared_trades.insert_report(
+            config, str(user.get("_access_token") or ""), trade_id, str(user.get("id") or ""), body.reason
+        )
+    except community_shared_trades.Unavailable:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True}
 
 
 def _stat_item_dict(item: player_quick_view.StatItem) -> dict[str, Any]:

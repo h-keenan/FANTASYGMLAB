@@ -2618,6 +2618,37 @@ export interface CommunityTradesResponse {
   reaction_emoji: string[];
 }
 
+/** Opt-in shared trade (services/mobile_api_service.py GET
+ * /v1/community/shared-trades). Never carries a user id. */
+export interface SharedCommunityTrade {
+  id: string;
+  display_name: string;
+  send: Array<{ asset_type: "player" | "pick"; name: string; position?: string; player_id?: string }>;
+  receive: Array<{ asset_type: "player" | "pick"; name: string; position?: string; player_id?: string }>;
+  grade: "ACCEPT" | "DECLINE" | "COUNTER" | "FAIR" | string;
+  band: string;
+  why: string;
+  created_at: string | null;
+  mine: boolean;
+}
+
+/** available=false means the storage migration has not been applied: hide
+ * the feed and the share toggle. */
+export interface SharedCommunityTradesResponse {
+  ok: boolean;
+  available: boolean;
+  trades: SharedCommunityTrade[];
+}
+
+export interface ShareCommunityTradeBody {
+  send: TradeAsset[];
+  receive: TradeAsset[];
+  grade: string;
+  band: string;
+  why: string;
+  display_name: string;
+}
+
 export interface CommunityPreferencesResponse {
   ok: boolean;
   /** "I don't want MY trades to appear in this feed." On by default
@@ -3423,6 +3454,22 @@ export const api = {
       `/v1/community/trades/${encodeURIComponent(outcomeId)}/react`,
       { method: "POST", jsonBody: { emoji, action } },
     ),
+  getSharedCommunityTrades: (limit = 30) =>
+    authorizedRequest<SharedCommunityTradesResponse>(`/v1/community/shared-trades?limit=${limit}`),
+  shareCommunityTrade: (body: ShareCommunityTradeBody) =>
+    authorizedRequest<{ ok: boolean; available?: boolean; trade?: SharedCommunityTrade }>(
+      "/v1/community/shared-trades",
+      { method: "POST", jsonBody: body },
+    ),
+  deleteSharedCommunityTrade: (id: string) =>
+    authorizedRequest<{ ok: boolean }>(`/v1/community/shared-trades/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+  reportSharedCommunityTrade: (id: string, reason = "") =>
+    authorizedRequest<{ ok: boolean }>(`/v1/community/shared-trades/${encodeURIComponent(id)}/report`, {
+      method: "POST",
+      jsonBody: { reason },
+    }),
   getCommunityPreferences: () =>
     authorizedRequest<CommunityPreferencesResponse>("/v1/community/preferences"),
   updateCommunityPreferences: (optedOut: boolean) =>

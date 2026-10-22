@@ -4,7 +4,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { api, type CommunityTradeItem, type CommunityTradesResponse } from "@/lib/api";
+import {
+  api,
+  type CommunityTradeItem,
+  type CommunityTradesResponse,
+  type SharedCommunityTradesResponse,
+} from "@/lib/api";
 import { CommunityTradesContent } from "@/components/CommunityTradesContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,6 +23,7 @@ export default function CommunityPage() {
 
   const [data, setData] = useState<CommunityTradesResponse | null>(null);
   const [optedOut, setOptedOut] = useState(false);
+  const [shared, setShared] = useState<SharedCommunityTradesResponse>({ ok: true, available: false, trades: [] });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,6 +33,14 @@ export default function CommunityPage() {
       return;
     }
     let cancelled = false;
+
+    // Fail soft: a missing shared-trades table must never break the page.
+    api
+      .getSharedCommunityTrades()
+      .then((result) => {
+        if (!cancelled) setShared(result);
+      })
+      .catch(() => {});
 
     Promise.all([api.getCommunityTrades(), api.getCommunityPreferences()])
       .then(([tradesResult, preferencesResult]) => {
@@ -67,6 +81,13 @@ export default function CommunityPage() {
     });
   }, []);
 
+  const handleDeleteShared = useCallback((id: string) => {
+    setShared((current) => ({ ...current, trades: current.trades.filter((trade) => trade.id !== id) }));
+    return api.deleteSharedCommunityTrade(id).catch(() => {});
+  }, []);
+
+  const handleReportShared = useCallback((id: string) => api.reportSharedCommunityTrade(id).catch(() => {}), []);
+
   const handleToggleOptOut = useCallback((nextOptedOut: boolean) => {
     setOptedOut(nextOptedOut);
     return api.updateCommunityPreferences(nextOptedOut).catch(() => {
@@ -92,6 +113,7 @@ export default function CommunityPage() {
       optedOut={optedOut}
       onReact={handleReact}
       onToggleOptOut={handleToggleOptOut}
+      shared={{ available: shared.available, trades: shared.trades, onDelete: handleDeleteShared, onReport: handleReportShared }}
     />
   );
 }

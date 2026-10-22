@@ -35,6 +35,7 @@ import {
   playerToTradeAsset,
   tradeAnalyzerReasonMessage,
 } from "@/lib/tradeAnalyzerPresentation";
+import { ShareToCommunityToggle } from "@/components/ShareToCommunityToggle";
 import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
@@ -474,6 +475,13 @@ function VerdictCard({
           </div>
         </details>
       ) : null}
+
+      <ShareToCommunityToggle
+        key={[...sendAssets, ...receiveAssets].map((a) => a.player_id || a.label || a.name).join("|") + verdict.band}
+        verdict={verdict}
+        sendAssets={sendAssets}
+        receiveAssets={receiveAssets}
+      />
 
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         Reply to your partner directly — no in-app accept.
