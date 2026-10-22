@@ -23,6 +23,7 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import MetricCard from '../components/MetricCard';
 import PlayerHero from '../components/PlayerHero';
+import DecisionFitCard from '../components/DecisionFitCard';
 import PlayerSharePreviewModal from '../components/PlayerSharePreviewModal';
 import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnapshotCard';
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
@@ -50,12 +51,11 @@ import {
   type WeeklyStatPoint,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
+import { resolvePlayerTier } from '../lib/playerTier';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { tradeShortcutsFor } from '../lib/tradeShortcuts';
 import { useRosterOwnership } from '../lib/useRosterOwnership';
-import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -1148,7 +1148,6 @@ function AgeFactorChip({ label, value }: { label: string; value: number | null }
 
 function ModelSection({ model }: { model: QuickViewModel }) {
   const { colors } = useThemeMode();
-  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
@@ -1156,9 +1155,6 @@ function ModelSection({ model }: { model: QuickViewModel }) {
   return (
     <View style={styles.card}>
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
-      {showExplanations && model.decision_fit_narrative ? (
-        <AppText style={styles.decisionFitNarrative}>{model.decision_fit_narrative}</AppText>
-      ) : null}
       {/* Market/Opportunity/Scarcity/Role/Durability — each a position
           percentile run through the same 0-99 curve and percentileColor
           tint as the headline OVR ring (see lib/subRatings + SubRatingRow),
@@ -1456,15 +1452,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       : rawOverall;
 
   const tags: PlayerTagSpec[] = [];
-  if (player.tier) {
-    tags.push({
-      key: 'tier',
-      label: tierIdentity.shortLabel,
-      color: tierIdentity.color,
-      variant: 'solid',
-      contrastText: contrastTextColor(tierIdentity.color),
-    });
-  }
+  // The tier is the archetype pill under the headshot (PlayerHero), so it
+  // isn't repeated as a tag here.
   if (stats?.prime_window) {
     tags.push({
       key: 'prime',
@@ -1629,18 +1618,28 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       key="hero"
       playerId={player.player_id}
       tier={player.tier}
+      tierLabel={player.tier ? tierIdentity.semanticLabel : null}
+      tierColor={tierIdentity.color}
       name={player.name ?? 'Unknown player'}
       position={player.position}
       team={player.team}
+      age={player.age}
+      score={player.score}
       overallRating={overallRating}
       ringColor={overallRating !== null ? percentileColor(overallRating, colors) : colors.accent}
-      glowColor={tierIdentity.color}
+      usageTrend={model?.usage_trend ?? null}
+      usageLoading={loading}
       expanded={snapshotExpanded}
       onToggleExpand={overallRating !== null ? () => setSnapshotExpanded((value) => !value) : undefined}
     >
       {heroActions}
     </PlayerHero>,
   );
+  // Decision Fit directly under the header as its own card (owner's PQV
+  // concept), not buried in the Model tab — it is the one-sentence "why".
+  if (model?.decision_fit_narrative) {
+    content.push(<DecisionFitCard key="decision-fit" narrative={model.decision_fit_narrative} />);
+  }
   // Beginner-only explanations of the value, Overall and tier shown in the
   // hero/Snapshot (lib/experienceCopy.ts). Not pushed at all for advanced or
   // unset accounts, so the content array (and the sticky tab-bar index
@@ -2181,12 +2180,6 @@ function createStyles(colors: ThemeColors) {
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-  },
-  decisionFitNarrative: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
   },
   modelSecondaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
   ageChip: {
