@@ -11,6 +11,7 @@ import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import OverallRatingBadge from '../components/OverallRatingBadge';
@@ -19,6 +20,7 @@ import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock from '../components/SkeletonBlock';
+import SharedTradeIdeaCard from '../components/TradeIdeaCard';
 import { TradeAssetRow } from './DashboardScreen';
 import {
   api,
@@ -27,6 +29,7 @@ import {
   type GmPlanResponse,
   type GmPlanTradeItem,
   type GmTarget,
+  type TradeIdea,
   type LineupPlayer,
   type PlayoffOddsTeam,
   type RankedPlayer,
@@ -207,12 +210,10 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.container, { paddingTop: headerHeight }]}>
         <GridBackground />
-        <EmptyState
-          icon="alert-circle-outline"
+        <ErrorState
           title="Couldn't load GM Plan"
-          subtitle={error}
-          actionLabel="Try again"
-          onPressAction={() => {
+          message={error}
+          onRetry={() => {
             setLoading(true);
             void load(false);
           }}
@@ -258,7 +259,19 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     ) : (
       <View style={styles.stack}>
         {(limit ? tradeItems.slice(0, limit) : tradeItems).map((item, index) => (
-          <TradeIdeaCard key={`trade-${index}`} item={item} onViewDetails={openTradeHub} />
+          item.send_assets?.length || item.receive_assets?.length ? (
+            // Same idea card as the Trade Hub screen (GM Plan only carries a
+            // subset of the idea fields, so the card hides what is absent).
+            <SharedTradeIdeaCard
+              key={`trade-${index}`}
+              idea={gmPlanItemToIdea(item)}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+            />
+          ) : (
+            <TradeIdeaCard key={`trade-${index}`} item={item} onViewDetails={openTradeHub} />
+          )
         ))}
       </View>
     ));
@@ -548,6 +561,29 @@ function SnapshotCell({
       {tile.key === 'odds' && percent !== null ? <CircularProgressRing percent={percent} size={44} strokeWidth={5} /> : null}
     </View>
   );
+}
+
+/** GM Plan trade items are a trimmed Trade Hub idea; map them onto the full
+ * TradeIdea shape the shared card renders (absent fields stay empty and the
+ * card hides them). */
+function gmPlanItemToIdea(item: GmPlanTradeItem): TradeIdea {
+  const gain = item.trade_gain ?? 0;
+  return {
+    partner_team_name: item.partner_team_name || 'Trade idea',
+    partner_team_avatar_url: null,
+    partner_team_archetype_label: '',
+    partner_trade_tendency: 'Neutral',
+    rationale: item.rationale,
+    trade_gain: gain,
+    confidence_label: item.trade_confidence_label,
+    market_realism_label: '',
+    reasoning_tags: [],
+    package: { send: item.send_assets ?? [], receive: item.receive_assets ?? [] } as TradeIdea['package'],
+    category: '',
+    value_edge_band: '',
+    impact_tag: '',
+    landed_gm_target_player_ids: [],
+  };
 }
 
 function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewDetails: () => void }) {
