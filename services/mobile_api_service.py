@@ -81,6 +81,10 @@ Deployment topology (Render):
                                                     explanation, from the daily Supabase snapshot table
                                                     modules.player_rating_history writes — see
                                                     docs/external-api-contract.md
+  - GET  /v1/external/players/{id}/week-result  — (static API key) one player's real completed-week
+                                                    stat line (Sleeper box score + PPR/half/standard)
+  - GET  /v1/external/recap                     — (static API key) the week's real top performers and
+                                                    notable stat lines — see docs/external-api-contract.md
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -208,6 +212,7 @@ from modules import (
     trade_offer_analyzer,
     transaction_grades,
     waivers_ui,
+    weekly_box_scores,
 )
 from modules.team_eval import (
     build_league_summary,
@@ -6609,6 +6614,69 @@ def get_external_player_background(
     """
 
     return player_background_profile.build_player_background_profile(str(player_id), season=season)
+
+
+# ---------------------------------------------------------------------------
+# External (bot) completed-week actual production: the "Weekly recap"
+# section of docs/external-api-contract.md. Business logic lives in
+# modules.weekly_box_scores; these handlers are thin wrappers gated by the
+# same require_external_api_key dependency as every other /v1/external/*
+# route (and rate limited by the same global middleware).
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/v1/external/players/{player_id}/week-result",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_player_week_result(
+    player_id: str,
+    week: int,
+    season: int | None = None,
+) -> dict[str, Any]:
+    """One player's real stat line for one completed regular-season week:
+    Sleeper's own box score and PPR/half-PPR/standard points, with the same
+    identity/team/position/game fields as the projections endpoints. Always
+    200 once authenticated (422 only for a week outside 1-18): a bye, an
+    unfinished game, a stat line cached before the game could have ended,
+    or an unknown player all come back as a non-"ok" `status` with every
+    stat null, never a guess. Never substitutes a projection or rating.
+    """
+
+    try:
+        return weekly_box_scores.build_player_week_result(str(player_id), int(week), season)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get(
+    "/v1/external/recap",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_week_recap(
+    week: int,
+    season: int | None = None,
+    position: str | None = None,
+    scoring_format: str = "ppr",
+    limit: int = weekly_box_scores.DEFAULT_TOP_LIMIT,
+) -> dict[str, Any]:
+    """The week's real results for a recap post: top performers (overall
+    and per position) and notable statistical lines, ranked by Sleeper's own
+    published points, plus the week's real game-level completion status.
+    Only final, fully captured stat lines are ranked. See
+    `modules.weekly_box_scores.build_week_recap`.
+    """
+
+    try:
+        return weekly_box_scores.build_week_recap(
+            int(week),
+            season,
+            position=position,
+            scoring_format=str(scoring_format or "ppr").strip().lower(),
+            limit=int(limit),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/v1/players/{player_id}/career")

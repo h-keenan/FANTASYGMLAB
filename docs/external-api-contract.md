@@ -6,7 +6,9 @@ documented weekly-projections endpoint. Phase 2 (structured news evidence
 with a conservative retraction/supersession signal), Phase 3 (persisted
 rating-change history), and Phase 4 (identity/completeness/evidence
 hardening of the Phase 1 projections endpoints, described in detail below)
-are also covered — this is now the complete wish list.
+are also covered — this is now the complete wish list. The weekly recap
+(completed-week actual production) followed once per-week box scores were
+retained; see "Weekly recap" below.
 
 All `/v1/external/*` routes live in `services/mobile_api_service.py` and are
 served by the same `fantasygm-lab-mobile-api` Render service as the mobile
@@ -996,25 +998,20 @@ treats as "played."
 | `source` | string \| null | `"sleeper_weekly_stats"` when real. |
 | `checked_at` | string \| null | When this sub-section was computed. |
 
-#### `standard_and_box_score` — always honestly `"unavailable"` today
+#### `standard_and_box_score` — always `"unavailable"` here; use the week-result/recap endpoints
 
 Per-week standard (non-PPR) fantasy points and full box-score fields
-(receiving/rushing/passing yards and touchdowns) are **not retained at the
-per-week grain anywhere in this codebase today** — only season totals
-carry those (`modules.sleeper.PLAYER_STATS_SUM_FIELDS`); the per-week
-cache (`WEEKLY_RETAIN_SOURCE_FIELDS`/`WEEKLY_RETAIN_FIELD_MAP`) only
-retains `games_played`/`targets`/`receptions`/`rush_attempts`/
-`pass_attempts`/`fantasy_points_ppr`. This is the exact same gap already
-investigated and documented in this file's own "Weekly recap
-(completed-week actual production) — investigated, not yet built" section
-below, which names the documented `GET /v1/external/players/{player_id}/
-week-result` proposal and its box-score-retention prerequisite — that work
-is not re-proposed here, this section just points to it.
+(receiving/rushing/passing yards and touchdowns) are now retained per
+week (`modules.sleeper.WEEKLY_BOX_SCORE_FIELD_MAP`) and served, with
+finality checks, by `GET /v1/external/players/{player_id}/week-result`
+and `GET /v1/external/recap` (see "Weekly recap" below). This background
+section doesn't duplicate them, so its shape is unchanged and it stays
+`"unavailable"`, with a reason that points to those endpoints.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `status` | string | Always `"unavailable"` today. |
-| `unavailable_reason` | string | Cites the "Weekly recap" section and its retention prerequisite by name (quoted above). |
+| `status` | string | Always `"unavailable"`. |
+| `unavailable_reason` | string | Points to the week-result/recap endpoints and the "Weekly recap" section. |
 | `fantasy_points_standard` | null | Always `null` today. |
 | `receiving_yards` / `rushing_yards` / `passing_yards` | null | Always `null` today. |
 | `receiving_tds` / `rushing_tds` / `passing_tds` | null | Always `null` today. |
@@ -1236,78 +1233,262 @@ are named explicitly in `weeks_missing_data` rather than silently skipped:
   present in this data source (or, for the two date fields, not
   expressible at the year-only precision this source provides). Every
   field is still present and typed, `null` where genuinely unknown.
-- `standard_and_box_score` is **always** `status: "unavailable"` today —
-  the per-week retention gap documented in "Weekly recap" below. Every
-  field is still present and typed, `null`.
+- `standard_and_box_score` is **always** `status: "unavailable"` here.
+  The real per-week values are served by the week-result/recap endpoints
+  in "Weekly recap" below. Every field is still present and typed, `null`.
 - Every other section/field can genuinely be `"ok"` once real data exists
   (a current team, retained weekly stats, a published depth chart), and
   is honestly `"unavailable"` with a specific `unavailable_reason` when it
   doesn't — never a guess, never a 0 standing in for "unknown."
 
-## Weekly recap (completed-week actual production) — investigated, not yet built
+## Weekly recap (completed-week actual production)
 
-Phase 4's spec also asked for a bot-facing "weekly recap" — checked,
-completed-week actual production, as distinct from a projection or this
-app's own overall rating. This was investigated before writing any code,
-per the spec's own instruction to check first:
+Two read-only routes, gated by the same `require_external_api_key` and
+rate limited by the same global middleware as every other route here:
 
-**No existing `/v1/external/*` (or any other) endpoint provides this
-today.** `GET /v1/players/{player_id}/schedule` (session-gated, not
-external) surfaces team-level schedule/score context only — it has no
-per-player box-score fields at all. The per-matchup `actual_points` logic
-in `services/mobile_api_service.py` (around `_matchup_player_identity_fields`)
-is real, but it is league/roster-scoped (a specific league's starters for a
-specific matchup), not a standalone per-player lookup a content bot could
-call.
+- `GET /v1/external/players/{player_id}/week-result`: one player's real
+  stat line for one completed week.
+- `GET /v1/external/recap`: the week's real top performers and notable
+  statistical lines, ranked by Sleeper's own published points.
 
-**The canonical weekly stats pipeline itself does not retain full box-score
-fields at the weekly grain yet**, which matters because the spec explicitly
-asked to reuse that pipeline rather than build a second scoring engine.
-`modules.sleeper.get_season_player_stats` retains per-week rows
-(`WEEKLY_RETAIN_SOURCE_FIELDS`/`WEEKLY_RETAIN_FIELD_MAP`) for only
-`games_played`/`targets`/`receptions`/`rush_attempts`/`pass_attempts`/
-`fantasy_points_ppr` — real season **totals** include receiving/rushing/
-passing yards and touchdowns and non-PPR point variants
-(`PLAYER_STATS_SUM_FIELDS`), but those are never retained per-week today.
-A recap endpoint that promises real "actual box-score fields, PPR and
-non-PPR points" at the per-week grain needs that retention set widened
-first — the raw Sleeper weekly payload already carries those fields (no
-new provider call), so this is additive to `WEEKLY_RETAIN_SOURCE_FIELDS`/
-`WEEKLY_RETAIN_FIELD_MAP`, but it is a real change to a cache schema nearly
-every weekly-stats consumer in this app shares, so it deserves its own
-focused change/test pass rather than riding in as a side effect of this
-one.
+Both return real, played-game data only. Neither ever substitutes a
+projection or this app's own overall rating for an actual result. When a
+game hasn't started or finished, or the cached stat line can't be the
+finished game's line yet, the result is a non-`"ok"` `status` with a
+reason and every stat `null`.
 
-Per the spec's own stated priority ("lower priority than identity/
-completeness and trustworthy start/sit explanations" — the bot already has
-its own checked nflverse production), this version ships the identity/
-completeness/evidence work above and documents the concrete, immediately
-buildable proposal here rather than implementing it in the same change:
+Business logic: `modules/weekly_box_scores.py`
+(`build_player_week_result`, `build_week_recap`). The route handlers are
+thin wrappers.
 
-- **Route:** `GET /v1/external/players/{player_id}/week-result` (new,
-  read-only, additive, gated by the same `require_external_api_key`).
-- **Query params:** `week` (required), `season` (optional, same default as
-  every other endpoint here).
-- **Fields:** `player_id`, `id_namespace`, `season`, `week`, `status`
-  (`"ok"` / `"bye_week"` / `"not_yet_played"` / `"unknown_player"` / etc. —
-  the same honesty-over-error discipline as every endpoint above),
-  `team`, `position`, `opponent`, `game_id`, `game_status`
-  (`"final"`/etc., reusing `modules.nfl_schedule.game_has_started`),
-  `week_complete` (whether the real schedule confirms this game has a
-  final score), real box-score fields once the retention gap above is
-  closed (receiving/rushing/passing yards, receptions, touchdowns),
-  `fantasy_points_ppr` and `fantasy_points_standard` (both real, both
-  widened-retention fields — exact PPR/standard scoring rules documented
-  alongside, same as `scoring_format` elsewhere in this contract),
-  `source` (`"sleeper_weekly_stats"`), `as_of`, and a `correction_version`
-  (an integer a bot can use to detect a corrected box score — Sleeper does
-  occasionally revise a published stat line after the fact; this would be
-  a monotonically increasing counter bumped whenever this endpoint's own
-  values change for an already-"final" week, not a guess).
-- **Explicit non-goal, stated here deliberately:** this endpoint never
-  substitutes a projection or this app's own overall rating for actual
-  results — it is real, played-game data only, or an honest non-`"ok"`
-  status when the game hasn't finished (or started) yet.
+### The prerequisite: per-week box scores in the stats cache
+
+`modules.sleeper.get_season_player_stats` builds its season cache from
+Sleeper's `GET /v1/stats/nfl/regular/{season}/{week}` payloads, one per
+week. Each player's weekly row used to keep only `games_played`/
+`targets`/`receptions`/`rush_attempts`/`pass_attempts`/
+`fantasy_points_ppr`/`snap_share`. It now also keeps
+`WEEKLY_BOX_SCORE_FIELD_MAP`, read from the same payloads (no new provider
+call):
+
+| Sleeper field | Weekly row field |
+|---|---|
+| `pass_cmp` / `pass_yd` / `pass_td` / `pass_int` | `passing_completions` / `passing_yards` / `passing_tds` / `passing_interceptions` |
+| `rush_yd` / `rush_td` | `rushing_yards` / `rushing_tds` |
+| `rec_yd` / `rec_td` | `receiving_yards` / `receiving_tds` |
+| `fum_lost` | `fumbles_lost` |
+| `fgm` / `fga` / `xpm` / `xpa` | `field_goals_made` / `field_goals_attempted` / `extra_points_made` / `extra_points_attempted` |
+| `pts_std` / `pts_half_ppr` | `fantasy_points_standard` / `fantasy_points_half_ppr` |
+
+Whether a weekly row exists is still decided only by the original
+fields, so this adds keys to existing rows and never adds rows or changes
+which weeks count as played for any other consumer.
+
+**Retention.** The cache is the existing on-disk file
+`data/sleeper_player_stats_{season}.json`. All mobile-api worker
+processes in the container read and write that same file, so the box
+scores are shared across workers rather than held in one process's
+memory. It refreshes on the existing TTL (12 hours for the active season).
+A redeploy starts a fresh container and rebuilds it from Sleeper on first
+use, so Sleeper stays the source of record.
+
+**Older caches.** The committed prior-season caches (`data/
+sleeper_player_stats_2024.json`/`_2025.json`) predate this retention and
+keep their long TTL. For those seasons `box_score_status` is
+`"unavailable"` with a reason; the fields those caches did keep
+(`receptions`/`targets`/`rush_attempts`/`pass_attempts`/
+`fantasy_points_ppr`) are still returned. The active season (2026) is not
+committed and always has the box-score fields.
+
+### `GET /v1/external/players/{player_id}/week-result`
+
+Query params: `week` (required, 1-18; anything else is a 422) and
+`season` (optional, same default as every other endpoint here). Always 200
+once authenticated.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `player_id` / `id_namespace` | string | Same as the projections endpoints (`"sleeper"`). |
+| `season` / `week` / `season_type` | int / int / string | `season_type` is always `"regular"`. |
+| `status` | string | See the status table below. |
+| `unavailable_reason` | string \| null | Plain-language reason for any non-`"ok"` status. |
+| `display_name` / `team` / `position` / `position_group` / `active` | | Same identity fields, from the same Sleeper directory row, as the projections endpoints. |
+| `team_basis` | string \| null | Always `"current_sleeper_directory_team"`. Sleeper's weekly stats payload has no team field, so `team` (and the game fields below) come from the player's **current** team. See `team_schedule_mismatch`. |
+| `opponent` / `is_home` / `bye` / `game_id` / `kickoff_at` | | That team's real game this week, from nflverse's schedule. Same meaning as the projections endpoints. |
+| `game_status` | string | `"final"` (nflverse has a final score), `"in_progress_or_awaiting_final"`, `"upcoming"`, `"bye"`, or `"unknown"`. |
+| `week_complete` | bool \| null | Whether the real schedule confirms this player's game has a final score. `null` on a bye or with no game. |
+| `team_score` / `opponent_score` | number \| null | Real final score from nflverse, from this team's side. |
+| `stats_captured_after_final` | bool \| null | Whether the cached Sleeper stat line was fetched at least 4 hours after kickoff (`FINAL_STATS_SETTLE`), so it can't be a partial in-game line. `null` when kickoff time is unknown. |
+| `box_score_status` / `box_score_unavailable_reason` | string / string \| null | `"ok"` or `"unavailable"`. |
+| `box_score` | object | Every field in `BOX_SCORE_FIELDS` (`receptions`, `targets`, `receiving_yards`, `receiving_tds`, `rush_attempts`, `rushing_yards`, `rushing_tds`, `pass_attempts`, `passing_completions`, `passing_yards`, `passing_tds`, `passing_interceptions`, `fumbles_lost`, `field_goals_made`, `field_goals_attempted`, `extra_points_made`, `extra_points_attempted`), always present, integer or `null`. |
+| `snap_share` | number \| null | Offensive snaps / team offensive snaps, as already retained. |
+| `fantasy_points_ppr` / `fantasy_points_half_ppr` / `fantasy_points_standard` | number \| null | Sleeper's own `pts_ppr`/`pts_half_ppr`/`pts_std`. |
+| `stat_line_fingerprint` | string \| null | 16-hex-character SHA-256 of the box score and points. Deterministic and stable across redeploys. It changes whenever Sleeper revises the line, so compare it to detect a corrected box score. |
+| `correction_version` | null | Always `null`, with `correction_version_unavailable_reason`. See below. |
+| `scoring_note` / `zero_omission_note` | string | See "Scoring and nulls" below. |
+| `source` | object | `{"weekly_stats": "sleeper_weekly_stats", "players": "sleeper_player_directory", "schedule": "nflverse_games_csv"}`. |
+| `stats_as_of` | string \| null | When the season stats cache was last fetched from Sleeper. |
+| `generated_at` | string | When this response was computed. |
+
+**Status values**, checked in this order:
+
+| `status` | Meaning |
+|---|---|
+| `"unknown_player"` | Not in the Sleeper directory. |
+| `"unsupported_position"` | Not QB/RB/WR/TE/K (same set as the projections endpoints). |
+| `"no_team"` | No current team, so finality can't be confirmed from a schedule. |
+| `"no_schedule_data"` | No game on record for this team and week. |
+| `"bye_week"` | The team had a bye. |
+| `"team_schedule_mismatch"` | Sleeper has a stat line this week but the player's current team had a bye (he most likely changed teams since). The stat line is withheld rather than shown against the wrong game. |
+| `"not_yet_played"` | Kickoff hasn't happened. |
+| `"game_not_final"` | Kicked off, no final score yet. |
+| `"unknown_game_status"` | No final score and no kickoff time on record. |
+| `"stats_pending"` | Final, but the cached stat line was fetched before kickoff + 4h and may be partial. It clears on the cache's next refresh. |
+| `"did_not_play"` | Final, captured after the game, but no games-played stat line from Sleeper (inactive/DNP). Not reported as a zero-point game. |
+| `"ok"` | Real final stat line. |
+
+**Why `correction_version` is not a counter.** The original proposal
+asked for a monotonic counter bumped whenever an already-final line
+changes. Nothing here can keep one honestly: the stats cache under `data/`
+and Redis are both rebuilt on every production redeploy (Redis has no
+persistence volume, see `docker-compose.yml`), so a counter would silently
+reset and a bot would miss corrections. `stat_line_fingerprint` gives the
+same signal without needing durable state.
+
+### `GET /v1/external/recap`
+
+Query params: `week` (required, 1-18), `season` (optional), `position`
+(optional, one of QB/RB/WR/TE/K), `scoring_format` (optional, `ppr`
+default, `half_ppr`, or `standard`, which decides the ranking order), and
+`limit` (optional, 1-50, default 10, the length of each top-performer
+list). Invalid values are a 422.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `season` / `week` / `season_type` / `id_namespace` | | As above. |
+| `generated_at` | string | When this response was computed. |
+| `source` | object | Same labels as week-result, plus `stats_as_of`. |
+| `position_scope` / `scoring_format` / `limit` | | The request as applied. |
+| `scoring_note` / `zero_omission_note` | string | As above. |
+| `week_status` | object | `games_scheduled`, `games_final`, `final_game_ids`, `pending_game_ids`, `week_complete` (every scheduled game final), and `stats_captured_after_all_final_games` (`true`/`false`/`null`). A partially played week still returns a recap of its final games; check `week_complete` before calling it a full-week recap. |
+| `box_score_status` / `box_score_unavailable_reason` | | Whether this season's cache has box-score fields (see "Older caches"). |
+| `ranking_status` / `ranking_unavailable_reason` | | `"unavailable"` only when the requested `scoring_format`'s points aren't retained for this season (e.g. `standard` on a pre-retention cache). |
+| `counts` | object | `ranked_players`, and `stat_lines_by_status`: the week-result status of every in-scope player with a Sleeper stat line this week. |
+| `top_performers.overall` | array | Up to `limit` week-result items with an extra `rank`, ordered by the chosen points field (ties by `player_id`). Only `status: "ok"` items are ranked. |
+| `top_performers.by_position` | object | The same, per position in `position_scope`. |
+| `notable_criteria` | array | The thresholds used, as `{code, field, threshold}`. |
+| `notable_lines` | array | Every ranked item that met at least one criterion, in ranking order, with `notable_reasons: [{code, stat, value, threshold}]`. |
+
+Notable criteria are conventional fantasy milestone lines on real stats
+only: `passing_300_yards`, `passing_4_tds`, `rushing_100_yards`,
+`receiving_100_yards`, `receptions_10`, `scrimmage_2_tds` (rushing +
+receiving TDs), and `field_goals_4`. They need box-score fields, so
+`notable_lines` is empty when `box_score_status` is `"unavailable"`.
+
+### Scoring and nulls
+
+- Points are Sleeper's own `pts_ppr`/`pts_half_ppr`/`pts_std` under its
+  default league scoring, passed through and never recomputed. The
+  formats differ only per reception: PPR = standard + 1.0 per reception,
+  half-PPR = standard + 0.5 per reception (checked against real 2026
+  Week 6 data: true for every player with both values).
+- Sleeper omits zero-valued stats from its weekly payload. A box-score
+  field is `null` whenever Sleeper reported nothing for it. That is most
+  often a real zero (no touchdowns, say), but it is never filled in as 0
+  here.
+
+### Example: `GET /v1/external/players/4034/week-result?season=2026&week=6`
+
+Real output (trimmed notes), generated locally against live Sleeper and
+nflverse data on 2026-10-22:
+
+```json
+{
+  "player_id": "4034",
+  "id_namespace": "sleeper",
+  "season": 2026,
+  "week": 6,
+  "season_type": "regular",
+  "status": "ok",
+  "unavailable_reason": null,
+  "display_name": "Christian McCaffrey",
+  "team": "SF",
+  "team_basis": "current_sleeper_directory_team",
+  "position": "RB",
+  "position_group": "skill",
+  "active": true,
+  "opponent": "WAS",
+  "is_home": true,
+  "bye": false,
+  "game_id": "2026_06_WAS_SF",
+  "kickoff_at": "2026-10-20T00:15:00+00:00",
+  "game_status": "final",
+  "week_complete": true,
+  "team_score": 23.0,
+  "opponent_score": 17.0,
+  "stats_captured_after_final": true,
+  "box_score_status": "ok",
+  "box_score_unavailable_reason": null,
+  "box_score": {
+    "receptions": 9, "targets": 10, "receiving_yards": 53, "receiving_tds": null,
+    "rush_attempts": 16, "rushing_yards": 64, "rushing_tds": 2,
+    "pass_attempts": null, "passing_completions": null, "passing_yards": null,
+    "passing_tds": null, "passing_interceptions": null, "fumbles_lost": 1,
+    "field_goals_made": null, "field_goals_attempted": null,
+    "extra_points_made": null, "extra_points_attempted": null
+  },
+  "snap_share": 0.8548,
+  "fantasy_points_ppr": 30.7,
+  "fantasy_points_half_ppr": 26.2,
+  "fantasy_points_standard": 21.7,
+  "stat_line_fingerprint": "7112ba8319229078",
+  "correction_version": null,
+  "correction_version_unavailable_reason": "No durable store exists for a monotonic correction counter: ...",
+  "scoring_note": "...",
+  "zero_omission_note": "...",
+  "source": {"weekly_stats": "sleeper_weekly_stats", "players": "sleeper_player_directory", "schedule": "nflverse_games_csv"},
+  "stats_as_of": "2026-10-22T01:05:44.977779+00:00",
+  "generated_at": "2026-10-22T01:05:52.954549+00:00"
+}
+```
+
+### Example: `GET /v1/external/recap?season=2026&week=6&limit=5` (abridged)
+
+```json
+{
+  "season": 2026,
+  "week": 6,
+  "scoring_format": "ppr",
+  "week_status": {
+    "games_scheduled": 14,
+    "games_final": 14,
+    "pending_game_ids": [],
+    "week_complete": true,
+    "stats_captured_after_all_final_games": true
+  },
+  "box_score_status": "ok",
+  "ranking_status": "ok",
+  "counts": {"ranked_players": 276, "stat_lines_by_status": {"did_not_play": 31, "no_team": 2, "ok": 390}},
+  "top_performers": {
+    "overall": [
+      {"rank": 1, "display_name": "Christian McCaffrey", "team": "SF", "position": "RB", "opponent": "WAS", "fantasy_points_ppr": 30.7, "...": "..."},
+      {"rank": 2, "display_name": "Malik Nabers", "team": "NYG", "position": "WR", "opponent": "NO", "fantasy_points_ppr": 28.5, "...": "..."},
+      {"rank": 3, "display_name": "Trevor Lawrence", "team": "JAX", "position": "QB", "opponent": "HOU", "fantasy_points_ppr": 28.34, "...": "..."}
+    ],
+    "by_position": {"QB": ["..."], "RB": ["..."], "WR": ["..."], "TE": ["..."], "K": ["..."]}
+  },
+  "notable_lines": [
+    {"display_name": "Malik Nabers", "notable_reasons": [
+      {"code": "receiving_100_yards", "stat": "receiving_yards", "value": 165, "threshold": 100},
+      {"code": "receptions_10", "stat": "receptions", "value": 12, "threshold": 10}
+    ], "...": "..."},
+    {"display_name": "Trevor Lawrence", "notable_reasons": [
+      {"code": "passing_300_yards", "stat": "passing_yards", "value": 306, "threshold": 300},
+      {"code": "passing_4_tds", "stat": "passing_tds", "value": 4, "threshold": 4}
+    ], "...": "..."}
+  ]
+}
+```
 
 ## Change history
 
@@ -1382,3 +1563,18 @@ buildable proposal here rather than implementing it in the same change:
   no existing field, status value, or route removed; every new field is
   `null`/absent-safe for a caller that only read the always-`"unavailable"`
   shape before this version.
+- `v1` (2026-10-22): built the weekly recap proposed in the 2026-10-20
+  Phase 4 entry. Prerequisite first: `modules.sleeper`'s weekly rows now
+  keep per-week box-score fields and standard/half-PPR points
+  (`WEEKLY_BOX_SCORE_FIELD_MAP`) from the same Sleeper weekly payloads, in
+  the same shared on-disk season cache. Then two new routes:
+  `GET /v1/external/players/{player_id}/week-result` (as proposed) and
+  `GET /v1/external/recap` (top performers overall/by position, notable
+  stat lines, week-level game completion). New module:
+  `modules/weekly_box_scores.py`. One deliberate change from the
+  proposal: `correction_version` ships as `null` with a reason, and
+  `stat_line_fingerprint` replaces it, because no durable store could keep
+  a monotonic counter across redeploys. The background endpoint's
+  `standard_and_box_score.unavailable_reason` text now points to these
+  routes; its shape is unchanged. Purely additive: no existing field,
+  status value, or route changed.
