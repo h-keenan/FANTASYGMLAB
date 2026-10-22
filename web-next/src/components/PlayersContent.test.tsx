@@ -2,7 +2,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { PlayersContent } from "./PlayersContent";
-import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer, RankedPlayerStat } from "@/lib/api";
+import type {
+  DraftPickAsset,
+  LeagueIdpValuesResponse,
+  LeagueRankingsResponse,
+  RankedPlayer,
+  RankedPlayerStat,
+} from "@/lib/api";
 
 /** Finds the one <select> among every combobox on the page whose options
  * include `optionText` — robust against new sort/filter controls shifting
@@ -246,6 +252,79 @@ describe("PlayersContent", () => {
         "href",
         "/trade-analyzer/league1?name=Dynasty+Overlords&playerId=a",
       );
+    });
+  });
+
+  describe("IDP leagues", () => {
+    const IDP: LeagueIdpValuesResponse = {
+      ok: true,
+      idp: true,
+      below_replacement_ids: [],
+      unscored_keys: ["bonus_def_int_td_50p"],
+      players: [
+        {
+          player_id: "d1",
+          name: "Edge Rusher",
+          position: "DE",
+          family: "DL",
+          team: "DET",
+          age: 26,
+          injury_status: null,
+          value: 2706,
+          ppg: 15.5,
+          projected_points: 240,
+          points_over_replacement: 53,
+          confidence: "high",
+          idp_rank: 1,
+        },
+        {
+          player_id: "d2",
+          name: "Thumper Backer",
+          position: "LB",
+          family: "LB",
+          team: "CLE",
+          age: 23,
+          injury_status: null,
+          value: 2358,
+          ppg: 16.7,
+          projected_points: 220,
+          points_over_replacement: 40,
+          confidence: "low",
+          idp_rank: 2,
+        },
+      ],
+    };
+
+    it("leaves a non-IDP league exactly as it was: no defense chips", () => {
+      render(
+        <PlayersContent
+          leagueId="league1"
+          leagueName="Dynasty Overlords"
+          data={DATA}
+          idp={{ ok: true, idp: false, players: [] }}
+        />,
+      );
+      const [positionSelect] = screen.getAllByRole("combobox");
+      expect(within(positionSelect).queryByText("DL")).not.toBeInTheDocument();
+      expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
+    });
+
+    it("keeps defenders off the offensive board and shows them, valued and caveated, under a DL/LB/DB chip", () => {
+      render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} idp={IDP} />);
+      expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
+
+      const [positionSelect] = screen.getAllByRole("combobox");
+      fireEvent.change(positionSelect, { target: { value: "DL" } });
+
+      expect(screen.getByText("Edge Rusher")).toBeInTheDocument();
+      expect(screen.queryByText("Thumper Backer")).not.toBeInTheDocument();
+      expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
+      expect(screen.getByText("Solid sample")).toBeInTheDocument();
+      expect(screen.getByText(/not market prices/)).toBeInTheDocument();
+      expect(screen.getByText(/bonus_def_int_td_50p/)).toBeInTheDocument();
+      // Compare / Add to Trade are not offered for defenders (those engines do not value them yet).
+      expect(screen.queryByRole("link", { name: "Compare" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Add to Trade" })).not.toBeInTheDocument();
     });
   });
 });

@@ -785,6 +785,35 @@ export interface LeagueRankingsResponse {
   players: RankedPlayer[];
 }
 
+/** One defender's IDP model value (GET .../idp/values): same 0-10,000 scale
+ * as offensive values, but a model estimate, not a market price. */
+export interface IdpValueRow {
+  player_id: string;
+  name: string;
+  position: string;
+  family: 'DL' | 'LB' | 'DB';
+  team: string | null;
+  age: number | null;
+  injury_status: string | null;
+  value: number;
+  ppg: number;
+  projected_points: number;
+  points_over_replacement: number;
+  confidence: 'high' | 'medium' | 'low';
+  idp_rank: number;
+}
+
+/** `idp: false` (and no rows) for any league that does not start defenders. */
+export interface LeagueIdpValuesResponse {
+  ok: boolean;
+  idp: boolean;
+  players: IdpValueRow[];
+  below_replacement_ids?: string[];
+  unscored_keys?: string[];
+  reason?: string;
+  method?: string;
+}
+
 // player_id/name/position/team/age/status/injury_status/tier/score are the
 // same shape as RankedPlayer, but position_rank/overall_rank here are
 // wire-relative (rank among available free agents), not the league-global
@@ -2315,6 +2344,8 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/matchup${query ? `?${query}` : ''}`,
     );
   },
+  getLeagueIdpValues: (leagueId: string) =>
+    authorizedFetch<LeagueIdpValuesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/idp/values`),
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

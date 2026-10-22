@@ -74,3 +74,9 @@ None usable. FantasyCalc publishes no IDP values. DynastyProcess's open
 shows no IDP values. The IDP rankings we know of (DLF and similar) are
 subscription products. We do not scrape any site, so IDP values come from our
 own model (`docs/idp-model-backtest.md`).
+
+## Where it shows up
+
+`GET /v1/leagues/{id}/idp/values` returns model values for leagues that start DL/LB/DB/IDP_FLEX (`idp: false` and no rows otherwise). Web and mobile Players add DL/LB/DB position chips in IDP leagues only; defenders never mix into the offensive board, show a projection-basis label instead of OVR, and carry a "model estimate, not a market price" note plus any scoring bonus that is not counted.
+
+Not yet wired (the valuation, trade and lineup engines still only know offensive assets): My Team, Waivers, Trade Analyzer, Trade Hub, lineup suggestions, Compare. Recommended next step: put defenders into the league valued frame behind `league_has_idp`, with the trust/authority columns those engines gate on.

@@ -3850,6 +3850,31 @@ def get_league_rankings(
     return {"ok": True, "players": players}
 
 
+@app.get("/v1/leagues/{league_id}/idp/values")
+def get_league_idp_values(
+    league_id: str = Depends(resolve_league_path_id),
+    limit: int = 300,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Individual-defensive-player values for leagues that start defenders.
+
+    Leagues without DL/LB/DB/IDP_FLEX slots get ``{"idp": false, "players": []}``
+    and are otherwise untouched. Values are model values on the same 0-10,000
+    scale as offensive values (see docs/idp-model-backtest.md), scored with this
+    league's own scoring_settings.
+    """
+
+    if not 1 <= limit <= 1000:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 1000.")
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    from modules import idp_league_values
+
+    result = idp_league_values.cached_league_idp_values(league_id, league)
+    return {"ok": True, **result, "players": result["players"][:limit]}
+
+
 @app.get("/v1/leagues/{league_id}/players/{player_id}/rank")
 def get_player_rank_in_league(
     player_id: str,

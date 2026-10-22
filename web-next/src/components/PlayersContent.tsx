@@ -5,7 +5,14 @@ import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { useMemo, useState } from "react";
 
-import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer } from "@/lib/api";
+import type { DraftPickAsset, LeagueIdpValuesResponse, LeagueRankingsResponse, RankedPlayer } from "@/lib/api";
+import {
+  IDP_CONFIDENCE_LABEL,
+  idpMethodNote,
+  idpRowsAsRankedPlayers,
+  isIdpPositionFilter,
+  playersPositionOptions,
+} from "@/lib/idpPresentation";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
@@ -136,12 +143,17 @@ function PlayerRow({
   leagueName,
   sortOption,
   sortMode,
+  idpConfidence,
 }: {
   player: RankedPlayer;
   leagueId: string;
   leagueName: string;
   sortOption: PlayersSortOption;
   sortMode: PlayersSortMode;
+  /** Set only for IDP rows: they show their projection basis instead of a
+   * rank/OVR, and skip Compare / Add to Trade (those engines do not value
+   * defenders yet). */
+  idpConfidence?: string;
 }) {
   const injury = waiverInjuryDisplay(player.injury_status);
   return (
@@ -165,7 +177,17 @@ function PlayerRow({
             should say in small print value above it so its not glaring
             but its there in case someone gets confused" */}
         <ValueStat value={formatWaiverScore(player.score)} />
-        <OvrGauge rating={player.overall_rating ?? null} size="sm" />
+        {idpConfidence ? (
+          <span
+            className="px-1.5 py-0.5 text-xs font-bold"
+            style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
+            title="How much real defensive play the projection rests on."
+          >
+            {IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence}
+          </span>
+        ) : (
+          <OvrGauge rating={player.overall_rating ?? null} size="sm" />
+        )}
         {player.position && player.position_rank ? (
           <span
             className="px-1.5 py-0.5 text-xs font-bold"
@@ -176,13 +198,15 @@ function PlayerRow({
             {player.position_rank}
           </span>
         ) : null}
-        <a
-          href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-          className="px-2 py-1 text-xs font-bold"
-          style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
-        >
-          Compare
-        </a>
+        {idpConfidence ? null : (
+          <a
+            href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
+            className="px-2 py-1 text-xs font-bold"
+            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+          >
+            Compare
+          </a>
+        )}
         {/* coridian_, 2026-10-20: "a way when searching for players to
             quickly add that player to a trade, where it inputs it into the
             trade hub into the appropriate section" — deep-links to Trade
@@ -192,13 +216,15 @@ function PlayerRow({
             Trade Hub. TradeAnalyzerContent reads it on mount, finds which
             roster owns this player, and pre-populates the builder — see
             that component's own docstring. */}
-        <a
-          href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
-          className="px-2 py-1 text-xs font-bold"
-          style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
-        >
-          Add to Trade
-        </a>
+        {idpConfidence ? null : (
+          <a
+            href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
+            className="px-2 py-1 text-xs font-bold"
+            style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
+          >
+            Add to Trade
+          </a>
+        )}
       </div>
     </div>
   );
@@ -210,12 +236,16 @@ export function PlayersContent({
   data,
   picks = [],
   rosters = [],
+  idp = null,
 }: {
   leagueId: string;
   leagueName: string;
   data: LeagueRankingsResponse;
   picks?: DraftPickAsset[];
   rosters?: Array<Record<string, unknown>>;
+  /** IDP leagues only (see lib/idpPresentation.ts); null/`idp: false` leaves
+   * this page exactly as it is for every other league. */
+  idp?: LeagueIdpValuesResponse | null;
 }) {
   const [view, setView] = useState<PlayersView>("players");
   const [search, setSearch] = useState("");
@@ -242,9 +272,22 @@ export function PlayersContent({
   }, [rosters]);
   const rosterOwnershipKnown = rosters.length > 0;
 
+  // Defender rows, adapted to RankedPlayer so the shared filter/sort/row code
+  // applies. They are only the pool when a DL/LB/DB chip is selected, so the
+  // offensive board (and its ranks) never mixes with a different scale.
+  const idpPlayers = useMemo(() => idpRowsAsRankedPlayers(idp), [idp]);
+  const idpConfidenceById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of idp?.players ?? []) map.set(row.player_id, row.confidence);
+    return map;
+  }, [idp]);
+  const positionOptions = useMemo(() => playersPositionOptions(PLAYERS_POSITION_FILTERS, idp), [idp]);
+  const idpSelected = idpPlayers.length > 0 && isIdpPositionFilter(position);
+  const pool = idpSelected ? idpPlayers : data.players;
+
   const filtered = useMemo(
     () =>
-      filterPlayers(data.players, {
+      filterPlayers(pool, {
         search,
         position,
         ageFilter,
@@ -253,7 +296,7 @@ export function PlayersContent({
         rosterFilter,
         rosteredPlayerIds,
       }),
-    [data.players, search, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, rosteredPlayerIds],
+    [pool, search, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, rosteredPlayerIds],
   );
   // Sort-by options reflect whatever stats the currently-filtered pool
   // actually carries (e.g. a position filter narrows this to that
@@ -312,7 +355,7 @@ export function PlayersContent({
               onChange={(event) => setPosition(event.target.value)}
               className="filter-select px-3 py-2 text-sm"
             >
-              {PLAYERS_POSITION_FILTERS.map((pos) => (
+              {positionOptions.map((pos) => (
                 <option key={pos} value={pos}>
                   {pos}
                 </option>
@@ -425,10 +468,16 @@ export function PlayersContent({
                   leagueName={leagueName}
                   sortOption={activeSortOption}
                   sortMode={sortMode}
+                  idpConfidence={idpSelected ? idpConfidenceById.get(player.player_id) ?? "low" : undefined}
                 />
               ))}
             </div>
           )}
+          {idpSelected ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {idpMethodNote(idp)}
+            </p>
+          ) : null}
           {filtered.length > visible.length ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Showing the top {visible.length} of {filtered.length} matching players, sorted by {activeSortOption.label}
