@@ -10,6 +10,7 @@ import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -225,13 +226,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <EmptyState
-          icon="alert-circle-outline"
-          title="Couldn't load My Team"
-          subtitle={error}
-          actionLabel="Try again"
-          onPressAction={() => void myTeamQuery.refetch()}
-        />
+        <ErrorState title="Couldn't load My Team" message={error} onRetry={() => void myTeamQuery.refetch()} />
       </View>
     );
   }

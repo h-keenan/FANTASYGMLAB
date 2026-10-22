@@ -10,6 +10,7 @@ import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import ErrorState from '../components/ErrorState';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -374,7 +375,11 @@ export default function DashboardScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState
+          title="Couldn't load your briefing"
+          message={error}
+          onRetry={() => void dashboardQuery.refetch()}
+        />
       </View>
     );
   }
@@ -1332,6 +1337,5 @@ function createStyles(colors: ThemeColors) {
   },
   emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
-  error: { color: colors.danger, textAlign: 'center' },
   });
 }

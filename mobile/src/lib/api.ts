@@ -2469,9 +2469,11 @@ export const api = {
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).
    * Server-cached per league for a few minutes (cache_ttl_seconds). */
   getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),
+  /** `strategy='auto'` lets the server resolve the declared team stance
+   * (same mapping as GET /team-stance), so no stance round trip is needed. */
   getTradeHubIdeas: (
     leagueId: string,
-    strategy: TeamStrategy = 'retool',
+    strategy: TeamStrategy | 'auto' = 'retool',
     adUnlocks = 0,
     lens: ValuationLens = 'Dynasty',
   ) =>

@@ -15,12 +15,13 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
+import { SkeletonRows } from '../components/SkeletonBlock';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterDropdownButton from '../components/FilterDropdownButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
-import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -125,6 +126,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [targetsFailed, setTargetsFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [position, setPosition] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -149,6 +151,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       let cancelled = false;
       (async () => {
         try {
+          setError(null);
           const result = await api.getLeagueWaivers(leagueId, { lens, limit: 300 });
           if (cancelled) return;
           setFreeAgents(result.players);
@@ -174,7 +177,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       return () => {
         cancelled = true;
       };
-    }, [leagueId, lens]),
+    }, [leagueId, lens, reloadToken]),
   );
 
   const filtered = useMemo(() => {
@@ -272,14 +275,22 @@ export default function WaiversScreen({ route, navigation }: Props) {
       <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
-      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <View style={styles.tabWrap}>
         <SegmentedTabBar options={TAB_OPTIONS} active={tab} onChange={setTab} />
       </View>
 
       {loading ? (
-        <BrandedSpinner style={styles.loading} />
+        <SkeletonRows count={6} style={styles.loading} />
+      ) : error && !freeAgents ? (
+        <ErrorState
+          title="Couldn't load waivers"
+          message={error}
+          onRetry={() => {
+            setLoading(true);
+            setReloadToken((n) => n + 1);
+          }}
+        />
       ) : (
         <FlatList
           ListFooterComponent={<ValuesCredit />}
@@ -844,6 +855,5 @@ function createStyles(colors: ThemeColors) {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }

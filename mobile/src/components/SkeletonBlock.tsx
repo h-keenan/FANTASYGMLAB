@@ -115,6 +115,17 @@ export function SkeletonRow({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
+/** A stack of `SkeletonRow`s for a list that is still loading. */
+export function SkeletonRows({ count = 5, style }: { count?: number; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={style}>
+      {Array.from({ length: count }, (_, index) => (
+        <SkeletonRow key={index} />
+      ))}
+    </View>
+  );
+}
+
 const rowStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   rowTextGroup: { flex: 1, gap: spacing.xs },
