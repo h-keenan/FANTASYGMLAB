@@ -1,5 +1,9 @@
 # Projections v2: backtest and decisions (2026-10)
 
+> Superseded for constants and evaluation method by
+> `docs/projections-v3-walkforward.md` (walk-forward, 2021-2026). The layer
+> decisions below still hold.
+
 `modules/player_projections.project_player_week` was rebuilt as a usage-based
 empirical-Bayes estimator. Sleeper's projections are never an input; they are
 only the benchmark.
