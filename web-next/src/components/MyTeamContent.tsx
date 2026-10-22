@@ -13,7 +13,9 @@ import {
   buildConstructionObservations,
   buildPositionGroupItems,
   formatScore,
+  lineupIneligibleTag,
   myTeamReasonMessage,
+  openSlotsMessage,
   sumScore,
 } from "@/lib/myTeamPresentation";
 import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
@@ -64,6 +66,7 @@ function joinRooms(rooms: string[]): ReactNode {
 }
 
 function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
+  const ineligibleTag = lineupIneligibleTag(player);
   return (
     <div
       className="flex items-center gap-3 py-2"
@@ -81,6 +84,11 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
           </span>
           <PlayerMetaLine injuryStatus={player.injury_label}>
             {player.team || "FA"} {player.slot && player.slot !== "BENCH" ? `· ${player.slot}` : ""}
+            {ineligibleTag ? (
+              <span className="font-bold" style={{ color: "var(--color-warning)" }}>
+                {` · ${ineligibleTag}`}
+              </span>
+            ) : null}
           </PlayerMetaLine>
         </div>
       </PlayerIdentityTrigger>
@@ -324,6 +332,17 @@ export function MyTeamContent({
             Total Starters Value {formatScore(startersTotalValue)}
           </span>
         </div>
+        {myTeam.lineup_basis_label && myTeam.lineup_basis && myTeam.lineup_basis !== "season_value" ? (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {myTeam.week ? `Week ${myTeam.week}. ` : ""}
+            {myTeam.lineup_basis_label}
+          </p>
+        ) : null}
+        {openSlotsMessage(myTeam.open_slots) ? (
+          <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
+            {openSlotsMessage(myTeam.open_slots)}
+          </p>
+        ) : null}
         {starters.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             No suggested starters yet.

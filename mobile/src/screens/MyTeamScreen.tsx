@@ -28,6 +28,7 @@ import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { isByeOnlyLabel, lineupStatusLabel, openSlotsMessage } from '../lib/lineupAvailability';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
@@ -255,7 +256,12 @@ export default function MyTeamScreen({ route, navigation }: Props) {
                 onViewAnalysis={hasRosterAnalysis(myTeam) ? () => setActiveTab('analysis') : undefined}
               />
             ) : null}
-            <StartersSection starters={starters} totalValue={totalStartersValue} onPressPlayer={goToPlayer} />
+            <StartersSection
+              starters={starters}
+              totalValue={totalStartersValue}
+              onPressPlayer={goToPlayer}
+              openSlotsNote={openSlotsMessage(myTeamData?.open_slots)}
+            />
           </>
         ) : null}
 
@@ -436,16 +442,20 @@ function StartersSection({
   starters,
   totalValue,
   onPressPlayer,
+  openSlotsNote = null,
 }: {
   starters: LineupPlayer[];
   totalValue: number;
   onPressPlayer: (player: LineupPlayer) => void;
+  /** lib/lineupAvailability.openSlotsMessage — slots nobody eligible can fill this week. */
+  openSlotsNote?: string | null;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View>
       <SectionHeaderRow label="Starters" total={formatTotalStartersValue(totalValue)} />
+      {openSlotsNote ? <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsNote}</AppText> : null}
       {starters.length === 0 ? (
         <EmptyState icon="people-outline" title="No suggested starters yet." />
       ) : (
@@ -621,7 +631,9 @@ function LineupRow({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const injuryTone = waiverInjuryDisplay(player.injury_status).tone;
+  // A bye-week player (benched by the server's weekly lineup) shows a
+  // "Bye" pill in the calmer watch tone; a real injury label always wins.
+  const injuryTone = isByeOnlyLabel(player) ? 'watch' : waiverInjuryDisplay(player.injury_status).tone;
   return (
     <TouchableOpacity
       style={[styles.compactRow, showDivider && styles.compactDivider]}
@@ -640,7 +652,7 @@ function LineupRow({
           // injury_label, not injury_status: IR/PUP/season-ending arrives on
           // `status` with `injury_status` blank, and an injury_status-driven
           // pill hides exactly those players. See LineupPlayer.injury_label.
-          injuryLabel={player.injury_label}
+          injuryLabel={lineupStatusLabel(player)}
           ruledOut={player.ruled_out}
           injuryTone={injuryTone}
           showDivider={false}

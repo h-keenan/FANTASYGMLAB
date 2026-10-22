@@ -440,7 +440,17 @@ export interface LineupPlayer {
    * QuickViewStats.overall_rating. Null when that position's pool was too
    * thin to rank against. */
   overall_rating: number | null;
+  /** In-season weekly lineup gate: 'Bye' / 'Out' / 'IR' / 'PUP' /
+   * 'Suspended' when this player can't start this week, else null. Absent
+   * from older API builds. See lib/lineupAvailability.ts. */
+  start_ineligible_reason?: string | null;
+  on_bye?: boolean;
+  /** The points figure this week's lineup ranked him on, and its source. */
+  lineup_points?: number | null;
+  lineup_points_basis?: 'projection' | 'value_estimate' | 'value' | null;
 }
+
+export type LineupBasis = 'season_value' | 'weekly_projection' | 'weekly_availability';
 
 export interface MyTeamResponse {
   ok: true;
@@ -448,6 +458,12 @@ export interface MyTeamResponse {
   bench: LineupPlayer[];
   reason: string;
   roster_id?: string;
+  /** NFL week the suggested lineup is for (null in the offseason). */
+  week?: number | null;
+  lineup_basis?: LineupBasis;
+  lineup_basis_label?: string;
+  /** Starting slots left open: nobody eligible this week (bye / ruled out). */
+  open_slots?: string[];
 }
 
 /**
@@ -520,6 +536,12 @@ export interface MatchupSide {
   season_value_total: number;
   /** Always the best-available lineup, for both sides — not necessarily the lineup Sleeper has set. */
   starters_basis: 'suggested_optimal_lineup';
+  /** What this side's suggested lineup ranked on ('weekly_projection' in
+   * season: byes/ruled-out never start). Absent from older API builds. */
+  lineup_basis?: LineupBasis;
+  lineup_basis_label?: string;
+  /** Starting slots left open: nobody eligible this week (bye / ruled out). */
+  open_slots?: string[];
   /**
    * This roster's ACTUAL current-week lineup, straight from Sleeper's own
    * matchup payload (`starters`/`starters_points`) — may differ from

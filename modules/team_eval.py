@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Mapping, Optional
+from typing import Dict, Any, Iterable, List, Mapping, Optional
 
 import pandas as pd
 
@@ -309,17 +309,206 @@ def _score_starter_weighted_roster(
     }
 
 
+def _cell_text(value) -> str:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    return str(value).strip()
+
+
+def _ineligible_injury_reason(status: str, injury_status: str) -> str:
+    """Short label for a ruled-out player: "Out", "IR", "PUP", "Suspended"."""
+
+    for text in (injury_status, status):
+        token = text.strip()
+        if not token:
+            continue
+        lowered = token.casefold()
+        if lowered == "ir" or "reserve" in lowered:
+            return "IR"
+        if "pup" in lowered:
+            return "PUP"
+        if lowered.startswith("sus"):
+            return "Suspended"
+        if lowered in {"nfi", "na", "dnr"}:
+            return token.upper()
+        if "out" in lowered:
+            return "Out"
+    return "Out"
+
+
+def _weekly_point_or_none(value) -> Optional[float]:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(parsed):
+        return None
+    return parsed
+
+
+def _value_matched_points(
+    df: pd.DataFrame, points: List[Optional[float]], projected_mask: List[bool]
+) -> List[Optional[float]]:
+    """Points estimate per row. Projected rows keep their projection.
+
+    A row without one (no usable recent production: a deep backup, a
+    rookie who hasn't played, a player back from injury) is matched
+    conservatively on season value against projected players at his
+    position (any position if none): he gets the projection of the
+    projected player just below him in season value, so he never outranks
+    a projected player he doesn't out-value on the strength of a guess. If
+    every projected peer out-values him, he gets the least valuable peer's
+    projection scaled down by their value ratio. All ``None`` when nothing
+    in the frame is projected."""
+
+    positions = df["position"].tolist()
+    values = [max(0.0, float(v)) for v in df["sort_score"].tolist()]
+    projected = [i for i, ok in enumerate(projected_mask) if ok]
+    if not projected:
+        return [None] * len(df)
+    estimates: List[Optional[float]] = []
+    for i, ok in enumerate(projected_mask):
+        if ok:
+            estimates.append(float(points[i]))
+            continue
+        pool = [j for j in projected if positions[j] == positions[i]] or projected
+        below = [j for j in pool if values[j] <= values[i]]
+        if below:
+            match = max(below, key=lambda j: values[j])
+            estimates.append(float(points[match]))
+        else:
+            match = min(pool, key=lambda j: values[j])
+            ratio = values[i] / values[match] if values[match] > 0 else 0.0
+            estimates.append(float(points[match]) * ratio)
+    return estimates
+
+
+def _assign_weekly_lineup(
+    df: pd.DataFrame,
+    assign_slots,
+    value_order: List[int],
+    *,
+    weekly_points: Mapping[str, Any],
+    bye_player_ids: Iterable[Any],
+) -> pd.DataFrame:
+    """Weekly-mode slot assignment (see suggest_optimal_lineup). ``df`` is
+    already value-sorted with a 0..n-1 index, ``sort_score`` and
+    ``ruled_out`` attached."""
+
+    bye_ids = {str(pid) for pid in bye_player_ids if pid not in (None, "")}
+    points_by_id = {str(pid): _weekly_point_or_none(pts) for pid, pts in weekly_points.items()}
+    n = len(df)
+    ids = df["player_id"].astype(str).tolist() if "player_id" in df.columns else [""] * n
+    statuses = df["status"].tolist() if "status" in df.columns else [None] * n
+    injuries = df["injury_status"].tolist() if "injury_status" in df.columns else [None] * n
+    ruled_out = df["ruled_out"].tolist()
+
+    on_bye = [pid in bye_ids for pid in ids]
+    reasons: List[Optional[str]] = []
+    for i in range(n):
+        if on_bye[i]:
+            reasons.append("Bye")
+        elif ruled_out[i]:
+            reasons.append(_ineligible_injury_reason(_cell_text(statuses[i]), _cell_text(injuries[i])))
+        else:
+            reasons.append(None)
+
+    points = [points_by_id.get(pid) for pid in ids]
+    projected_mask = [points[i] is not None and not on_bye[i] for i in range(n)]
+    estimates = _value_matched_points(df, points, projected_mask)
+    has_projection = any(projected_mask)
+
+    if has_projection:
+        df["lineup_points"] = [None if on_bye[i] else estimates[i] for i in range(n)]
+        df["lineup_points_basis"] = [
+            None if on_bye[i] else ("projection" if projected_mask[i] else "value_estimate") for i in range(n)
+        ]
+        eligible = [i for i in range(n) if reasons[i] is None]
+        # Stable on value order, so equal projections keep season value as
+        # the tiebreak.
+        selection_order = sorted(eligible, key=lambda i: -float(estimates[i]))
+    else:
+        df["lineup_points"] = None
+        df["lineup_points_basis"] = [None if on_bye[i] else "value" for i in range(n)]
+        selection_order = [i for i in value_order if reasons[i] is None]
+
+    assigned = assign_slots(selection_order)
+    # Who the bye/injury actually cost a starting spot: he'd have started
+    # on season value alone.
+    value_assigned = assign_slots(value_order)
+
+    df["on_bye"] = on_bye
+    df["start_ineligible_reason"] = reasons
+    df["slot"] = [assigned.get(i, "BENCH") for i in range(n)]
+    df["displaced_by_injury"] = [
+        bool(ruled_out[i]) and not on_bye[i] and i in value_assigned and i not in assigned for i in range(n)
+    ]
+    df["displaced_by_bye"] = [on_bye[i] and i in value_assigned for i in range(n)]
+    df["suggested_starter"] = df["slot"] != "BENCH"
+    return df
+
+
+def lineup_open_slots(
+    lineup_df: pd.DataFrame, lineup_settings: Optional[Dict[str, Any]] = None
+) -> List[str]:
+    """Starting slots ``suggest_optimal_lineup`` could not fill. Weekly mode
+    leaves a slot open rather than start a bye or ruled-out player."""
+
+    slots = _lineup_slots(lineup_settings)
+    filled: Dict[str, int] = {}
+    if not lineup_df.empty and "slot" in lineup_df.columns:
+        for slot in lineup_df["slot"].tolist():
+            filled[str(slot)] = filled.get(str(slot), 0) + 1
+    open_slots: List[str] = []
+    for slot_name in ("QB", "RB", "WR", "TE", "K", "WR/RB", "FLEX", "SUPER_FLEX"):
+        missing = int(slots.get(slot_name, 0) or 0) - filled.get(slot_name, 0)
+        open_slots.extend([slot_name] * max(0, missing))
+    return open_slots
+
+
 @runtime_trace.traced("suggest_optimal_lineup", phase="lineup_generation")
 def suggest_optimal_lineup(
     df_team: pd.DataFrame,
     lineup_settings: Optional[Dict[str, Any]] = None,
     *,
     score_field: Optional[str] = None,
+    weekly_points: Optional[Mapping[str, Any]] = None,
+    bye_player_ids: Optional[Iterable[Any]] = None,
 ) -> pd.DataFrame:
+    """Best lineup for a roster frame.
+
+    Default (season) mode ranks by season value: the structural "who are
+    this roster's starters" answer that team strength, needs and trade
+    logic rely on. A ruled-out player sinks below every available one but
+    can still fill a slot nothing else can.
+
+    Weekly mode, enabled by passing ``weekly_points`` and/or
+    ``bye_player_ids``, answers "who should start THIS week". A player on
+    bye or ruled out (Out/IR/PUP/Suspended, per
+    ``modules.rankings.is_ruled_out``) is never slotted: his slot stays
+    open (see ``lineup_open_slots``) and he carries
+    ``start_ineligible_reason``. Starters rank by this week's projected
+    points (``weekly_points``: player_id -> points). A player without a
+    usable projection gets a conservative value-matched estimate (see
+    ``_value_matched_points``) so everyone is compared on one points
+    scale. With no projections at all the order falls back to season
+    value.
+    """
+
+    weekly_mode = weekly_points is not None or bye_player_ids is not None
     if df_team.empty:
-        return df_team.assign(
+        out = df_team.assign(
             slot="BENCH", suggested_starter=False, ruled_out=False, displaced_by_injury=False
         )
+        if weekly_mode:
+            out = out.assign(
+                on_bye=False,
+                start_ineligible_reason=None,
+                displaced_by_bye=False,
+                lineup_points=None,
+                lineup_points_basis=None,
+            )
+        return out
 
     df = df_team.copy()
     resolved_field = str(score_field or "").strip()
@@ -385,6 +574,15 @@ def suggest_optimal_lineup(
 
     value_order = df.index.tolist()  # already season-value descending
     ruled_out = df["ruled_out"].tolist()
+
+    if weekly_mode:
+        return _assign_weekly_lineup(
+            df,
+            assign_slots,
+            value_order,
+            weekly_points=weekly_points or {},
+            bye_player_ids=bye_player_ids or (),
+        )
 
     if any(ruled_out):
         # Fill order, not row order: players confirmed unavailable this week

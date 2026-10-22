@@ -34,6 +34,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { openSlotsMessage } from '../lib/lineupAvailability';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -649,6 +650,9 @@ function StarterSection({
           {Math.round(side.season_value_total).toLocaleString()} SEASON VALUE
         </AppText>
       </View>
+      {openSlotsMessage(side.open_slots) ? (
+        <AppText style={[styles.emptySection, { color: colors.premium }]}>{openSlotsMessage(side.open_slots)}</AppText>
+      ) : null}
       <AnimatedCard style={styles.sectionCard}>
         {side.starters.length === 0 ? (
           <AppText style={styles.emptySection}>No startable players on this roster right now.</AppText>

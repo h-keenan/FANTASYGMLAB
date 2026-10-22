@@ -7,6 +7,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { leanBar } from "@/lib/tradeHubPresentation";
+import { openSlotsMessage } from "@/lib/myTeamPresentation";
 import {
   deriveContextLine,
   formatSeasonValue,
@@ -351,6 +352,11 @@ function SuggestedLineupSection({ title, side }: { title: string; side: MatchupS
           {formatSeasonValue(side.season_value_total)} SEASON VALUE
         </span>
       </div>
+      {openSlotsMessage(side.open_slots) ? (
+        <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
+          {openSlotsMessage(side.open_slots)}
+        </p>
+      ) : null}
       {side.starters.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           No startable players on this roster right now.
