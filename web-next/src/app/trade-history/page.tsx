@@ -8,6 +8,7 @@ import { api, type TradeOutcomeHistoryResponse } from "@/lib/api";
 import { TradeHistoryContent } from "@/components/TradeHistoryContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { onTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
 
 // Like Portfolio, Trade History has no [leagueId] segment — the real
 // current page (modules/trade_outcomes_page.py) and GET
@@ -39,8 +40,21 @@ export default function TradeHistoryPage() {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Trade History.");
       });
 
+    // Re-fetch quietly when the "Did this trade happen?" prompt records an
+    // answer while this page is open, so the new row shows without a
+    // reload. A failed refresh keeps the list already on screen.
+    const unsubscribe = onTradeOutcomeAnswered(() => {
+      api
+        .getTradeOutcomeHistory()
+        .then((result) => {
+          if (!cancelled) setData(result);
+        })
+        .catch(() => {});
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [authLoading, session, router]);
 

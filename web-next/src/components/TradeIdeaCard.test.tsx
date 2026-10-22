@@ -11,6 +11,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       getTradeHubIdeaShareCardBlob: vi.fn(),
+      recordTradeShare: vi.fn(),
     },
   };
 });
@@ -104,6 +105,8 @@ function stubClipboard() {
 describe("ShareTradeButton", () => {
   beforeEach(() => {
     vi.mocked(api.getTradeHubIdeaShareCardBlob).mockReset();
+    vi.mocked(api.recordTradeShare).mockReset();
+    vi.mocked(api.recordTradeShare).mockResolvedValue({ ok: true, reason: "" });
   });
 
   afterEach(() => {
@@ -203,5 +206,110 @@ describe("ShareTradeButton", () => {
 
     await waitFor(() => expect(navigator.share).toHaveBeenCalledTimes(1));
     expect(api.getTradeHubIdeaShareCardBlob).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Trade Outcomes: a completed share records the trade (POST
+   * /v1/leagues/{id}/trade-outcomes) so "Did this trade happen?" can ask
+   * about it later. Same payload and behaviour as mobile's
+   * TradeSharePreviewModal.recordShare: picks dropped, one record per
+   * completed share, nothing recorded for a cancelled share sheet.
+   */
+  const expectedRecord = {
+    partnerTeamName: "Rival GM",
+    send: [{ name: "My Running Back", position: "RB", player_id: "my-rb", value_score: 2000 }],
+    receive: [{ name: "Opp Wide Receiver", position: "WR", player_id: "opp-wr", value_score: 2000 }],
+    valueEdgeLabel: "Realistic",
+    valuationLens: "Rebuild",
+  };
+
+  it("records the trade after a successful image share", async () => {
+    stubShare();
+    stubCanShare(() => true);
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockResolvedValue(
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }),
+    );
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" lens="Rebuild" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(api.recordTradeShare).toHaveBeenCalledTimes(1));
+    expect(api.recordTradeShare).toHaveBeenCalledWith("league-1", expectedRecord);
+  });
+
+  it("records the trade after a text share or a clipboard copy", async () => {
+    removeShareApis();
+    stubClipboard();
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" lens="Rebuild" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(api.recordTradeShare).toHaveBeenCalledWith("league-1", expectedRecord));
+  });
+
+  it("drops draft picks and empty player ids from the recorded trade", async () => {
+    removeShareApis();
+    stubClipboard();
+    const withPick = idea({
+      package: {
+        send: [
+          asset({ player_id: "", name: "Hand Built", score: null }),
+          asset({ asset_type: "pick", player_id: undefined, name: "2027 1st" }),
+        ],
+        receive: [],
+        value_edge: "+0",
+        confidence: "Low",
+      },
+      market_realism_label: "",
+    });
+
+    render(<ShareTradeButton idea={withPick} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(api.recordTradeShare).toHaveBeenCalledTimes(1));
+    expect(api.recordTradeShare).toHaveBeenCalledWith("league-1", {
+      partnerTeamName: "Rival GM",
+      send: [{ name: "Hand Built", position: "RB", player_id: undefined, value_score: undefined }],
+      receive: [],
+      valueEdgeLabel: "Trade Hub idea",
+      valuationLens: "Dynasty",
+    });
+  });
+
+  it("records each completed share, like mobile (no dedupe)", async () => {
+    removeShareApis();
+    stubClipboard();
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() => expect(api.recordTradeShare).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() => expect(api.recordTradeShare).toHaveBeenCalledTimes(2));
+  });
+
+  it("records nothing when the image share sheet is cancelled", async () => {
+    stubShare(() => Promise.reject(new DOMException("cancelled", "AbortError")));
+    stubCanShare(() => true);
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockResolvedValue(
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }),
+    );
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(navigator.share).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button")).not.toBeDisabled());
+    expect(api.recordTradeShare).not.toHaveBeenCalled();
+  });
+
+  it("records nothing without a leagueId", async () => {
+    removeShareApis();
+    const writeText = stubClipboard();
+
+    render(<ShareTradeButton idea={idea()} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(api.recordTradeShare).not.toHaveBeenCalled();
   });
 });

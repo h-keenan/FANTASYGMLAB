@@ -9,6 +9,7 @@ import {
   isTradeOutcomePromptDismissed,
   setTradeOutcomePromptDismissed,
 } from "@/lib/tradeOutcomePromptDismissed";
+import { emitTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
 
 // "/" is the signed-out landing page and the signup/Sleeper-import/paywall
 // flow (same rule GmOrb.tsx uses); "/premium" is the standalone paywall.
@@ -89,6 +90,7 @@ export function TradeOutcomePrompt() {
     setAnswering(true);
     try {
       await api.answerTradeOutcome(current.id, outcome);
+      if (outcome !== "still_pending") emitTradeOutcomeAnswered();
       setPending((prev) => (prev ? { ...prev, queue: prev.queue.filter((item) => item.id !== current.id) } : prev));
     } catch {
       // Leave it in the queue; the next visibility check asks again.

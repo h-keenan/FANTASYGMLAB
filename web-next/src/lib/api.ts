@@ -2123,6 +2123,21 @@ export interface PendingTradeOutcomesResponse {
 
 export type TradeOutcomeAnswer = "yes" | "no" | "didnt_send" | "still_pending";
 
+export interface RecordTradeShareAsset {
+  name: string;
+  position: string;
+  player_id?: string;
+  value_score?: number | null;
+}
+
+export interface RecordTradeShareBody {
+  partnerTeamName?: string;
+  send: RecordTradeShareAsset[];
+  receive: RecordTradeShareAsset[];
+  valueEdgeLabel?: string;
+  valuationLens?: string;
+}
+
 export interface TradeOutcomeHistoryResponse {
   ok: boolean;
   outcomes: PastTradeOutcome[];
@@ -2876,6 +2891,23 @@ export const api = {
   // League-independent like getPortfolio/getNews above: no leagueId param.
   getTradeOutcomeHistory: () =>
     authorizedRequest<TradeOutcomeHistoryResponse>("/v1/trade-outcomes/history"),
+  // POST /v1/leagues/{id}/trade-outcomes: records a shared trade so the
+  // "Did this trade happen?" prompt can ask about it ~a day later. Same
+  // body as mobile's api.recordTradeShare.
+  recordTradeShare: (leagueId: string, body: RecordTradeShareBody) =>
+    authorizedRequest<{ ok: boolean; reason: string }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-outcomes`,
+      {
+        method: "POST",
+        jsonBody: {
+          partner_team_name: body.partnerTeamName ?? "",
+          send: body.send,
+          receive: body.receive,
+          value_edge_label: body.valueEdgeLabel ?? "",
+          valuation_lens: body.valuationLens ?? "",
+        },
+      },
+    ),
   getPendingTradeOutcomes: () =>
     authorizedRequest<PendingTradeOutcomesResponse>("/v1/trade-outcomes/pending"),
   answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>
