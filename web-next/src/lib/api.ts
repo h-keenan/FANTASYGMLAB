@@ -1421,6 +1421,8 @@ export interface RankedPlayer {
    * (not the single-player GET .../players/{id}/rank lookup); absent/empty
    * everywhere else, same fail-open contract as `usage_trend`. */
   stats?: RankedPlayerStat[];
+  /** Weekly-recency usage read, already on every GET .../rankings row (null below its sample gate). */
+  usage_trend?: UsageTrend | null;
 }
 
 export interface LeagueRankingsResponse {

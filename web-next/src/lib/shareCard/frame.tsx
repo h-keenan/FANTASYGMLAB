@@ -79,6 +79,7 @@ export function ShareFrame({
   height,
   children,
   footer = true,
+  headerRight,
 }: {
   brand: ShareBrandAssets;
   /** Top-right label, e.g. "Trade idea" or "Player card". */
@@ -87,6 +88,8 @@ export function ShareFrame({
   height: number;
   children: ReactNode;
   footer?: boolean;
+  /** Right side of the header row (the trade card's "Team A <-> Team B"). */
+  headerRight?: ReactNode;
 }) {
   const compact = height < 900;
   const pad = compact ? 48 : 64;
@@ -109,21 +112,15 @@ export function ShareFrame({
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <img src={brand.backdrop} width={width} height={height} style={{ position: "absolute", top: 0, left: 0 }} />
       ) : null}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
-        <img src={brand.lockup} height={compact ? 44 : 52} width={(compact ? 44 : 52) * (1102 / 160)} />
-        <div
-          style={{
-            display: "flex",
-            padding: compact ? "8px 18px" : "10px 22px",
-            borderRadius: 999,
-            border: `1.5px solid ${withAlpha(T["--color-accent"], 0.55)}`,
-            backgroundColor: T["--color-accent-soft"],
-            ...eyebrowStyle(T["--color-accent"], compact ? 18 : 22),
-          }}
-        >
-          {kind}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: compact ? 6 : 10 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+          <img src={brand.lockup} height={compact ? 40 : 56} width={(compact ? 40 : 56) * (1102 / 160)} />
+          <div style={{ ...eyebrowStyle(T["--color-accent"], compact ? 18 : 24), letterSpacing: "0.3em" }}>{kind}</div>
         </div>
+        {headerRight ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: compact ? 26 : 34, fontWeight: 700 }}>{headerRight}</div>
+        ) : null}
       </div>
       {/* space-between spreads a short card's spare height evenly between
           its blocks instead of leaving one empty band above the footer. */}
@@ -135,28 +132,26 @@ export function ShareFrame({
   );
 }
 
+/** White-backed QR, the same canonical site URL the mobile chrome encodes. */
+export function ShareQr({ brand, size }: { brand: ShareBrandAssets; size: number }) {
+  return (
+    <div style={{ display: "flex", padding: Math.round(size * 0.07), backgroundColor: "#ffffff", borderRadius: shareRadius("--radius-sm") }}>
+      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+      <img src={brand.qr} width={size} height={size} />
+    </div>
+  );
+}
+
 function ShareFooter({ brand }: { brand: ShareBrandAssets }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 28,
-        paddingTop: 28,
-        borderTop: `1.5px solid ${T["--color-border"]}`,
-      }}
-    >
-      <div style={{ display: "flex", padding: 8, backgroundColor: "#ffffff", borderRadius: shareRadius("--radius-sm") }}>
-        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
-        <img src={brand.qr} width={112} height={112} />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, flexGrow: 1 }}>
-        <div style={eyebrowStyle(T["--color-accent"], 20)}>Scan to try</div>
-        <div style={{ fontSize: 34, fontWeight: 800 }}>{BRAND_NAME}</div>
-        <div style={{ fontSize: 24, fontWeight: 500, color: T["--color-text-muted"] }}>{BRAND_DOMAIN}</div>
+    <div style={{ ...glassStyle(), alignItems: "center", gap: 28, padding: "18px 28px" }}>
+      <ShareQr brand={brand} size={100} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, flexGrow: 1 }}>
+        <div style={{ display: "flex", fontSize: 40, fontWeight: 800 }}>{BRAND_DOMAIN}</div>
+        <div style={{ display: "flex", fontSize: 26, fontWeight: 500, color: T["--color-text-muted"] }}>{`Scan to try ${BRAND_NAME}`}</div>
       </div>
       {/* Mobile ShareCardChrome's tagline, same three semantic colors. */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 24, fontWeight: 900, letterSpacing: "0.12em" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 22, fontWeight: 900, letterSpacing: "0.12em" }}>
         <span style={{ color: T["--color-accent"] }}>PLAN.</span>
         <span style={{ color: T["--color-action"] }}>PROJECT.</span>
         <span style={{ color: T["--color-danger"] }}>WIN.</span>

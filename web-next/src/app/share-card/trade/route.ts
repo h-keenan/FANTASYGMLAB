@@ -1,4 +1,4 @@
-import type { TradeHubResponse } from "@/lib/api";
+import type { PortfolioLeagueResponse, TradeHubResponse } from "@/lib/api";
 import {
   UpstreamError,
   cacheKey,
@@ -8,6 +8,7 @@ import {
   jsonError,
   pngResponse,
   putCachedPng,
+  parseShareFormat,
   renderTradeCardPng,
 } from "@/lib/shareCard/server";
 import { isValuationLens } from "@/lib/valuationLens";
@@ -33,22 +34,35 @@ export async function GET(request: Request): Promise<Response> {
   const recommendationId = params.get("rec");
   const strategy = params.get("strategy") || "retool";
   const lens = params.get("lens") || "Dynasty";
+  const format = parseShareFormat(params.get("format"));
   if (!isSafeId(leagueId) || !isSafeId(recommendationId) || !isSafeId(strategy)) {
     return jsonError(422, "leagueId, rec and strategy are required.");
   }
   if (!isValuationLens(lens)) return jsonError(422, "Unknown lens.");
 
   // Keyed on the caller's token too: two users never share a cached card.
-  const key = cacheKey(["trade", authorization, leagueId, recommendationId, strategy, lens]);
+  const key = cacheKey(["trade", authorization, leagueId, recommendationId, strategy, lens, format]);
   const cached = getCachedPng(key);
   if (cached) return pngResponse(cached, "hit");
 
   let board: TradeHubResponse;
+  let myTeam: PortfolioLeagueResponse["league"] = null;
   try {
-    board = await fetchUpstreamJson<TradeHubResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
-      authorization,
-    );
+    // The manager's own team name/avatar comes from their Portfolio row.
+    // Fail-open: it's Premium-gated and decorative, so any failure just
+    // labels their side "Your team" rather than failing the card.
+    const [boardResult, mine] = await Promise.all([
+      fetchUpstreamJson<TradeHubResponse>(
+        `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
+        authorization,
+      ),
+      fetchUpstreamJson<PortfolioLeagueResponse>(
+        `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}`,
+        authorization,
+      ).catch(() => null),
+    ]);
+    board = boardResult;
+    myTeam = mine?.league ?? null;
   } catch (error) {
     const status = error instanceof UpstreamError ? error.status : 502;
     return jsonError(status, error instanceof Error ? error.message : "Could not load this trade.");
@@ -60,7 +74,11 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const png = await renderTradeCardPng(idea, lens);
+    const png = await renderTradeCardPng(idea, lens, {
+      format,
+      myTeamName: myTeam?.team_name,
+      myAvatarUrl: myTeam?.team_avatar_url,
+    });
     putCachedPng(key, png);
     return pngResponse(png, "miss");
   } catch {

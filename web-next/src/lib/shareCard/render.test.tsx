@@ -7,7 +7,7 @@ import type { RankedPlayer, TradeIdea } from "@/lib/api";
 
 import { clearShareCachesForTests, isAllowedImageUrl, renderPlayerCardPng, renderTradeCardPng, sniffImageType } from "./server";
 import { fixtureIdea as idea, fixturePlayer as player, pngSize } from "./testFixtures";
-import { maxRowsPerSide, rowSizeFor } from "./tradeCard";
+import { clampText, confidenceBars, edgeSummary, maxRowsFor } from "./tradeCard";
 
 describe("share card rendering", () => {
   beforeEach(() => {
@@ -21,6 +21,11 @@ describe("share card rendering", () => {
 
   it("renders the trade card as a 1080x1350 PNG", async () => {
     expect(pngSize(await renderTradeCardPng(idea, "Dynasty"))).toEqual({ width: 1080, height: 1350, isPng: true });
+  }, 60_000);
+
+  it("renders the 1200x630 OG variants of both cards", async () => {
+    expect(pngSize(await renderTradeCardPng(idea, "Dynasty", { format: "og", myTeamName: "My Team" }))).toEqual({ width: 1200, height: 630, isPng: true });
+    expect(pngSize(await renderPlayerCardPng(player, "Dynasty", { format: "og" }))).toEqual({ width: 1200, height: 630, isPng: true });
   }, 60_000);
 
   it("renders a trade with many assets without throwing", async () => {
@@ -50,10 +55,29 @@ describe("share card helpers", () => {
   });
 
   it("caps rows so big trades stay legible", () => {
-    expect(maxRowsPerSide(1, 2)).toBe(4);
-    expect(maxRowsPerSide(4, 4)).toBe(3);
-    expect(rowSizeFor(2)).toBeGreaterThan(rowSizeFor(6));
-    expect(rowSizeFor(6)).toBeGreaterThanOrEqual(60);
+    expect(maxRowsFor(false)).toBe(4);
+    expect(maxRowsFor(true)).toBe(2);
+  });
+
+  it("maps confidence to meter bars only when the label is real", () => {
+    expect(confidenceBars("Low")).toBe(1);
+    expect(confidenceBars("Medium")).toBe(2);
+    expect(confidenceBars("High")).toBe(3);
+    expect(confidenceBars("")).toBeNull();
+    expect(confidenceBars("Unrated")).toBeNull();
+  });
+
+  it("names the side the value edge favors", () => {
+    expect(edgeSummary(663, "Me", "Them").text).toBe("Edge: Me +663");
+    expect(edgeSummary(-663, "Me", "Them").text).toBe("Edge: Them +663");
+    expect(edgeSummary(0, "Me", "Them").text).toBe("Even value");
+  });
+
+  it("clamps rationale at a word boundary", () => {
+    expect(clampText("short text", 50)).toBe("short text");
+    const clamped = clampText("alpha bravo charlie delta echo foxtrot golf hotel india juliet", 30);
+    expect(clamped.endsWith("…")).toBe(true);
+    expect(clamped.length).toBeLessThanOrEqual(31);
   });
 });
 
@@ -70,14 +94,21 @@ describe.skipIf(!previewDir)("share card preview output", () => {
       const wanted = process.env.SHARE_CARD_PREVIEW_REC_IDS?.split(",") ?? [];
       for (const real of ideas) {
         if (!wanted.includes(real.recommendation_id ?? "")) continue;
-        writeFileSync(join(previewDir as string, `after-trade-${real.recommendation_id}.png`), Buffer.from(await renderTradeCardPng(real, "Dynasty")));
+        const myTeamName = process.env.SHARE_CARD_PREVIEW_TEAM;
+        writeFileSync(join(previewDir as string, `after-trade-${real.recommendation_id}.png`), Buffer.from(await renderTradeCardPng(real, "Dynasty", { myTeamName })));
+        writeFileSync(join(previewDir as string, `after-trade-${real.recommendation_id}-og.png`), Buffer.from(await renderTradeCardPng(real, "Dynasty", { format: "og", myTeamName })));
       }
     }
+    // Layout-only sample (a fixture player with stats), so the stats and
+    // usage blocks can be eyeballed when the real rows carry none.
+    writeFileSync(join(previewDir as string, "layout-sample-player.png"), Buffer.from(await renderPlayerCardPng(player, "Dynasty", { usageTrend: player.usage_trend })));
+    writeFileSync(join(previewDir as string, "layout-sample-player-og.png"), Buffer.from(await renderPlayerCardPng(player, "Dynasty", { format: "og", usageTrend: player.usage_trend })));
     const playersPath = process.env.SHARE_CARD_PREVIEW_PLAYERS;
     if (playersPath) {
       const players = JSON.parse(readFileSync(playersPath, "utf8")) as RankedPlayer[];
       for (const real of players) {
-        writeFileSync(join(previewDir as string, `after-player-${real.player_id}.png`), Buffer.from(await renderPlayerCardPng(real, "Dynasty")));
+        writeFileSync(join(previewDir as string, `after-player-${real.player_id}.png`), Buffer.from(await renderPlayerCardPng(real, "Dynasty", { usageTrend: real.usage_trend })));
+        writeFileSync(join(previewDir as string, `after-player-${real.player_id}-og.png`), Buffer.from(await renderPlayerCardPng(real, "Dynasty", { format: "og", usageTrend: real.usage_trend })));
       }
     }
   }, 180_000);

@@ -4,7 +4,7 @@ import type { RankedPlayer, TradeIdea } from "@/lib/api";
 export const fixtureIdea: TradeIdea = {
   partner_team_name: "Rival GM",
   partner_team_avatar_url: "https://sleepercdn.com/avatars/abc",
-  rationale: "",
+  rationale: "You move from RB surplus. Rival GM gets RB help and moves from WR surplus.",
   trade_gain: 274,
   confidence_label: "Low",
   market_realism_label: "Likely",
@@ -42,6 +42,20 @@ export const fixturePlayer: RankedPlayer = {
   rank_unavailable_reason: null,
   opportunity_label: "Strong Opportunity",
   overall_rating: 72,
+  usage_trend: {
+    direction: "up",
+    trend_pct: 26,
+    confidence_label: "moderate confidence",
+    arrow: "▲",
+    tone: "positive",
+    detail: "Weighted last 4 games 4.4 vs 3.5 baseline (4 usable games).",
+  },
+  stats: [
+    { key: "rec", label: "Rec", value: 64, format: "count", percentile: 71 },
+    { key: "rec_yds", label: "Rec Yds", value: 812, format: "yards", percentile: 68 },
+    { key: "rec_td", label: "Rec TD", value: 5, format: "td", percentile: 60 },
+    { key: "target_share", label: "Target Share", value: 21, format: "share", percentile: 74 },
+  ],
 };
 
 export function pngSize(png: ArrayBuffer): { width: number; height: number; isPng: boolean } {

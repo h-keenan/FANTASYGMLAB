@@ -8,6 +8,7 @@ import {
   jsonError,
   pngResponse,
   putCachedPng,
+  parseShareFormat,
   renderPlayerCardPng,
 } from "@/lib/shareCard/server";
 import { isValuationLens } from "@/lib/valuationLens";
@@ -31,10 +32,11 @@ export async function GET(request: Request): Promise<Response> {
   const leagueId = params.get("leagueId");
   const playerId = params.get("playerId");
   const lens = params.get("lens") || "Dynasty";
+  const format = parseShareFormat(params.get("format"));
   if (!isSafeId(leagueId) || !isSafeId(playerId)) return jsonError(422, "leagueId and playerId are required.");
   if (!isValuationLens(lens)) return jsonError(422, "Unknown lens.");
 
-  const key = cacheKey(["player", authorization, leagueId, playerId, lens]);
+  const key = cacheKey(["player", authorization, leagueId, playerId, lens, format]);
   const cached = getCachedPng(key);
   if (cached) return pngResponse(cached, "hit");
 
@@ -53,7 +55,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!player) return jsonError(404, "That player isn't on the current rankings board for this league.");
 
   try {
-    const png = await renderPlayerCardPng(player, lens);
+    const png = await renderPlayerCardPng(player, lens, { format, usageTrend: player.usage_trend ?? null });
     putCachedPng(key, png);
     return pngResponse(png, "miss");
   } catch {

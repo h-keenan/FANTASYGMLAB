@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import type { ReactElement } from "react";
 
-import type { RankedPlayer, TradeIdea } from "@/lib/api";
+import type { RankedPlayer, TradeIdea, UsageTrend } from "@/lib/api";
 import { valuationLensLabel } from "@/lib/valuationLens";
 
 import { OG_SIZE, SHARE_FONT_FAMILY, STORY_SIZE, ShareBackdrop, type ShareBrandAssets } from "./frame";
@@ -22,6 +22,12 @@ import { PlayerShareCard } from "./playerCard";
 import { TradeShareCard } from "./tradeCard";
 
 export type ShareFormat = "story" | "og";
+
+/** `?format=og` -> the 1200x630 link-unfurl card; anything else is the
+ * 1080x1350 story/post card. */
+export function parseShareFormat(value: string | null | undefined): ShareFormat {
+  return value === "og" ? "og" : "story";
+}
 
 export function shareSize(format: ShareFormat) {
   return format === "og" ? OG_SIZE : STORY_SIZE;
@@ -189,26 +195,57 @@ export async function brandFor(format: ShareFormat): Promise<ShareBrandAssets> {
 
 // ---------------------------------------------------------------- card renderers
 
-export async function renderTradeCardPng(idea: TradeIdea, lens: string): Promise<ArrayBuffer> {
-  const brand = await brandFor("story");
+export interface TradeCardOptions {
+  format?: ShareFormat;
+  /** The signed-in manager's own team (name + Sleeper avatar URL), when known. */
+  myTeamName?: string | null;
+  myAvatarUrl?: string | null;
+}
+
+export async function renderTradeCardPng(idea: TradeIdea, lens: string, options: TradeCardOptions = {}): Promise<ArrayBuffer> {
+  const format = options.format ?? "story";
+  const brand = await brandFor(format);
   const playerIds = [...(idea.package.send ?? []), ...(idea.package.receive ?? [])]
     .filter((asset) => asset.asset_type !== "pick" && asset.player_id)
     .map((asset) => asset.player_id as string);
-  const [partnerAvatar, ...shots] = await Promise.all([
+  const [partnerAvatar, myAvatar, ...shots] = await Promise.all([
     fetchImageDataUri(idea.partner_team_avatar_url),
+    fetchImageDataUri(options.myAvatarUrl),
     ...playerIds.map((id) => fetchImageDataUri(headshotUrl(id))),
   ]);
   const headshots = Object.fromEntries(playerIds.map((id, index) => [id, shots[index]]));
   return renderPng(
-    <TradeShareCard idea={idea} brand={brand} images={{ headshots, partnerAvatar }} lens={valuationLensLabel(lens)} {...STORY_SIZE} />,
-    "story",
+    <TradeShareCard
+      idea={idea}
+      brand={brand}
+      images={{ headshots, partnerAvatar, myAvatar }}
+      lens={valuationLensLabel(lens)}
+      myTeamName={options.myTeamName}
+      {...shareSize(format)}
+    />,
+    format,
   );
 }
 
-export async function renderPlayerCardPng(player: RankedPlayer, lens: string): Promise<ArrayBuffer> {
-  const brand = await brandFor("story");
+export async function renderPlayerCardPng(
+  player: RankedPlayer,
+  lens: string,
+  options: { format?: ShareFormat; usageTrend?: UsageTrend | null } = {},
+): Promise<ArrayBuffer> {
+  const format = options.format ?? "story";
+  const brand = await brandFor(format);
   const headshot = await fetchImageDataUri(headshotUrl(player.player_id));
-  return renderPng(<PlayerShareCard player={player} brand={brand} headshot={headshot} lens={valuationLensLabel(lens)} {...STORY_SIZE} />, "story");
+  return renderPng(
+    <PlayerShareCard
+      player={player}
+      brand={brand}
+      headshot={headshot}
+      lens={valuationLensLabel(lens)}
+      usageTrend={options.usageTrend ?? null}
+      {...shareSize(format)}
+    />,
+    format,
+  );
 }
 
 // ---------------------------------------------------------------- upstream API

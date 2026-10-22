@@ -93,7 +93,7 @@ function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; l
     const facts = [
       player.position && player.position_rank ? `${player.position}${player.position_rank}` : player.position,
       player.overall_rank ? `#${player.overall_rank} overall` : null,
-      player.score != null ? `${formatScore(player.score)} value` : null,
+      player.score != null ? `${Math.round(player.score).toLocaleString("en-US")} value` : null,
     ].filter(Boolean);
     const outcome = await shareImageOrText({
       fetchImage: () => api.getPlayerShareCardBlob(leagueId, player.player_id, lens),
@@ -241,16 +241,13 @@ export function PlayerProfileContent({
       </div>
 
       <div className="pqv-actions">
-<<<<<<< HEAD
         <PlayerLeagueActions
           leagueId={leagueId}
           leagueName={leagueName}
           playerId={player.player_id}
           sourceSurface="player_profile"
         />
-=======
         <SharePlayerButton player={player} leagueId={leagueId} lens={lens} />
->>>>>>> 7dc0932f (Redraw web trade and player share cards in web-next)
         <a
           className="pqv-action-link"
           href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
