@@ -79,8 +79,10 @@ async function authorizedRequest<T>(
 /** Authenticated binary GET (e.g. a share-card PNG) — mirrors
  * authorizedRequest/performRequest's auth, timeout, and error-detail
  * handling, but returns a Blob instead of parsing JSON (a PNG body isn't
- * JSON, and parsing it as such would always throw). */
-async function authorizedBinaryRequest(path: string): Promise<Blob> {
+ * JSON, and parsing it as such would always throw). `baseUrl` is the API
+ * by default; "" targets this web app's own origin (the share-card
+ * routes). */
+async function authorizedBinaryRequest(path: string, baseUrl: string = env.apiBaseUrl): Promise<Blob> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) {
@@ -92,7 +94,7 @@ async function authorizedBinaryRequest(path: string): Promise<Blob> {
 
   let response: Response;
   try {
-    response = await fetch(`${env.apiBaseUrl}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: controller.signal,
     });
@@ -2684,13 +2686,12 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
     ),
 
-  // Branded, QR-coded PNG for one Trade Hub idea (modules.share_card_renderer
-  // — the same pipeline the legacy Streamlit app already uses for its
-  // player-quick-view share card). ShareTradeButton (TradeIdeaCard.tsx)
-  // attaches this to the native Web Share sheet instead of sharing plain
-  // text only. The server re-derives the idea from its own cached search
-  // by recommendation_id rather than trusting a client-posted payload — see
-  // that endpoint's docstring in services/mobile_api_service.py.
+  // Branded 1080x1350 PNG for one Trade Hub idea, drawn by web-next itself
+  // (app/share-card/trade, lib/shareCard) from the app's own design tokens.
+  // ShareTradeButton (TradeIdeaCard.tsx) attaches it to the native Web
+  // Share sheet. That route re-derives the idea from the caller's own
+  // GET .../trade-hub by recommendation_id rather than trusting a
+  // client-posted payload. Same-origin, so no API base URL.
   getTradeHubIdeaShareCardBlob: (
     leagueId: string,
     recommendationId: string,
@@ -2698,7 +2699,17 @@ export const api = {
     lens: string = "Dynasty",
   ) =>
     authorizedBinaryRequest(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub/${encodeURIComponent(recommendationId)}/share-card.png?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
+      `/share-card/trade?leagueId=${encodeURIComponent(leagueId)}&rec=${encodeURIComponent(recommendationId)}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
+      "",
+    ),
+
+  // Branded 1080x1350 player card PNG (app/share-card/player) for the
+  // Player Profile page's Share button, built from the same
+  // GET .../rankings row that page renders.
+  getPlayerShareCardBlob: (leagueId: string, playerId: string, lens: string = "Dynasty") =>
+    authorizedBinaryRequest(
+      `/share-card/player?leagueId=${encodeURIComponent(leagueId)}&playerId=${encodeURIComponent(playerId)}&lens=${encodeURIComponent(lens)}`,
+      "",
     ),
 
   // "Select these specific players, find who'd want them" — same engine/
