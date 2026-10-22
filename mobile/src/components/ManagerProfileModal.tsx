@@ -5,9 +5,13 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 
+import AccentCard from './AccentCard';
 import AppText from './AppText';
+import DashboardStatRow from './DashboardStatRow';
+import SectionHeading from './SectionHeading';
+import ToneBadge from './ToneBadge';
 import { api } from '../lib/api';
-import { TENDENCY_SIGNALS } from '../lib/managerTendencies';
+import { sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone } from '../lib/managerTendencies';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
@@ -35,6 +39,8 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, roster
   });
   const data = query.data;
   const signals = data?.manager?.signals ?? {};
+  const sample = data?.manager?.sample ?? null;
+  const toneColors = { success: colors.success, warning: colors.premium, accent: colors.accent, premium: colors.violet };
   const rows = TENDENCY_SIGNALS.filter(([key]) => signals[key]?.status === 'ok');
 
   return (
@@ -70,15 +76,45 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, roster
             ) : rows.length === 0 ? (
               <AppText style={styles.muted}>Not enough trade history yet.</AppText>
             ) : (
-              rows.map(([key, title]) => (
-                <View key={key} style={styles.signal}>
-                  <AppText style={styles.signalTitle}>{title}</AppText>
-                  <AppText style={styles.signalSummary}>{signals[key].summary}</AppText>
-                  <AppText style={styles.muted}>
-                    {signals[key].sample_size} trade{signals[key].sample_size === 1 ? '' : 's'} analyzed
-                  </AppText>
-                </View>
-              ))
+              <>
+                {sample ? (
+                  <DashboardStatRow
+                    items={[
+                      { label: 'Trades', icon: 'swap-horizontal', value: String(sample.trades), valueColor: colors.success },
+                      { label: 'Wire moves', icon: 'flash-outline', value: String(sample.wire_moves) },
+                      { label: 'Seasons', icon: 'calendar-outline', value: String(sample.seasons) },
+                    ]}
+                  />
+                ) : null}
+                <SectionHeading title="Tendencies" />
+                {rows.map(([key, title]) => {
+                  const signal = signals[key];
+                  const tone = toneColors[tendencyTone(signal.label)];
+                  const badge = tendencyBadgeText(signal.label);
+                  return (
+                    <AccentCard key={key} accent={tone} compact style={styles.signal}>
+                      <View style={styles.signalHead}>
+                        <AppText style={styles.signalTitle}>{title}</AppText>
+                        {badge ? <ToneBadge label={badge} color={tone} /> : null}
+                      </View>
+                      <AppText style={styles.signalSummary}>{signal.summary}</AppText>
+                      <View style={styles.meterRow}>
+                        <View style={styles.meterTrack}>
+                          <View
+                            style={[
+                              styles.meterFill,
+                              { backgroundColor: tone, width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%` },
+                            ]}
+                          />
+                        </View>
+                        <AppText style={styles.muted}>
+                          {signal.sample_size} trade{signal.sample_size === 1 ? '' : 's'}
+                        </AppText>
+                      </View>
+                    </AccentCard>
+                  );
+                })}
+              </>
             )}
           </ScrollView>
         </Pressable>
@@ -111,9 +147,13 @@ function createStyles(colors: ThemeColors) {
     kicker: { fontSize: 11, color: colors.textSecondary },
     title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     body: { flexGrow: 0 },
-    signal: { marginBottom: spacing.md },
-    signalTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textSecondary },
-    signalSummary: { fontSize: 14, color: colors.textPrimary },
+    signal: { marginBottom: spacing.sm },
+    signalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    meterTrack: { flex: 1, height: 4, borderRadius: radii.pill, backgroundColor: colors.cardBorder, overflow: 'hidden' },
+    meterFill: { height: 4, borderRadius: radii.pill },
+    signalTitle: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: colors.textSecondary },
+    signalSummary: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
     muted: { fontSize: 12, color: colors.textSecondary },
     upsellTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     upsellCta: { fontSize: 13, fontWeight: '700', color: colors.premium, marginTop: spacing.xs },
