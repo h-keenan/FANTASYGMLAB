@@ -153,7 +153,7 @@ function RosterRow({
 }
 
 export interface RosterTab {
-  value: "starters" | "bench" | "ir" | "taxi";
+  value: "starters" | "bench" | "ir" | "taxi" | "idp";
   label: string;
   players: LineupPlayer[];
   /** Slot labels (FLEX, SF) replace the position badge on this tab. */

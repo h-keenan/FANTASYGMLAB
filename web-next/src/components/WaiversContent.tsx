@@ -32,6 +32,7 @@ import {
   waiversReasonMessage,
   type WaiverRecFilter,
 } from "@/lib/waiversPresentation";
+import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
@@ -411,12 +412,16 @@ export function WaiversContent({
     }).filter((entry): entry is { position: string; player: WaiverPlayer; count: number } => entry !== null);
   }, [data.players]);
 
+  const idpPlayers = useMemo(() => data.idp_players ?? [], [data.idp_players]);
+  const positionFilters = withIdpPositionOptions(FILTER_POSITIONS, idpPlayers);
+
   const filteredFreeAgents = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return data.players
+    const pool = isIdpPositionFilter(position) ? idpPlayers : data.players;
+    return pool
       .filter((p) => position === "ALL" || p.position === position)
       .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query));
-  }, [data.players, position, search]);
+  }, [data.players, idpPlayers, position, search]);
 
   const visibleFreeAgents = useMemo(() => {
     const base = filteredFreeAgents.slice(0, FREE_AGENT_LIST_PREVIEW_ROWS);
@@ -595,7 +600,7 @@ export function WaiversContent({
               onChange={(event) => setPosition(event.target.value)}
               className="filter-select px-3 py-2 text-sm"
             >
-              {FILTER_POSITIONS.map((pos) => (
+              {positionFilters.map((pos) => (
                 <option key={pos} value={pos}>
                   {pos}
                 </option>

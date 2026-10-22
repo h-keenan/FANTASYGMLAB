@@ -64,3 +64,9 @@ export function idpMethodNote(idp: LeagueIdpValuesResponse | null | undefined): 
   const unscored = keys.length ? ` Not counted: ${keys.join(', ')}.` : '';
   return `IDP values are model estimates from this league's own scoring, not market prices.${unscored}`;
 }
+
+/** Waivers / My Team position choices: defense chips only when the league
+ * response actually carries defenders (IDP leagues), else `base` unchanged. */
+export function withIdpPositionOptions(base: readonly string[], idpRows: readonly unknown[] | null | undefined): string[] {
+  return idpRows && idpRows.length > 0 ? [...base, ...IDP_POSITION_FILTERS] : [...base];
+}

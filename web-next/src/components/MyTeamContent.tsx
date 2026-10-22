@@ -171,6 +171,9 @@ export function MyTeamContent({
       ];
   if (irBench.length > 0) tabs.push({ value: "ir", label: "IR", players: irBench, muted: true });
   if (taxiBench.length > 0) tabs.push({ value: "taxi", label: "Taxi", players: taxiBench, muted: true });
+  // IDP leagues only: rostered defenders (model value), else the tab is absent.
+  const idpPlayers = myTeam.idp_players ?? [];
+  if (idpPlayers.length > 0) tabs.push({ value: "idp", label: "IDP", players: idpPlayers, muted: true });
 
   const composition = buildRosterComposition(
     bestBall

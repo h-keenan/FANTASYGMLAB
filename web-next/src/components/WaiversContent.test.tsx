@@ -276,4 +276,18 @@ describe("WaiversContent", () => {
     expect(screen.queryByText("Other Guy")).not.toBeInTheDocument();
     spy.mockRestore();
   });
+
+  it("Explore lists free-agent defenders under DL/LB/DB only in IDP leagues", () => {
+    const idp = [player({ player_id: "dl9", name: "Free Edge", position: "DL", score: 640, overall_rating: null })];
+    const { unmount } = render(<WaiversContent leagueName="IDP" data={{ ...BASE_RESPONSE, idp_players: idp }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    expect(screen.queryByText("Free Edge")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "DL" } });
+    expect(screen.getByText("Free Edge")).toBeInTheDocument();
+    unmount();
+
+    render(<WaiversContent leagueName="Std" data={BASE_RESPONSE} />);
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    expect(screen.queryByRole("option", { name: "DL" })).not.toBeInTheDocument();
+  });
 });

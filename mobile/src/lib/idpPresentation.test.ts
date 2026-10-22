@@ -7,6 +7,7 @@ import {
   idpRowsAsRankedPlayers,
   isIdpPositionFilter,
   playersPositionOptions,
+  withIdpPositionOptions,
 } from './idpPresentation.ts';
 
 const BASE = ['ALL', 'QB', 'RB', 'WR', 'TE'];
@@ -62,4 +63,10 @@ test('chips and the method note', () => {
   assert.ok(note.includes('not market prices'));
   assert.ok(note.includes('bonus_def_int_td_50p'));
   assert.equal(idpMethodNote(null), null);
+});
+
+test('withIdpPositionOptions adds DL/LB/DB only when defenders are present', () => {
+  assert.deepEqual(withIdpPositionOptions(BASE, []), BASE);
+  assert.deepEqual(withIdpPositionOptions(BASE, undefined), BASE);
+  assert.deepEqual(withIdpPositionOptions(BASE, [{}]), [...BASE, 'DL', 'LB', 'DB']);
 });

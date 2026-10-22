@@ -43,6 +43,7 @@ import WaiverRecommendationCard, {
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { isIdpPositionFilter, withIdpPositionOptions } from '../lib/idpPresentation';
 import { filterByRecommendation, type WaiverRecFilter } from '../lib/waiverChips';
 import { useOrbClearance } from '../lib/orbLayout';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
@@ -109,6 +110,8 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const { leagueId, leagueName } = route.params;
   const { lens } = useValuationLens(leagueId);
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
+  // IDP leagues only; empty otherwise.
+  const [idpAgents, setIdpAgents] = useState<WaiverPlayer[]>([]);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [neededPositions, setNeededPositions] = useState<string[]>([]);
   const [stashCandidates, setStashCandidates] = useState<WaiverPlayer[]>([]);
@@ -155,6 +158,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           const result = await api.getLeagueWaivers(leagueId, { lens, limit: 300 });
           if (cancelled) return;
           setFreeAgents(result.players);
+          setIdpAgents(result.idp_players ?? []);
           setPriorityAdds(result.priority_adds);
           setNeededPositions(result.needed_positions);
           setStashCandidates(result.stash_candidates);
@@ -183,10 +187,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const filtered = useMemo(() => {
     if (!freeAgents) return [];
     const query = search.trim().toLowerCase();
-    return freeAgents
+    return (isIdpPositionFilter(position) ? idpAgents : freeAgents)
       .filter((p) => position === 'ALL' || p.position === position)
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
-  }, [freeAgents, position, search]);
+  }, [freeAgents, idpAgents, position, search]);
+  const positionOptions = useMemo(() => withIdpPositionOptions(POSITIONS, idpAgents), [idpAgents]);
 
   // Mirrors modules/waivers_ui.py's render_free_agent_summary_cards: prefer
   // non-stale players with a real score as the pool, falling back to the
@@ -374,7 +379,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     placeholderTextColor={colors.textTertiary}
                   />
                   <View style={styles.filterRow}>
-                    <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+                    <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
                     <ViewModeToggle value={viewMode} onChange={setViewMode} />
                   </View>
                 </View>
