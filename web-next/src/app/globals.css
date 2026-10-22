@@ -2136,3 +2136,248 @@ a {
   border-color: var(--color-accent-strong) !important;
   background: var(--color-accent-soft) !important;
 }
+
+/* Percentile Explorer sheet (components/PercentileExplorerSheet.tsx): reuses
+   the shared .pqv-backdrop/.pqv-modal sheet shell; only the chart, marker and
+   compare-card pieces are new. Colors are existing semantic tokens. */
+.pe-backdrop {
+  z-index: 60;
+}
+.pe-sheet {
+  max-height: 92vh;
+}
+.pe-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+.pe-title {
+  margin: 0;
+  padding-right: 2.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.pe-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.pe-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.pe-skeleton {
+  height: 260px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-secondary);
+  opacity: 0.6;
+}
+.pe-chart {
+  position: relative;
+  width: 100%;
+  margin-top: var(--space-sm);
+}
+.pe-bars {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  height: 64px;
+  border-bottom: 2px solid var(--color-accent);
+}
+.pe-bar {
+  position: absolute;
+  bottom: 0;
+  box-sizing: border-box;
+  background: var(--color-surface-raised);
+  border-right: 1px solid var(--color-surface-primary);
+  border-radius: 2px 2px 0 0;
+}
+.pe-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 20px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+.pe-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.pe-axis span:first-child {
+  transform: none;
+}
+.pe-axis span:last-child {
+  transform: translateX(-100%);
+}
+.pe-axis-title {
+  margin: 0;
+  text-align: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.pe-stem {
+  position: absolute;
+  bottom: 22px;
+  width: 1px;
+  background: var(--color-border-strong);
+  opacity: 0.55;
+}
+.pe-marker {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 58px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.pe-marker:disabled {
+  cursor: default;
+}
+.pe-marker-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+}
+.pe-marker-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.pe-marker--me .pe-marker-name,
+.pe-marker--me .pe-marker-value {
+  color: var(--color-accent);
+}
+.pe-face {
+  display: inline-grid;
+  border-radius: 50%;
+}
+.pe-face--me {
+  box-shadow: 0 0 10px var(--color-accent);
+}
+.pe-marker--picked .pe-face {
+  box-shadow: 0 0 0 2px var(--color-action);
+}
+.pe-badge {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-default) solid var(--color-border);
+  background: var(--color-surface-secondary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+.pe-badge--low {
+  border-color: var(--color-danger);
+}
+.pe-badge--mid {
+  border-color: var(--color-action);
+}
+.pe-badge--high {
+  border-color: var(--color-success);
+}
+.pe-compare {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+.pe-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-sm);
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-secondary);
+}
+.pe-side-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+.pe-side-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pe-side-meta {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+.pe-side-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.pe-delta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.pe-swap {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-default) solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.pe-delta-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-accent);
+}
+.pe-delta-label {
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+}
+
+.pqv-stat-row--tap {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.pqv-stat-row--tap:hover,
+.pqv-stat-row--tap:focus-visible {
+  border-color: var(--color-accent);
+}

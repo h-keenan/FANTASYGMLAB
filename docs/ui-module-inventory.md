@@ -123,6 +123,7 @@ player half), mobile `ValueStat`/`ToneBadge`/`AccentCard` call sites.
 | Module | Where used | Props / variants |
 |---|---|---|
 | `PlayerQuickView` (+ exported `StatGroup`, `SubRatingRow`, `AwardsStrip`, `BioGrid`) | every route via `PlayerQuickViewProvider`, and /players/[id] | The one player modal/sheet |
+| `PercentileExplorerSheet` (web + mobile) | tap a stat tile in the player view | Percentile distribution, nearby-player markers and compare card. Reuses the shared sheet, `PillRow`/`SegmentedTabBar`, `EmptyState`, `PlayerAvatar` |
 | `EmbeddedCheckoutModal` | /, /premium | Stripe embedded checkout |
 | `AgeGate` | / (via SignInForm) | Justified one-off |
 

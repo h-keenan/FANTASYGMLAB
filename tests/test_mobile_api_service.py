@@ -15376,3 +15376,45 @@ def test_quick_view_bye_offseason_has_week_but_no_this_week_flag():
 
     with patch("modules.nfl_schedule.load_games", return_value=_bye_games()):
         assert svc._quick_view_bye("CHI", today=date(2026, 6, 1)) == (9, False)
+
+
+
+def _explorer_get(monkeypatch, frame, query):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            return client.get(
+                f"/v1/players/fixture-player/percentile-explorer?{query}",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+
+def test_percentile_explorer_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/players/9001/percentile-explorer?stat=ppr_ppg").status_code == 401
+
+
+def test_percentile_explorer_matches_quick_view_tile(monkeypatch):
+    from tests.test_player_quick_view import _pool_with_subject
+
+    frame = _pool_with_subject(30)
+    response = _explorer_get(monkeypatch, frame, "stat=ppr_ppg&pool=position&season=2025")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reason"] == ""
+    assert body["player"]["player_id"] == "fixture-player"
+    assert body["nearby"] and body["bins"]
+
+    unavailable = _explorer_get(monkeypatch, frame, "stat=ppr_ppg&season=1999").json()
+    assert unavailable["reason"] == "season_unavailable"
+    assert unavailable["nearby"] == []
+
+
+def test_percentile_explorer_small_pool_has_no_chart(monkeypatch):
+    from tests.test_player_quick_view import _pool_with_subject
+
+    body = _explorer_get(monkeypatch, _pool_with_subject(4), "stat=ppr_ppg").json()
+    assert body["reason"] == "insufficient_pool"
+    assert "bins" not in body
