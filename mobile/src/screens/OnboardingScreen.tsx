@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -21,62 +22,36 @@ import type { ExperienceLevelValue } from '../lib/api';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { disabledOpacity, radii, shadows, spacing, typography, type ThemeColors } from '../theme';
+import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type ColorKey = 'accent' | 'premium' | 'success';
 
-const STEP_KEYS = ['who', 'solve', 'how', 'orb', 'level'] as const;
+// One swipeable slide per feature, led by a real screenshot of that page in
+// a phone frame with a one-line benefit below (owner, 2026-10-22: the old
+// sample-card slide was "too basic"). Screenshots are captured from the real
+// web UI against a generic sample league (no real users' data) and shared
+// with web-next (public/onboarding/*.webp mirrors assets/onboarding/).
+// Keep this list, its order and its copy in lockstep with web-next's
+// OnboardingCarousel.tsx ONBOARDING_FEATURES. Flow: features -> connect ->
+// experience level. (The mobile-only GM orb intro slide was dropped to match
+// that flow.)
+const FEATURES = [
+  { key: 'gameplan', title: 'Game Plan', benefit: 'One clear top priority every time you open the app.', image: require('../../assets/onboarding/onboarding-gameplan.webp') },
+  { key: 'tradehub', title: 'Trade Hub', benefit: 'Trade ideas your league partners would actually accept.', image: require('../../assets/onboarding/onboarding-tradehub.webp') },
+  { key: 'matchup', title: 'Matchup', benefit: 'Win odds for your week, before kickoff.', image: require('../../assets/onboarding/onboarding-matchup.webp') },
+  { key: 'planner', title: 'Lineup Planner', benefit: 'See what a swap does to your win odds.', image: require('../../assets/onboarding/onboarding-planner.webp') },
+  { key: 'pqv', title: 'Player Quick View', benefit: 'Value, usage, and fit for any player in one tap.', image: require('../../assets/onboarding/onboarding-pqv.webp') },
+  { key: 'playoff', title: 'Playoff Odds', benefit: 'Simulated playoff odds for every team in your league.', image: require('../../assets/onboarding/onboarding-playoff.webp') },
+  { key: 'tendencies', title: 'Manager Tendencies', benefit: 'Know how each manager trades before you pitch.', image: require('../../assets/onboarding/onboarding-tendencies.webp') },
+  { key: 'waivers', title: 'Waivers', benefit: 'Priority Adds ranked for your roster, with FAAB ranges.', image: require('../../assets/onboarding/onboarding-waivers.webp') },
+] as const;
+
+const STEP_KEYS = [...FEATURES.map((f) => f.key), 'connect', 'level'] as const;
 type StepKey = (typeof STEP_KEYS)[number];
-
-// Steps 'who' / 'solve' / 'how' / 'level' are a port of web-next's
-// OnboardingCarousel.tsx (Zach, 2026-10-18: "at least 3 pgs on sign up abt
-// who we are and what we solve and how it works and ask if the user is a
-// beginner or advanced"), copy verbatim from that component. Its step-1
-// copy is itself the coridian_-approved (2026-09-26) mobile copy, so do not
-// rephrase without re-checking with product. 'orb' is the one mobile-only
-// step: web's carousel omits it only because the GM orb doesn't exist on web.
-
-const SOLVE_ROWS: { icon: IconName; color: ColorKey; title: string; body: string }[] = [
-  {
-    icon: 'swap-horizontal-outline',
-    color: 'premium',
-    title: 'Trade Hub',
-    body: 'Real, believable trade ideas — ones your league partners would actually say yes to.',
-  },
-  {
-    icon: 'add-circle-outline',
-    color: 'success',
-    title: 'Waivers',
-    body: 'Priority Adds ranked for your roster, not a generic most-added list.',
-  },
-  {
-    icon: 'flash-outline',
-    color: 'accent',
-    title: 'Next Move',
-    body: 'One clear top priority every time you open the app.',
-  },
-];
-
-const HOW_STEPS: { color: ColorKey; title: string; body: string }[] = [
-  {
-    color: 'accent',
-    title: 'Connect your Sleeper league',
-    body: 'The one setup step. Every recommendation depends on it.',
-  },
-  {
-    color: 'premium',
-    title: 'Get your Game Plan',
-    body: 'The Dashboard leads with your top priority action first.',
-  },
-  {
-    color: 'success',
-    title: 'Make your move',
-    body: 'Act straight from Trade Hub or Waivers — recommendation and action, same place.',
-  },
-];
+const PHONE_ASPECT = 600 / 1298;
 
 const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: ColorKey; title: string; body: string }[] = [
   {
@@ -108,7 +83,10 @@ export default function OnboardingScreen({ navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  // Phone frame fills most of the slide but leaves room for the header,
+  // eyebrow, one-line benefit and footer buttons.
+  const phoneHeight = Math.max(240, Math.min(height * 0.56, 460));
   const { onboardingComplete, completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
@@ -157,71 +135,31 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   const renderStep = (key: StepKey) => {
+    const feature = FEATURES.find((f) => f.key === key);
+    if (feature) {
+      return (
+        <>
+          <AppText style={styles.eyebrow}>{feature.title}</AppText>
+          <View style={[styles.phoneFrame, { height: phoneHeight, width: phoneHeight * PHONE_ASPECT }]}>
+            <Image
+              source={feature.image}
+              style={styles.phoneImage}
+              resizeMode="cover"
+              accessibilityLabel={`${feature.title} screen, shown with sample league data`}
+            />
+          </View>
+          <AppText style={styles.benefit}>{feature.benefit}</AppText>
+        </>
+      );
+    }
     switch (key) {
-      case 'who':
+      case 'connect':
         return (
           <>
             <BrandMark width={112} style={styles.mark} />
-            <AppText style={styles.eyebrow}>Who we are</AppText>
-            <AppText style={styles.headline}>Your fantasy front office, not just a stats app.</AppText>
-            <AppText style={styles.body}>
-              Real recommendations across your Trade Hub, Waivers, and Next Move — not raw data you have to
-              interpret yourself.
-            </AppText>
-          </>
-        );
-      case 'solve':
-        return (
-          <>
-            <AppText style={styles.eyebrow}>What we solve</AppText>
-            <AppText style={styles.headlineSm}>{'Dynasty data is everywhere.\nDecisions are hard.'}</AppText>
-            <View style={styles.cards}>
-              {SOLVE_ROWS.map((row) => (
-                <GlassPanel key={row.title} style={styles.rowCard}>
-                  <Ionicons name={row.icon} size={20} color={colors[row.color]} style={styles.rowIcon} />
-                  <View style={styles.rowText}>
-                    <AppText style={styles.rowTitle}>{row.title}</AppText>
-                    <AppText style={styles.rowBody}>{row.body}</AppText>
-                  </View>
-                </GlassPanel>
-              ))}
-            </View>
-          </>
-        );
-      case 'how':
-        return (
-          <>
-            <AppText style={styles.eyebrow}>How it works</AppText>
-            <AppText style={styles.headlineSm}>Three steps. That's it.</AppText>
-            <View style={styles.cards}>
-              {HOW_STEPS.map((step, i) => (
-                <View key={step.title} style={styles.howRow}>
-                  <View style={[styles.stepNumber, { backgroundColor: colors[step.color] }]}>
-                    <AppText style={styles.stepNumberText}>{i + 1}</AppText>
-                  </View>
-                  <GlassPanel style={styles.howCard}>
-                    <AppText style={styles.rowTitle}>{step.title}</AppText>
-                    <AppText style={styles.rowBody}>{step.body}</AppText>
-                  </GlassPanel>
-                </View>
-              ))}
-            </View>
-          </>
-        );
-      case 'orb':
-        return (
-          <>
-            <View style={styles.orbHalo}>
-              <View style={styles.orbCore}>
-                <BrandMark width={40} />
-              </View>
-            </View>
-            <AppText style={styles.eyebrow}>Getting around</AppText>
-            <AppText style={styles.headline}>Meet the GM orb</AppText>
-            <AppText style={styles.body}>
-              This single floating control gets you anywhere — your leagues, GM Tools, everything else. There is
-              no bottom nav. This is it.
-            </AppText>
+            <AppText style={styles.eyebrow}>One setup step</AppText>
+            <AppText style={styles.headlineSm}>Connect Sleeper or ESPN</AppText>
+            <AppText style={styles.body}>Every recommendation is built around your league.</AppText>
           </>
         );
       case 'level':
@@ -380,46 +318,30 @@ function createStyles(colors: ThemeColors) {
       maxWidth: 340,
     },
     cards: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.md },
-    rowCard: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing.md },
-    rowIcon: { marginRight: spacing.md, marginTop: 2 },
-    rowText: { flex: 1 },
+    phoneFrame: {
+      marginTop: spacing.sm,
+      borderWidth: 5,
+      borderColor: colors.borderStrong,
+      borderRadius: radii.lg,
+      backgroundColor: colors.background,
+      overflow: 'hidden',
+    },
+    phoneImage: { width: '100%', height: '100%' },
+    benefit: {
+      ...typography.body,
+      fontSize: 17,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      textAlign: 'center',
+      lineHeight: 24,
+      maxWidth: 320,
+      marginTop: spacing.md,
+    },
     rowTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     rowBody: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: 2 },
-    howRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    stepNumber: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    stepNumberText: { fontSize: 14, fontWeight: '800', color: colors.onAccent },
-    howCard: { flex: 1, padding: spacing.md },
     pickCard: { padding: spacing.md, borderWidth: 1.5, borderColor: 'transparent' },
     pickCardSelected: { borderColor: colors.accent },
     pickHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
-    // Stylized stand-in for the GM orb (not the real animated component):
-    // an accent-tinted halo around a small core carrying the FD mark.
-    orbHalo: {
-      width: 132,
-      height: 132,
-      borderRadius: 66,
-      backgroundColor: colors.accentMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.xl,
-    },
-    orbCore: {
-      width: 68,
-      height: 68,
-      borderRadius: 34,
-      backgroundColor: colors.background,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      ...shadows.orbGlow,
-    },
     footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
     dotsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     dot: { width: 7, height: 7, borderRadius: radii.pill, backgroundColor: colors.border },
