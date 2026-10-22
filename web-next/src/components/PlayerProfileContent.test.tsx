@@ -22,6 +22,7 @@ vi.mock("@/lib/api", async () => {
       getPlayerWeeklyStats: vi.fn(),
       getPlayerSchedule: vi.fn(),
       getPlayerCareer: vi.fn(),
+      getPlayerShareCardBlob: vi.fn(),
     },
   };
 });
@@ -272,5 +273,26 @@ describe("PlayerProfileContent", () => {
 
     const link = screen.getByText("Compare this player");
     expect(link.closest("a")).toHaveAttribute("href", "/player-compare/league-1?a=p1&name=My%20League");
+  });
+
+  it("shares the branded player card PNG for this league and lens", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+    vi.mocked(api.getPlayerShareCardBlob).mockResolvedValue(new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }));
+    const share = vi.fn(async () => {});
+    Object.defineProperty(navigator, "share", { value: share, configurable: true, writable: true });
+    Object.defineProperty(navigator, "canShare", { value: () => true, configurable: true, writable: true });
+
+    render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" lens="Rebuild" />);
+    fireEvent.click(screen.getByText("Share card"));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(api.getPlayerShareCardBlob).toHaveBeenCalledWith("league-1", "p1", "Rebuild");
+    const data = (share.mock.calls[0] as unknown as [ShareData])[0];
+    expect(data.files?.[0].type).toBe("image/png");
+    expect(data.text).toContain("Player One");
+
+    delete (navigator as unknown as Record<string, unknown>).share;
+    delete (navigator as unknown as Record<string, unknown>).canShare;
   });
 });
