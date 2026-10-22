@@ -3,15 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import { api, type RankedPlayer } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
+import { PositionBadge } from "@/components/PositionBadge";
 import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
+import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from "@/lib/playerSearch";
 
 /**
  * web-next's counterpart to mobile's GmOrb.tsx and the Streamlit web app's
@@ -28,9 +32,15 @@ import { SheetHandle } from "@/components/SheetHandle";
  * 2026-10-17: "desktop side menu").
  *
  * Deliberately smaller than mobile's version for a first pass: no drag-to-
- * reposition, no destination search, no unread/new-content badges. The core
- * job — "one button gets you anywhere" — is what was completely missing;
- * those refinements are real but separate follow-ups.
+ * reposition, no unread/new-content badges. The core job — "one button gets
+ * you anywhere" — is what was completely missing; those refinements are
+ * real but separate follow-ups.
+ *
+ * Search (tap-depth audit 2026-10, #3): one field, same as mobile's orb.
+ * It filters the destinations below by label/subtitle and, with a league
+ * open, also matches player names from that league's ranked pool (the same
+ * pool the Players page searches, fetched once on the first real query).
+ * Tapping a player opens their Player Quick View.
  */
 export function GmOrb() {
   const [open, setOpen] = useState(false);
@@ -69,6 +79,41 @@ export function GmOrb() {
   // DesktopSidebar.tsx and has no notion of this per-account gate.
   const founderCapable = session?.user?.app_metadata?.founder_ops === true;
 
+  const { openPlayer } = usePlayerQuickView();
+  const [query, setQuery] = useState("");
+  const [playerPool, setPlayerPool] = useState<{ leagueId: string; players: RankedPlayer[] } | null>(null);
+  const normalizedQuery = query.trim().toLowerCase();
+  const wantsPlayers = Boolean(leagueId) && normalizedQuery.length >= PLAYER_SEARCH_MIN_CHARS;
+  const poolReady = playerPool !== null && playerPool.leagueId === leagueId;
+  useEffect(() => {
+    if (!wantsPlayers || !leagueId || poolReady) return;
+    let cancelled = false;
+    api
+      .getLeagueRankings(leagueId)
+      .then((result) => {
+        if (!cancelled) setPlayerPool({ leagueId, players: result.players ?? [] });
+      })
+      .catch(() => {
+        // Search still works for destinations; players just don't match.
+        if (!cancelled) setPlayerPool({ leagueId, players: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantsPlayers, leagueId, poolReady]);
+
+  const destinationResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    const searchable = [...(leagueId ? [...coreLeagueDestinations, ...gmToolsDestinations] : []), ...generalDestinations];
+    return searchable.filter((destination) =>
+      `${destination.label} ${destination.subtitle}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [normalizedQuery, leagueId, coreLeagueDestinations, gmToolsDestinations, generalDestinations]);
+  const playerResults = useMemo(
+    () => (wantsPlayers && poolReady ? matchPlayersByName(playerPool.players, normalizedQuery) : []),
+    [wantsPlayers, poolReady, playerPool, normalizedQuery],
+  );
+
   if (!session) return null;
   // Zach, 2026-10-19: "fix the bottom orb on onboard its covering" — "/"
   // is exclusively the signup/Sleeper-import/paywall flow (an already-
@@ -84,6 +129,7 @@ export function GmOrb() {
       <button
         type="button"
         onClick={() => {
+          setQuery("");
           setOpen(true);
           // Every real open is its own meaningful interaction, not a
           // reached-once-ever milestone -- no dedup (see
@@ -168,6 +214,66 @@ export function GmOrb() {
                 <span style={{ font: "var(--type-section-title)" }}>Where to go</span>
               </div>
 
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={leagueId ? "Search where to go or a player" : "Search where to go"}
+                aria-label={leagueId ? "Search destinations and players" : "Search destinations"}
+                autoComplete="off"
+                className="filter-input px-3 py-2 text-sm w-full"
+              />
+
+              {normalizedQuery ? (
+                destinationResults.length > 0 || playerResults.length > 0 ? (
+                  <>
+                    {destinationResults.length > 0 ? (
+                      <div className="flex flex-col">
+                        {destinationResults.map((destination) => (
+                          <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                        ))}
+                      </div>
+                    ) : null}
+                    {playerResults.length > 0 ? (
+                      <NavSection label="Players">
+                        {playerResults.map((player) => (
+                          <button
+                            key={player.player_id}
+                            type="button"
+                            onClick={() => {
+                              setOpen(false);
+                              openPlayer({ ...player, leagueId: leagueId ?? undefined, leagueName, sourceLabel: "Search" });
+                            }}
+                            className="flex items-center gap-3 py-2.5 text-left"
+                            style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+                          >
+                            <PositionBadge position={player.position} />
+                            <span className="flex flex-col min-w-0">
+                              <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                                {player.name}
+                              </span>
+                              {player.team ? (
+                                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                                  {player.team}
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                        ))}
+                      </NavSection>
+                    ) : null}
+                  </>
+                ) : wantsPlayers && !poolReady ? (
+                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                    Searching players…
+                  </p>
+                ) : (
+                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                    {leagueId ? "No destinations or players match" : "No destinations match"} &ldquo;{query.trim()}&rdquo;.
+                  </p>
+                )
+              ) : (
+              <>
               {leagueId ? (
                 <NavSection label={leagueName || "League"}>
                   {coreLeagueDestinations.map((destination) => (
@@ -208,6 +314,8 @@ export function GmOrb() {
                   />
                 </NavSection>
               ) : null}
+              </>
+              )}
             </div>
           </div>
         </div>

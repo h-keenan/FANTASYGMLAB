@@ -42,6 +42,9 @@ export const queryKeys = {
   leagueRosters: (leagueId: string) =>
     [...userScopeKey(), 'league', leagueId, 'league-rosters'] as const,
   myRoster: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'my-roster'] as const,
+  // GET .../rankings at the default lens: the GM orb's player-name search
+  // pool (only names/ids are read from it, so the lens doesn't matter).
+  leagueRankings: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'rankings'] as const,
   // MyTeamScreen's suggested starters/bench — also the same endpoint
   // PlayerDetailScreen's roster-recommendation enrichment fetch hits, though
   // that one's still a plain fetch-on-mount (out of scope for this pass).

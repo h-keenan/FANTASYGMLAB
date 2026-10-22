@@ -29,15 +29,17 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
 import BrandMark from './BrandMark';
+import PlayerIdentityRow from './PlayerIdentityRow';
 import { currentLeagueContext, navigationRef, switchLeagueKeepingScreen } from '../navigation/navigationRef';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
-import { api } from '../lib/api';
+import { api, type RankedPlayer } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { queryKeys } from '../lib/queryKeys';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
+import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from '../lib/playerSearch';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -558,6 +560,23 @@ export default function GmOrb() {
     );
   }, [searchableDestinations, normalizedQuery]);
 
+  // Player names too (tap-depth audit #3): the same league-ranked pool the
+  // Players screen searches, fetched only once someone has typed a real
+  // query with a league open, then cached. Tapping a match opens that
+  // player's detail screen.
+  const playerSearchEnabled =
+    !isRestoring && open && Boolean(league?.leagueId) && normalizedQuery.length >= PLAYER_SEARCH_MIN_CHARS;
+  const playerPoolQuery = useQuery({
+    queryKey: queryKeys.leagueRankings(league?.leagueId ?? ''),
+    queryFn: () => api.getLeagueRankings(league!.leagueId, { limit: 300 }),
+    enabled: playerSearchEnabled,
+    staleTime: 10 * 60 * 1000,
+  });
+  const playerResults = useMemo(
+    () => (playerSearchEnabled ? matchPlayersByName(playerPoolQuery.data?.players ?? [], normalizedQuery) : []),
+    [playerSearchEnabled, playerPoolQuery.data, normalizedQuery],
+  );
+
   const sheetY = useSharedValue(400);
   const backdropOpacity = useSharedValue(0);
   const orbScale = useSharedValue(1);
@@ -716,6 +735,12 @@ export default function GmOrb() {
     navigationRef.dispatch(StackActions.popTo(destination.route, league));
   };
 
+  const openPlayer = (player: RankedPlayer) => {
+    closeSheet();
+    if (!league || !navigationRef.isReady()) return;
+    navigationRef.navigate('PlayerDetail', { player, leagueId: league.leagueId, leagueName: league.leagueName });
+  };
+
   const switchToLeague = (row: SavedLeagueRow) => {
     closeSheet();
     const target = { leagueId: row.league_id, leagueName: row.league_name || 'League' };
@@ -789,13 +814,13 @@ export default function GmOrb() {
 
           <TextInput
             style={styles.searchInput}
-            placeholder="Search where to go"
+            placeholder={league ? 'Search where to go or a player' : 'Search where to go'}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
             placeholderTextColor={colors.textTertiary}
-            accessibilityLabel="Search destinations"
+            accessibilityLabel={league ? 'Search destinations and players' : 'Search destinations'}
           />
 
           <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
@@ -804,8 +829,9 @@ export default function GmOrb() {
               // groups into one plain match list — same NavRow, same
               // unreadCount/hasNew badges, just no section labels since
               // results can span every group at once.
-              searchResults.length > 0 ? (
-                searchResults.map((destination) => (
+              searchResults.length > 0 || playerResults.length > 0 ? (
+                <>
+                {searchResults.map((destination) => (
                   <NavRow
                     key={destination.route}
                     destination={destination}
@@ -820,9 +846,30 @@ export default function GmOrb() {
                     }
                     onPress={() => go(destination)}
                   />
-                ))
+                ))}
+                {playerResults.length > 0 ? (
+                  <NavSection label="Players">
+                    {playerResults.map((player) => (
+                      <PlayerIdentityRow
+                        key={player.player_id}
+                        playerId={player.player_id}
+                        name={player.name}
+                        position={player.position}
+                        team={player.team}
+                        tier={player.tier}
+                        overallRating={player.overall_rating}
+                        onPress={() => openPlayer(player)}
+                      />
+                    ))}
+                  </NavSection>
+                ) : null}
+                </>
+              ) : playerSearchEnabled && playerPoolQuery.isFetching ? (
+                <AppText style={styles.sectionNote}>Searching players…</AppText>
               ) : (
-                <AppText style={styles.sectionNote}>No destinations match "{searchQuery.trim()}".</AppText>
+                <AppText style={styles.sectionNote}>
+                  {league ? 'No destinations or players match' : 'No destinations match'} "{searchQuery.trim()}".
+                </AppText>
               )
             ) : (
               <>
