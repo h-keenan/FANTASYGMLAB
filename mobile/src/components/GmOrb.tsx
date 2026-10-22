@@ -37,6 +37,8 @@ import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { queryKeys } from '../lib/queryKeys';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
+import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
+import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from '../lib/playerSearch';
@@ -233,7 +235,16 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
   ];
 }
 
-function generalDestinations(colors: ThemeColors): Destination[] {
+// Not a stack route: the Premium row's subscriber variant opens the store's
+// subscription settings instead (see `go`).
+const MANAGE_SUBSCRIPTION_ROUTE = '__manage_subscription__';
+
+/** `storeSubscriber`: an active App Store / Play subscription per RevenueCat
+ * (tap-depth audit #10). Those users get "Manage subscription" -> the same
+ * store settings More's row opens, instead of a Paywall they've already
+ * bought through. A web (Stripe) or unknown subscriber stays on Premium ->
+ * Paywall, unchanged, since the store page wouldn't show their plan. */
+function generalDestinations(colors: ThemeColors, storeSubscriber = false): Destination[] {
   return [
     { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: 'Switch leagues and manage account' },
     // Account-wide, not league-scoped — belongs here with Home/News/Premium,
@@ -251,13 +262,21 @@ function generalDestinations(colors: ThemeColors): Destination[] {
       subtitle: 'Your standing across every saved league',
     },
     { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
-    {
-      label: 'Premium',
-      route: 'Paywall',
-      icon: 'star-outline',
-      color: colors.premium,
-      subtitle: 'Unlock the full FantasyDesk experience',
-    },
+    storeSubscriber
+      ? {
+          label: 'Manage subscription',
+          route: MANAGE_SUBSCRIPTION_ROUTE,
+          icon: 'star-outline',
+          color: colors.premium,
+          subtitle: 'Change or cancel your plan',
+        }
+      : {
+          label: 'Premium',
+          route: 'Paywall',
+          icon: 'star-outline',
+          color: colors.premium,
+          subtitle: 'Unlock the full FantasyDesk experience',
+        },
     {
       label: 'More',
       route: 'More',
@@ -507,6 +526,7 @@ export default function GmOrb() {
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [tradeHubHasNew, setTradeHubHasNew] = useState(false);
+  const [storeSubscriber, setStoreSubscriber] = useState(false);
   // This used to clamp bottom to a 100pt ceiling, on the theory that a
   // reported "orb sits mid-screen" bug meant some device was inflating the
   // inset. Measured rawInsets.bottom on a real iPhone (34), an iOS simulator
@@ -548,9 +568,9 @@ export default function GmOrb() {
     () => [
       ...(league ? coreLeagueDestinations(colors) : []),
       ...(league ? gmToolsDestinations(colors) : []),
-      ...generalDestinations(colors),
+      ...generalDestinations(colors, storeSubscriber),
     ],
-    [colors, league],
+    [colors, league, storeSubscriber],
   );
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const searchResults = useMemo(() => {
@@ -618,6 +638,21 @@ export default function GmOrb() {
       const fraction = finalX >= 0 ? finalX / rightBound : finalX / -leftBound;
       runOnJS(setHorizontalFraction)(fraction);
     });
+
+  // RevenueCat caches customer info, so this is cheap per open; any failure
+  // just keeps the plain Premium row.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getEntitlementTier()
+      .then((tier) => {
+        if (!cancelled) setStoreSubscriber(isAtLeast(tier, PRO));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -727,6 +762,10 @@ export default function GmOrb() {
     // instance of the destination if one is already on the stack, or
     // replaces the current screen with it if not - the stack never grows
     // past one screen per orb hop.
+    if (destination.route === MANAGE_SUBSCRIPTION_ROUTE) {
+      openStoreSubscriptionSettings();
+      return;
+    }
     if (!destination.needsLeague) {
       navigationRef.dispatch(StackActions.popTo(destination.route));
       return;
@@ -935,7 +974,7 @@ export default function GmOrb() {
                 ) : null}
 
                 <NavSection label="General">
-                  {generalDestinations(colors).map((destination) => (
+                  {generalDestinations(colors, storeSubscriber).map((destination) => (
                     <NavRow
                       key={destination.route}
                       destination={destination}
