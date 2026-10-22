@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type TradeIdea } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import {
   LOW_CONFIDENCE_USER_NOTE,
   categoryColor,
@@ -191,6 +193,7 @@ export function TradeIdeaCardView({
 
   const confidenceLvl = confidenceLevel(idea.confidence_label);
   const realismLvl = realismLevel(idea.market_realism_label);
+  const copy = useExperienceCopy();
 
   return (
     <article
@@ -225,6 +228,7 @@ export function TradeIdeaCardView({
           ) : null}
         </div>
       ) : null}
+      <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} />
 
       {landedNames.length > 0 ? (
         <p className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>
@@ -288,6 +292,7 @@ export function TradeIdeaCardView({
           picks") — previously sat directly under the Balance figure, above
           the package. */}
       <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
+      <BeginnerHelp term="ideaBalance" />
 
       {isLowConfidence ? (
         <p className="text-xs" style={{ color: "var(--color-warning)" }}>
@@ -339,10 +344,12 @@ export function TradeIdeaCardView({
                 size="sm"
               />
               <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                Realism · {idea.market_realism_label}
+                {copy.label("ideaRealism", "Realism")} · {idea.market_realism_label}
               </span>
             </div>
           </div>
+          <BeginnerHelp term="ideaConfidence" />
+          <BeginnerHelp term="ideaRealism" />
           <ReasoningTags tags={idea.reasoning_tags} />
         </div>
       ) : null}

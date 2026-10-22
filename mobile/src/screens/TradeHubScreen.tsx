@@ -14,6 +14,8 @@ import PlayerCard from '../components/PlayerCard';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenInfoNote';
+import BeginnerHelp from '../components/BeginnerHelp';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
@@ -873,6 +875,7 @@ function TradeIdeaCard({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { showExplanations } = useDensity();
+  const copy = useExperienceCopy();
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
@@ -901,6 +904,7 @@ function TradeIdeaCard({
           <ImpactBadge impactTag={idea.impact_tag} />
         </View>
       ) : null}
+      <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} style={styles.beginnerHelp} />
       {/* Density fix (card-height audit, this pass): "Lands your target" and
           "FOR <team>" (All Trades mode only) previously each carried their
           own top padding as fully independent rows, stacking up to two
@@ -1002,6 +1006,7 @@ function TradeIdeaCard({
           same delta, same tradeValueColor mapping, just shape instead of
           just digits (UI_HIERARCHY_DIRECTIVE.md's "pair color with shape"). */}
       <TradeValueBar delta={idea.trade_gain} style={styles.valueBar} />
+      <BeginnerHelp term="ideaBalance" style={styles.beginnerHelp} />
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -1057,8 +1062,15 @@ function TradeIdeaCard({
 
       <View style={styles.footerRow}>
         <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
-        <MeterRow label="REALISM" value={idea.market_realism_label} level={realismLevel} color={colors.premium} />
+        <MeterRow
+          label={copy.label('ideaRealism', 'REALISM').toUpperCase()}
+          value={idea.market_realism_label}
+          level={realismLevel}
+          color={colors.premium}
+        />
       </View>
+      <BeginnerHelp text={copy.help('ideaConfidence') && `Confidence: ${copy.help('ideaConfidence')}`} style={styles.beginnerHelp} />
+      <BeginnerHelp text={copy.help('ideaRealism') && `Partner acceptance: ${copy.help('ideaRealism')}`} style={styles.beginnerHelp} />
 
       {/* Recommendation-clarity fix (this pass): every other required field
           on this card — partner, assets, value, rationale, confidence,
@@ -1091,6 +1103,7 @@ function TradeIdeaCard({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    beginnerHelp: { marginBottom: spacing.xs },
   gateCard: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.xs },
   gateIconDisc: {
     width: 44,

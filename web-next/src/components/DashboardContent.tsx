@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import type { DashboardResponse } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { WatchListCard } from "@/components/WatchListCard";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 
 /**
@@ -40,6 +42,9 @@ export function DashboardContent({
   data: DashboardResponse;
 }) {
   const snapshot = data.team_snapshot;
+  // Beginner helper text (onboarding experience level) — null/undefined for
+  // advanced or unset accounts, so every tile below renders as before.
+  const copy = useExperienceCopy();
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -88,6 +93,7 @@ export function DashboardContent({
         <h2 id="game-plan-heading" style={{ font: "var(--type-section-title)" }}>
           Today&apos;s Game Plan
         </h2>
+        <BeginnerHelp term="dashboardGamePlan" />
 
         {data.quiet || data.items.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -149,6 +155,7 @@ export function DashboardContent({
           <h2 id="snapshot-heading" style={{ font: "var(--type-section-title)" }}>
             Team Snapshot
           </h2>
+          <BeginnerHelp term="dashboardSnapshot" />
           <div className="flex flex-wrap gap-3">
             <SnapshotTile
               glyph="record"
@@ -160,29 +167,39 @@ export function DashboardContent({
               label="Power Rank"
               value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
               tone={snapshot.power_rank === 1 ? "premium" : "neutral"}
+              note={copy.help("powerRank") ?? undefined}
+              wrapNote
             />
             <SnapshotTile
               glyph="franchise"
               label="Franchise Rank"
               value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
               tone={snapshot.franchise_rank === 1 ? "premium" : "neutral"}
+              note={copy.help("franchiseRank") ?? undefined}
+              wrapNote
             />
             <SnapshotTile
               glyph="starter"
               label="Starter Strength"
               value={formatRank(snapshot.starter_rank, snapshot.starter_rank_tied)}
               tone={snapshot.starter_rank === 1 ? "premium" : "neutral"}
+              note={copy.help("starterStrength") ?? undefined}
+              wrapNote
             />
             <SnapshotTile
               glyph="bench"
               label="Bench Strength"
               value={formatRank(snapshot.bench_rank, snapshot.bench_rank_tied)}
               tone={snapshot.bench_rank === 1 ? "premium" : "neutral"}
+              note={copy.help("benchStrength") ?? undefined}
+              wrapNote
             />
             <SnapshotTile
               glyph="age"
-              label="Avg Age"
+              label={copy.label("averageAge", "Avg Age")}
               value={snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—"}
+              note={copy.help("averageAge") ?? undefined}
+              wrapNote
             />
             <SnapshotTile
               glyph="injury"

@@ -2430,10 +2430,15 @@ export interface DevicePreferencesResponse {
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
-  /** Set once by the signup onboarding carousel's last step — not yet
-   * consumed anywhere to vary copy/explanation depth (separate, later
-   * work). Backed by the same user_settings row every other device
-   * preference already uses, not a new table. */
+  /** Cross-device account preferences (GET /v1/preferences). Read by
+   * ExperienceLevelContext for `experience_level`. */
+  getDevicePreferences: () => authorizedRequest<DevicePreferencesResponse>("/v1/preferences"),
+
+  /** Written by the signup onboarding carousel's last step and by the
+   * Account page's Explanations setting. Read back through
+   * getDevicePreferences by ExperienceLevelContext, which feeds
+   * lib/experienceCopy.ts (beginner helper text). Backed by the same
+   * user_settings row every other device preference already uses. */
   setExperienceLevel: (level: "beginner" | "advanced") =>
     authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
       method: "POST",

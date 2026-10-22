@@ -55,6 +55,8 @@ import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import BeginnerHelp from '../components/BeginnerHelp';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -1432,6 +1434,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  const copy = useExperienceCopy();
   const season = stats?.seasons[0];
   const tierIdentity = resolvePlayerTier(player.tier, isDark);
   // The 2K-style headline: one 0-99 read on the same value_score the
@@ -1603,6 +1606,19 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       {heroActions}
     </PlayerHero>,
   );
+  // Beginner-only explanations of the value, Overall and tier shown in the
+  // hero/Snapshot (lib/experienceCopy.ts). Not pushed at all for advanced or
+  // unset accounts, so the content array (and the sticky tab-bar index
+  // computed from it below) is exactly what it was before.
+  if (copy.isBeginner) {
+    content.push(
+      <View key="beginner-help" style={styles.beginnerHelpBlock}>
+        <BeginnerHelp text={`Value: ${copy.help('playerValue')}`} />
+        {overallRating !== null ? <BeginnerHelp text={`Overall: ${copy.help('overallRating')}`} /> : null}
+        {player.tier ? <BeginnerHelp text={`Tier (${tierIdentity.semanticLabel}): ${copy.help('playerTier')}`} /> : null}
+      </View>,
+    );
+  }
 
   // Snapshot (+ its rank-unavailable note) is tab-agnostic — same info
   // regardless of which tab is active — but per the more-authoritative QB
@@ -2266,6 +2282,7 @@ function createStyles(colors: ThemeColors) {
   yearPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   yearPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   yearPillTextActive: { color: colors.onAccent },
+  beginnerHelpBlock: { marginTop: spacing.sm, gap: spacing.xs },
   notice: {
     marginTop: spacing.md,
     fontSize: 12,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ModelRadarChart } from "@/components/ModelRadarChart";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -316,6 +317,11 @@ export function PlayerQuickView({
         {tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label) ? (
           <p className="pqv-tier-mismatch-note">{tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label)}</p>
         ) : null}
+        {/* Beginner-only explanations of the hero's value/OVR/tier labels
+            (lib/experienceCopy.ts) — renders nothing for advanced/unset. */}
+        {identity.score != null ? <BeginnerHelp term="playerValue" className="mt-1" /> : null}
+        {overallRating != null ? <BeginnerHelp term="overallRating" className="mt-1" /> : null}
+        {identity.tier ? <BeginnerHelp term="playerTier" className="mt-1" /> : null}
 
         <div className="pqv-body">
           {loading ? (

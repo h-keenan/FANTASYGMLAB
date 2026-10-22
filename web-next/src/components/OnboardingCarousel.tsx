@@ -3,10 +3,9 @@
 import Image from "next/image";
 import { useState } from "react";
 
-import { api } from "@/lib/api";
+import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
-
-type ExperienceLevel = "beginner" | "advanced";
+import type { ExperienceLevel } from "@/lib/experienceCopy";
 
 /**
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
@@ -33,6 +32,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
   const [saving, setSaving] = useState(false);
+  const { setLevel: saveExperienceLevel } = useExperienceLevel();
 
   const totalSteps = 4;
 
@@ -40,11 +40,14 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
     if (!level) return;
     setSaving(true);
     try {
-      await api.setExperienceLevel(level);
+      // Saved through ExperienceLevelContext so the answer takes effect
+      // right away (lib/experienceCopy.ts beginner helper text), not only
+      // after the next page load.
+      await saveExperienceLevel(level);
     } catch {
       // Best-effort — a failed preference write should never block
-      // onboarding itself; the question can always be answered again
-      // later once Settings reads/writes this same field.
+      // onboarding itself; the answer can be changed later on the Account
+      // page's Explanations setting.
     }
     setSaving(false);
     onDone();
