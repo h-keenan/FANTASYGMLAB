@@ -1,0 +1,973 @@
+[
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 2.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 1.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 1.0,
+"idp_int": 2.0,
+"idp_pass_def": 1.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 2.0,
+"idp_sack_yd": 0.05,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 1.5,
+"idp_tkl_solo": 1.0
+},
+"season": "2025",
+"style": "tackle-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 2.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 1.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 2.0,
+"idp_pass_def": 1.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 3.0,
+"idp_sack_yd": 0.05,
+"idp_safe": 3.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2024",
+"style": "tackle-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"LB": 1
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"LB": 1
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"IDP_FLEX": 2
+},
+"scoring": {
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 10.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 4
+},
+{
+"idp_slots": {
+"IDP_FLEX": 2
+},
+"scoring": {
+"bonus_def_fum_td_50p": 1.0,
+"bonus_def_int_td_50p": 1.0,
+"bonus_sack_2p": 1.0,
+"bonus_tkl_10p": 0.5,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_fum_ret_yd": 0.2,
+"idp_int": 6.0,
+"idp_int_ret_yd": 0.1,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 0.2,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.3333333333333333,
+"idp_safe": 3.0,
+"idp_tkl": 0.5,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 2,
+"DL": 2,
+"IDP_FLEX": 2,
+"LB": 2
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.04,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.04,
+"idp_pass_def": 0.5,
+"idp_pass_def_3p": 1.0,
+"idp_qb_hit": 0.5,
+"idp_sack": 4.0,
+"idp_sack_yd": 0.1,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 1.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 2,
+"LB": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 2.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 1.0,
+"idp_fum_ret_yd": 0.04,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.04,
+"idp_pass_def": 0.5,
+"idp_pass_def_3p": 1.0,
+"idp_qb_hit": 0.5,
+"idp_sack": 4.0,
+"idp_sack_yd": 0.1,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 1.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 2,
+"DL": 2,
+"IDP_FLEX": 2,
+"LB": 2
+},
+"scoring": {
+"bonus_def_fum_td_50p": 4.0,
+"bonus_def_int_td_50p": 4.0,
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 1.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.2,
+"idp_int": 6.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 1.0,
+"idp_pass_def_3p": 2.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 3.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 0.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 2.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 0.5,
+"idp_tkl_ast": 0.0,
+"idp_tkl_loss": 0.5,
+"idp_tkl_solo": 0.5
+},
+"season": "2025",
+"style": "tackle-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 3.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 0.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 2.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 0.5,
+"idp_tkl_ast": 0.0,
+"idp_tkl_loss": 0.5,
+"idp_tkl_solo": 0.5
+},
+"season": "2025",
+"style": "tackle-leaning",
+"teams": 14
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 3.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 0.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 2.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 0.5,
+"idp_tkl_ast": 0.0,
+"idp_tkl_loss": 0.5,
+"idp_tkl_solo": 0.5
+},
+"season": "2024",
+"style": "tackle-leaning",
+"teams": 14
+},
+{
+"idp_slots": {
+"DB": 2,
+"DL": 2,
+"IDP_FLEX": 2,
+"LB": 2
+},
+"scoring": {
+"bonus_def_fum_td_50p": 4.0,
+"bonus_def_int_td_50p": 4.0,
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 1.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.2,
+"idp_int": 6.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 1.0,
+"idp_pass_def_3p": 2.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 2,
+"LB": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 2.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 1.0,
+"idp_fum_ret_yd": 0.04,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.04,
+"idp_pass_def": 0.5,
+"idp_pass_def_3p": 1.0,
+"idp_qb_hit": 0.5,
+"idp_sack": 4.0,
+"idp_sack_yd": 0.1,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 1.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 2,
+"DL": 2,
+"IDP_FLEX": 2,
+"LB": 2
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.04,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.04,
+"idp_pass_def": 0.5,
+"idp_pass_def_3p": 1.0,
+"idp_qb_hit": 0.5,
+"idp_sack": 4.0,
+"idp_sack_yd": 0.1,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 1.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 3.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 0.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 2.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 0.5,
+"idp_tkl_ast": 0.0,
+"idp_tkl_loss": 0.5,
+"idp_tkl_solo": 0.5
+},
+"season": "2025",
+"style": "tackle-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 3.0,
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 2.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 2.0,
+"idp_int_ret_yd": 0.2,
+"idp_pass_def": 0.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 0.0,
+"idp_sack": 2.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 2.0,
+"idp_tkl": 0.5,
+"idp_tkl_ast": 0.0,
+"idp_tkl_loss": 0.5,
+"idp_tkl_solo": 0.5
+},
+"season": "2024",
+"style": "tackle-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 0.0,
+"bonus_def_int_td_50p": 0.0,
+"bonus_sack_2p": 0.0,
+"bonus_tkl_10p": 0.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_fum_ret_yd": 0.0,
+"idp_int": 6.0,
+"idp_int_ret_yd": 0.0,
+"idp_pass_def": 3.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.0,
+"idp_safe": 3.0,
+"idp_tkl": 0.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 0.0,
+"bonus_def_int_td_50p": 0.0,
+"bonus_sack_2p": 0.0,
+"bonus_tkl_10p": 0.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_fum_ret_yd": 0.0,
+"idp_int": 6.0,
+"idp_int_ret_yd": 0.0,
+"idp_pass_def": 3.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.0,
+"idp_safe": 3.0,
+"idp_tkl": 0.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 3,
+"DL": 3,
+"IDP_FLEX": 2,
+"LB": 3
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 7.0,
+"idp_int_ret_yd": 0.1,
+"idp_pass_def": 3.75,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 3,
+"DL": 3,
+"IDP_FLEX": 2,
+"LB": 3
+},
+"scoring": {
+"bonus_sack_2p": 1.0,
+"bonus_tkl_10p": 1.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 2.0,
+"idp_fum_ret_yd": 0.05,
+"idp_int": 4.0,
+"idp_int_ret_yd": 0.05,
+"idp_pass_def": 2.0,
+"idp_pass_def_3p": 1.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 4.0,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 1.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 3,
+"DL": 3,
+"LB": 3
+},
+"scoring": {
+"bonus_def_fum_td_50p": 2.0,
+"bonus_def_int_td_50p": 2.0,
+"bonus_sack_2p": 0.5,
+"bonus_tkl_10p": 1.0,
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 2.0,
+"idp_int": 6.0,
+"idp_pass_def": 2.0,
+"idp_pass_def_3p": 1.0,
+"idp_qb_hit": 0.5,
+"idp_sack": 4.5,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 1.0,
+"idp_tkl_solo": 1.5
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 16
+},
+{
+"idp_slots": {
+"DB": 2,
+"DL": 2,
+"LB": 2
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 2.0,
+"idp_int": 6.0,
+"idp_pass_def": 1.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 3.0,
+"idp_safe": 2.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 0.0,
+"idp_tkl_loss": 1.0,
+"idp_tkl_solo": 0.0
+},
+"season": "2024",
+"style": "tackle-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 1,
+"LB": 1
+},
+"scoring": {
+"bonus_def_fum_td_50p": 1.0,
+"bonus_def_int_td_50p": 1.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 0.5,
+"idp_sack": 6.0,
+"idp_safe": 2.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 32
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 3,
+"LB": 1
+},
+"scoring": {
+"bonus_sack_2p": 2.0,
+"bonus_tkl_10p": 5.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 8.0,
+"idp_ff": 4.0,
+"idp_fum_rec": 3.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 4.0,
+"idp_int_ret_yd": 0.1,
+"idp_pass_def": 4.0,
+"idp_pass_def_3p": 2.0,
+"idp_qb_hit": 2.0,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 4.0,
+"idp_tkl": 1.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 1,
+"LB": 1
+},
+"scoring": {
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 0.5,
+"idp_fum_ret_yd": 0.10000000149011612,
+"idp_int": 2.5,
+"idp_int_ret_yd": 0.10000000149011612,
+"idp_pass_def": 0.75,
+"idp_qb_hit": 0.5,
+"idp_sack": 2.5,
+"idp_safe": 2.0,
+"idp_tkl": 0.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 2.5,
+"idp_tkl_solo": 1.0
+},
+"season": "2025",
+"style": "tackle-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 3,
+"DL": 2,
+"IDP_FLEX": 1,
+"LB": 3
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 0.9,
+"idp_tkl_loss": 1.5,
+"idp_tkl_solo": 1.8
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 1,
+"LB": 1
+},
+"scoring": {
+"idp_blk_kick": 2.0,
+"idp_def_td": 6.0,
+"idp_ff": 1.0,
+"idp_fum_rec": 0.5,
+"idp_fum_ret_yd": 0.10000000149011612,
+"idp_int": 2.5,
+"idp_int_ret_yd": 0.10000000149011612,
+"idp_pass_def": 0.75,
+"idp_qb_hit": 0.5,
+"idp_sack": 2.5,
+"idp_safe": 2.0,
+"idp_tkl": 0.0,
+"idp_tkl_ast": 0.5,
+"idp_tkl_loss": 2.5,
+"idp_tkl_solo": 1.0
+},
+"season": "2024",
+"style": "tackle-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 3,
+"DL": 2,
+"IDP_FLEX": 1,
+"LB": 3
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 0.9,
+"idp_tkl_loss": 1.5,
+"idp_tkl_solo": 1.8
+},
+"season": "2024",
+"style": "sack/big-play-leaning",
+"teams": 12
+},
+{
+"idp_slots": {
+"DB": 1,
+"DL": 1,
+"IDP_FLEX": 1,
+"LB": 1
+},
+"scoring": {
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 3.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 2.0,
+"idp_fum_rec": 2.0,
+"idp_int": 3.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 4.0,
+"idp_sack_yd": 0.25,
+"idp_safe": 2.0,
+"idp_tkl_ast": 1.5,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 3.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 10
+},
+{
+"idp_slots": {
+"DB": 4,
+"DL": 4,
+"IDP_FLEX": 4,
+"LB": 3
+},
+"scoring": {
+"bonus_def_fum_td_50p": 3.0,
+"bonus_def_int_td_50p": 3.0,
+"bonus_sack_2p": 3.0,
+"bonus_tkl_10p": 3.0,
+"idp_blk_kick": 5.0,
+"idp_def_td": 16.0,
+"idp_ff": 5.0,
+"idp_fum_rec": 3.0,
+"idp_fum_ret_yd": 0.1,
+"idp_int": 8.0,
+"idp_int_ret_yd": 0.1,
+"idp_pass_def": 3.0,
+"idp_pass_def_3p": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 5.0,
+"idp_sack_yd": 0.2,
+"idp_safe": 5.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 3.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 4
+},
+{
+"idp_slots": {
+"IDP_FLEX": 1
+},
+"scoring": {
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 16
+},
+{
+"idp_slots": {
+"DB": 2,
+"DL": 2,
+"IDP_FLEX": 2,
+"LB": 2
+},
+"scoring": {
+"bonus_def_fum_td_50p": 0.0,
+"bonus_def_int_td_50p": 0.0,
+"bonus_sack_2p": 0.0,
+"bonus_tkl_10p": 0.0,
+"idp_blk_kick": 3.0,
+"idp_def_td": 6.0,
+"idp_ff": 3.0,
+"idp_fum_rec": 3.0,
+"idp_int": 6.0,
+"idp_pass_def": 3.0,
+"idp_pass_def_3p": 0.0,
+"idp_qb_hit": 1.0,
+"idp_sack": 6.0,
+"idp_sack_yd": 0.0,
+"idp_safe": 3.0,
+"idp_tkl_ast": 1.0,
+"idp_tkl_loss": 2.0,
+"idp_tkl_solo": 2.0
+},
+"season": "2025",
+"style": "sack/big-play-leaning",
+"teams": 12
+}
+]

@@ -102,6 +102,38 @@ WEEKLY_BOX_SCORE_FIELD_MAP = {
     "pts_std": "fantasy_points_standard",
     "pts_half_ppr": "fantasy_points_half_ppr",
 }
+# Individual-defensive-player (IDP) weekly fields from the same payloads.
+# Verified against real Sleeper payloads (2024 and 2025, weeks 1-18; see
+# docs/idp-support.md): defenders carry ``idp_*`` counting stats plus
+# ``def_snp`` / ``tm_def_snp`` (defensive snaps and team defensive snaps).
+# Sleeper omits zero-valued keys, so an absent key means "not reported" and
+# is never written as 0 - the defensive-snap fields tell consumers whether
+# the player was actually on the field. ``idp_tkl`` is Sleeper's combined
+# tackle total (solo + assist); ``idp_tkl_loss`` is tackles for loss. Values
+# stay floats because sacks and tackle credit can be fractional.
+WEEKLY_IDP_FIELD_MAP = {
+    "idp_tkl_solo": "idp_tkl_solo",
+    "idp_tkl_ast": "idp_tkl_ast",
+    "idp_tkl": "idp_tkl",
+    "idp_tkl_loss": "idp_tkl_loss",
+    "idp_sack": "idp_sack",
+    "idp_qb_hit": "idp_qb_hit",
+    "idp_int": "idp_int",
+    "idp_pass_def": "idp_pass_def",
+    "idp_ff": "idp_ff",
+    "idp_fum_rec": "idp_fum_rec",
+    "idp_def_td": "idp_def_td",
+    "idp_safe": "idp_safe",
+    "idp_blk_kick": "idp_blk_kick",
+    "idp_sack_yd": "idp_sack_yd",
+    "idp_int_ret_yd": "idp_int_ret_yd",
+    "idp_fum_ret_yd": "idp_fum_ret_yd",
+    "idp_pass_def_3p": "idp_pass_def_3p",
+    "gs": "games_started",
+}
+# Marker: a weekly row carrying this key was written after IDP retention shipped.
+WEEKLY_IDP_SCHEMA_MARKER_FIELD = "defensive_snaps"
+
 # Point totals stay floats; every other box-score field is a whole-number count.
 WEEKLY_BOX_SCORE_FLOAT_FIELDS = frozenset({"fantasy_points_standard", "fantasy_points_half_ppr"})
 # Sleeper publishes ``pts_half_ppr`` next to ``pts_ppr`` for every player
@@ -265,6 +297,25 @@ def _extract_week_observation(week: int, raw_stats: Dict[str, Any]) -> Dict[str,
         if not (numeric == numeric):  # NaN
             continue
         row[target] = float(numeric) if target in WEEKLY_BOX_SCORE_FLOAT_FIELDS else int(round(numeric))
+    for source_field, target in WEEKLY_IDP_FIELD_MAP.items():
+        if source_field not in raw_stats or raw_stats.get(source_field) is None:
+            continue
+        try:
+            numeric = float(raw_stats.get(source_field))
+        except (TypeError, ValueError):
+            continue
+        if numeric == numeric:
+            row[target] = numeric
+    try:
+        def_snp = float(raw_stats.get("def_snp")) if raw_stats.get("def_snp") is not None else None
+        tm_def = float(raw_stats.get("tm_def_snp")) if raw_stats.get("tm_def_snp") is not None else None
+    except (TypeError, ValueError):
+        def_snp = tm_def = None
+    if def_snp is not None and def_snp == def_snp and def_snp >= 0:
+        row["defensive_snaps"] = int(round(def_snp))
+        if tm_def is not None and tm_def == tm_def and tm_def > 0:
+            row["team_defensive_snaps"] = int(round(tm_def))
+            row["def_snap_share"] = min(1.0, max(0.0, def_snp / tm_def))
     off_snp = float(row.pop("_offensive_snaps", 0.0) or 0.0)
     tm_off = float(row.pop("_team_offensive_snaps", 0.0) or 0.0)
     if off_snp >= 0 and tm_off > 0:
@@ -403,6 +454,70 @@ def season_stats_cache_has_box_scores(cached: Dict[str, Any] | None) -> bool:
             if isinstance(row, dict) and WEEKLY_BOX_SCORE_SCHEMA_MARKER_FIELD in row:
                 return True
     return False
+
+
+def season_stats_cache_has_idp(cached: Dict[str, Any] | None) -> bool:
+    """True when a loaded season aggregate has per-week defensive snap/IDP
+    fields on its weekly rows (written after IDP retention shipped). Older
+    caches have defenders' rows but no ``idp_*`` keys; callers must report IDP
+    stats as unavailable for them rather than reading absence as zeros."""
+
+    if not isinstance(cached, dict):
+        return False
+    for values in cached.values():
+        weekly = values.get("weekly") if isinstance(values, dict) else None
+        if not isinstance(weekly, list):
+            continue
+        for row in weekly:
+            if isinstance(row, dict) and WEEKLY_IDP_SCHEMA_MARKER_FIELD in row:
+                return True
+    return False
+
+
+_idp_rebuild_attempted: set[int] = set()
+
+
+def ensure_season_idp_stats(season: int | None = None) -> Dict[str, Dict[str, Any]]:
+    """Season aggregate guaranteed to carry IDP weekly fields where Sleeper has them.
+
+    A cache written before IDP retention has defenders' rows without ``idp_*``
+    keys, and a prior-season cache would stay that way for its whole 180-day
+    TTL. Only IDP surfaces call this (offense-only paths keep using
+    ``get_season_player_stats`` untouched): it rebuilds such a cache once per
+    process from the same week endpoints, and never replaces it with a rebuild
+    that fetched fewer weeks than the cache already holds.
+    """
+
+    selected = int(season or default_player_stats_season())
+    cached = get_season_player_stats(selected, retain_weekly=True)
+    if season_stats_cache_has_idp(cached) or selected in _idp_rebuild_attempted:
+        return cached
+    _idp_rebuild_attempted.add(selected)
+    prior_weeks = {
+        int(row.get("week") or 0)
+        for values in cached.values()
+        if isinstance(values, dict)
+        for row in (values.get("weekly") or [])
+        if isinstance(row, dict)
+    }
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    weekly_payloads: List[Any] = []
+    for week in range(1, 19):
+        try:
+            payload = _request_json("sleeper_player_stats_week", f"{SLEEPER_BASE}/stats/nfl/regular/{selected}/{week}", timeout=20)
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            weekly_payloads.append((week, payload))
+    if not weekly_payloads or len(weekly_payloads) < len(prior_weeks):
+        return cached
+    rebuilt = _aggregate_player_week_stats(weekly_payloads, selected, retain_weekly=True)
+    try:
+        with open(cache_path, "w", encoding="utf-8") as handle:
+            json.dump(rebuilt, handle)
+    except Exception:
+        return cached
+    return get_season_player_stats(selected, retain_weekly=True)
 
 
 def season_stats_cache_written_at(season: int | None = None) -> float | None:
