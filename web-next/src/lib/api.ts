@@ -566,6 +566,8 @@ export interface KeepersResponse {
   keep_count?: number;
   keep_count_basis?: "league_setting" | "previous_draft" | "declared_keepers" | "unknown";
   unpriced_count?: number;
+  /** Rounds added to each keeper's cost (user-set per league, 0-3). */
+  round_penalty?: number;
 }
 
 export interface MyTeamResponse {
@@ -3064,6 +3066,12 @@ export const api = {
   getKeepers: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<KeepersResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/keepers?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  setKeeperRoundPenalty: (leagueId: string, roundPenalty: number) =>
+    authorizedRequest<{ ok: boolean; round_penalty: number }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/keeper-settings`,
+      { method: "POST", jsonBody: { round_penalty: roundPenalty } },
     ),
 
   getMyTeamNeeds: (leagueId: string, lens: string = "Dynasty") =>

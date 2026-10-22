@@ -121,3 +121,39 @@ def test_keepers_endpoint_keeper_league(monkeypatch):
     assert r.status_code == 200 and body["is_keeper_league"] is True
     assert body["players"]["my1"]["is_keeper"] and body["players"]["my1"]["cost_round"] == 9
     assert body["keep_count"] == 2 and "estimate_note" in body
+
+
+def test_keeper_adjusted_values_reward_surplus_and_skip_unknown_cost():
+    prev = [
+        {"player_id": "p0", "round": 8, "roster_id": 1},
+        {"player_id": "p50", "round": 1, "roster_id": 1},
+    ]
+    adj = keepers.keeper_adjusted_values(
+        valued=_valued(), score_field="dynasty_score", num_teams=10, current_picks=[], previous_picks=prev
+    )
+    assert 10000 < adj["p0"] <= 10000 * 1.25
+    assert adj["p50"] < 10000 - 50 * 100
+    assert "p30" not in adj  # no known cost -> normal value
+    out = keepers.apply_keeper_values(_valued(), "dynasty_score", adj)
+    assert out.loc[out.player_id == "p30", "dynasty_score"].iloc[0] == 10000 - 3000
+
+
+def test_stored_round_penalty_reads_user_settings_and_falls_back_to_zero():
+    from services import mobile_api_service as svc
+
+    blob = {"settings": {"keeper_round_penalty_by_league": {"L1": 2, "L2": 99}}}
+    with patch.object(svc.account_store, "fetch_user_settings", return_value=(blob, "")):
+        assert svc._stored_keeper_round_penalty({}, "u", "t", "L1") == 2
+        assert svc._stored_keeper_round_penalty({}, "u", "t", "L2") == keepers.MAX_ROUND_PENALTY
+        assert svc._stored_keeper_round_penalty({}, "u", "t", "other") == 0
+    with patch.object(svc.account_store, "fetch_user_settings", return_value=({}, "boom")):
+        assert svc._stored_keeper_round_penalty({}, "u", "t", "L1") == 0
+
+
+def test_round_penalty_never_raises_adjusted_value_and_is_clamped():
+    prev = [{"player_id": "p0", "round": 8, "roster_id": 1}]
+    kwargs = dict(valued=_valued(), score_field="dynasty_score", num_teams=10, current_picks=[], previous_picks=prev)
+    base = keepers.keeper_adjusted_values(**kwargs)
+    pen = keepers.keeper_adjusted_values(**kwargs, round_penalty=3)
+    assert pen["p0"] <= base["p0"]
+    assert keepers.clamp_round_penalty(99) == keepers.MAX_ROUND_PENALTY

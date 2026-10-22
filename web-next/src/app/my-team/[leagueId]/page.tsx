@@ -143,6 +143,17 @@ export default function MyTeamPage() {
       teamRanking={teamRanking}
       leagueSize={leagueSize}
       keepers={keepers}
+      onKeeperRoundPenalty={(penalty) => {
+        // Optimistic: show the choice, then reload keeper numbers from the server.
+        setKeepers((prev) => (prev ? { ...prev, round_penalty: penalty } : prev));
+        api
+          .setKeeperRoundPenalty(leagueId, penalty)
+          .then(() => api.getKeepers(leagueId, lens))
+          .then(setKeepers)
+          .catch(() => {
+            /* best-effort: the next load shows the stored value */
+          });
+      }}
       highlightPlayerId={highlightPlayerId}
     />
   );

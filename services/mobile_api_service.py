@@ -4248,6 +4248,31 @@ def post_trade_analyzer(
     valued = trade_hub_engine.apply_strategy_age_curve(valued, body.strategy, score_field)
     pick_score_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, body.strategy)
 
+    # Keeper leagues: fold estimated keeper surplus into player values. Any
+    # missing cost data (or failure) silently keeps the normal value.
+    keeper_adjusted = False
+    if settings.get("_keeper_mode"):
+        try:
+            current_picks, previous_picks = _keeper_draft_picks(league_id, league)
+            adjusted = keepers_module.keeper_adjusted_values(
+                valued=valued,
+                score_field=score_field,
+                num_teams=int(league.get("total_rosters") or (league.get("settings") or {}).get("num_teams") or 12),
+                current_picks=current_picks,
+                previous_picks=previous_picks,
+                round_penalty=_stored_keeper_round_penalty(
+                    auth_supabase.get_supabase_config(),
+                    analyzer_user_id,
+                    str(user.get("_access_token") or ""),
+                    league_id,
+                ),
+            )
+            if adjusted:
+                valued = keepers_module.apply_keeper_values(valued, score_field, adjusted)
+                keeper_adjusted = True
+        except Exception:
+            keeper_adjusted = False
+
     my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
     my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
     if my_team_df.empty:
@@ -4419,9 +4444,15 @@ def post_trade_analyzer(
         "ok": True,
         "verdict": verdict.to_public_dict(),
         "reason": "",
+        "keeper_adjusted": keeper_adjusted,
         "trade_window": trade_window,
-        "planning_note": (
-            league_calendar.TRADE_ANALYZER_DEADLINE_NOTE if trade_window["trade_deadline_passed"] else ""
+        "planning_note": " ".join(
+            note
+            for note in (
+                league_calendar.TRADE_ANALYZER_DEADLINE_NOTE if trade_window["trade_deadline_passed"] else "",
+                "Values include estimated keeper surplus." if keeper_adjusted else "",
+            )
+            if note
         ),
     }
 
@@ -10432,7 +10463,7 @@ def get_league_my_team(
 def get_league_keepers(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
-    round_penalty: int = 0,
+    round_penalty: int | None = None,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Keeper tags, estimated surplus and keep-or-cut candidates (keeper leagues).
@@ -10459,15 +10490,9 @@ def get_league_keepers(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     league_settings = league.get("settings") or {}
-    current_picks = keepers_module.latest_draft_picks(
-        sleeper.get_league_drafts(league_id), sleeper.get_draft_picks
-    )
-    previous_id = str(league.get("previous_league_id") or "")
-    previous_picks = (
-        keepers_module.latest_draft_picks(sleeper.get_league_drafts(previous_id), sleeper.get_draft_picks)
-        if previous_id and previous_id != "0"
-        else []
-    )
+    current_picks, previous_picks = _keeper_draft_picks(league_id, league)
+    if round_penalty is None:
+        round_penalty = _stored_keeper_round_penalty(config, user_id, str(user.get("_access_token") or ""), league_id)
     report = keepers_module.build_keeper_report(
         roster=my_roster,
         valued=valued,
@@ -10489,6 +10514,64 @@ def get_league_keepers(
         ),
         **report,
     }
+
+
+def _keeper_draft_picks(league_id: str, league: dict[str, Any]) -> tuple[list[dict], list[dict]]:
+    """(this season's draft picks, previous season's draft picks) from Sleeper."""
+
+    current_picks = keepers_module.latest_draft_picks(
+        sleeper.get_league_drafts(league_id), sleeper.get_draft_picks
+    )
+    previous_id = str(league.get("previous_league_id") or "")
+    previous_picks = (
+        keepers_module.latest_draft_picks(sleeper.get_league_drafts(previous_id), sleeper.get_draft_picks)
+        if previous_id and previous_id != "0"
+        else []
+    )
+    return current_picks, previous_picks
+
+
+def _stored_keeper_round_penalty(config: dict, user_id: str, access_token: str, league_id: str) -> int:
+    """User-set keeper round penalty for a league (user_settings blob); 0 when unset or on any failure."""
+
+    if not user_id:
+        return 0
+    try:
+        current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+        if error:
+            return 0
+        stored = (current.get("settings") or {}).get("keeper_round_penalty_by_league") or {}
+        return keepers_module.clamp_round_penalty(stored.get(league_id))
+    except Exception:
+        return 0
+
+
+class KeeperSettingsRequest(BaseModel):
+    round_penalty: int = Field(ge=0, le=keepers_module.MAX_ROUND_PENALTY)
+
+
+@app.post("/v1/leagues/{league_id}/keeper-settings")
+def set_league_keeper_settings(
+    body: KeeperSettingsRequest,
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Store the user's keeper round penalty for this league (read-modify-write
+    on the user_settings blob, like /v1/preferences)."""
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "round_penalty": 0}
+    settings = dict(current.get("settings") or {})
+    by_league = dict(settings.get("keeper_round_penalty_by_league") or {})
+    by_league[league_id] = body.round_penalty
+    settings["keeper_round_penalty_by_league"] = by_league
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, _ = account_store.upsert_user_settings(config, access_token, payload)
+    return {"ok": bool(ok), "round_penalty": body.round_penalty}
 
 
 def _empty_my_team_needs_response(settings: dict[str, Any], *, reason: str) -> dict[str, Any]:
