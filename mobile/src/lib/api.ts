@@ -1119,6 +1119,10 @@ export interface GmPlanPlayoffOddsItem {
 }
 
 export interface GmPlanTradeItem {
+  /** Same give/get asset dicts Trade Hub cards carry (empty when the idea had no detail). */
+  send_assets?: PresentationAsset[];
+  receive_assets?: PresentationAsset[];
+  trade_gain?: number | null;
   partner_team_name: string;
   my_player: string;
   their_player: string;
@@ -1180,6 +1184,9 @@ export interface GmPlanResponse {
   headline?: string;
   focus_areas: GmPlanFocusArea[];
   trade_window?: TradeWindow;
+  /** Free callers get quiet: true with is_premium: false (GM Plan is Premium). */
+  is_premium?: boolean;
+  upsell?: { title?: string; body?: string } | null;
 }
 
 export interface TradeCounterAction {

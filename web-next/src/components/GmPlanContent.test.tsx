@@ -15,6 +15,10 @@ import type {
 import { api } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
 }));
@@ -197,7 +201,7 @@ describe("GmPlanContent", () => {
   });
 
   it("renders Where You Stand facts including a flagged weak spot", () => {
-    render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    render(<GmPlanContent initialTab="trades" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByText("Roster Power: 3 of 12")).toBeInTheDocument();
     expect(screen.getByText("Bench Depth: 11 of 12")).toBeInTheDocument();
@@ -230,7 +234,7 @@ describe("GmPlanContent", () => {
   });
 
   it("renders the roster injury-exposure fact with real player identity", () => {
-    render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    render(<GmPlanContent initialTab="trades" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByText("Major Starter Absence: TE")).toBeInTheDocument();
     expect(screen.getByText("My Player 7")).toBeInTheDocument();
@@ -246,7 +250,7 @@ describe("GmPlanContent", () => {
           : area,
       ),
     };
-    render(<GmPlanContent leagueName="Dynasty Overlords" data={noSignal} />);
+    render(<GmPlanContent initialTab="trades" leagueName="Dynasty Overlords" data={noSignal} />);
 
     expect(screen.getByText("No specific trade opportunities surfaced this week.")).toBeInTheDocument();
   });
@@ -269,7 +273,7 @@ describe("GmPlanContent", () => {
     const quiet: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [], is_premium: true, upsell: null };
     render(<GmPlanContent leagueName="Dynasty Overlords" data={quiet} />);
 
-    expect(screen.getByText(/We don't have enough to build a GM Plan/)).toBeInTheDocument();
+    expect(screen.getByText("Not enough to build a GM Plan yet.")).toBeInTheDocument();
   });
 
   it("shows the premium upsell instead of a plan for a Free caller", () => {
@@ -284,7 +288,7 @@ describe("GmPlanContent", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={locked} />);
 
     expect(screen.getByRole("heading", { name: "Your season-arc roadmap" })).toBeInTheDocument();
-    expect(screen.queryByText(/We don't have enough to build a GM Plan/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Not enough to build a GM Plan yet.")).not.toBeInTheDocument();
     // A real regression this PR fixes: PremiumUpsellCard renders its own
     // <main> by default, and this component already has its own — nesting
     // one inside the other is invalid HTML. `bare` must be passed here.
@@ -338,6 +342,7 @@ describe("GmPlanContent", () => {
     it("lists roster players and groups an already-untouchable one as protected", () => {
       render(
         <GmPlanContent
+          initialTab="core"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -348,6 +353,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
+      fireEvent.click(screen.getByText(/more players? on your roster/));
       expect(screen.getByText("Test Player")).toBeInTheDocument();
       expect(screen.getByText("Bench Guy")).toBeInTheDocument();
       expect(screen.getByText("Rest of Roster")).toBeInTheDocument();
@@ -357,6 +363,7 @@ describe("GmPlanContent", () => {
     it("adds a GM Target then marks it untouchable when protecting a player not yet tracked", async () => {
       render(
         <GmPlanContent
+          initialTab="core"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -367,6 +374,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
+      fireEvent.click(screen.getByText(/more players? on your roster/));
       fireEvent.click(screen.getAllByRole("button", { name: "Protect" })[0]);
 
       expect(api.addGmTarget).toHaveBeenCalledWith("league-1", "p1", "team_stance");
@@ -382,6 +390,7 @@ describe("GmPlanContent", () => {
       vi.mocked(api.addGmTarget).mockResolvedValueOnce({ ok: false, reason: "not_available" });
       render(
         <GmPlanContent
+          initialTab="core"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -392,6 +401,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
+      fireEvent.click(screen.getByText(/more players? on your roster/));
       fireEvent.click(screen.getAllByRole("button", { name: "Protect" })[0]);
 
       // Reverted back to "Protect" (not "Protected") once the failed add settles.
@@ -403,6 +413,7 @@ describe("GmPlanContent", () => {
     it("shows a no-roster message when the league has no roster players", () => {
       render(
         <GmPlanContent
+          initialTab="core"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -426,6 +437,7 @@ describe("GmPlanContent", () => {
     it("shows only non-untouchable targets (Protected Players already covers untouchable ones)", () => {
       render(
         <GmPlanContent
+          initialTab="watching"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -449,6 +461,7 @@ describe("GmPlanContent", () => {
     it("links each watched target to Player Compare and shows its origin", () => {
       render(
         <GmPlanContent
+          initialTab="watching"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -469,6 +482,7 @@ describe("GmPlanContent", () => {
     it("calls removeGmTarget and optimistically removes the row when Remove is pressed", () => {
       render(
         <GmPlanContent
+          initialTab="watching"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -488,6 +502,7 @@ describe("GmPlanContent", () => {
     it("shows an empty-watchlist message when there's nothing to watch", () => {
       render(
         <GmPlanContent
+          initialTab="watching"
           leagueId="league-1"
           leagueName="Dynasty Overlords"
           data={BASE_RESPONSE}
@@ -503,7 +518,70 @@ describe("GmPlanContent", () => {
 
     it("omits the section entirely when no rankings are passed", () => {
       render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
-      expect(screen.queryByText("Watching")).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Watching" })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("GmPlanContent concept structure", () => {
+  const WINDOW = { trade_deadline_week: 11, current_week: 6, trade_deadline_passed: false, message: "" };
+  const withWindow = (trade_window: GmPlanResponse["trade_window"]): GmPlanResponse => ({ ...BASE_RESPONSE, trade_window });
+  const props = { leagueId: "league-1", teamStance: STANCE, myTeam: MY_TEAM, targets: [], rankings: { ok: true, players: [] } };
+
+  it("switches between the four tabs", () => {
+    render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} {...props} />);
+    expect(screen.getByRole("button", { name: "Overview", pressed: true })).toBeInTheDocument();
+    for (const name of ["Trades", "Core", "Watching"]) {
+      fireEvent.click(screen.getByRole("button", { name }));
+      expect(screen.getByRole("button", { name, pressed: true })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("heading", { name: "Watching" })).toBeInTheDocument();
+  });
+
+  it("shows the trade deadline banner with the real week before the deadline", () => {
+    render(<GmPlanContent leagueName="L" data={withWindow(WINDOW)} {...props} />);
+    expect(screen.getByTestId("deadline-banner")).toHaveTextContent("Trade deadline: Week 11");
+  });
+
+  it("drops the banner after the deadline", () => {
+    render(<GmPlanContent leagueName="L" data={withWindow({ ...WINDOW, trade_deadline_passed: true })} {...props} />);
+    expect(screen.queryByTestId("deadline-banner")).not.toBeInTheDocument();
+    expect(screen.getByText("Past the trade deadline")).toBeInTheDocument();
+  });
+
+  it("renders snapshot tiles with progress bars and a playoff ring, and no tiles without data", () => {
+    const snapshot = [
+      { key: "power" as const, label: "Roster Power", value: "3 of 12", fill: 0.83 },
+      { key: "odds" as const, label: "Playoff Odds", value: "55%", fill: 0.55, note: "Proj. 6-seed" },
+    ];
+    const { unmount } = render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} snapshot={snapshot} {...props} />);
+    expect(screen.getByRole("progressbar", { name: "Roster Power" })).toHaveAttribute("aria-valuenow", "83");
+    expect(screen.getByRole("img", { name: "Playoff Odds 55%" })).toBeInTheDocument();
+    expect(screen.getByText("Proj. 6-seed")).toBeInTheDocument();
+    unmount();
+    render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} snapshot={[]} {...props} />);
+    expect(screen.queryByText("Plan Snapshot")).not.toBeInTheDocument();
+  });
+
+  it("links trade ideas to Trade Hub", () => {
+    render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} {...props} />);
+    expect(screen.getAllByRole("link", { name: "View details" })[0].getAttribute("href")).toContain("/trade-hub/league-1");
+  });
+
+  it("keeps Free locked while Team Situation stays open", () => {
+    const locked: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [], is_premium: false, upsell: { title: "Locked plan", body: "Upgrade." } };
+    render(<GmPlanContent leagueName="L" data={locked} {...props} />);
+    expect(screen.getAllByRole("heading", { name: "Locked plan" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Competing" })).toBeInTheDocument();
+  });
+
+  it("shows an empty state with a next step when there are no trade ideas", () => {
+    const none: GmPlanResponse = {
+      ...BASE_RESPONSE,
+      focus_areas: BASE_RESPONSE.focus_areas.map((a) => (a.key === "trade_opportunities" ? { ...a, status: "no_signal", items: [] } : a)),
+    };
+    render(<GmPlanContent leagueName="L" data={none} {...props} />);
+    expect(screen.getByText("No trade ideas right now.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Trade Hub" })).toBeInTheDocument();
   });
 });

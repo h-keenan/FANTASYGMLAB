@@ -660,7 +660,7 @@ function DestinationButton({
   );
 }
 
-function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
+export function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.asset_type === 'pick') {

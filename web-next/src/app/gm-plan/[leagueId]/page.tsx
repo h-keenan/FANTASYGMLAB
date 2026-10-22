@@ -12,11 +12,14 @@ import {
   type GmTargetsResponse,
   type LeagueRankingsResponse,
   type MyTeamResponse,
+  type PlayoffOddsTeam,
+  type TeamRanking,
   type TeamStanceResponse,
 } from "@/lib/api";
 import { GmPlanContent } from "@/components/GmPlanContent";
+import { GmPlanSkeleton, isGmPlanTab } from "@/components/GmPlanSections";
+import { buildPlanSnapshot } from "@/lib/gmPlanSnapshot";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
-import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function GmPlanPage() {
   const params = useParams<{ leagueId: string }>();
@@ -33,6 +36,9 @@ export default function GmPlanPage() {
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [targets, setTargets] = useState<GmTargetsResponse | null>(null);
   const [rankings, setRankings] = useState<LeagueRankingsResponse | null>(null);
+  // Best-effort Plan Snapshot sources: a tile just doesn't render if its call fails.
+  const [teamRankings, setTeamRankings] = useState<TeamRanking[] | null>(null);
+  const [oddsTeams, setOddsTeams] = useState<PlayoffOddsTeam[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Audit finding, 2026-10-20: gm_plan_opened (already in TRACKED_EVENTS,
@@ -76,15 +82,26 @@ export default function GmPlanPage() {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load GM Plan.");
       });
 
+    api
+      .getTeamRankings(leagueId, lens)
+      .then((result) => {
+        if (!cancelled) setTeamRankings(result.teams);
+      })
+      .catch(() => {});
+    api
+      .getLeaguePlayoffOdds(leagueId, lens)
+      .then((result) => {
+        if (!cancelled) setOddsTeams(result.teams);
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
   }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!gmPlan && !error)) {
-    return (
-      <LoadingScreen status="Loading GM Plan…" />
-    );
+    return <GmPlanSkeleton leagueName={leagueName} />;
   }
 
   if (error || !gmPlan || !teamStance || !myTeam || !targets || !rankings) {
@@ -93,8 +110,18 @@ export default function GmPlanPage() {
     );
   }
 
+  const rosterId = myTeam.roster_id;
+  const snapshot = buildPlanSnapshot(
+    teamRankings?.find((team) => team.roster_id === rosterId) ?? null,
+    teamRankings?.length ?? 0,
+    oddsTeams?.find((team) => team.roster_id === rosterId) ?? null,
+  );
+  const tabParam = searchParams.get("tab");
+
   return (
     <GmPlanContent
+      snapshot={snapshot}
+      initialTab={isGmPlanTab(tabParam) ? tabParam : undefined}
       leagueId={leagueId}
       leagueName={leagueName}
       data={gmPlan}
