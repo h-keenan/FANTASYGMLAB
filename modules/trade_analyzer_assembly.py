@@ -86,6 +86,15 @@ def _int_score(value: object) -> int:
         return 0
 
 
+def _is_missing_score(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        return float(value) != float(value)  # NaN
+    except (TypeError, ValueError):
+        return True
+
+
 def player_asset_from_mapping(
     row: Mapping[str, Any],
     *,
@@ -97,7 +106,19 @@ def player_asset_from_mapping(
     info = owner_info or {}
     player_id = _text(row.get("player_id"))
     name = _text(row.get("name") or row.get("label"), "Player")
-    score_raw = row.get("score", row.get(score_field, row.get("value_score", 0)))
+    # The caller's lens column (dynasty_score / rebuild_score / value_score)
+    # is the league-adjusted value: league_value_settings.apply_valuation_lens
+    # applies Superflex/2QB, TE premium, league size, and lineup depth to it.
+    # A valued frame's own "score" column is the canonical base_score from
+    # before any of that. Reading "score" first meant the Trade Analyzer
+    # ignored the lens and every league setting, while Trade Hub
+    # (trade_ideas._row_score) priced the same players with score_field.
+    # "score" is only a fallback now, for rows that have no score_field.
+    lens_score = row.get(score_field) if score_field else None
+    if _is_missing_score(lens_score):
+        score_raw = row.get("score", row.get("value_score", 0))
+    else:
+        score_raw = lens_score
     return {
         "asset_type": "player",
         "player_id": player_id,
