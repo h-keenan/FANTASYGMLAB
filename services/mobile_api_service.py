@@ -11976,6 +11976,11 @@ def _project_and_enrich_trade_idea_cards(
     return ranked
 
 
+# `strategy=auto` on GET .../trade-hub: derive the strategy server-side from the
+# caller's declared Team Situation instead of making the client fetch it first.
+TRADE_HUB_AUTO_STRATEGY = "auto"
+
+
 @app.get("/v1/leagues/{league_id}/trade-hub")
 def get_trade_hub_ideas(
     league_id: str = Depends(resolve_league_path_id),
@@ -12041,6 +12046,11 @@ def get_trade_hub_ideas(
     declared_team_stance = _fetch_team_stance(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    if strategy == TRADE_HUB_AUTO_STRATEGY:
+        # The caller asked for the strategy this server derives from the
+        # declared Team Situation (the same mapping GET .../team-stance
+        # returns as `strategy`), so it needs no stance round trip first.
+        strategy = team_stance.team_strategy_for_stance(declared_team_stance)
     records = trade_hub_engine.generate_trade_idea_records_cached(
         league_id=league_id,
         roster_id=int(roster_id),
