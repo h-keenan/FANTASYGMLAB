@@ -136,3 +136,20 @@ def test_build_valued_players_frame_cached_returns_empty_frame_for_missing_leagu
     )
 
     assert result.empty
+
+
+def test_taxi_slots_setting_is_detected_and_boosts_young_skill_players():
+    lvs = league_value_settings
+    league = {
+        "roster_positions": ["QB", "RB", "WR", "TE", "FLEX"] + ["BN"] * 8,
+        "settings": {"taxi_slots": 4, "reserve_slots": 0, "num_teams": 12},
+    }
+    settings = lvs.detect_league_value_settings_from_payload(league)
+    assert settings["taxi_count"] == 4  # Sleeper never lists TAXI in roster_positions
+    frame = pd.DataFrame({"position": ["WR", "WR", "RB"], "age": [22.0, 27.0, 23.0]})
+    on = lvs.league_settings_adjustment_components(frame, settings)["league_adj_roster_depth"]
+    off = lvs.league_settings_adjustment_components(frame, dict(settings, taxi_count=0))[
+        "league_adj_roster_depth"
+    ]
+    assert on.iloc[0] / off.iloc[0] > 1.07  # 4 slots * 2% taxi boost
+    assert on.iloc[1] == off.iloc[1] == 1.0  # age 27 is not a taxi stash candidate
