@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TradeOutcomePrompt } from "./TradeOutcomePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { api, type PendingTradeOutcome } from "@/lib/api";
+import { onTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -102,6 +103,23 @@ describe("TradeOutcomePrompt", () => {
 
     await waitFor(() => expect(api.answerTradeOutcome).toHaveBeenCalledWith("o-1", value));
     await waitFor(() => expect(screen.queryByTestId("trade-outcome-prompt")).not.toBeInTheDocument());
+  });
+
+  it.each([
+    ["Yes, it happened", 1],
+    ["Still pending", 0],
+  ] as const)("answering %s tells an open Trade History page to refresh (%i times)", async (label, expected) => {
+    mockAuth(true);
+    vi.mocked(api.getPendingTradeOutcomes).mockResolvedValue({ ok: true, outcomes: [outcome("o-1", "Team Rocket")] });
+    const listener = vi.fn();
+    const unsubscribe = onTradeOutcomeAnswered(listener);
+
+    render(<TradeOutcomePrompt />);
+    fireEvent.click(await screen.findByRole("button", { name: label }));
+    await waitFor(() => expect(screen.queryByTestId("trade-outcome-prompt")).not.toBeInTheDocument());
+
+    expect(listener).toHaveBeenCalledTimes(expected);
+    unsubscribe();
   });
 
   it("moves to the next pending outcome after an answer", async () => {

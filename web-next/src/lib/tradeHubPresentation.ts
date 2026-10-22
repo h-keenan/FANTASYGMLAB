@@ -10,7 +10,7 @@
  */
 
 import { notReadyReasonMessage } from "./notReadyMessages";
-import type { TradeAsset, TradeIdea } from "./api";
+import type { RecordTradeShareAsset, RecordTradeShareBody, TradeAsset, TradeIdea } from "./api";
 
 /** Byte-for-byte port of modules/trade_visual_language.py's confidence_level. */
 export function confidenceLevel(label: string | null | undefined): "high" | "medium" | "low" {
@@ -185,4 +185,34 @@ export function tradeIdeaShareText(idea: TradeIdea): string {
     `You get: ${receive}\n` +
     `Balance: ${formatTradeGain(idea.trade_gain)}`
   );
+}
+
+function shareRecordAsset(asset: TradeAsset): RecordTradeShareAsset {
+  return {
+    name: asset.name ?? "Unknown",
+    position: asset.position ?? "",
+    player_id: asset.player_id || undefined,
+    value_score: asset.score ?? undefined,
+  };
+}
+
+/**
+ * The POST /v1/leagues/{id}/trade-outcomes body for a shared Trade Hub or
+ * Trade Finder idea. Mirrors mobile exactly (TradeHubScreen's
+ * shareAssetsToPlayers + ideaToShareVerdict, then
+ * TradeSharePreviewModal.recordShare): draft picks are dropped, an empty
+ * player_id becomes undefined, the idea's own score is the baseline
+ * value_score, and the label is the market-realism label (falling back to
+ * "Trade Hub idea"). The lens is whichever one the idea was built under.
+ */
+export function tradeIdeaShareRecord(idea: TradeIdea, lens: string): RecordTradeShareBody {
+  const players = (assets: TradeAsset[]) =>
+    (assets ?? []).filter((asset) => asset.asset_type !== "pick").map(shareRecordAsset);
+  return {
+    partnerTeamName: idea.partner_team_name,
+    send: players(idea.package.send),
+    receive: players(idea.package.receive),
+    valueEdgeLabel: idea.market_realism_label || "Trade Hub idea",
+    valuationLens: lens,
+  };
 }

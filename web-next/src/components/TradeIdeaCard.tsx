@@ -18,6 +18,7 @@ import {
   levelToRingTone,
   realismLevel,
   realismRingPercent,
+  tradeIdeaShareRecord,
   tradeIdeaShareText,
 } from "@/lib/tradeHubPresentation";
 
@@ -46,10 +47,21 @@ export function ShareTradeButton({
   const [copied, setCopied] = useState(false);
   const [preparingImage, setPreparingImage] = useState(false);
 
+  // Records the share for the later "Did this trade happen?" prompt, same
+  // as mobile's TradeSharePreviewModal.recordShare: fire-and-forget, once
+  // per completed share (no dedupe, as on mobile; the prompt's "Didn't
+  // send" answer covers a share that never really went out). Skipped
+  // without a leagueId, since the endpoint is league-scoped.
+  const recordShare = () => {
+    if (!leagueId) return;
+    void api.recordTradeShare(leagueId, tradeIdeaShareRecord(idea, lens)).catch(() => {});
+  };
+
   const shareTextOnly = async (text: string, title: string) => {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ text, title });
+        recordShare();
         return;
       } catch {
         // User cancelled the share sheet, or the platform rejected it —
@@ -59,6 +71,7 @@ export function ShareTradeButton({
     }
     try {
       await navigator.clipboard.writeText(text);
+      recordShare();
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -84,6 +97,7 @@ export function ShareTradeButton({
         });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], text, title });
+          recordShare();
           setPreparingImage(false);
           return;
         }
