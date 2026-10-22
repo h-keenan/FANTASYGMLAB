@@ -11,6 +11,18 @@ semantic colors are fixed, and the GM orb is never redesigned per screen.
 layout, so every page. Page-body components (`XContent.tsx`) are listed once
 under **Page bodies** and are not modules in their own right.
 
+**Summary.** There are 23 web band-aid findings (B1-B23):
+- **8 consolidated**, in #1325, #1331 and #1337. These are B1, B4, B9, B10,
+  B11, B13 and B15, plus B17's token fix.
+- **11 need an owner decision.** These are B2, B5, B6, B7 (pick look), B9
+  (canonical badge shape), B14, B15 (tracking), B17 (shared accent card),
+  B20, B21 and B22.
+- **8 are justified one-offs.**
+
+The changes added four shared modules (`SectionHeading`,
+`HighlightTarget`, `ToneBadge`, `VerdictCallout`) and moved 23 page error
+blocks onto `ErrorState`.
+
 ## 1. Canonical modules (use these, don't re-create them)
 
 ### Cards / panels
@@ -111,7 +123,22 @@ No shared button component exists. See band-aid B10.
 ## 2. Band-aid list
 
 Status: **Consolidated (PR #n)**, **Needs decision** (both variants
-described), or **Justified one-off**.
+described), **Justified one-off**, or **Being redesigned separately**.
+
+**Being redesigned separately (as of 2026-10-21; this audit leaves them
+alone):**
+- `PlayerQuickView.tsx`: header redesign and swipe-to-dismiss. This
+  covers its `PqvBodySkeleton` and its `pqv-chip` injury chip.
+- `TradeAssetExchange.tsx` (`TradeAssetRow`/`ExchangeSide`) and
+  `PlayerInjuryBadge.tsx`: the injury pill moves off the name line. B5,
+  B6 and B7 below touch `TradeAssetRow`, so revisit them once that lands.
+  The eight sites B10 moved onto `PlayerInjuryBadge` will pick up its
+  redesign automatically.
+- The web Matchup page (`app/matchup/…` and `MatchupContent.tsx`). Its
+  local rows in B5, its edge pill in B9, and `MatchupHero`/`VersusSide` are
+  left to that redesign. #1325 and #1331 had already swapped its section
+  heading and injury labels onto the shared modules, before this
+  coordination note.
 
 ### Headers / section titles
 - **B1. Five local `SectionHeading` copies.** MyTeam, Waivers, Matchup and
