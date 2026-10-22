@@ -190,7 +190,17 @@ export interface SaveLeagueResponse {
   ok: boolean;
   reason: string;
   cap: number;
+  /** True when the server started warming this league's first-load data;
+   * poll getLeagueWarmupStatus for real progress. */
+  warming?: boolean;
   league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" };
+}
+
+/** GET /v1/leagues/{id}/warmup-status: "none" means nothing to wait for. */
+export interface LeagueWarmupStatus {
+  ok: boolean;
+  state: "none" | "running" | "done" | "error";
+  stages: { roster: boolean; values: boolean; trades: boolean };
 }
 
 /** POST /v1/espn/leagues/preview (modules/espn_leagues.py). Public ESPN
@@ -2939,6 +2949,9 @@ export const api = {
     authorizedRequest<{ ok: boolean; league: { settings?: { type?: number } } }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}`,
     ),
+
+  getLeagueWarmupStatus: (leagueId: string) =>
+    authorizedRequest<LeagueWarmupStatus>(`/v1/leagues/${encodeURIComponent(leagueId)}/warmup-status`),
 
   getDashboard: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<DashboardResponse>(

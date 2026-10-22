@@ -6,6 +6,7 @@ import { api, type SleeperLeagueSummary } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { EspnImportForm } from "@/components/EspnImportForm";
+import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { PillRow } from "@/components/PillRow";
 
 /**
@@ -74,6 +75,17 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
   // Sleeper user with no path forward (see onboarding audit, 2026-10-18).
   const [noSleeperAccount, setNoSleeperAccount] = useState(false);
   const [leagues, setLeagues] = useState<SleeperLeagueSummary[]>([]);
+  // Set once a save reports the server is warming the league's first-load
+  // data; shows real progress until it is ready, then continues.
+  const [warming, setWarming] = useState<{ leagueId: string; name: string } | null>(null);
+
+  const finishSave = (saved: { warming?: boolean }, leagueId: string, name: string) => {
+    if (saved?.warming) {
+      setWarming({ leagueId, name });
+      return;
+    }
+    onLeagueChosen(leagueId, name);
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -125,12 +137,12 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
 
       if (result.leagues.length === 1) {
         const only = result.leagues[0];
-        await api.saveLeague({ leagueId: only.league_id, sleeperUsername: clean, leagueName: only.name, makeDefault: true });
+        const saved = await api.saveLeague({ leagueId: only.league_id, sleeperUsername: clean, leagueName: only.name, makeDefault: true });
         // once_key scoped by leagueId (trackFeatureUse's default dedupe),
         // matching app.py's set_selected_league: once_key=selected_league_id.
         trackFeatureUse("league_import_completed", { leagueId: only.league_id });
         setStatus("idle");
-        onLeagueChosen(only.league_id, only.name);
+        finishSave(saved, only.league_id, only.name);
         return;
       }
 
@@ -146,16 +158,20 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
   const openLeague = async (league: SleeperLeagueSummary) => {
     setStatus("loading");
     try {
-      await api.saveLeague({ leagueId: league.league_id, sleeperUsername: username.trim(), leagueName: league.name });
+      const saved = await api.saveLeague({ leagueId: league.league_id, sleeperUsername: username.trim(), leagueName: league.name });
       trackFeatureUse("league_import_completed", { leagueId: league.league_id });
       setStatus("idle");
-      onLeagueChosen(league.league_id, league.name);
+      finishSave(saved, league.league_id, league.name);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Could not open that league.");
       trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
     }
   };
+
+  if (warming) {
+    return <LeagueWarmupProgress leagueId={warming.leagueId} onDone={() => onLeagueChosen(warming.leagueId, warming.name)} />;
+  }
 
   if (leagues.length > 0) {
     // Bug report, 2026-10-21: "it keeps auto defaulting to 2025" / "we need

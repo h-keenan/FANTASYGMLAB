@@ -225,6 +225,9 @@ export interface SaveLeagueResponse {
   reason: SaveLeagueReason;
   // How many leagues this account's plan may keep (see MeResponse.league_cap).
   cap: number;
+  // True when the server started warming this league's first-load data;
+  // follow it with getLeagueWarmupStatus.
+  warming?: boolean;
   league?: {
     league_id: string;
     league_name: string;
@@ -2561,6 +2564,10 @@ export const api = {
       make_default: input.makeDefault ?? false,
       roster_id: input.rosterId ?? '',
     }),
+  getLeagueWarmupStatus: (leagueId: string) =>
+    authorizedFetch<import('./leagueWarmup').WarmupStatus>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/warmup-status`,
+    ),
   previewEspnLeague: (leagueId: string, season: number) =>
     authorizedPost<EspnLeaguePreviewResponse>('/v1/espn/leagues/preview', { league_id: leagueId, season }),
   getGmTargets: (leagueId: string) =>

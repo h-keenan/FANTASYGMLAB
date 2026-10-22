@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import BrandMark from '../components/BrandMark';
+import LeagueWarmupProgress from '../components/LeagueWarmupProgress';
 import EmptyState from '../components/EmptyState';
 import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
@@ -92,6 +93,13 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Set only when the server refuses a save with reason "at_cap" — the copy
   // is derived from the cap the server sent, never a hardcoded number.
   const [addCapMessage, setAddCapMessage] = useState<string | null>(null);
+  // Set when a save reports the server is warming the new league; the sheet
+  // then shows real progress and finishSave runs once it is ready.
+  const [warmingLeague, setWarmingLeague] = useState<{
+    leagueId: string;
+    leagueName?: string;
+    routeToTeamStance: boolean;
+  } | null>(null);
   const autoNavigated = useRef(false);
   // Bumped on every load() (focus + pull-to-refresh) so the "All leagues at
   // a glance" section re-reads its server-cached cards alongside the rest.
@@ -223,6 +231,15 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   };
 
+  const finishSave = async (leagueId: string, leagueName: string | undefined, routeToTeamStance: boolean) => {
+    setWarmingLeague(null);
+    closeAddLeague();
+    await load();
+    if (routeToTeamStance) {
+      navigation.navigate('TeamStance', { leagueId, leagueName: leagueName || 'League' });
+    }
+  };
+
   const saveLeague = async (input: { leagueId: string; leagueName?: string; username?: string }) => {
     setAddBusy(true);
     setAddMessage(null);
@@ -244,14 +261,15 @@ export default function HomeScreen({ navigation, route }: Props) {
         const wasFirstLeagueEver = (leagues?.length ?? 0) === 0;
         const routeToTeamStance = wasFirstLeagueEver && consumeFirstLeagueTeamStanceRouting();
         if (routeToTeamStance) autoNavigated.current = true;
-        closeAddLeague();
-        await load();
-        if (routeToTeamStance) {
-          navigation.navigate('TeamStance', {
+        if (result.warming) {
+          setWarmingLeague({
             leagueId: input.leagueId,
-            leagueName: input.leagueName || 'League',
+            leagueName: input.leagueName,
+            routeToTeamStance,
           });
+          return;
         }
+        await finishSave(input.leagueId, input.leagueName, routeToTeamStance);
         return;
       }
       if (result.reason === 'at_cap') {
@@ -590,6 +608,15 @@ export default function HomeScreen({ navigation, route }: Props) {
       <SheetModal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
         <View style={styles.renameBackdrop}>
           <SwipeDismissCard style={styles.renameCard} onDismiss={closeAddLeague} handleOnly>
+            {warmingLeague ? (
+              <LeagueWarmupProgress
+                leagueId={warmingLeague.leagueId}
+                onDone={() =>
+                  void finishSave(warmingLeague.leagueId, warmingLeague.leagueName, warmingLeague.routeToTeamStance)
+                }
+              />
+            ) : (
+            <>
             <AppText style={styles.renameTitle}>Add a league</AppText>
             <View style={styles.platformTabs}>
               <SegmentedTabBar<'sleeper' | 'espn'>
@@ -751,6 +778,8 @@ export default function HomeScreen({ navigation, route }: Props) {
                 )}
               </TouchableOpacity>
             </View>
+            </>
+            )}
             </>
             )}
           </SwipeDismissCard>
