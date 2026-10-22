@@ -152,22 +152,22 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueMyTeam(leagueId),
     enabled: !isRestoring,
   });
-  // Best-effort enrichment (Team Snapshot's rank/archetype), previously
-  // chained only after `result.roster_id` was known — same dependency here
-  // via `enabled`, and the exact same endpoint Dashboard's League Pulse and
+  // Best-effort enrichment (Team Snapshot's rank/archetype). Started with the
+  // lineup request rather than after it returns `roster_id`; the match-up
+  // to the caller's own row happens below once both have landed. The exact same endpoint Dashboard's League Pulse and
   // TeamsScreen's leaderboard both fetch, so this shares one cache entry
   // under queryKeys.teamRankings(leagueId) instead of hitting it again.
   const teamRankingsQuery = useQuery({
     queryKey: queryKeys.teamRankings(leagueId),
     queryFn: () => api.getLeagueTeamRankings(leagueId),
-    enabled: !isRestoring && Boolean(myTeamQuery.data?.roster_id),
+    enabled: !isRestoring,
   });
 
   // Best-effort: only keeper leagues return tags/candidates.
   const keepersQuery = useQuery({
     queryKey: queryKeys.keepers(leagueId),
     queryFn: () => api.getLeagueKeepers(leagueId),
-    enabled: !isRestoring && Boolean(myTeamQuery.data?.roster_id),
+    enabled: !isRestoring,
   });
   const keepers = keepersQuery.data?.is_keeper_league ? keepersQuery.data : null;
 

@@ -24,7 +24,7 @@ export default function TradeHubPage() {
   // here (see gamePlanTileHref/resolveGamePlanTargetPlayerId) instead of
   // landing on this generic board with no way to tell which idea it meant.
   const highlightPlayerId = searchParams.get("playerId") || undefined;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   useEffect(() => {
     if (!session) return;
@@ -35,33 +35,13 @@ export default function TradeHubPage() {
   }, [session, leagueId]);
 
   // Recommendation-compliance audit finding: this page used to hardcode
-  // "retool" regardless of the caller's declared Team Situation, so a user
-  // who declared Competing/Rebuilding never actually saw ideas generated
-  // under their own stated stance here — only Dashboard/GM Plan (which
-  // derive the real strategy server-side) and mobile's TradeHubScreen
-  // (which reads it via useGmStance) did. GET .../team-stance already
-  // returns the exact mapped engine key (`strategy`) Trade Hub needs; this
-  // mirrors mobile's useGmStance gating (null until resolved, falling back
-  // to "retool" on fetch failure/no stance set, same as always) rather than
-  // firing the real idea search under a possibly-wrong default first.
-  const [strategy, setStrategy] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    api
-      .getTeamStance(leagueId)
-      .then((result) => {
-        if (!cancelled) setStrategy(result.strategy || "retool");
-      })
-      .catch(() => {
-        if (!cancelled) setStrategy("retool");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session, leagueId]);
-
+  // "retool" regardless of the caller's declared Team Situation, so ideas
+  // were never generated under the user's own stated stance. The strategy
+  // now comes from the declared stance, but the server resolves it
+  // (strategy=auto, the same mapping GET .../team-stance returns), so the
+  // idea request no longer waits for a stance round trip first. A server
+  // that predates "auto" echoes it back unresolved; that case falls back to
+  // the old stance-then-ideas sequence.
   const [tradeHub, setTradeHub] = useState<TradeHubResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,11 +51,18 @@ export default function TradeHubPage() {
       router.replace("/");
       return;
     }
-    if (strategy === null) return;
+    // First fetch waits only for the league type, so a redraft league is
+    // requested once (as Non-Dynasty), not once as Dynasty and again.
+    if (!lensReady) return;
     let cancelled = false;
 
     api
-      .getTradeHub(leagueId, strategy, lens)
+      .getTradeHub(leagueId, "auto", lens)
+      .then(async (result) => {
+        if (result.team_strategy !== "auto") return result;
+        const stance = await api.getTeamStance(leagueId).catch(() => null);
+        return api.getTradeHub(leagueId, stance?.strategy || "retool", lens);
+      })
       .then((result) => {
         if (!cancelled) setTradeHub(result);
       })
@@ -86,7 +73,7 @@ export default function TradeHubPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, strategy, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!tradeHub && !error)) {
     return (

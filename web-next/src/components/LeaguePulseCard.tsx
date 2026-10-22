@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { api, type TeamRanking } from "@/lib/api";
+import { api, type LeagueTeamRankingsResponse, type TeamRanking } from "@/lib/api";
 import { TeamAvatar } from "@/components/TeamAvatar";
 
 /**
@@ -92,13 +92,22 @@ function toneColor(tone: Highlight["tone"]): string {
   return "var(--color-text-muted)";
 }
 
-export function LeaguePulseCard({ leagueId, leagueName = "" }: { leagueId: string; leagueName?: string }) {
+export function LeaguePulseCard({
+  leagueId,
+  leagueName = "",
+  teamRankings,
+}: {
+  leagueId: string;
+  leagueName?: string;
+  /** Already-started GET .../team-rankings for this league (the Dashboard page
+   * starts it alongside its own request). Omitted: fetch it here. */
+  teamRankings?: Promise<LeagueTeamRankingsResponse>;
+}) {
   const [highlights, setHighlights] = useState<Highlight[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .getTeamRankings(leagueId)
+    (teamRankings ?? api.getTeamRankings(leagueId))
       .then((result) => {
         if (cancelled) return;
         setHighlights(result.ok ? leaguePulseHighlights(result.teams) : []);
@@ -111,7 +120,7 @@ export function LeaguePulseCard({ leagueId, leagueName = "" }: { leagueId: strin
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, teamRankings]);
 
   if (!highlights || highlights.length === 0) return null;
 

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
-import { api, type DashboardResponse } from "@/lib/api";
+import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,9 +18,13 @@ export default function DashboardPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   const [data, setData] = useState<DashboardResponse | null>(null);
+  // League Pulse's source, started in the same tick as the Dashboard request
+  // (it used to start only after the Dashboard rendered, a full round trip
+  // later). Handed down as a promise so the tile renders whenever it lands.
+  const [teamRankings, setTeamRankings] = useState<Promise<LeagueTeamRankingsResponse> | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped by the "Try again" button below — included in the fetch effect's
   // deps so a retry re-runs it without a full page reload (see
@@ -34,12 +38,20 @@ export default function DashboardPage() {
       router.replace("/");
       return;
     }
+    // First fetch waits only for the league type, so a redraft league is
+    // requested once (as Non-Dynasty), not once as Dynasty and again.
+    if (!lensReady) return;
     let cancelled = false;
+    const rankings = api.getTeamRankings(leagueId, lens);
+    rankings.catch(() => {
+      /* the tile renders nothing on failure; avoid an unhandled rejection */
+    });
     api
       .getDashboard(leagueId, lens)
       .then((result) => {
         if (!cancelled) {
           setData(result);
+          setTeamRankings(rankings);
           setError(null);
         }
       })
@@ -49,7 +61,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router, retryToken]);
+  }, [authLoading, session, leagueId, lens, lensReady, router, retryToken]);
 
   if (authLoading || (!data && !error)) {
     return (
@@ -69,5 +81,5 @@ export default function DashboardPage() {
     );
   }
 
-  return <DashboardContent leagueId={leagueId} leagueName={leagueName} data={data} />;
+  return <DashboardContent leagueId={leagueId} leagueName={leagueName} data={data} teamRankings={teamRankings ?? undefined} />;
 }

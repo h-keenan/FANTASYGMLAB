@@ -1,7 +1,7 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
 
-import type { DashboardResponse } from "@/lib/api";
+import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
@@ -39,10 +39,14 @@ export function DashboardContent({
   leagueId,
   leagueName,
   data,
+  teamRankings,
 }: {
   leagueId: string;
   leagueName: string;
   data: DashboardResponse;
+  /** League Pulse's source, already in flight (the page starts it alongside
+   * the Dashboard request). Omitted: the tile fetches it itself. */
+  teamRankings?: Promise<LeagueTeamRankingsResponse>;
 }) {
   const snapshot = data.team_snapshot;
   // Beginner helper text (onboarding experience level) — null/undefined for
@@ -146,7 +150,7 @@ export function DashboardContent({
           Both self-fetch and render nothing on failure; a lone card takes
           the full row. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 [&>*:only-child]:sm:col-span-2">
-        <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} />
+        <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
         <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
       </div>
       <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
