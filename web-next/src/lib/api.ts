@@ -1,5 +1,6 @@
 import { env } from "./env";
 import { supabase } from "./supabase";
+import type { PercentileExplorerResponse } from "./percentileExplorer";
 
 /**
  * Client for services/mobile_api_service.py. Mirrors mobile/src/lib/api.ts's
@@ -3169,6 +3170,12 @@ export const api = {
   // PlayerCompareScreen calls twice (once per side) via getPlayerQuickView.
   getPlayerQuickView: (playerId: string) =>
     authorizedRequest<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
+
+  // Percentile Explorer: distribution + nearby real players behind one stat tile.
+  getPercentileExplorer: (playerId: string, stat: string, pool: "position" | "all") =>
+    authorizedRequest<PercentileExplorerResponse>(
+      `/v1/players/${encodeURIComponent(playerId)}/percentile-explorer?stat=${encodeURIComponent(stat)}&pool=${pool}`,
+    ),
 
   // Shared PlayerQuickView modal (Revision 22) — the same verified-badges
   // endpoint mobile's PlayerDetailScreen already calls
