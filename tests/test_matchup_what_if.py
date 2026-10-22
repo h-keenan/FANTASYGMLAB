@@ -209,3 +209,20 @@ def test_endpoint_hidden_for_best_ball(monkeypatch):
     _patch_page(monkeypatch, best_ball=True)
     out = call(lineup=LINEUP, edit_index=0)
     assert out["best_ball"] is True and out["reason"] == "best_ball" and "lineup" not in out
+
+
+def test_bench_players_are_listed_before_other_starters():
+    """Swapping a starter out should lead with the bench, not with the other
+    starters who would merely trade places (owner feedback)."""
+
+    pool = base_pool()
+    # A starter who would be a strong swap candidate for the FLEX slot.
+    pool["wr1"] = p("wr1", "WR", 30)
+    result = wi.candidates_for_slot(pool, LINEUP, 3, OPP, ELIG)
+    selectable = [c for c in result["candidates"] if c["selectable"]]
+    flags = [bool(c["currently_starting"]) for c in selectable]
+    assert any(flags) and not all(flags)
+    # Once a starter appears, no bench player may follow.
+    first_starter = flags.index(True)
+    assert all(flags[first_starter:])
+    assert not flags[0]

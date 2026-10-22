@@ -235,13 +235,21 @@ export function SwapSheet({
             ) : candidates.length === 0 ? (
               <AppText style={styles.muted}>No one else on your roster can fill this slot.</AppText>
             ) : (
-              candidates.map((candidate) => (
-                <CandidateRow
-                  key={candidate.player.player_id}
-                  candidate={candidate}
-                  onPick={() => onPick(candidate)}
-                />
-              ))
+              candidates.map((candidate, index) => {
+                const previous = candidates[index - 1];
+                const startsGroup = candidate.selectable && !!candidate.currently_starting
+                  && (!previous || !previous.currently_starting || !previous.selectable);
+                return (
+                  <View key={candidate.player.player_id}>
+                    {startsGroup && index > 0 ? (
+                      <AppText style={[styles.muted, { marginTop: 12, textTransform: 'uppercase', fontWeight: '700' }]}>
+                        Swap with another starter
+                      </AppText>
+                    ) : null}
+                    <CandidateRow candidate={candidate} onPick={() => onPick(candidate)} />
+                  </View>
+                );
+              })
             )}
           </SheetScrollView>
         </SwipeDismissCard>

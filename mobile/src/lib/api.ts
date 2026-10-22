@@ -752,6 +752,8 @@ export interface MatchupWhatIfBullet {
 export interface MatchupWhatIfCandidate {
   player: MatchupStarter;
   selectable: boolean;
+  /** True when this player is already in the lineup (he would trade places). */
+  currently_starting?: boolean;
   blocked_reason: 'bye' | 'out' | 'locked' | null;
   points_delta: number | null;
   /** Whole-percent change in this matchup's win probability. */
