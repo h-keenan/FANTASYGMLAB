@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
+import { AccentCard } from "@/components/AccentCard";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
 import {
   GAME_PLAN_INTERNAL_ROUTES,
@@ -40,8 +44,9 @@ export function GamePlanCard({
   leagueName: string;
 }) {
   const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
+  const copy = useExperienceCopy();
   return (
-    <article className="glass-surface flex flex-col gap-2 p-4">
+    <AccentCard accent="var(--color-accent)">
       <span
         className="uppercase"
         style={{
@@ -53,7 +58,15 @@ export function GamePlanCard({
         {formatGamePlanCategory(item.category)}
       </span>
       <h3 style={{ font: "var(--font-card-title)" }}>{item.headline}</h3>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+      <p
+        className="text-sm"
+        style={{
+          color: "var(--color-text-secondary)",
+          ...(copy.isBeginner
+            ? {}
+            : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
+        }}
+      >
         {item.reason}
       </p>
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
@@ -74,6 +87,6 @@ export function GamePlanCard({
           {destinationCtaLabel(item.destination)} →
         </a>
       )}
-    </article>
+    </AccentCard>
   );
 }

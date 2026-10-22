@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { api, type TeamRanking } from "@/lib/api";
@@ -91,7 +92,7 @@ function toneColor(tone: Highlight["tone"]): string {
   return "var(--color-text-muted)";
 }
 
-export function LeaguePulseCard({ leagueId }: { leagueId: string }) {
+export function LeaguePulseCard({ leagueId, leagueName = "" }: { leagueId: string; leagueName?: string }) {
   const [highlights, setHighlights] = useState<Highlight[] | null>(null);
 
   useEffect(() => {
@@ -116,14 +117,15 @@ export function LeaguePulseCard({ leagueId }: { leagueId: string }) {
 
   return (
     <article className="glass-surface flex flex-col gap-3 p-4" data-testid="league-pulse-card">
-      <div className="flex flex-col gap-0.5">
-        <span
-          className="uppercase"
-          style={{ font: "var(--type-badge-size)", letterSpacing: "var(--letter-spacing-badge)", color: "var(--color-accent)" }}
+      <div className="flex items-center justify-between gap-2">
+        <h3 style={{ font: "var(--font-card-title)" }}>League Activity</h3>
+        <Link
+          href={`/league-recaps/${encodeURIComponent(leagueId)}${leagueName ? `?name=${encodeURIComponent(leagueName)}` : ""}`}
+          aria-label="Open League Recaps"
+          style={{ color: "var(--color-accent)" }}
         >
-          League Pulse
-        </span>
-        <h3 style={{ font: "var(--font-card-title)" }}>Real activity and streaks</h3>
+          ›
+        </Link>
       </div>
       <div className="flex flex-col gap-2.5">
         {highlights.map((highlight) => (

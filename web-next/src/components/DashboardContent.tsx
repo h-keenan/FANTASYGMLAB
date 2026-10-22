@@ -7,7 +7,9 @@ import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
-import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
+import { EmptyState } from "@/components/EmptyState";
+import { formatRank } from "@/components/SnapshotTile";
+import { StatStrip } from "@/components/StatStrip";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
@@ -46,6 +48,9 @@ export function DashboardContent({
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
+  const query = `?name=${encodeURIComponent(leagueName)}`;
+  const topItems = data.items.filter((item) => item.category === "top_priority");
+  const watchItems = data.items.filter((item) => item.category !== "top_priority");
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -55,85 +60,61 @@ export function DashboardContent({
     // (it only restated what the heading already said; the real content —
     // the actionable cards below — is what should hit the fold).
     <main className="flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto">
-      {/* coridian_, 2026-10-18: "dashboard should go up into the header...
-          so you can always see what page you're on" — the "Dashboard"
-          label now lives in the persistent Header (HeaderPageTitle) instead
-          of repeated here, where it scrolls away with the rest of the page.
-          The league name stays as this page's own <h1> — normal page
-          content, not something he asked to remove — it's ALSO now in the
-          header's league switcher button. */}
-      <header className="flex flex-col gap-1">
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
-      </header>
+      {/* The page title lives in the persistent Header (level with search and
+          alerts); the league name stays here as the page's <h1> for screen
+          readers and is already in the header's league switcher. */}
+      <h1 className="sr-only">{leagueName}</h1>
 
-      {/* "Guess the Player" mini-game (coridian_, 2026-10-19) — league-
-          independent (one shared daily pick for every signed-in user), so
-          it fetches its own data rather than reading from `data` above.
-          Renders nothing while loading, on fetch failure, or once
-          dismissed — never blocks or visually disrupts the real Game Plan
-          content below it. `leagueId` is only used for its "League
-          Leaderboard" link (feature-brainstorm audit, 2026-10-19) — the
-          leaderboard itself is league-scoped even though the daily pick
-          isn't. */}
-      <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
-
-      {/* "Who is who?" name-match mini-game (coridian_, 2026-10-19) — a
-          second, distinct daily mini-game alongside Guess the Player
-          above; same league-independent, self-fetching, dismissible
-          shape, own daily pick and own streak. */}
-      <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
-
-      {/* League Pulse (coridian_'s brainstorm list, "do it all") — real
-          league-wide activity/streak leaders off GET .../team-rankings.
-          Self-fetching, same contract as the two mini-game cards above:
-          renders nothing while loading, on fetch failure, or when no team
-          has a standout signal yet. */}
-      <LeaguePulseCard leagueId={leagueId} />
+      {snapshot ? (
+        <section className="flex flex-col gap-2" aria-label="Team summary">
+          <StatStrip
+            columns={4}
+            items={[
+              { glyph: "record", label: "Record", value: `${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}` },
+              {
+                glyph: "power",
+                label: "Power Rank",
+                value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
+                tone: snapshot.power_rank === 1 ? "premium" : "neutral",
+                note: copy.help("powerRank") ?? undefined,
+              },
+              {
+                glyph: "franchise",
+                label: "Franchise Rank",
+                value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
+                tone: snapshot.franchise_rank === 1 ? "premium" : "neutral",
+                note: copy.help("franchiseRank") ?? undefined,
+              },
+              {
+                glyph: "age",
+                label: copy.label("averageAge", "Avg Age"),
+                value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
+                note: copy.help("averageAge") ?? undefined,
+              },
+            ]}
+          />
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
-        <SectionHeading id="game-plan-heading">
-          Today&apos;s Game Plan
+        <SectionHeading id="game-plan-heading" action={<ViewAllLink href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`} label="View all game plan items" />}>
+          Today
         </SectionHeading>
         <BeginnerHelp term="dashboardGamePlan" />
 
-        {data.quiet || data.items.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            {/* Zach's repro: a league still mid-draft resolves to an empty
-                roster (Sleeper doesn't populate roster.players until the
-                draft completes), which previously crashed this page
-                entirely (see services/mobile_api_service.py's
-                get_league_dashboard fix). Now that it returns cleanly,
-                this reason deserves a message that actually explains why,
-                not the generic "no urgent issues" line. */}
-            {notReadyReasonMessage(data.reason, {
-              linkAccount: "Connect your Sleeper account to see your Game Plan.",
-              emptyRoster: "Your roster doesn't have any players yet — this is expected if your draft is still in progress.",
-            }) || "No urgent roster issues right now."}
-          </p>
+        {topItems.length === 0 && watchItems.length === 0 ? (
+          <EmptyState
+            title={
+              notReadyReasonMessage(data.reason, {
+                linkAccount: "Connect your Sleeper account to see your Game Plan.",
+                emptyRoster: "Your roster doesn't have any players yet. This is expected if your draft is still in progress.",
+              }) || "No urgent roster issues right now."
+            }
+          />
         ) : (
-          <div className="flex flex-col gap-3">
-            {/* coridian_, 2026-10-18: "you can just put them all under
-                watch... to make this much simpler and more streamlined" —
-                Top Priority keeps its own full card (it's the single
-                highest-priority recommendation); every other item groups
-                into one WatchListCard instead of each getting a full card
-                of its own. */}
-            {data.items
-              .filter((item) => item.category === "top_priority")
-              .map((item) => (
-                <GamePlanCard
-                  key={item.recommendation_id || item.headline}
-                  item={item}
-                  leagueId={leagueId}
-                  leagueName={leagueName}
-                />
-              ))}
-            <WatchListCard
-              items={data.items.filter((item) => item.category !== "top_priority")}
-              leagueId={leagueId}
-              leagueName={leagueName}
-            />
-          </div>
+          topItems.map((item) => (
+            <GamePlanCard key={item.recommendation_id || item.headline} item={item} leagueId={leagueId} leagueName={leagueName} />
+          ))
         )}
 
         {data.entitlement.hidden_count > 0 ? (
@@ -151,75 +132,64 @@ export function DashboardContent({
         ) : null}
       </section>
 
-      {snapshot ? (
-        <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true">
-          <SectionHeading id="snapshot-heading">
-            Team Snapshot
+      {watchItems.length > 0 ? (
+        <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
+          <SectionHeading id="watchlist-heading" action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" />}>
+            Watchlist &amp; Alerts
           </SectionHeading>
-          <BeginnerHelp term="dashboardSnapshot" />
-          <div className="flex flex-wrap gap-3">
-            <SnapshotTile
-              glyph="record"
-              label="Record"
-              value={`${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`}
-            />
-            <SnapshotTile
-              glyph="power"
-              label="Power Rank"
-              value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
-              tone={snapshot.power_rank === 1 ? "premium" : "neutral"}
-              note={copy.help("powerRank") ?? undefined}
-              wrapNote
-            />
-            <SnapshotTile
-              glyph="franchise"
-              label="Franchise Rank"
-              value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
-              tone={snapshot.franchise_rank === 1 ? "premium" : "neutral"}
-              note={copy.help("franchiseRank") ?? undefined}
-              wrapNote
-            />
-            <SnapshotTile
-              glyph="starter"
-              label="Starter Strength"
-              value={formatRank(snapshot.starter_rank, snapshot.starter_rank_tied)}
-              tone={snapshot.starter_rank === 1 ? "premium" : "neutral"}
-              note={copy.help("starterStrength") ?? undefined}
-              wrapNote
-            />
-            <SnapshotTile
-              glyph="bench"
-              label="Bench Strength"
-              value={formatRank(snapshot.bench_rank, snapshot.bench_rank_tied)}
-              tone={snapshot.bench_rank === 1 ? "premium" : "neutral"}
-              note={copy.help("benchStrength") ?? undefined}
-              wrapNote
-            />
-            <SnapshotTile
-              glyph="age"
-              label={copy.label("averageAge", "Avg Age")}
-              value={snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—"}
-              note={copy.help("averageAge") ?? undefined}
-              wrapNote
-            />
-            <SnapshotTile
-              glyph="injury"
-              label="Injuries"
-              value={snapshot.health_flag || "Stable"}
-              tone={snapshot.injured_starters && snapshot.injured_starters > 0 ? "risk" : "positive"}
-            />
-          </div>
+          <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
         </section>
       ) : null}
 
-      {/* Explore grid removed entirely (coridian_, 2026-10-18: "You never
-          removed the explore section"). The 2026-10-17 pass only hid it at
-          md+ width, reasoning GmOrb was "a floating button, not a
-          persistent nav" on mobile — but GmOrb (fixed bottom-center on
-          every mobile page, see GmOrb.tsx) already surfaces this exact
-          same League/GM Tools/General destination list via
-          useNavDestinations, so the grid was genuinely redundant on mobile
-          too, not just desktop. */}
+      {/* League Activity and Guess the Player side by side (stacked on a
+          phone-narrow viewport, where the playable game needs the width).
+          Both self-fetch and render nothing on failure; a lone card takes
+          the full row. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 [&>*:only-child]:sm:col-span-2">
+        <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} />
+        <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
+      </div>
+      <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
+
+      {snapshot ? (
+        <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true">
+          <SectionHeading id="snapshot-heading">Team Snapshot</SectionHeading>
+          <BeginnerHelp term="dashboardSnapshot" />
+          <StatStrip
+            columns={3}
+            items={[
+              {
+                glyph: "starter",
+                label: "Starter Strength",
+                value: formatRank(snapshot.starter_rank, snapshot.starter_rank_tied),
+                tone: snapshot.starter_rank === 1 ? "premium" : "neutral",
+                note: copy.help("starterStrength") ?? undefined,
+              },
+              {
+                glyph: "bench",
+                label: "Bench Strength",
+                value: formatRank(snapshot.bench_rank, snapshot.bench_rank_tied),
+                tone: snapshot.bench_rank === 1 ? "premium" : "neutral",
+                note: copy.help("benchStrength") ?? undefined,
+              },
+              {
+                glyph: "injury",
+                label: "Injuries",
+                value: snapshot.health_flag || "Stable",
+                tone: snapshot.injured_starters && snapshot.injured_starters > 0 ? "risk" : "positive",
+              },
+            ]}
+          />
+        </section>
+      ) : null}
     </main>
+  );
+}
+
+function ViewAllLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} aria-label={label} className="text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
+      View All →
+    </Link>
   );
 }

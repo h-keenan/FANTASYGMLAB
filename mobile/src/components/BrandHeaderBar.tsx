@@ -24,13 +24,46 @@ import { spacing, type ThemeColors } from '../theme';
 export default function BrandHeaderBar({
   leagueId,
   leagueName,
+  title,
+  onSearch,
 }: {
   leagueId?: string;
   leagueName?: string;
+  /** Page-title mode (Dashboard): the title sits level with a search icon
+   * (opens the GM orb's player search) and an Alerts bell. */
+  title?: string;
+  onSearch?: () => void;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  if (title) {
+    return (
+      <View style={styles.row}>
+        <AppText style={styles.pageTitle} accessibilityRole="header">
+          {title}
+        </AppText>
+        <View style={[styles.side, styles.actions]}>
+          {onSearch ? (
+            <TouchableOpacity style={styles.iconButton} hitSlop={8} onPress={onSearch} accessibilityLabel="Search players and pages">
+              <Ionicons name="search-outline" size={19} color={colors.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+          {leagueId && leagueName ? (
+            <TouchableOpacity
+              style={styles.iconButton}
+              hitSlop={8}
+              onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })}
+              accessibilityLabel="Alerts"
+            >
+              <Ionicons name="notifications-outline" size={19} color={colors.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.row}>
@@ -68,6 +101,7 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   side: { flex: 1 },
+  pageTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
   centerGroup: {
     flexDirection: 'row',
     alignItems: 'center',

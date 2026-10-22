@@ -1,32 +1,29 @@
+"use client";
+
 import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
-import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { PositionBadge } from "@/components/PositionBadge";
+import { ToneBadge } from "@/components/ToneBadge";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
+import { usageTrendPct, watchTag } from "@/lib/dashboardPresentation";
 import {
   GAME_PLAN_INTERNAL_ROUTES,
-  formatGamePlanCategory,
   gamePlanTileHref,
   resolveGamePlanTargetPlayerId,
 } from "@/lib/gamePlanPresentation";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
 
 /**
- * coridian_, 2026-10-18: "With these modules and other modules similar to
- * it, you can just put them all under watch and then have the micro player
- * card and then underneath that micro player card you can have usage
- * trending down and then you can have another micro player card and then
- * under that it can say injured or whatever, stuff like that, to make this
- * much simpler and more streamlined."
- *
- * Every Today's Game Plan item EXCEPT Top Priority (Watch, Waiver
- * Opportunity, League Movement, ...) used to render as its own full
- * GamePlanCard — same border, padding, and CTA as the headline trade card,
- * for what's usually a one-line signal + one or two player chips. This
- * groups all of them into one card instead: a small section per item
- * (category label + headline + its own compact CTA), separated by a
- * hairline rather than a full card boundary each. Top Priority keeps its
- * own full-card treatment in GamePlanCard — it's the single highest-
- * priority recommendation and still needs the room.
+ * Watchlist & Alerts: every Game Plan item except Top Priority, as one
+ * list. Each row is one tap target: a type tag (TRENDING / INJURY / WAIVER),
+ * the player, one line of why, and on the right a trend indicator only when
+ * the item carries a real figure (today: the usage-drop percentage of a
+ * Value Trend item). Rows without data show just the chevron; nothing is
+ * drawn or labelled as a placeholder. Beginner mode shows the full reason,
+ * advanced clamps it to one line.
  */
 export function WatchListCard({
   items,
@@ -37,61 +34,82 @@ export function WatchListCard({
   leagueId: string;
   leagueName: string;
 }) {
+  const copy = useExperienceCopy();
   if (items.length === 0) return null;
   return (
-    <article className="glass-surface flex flex-col" style={{ overflow: "hidden" }}>
+    <article className="glass-surface flex flex-col" style={{ overflow: "hidden" }} data-testid="watchlist-alerts">
       {items.map((item, index) => {
         const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
-        return (
-          <div
-            key={item.recommendation_id || item.headline}
-            className="flex flex-col gap-1 px-3 py-2.5"
-            style={index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined}
-          >
-            <div className="flex items-center justify-between gap-2">
+        const tag = watchTag(item);
+        const trendPct = usageTrendPct(item);
+        const mentioned = item.mentioned_players?.[0];
+        const playerId = item.route_player_id || mentioned?.player_id || "";
+        const name = item.route_player_name || mentioned?.name || "";
+        const position = item.route_player_position || mentioned?.position || "";
+        const team = item.route_player_team || mentioned?.team || "";
+        const tier = item.route_player_tier || mentioned?.player_tier || "";
+        const injury = item.route_player_injury_status || mentioned?.injury_status || "";
+        const label = `${destinationCtaLabel(item.destination)}: ${item.headline}`;
+        const rowStyle = index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined;
+        const body = (
+          <>
+            <span className="shrink-0 w-[4.25rem]">
+              <ToneBadge label={tag.label} color={tag.color} />
+            </span>
+            {playerId ? <PlayerAvatar playerId={playerId} tier={tier} size={36} /> : null}
+            <span className="flex flex-col gap-0.5 min-w-0 flex-1">
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                  {name || item.headline}
+                </span>
+                {team ? (
+                  <span className="hidden sm:inline text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
+                    {team}
+                  </span>
+                ) : null}
+                <PlayerInjuryBadge status={injury} />
+              </span>
+              <span className="flex items-start gap-1.5 min-w-0">
+              <PositionBadge position={position} />
               <span
-                className="uppercase"
+                className="text-xs min-w-0"
                 style={{
-                  font: "var(--type-badge-size)",
-                  letterSpacing: "var(--letter-spacing-badge)",
-                  color: "var(--color-accent)",
+                  color: "var(--color-text-secondary)",
+                  ...(copy.isBeginner
+                    ? {}
+                    : { display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
                 }}
               >
-                {formatGamePlanCategory(item.category)}
+                {item.reason}
               </span>
-              {internalRoute ? (
-                <Link
-                  href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
-                  className="text-xs font-bold shrink-0"
-                  style={{ color: "var(--color-accent)" }}
-                >
-                  {destinationCtaLabel(item.destination)} →
-                </Link>
-              ) : (
-                <a
-                  href={streamlitPageUrl(item.destination)}
-                  className="text-xs font-bold shrink-0"
-                  style={{ color: "var(--color-accent)" }}
-                >
-                  {destinationCtaLabel(item.destination)} →
-                </a>
-              )}
-            </div>
-            <h4 style={{ font: "var(--font-card-title)" }}>{item.headline}</h4>
-            <p
-              className="text-sm"
-              style={{
-                color: "var(--color-text-secondary)",
-                display: "-webkit-box",
-                WebkitLineClamp: 1,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {item.reason}
-            </p>
-            <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
-          </div>
+              </span>
+            </span>
+            {trendPct !== null ? (
+              <span className="shrink-0">
+                <ToneBadge label={`↓ ${trendPct}%`} color="var(--color-danger)" />
+              </span>
+            ) : null}
+            <span aria-hidden="true" className="shrink-0 text-lg" style={{ color: "var(--color-accent)" }}>
+              ›
+            </span>
+          </>
+        );
+        const className = "flex items-center gap-3 px-3 py-2.5";
+        const key = item.recommendation_id || item.headline;
+        return internalRoute ? (
+          <Link
+            key={key}
+            href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
+            aria-label={label}
+            className={className}
+            style={rowStyle}
+          >
+            {body}
+          </Link>
+        ) : (
+          <a key={key} href={streamlitPageUrl(item.destination)} aria-label={label} className={className} style={rowStyle}>
+            {body}
+          </a>
         );
       })}
     </article>

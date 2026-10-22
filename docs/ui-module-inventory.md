@@ -43,6 +43,16 @@ mobile is `mobile/src/components`.
 | 10 | Sign-in uses standard tokens/radii | `SignInForm` uses `.glass-surface`, `.glass-input`, `--radius-control` | n/a |
 | 11 | One modal backdrop | `--color-scrim` (0.6) / `scrim` export in `theme.ts` | n/a |
 
+Dashboard modules (2026-10-22): `StatStrip` (web) / `DashboardStatRow`
+(mobile) render the Record / Power / Franchise / Avg Age strip once and the
+Starter / Bench / Injuries Team Snapshot row; `WatchListCard` (web) and
+`WatchlistAlertsSection` (mobile) are the one Watchlist & Alerts list with
+TRENDING / INJURY / WAIVER tags (`lib/dashboardPresentation.ts`,
+`lib/dashboardWatch.ts`); the trend indicator renders only when the item
+carries a real usage-drop figure; `SectionHeading` takes `action` (web) /
+`right` (mobile) for View All links; the header search icon opens the GM
+orb's search (`lib/orbSearch.ts`, `lib/orbEvents.ts`).
+
 Not yet migrated (follow-ups): web `MatchupContent` rows (being redesigned
 separately), `LeagueRecapsContent.RecapStoryCard` (different lead/non-lead
 card), `LiveDraftContent.PickRowView` (pick result, not an asset), mobile

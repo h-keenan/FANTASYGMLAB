@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import Link from "next/link";
 import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -276,6 +277,57 @@ function HeaderPageTitle() {
   );
 }
 
+const ICON_BUTTON_STYLE = {
+  color: "var(--color-text-secondary)",
+  border: "var(--border-width-default) solid var(--color-border)",
+  borderRadius: "var(--radius-control)",
+  width: "2.25rem",
+  height: "2.25rem",
+} as const;
+
+/**
+ * Search and alerts, level with the page title. Search opens the GM orb's
+ * destination and player search (no second search UI); the bell goes to the
+ * league's Alerts page. Alerts only exists inside a league, so the bell is
+ * hidden elsewhere. Rendered only when signed in.
+ */
+function HeaderIconActions() {
+  const { session } = useAuth();
+  const params = useParams<{ leagueId?: string }>();
+  const searchParams = useSearchParams();
+  const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
+  if (!session) return null;
+  const name = searchParams.get("name");
+  const alertsHref = leagueId
+    ? `/alerts/${encodeURIComponent(leagueId)}${name ? `?name=${encodeURIComponent(name)}` : ""}`
+    : null;
+  const svg = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Search players and pages"
+        onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
+        className="inline-flex items-center justify-center"
+        style={ICON_BUTTON_STYLE}
+      >
+        <svg {...svg}>
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+      </button>
+      {alertsHref ? (
+        <Link href={alertsHref} aria-label="Alerts" className="inline-flex items-center justify-center" style={ICON_BUTTON_STYLE}>
+          <svg {...svg}>
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
 /**
  * Site-wide persistent top bar — rendered once in layout.tsx, so every
  * route gets it for free (coridian_: "add ... the header", 2026-10-16).
@@ -295,10 +347,11 @@ export function Header() {
 
   return (
     <header
-      className="flex items-center justify-between px-4 py-3 relative gap-3 flex-wrap"
+      className="flex flex-col px-4 py-3 relative gap-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
@@ -308,9 +361,9 @@ export function Header() {
         <HeaderPageTitle />
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2">
         <Suspense fallback={null}>
-          <HeaderLeagueControls />
+          <HeaderIconActions />
         </Suspense>
 
         <div className="relative">
@@ -404,6 +457,12 @@ export function Header() {
             </>
           ) : null}
         </div>
+      </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap empty:hidden">
+        <Suspense fallback={null}>
+          <HeaderLeagueControls />
+        </Suspense>
       </div>
     </header>
   );

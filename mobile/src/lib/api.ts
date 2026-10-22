@@ -1684,6 +1684,10 @@ export interface TeamSnapshot {
   power_rank_tied: boolean;
   franchise_rank: number | null;
   franchise_rank_tied: boolean;
+  starter_rank?: number | null;
+  starter_rank_tied?: boolean;
+  bench_rank?: number | null;
+  bench_rank_tied?: boolean;
 }
 
 export interface DashboardEntitlementInfo extends EntitlementGateInfo {

@@ -19,6 +19,7 @@ export function SectionHeading({
   note,
   id,
   className = "flex flex-col gap-1",
+  action,
 }: {
   children: ReactNode;
   /** Small accent label above the title (e.g. "Head-to-Head"). */
@@ -28,12 +29,22 @@ export function SectionHeading({
   id?: string;
   /** Wrapper classes, only used when a kicker or note is present. */
   className?: string;
+  /** Right-aligned slot on the title row (e.g. a "View All" link). */
+  action?: ReactNode;
 }) {
   const title = (
     <h2 id={id} className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
       {children}
     </h2>
   );
+  if (action) {
+    return (
+      <div className="flex items-baseline justify-between gap-3">
+        {title}
+        {action}
+      </div>
+    );
+  }
   if (!kicker && !note) return title;
   return (
     <div className={className}>

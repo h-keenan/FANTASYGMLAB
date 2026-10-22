@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, TouchableOpacity, View, StyleSheet, DeviceEventEmitter } from 'react-native';
+import { OPEN_GUESS_EVENT } from '../lib/orbEvents';
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
@@ -78,6 +79,12 @@ export default function GuessThePlayerPrompt() {
       setResponse(null);
     }
   };
+
+  // The Dashboard's Guess the Player card re-opens today's prompt.
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(OPEN_GUESS_EVENT, () => setDismissedPickId(null));
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     (async () => {

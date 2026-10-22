@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import {
   Dimensions,
   Pressable,
@@ -41,6 +42,7 @@ import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from '../lib/playerSearch';
+import { OPEN_ORB_SEARCH_EVENT } from '../lib/orbEvents';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -728,6 +730,24 @@ export default function GmOrb() {
     // every render, only leagueId actually matters.
   }, [open, league?.leagueId]);
 
+  const searchInputRef = useRef<TextInput>(null);
+  const focusSearchOnOpen = useRef(false);
+  const openSheetRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(OPEN_ORB_SEARCH_EVENT, () => {
+      focusSearchOnOpen.current = true;
+      openSheetRef.current();
+    });
+    return () => subscription.remove();
+  }, []);
+  useEffect(() => {
+    if (visible && focusSearchOnOpen.current) {
+      focusSearchOnOpen.current = false;
+      const timer = setTimeout(() => searchInputRef.current?.focus(), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
   const openSheet = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -735,10 +755,12 @@ export default function GmOrb() {
     setVisible(true);
     setOpen(true);
     sheetY.value = withSpring(0, motion.sheetSpring);
-    backdropOpacity.value = withTiming(0.55, { duration: 220 });
+    backdropOpacity.value = withTiming(0.6, { duration: 220 });
     orbScale.value = withTiming(0.9, { duration: 180 });
     orbOpacity.value = withTiming(0, { duration: 180 });
   };
+
+  openSheetRef.current = openSheet;
 
   const closeSheet = () => {
     setOpen(false);
@@ -868,6 +890,7 @@ export default function GmOrb() {
           <AppText style={styles.sheetTitle}>Where to go</AppText>
 
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
             placeholder={league ? 'Search where to go or a player' : 'Search where to go'}
             value={searchQuery}
