@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type {
   MatchupPositionEdge,
@@ -9,6 +9,7 @@ import type {
   MatchupSuggestedMove,
 } from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
+import { PlannerBar, SwapSheet, useLineupPlanner } from "@/components/MatchupPlanner";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
@@ -36,6 +37,7 @@ import {
   type VerdictTone,
 } from "@/lib/matchupPresentation";
 import { positionColorVar } from "@/lib/playerPresentation";
+import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from "@/lib/matchupPlanner";
 
 /**
  * Weekly Matchup, laid out to the owner's concept (2026-10-21): header with
@@ -47,9 +49,9 @@ import { positionColorVar } from "@/lib/playerPresentation";
  * PillRow, PositionBadge, ToneBadge, .winprob-bar-*).
  *
  * FantasyDesk can't set a Sleeper lineup, so the Suggested tab and the
- * moves list are a planner; the copy says so. Interactive swap editing is
- * the next phase: it slots in on SuggestedMoves' cards and the Suggested
- * tab's rows without changing this data shape.
+ * moves list are a planner; the copy says so. "Edit lineup" turns the
+ * user's own column into a swap planner (components/MatchupPlanner.tsx):
+ * every number for an edited lineup comes from POST .../matchup/what-if.
  */
 
 const MOVES_PREVIEW_COUNT = 3;
@@ -338,29 +340,34 @@ function LineupCell({
   player,
   mine,
   maxValue,
+  onEdit,
 }: {
   player: LineupPlayer | "empty" | null;
   mine: boolean;
   maxValue: number;
+  /** Planner mode: tapping the cell opens the swap sheet instead of Quick View. */
+  onEdit?: () => void;
 }) {
   if (player === null) return <div />;
   if (player === "empty") {
-    return (
-      <div className={`flex items-center py-2 ${mine ? "" : "justify-end"}`}>
-        <span className="text-xs italic" style={{ color: "var(--color-text-muted)" }}>
-          Empty slot
-        </span>
-      </div>
+    const label = (
+      <span className="text-xs italic" style={{ color: onEdit ? "var(--color-accent)" : "var(--color-text-muted)" }}>
+        {onEdit ? "Empty slot, tap to fill" : "Empty slot"}
+      </span>
+    );
+    return onEdit ? (
+      <button type="button" onClick={onEdit} className="flex items-center py-2 w-full text-left">
+        {label}
+      </button>
+    ) : (
+      <div className={`flex items-center py-2 ${mine ? "" : "justify-end"}`}>{label}</div>
     );
   }
   const points = lineupPlayerPoints(player);
   const valueText = points.value != null ? points.value.toFixed(1) : points.note === "bye" ? null : "—";
   const reverse = mine ? "" : "flex-row-reverse";
-  return (
-    <PlayerIdentityTrigger
-      identity={{ ...player, sourceLabel: "Matchup" }}
-      className={`flex items-center gap-1.5 sm:gap-2 py-2 w-full ${reverse}`}
-    >
+  const body = (
+    <>
       <span className="inline-flex shrink-0">
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={28} />
       </span>
@@ -394,6 +401,23 @@ function LineupCell({
         </div>
         <PointsBar value={points.value} max={maxValue} mine={mine} />
       </div>
+    </>
+  );
+  return onEdit ? (
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label={`Swap ${player.name || "player"}`}
+      className={`flex items-center gap-1.5 sm:gap-2 py-2 w-full text-left ${reverse}`}
+    >
+      {body}
+    </button>
+  ) : (
+    <PlayerIdentityTrigger
+      identity={{ ...player, sourceLabel: "Matchup" }}
+      className={`flex items-center gap-1.5 sm:gap-2 py-2 w-full ${reverse}`}
+    >
+      {body}
     </PlayerIdentityTrigger>
   );
 }
@@ -404,16 +428,29 @@ function LineupComparison({
   matchup,
   view,
   onViewChange,
+  leagueId,
+  planner,
 }: {
   matchup: MatchupResponse;
   view: LineupView;
   onViewChange: (view: LineupView) => void;
+  leagueId?: string;
+  planner?: ReturnType<typeof useLineupPlanner>;
 }) {
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
   const bestBall = matchup.best_ball === true;
   const actual = bestBall || view === "actual";
-  const rows = actual
+  const plan = planner?.plan ?? null;
+  const canPlan = Boolean(planner && leagueId && !bestBall && plannerBase(matchup, view));
+  const rows = plan
+    ? lineupComparisonRows(
+        plan.starters ?? [],
+        plannerOpponentPlayers(matchup),
+        emptySlotsOf(plan.slots),
+        opponent.has_live_data ? (opponent.real_empty_slots ?? []) : (opponent.open_slots ?? []),
+      )
+    : actual
     ? lineupComparisonRows(
         mine.has_live_data ? mine.real_starters : [],
         opponent.has_live_data ? opponent.real_starters : [],
@@ -429,7 +466,9 @@ function LineupComparison({
       ),
     ),
   );
-  const caption = actual
+  const caption = plan
+    ? "Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper."
+    : actual
     ? "Lineups as set in Sleeper."
     : "Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.";
 
@@ -437,7 +476,7 @@ function LineupComparison({
     <section className="glass-surface flex flex-col gap-3 p-3 sm:p-4" aria-labelledby="lineup-comparison-title">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <SectionHeading id="lineup-comparison-title">Lineup Comparison</SectionHeading>
-        {bestBall ? null : (
+        {bestBall || plan ? null : (
         <PillRow
           options={[
             { label: "Suggested Lineup", value: "suggested" },
@@ -448,6 +487,19 @@ function LineupComparison({
         />
         )}
       </div>
+      {canPlan || plan ? (
+        <PlannerBar
+          editing={Boolean(plan)}
+          busy={plan?.busy ?? false}
+          error={plan?.error ?? null}
+          baselinePct={plan?.baselinePct ?? null}
+          currentPct={winPercent(plan?.result?.win_probability)}
+          leagueId={leagueId!}
+          onEdit={() => planner!.start(view)}
+          onReset={() => planner!.resetToSuggested()}
+          onDone={() => planner!.exit()}
+        />
+      ) : null}
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         {caption}
         {hasKickedOff(matchup) ? " Started games show real points; the rest show projections." : " Numbers are this week's projections."}
@@ -461,7 +513,13 @@ function LineupComparison({
         </p>
       ) : (
         <div role="table" aria-label={actual ? "Actual lineups" : "Suggested lineups"} className="flex flex-col">
-          {rows.map((row, index) => (
+          {rows.map((row, index) => {
+            const emptyOrdinal =
+              row.mine === "empty"
+                ? rows.slice(0, index).filter((r) => r.slot === row.slot && r.mine === "empty").length
+                : 0;
+            const editIndex = plan ? slotIndexFor(plan.slots, row.mine, row.slot, emptyOrdinal) : -1;
+            return (
             <div
               role="row"
               key={`${row.slot}-${index}`}
@@ -469,7 +527,12 @@ function LineupComparison({
               style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
             >
               <div role="cell" className="min-w-0">
-                <LineupCell player={row.mine} mine maxValue={maxValue} />
+                <LineupCell
+                  player={row.mine}
+                  mine
+                  maxValue={maxValue}
+                  onEdit={plan && editIndex >= 0 ? () => void planner!.openSlot(editIndex) : undefined}
+                />
               </div>
               <div
                 role="cell"
@@ -482,7 +545,8 @@ function LineupComparison({
                 <LineupCell player={row.opponent} mine={false} maxValue={maxValue} />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
@@ -599,10 +663,38 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
   );
 }
 
-export function MatchupContent({ leagueName, matchup }: { leagueName: string; matchup: MatchupResponse }) {
+export function MatchupContent({
+  leagueName,
+  matchup,
+  leagueId,
+  lens = "Dynasty",
+}: {
+  leagueName: string;
+  matchup: MatchupResponse;
+  leagueId?: string;
+  lens?: string;
+}) {
   const ready = matchup.ok && matchup.my_team && matchup.opponent && matchup.comparison;
   const defaultView: LineupView = matchup.my_team?.has_live_data ? "actual" : "suggested";
   const [view, setView] = useState<LineupView>(defaultView);
+  const planner = useLineupPlanner(leagueId ?? "", lens, matchup);
+  const edited = planner.plan?.result;
+  // While planning, the scoreboard and position edges show the edited
+  // lineup (the API's numbers), everything else stays the real matchup.
+  const shown = useMemo<MatchupResponse>(
+    () =>
+      edited?.win_probability
+        ? {
+            ...matchup,
+            win_probability: edited.win_probability,
+            position_edges: {
+              actual: edited.position_edges ?? null,
+              suggested: edited.position_edges ?? [],
+            },
+          }
+        : matchup,
+    [matchup, edited],
+  );
 
   if (!ready) {
     return (
@@ -618,9 +710,23 @@ export function MatchupContent({ leagueName, matchup }: { leagueName: string; ma
   return (
     <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
-      <Scoreboard matchup={matchup} />
-      <MatchupInsights matchup={matchup} />
-      <LineupComparison matchup={matchup} view={view} onViewChange={setView} />
+      <Scoreboard matchup={shown} />
+      <MatchupInsights matchup={shown} />
+      <LineupComparison
+        matchup={matchup}
+        view={view}
+        onViewChange={setView}
+        leagueId={leagueId}
+        planner={leagueId ? planner : undefined}
+      />
+      {planner.sheet && planner.plan ? (
+        <SwapSheet
+          sheet={planner.sheet}
+          slot={planner.plan.slots[planner.sheet.index]?.slot ?? ""}
+          onPick={planner.pick}
+          onClose={planner.closeSheet}
+        />
+      ) : null}
       {matchup.best_ball ? (
         // Best ball: Sleeper sets both lineups from the highest weekly
         // scorers, so there is no suggested lineup or start/sit call.

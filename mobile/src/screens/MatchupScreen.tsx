@@ -13,6 +13,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
+import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPlanner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -45,6 +46,7 @@ import {
   type LineupPlayer,
   type VerdictTone,
 } from '../lib/matchupPresentation';
+import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from '../lib/matchupPlanner';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -61,8 +63,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Matchup'>;
  * Suggested | Actual tabs, Suggested Moves. Every number comes from
  * GET .../leagues/{id}/matchup (the same payload the web page reads); the
  * helpers in lib/matchupPresentation only format it. FantasyDesk can't set
- * a Sleeper lineup, so Suggested is a planner. The interactive swap planner
- * is the next phase and slots onto the lineup rows and move cards.
+ * a Sleeper lineup, so Suggested is a planner. "Edit lineup" turns the
+ * user's own column into a swap planner (components/MatchupPlanner.tsx);
+ * every number for an edited lineup comes from POST .../matchup/what-if.
  */
 
 const NOT_READY_MESSAGES: Record<string, string> = {
@@ -133,6 +136,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
       ? toUserErrorMessage(matchupQuery.error, 'Failed to load this week’s matchup.')
       : null;
   const [view, setView] = useState<LineupView | null>(null);
+  const planner = useLineupPlanner(leagueId, matchupQuery.data ?? ({ best_ball: true } as MatchupResponse));
+  const edited = planner.plan?.result;
 
   useScreenHeaderTitle(navigation, 'Matchup', leagueName);
 
@@ -181,6 +186,15 @@ export default function MatchupScreen({ route, navigation }: Props) {
   const opponent = matchup.opponent;
   const bestBall = matchup.best_ball === true;
   const activeView: LineupView = bestBall ? 'actual' : (view ?? (mine.has_live_data ? 'actual' : 'suggested'));
+  // While planning, the scoreboard and position edges show the edited
+  // lineup (the API's numbers); everything else stays the real matchup.
+  const shown: MatchupResponse = edited?.win_probability
+    ? {
+        ...matchup,
+        win_probability: edited.win_probability,
+        position_edges: { actual: edited.position_edges ?? null, suggested: edited.position_edges ?? [] },
+      }
+    : matchup;
   const openPlayer = (player: LineupPlayer) =>
     navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
 
@@ -203,9 +217,24 @@ export default function MatchupScreen({ route, navigation }: Props) {
           ) : null}
         </View>
 
-        <Scoreboard matchup={matchup} mine={mine} opponent={opponent} />
-        <Insights matchup={matchup} />
-        <LineupComparison matchup={matchup} view={activeView} onViewChange={setView} onPressPlayer={openPlayer} />
+        <Scoreboard matchup={shown} mine={mine} opponent={opponent} />
+        <Insights matchup={shown} />
+        <LineupComparison
+          matchup={matchup}
+          view={activeView}
+          onViewChange={setView}
+          onPressPlayer={openPlayer}
+          leagueId={leagueId}
+          planner={planner}
+        />
+        {planner.sheet && planner.plan ? (
+          <SwapSheet
+            sheet={planner.sheet}
+            slot={planner.plan.slots[planner.sheet.index]?.slot ?? ''}
+            onPick={planner.pick}
+            onClose={planner.closeSheet}
+          />
+        ) : null}
         {bestBall ? (
           // Best ball: Sleeper sets both lineups from the highest weekly
           // scorers, so there is no suggested lineup or start/sit call.
@@ -405,17 +434,24 @@ function LineupCell({
   mine,
   maxValue,
   onPress,
+  onEdit,
 }: {
   player: LineupPlayer | 'empty' | null;
   mine: boolean;
   maxValue: number;
   onPress: (player: LineupPlayer) => void;
+  /** Planner mode: tapping the cell opens the swap sheet instead of Player Detail. */
+  onEdit?: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (player === null) return <View style={styles.cell} />;
   if (player === 'empty') {
-    return (
+    return onEdit ? (
+      <TouchableOpacity style={[styles.cell, styles.cellCenter]} onPress={onEdit} accessibilityRole="button">
+        <AppText style={[styles.emptySlot, { color: colors.accent }]}>Empty slot, tap to fill</AppText>
+      </TouchableOpacity>
+    ) : (
       <View style={[styles.cell, styles.cellCenter]}>
         <AppText style={styles.emptySlot}>Empty slot</AppText>
       </View>
@@ -427,9 +463,9 @@ function LineupCell({
   return (
     <TouchableOpacity
       style={[styles.cell, mine ? styles.cellRow : styles.cellRowReverse]}
-      onPress={() => onPress(player)}
+      onPress={() => (onEdit ? onEdit() : onPress(player))}
       accessibilityRole="button"
-      accessibilityLabel={`${player.name ?? 'Player'}, ${player.team ?? 'free agent'}`}
+      accessibilityLabel={onEdit ? `Swap ${player.name ?? 'player'}` : `${player.name ?? 'Player'}, ${player.team ?? 'free agent'}`}
     >
       <PlayerAvatar playerId={player.player_id} tier={player.tier} size={30} />
       <View style={[styles.cellBody, { alignItems: align }]}>
@@ -458,11 +494,15 @@ function LineupComparison({
   view,
   onViewChange,
   onPressPlayer,
+  leagueId,
+  planner,
 }: {
   matchup: MatchupResponse;
   view: LineupView;
   onViewChange: (view: LineupView) => void;
   onPressPlayer: (player: LineupPlayer) => void;
+  leagueId: string;
+  planner: ReturnType<typeof useLineupPlanner>;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -470,7 +510,16 @@ function LineupComparison({
   const opponent = matchup.opponent!;
   const bestBall = matchup.best_ball === true;
   const actual = view === 'actual';
-  const rows = actual
+  const plan = planner.plan;
+  const canPlan = !bestBall && plannerBase(matchup, view) != null;
+  const rows = plan
+    ? lineupComparisonRows(
+        plan.starters ?? [],
+        plannerOpponentPlayers(matchup),
+        emptySlotsOf(plan.slots),
+        opponent.has_live_data ? (opponent.real_empty_slots ?? []) : (opponent.open_slots ?? []),
+      )
+    : actual
     ? lineupComparisonRows(
         mine.has_live_data ? mine.real_starters : [],
         opponent.has_live_data ? opponent.real_starters : [],
@@ -484,14 +533,16 @@ function LineupComparison({
       [row.mine, row.opponent].map((cell) => (cell && cell !== 'empty' ? (lineupPlayerPoints(cell).value ?? 0) : 0)),
     ),
   );
-  const caption = actual
+  const caption = plan
+    ? 'Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper.'
+    : actual
     ? 'Lineups as set in Sleeper.'
     : 'Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.';
 
   return (
     <AnimatedCard style={styles.card}>
       <SectionHeading title="Lineup Comparison" icon="git-compare-outline" />
-      {bestBall ? null : (
+      {bestBall || plan ? null : (
         <SegmentedTabBar
           options={[
             { key: 'suggested' as const, label: 'Suggested Lineup' },
@@ -501,6 +552,19 @@ function LineupComparison({
           onChange={onViewChange}
         />
       )}
+      {canPlan || plan ? (
+        <PlannerBar
+          editing={Boolean(plan)}
+          busy={plan?.busy ?? false}
+          error={plan?.error ?? null}
+          baselinePct={plan?.baselinePct ?? null}
+          currentPct={winPercent(plan?.result?.win_probability)}
+          leagueId={leagueId}
+          onEdit={() => planner.start(view)}
+          onReset={planner.resetToSuggested}
+          onDone={planner.exit}
+        />
+      ) : null}
       <AppText style={styles.footnote}>
         {caption}
         {hasKickedOff(matchup)
@@ -513,15 +577,28 @@ function LineupComparison({
         </AppText>
       ) : (
         <View>
-          {rows.map((row, index) => (
+          {rows.map((row, index) => {
+            const emptyOrdinal =
+              row.mine === 'empty'
+                ? rows.slice(0, index).filter((r) => r.slot === row.slot && r.mine === 'empty').length
+                : 0;
+            const editIndex = plan ? slotIndexFor(plan.slots, row.mine, row.slot, emptyOrdinal) : -1;
+            return (
             <View key={`${row.slot}-${index}`} style={styles.tableRow}>
-              <LineupCell player={row.mine} mine maxValue={maxValue} onPress={onPressPlayer} />
+              <LineupCell
+                player={row.mine}
+                mine
+                maxValue={maxValue}
+                onPress={onPressPlayer}
+                onEdit={plan && editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined}
+              />
               <View style={styles.slotCell}>
                 <AppText style={styles.slotText}>{slotDisplayLabel(row.slot)}</AppText>
               </View>
               <LineupCell player={row.opponent} mine={false} maxValue={maxValue} onPress={onPressPlayer} />
             </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </AnimatedCard>

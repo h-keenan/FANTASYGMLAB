@@ -176,6 +176,7 @@ from modules import (
     live_draft_trade_evaluator,
     manager_activity,
     manager_tendencies,
+    matchup_what_if,
     matchup_win_probability,
     my_news,
     news as news_cache,
@@ -10494,6 +10495,7 @@ def _matchup_side(
     players_lookup: dict[str, Any] | None = None,
     projection_context: "_ProjectionContext | None" = None,
     matchup_entry: dict[str, Any] | None = None,
+    bench_out: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """One team's side of the matchup: identity, suggested starters, season-value total.
 
@@ -10536,6 +10538,14 @@ def _matchup_side(
         projection_context=projection_context,
         meta=lineup_meta,
     )
+    if bench_out is not None:
+        # The lineup planner (get_league_matchup_what_if) needs the bench too,
+        # with the same live fields a starter carries. Not part of the payload.
+        for player in _bench:
+            player.setdefault("projection", None)
+            player.update(_player_game_state(player.get("team"), projection_context))
+            player["actual_points"] = _players_points_for(matchup_entry, player.get("player_id"))
+        bench_out.extend(_bench)
 
     best_score_by_position: dict[str, float] = {}
     for player in starters:
@@ -11311,6 +11321,15 @@ def get_league_matchup(
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
+    return _build_matchup(league_id, lens, user)
+
+
+def _build_matchup(
+    league_id: str,
+    lens: str,
+    user: dict[str, Any],
+    state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """This week's head-to-head: two views, side by side, per roster.
 
     View 1 — REAL current lineup/points (`real_starters` / `real_points` /
@@ -11435,6 +11454,7 @@ def get_league_matchup(
     # as everywhere else in this file.
     projection_context = _build_projection_context(current_week)
 
+    my_bench: list[dict[str, Any]] = []
     my_side = _matchup_side(
         my_roster_id,
         my_roster,
@@ -11445,6 +11465,7 @@ def get_league_matchup(
         players_lookup=matchup_players_lookup,
         projection_context=projection_context,
         matchup_entry=my_entry,
+        bench_out=my_bench if state is not None else None,
     )
     opponent_side = _matchup_side(
         opponent_roster_id,
@@ -11502,6 +11523,8 @@ def get_league_matchup(
     win_probability = matchup_win_probability.compute_live_win_probability(
         my_side.get("real_starters") or [], opponent_side.get("real_starters") or []
     )
+    if state is not None:
+        state.update(my_side=my_side, opponent_side=opponent_side, my_bench=my_bench, league=league)
 
     return {
         "ok": True,
@@ -11535,6 +11558,88 @@ def get_league_matchup(
             league_calendar.BEST_BALL_LINEUP_MESSAGE if league_calendar.is_best_ball(league) else ""
         ),
     }
+
+
+class MatchupWhatIfLineupSlot(BaseModel):
+    slot: str
+    player_id: str | None = None
+
+
+class MatchupWhatIfRequest(BaseModel):
+    """A proposed lineup for the user's own side, slot by slot. `edit_index`
+    (an index into `lineup`) additionally asks for every candidate swap into
+    that slot with its pros and cons."""
+
+    lineup: list[MatchupWhatIfLineupSlot] = Field(default_factory=list, max_length=40)
+    edit_index: int | None = None
+    lens: str = "Dynasty"
+
+
+@app.post("/v1/leagues/{league_id}/matchup/what-if")
+def post_league_matchup_what_if(
+    request: MatchupWhatIfRequest,
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Lineup planner: re-score an edited lineup against this week's opponent.
+
+    Planner only; FantasyDesk can't change a Sleeper lineup. Gated exactly
+    like GET .../matchup (signed in, no Pro check; the Matchup page is free),
+    and ESPN leagues are refused by _EspnLeagueRouteGate. Best ball leagues
+    set their own lineups, so the planner answers `reason: best_ball`.
+
+    Rebuilds the page's context through the same `_build_matchup` (cached
+    valued frame, shared projections), so the win probability here is the
+    scoreboard's `compute_live_win_probability` over the same player rows:
+    submitting the Actual lineup returns the scoreboard's number exactly.
+    The opponent is their Sleeper lineup when posted, else their suggested
+    one. The roster pool is the user's suggested starters, bench and
+    Sleeper starters; client-sent player data is never trusted, only ids.
+    """
+
+    if request.lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(status_code=422, detail="Unknown lens.")
+    state: dict[str, Any] = {}
+    page = _build_matchup(league_id, request.lens, user, state)
+    if not page.get("ok") or not state:
+        return {"ok": False, "reason": page.get("reason") or "no_matchup_data"}
+    if page.get("best_ball"):
+        return {"ok": True, "reason": "best_ball", "best_ball": True}
+
+    my_side = state["my_side"]
+    opponent_side = state["opponent_side"]
+    pool: dict[str, dict[str, Any]] = {}
+    for group in (my_side.get("starters") or [], state["my_bench"], my_side.get("real_starters") or []):
+        for player in group:
+            player_id = str(player.get("player_id") or "")
+            if player_id and player_id not in pool:
+                pool[player_id] = player
+
+    lineup = [{"slot": e.slot, "player_id": e.player_id or None} for e in request.lineup]
+    try:
+        matchup_what_if.validate_lineup(pool, lineup, _SLOT_ELIGIBLE_POSITIONS)
+    except matchup_what_if.LineupError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    opponent_starters = (
+        opponent_side.get("real_starters") if opponent_side.get("has_live_data") else opponent_side.get("starters")
+    ) or []
+    evaluated = matchup_what_if.evaluate(pool, lineup, opponent_starters)
+    response: dict[str, Any] = {
+        "ok": True,
+        "reason": "",
+        "lineup": evaluated["starters"],
+        "win_probability": evaluated["win_probability"],
+        "position_edges": _position_edges(evaluated["starters"], opponent_starters),
+        "candidates": None,
+    }
+    if request.edit_index is not None:
+        if not 0 <= request.edit_index < len(lineup):
+            raise HTTPException(status_code=422, detail="edit_index is outside the lineup.")
+        response["candidates"] = matchup_what_if.candidates_for_slot(
+            pool, lineup, request.edit_index, opponent_starters, _SLOT_ELIGIBLE_POSITIONS
+        )
+    return response
 
 
 _NON_SKILL_WAIVER_POSITIONS = {"K", "DEF", "DST"}
