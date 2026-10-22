@@ -636,3 +636,28 @@ def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
     assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
     assert len(results) == 8
     assert all(r and r[0]["league_id"] == league_id for r in results)
+
+
+def test_generate_trade_idea_records_forwards_trade_finder_pick_controls():
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch("modules.trade_ideas.build_trade_ideas", return_value=[]) as mock_build:
+                trade_hub_engine.generate_trade_idea_records(
+                    league_id="league-1",
+                    my_roster_id=1,
+                    players_df=players_df,
+                    rosters=_rosters(),
+                    league_settings=SETTINGS,
+                    score_field="dynasty_score",
+                    team_strategy="contender",
+                    trade_block_pick_ids=("2027:1:1",),
+                    require_receive_picks=True,
+                )
+
+    assert mock_build.call_args.kwargs["trade_block_pick_ids"] == ["2027:1:1"]
+    assert mock_build.call_args.kwargs["require_receive_picks"] is True
+    assert mock_build.call_args.kwargs["trade_block_names"] == []

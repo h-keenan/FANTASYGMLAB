@@ -2097,9 +2097,13 @@ export const api = {
     playerIds: string[],
     strategy: TeamStrategy = 'retool',
     lens: ValuationLens = 'Dynasty',
+    /** Draft picks: `pickIds` are the caller's own DraftPickAsset.pick_id
+     * values to offer (a picks-only selection is valid); `returnPicks` keeps
+     * only packages that bring a partner pick back. */
+    options: { pickIds?: string[]; returnPicks?: boolean } = {},
   ) =>
     authorizedFetch<TradeHubResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(','))}&strategy=${strategy}&lens=${encodeURIComponent(lens)}`,
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(','))}&strategy=${strategy}&lens=${encodeURIComponent(lens)}${options.pickIds && options.pickIds.length > 0 ? `&pick_ids=${encodeURIComponent(options.pickIds.join(','))}` : ''}${options.returnPicks ? '&return_picks=true' : ''}`,
     ),
   getAllTrades: (
     leagueId: string,

@@ -1,13 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { api, type LineupPlayer, type MyTeamResponse, type PremiumUpsell, type TradeIdea } from "@/lib/api";
+import {
+  api,
+  type DraftPickAsset,
+  type LineupPlayer,
+  type MyTeamResponse,
+  type PremiumUpsell,
+  type TradeIdea,
+} from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
+import { TradeAssetRow } from "@/components/TradeAssetExchange";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
+import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
+
+/** Mirrors modules.trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS — the server
+ * ignores any selected pick past this many, so the picker stops there too. */
+export const TRADE_FINDER_MAX_PICKS = 4;
 
 /**
  * Trade Finder (Revision 17) — "select these specific players, find who'd
@@ -49,7 +63,72 @@ import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
  * either (see TradeHubContent.tsx's and TradeAnalyzerContent.tsx's own
  * "quick-view/full-detail split" notes); adding it here first would be
  * inventing new cross-page surface, not porting this page.
+ *
+ * Draft picks: the caller's own picks (GET .../draft-picks filtered to this
+ * roster's owner_roster_id — real Sleeper traded-picks ownership, the same
+ * list and valuation Trade Analyzer's Picks browser uses) can be offered
+ * alongside or instead of players, and "Picks back" asks the engine to keep
+ * only packages that return a partner pick. Pick rows reuse Trade Analyzer's
+ * shared TradeAssetRow + pickToTradeAsset rather than a local pick layout.
  */
+
+function SelectionCheck({ selected }: { selected: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex items-center justify-center shrink-0"
+      style={{
+        width: "1.125rem",
+        height: "1.125rem",
+        border: `1.5px solid ${selected ? "var(--border-accent)" : "var(--color-border-strong)"}`,
+        background: selected ? "var(--color-accent)" : "transparent",
+        color: "var(--color-bg)",
+        fontSize: "0.7rem",
+        fontWeight: 900,
+      }}
+    >
+      {selected ? "✓" : ""}
+    </span>
+  );
+}
+
+function selectableRowStyle(selected: boolean) {
+  return {
+    background: selected ? "var(--surface-selected)" : "transparent",
+    borderBottom: "var(--border-width-default) solid var(--color-border)",
+  };
+}
+
+function OwnedPickRow({
+  pick,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  pick: DraftPickAsset;
+  selected: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={selected}
+      disabled={disabled}
+      className="w-full flex items-center gap-3 py-1 px-2 text-left"
+      style={{ ...selectableRowStyle(selected), opacity: disabled ? 0.5 : 1 }}
+    >
+      <SelectionCheck selected={selected} />
+      <div className="flex-1 min-w-0">
+        <TradeAssetRow asset={pickToTradeAsset(pick)} disableQuickView />
+      </div>
+      <span className="text-sm font-extrabold shrink-0" style={{ color: "var(--color-accent)" }}>
+        {pick.score != null ? Math.round(pick.score) : "—"}
+      </span>
+    </button>
+  );
+}
 
 function RosterPickRow({
   player,
@@ -77,26 +156,9 @@ function RosterPickRow({
       onClick={onToggle}
       aria-pressed={selected}
       className="w-full flex items-center gap-3 py-2 px-2 text-left"
-      style={{
-        background: selected ? "var(--surface-selected)" : "transparent",
-        borderBottom: "var(--border-width-default) solid var(--color-border)",
-      }}
+      style={selectableRowStyle(selected)}
     >
-      <span
-        aria-hidden="true"
-        className="flex items-center justify-center shrink-0"
-        style={{
-          width: "1.125rem",
-          height: "1.125rem",
-          border: `1.5px solid ${selected ? "var(--border-accent)" : "var(--color-border-strong)"}`,
-          background: selected ? "var(--color-accent)" : "transparent",
-          color: "var(--color-bg)",
-          fontSize: "0.7rem",
-          fontWeight: 900,
-        }}
-      >
-        {selected ? "✓" : ""}
-      </span>
+      <SelectionCheck selected={selected} />
       <PositionBadge position={player.position} />
       <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -136,6 +198,9 @@ export function TradeFinderContent({
   );
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [ownedPicks, setOwnedPicks] = useState<DraftPickAsset[]>([]);
+  const [selectedPickIds, setSelectedPickIds] = useState<Set<string>>(new Set());
+  const [returnPicks, setReturnPicks] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
@@ -164,6 +229,40 @@ export function TradeFinderContent({
     };
   }, [leagueId]);
 
+  useEffect(() => {
+    const myRosterId = myTeam.roster_id ? String(myTeam.roster_id) : "";
+    if (!myRosterId) return;
+    let cancelled = false;
+    api
+      .getLeagueDraftPicks(leagueId, lens)
+      .then((result) => {
+        if (cancelled) return;
+        const mine = (result.picks ?? [])
+          .filter((pick) => String(pick.owner_roster_id) === myRosterId)
+          .sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.round ?? 0) - (b.round ?? 0));
+        setOwnedPicks(mine);
+      })
+      .catch(() => {
+        // No pick list is never fatal — player-only search still works.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, lens, myTeam.roster_id]);
+
+  const selectionCount = selectedIds.size + selectedPickIds.size;
+
+  function togglePick(pickId: string) {
+    setSelectedPickIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(pickId)) next.delete(pickId);
+      else if (next.size < TRADE_FINDER_MAX_PICKS) next.add(pickId);
+      return next;
+    });
+    setIdeas(null);
+    setSearchError(null);
+  }
+
   function toggle(playerId: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -176,15 +275,18 @@ export function TradeFinderContent({
   }
 
   async function search() {
-    if (selectedIds.size === 0) return;
+    if (selectionCount === 0) return;
     setSearchError(null);
     setSearching(true);
     try {
-      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens);
+      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens, {
+        pickIds: Array.from(selectedPickIds),
+        returnPicks,
+      });
       setIdeas(result.ideas);
       setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
       if (result.ideas.length === 0 && result.reason === "no_players_selected") {
-        setSearchError("Select at least one player to search with.");
+        setSearchError("Select at least one player or pick to search with.");
       }
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : "Could not search for trades.");
@@ -224,7 +326,7 @@ export function TradeFinderContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Choose players from your roster and search for realistic packages the league would accept for them.
+          Choose players and picks you&apos;d move and search for realistic packages the league would accept for them.
         </p>
       </header>
 
@@ -253,22 +355,71 @@ export function TradeFinderContent({
             </div>
           </section>
 
+          {ownedPicks.length > 0 ? (
+            <section className="flex flex-col gap-2">
+              <span
+                className="text-xs uppercase font-bold"
+                style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+              >
+                Picks you&apos;d trade away
+              </span>
+              <div className="flex flex-col" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
+                {ownedPicks.map((pick) => {
+                  const selected = selectedPickIds.has(pick.pick_id);
+                  return (
+                    <OwnedPickRow
+                      key={pick.pick_id}
+                      pick={pick}
+                      selected={selected}
+                      disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
+                      onToggle={() => togglePick(pick.pick_id)}
+                    />
+                  );
+                })}
+              </div>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Up to {TRADE_FINDER_MAX_PICKS} picks per search.
+              </p>
+            </section>
+          ) : null}
+
+          <section className="flex flex-col gap-2">
+            <span
+              className="text-xs uppercase font-bold"
+              style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+            >
+              What you want back
+            </span>
+            <PillRow
+              options={[
+                { label: "Any return", value: "any" },
+                { label: "Picks back", value: "picks" },
+              ]}
+              active={returnPicks ? "picks" : "any"}
+              onSelect={(value) => {
+                setReturnPicks(value === "picks");
+                setIdeas(null);
+                setSearchError(null);
+              }}
+            />
+          </section>
+
           <button
             type="button"
             onClick={search}
-            disabled={selectedIds.size === 0 || searching}
+            disabled={selectionCount === 0 || searching}
             className="self-start px-4 py-2 text-sm font-bold"
             style={{
-              background: selectedIds.size > 0 ? "var(--color-accent)" : "var(--color-surface-muted)",
-              color: selectedIds.size > 0 ? "var(--color-bg)" : "var(--color-text-muted)",
+              background: selectionCount > 0 ? "var(--color-accent)" : "var(--color-surface-muted)",
+              color: selectionCount > 0 ? "var(--color-bg)" : "var(--color-text-muted)",
             }}
           >
-            {searching ? "Searching…" : `Find Realistic Trades${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+            {searching ? "Searching…" : `Find Realistic Trades${selectionCount > 0 ? ` (${selectionCount})` : ""}`}
           </button>
 
-          {selectedIds.size === 0 ? (
+          {selectionCount === 0 ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Select one or more of your players, then search for realistic trade packages built around them.
+              Select one or more of your players or picks, then search for realistic trade packages built around them.
             </p>
           ) : null}
 
