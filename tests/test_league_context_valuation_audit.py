@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from pytest import approx
 import pandas as pd
 
 import app
@@ -644,6 +646,18 @@ def test_redraft_pick_values_discounted_vs_dynasty():
     assert redraft_mult == 0.45
     stacked_bug = app.draft_pick_score_multiplier("Dynasty", {"league_format": "Redraft"})
     assert stacked_bug == 0.45
+
+
+def test_keeper_league_uses_mild_pick_size_sensitivity_not_dynasty():
+    keeper = app.detect_league_value_settings_from_payload({"settings": {"type": 1, "num_teams": 16}})
+    dynasty = app.detect_league_value_settings_from_payload({"settings": {"type": 2, "num_teams": 16}})
+    assert keeper["_keeper_mode"] and keeper["league_format"] == "Dynasty"
+    base = app.draft_pick_score_multiplier("Dynasty", {"league_format": "Dynasty", "league_size": 12})
+    keeper_mult = app.draft_pick_score_multiplier("Dynasty", keeper)
+    dynasty_mult = app.draft_pick_score_multiplier("Dynasty", dynasty)
+    assert keeper_mult  == approx(base * (1 + 4 * 0.008))
+    assert dynasty_mult  == approx(base * (1 + 4 * 0.015))
+    assert app.league_format_context.format_display_name(keeper) == "Keeper"
 
 
 def test_news_factor_remains_zero_after_league_lens():
