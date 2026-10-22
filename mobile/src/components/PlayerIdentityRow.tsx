@@ -8,6 +8,7 @@ import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
 import TierBadge from './TierBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { injuryAbbreviation } from '../lib/injuryDisplay';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -65,7 +66,9 @@ export interface PlayerIdentityRowProps {
    * existing caller is unaffected. */
   contextLineColor?: string;
   /** Injury tag to render — '' / null / undefined means healthy, so no pill
-   * renders at all. */
+   * renders at all. Shown as a compact code (Q, D, O, IR, SUS... — see
+   * lib/injuryDisplay.ts's injuryAbbreviation) on the secondary line, with
+   * the full label as the pill's accessibility label. */
   injuryLabel?: string | null;
   /** True only for a confirmed-unavailable starter kept in the lineup
    * because nothing else was available for the slot — renders as a solid
@@ -189,6 +192,23 @@ export default function PlayerIdentityRow({
   const injuryPillBg = ruledOut ? colors.danger : isWatch ? colors.premiumMuted : colors.dangerMuted;
   const injuryTextColor = ruledOut ? colors.badgeText : isWatch ? colors.premium : colors.danger;
 
+  // Compact status pill (Q / D / O / IR / SUS ...) with the full status as
+  // its accessibility label. It lives on the secondary line (row layout) or
+  // the top row (grid layout), never on the name line: a full
+  // "QUESTIONABLE" label there cut names down to "Ja..." (owner
+  // screenshot, 2026-10-21).
+  const injuryPill = injuryLabel ? (
+    <View
+      style={[styles.injuryPill, { backgroundColor: injuryPillBg }]}
+      accessible
+      accessibilityLabel={`Injury status: ${injuryLabel}`}
+    >
+      <AppText style={[styles.injuryText, { color: injuryTextColor }]} numberOfLines={1}>
+        {injuryAbbreviation(injuryLabel)}
+      </AppText>
+    </View>
+  ) : null;
+
   const labelBits: string[] = [];
   if (tierIdentity) labelBits.push(tierIdentity.shortLabel);
   if (opportunityLabel) labelBits.push(opportunityLabel.toUpperCase());
@@ -225,13 +245,7 @@ export default function PlayerIdentityRow({
             ) : (
               <View />
             )}
-            {injuryLabel ? (
-              <View style={[styles.injuryPill, { backgroundColor: injuryPillBg }]}>
-                <AppText style={[styles.injuryText, { color: injuryTextColor }]} numberOfLines={1}>
-                  {injuryLabel}
-                </AppText>
-              </View>
-            ) : null}
+            {injuryPill}
           </View>
         ) : null}
         <View style={styles.gridIdentityRow}>
@@ -331,13 +345,6 @@ export default function PlayerIdentityRow({
            * across My Team/Waivers/Trade Hub/Matchup/etc., so the fix here
            * covers every consumer at once. */}
           <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} />
-          {injuryLabel ? (
-            <View style={[styles.injuryPill, { backgroundColor: injuryPillBg }]}>
-              <AppText style={[styles.injuryText, { color: injuryTextColor }]} numberOfLines={1}>
-                {injuryLabel}
-              </AppText>
-            </View>
-          ) : null}
         </View>
         <View style={styles.metaRow}>
           <PositionBadge position={position} />
@@ -347,6 +354,7 @@ export default function PlayerIdentityRow({
               {team}
             </AppText>
           ) : null}
+          {injuryPill}
           {trendingAddLabel ? (
             <View style={styles.trendingPill}>
               <AppText style={styles.trendingPillText} numberOfLines={1}>
@@ -437,21 +445,17 @@ function createStyles(colors: ThemeColors) {
     // Colors (background/text) are applied inline per-row from
     // injuryTone/ruledOut — see the component body — since they vary per
     // player, not per theme, and this StyleSheet is memoized on colors
-    // alone.
-    // flexShrink+maxWidth (not the old flexShrink: 0) so a long label like
-    // "Questionable" can't claim unbounded width and squeeze `name` down to
-    // one or two letters in a narrow context (e.g. Trade Hub's two-column
-    // exchange rows) — coridian_ reported a player name reading as just
-    // "C." next to a Questionable pill (screenshot, 2026-09-23). The pill's
-    // own text still has numberOfLines={1}, so it now ellipsizes instead.
+    // alone. A short code (injuryAbbreviation) that never shrinks: it sits
+    // beside the team on the secondary line, so it can't squeeze the name.
     injuryPill: {
-      flexShrink: 1,
-      maxWidth: '50%',
+      flexShrink: 0,
+      minWidth: 18,
+      alignItems: 'center',
       borderRadius: radii.pill,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
+      paddingHorizontal: spacing.xs + 1,
+      paddingVertical: 1,
     },
-    injuryText: { fontSize: 10, fontWeight: '700' },
+    injuryText: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.3 },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     trailingCaption: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },

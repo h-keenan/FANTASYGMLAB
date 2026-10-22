@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { injuryTone } from './injuryDisplay.ts';
+import { injuryAbbreviation, injuryTone } from './injuryDisplay.ts';
 
 test('null/undefined/empty injury_status reads as neutral, never a fabricated "Healthy" success tone', () => {
   // Regression test for the P0 bug: a player with no injury data (e.g. a
@@ -30,4 +30,24 @@ test('season-ending / out-of-action designations read as danger', () => {
 test('day-to-day designations that are neither healthy nor ruled out read as neutral', () => {
   assert.equal(injuryTone('Questionable'), 'neutral');
   assert.equal(injuryTone('Probable'), 'neutral');
+});
+
+test('injuryAbbreviation maps common statuses to short pill codes', () => {
+  assert.equal(injuryAbbreviation('Questionable'), 'Q');
+  assert.equal(injuryAbbreviation('QUESTIONABLE'), 'Q');
+  assert.equal(injuryAbbreviation('Doubtful'), 'D');
+  assert.equal(injuryAbbreviation('Out'), 'O');
+  assert.equal(injuryAbbreviation('IR'), 'IR');
+  assert.equal(injuryAbbreviation('Injured Reserve'), 'IR');
+  assert.equal(injuryAbbreviation('Suspended'), 'SUS');
+  assert.equal(injuryAbbreviation('Sus'), 'SUS');
+  assert.equal(injuryAbbreviation('PUP'), 'PUP');
+});
+
+test('injuryAbbreviation never drops an unknown status and is empty for no status', () => {
+  assert.equal(injuryAbbreviation('Personal'), 'PER');
+  assert.equal(injuryAbbreviation('Note'), 'NOTE');
+  assert.equal(injuryAbbreviation(''), '');
+  assert.equal(injuryAbbreviation(null), '');
+  assert.equal(injuryAbbreviation(undefined), '');
 });
