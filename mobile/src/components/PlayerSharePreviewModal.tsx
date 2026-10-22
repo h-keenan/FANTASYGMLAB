@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { SubRating } from '../lib/subRatings';
+import type { UsageTrend } from '../lib/api';
 import { radii, spacing, type ThemeColors } from '../theme';
 import PlayerShareCard, { CARD_HEIGHT, CARD_WIDTH } from './PlayerShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
@@ -23,6 +24,8 @@ interface Props {
   team?: string | null;
   overallRating: number | null;
   subRatings: SubRating[];
+  value?: number | null;
+  usageTrend?: UsageTrend | null;
 }
 
 /** Preview + share sheet for the real branded single-player PNG card, plus a
@@ -40,6 +43,8 @@ export default function PlayerSharePreviewModal({
   team,
   overallRating,
   subRatings,
+  value,
+  usageTrend,
 }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -116,6 +121,8 @@ export default function PlayerSharePreviewModal({
                 team={team}
                 overallRating={overallRating}
                 subRatings={subRatings}
+                value={value}
+                usageTrend={usageTrend}
                 onReadyChange={(ready) => {
                   imagesReadyRef.current = ready;
                 }}

@@ -2033,6 +2033,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       team={player.team}
       overallRating={overallRating}
       subRatings={model ? playerSubRatings(model) : []}
+      value={player.score}
+      usageTrend={model?.usage_trend ?? null}
     />
     </>
   );

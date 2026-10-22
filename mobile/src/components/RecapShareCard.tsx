@@ -1,17 +1,14 @@
 import React, { forwardRef } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import TeamAvatar from './TeamAvatar';
+import ShareCardChrome, { CARD_WIDTH } from './ShareCardChrome';
 import { Ionicons } from '@expo/vector-icons';
-import QRCode from 'react-native-qrcode-svg';
 
 import type { RecapStory, WeeklyRecap } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 
-const CARD_WIDTH = 360;
-const CARD_HEIGHT = 500;
-const SHARE_QR_URL = 'https://fantasygmlab.com';
-const QR_SIZE = 60;
+const CARD_HEIGHT = 520;
 const MAX_STORIES = 3;
 
 /** Minimal roster-id -> avatar lookup the share card needs — structurally
@@ -80,21 +77,16 @@ const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap
   ({ leagueName, recap, rosterMap }, ref) => {
     const stories = recap.stories.slice(0, MAX_STORIES);
     return (
-      <View ref={ref} collapsable={false} style={styles.card}>
-        <View style={styles.headerRow}>
-          <View style={styles.brandRow}>
-            <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
-            <AppText style={styles.brandWord}>
-              FANTASY<AppText style={styles.brandWordAccent}>GM</AppText> LAB
-            </AppText>
-          </View>
+      <ShareCardChrome
+        ref={ref}
+        kind="League Recap"
+        height={CARD_HEIGHT}
+        headerRight={
           <AppText style={styles.leagueName} numberOfLines={1}>
             {leagueName.toUpperCase()}
           </AppText>
-        </View>
-
-        <View style={styles.hairline} />
-
+        }
+      >
         <AppText style={styles.kicker}>LEAGUE MEMORY · WEEK {recap.week}</AppText>
         <AppText style={styles.headline}>{recap.headline}</AppText>
 
@@ -106,35 +98,7 @@ const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap
           ))}
         </View>
 
-        <View style={styles.qrRow}>
-          <View style={styles.qrTextGroup}>
-            <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
-            <AppText style={styles.qrTitle}>FantasyDesk</AppText>
-            <AppText style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</AppText>
-          </View>
-          <View style={styles.qrWrap}>
-            <QRCode
-              value={SHARE_QR_URL}
-              size={QR_SIZE}
-              color={colors.background}
-              backgroundColor="#fff"
-              logo={require('../../assets/icon.png')}
-              logoSize={QR_SIZE * 0.28}
-              logoBorderRadius={4}
-              logoBackgroundColor="#fff"
-              ecl="H"
-            />
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <AppText style={styles.footerText}>
-            <AppText style={{ color: colors.accent }}>PLAN. </AppText>
-            <AppText style={{ color: colors.premium }}>PROJECT. </AppText>
-            <AppText style={{ color: colors.danger }}>WIN.</AppText>
-          </AppText>
-        </View>
-      </View>
+      </ShareCardChrome>
     );
   },
 );
@@ -144,20 +108,6 @@ export default RecapShareCard;
 export { CARD_WIDTH, CARD_HEIGHT };
 
 const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  brandMark: { width: 28, height: 28, borderRadius: 8 },
-  brandWord: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0.5 },
-  brandWordAccent: { color: colors.accent },
   leagueName: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6, maxWidth: 120 },
   hairline: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.sm },
   kicker: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.8, marginTop: spacing.xs },
@@ -174,24 +124,4 @@ const styles = StyleSheet.create({
   storyTextGroup: { flex: 1 },
   storyTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   storyMetric: { fontSize: 11, fontWeight: '700', marginTop: 1 },
-  qrRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    gap: spacing.md,
-  },
-  qrTextGroup: { flex: 1 },
-  qrKicker: { fontSize: 9, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
-  qrTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
-  qrSubtitle: { fontSize: 10, color: colors.textSecondary, lineHeight: 13, marginTop: 2 },
-  qrWrap: {
-    padding: 6,
-    backgroundColor: '#fff',
-    borderRadius: radii.sm,
-  },
-  footer: { position: 'absolute', bottom: spacing.md, left: 0, right: 0, alignItems: 'center' },
-  footerText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
 });

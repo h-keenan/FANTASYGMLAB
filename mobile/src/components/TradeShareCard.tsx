@@ -1,35 +1,45 @@
 import React, { forwardRef, useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
-import QRCode from 'react-native-qrcode-svg';
 
 import type { RankedPlayer, TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
+import { confidenceLevelFor } from './ConfidenceMeter';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
+import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './ShareCardChrome';
 import TeamAvatar from './TeamAvatar';
-import TradeValueBar from './TradeValueBar';
 
-const CARD_WIDTH = 360;
-const CARD_HEIGHT = 540;
-const SHARE_QR_URL = 'https://fantasygmlab.com';
-const QR_SIZE = 60;
+const CARD_HEIGHT = 620;
 // Safety net only — NOT the fix. If some avatar never fires onLoad/onError
 // (e.g. a hung request), don't leave the share button stuck forever. The
 // real fix is waiting for PlayerAvatar's onLoadSettle below.
 const AVATAR_READY_TIMEOUT_MS = 4000;
+const MAX_ROWS = 3;
 
-const HEADLINE_META: Record<TradeVerdict['tone'], { headline: string; color: string }> = {
-  accept: { headline: 'TRADE ACCEPTED', color: colors.accent },
-  counter: { headline: 'COUNTER THIS TRADE', color: colors.premium },
-  decline: { headline: 'TRADE DECLINED', color: colors.danger },
-  fair: { headline: 'FAIR TRADE', color: colors.textSecondary },
+/** Verdict word color by band, same fairness-band tones as web's share card
+ * (favorable green, fair neutral, overpay warm, major overpay red). */
+function bandColor(band: string, fallback: string): string {
+  const key = band.trim().toLowerCase();
+  if (key === 'favorable') return colors.successBright;
+  if (key === 'fair') return colors.textPrimary;
+  if (key === 'slight overpay') return '#F59E0B';
+  if (key === 'major overpay') return colors.danger;
+  return fallback;
+}
+
+const HEADLINE_COLOR: Record<TradeVerdict['tone'], string> = {
+  accept: colors.accent,
+  counter: colors.premium,
+  decline: colors.danger,
+  fair: colors.textPrimary,
   // Trade Hub's own suggestions — nobody has accepted or declined anything.
-  idea: { headline: 'TRADE IDEA', color: colors.accent },
+  idea: colors.accent,
 };
 
-function AssetLine({
+function AssetRow({
   player,
   trackKey,
   onAvatarSettle,
@@ -39,12 +49,11 @@ function AssetLine({
   onAvatarSettle: (key: string) => void;
 }) {
   return (
-    <View style={styles.assetLine}>
+    <View style={styles.assetRow}>
       <PlayerAvatar
         playerId={player.player_id}
-        size={32}
+        size={30}
         tier={player.tier}
-        style={styles.assetAvatar}
         onLoadSettle={() => onAvatarSettle(trackKey)}
       />
       <View style={styles.assetTextGroup}>
@@ -60,13 +69,57 @@ function AssetLine({
   );
 }
 
+function ReceivesPanel({
+  teamName,
+  avatarId,
+  accent,
+  total,
+  players,
+  keyPrefix,
+  onAvatarSettle,
+}: {
+  teamName: string;
+  avatarId?: string | null;
+  accent: string;
+  total?: number;
+  players: RankedPlayer[];
+  keyPrefix: string;
+  onAvatarSettle: (key: string) => void;
+}) {
+  const shown = players.slice(0, MAX_ROWS);
+  const hidden = players.length - shown.length;
+  return (
+    <ShareGlass style={[styles.panel, { borderColor: `${accent}8C` }]}>
+      <View style={styles.panelHead}>
+        <TeamAvatar avatarId={avatarId} size={22} />
+        <AppText style={[styles.panelTeam, { color: accent }]} numberOfLines={1}>
+          {teamName.toUpperCase()}
+        </AppText>
+      </View>
+      <View style={styles.panelTotalRow}>
+        <AppText style={styles.panelReceives}>RECEIVES</AppText>
+        {total != null ? <AppText style={styles.panelTotal}>{Math.round(total).toLocaleString('en-US')}</AppText> : null}
+      </View>
+      {shown.map((player, i) => (
+        <AssetRow
+          key={`${player.player_id}-${i}`}
+          player={player}
+          trackKey={`${keyPrefix}-${player.player_id ?? i}`}
+          onAvatarSettle={onAvatarSettle}
+        />
+      ))}
+      {hidden > 0 ? <AppText style={styles.more}>{`+${hidden} more`}</AppText> : null}
+    </ShareGlass>
+  );
+}
+
 /**
- * The literal graphic that gets captured + shared — a wireframe port of the
- * FGL brand style sheet's "Share Card Example" panel (logo + wordmark, big
- * value-change number, send/receive breakdown, "why this works", tagline
- * footer), built from the same TradeVerdict data the on-screen card shows.
- * Rendered at a fixed 360x450 logical size so react-native-view-shot's
- * capture produces a consistent image regardless of device.
+ * The literal graphic that gets captured + shared, laid out like web-next's
+ * trade share card (lib/shareCard/tradeCard): header, two RECEIVES panels
+ * with swap arrows, the verdict word + edge + confidence meter, WHY, and the
+ * shared ShareCardChrome footer. Built from the same TradeVerdict data the
+ * on-screen card shows. Rendered at a fixed 360x620 logical size so
+ * react-native-view-shot's capture is consistent across devices.
  *
  * `onReadyChange` reports whether every rendered player headshot has
  * settled (loaded, failed, or had no id to load) — see PlayerAvatar's
@@ -75,13 +128,10 @@ function AssetLine({
  * modal) should treat the latest value as the source of truth, not a
  * one-shot event.
  *
- * `partnerTeamName`/`partnerTeamAvatarUrl` (this pass): UI_MAGNA_CARTA.md's
- * Trade UI priority order is "partner/team → assets sent → assets received →
- * value change → rationale → confidence" — this card had no partner
- * identity at all despite TradeHubScreen already fetching both fields and
- * already rendering them in its own on-screen partner row. Reuses
- * `TeamAvatar`, the same shared component that on-screen row uses, rather
- * than a one-off avatar here.
+ * `sendTotal`/`receiveTotal` are the engine's own per-side value totals
+ * (Trade Hub's send_score/receive_score); omitted when the caller doesn't
+ * have them, so the card never sums a partial (pick-less) player list.
+ * `myTeamName` falls back to "You".
  */
 const TradeShareCard = forwardRef<View, {
   leagueName: string;
@@ -90,15 +140,25 @@ const TradeShareCard = forwardRef<View, {
   receivePlayers: RankedPlayer[];
   partnerTeamName?: string;
   partnerTeamAvatarUrl?: string | null;
+  myTeamName?: string;
+  sendTotal?: number;
+  receiveTotal?: number;
   onReadyChange?: (ready: boolean) => void;
-}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, onReadyChange }, ref) => {
-  const meta = HEADLINE_META[verdict.tone];
+}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, myTeamName, sendTotal, receiveTotal, onReadyChange }, ref) => {
+  const me = myTeamName?.trim() || 'You';
+  const partner = partnerTeamName?.trim() || 'Partner';
   const gain = verdict.value_delta;
-  const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
-  const gainLabel = `${gain > 0 ? '+' : ''}${gain.toLocaleString()}`;
+  const band = verdict.band?.trim() || '';
+  const verdictColor = bandColor(band, HEADLINE_COLOR[verdict.tone]);
+  const edge =
+    gain === 0
+      ? { text: 'Even value', color: colors.textSecondary }
+      : gain > 0
+        ? { text: `Edge: ${me} +${Math.round(gain).toLocaleString('en-US')}`, color: colors.successBright }
+        : { text: `Edge: ${partner} +${Math.round(Math.abs(gain)).toLocaleString('en-US')}`, color: colors.danger };
 
-  const sendShown = sendPlayers.slice(0, 3);
-  const receiveShown = receivePlayers.slice(0, 3);
+  const sendShown = sendPlayers.slice(0, MAX_ROWS);
+  const receiveShown = receivePlayers.slice(0, MAX_ROWS);
   const trackedKeys = useMemo(
     () => [
       ...sendShown.map((p, i) => `send-${p.player_id ?? i}`),
@@ -129,117 +189,79 @@ const TradeShareCard = forwardRef<View, {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
+  const confidenceLabel = (verdict.confidence || '').trim();
+  const why = (verdict.rationale || '').trim();
+
   return (
-    <View ref={ref} collapsable={false} style={styles.card}>
-      <View style={styles.headerRow}>
-        <View style={styles.brandRow}>
-          <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
-          <View>
-            <AppText style={styles.brandWord}>
-              FANTASY<AppText style={styles.brandWordAccent}>GM</AppText> LAB
-            </AppText>
-          </View>
-        </View>
+    <ShareCardChrome
+      ref={ref}
+      kind="Trade"
+      height={CARD_HEIGHT}
+      headerRight={
         <AppText style={styles.leagueName} numberOfLines={1}>
           {leagueName.toUpperCase()}
         </AppText>
-      </View>
-
-      <View style={styles.hairline} />
-
-      {partnerTeamName ? (
-        <View style={styles.partnerRow}>
-          <TeamAvatar avatarId={partnerTeamAvatarUrl} size={28} style={styles.partnerAvatar} />
-          <AppText style={styles.partnerName} numberOfLines={1}>
-            {partnerTeamName}
-          </AppText>
-        </View>
-      ) : null}
-
-      <AppText style={[styles.headline, { color: meta.color }]}>{meta.headline}</AppText>
-      <View style={styles.bandRow}>
-        <View style={[styles.bandChip, { backgroundColor: `${meta.color}26` }]}>
-          <AppText style={[styles.bandChipText, { color: meta.color }]}>{verdict.band}</AppText>
-        </View>
-        <AppText style={styles.confidenceText}>{verdict.confidence} confidence</AppText>
-      </View>
-
-      <AppText style={[styles.gainValue, { color: gainColor }]}>{gainLabel}</AppText>
-      <AppText style={styles.gainLabel}>Value Change</AppText>
-      {/* Fixed-palette `colors` (not useThemeMode) — this card's look must
-          stay identical regardless of the viewer's light/dark setting, same
-          as every other color on this exported graphic. */}
-      <TradeValueBar delta={gain} colors={colors} style={styles.gainBar} />
-
-      <View style={styles.hairline} />
-
-      <View style={styles.exchangeRow}>
-        <View style={styles.exchangeSide}>
-          <View style={styles.exchangeKickerRow}>
-            <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
-            <AppText style={styles.exchangeKicker}>YOU SEND</AppText>
-          </View>
-          {sendShown.map((player, i) => (
-            <AssetLine
-              key={player.player_id}
-              player={player}
-              trackKey={`send-${player.player_id ?? i}`}
-              onAvatarSettle={handleAvatarSettle}
-            />
-          ))}
-        </View>
-        <View style={styles.exchangeSide}>
-          <View style={styles.exchangeKickerRow}>
-            <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
-            <AppText style={styles.exchangeKicker}>YOU RECEIVE</AppText>
-          </View>
-          {receiveShown.map((player, i) => (
-            <AssetLine
-              key={player.player_id}
-              player={player}
-              trackKey={`receive-${player.player_id ?? i}`}
-              onAvatarSettle={handleAvatarSettle}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.hairline} />
-
-      <AppText style={styles.whyLabel}>Why this works</AppText>
-      <AppText style={styles.whyText} numberOfLines={6}>
-        {verdict.rationale}
-      </AppText>
-
-      <View style={styles.qrRow}>
-        <View style={styles.qrTextGroup}>
-          <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
-          <AppText style={styles.qrTitle}>FantasyDesk</AppText>
-          <AppText style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</AppText>
-        </View>
-        <View style={styles.qrWrap}>
-          <QRCode
-            value={SHARE_QR_URL}
-            size={QR_SIZE}
-            color={colors.background}
-            backgroundColor="#fff"
-            logo={require('../../assets/icon.png')}
-            logoSize={QR_SIZE * 0.28}
-            logoBorderRadius={4}
-            logoBackgroundColor="#fff"
-            ecl="H"
-          />
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <AppText style={styles.footerText}>
-          <AppText style={{ color: colors.accent }}>PLAN. </AppText>
-          <AppText style={{ color: colors.premium }}>PROJECT. </AppText>
-          <AppText style={{ color: colors.danger }}>WIN.</AppText>
+      }
+    >
+      <View style={styles.matchup}>
+        <AppText style={styles.matchupName} numberOfLines={1}>
+          {me}
+        </AppText>
+        <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+        <AppText style={styles.matchupName} numberOfLines={1}>
+          {partner}
         </AppText>
       </View>
-    </View>
+
+      <View style={styles.panelsRow}>
+        <ReceivesPanel
+          teamName={me}
+          accent={colors.accent}
+          total={receiveTotal}
+          players={receivePlayers}
+          keyPrefix="receive"
+          onAvatarSettle={handleAvatarSettle}
+        />
+        <ReceivesPanel
+          teamName={partner}
+          avatarId={partnerTeamAvatarUrl}
+          accent={colors.premium}
+          total={sendTotal}
+          players={sendPlayers}
+          keyPrefix="send"
+          onAvatarSettle={handleAvatarSettle}
+        />
+        <View style={styles.swapDisc} pointerEvents="none">
+          <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+        </View>
+      </View>
+
+      <ShareGlass style={styles.verdictBlock}>
+        <AppText style={[styles.verdictWord, { color: verdictColor }]} numberOfLines={1} adjustsFontSizeToFit>
+          {band || 'Trade idea'}
+        </AppText>
+        <AppText style={[styles.edge, { color: edge.color }]} numberOfLines={1}>
+          {edge.text}
+        </AppText>
+        {confidenceLabel ? (
+          <View style={styles.meterWrap}>
+            <ShareConfidenceBars
+              level={confidenceLevelFor(confidenceLabel)}
+              label={`${confidenceLabel.replace(/ confidence$/i, '')} confidence`}
+            />
+          </View>
+        ) : null}
+      </ShareGlass>
+
+      {why ? (
+        <ShareGlass style={styles.whyBlock}>
+          <AppText style={styles.whyLabel}>WHY</AppText>
+          <AppText style={styles.whyText} numberOfLines={5}>
+            {why}
+          </AppText>
+        </ShareGlass>
+      ) : null}
+    </ShareCardChrome>
   );
 });
 TradeShareCard.displayName = 'TradeShareCard';
@@ -248,75 +270,49 @@ export default TradeShareCard;
 export { CARD_WIDTH, CARD_HEIGHT };
 
 const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  brandMark: { width: 28, height: 28, borderRadius: 8 },
-  brandWord: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0.5 },
-  brandWordAccent: { color: colors.accent },
   leagueName: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6, maxWidth: 120 },
-  hairline: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.sm },
-  partnerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  partnerAvatar: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  partnerName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
-  headline: { fontSize: 20, fontWeight: '800', letterSpacing: 0.5, marginTop: spacing.xs },
-  bandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
-  bandChip: { borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  bandChipText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
-  confidenceText: { fontSize: 11, color: colors.textSecondary },
-  gainValue: { fontSize: 40, fontWeight: '800', letterSpacing: -1, marginTop: spacing.md },
-  gainLabel: { fontSize: 12, color: colors.textSecondary, marginTop: -2 },
-  gainBar: { marginTop: spacing.sm },
-  exchangeRow: { flexDirection: 'row', gap: spacing.md },
-  exchangeSide: { flex: 1, gap: 6 },
-  exchangeKickerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
-  exchangeDot: { width: 5, height: 5, borderRadius: 2.5 },
-  exchangeKicker: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
-  assetLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  assetAvatar: {},
-  assetTextGroup: { flex: 1 },
-  assetName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
-  assetMeta: { fontSize: 10, color: colors.textSecondary },
-  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  whyLabel: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-  whyText: { fontSize: 11, color: colors.textSecondary, lineHeight: 15, marginTop: 2 },
-  qrRow: {
+  matchup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
+  matchupName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+  panelsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
+  panel: { flex: 1, padding: spacing.sm, gap: 6, borderWidth: 1.5 },
+  panelHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  panelTeam: { flex: 1, fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
+  panelTotalRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  panelReceives: { fontSize: 8, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1.6 },
+  panelTotal: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  assetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    // 'auto' (not a fixed value), same trick as `footer` below: with both
-    // this and `footer` set to marginTop: 'auto', flexbox splits whatever
-    // room is left in the fixed-height card evenly across the two gaps
-    // instead of dumping it all into one gap right above the footer (which
-    // is what a fixed margin here + `footer`'s own auto margin produced for
-    // any trade whose rationale was shorter than the max 6 lines).
-    marginTop: 'auto',
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    gap: spacing.md,
-  },
-  qrTextGroup: { flex: 1 },
-  qrKicker: { fontSize: 9, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
-  qrTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
-  qrSubtitle: { fontSize: 10, color: colors.textSecondary, lineHeight: 13, marginTop: 2 },
-  qrWrap: {
-    padding: 6,
-    backgroundColor: '#fff',
+    gap: 6,
+    padding: 4,
     borderRadius: radii.sm,
+    backgroundColor: 'rgba(255,255,255,0.045)',
   },
-  // marginTop: 'auto' (not a fixed value) so this fills whatever room is
-  // left in the fixed-height card and stays pinned to the bottom edge
-  // regardless of how many lines the rationale above actually took —
-  // a fixed margin here left a growing gap of dead space for any trade
-  // whose rationale was shorter than the max 6 lines.
-  footer: { marginTop: 'auto', alignItems: 'center' },
-  footerText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
+  assetTextGroup: { flex: 1 },
+  assetName: { fontSize: 11, fontWeight: '700', color: colors.textPrimary },
+  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  assetMeta: { fontSize: 10, color: colors.textSecondary },
+  more: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
+  swapDisc: {
+    position: 'absolute',
+    alignSelf: 'center',
+    left: '50%',
+    top: '38%',
+    marginLeft: -15,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: `${colors.accent}80`,
+  },
+  verdictBlock: { marginTop: spacing.md, padding: spacing.md, gap: 4, borderColor: `${colors.accent}66` },
+  verdictWord: { fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
+  edge: { fontSize: 14, fontWeight: '800' },
+  meterWrap: { marginTop: 4 },
+  whyBlock: { marginTop: spacing.sm, padding: spacing.md, gap: 3 },
+  whyLabel: { fontSize: 10, fontWeight: '800', color: colors.accent, letterSpacing: 2 },
+  whyText: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
 });

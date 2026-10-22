@@ -146,8 +146,8 @@ const CompareShareCard = forwardRef<
   return (
     <ShareCardChrome
       ref={ref}
+      kind="Compare"
       headerRight={<AppText style={styles.headToHead}>HEAD-TO-HEAD</AppText>}
-      qrSubtitle="Real player grades, model breakdowns, and a dynasty engine built for GMs."
     >
       <View style={styles.identityRow}>
         <IdentityColumn side={sideA} trackKey="a" onAvatarSettle={handleAvatarSettle} />

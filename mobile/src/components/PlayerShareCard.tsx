@@ -2,7 +2,9 @@ import React, { forwardRef, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 
-import ShareCardChrome, { CARD_HEIGHT, CARD_WIDTH } from './ShareCardChrome';
+import ShareCardChrome, { CARD_HEIGHT, CARD_WIDTH, ShareGlass } from './ShareCardChrome';
+import PositionBadge from './PositionBadge';
+import type { UsageTrend } from '../lib/api';
 import PlayerAvatar from './PlayerAvatar';
 import SubRatingRow from './SubRatingRow';
 import TierBadge from './TierBadge';
@@ -44,8 +46,12 @@ const PlayerShareCard = forwardRef<View, {
   team?: string | null;
   overallRating: number | null;
   subRatings: SubRating[];
+  /** League value score (same number the profile hero shows); hidden when null. */
+  value?: number | null;
+  /** Weekly-recency usage read from the quick-view model; hidden when null. */
+  usageTrend?: UsageTrend | null;
   onReadyChange?: (ready: boolean) => void;
-}>(({ playerId, tier, name, position, team, overallRating, subRatings, onReadyChange }, ref) => {
+}>(({ playerId, tier, name, position, team, overallRating, subRatings, value, usageTrend, onReadyChange }, ref) => {
   const tierIdentity = resolvePlayerTier(tier, true);
   const ringColor = overallRating !== null ? percentileColor(overallRating, colors) : colors.accent;
 
@@ -70,8 +76,8 @@ const PlayerShareCard = forwardRef<View, {
   return (
     <ShareCardChrome
       ref={ref}
+      kind="Player"
       headerRight={<TierBadge storedTier={tier} size="md" />}
-      qrSubtitle="Real player grades, model breakdowns, and a dynasty engine built for GMs."
     >
       <View style={styles.portraitRow}>
         <View style={styles.avatarWrap}>
@@ -101,13 +107,34 @@ const PlayerShareCard = forwardRef<View, {
         {name}
       </AppText>
       <View style={styles.metaRow}>
-        {position ? (
+        <PositionBadge position={position} size="md" />
+        {team ? (
           <View style={styles.positionPill}>
-            <AppText style={styles.positionPillText}>{position}</AppText>
+            <AppText style={styles.positionPillText}>{team}</AppText>
           </View>
         ) : null}
-        {team ? <AppText style={styles.team}>{team}</AppText> : null}
       </View>
+
+      {value != null || usageTrend ? (
+        <ShareGlass style={styles.statsRow}>
+          {value != null ? (
+            <View style={styles.statCell}>
+              <AppText style={styles.statLabel}>VALUE</AppText>
+              <AppText style={styles.statValue}>{Math.round(value).toLocaleString('en-US')}</AppText>
+            </View>
+          ) : null}
+          {usageTrend ? (
+            <View style={styles.statCell}>
+              <AppText style={styles.statLabel}>USAGE TREND</AppText>
+              <AppText
+                style={[styles.statValue, { color: usageTrend.direction === 'up' ? colors.successBright : colors.danger }]}
+              >
+                {`${usageTrend.direction === 'up' ? '+' : '-'}${Math.abs(Math.round(usageTrend.trend_pct))}%`}
+              </AppText>
+            </View>
+          ) : null}
+        </ShareGlass>
+      ) : null}
 
       <View style={styles.hairline} />
 
@@ -154,7 +181,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   positionPillText: { fontSize: 11, fontWeight: '800', color: colors.textPrimary, letterSpacing: 0.3 },
-  team: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  statsRow: { flexDirection: 'row', marginTop: spacing.md, padding: spacing.md, gap: spacing.lg },
+  statCell: { flex: 1 },
+  statLabel: { fontSize: 9, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1.2 },
+  statValue: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
   attributesLabel: {
     fontSize: 11,
     fontWeight: '700',
