@@ -56,7 +56,7 @@ def test_diagnostics_disabled_by_default(monkeypatch):
     assert first["startup_run_number"] == 1
 
 
-def test_process_temperature_classification_stable():
+def test_process_temperature_classification_stable(monkeypatch):
     game_plan_process_cache.clear_process_game_plan_caches()
     try:
         from modules import prepared_player_frame
@@ -66,6 +66,11 @@ def test_process_temperature_classification_stable():
         daily_gm_briefing.clear_compose_memo()
     except Exception:
         pass
+    # Other tests sharing this xdist worker can leave process-level caches
+    # warm (the clears above are best-effort), which made this ordering-
+    # dependent. Pin the cache snapshot to "cold" so the test checks the
+    # classification rule itself.
+    monkeypatch.setattr(tail_latency_diagnostics, "process_cache_survival_snapshot", lambda: {})
     cold = {"_startup_run_number": 1}
     auth_restore_lifecycle.ensure_startup_session(cold)
     assert (
