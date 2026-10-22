@@ -211,13 +211,32 @@ function shareRecordAsset(asset: TradeAsset): RecordTradeShareAsset {
  * "Trade Hub idea"). The lens is whichever one the idea was built under.
  */
 export function tradeIdeaShareRecord(idea: TradeIdea, lens: string): RecordTradeShareBody {
+  return tradeShareRecord({
+    partnerTeamName: idea.partner_team_name,
+    send: idea.package.send,
+    receive: idea.package.receive,
+    valueEdgeLabel: idea.market_realism_label || "Trade Hub idea",
+    lens,
+  });
+}
+
+/** Shared record builder (same shape mobile's TradeSharePreviewModal posts):
+ * picks dropped, empty player_id -> undefined. Trade Analyzer's verdict share
+ * uses it with the verdict band as the label. */
+export function tradeShareRecord(input: {
+  partnerTeamName: string;
+  send: TradeAsset[];
+  receive: TradeAsset[];
+  valueEdgeLabel: string;
+  lens: string;
+}): RecordTradeShareBody {
   const players = (assets: TradeAsset[]) =>
     (assets ?? []).filter((asset) => asset.asset_type !== "pick").map(shareRecordAsset);
   return {
-    partnerTeamName: idea.partner_team_name,
-    send: players(idea.package.send),
-    receive: players(idea.package.receive),
-    valueEdgeLabel: idea.market_realism_label || "Trade Hub idea",
-    valuationLens: lens,
+    partnerTeamName: input.partnerTeamName,
+    send: players(input.send),
+    receive: players(input.receive),
+    valueEdgeLabel: input.valueEdgeLabel,
+    valuationLens: input.lens,
   };
 }

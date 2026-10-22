@@ -17,6 +17,7 @@ import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenI
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
+import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -989,6 +990,7 @@ function TradeIdeaCard({
               </AppText>
             </View>
           ) : null}
+          <ManagerTendenciesChips leagueId={leagueId} teamName={idea.partner_team_name} />
         </View>
         <TouchableOpacity
           style={styles.shareButton}

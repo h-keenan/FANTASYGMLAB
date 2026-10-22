@@ -13,6 +13,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
+import ManagerProfileModal from '../components/ManagerProfileModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
@@ -203,6 +204,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
   const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
   const config = METRIC_CONFIG[metric];
   const queryClient = useQueryClient();
+  const [profileTeam, setProfileTeam] = useState<{ rosterId: number | string; teamName: string } | null>(null);
   // Gates every query below until the persisted AsyncStorage cache has
   // finished hydrating back into the in-memory QueryClient — same guard
   // Dashboard/Matchup use, so a query here never fires before last session's
@@ -381,6 +383,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
             showTrophy={metric === 'power'}
             colors={colors}
             styles={styles}
+            onOpenProfile={() => setProfileTeam({ rosterId: item.rosterId, teamName: item.teamName })}
             onPress={() =>
               navigation.navigate('TeamRoster', {
                 ownerName: item.teamName,
@@ -393,6 +396,15 @@ export default function TeamsScreen({ route, navigation }: Props) {
           />
         )}
       />
+      {profileTeam ? (
+        <ManagerProfileModal
+          visible
+          onClose={() => setProfileTeam(null)}
+          leagueId={leagueId}
+          rosterId={profileTeam.rosterId}
+          teamName={profileTeam.teamName}
+        />
+      ) : null}
     </View>
   );
 }
@@ -407,6 +419,7 @@ function TeamRowCard({
   colors,
   styles,
   onPress,
+  onOpenProfile,
 }: {
   item: TeamRow;
   isFirst: boolean;
@@ -421,6 +434,8 @@ function TeamRowCard({
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
   onPress: () => void;
+  /** Opens the manager profile (Manager Tendencies). */
+  onOpenProfile: () => void;
 }) {
   const isChampion = showTrophy && item.metricRank === 1;
   const rankPercentile = percentileFromRank(item.metricRank, rankedTeamCount);
@@ -500,6 +515,15 @@ function TeamRowCard({
           </View>
         ) : null}
       </View>
+      <TouchableOpacity
+        onPress={onOpenProfile}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.teamName} manager profile`}
+        style={{ paddingHorizontal: spacing.xs }}
+      >
+        <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+      </TouchableOpacity>
       {item.metricRank != null ? (
         <View style={[styles.rankPill, isChampion && styles.rankPillFirst, { borderColor: `${rankColor}80` }]}>
           {isChampion ? (

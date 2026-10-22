@@ -16,7 +16,14 @@ import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ValueRing } from "@/components/ValueRing";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { confidenceLevel, confidenceRingPercent, formatTradeGain, levelToRingTone } from "@/lib/tradeHubPresentation";
+import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
+import {
+  confidenceLevel,
+  confidenceRingPercent,
+  formatTradeGain,
+  levelToRingTone,
+  tradeShareRecord,
+} from "@/lib/tradeHubPresentation";
 import {
   ALL_POSITION_OPTIONS,
   ALL_TEAMS_ID,
@@ -188,16 +195,95 @@ function TradeSidePanel({
   );
 }
 
+/** Shares the reviewed package as text (native share sheet, else clipboard)
+ * and records it for the "Did this trade happen?" prompt, same payload as
+ * mobile's Analyzer share (TradeSharePreviewModal.recordShare). */
+function ShareVerdictButton({
+  leagueId,
+  partnerTeamName,
+  lens,
+  verdict,
+  sendAssets,
+  receiveAssets,
+}: {
+  leagueId: string;
+  partnerTeamName: string;
+  lens: string;
+  verdict: TradeVerdict;
+  sendAssets: TradeAsset[];
+  receiveAssets: TradeAsset[];
+}) {
+  const [copied, setCopied] = useState(false);
+  const label = (assets: TradeAsset[]) => assets.map((a) => a.name).join(", ") || "nothing";
+
+  const recordShare = () => {
+    void api
+      .recordTradeShare(
+        leagueId,
+        tradeShareRecord({
+          partnerTeamName,
+          send: sendAssets,
+          receive: receiveAssets,
+          valueEdgeLabel: verdict.band,
+          lens,
+        }),
+      )
+      .catch(() => {});
+  };
+
+  const onShare = async () => {
+    const title = partnerTeamName ? `Trade vs. ${partnerTeamName}` : "Trade analysis";
+    const text =
+      `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
+      `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
+      `Balance: ${formatTradeGain(verdict.value_delta)}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text, title });
+        recordShare();
+        return;
+      } catch {
+        // Cancelled or rejected: fall through to the clipboard.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      recordShare();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // No Share API and no clipboard permission.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onShare}
+      className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
+      style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
+    >
+      {copied ? "Copied!" : "Share"}
+    </button>
+  );
+}
+
 function VerdictCard({
   verdict,
   sendAssets,
   receiveAssets,
   onBuildCounter,
+  leagueId,
+  partnerTeamName,
+  lens,
 }: {
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
   receiveAssets: TradeAsset[];
   onBuildCounter: () => void;
+  leagueId: string;
+  partnerTeamName: string;
+  lens: string;
 }) {
   const toneColor = TONE_COLOR[verdict.tone];
   const deltaText = formatTradeGain(verdict.value_delta);
@@ -220,8 +306,18 @@ function VerdictCard({
         >
           Reviewed package
         </span>
-        <span className="text-lg font-black uppercase" style={{ color: toneColor }}>
-          {verdict.ui_verdict}
+        <span className="flex items-center gap-2">
+          <span className="text-lg font-black uppercase" style={{ color: toneColor }}>
+            {verdict.ui_verdict}
+          </span>
+          <ShareVerdictButton
+            leagueId={leagueId}
+            partnerTeamName={partnerTeamName}
+            lens={lens}
+            verdict={verdict}
+            sendAssets={sendAssets}
+            receiveAssets={receiveAssets}
+          />
         </span>
       </div>
       {verdict.band !== verdict.ui_verdict ? (
@@ -389,6 +485,7 @@ export function TradeAnalyzerContent({
   rosters,
   teamProfiles,
   quickAddPlayerId,
+  lens = "Dynasty",
 }: {
   leagueId: string;
   leagueName: string;
@@ -400,6 +497,8 @@ export function TradeAnalyzerContent({
   /** See this component's own docstring (Revision 20) — a Players row's
    * "Add to Trade" deep-link, ?playerId=. */
   quickAddPlayerId?: string;
+  /** Valuation lens recorded with a shared trade. */
+  lens?: string;
 }) {
   const reasonMessage = myRoster.reason ? tradeAnalyzerReasonMessage(myRoster.reason) : null;
   const myRosterId = String((myRoster.roster?.roster_id as string | number | undefined) ?? "");
@@ -691,6 +790,14 @@ export function TradeAnalyzerContent({
           />
         ) : null}
 
+        {selectedTeamId !== ALL_TEAMS_ID ? (
+          <ManagerTendenciesCard
+            leagueId={leagueId}
+            rosterId={selectedTeamId}
+            teamName={teamProfiles[selectedTeamId]?.team_name ?? undefined}
+          />
+        ) : null}
+
         <input
           type="text"
           value={search}
@@ -769,6 +876,9 @@ export function TradeAnalyzerContent({
           sendAssets={sendAssets}
           receiveAssets={receiveAssets}
           onBuildCounter={applyCounterAction}
+          leagueId={leagueId}
+          partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
+          lens={lens}
         />
       ) : hasAnyAssets ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

@@ -17,6 +17,7 @@ import {
   teamRankingsReasonMessage,
   type RankBoardKey,
 } from "@/lib/leagueRankingsPresentation";
+import { ManagerProfileSheet } from "@/components/ManagerProfileSheet";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -59,6 +60,7 @@ function RankingRow({
   firstPlace,
   secondary,
   badges,
+  onOpen,
 }: {
   rankLabel: string;
   teamName: string;
@@ -71,10 +73,17 @@ function RankingRow({
   firstPlace?: boolean;
   secondary?: string[];
   badges?: { label: string; tone?: "positive" | "negative" | "neutral" }[];
+  /** Opens the manager profile (Manager Tendencies) for this team. */
+  onOpen?: () => void;
 }) {
   return (
     <div
-      className="flex items-center gap-3 py-2.5 px-1"
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      aria-label={onOpen ? `${teamName} manager profile` : undefined}
+      onClick={onOpen}
+      onKeyDown={onOpen ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } } : undefined}
+      className={`flex items-center gap-3 py-2.5 px-1${onOpen ? " cursor-pointer" : ""}`}
       style={{
         borderBottom: "var(--border-width-default) solid var(--color-border)",
         background: isCurrent ? "var(--color-accent-soft)" : "transparent",
@@ -122,7 +131,9 @@ function RankingRow({
   );
 }
 
-function StandingsSection({ data, myRosterId }: { data: LeagueTeamRankingsResponse; myRosterId: string }) {
+type OpenManager = (rosterId: string, teamName: string) => void;
+
+function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTeamRankingsResponse; myRosterId: string; onOpenManager: OpenManager }) {
   const title = data.season ? `${data.season} Standings` : "Standings";
 
   if (!data.standings_available) {
@@ -169,6 +180,7 @@ function StandingsSection({ data, myRosterId }: { data: LeagueTeamRankingsRespon
                 firstPlace={team.standing_rank === 1}
                 secondary={secondary}
                 badges={team.playoff_status ? [{ label: team.playoff_status, tone: "neutral" }] : undefined}
+                onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team")}
               />
               {team.on_playoff_line ? (
                 <div
@@ -276,7 +288,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
   );
 }
 
-function RankBoardSection({ board, teams, myRosterId }: { board: RankBoardKey; teams: TeamRanking[]; myRosterId: string }) {
+function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: RankBoardKey; teams: TeamRanking[]; myRosterId: string; onOpenManager: OpenManager }) {
   const config = RANK_BOARD_CONFIG[board];
   const ordered = sortByBoard(teams, board);
 
@@ -309,6 +321,7 @@ function RankBoardSection({ board, teams, myRosterId }: { board: RankBoardKey; t
               firstPlace={rank === 1}
               secondary={boardSecondaryParts(board, team)}
               badges={badges}
+              onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team")}
             />
           );
         })}
@@ -334,6 +347,8 @@ export function LeagueRankingsContent({
   myRosterId?: string;
 }) {
   const notReady = !data.ok || data.teams.length === 0;
+  const [profile, setProfile] = useState<{ rosterId: string; teamName: string } | null>(null);
+  const openManager: OpenManager = (rosterId, teamName) => setProfile({ rosterId, teamName });
 
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
@@ -350,15 +365,23 @@ export function LeagueRankingsContent({
         </p>
       ) : (
         <>
-          <StandingsSection data={data} myRosterId={myRosterId} />
+          <StandingsSection data={data} myRosterId={myRosterId} onOpenManager={openManager} />
           <PlayoffOddsSection leagueId={leagueId} myRosterId={myRosterId} />
-          <RankBoardSection board="power" teams={data.teams} myRosterId={myRosterId} />
-          <RankBoardSection board="franchise" teams={data.teams} myRosterId={myRosterId} />
-          <RankBoardSection board="draft_capital" teams={data.teams} myRosterId={myRosterId} />
-          <RankBoardSection board="starter" teams={data.teams} myRosterId={myRosterId} />
-          <RankBoardSection board="bench" teams={data.teams} myRosterId={myRosterId} />
+          <RankBoardSection board="power" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
+          <RankBoardSection board="franchise" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
+          <RankBoardSection board="draft_capital" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
+          <RankBoardSection board="starter" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
+          <RankBoardSection board="bench" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
         </>
       )}
+      {profile ? (
+        <ManagerProfileSheet
+          leagueId={leagueId}
+          rosterId={profile.rosterId}
+          teamName={profile.teamName}
+          onClose={() => setProfile(null)}
+        />
+      ) : null}
       <ValuesCredit />
     </main>
   );

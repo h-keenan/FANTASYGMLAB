@@ -1,3 +1,4 @@
+import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import { useEffect, useRef, useState } from "react";
 import { api, type TradeIdea } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -274,6 +275,7 @@ export function TradeIdeaCardView({
           {idea.partner_team_archetype_label}
         </span>
       ) : null}
+      <ManagerTendenciesCard leagueId={leagueId} teamName={idea.partner_team_name} />
 
       <div className="flex items-baseline gap-2">
         <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
