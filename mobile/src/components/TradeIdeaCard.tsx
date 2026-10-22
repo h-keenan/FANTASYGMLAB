@@ -833,4 +833,3 @@ function createStyles(colors: ThemeColors) {
   proposeButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
   });
 }
-
