@@ -8,34 +8,31 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
-import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
-import MetricCard from '../components/MetricCard';
+import DashboardStatRow from '../components/DashboardStatRow';
+import PositionBadge from '../components/PositionBadge';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
-import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
-import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type KeeperPlayerInfo, type KeepersResponse, type LineupPlayer, type TeamRanking } from '../lib/api';
+import { buildRosterComposition, buildTeamAnalysisRows, type CompositionSegment, type TeamAnalysisRow } from '../lib/myTeamAnalysis';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isByeOnlyLabel, lineupStatusLabel, openSlotsMessage } from '../lib/lineupAvailability';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -79,72 +76,28 @@ function toRankedPlayer(player: LineupPlayer) {
   };
 }
 
-// Same three buckets PlayersScreen.tsx's own age filter already uses
-// (AGE_FILTERS: Under 25 / 25-28 / 29+) — reused here rather than inventing
-// a second set of age thresholds for the same underlying concept.
-function ageLabel(averageAge: number | null): string {
-  if (averageAge == null) return '—';
-  if (averageAge < 25) return 'Young';
-  if (averageAge <= 28) return 'Prime';
-  return 'Aging';
-}
+type RosterTabKey = 'starters' | 'bench' | 'ir' | 'taxi';
 
-/**
- * My Team's local subnav — UI_V2_ARCHITECTURE_RESET.md restructure.
- *
- * Previously four tabs: Overview (identity/value + a 3-row starters
- * "preview"), Starters (the identical full lineup, reached via the preview's
- * "View all" link), Bench, Analysis. That preview/full split was an
- * artificial screen-local construct — coridian_'s concept mockup shows Team
- * Snapshot flowing directly into the *complete* starting lineup as one
- * continuous view, never a truncated teaser gated behind a second tab. Once
- * Overview shows every starter, a separate "Starters" tab is 100% duplicate
- * content, so it's removed rather than left active alongside the new
- * Overview (Magna Carta §12 / V2 doc §5 — don't leave both the old and new
- * pattern live). No information or interaction is lost: every starter row,
- * the total-value aggregate, and drill-down-to-player all still exist,
- * simply on Overview directly instead of gated behind a tap. See this
- * screen's PR description for the explicit feature-parity callout.
- *
- * Three tabs remain: Overview (identity/value snapshot + complete starting
- * lineup — the concept's single continuous view), Bench (full bench,
- * visually quieter — not part of the concept mockup, kept as reference
- * information per Magna Carta's hierarchy rule), Analysis (the real
- * TeamRanking rank matrix + archetype narrative, via TeamAnalysisPanel).
- * SegmentedTabBar (built for Player Detail's Stats/Trends/... tabs) is
- * reused here rather than a My-Team-specific tab control.
- */
-type TeamTab = 'overview' | 'bench' | 'analysis';
-
-const TEAM_TABS: Array<{ key: TeamTab; label: string }> = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'bench', label: 'Bench' },
-  { key: 'analysis', label: 'Analysis' },
-];
-
-function infoNoteText(tab: TeamTab, leagueName: string): string {
-  switch (tab) {
-    case 'bench':
-      return `Every other rostered player in ${leagueName} not currently in your suggested starting lineup.`;
-    case 'analysis':
-      return `Real roster analytics for ${leagueName} — the same team-evaluation model used across FantasyDesk.`;
-    default:
-      return `Your roster snapshot for ${leagueName} — strength, identity, and complete starting lineup at a glance.`;
-  }
-}
+const ANALYSIS_TONE_COLOR = (tone: TeamAnalysisRow['tone'], colors: ThemeColors): string =>
+  tone === 'success'
+    ? colors.success
+    : tone === 'warning'
+      ? colors.premium
+      : tone === 'danger'
+        ? colors.danger
+        : colors.accent;
 
 export default function MyTeamScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
-  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [activeTab, setActiveTab] = useState<TeamTab>('overview');
+  const [rosterTab, setRosterTab] = useState<RosterTabKey>('starters');
+  const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const queryClient = useQueryClient();
-  // Gates both queries below until the persisted AsyncStorage cache has
-  // finished hydrating back into the in-memory QueryClient — same guard
-  // Dashboard/Matchup/Teams use.
+  // Gates the queries below until the persisted AsyncStorage cache has
+  // finished hydrating back into the in-memory QueryClient.
   const isRestoring = useIsRestoring();
 
   const myTeamQuery = useQuery({
@@ -152,17 +105,19 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueMyTeam(leagueId),
     enabled: !isRestoring,
   });
-  // Best-effort enrichment (Team Snapshot's rank/archetype). Started with the
-  // lineup request rather than after it returns `roster_id`; the match-up
-  // to the caller's own row happens below once both have landed. The exact same endpoint Dashboard's League Pulse and
-  // TeamsScreen's leaderboard both fetch, so this shares one cache entry
-  // under queryKeys.teamRankings(leagueId) instead of hitting it again.
+  // Best-effort enrichment (Team Snapshot's rank/archetype); shares the cache
+  // entry Dashboard and Teams use.
   const teamRankingsQuery = useQuery({
     queryKey: queryKeys.teamRankings(leagueId),
     queryFn: () => api.getLeagueTeamRankings(leagueId),
     enabled: !isRestoring,
   });
-
+  // Best-effort: per-position room statuses for Team Analysis.
+  const needsQuery = useQuery({
+    queryKey: queryKeys.myTeamNeeds(leagueId),
+    queryFn: () => api.getLeagueMyTeamNeeds(leagueId),
+    enabled: !isRestoring,
+  });
   // Best-effort: only keeper leagues return tags/candidates.
   const keepersQuery = useQuery({
     queryKey: queryKeys.keepers(leagueId),
@@ -185,10 +140,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
-  // Matches the previous useFocusEffect's cadence (always re-check on
-  // regaining focus) but through React Query: invalidating marks each query
-  // stale and triggers its background refetch if it's currently mounted —
-  // cached data stays on screen throughout, never cleared first.
+  // Re-check on regaining focus; cached data stays on screen throughout.
   useFocusEffect(
     useCallback(() => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.myTeam(leagueId) });
@@ -197,41 +149,54 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 
   const myTeamData = myTeamQuery.data;
-  // Best ball (Sleeper settings.best_ball): Sleeper sets the lineup itself
-  // from the highest weekly scorers, so the suggested starters/bench split is
-  // replaced by one roster list (suggested slot labels stripped), with
-  // IR/Taxi still on the Bench tab.
+  // Best ball: Sleeper sets the lineup itself, so the suggested
+  // starters/bench split is one roster list (suggested slot labels stripped).
   const bestBall = myTeamData?.best_ball === true;
-  const rawStarters: LineupPlayer[] = myTeamData?.starters ?? [];
-  const rawBench: LineupPlayer[] = myTeamData?.bench ?? [];
+  const rawStarters = useMemo<LineupPlayer[]>(() => myTeamData?.starters ?? [], [myTeamData]);
+  const rawBench = useMemo<LineupPlayer[]>(() => myTeamData?.bench ?? [], [myTeamData]);
+  const isActiveBench = (p: LineupPlayer) => p.roster_slot !== 'ir' && p.roster_slot !== 'taxi';
   const starters: LineupPlayer[] = bestBall
-    ? [...rawStarters, ...rawBench.filter((p) => p.roster_slot !== 'ir' && p.roster_slot !== 'taxi')].map((p) => ({
-        ...p,
-        slot: 'BENCH',
-      }))
+    ? [...rawStarters, ...rawBench.filter(isActiveBench)].map((p) => ({ ...p, slot: 'BENCH' }))
     : rawStarters;
-  const bench: LineupPlayer[] = bestBall
-    ? rawBench.filter((p) => p.roster_slot === 'ir' || p.roster_slot === 'taxi')
-    : rawBench;
+  const activeBench = bestBall ? [] : rawBench.filter(isActiveBench);
+  const irBench = rawBench.filter((p) => p.roster_slot === 'ir');
+  const taxiBench = rawBench.filter((p) => p.roster_slot === 'taxi');
   const notice = myTeamData?.reason ? reasonMessage(myTeamData.reason) : null;
   const leagueSize = teamRankingsQuery.data?.teams.length ?? 0;
   const myTeam: TeamRanking | null = myTeamData?.roster_id
     ? teamRankingsQuery.data?.teams.find((team) => team.roster_id === myTeamData.roster_id) ?? null
     : null;
 
-  // No data at all yet (neither a persisted cache hit nor a prior in-memory
-  // fetch) — the one case that still needs a blank-slate spinner. Team
-  // Analytics (teamRankingsQuery) is a bonus section, not core to this
-  // screen, so it never blocks the lineup from painting.
   const loading = isRestoring || myTeamQuery.isPending;
   const error =
     myTeamQuery.isError && !myTeamData
       ? toUserErrorMessage(myTeamQuery.error, 'Failed to load your lineup.')
       : null;
 
-  const totalStartersValue = useMemo(
-    () => starters.reduce((sum, player) => sum + (player.score ?? 0), 0),
-    [starters],
+  const startersValue = useMemo(() => rawStarters.reduce((sum, p) => sum + (p.score ?? 0), 0), [rawStarters]);
+  const teamValue = useMemo(
+    () => startersValue + rawBench.reduce((sum, p) => sum + (p.score ?? 0), 0),
+    [startersValue, rawBench],
+  );
+
+  const analysisRows = useMemo(
+    () => (needsQuery.data?.ok ? buildTeamAnalysisRows(needsQuery.data) : []),
+    [needsQuery.data],
+  );
+
+  const composition = buildRosterComposition(
+        bestBall
+          ? [
+              { key: 'roster', label: 'Roster', players: starters },
+              { key: 'ir', label: 'IR', players: irBench },
+              { key: 'taxi', label: 'Taxi', players: taxiBench },
+            ]
+          : [
+              { key: 'starters', label: 'Starters', players: starters },
+              { key: 'bench', label: 'Bench', players: activeBench },
+              { key: 'ir', label: 'IR', players: irBench },
+              { key: 'taxi', label: 'Taxi', players: taxiBench },
+            ],
   );
 
   const goToPlayer = useCallback(
@@ -242,13 +207,31 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return (
+      <View style={styles.root}>
+        <GridBackground />
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+        >
+          {[190, 230, 420, 110].map((height) => (
+            <View key={height} style={[styles.skeletonBlock, { height }]} />
+          ))}
+        </ScrollView>
+      </View>
+    );
   }
 
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Couldn't load My Team"
+          subtitle={error}
+          actionLabel="Try again"
+          onPressAction={() => void myTeamQuery.refetch()}
+        />
       </View>
     );
   }
@@ -261,62 +244,99 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     );
   }
 
+  const rosterTabs: { key: RosterTabKey; label: string; players: LineupPlayer[] }[] = bestBall
+    ? [{ key: 'starters', label: 'Roster', players: starters }]
+    : [
+        { key: 'starters', label: 'Starters', players: starters },
+        { key: 'bench', label: 'Bench', players: activeBench },
+      ];
+  if (irBench.length > 0) rosterTabs.push({ key: 'ir', label: 'IR', players: irBench });
+  if (taxiBench.length > 0) rosterTabs.push({ key: 'taxi', label: 'Taxi', players: taxiBench });
+  const currentTab = rosterTabs.find((tab) => tab.key === rosterTab) ?? rosterTabs[0];
+
   return (
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <View style={styles.tabBar}>
-          <SegmentedTabBar options={TEAM_TABS} active={activeTab} onChange={setActiveTab} />
-        </View>
-        <ScreenInfoNote text={infoNoteText(activeTab, leagueName)} />
 
-        {activeTab === 'overview' ? (
+        <SectionHeading title="Team Snapshot" topGap={12} />
+        <TeamSnapshot team={myTeam} leagueSize={leagueSize} teamValue={teamValue} />
+        {myTeam && hasRosterAnalysis(myTeam) ? (
+          <TouchableOpacity
+            style={styles.headerLink}
+            onPress={() => setShowFullAnalysis((v) => !v)}
+            activeOpacity={0.7}
+            hitSlop={6}
+          >
+            <AppText style={styles.linkRowText}>{showFullAnalysis ? 'Hide team analytics' : 'Team analytics'}</AppText>
+            <Ionicons name={showFullAnalysis ? 'chevron-up' : 'chevron-forward'} size={13} color={colors.accent} />
+          </TouchableOpacity>
+        ) : null}
+        {showFullAnalysis && myTeam ? (
+          <TeamAnalysisPanel
+            team={myTeam}
+            leagueSize={leagueSize}
+            showExplanations={false}
+            onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
+            onOpenFranchise={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'franchise' })}
+            onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
+            onOpenStarters={() => setRosterTab('starters')}
+            onOpenBench={() => setRosterTab('bench')}
+            onOpenAge={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'age' })}
+          />
+        ) : null}
+
+        {analysisRows.length > 0 ? (
           <>
-            {myTeam ? (
-              <TeamAnalyticsSection
-                team={myTeam}
-                leagueSize={leagueSize}
-                onViewAnalysis={hasRosterAnalysis(myTeam) ? () => setActiveTab('analysis') : undefined}
-              />
-            ) : null}
-            {bestBall && myTeamData?.lineup_advice_message ? (
-              <AppText style={styles.bestBallNote}>{myTeamData.lineup_advice_message}</AppText>
-            ) : null}
-            <StartersSection
-              starters={starters}
-              totalValue={bestBall ? 0 : totalStartersValue}
-              label={bestBall ? 'Roster' : 'Starters'}
-              onPressPlayer={goToPlayer}
-              openSlotsNote={bestBall ? null : openSlotsMessage(myTeamData?.open_slots)}
-              keepers={keepers}
-            />
-            <KeeperCandidatesSection keepers={keepers} />
+            <SectionHeading title="Team Analysis" topGap={12} />
+            <TeamAnalysisRows rows={analysisRows} />
           </>
         ) : null}
 
-        {activeTab === 'bench' ? <BenchFullSection bench={bench} onPressPlayer={goToPlayer} keepers={keepers} /> : null}
+        <SectionHeading
+          title="Your Roster"
+          topGap={12}
+          right={
+            !bestBall && startersValue > 0 ? (
+              <AppText style={styles.sectionTotal}>{`Starters Value ${Math.round(startersValue).toLocaleString()}`}</AppText>
+            ) : undefined
+          }
+        />
+        {bestBall && myTeamData?.lineup_advice_message ? (
+          <AppText style={styles.bestBallNote}>{myTeamData.lineup_advice_message}</AppText>
+        ) : null}
+        <View style={styles.tabBar}>
+          <SegmentedTabBar options={rosterTabs} active={currentTab.key} onChange={setRosterTab} />
+        </View>
+        {currentTab.key === 'starters' && !bestBall && openSlotsMessage(myTeamData?.open_slots) ? (
+          <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsMessage(myTeamData?.open_slots)}</AppText>
+        ) : null}
+        {currentTab.players.length === 0 ? (
+          <AppText style={styles.rosterEmpty}>
+            {currentTab.key === 'starters' ? 'No suggested starters yet.' : 'Nobody here yet.'}
+          </AppText>
+        ) : (
+          <AnimatedCard style={styles.groupCard}>
+            {currentTab.players.map((player, index) => (
+              <LineupRow
+                key={player.player_id}
+                player={player}
+                keeper={keepers?.players?.[player.player_id]}
+                showDivider={index < currentTab.players.length - 1}
+                onPress={() => goToPlayer(player)}
+                muted={currentTab.key !== 'starters'}
+              />
+            ))}
+          </AnimatedCard>
+        )}
+        <KeeperCandidatesSection keepers={keepers} />
 
-        {activeTab === 'analysis' ? (
-          myTeam ? (
-            <TeamAnalysisPanel
-              team={myTeam}
-              leagueSize={leagueSize}
-              showExplanations={showExplanations}
-              onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
-              onOpenFranchise={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'franchise' })}
-              onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
-              onOpenStarters={() => setActiveTab('overview')}
-              onOpenBench={() => setActiveTab('bench')}
-              onOpenAge={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'age' })}
-            />
-          ) : (
-            <EmptyState
-              icon="stats-chart-outline"
-              title="Analysis unavailable"
-              subtitle="Team analytics aren't available for this roster right now."
-            />
-          )
+        {composition.length > 0 ? (
+          <>
+            <SectionHeading title="Roster Composition" topGap={12} />
+            <RosterCompositionBar segments={composition} />
+          </>
         ) : null}
         <ValuesCredit />
       </ScrollView>
@@ -324,298 +344,123 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 }
 
-/**
- * The concept sheet's Panel 4 ("MY TEAM") leads with a team-value ring plus
- * a Key Metrics readout — this screen had no equivalent team-level summary
- * at all before, only the lineup. Every number here is real: Team Value,
- * Starter Strength and Draft Capital are percentiles derived from
- * modules/league_rankings.py's own dense ranks (best team in the league ->
- * 100), Roster Age is the real average, and Overall Outlook is the
- * archetype/strategy label modules/team_eval.py already assigns per roster.
- * Two panel-7 items ("Contender Window", a multi-year projected/ceiling/
- * floor chart) are deliberately NOT here — nothing in the backend computes
- * either, and showing invented numbers next to real ones would be worse
- * than showing nothing.
- *
- * Built on the same MetricCard/AnalyticsSection primitives Dashboard's
- * League Snapshot and Player Detail's Stats tab use (rather than this
- * screen's own icon-cell grid + a second, page-local percentile bar), so
- * "how good is this number" reads through one shared percentile scale
- * (lib/percentile.ts) everywhere in the app instead of two. Draft Capital
- * previously appeared twice — once as an icon cell, once as a percentile
- * bar — collapsed here into the single MetricCard tile.
- *
- * `onViewAnalysis`, when provided, renders a compact "View Analysis" link
- * into the card's own header row, next to the "Team Snapshot" title
- * (matching coridian_'s concept mockup exactly) — only ever passed when
- * TeamAnalysisPanel actually has real content to show (see
- * `hasRosterAnalysis`), never as a dead affordance.
- */
-/** Young/Prime/Aging isn't itself good/bad, but Prime is the ideal state,
- * Aging carries real roster risk, and Young is still "not there yet" —
- * distinct from a plain percentile tier, so this stays a page-local
- * mapping rather than being forced through the shared percentile ramp. */
-function ageColor(averageAge: number | null, colors: ThemeColors): string {
-  if (averageAge == null) return colors.textTertiary;
-  if (averageAge <= 28) return colors.success;
-  if (averageAge <= 30) return colors.premium;
-  return colors.danger;
-}
-
-function TeamAnalyticsSection({
+/** Ring + archetype pill + Team Value total, then the six rank tiles. */
+function TeamSnapshot({
   team,
   leagueSize,
-  onViewAnalysis,
+  teamValue,
 }: {
-  team: TeamRanking;
+  team: TeamRanking | null;
   leagueSize: number;
-  onViewAnalysis?: () => void;
+  teamValue: number;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const valuePercentile = percentileFromRank(team.power_rank, leagueSize);
-  const draftCapitalPercentile = percentileFromRank(team.draft_capital_rank, leagueSize);
-  const starterPercentile = percentileFromRank(team.starter_rank, leagueSize);
-  // Color-system/percentile-bar follow-up (this pass): `age_rank` is the
-  // same dense, league_rankings.py-computed rank (1 = best) as
-  // starter_rank/draft_capital_rank above — ascending by avg_age, so rank 1
-  // is the youngest roster — just never wired into a percentile here before.
-  // Reusing it (rather than inventing a new computation) keeps Roster Age on
-  // the exact same rank->percentile transform as its two siblings on this
-  // card. `ageLabel`/`note` below stays as the fallback caption for the rare
-  // case percentileFromRank can't produce a value (single-team league).
-  const agePercentile = percentileFromRank(team.age_rank, leagueSize);
-  const outlook = team.archetype_label || team.strategy_label;
+  const valuePercentile = team ? percentileFromRank(team.power_rank, leagueSize) : null;
+  const outlook = team ? team.archetype_label || team.strategy_label : null;
   const ringColor = valuePercentile != null ? percentileColor(valuePercentile, colors) : colors.accent;
-
+  const record = team
+    ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
+    : '—';
+  const rank = (value: number | null | undefined, tied: boolean | undefined) =>
+    value != null ? formatRank(value, Boolean(tied)) : '—';
   return (
-    <AnalyticsSection
-      title="Team Snapshot"
-      icon="bar-chart-outline"
-      footer={onViewAnalysis ? <HeaderLink label="View Analysis" onPress={onViewAnalysis} /> : undefined}
-    >
+    <AnimatedCard>
       <View style={styles.analyticsHeaderRow}>
-        <View style={styles.analyticsRingWrap}>
-          <CircularProgressRing
-            percent={valuePercentile ?? 0}
-            size={84}
-            strokeWidth={8}
-            color={ringColor}
-            valueLabel={valuePercentile != null ? String(valuePercentile) : '—'}
-          />
-          <AppText style={styles.analyticsRingCaption}>TEAM VALUE</AppText>
-        </View>
-        {team.avatar_url ? (
-          <TeamAvatar avatarId={team.avatar_url} size={52} style={styles.analyticsTeamAvatar} />
-        ) : null}
+        <CircularProgressRing
+          percent={valuePercentile ?? 0}
+          size={84}
+          strokeWidth={8}
+          color={ringColor}
+          valueLabel={valuePercentile != null ? String(valuePercentile) : '—'}
+        />
         <View style={styles.analyticsHeaderText}>
           {outlook ? (
             <View style={styles.outlookBadge}>
               <AppText style={styles.outlookBadgeText}>{outlook.toUpperCase()}</AppText>
             </View>
           ) : null}
-          {team.power_rank != null ? (
-            <AppText style={styles.analyticsRankLine}>
-              Roster Power {formatRank(team.power_rank, team.power_rank_tied)} of {leagueSize}
-            </AppText>
-          ) : null}
+          <AppText style={styles.teamValueLabel}>TEAM VALUE</AppText>
+          <AppText style={styles.teamValueNumber}>{teamValue > 0 ? Math.round(teamValue).toLocaleString() : '—'}</AppText>
         </View>
       </View>
       <View style={styles.analyticsMetricsRow}>
-        <MetricCard
-          label="Starter Strength"
-          icon="american-football-outline"
-          value={formatRank(team.starter_rank, team.starter_rank_tied)}
-          percentile={starterPercentile}
-          valueColor={starterPercentile != null ? percentileColor(starterPercentile, colors) : undefined}
-          style={styles.analyticsMetricTile}
-        />
-        <MetricCard
-          label="Draft Capital"
-          icon="file-tray-stacked-outline"
-          value={formatRank(team.draft_capital_rank, team.draft_capital_rank_tied)}
-          percentile={draftCapitalPercentile}
-          valueColor={draftCapitalPercentile != null ? percentileColor(draftCapitalPercentile, colors) : undefined}
-          style={styles.analyticsMetricTile}
-        />
-        <MetricCard
-          label="Roster Age"
-          icon="hourglass-outline"
-          value={team.average_age != null ? team.average_age.toFixed(1) : '—'}
-          percentile={agePercentile}
-          note={ageLabel(team.average_age)}
-          valueColor={ageColor(team.average_age, colors)}
-          style={styles.analyticsMetricTile}
+        <DashboardStatRow
+          items={[
+            { label: 'Record', icon: 'ribbon-outline', value: record },
+            { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied) },
+            { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied) },
+          ]}
         />
       </View>
-    </AnalyticsSection>
+      <DashboardStatRow
+        items={[
+          { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied) },
+          { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied) },
+          { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—' },
+        ]}
+      />
+    </AnimatedCard>
   );
 }
 
-/** "Total Starters Value 48,123" — label-then-number, matching coridian_'s
- * concept mockup exactly (previously rendered as "48,123 TOTAL VALUE",
- * number-then-label). */
-function formatTotalStartersValue(totalValue: number): string | null {
-  return totalValue > 0 ? `Total Starters Value ${Math.round(totalValue).toLocaleString()}` : null;
-}
-
-/**
- * The complete starting lineup, directly on Overview — coridian_'s concept
- * mockup shows Team Snapshot flowing straight into every starter, never a
- * truncated preview gated behind a second tab (see this file's TeamTab doc
- * comment for why the old "Starters" tab was removed). A real "Total
- * Starters Value" aggregate — the sum of the exact per-starter `score`
- * values already rendered in each row below, never a fabricated number the
- * app has no inputs for.
- */
-function StartersSection({
-  starters,
-  totalValue,
-  label = 'Starters',
-  onPressPlayer,
-  openSlotsNote = null,
-  keepers = null,
-}: {
-  keepers?: KeepersResponse | null;
-  starters: LineupPlayer[];
-  totalValue: number;
-  label?: string;
-  onPressPlayer: (player: LineupPlayer) => void;
-  /** lib/lineupAvailability.openSlotsMessage — slots nobody eligible can fill this week. */
-  openSlotsNote?: string | null;
-}) {
+/** One row per position room; tap to expand the full sentence. */
+function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState<string | null>(null);
   return (
-    <View>
-      <SectionHeading title={label} topGap={12} right={<AppText style={styles.sectionTotal}>{formatTotalStartersValue(totalValue)}</AppText>} />
-      {openSlotsNote ? <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsNote}</AppText> : null}
-      {starters.length === 0 ? (
-        <EmptyState icon="people-outline" title="No suggested starters yet." />
-      ) : (
-        <AnimatedCard style={styles.groupCard}>
-          {starters.map((player, index) => (
-            <LineupRow
-              key={player.player_id}
-              player={player}
-              keeper={keepers?.players?.[player.player_id]}
-              showDivider={index < starters.length - 1}
-              onPress={() => onPressPlayer(player)}
-            />
-          ))}
-        </AnimatedCard>
-      )}
-    </View>
+    <AnimatedCard style={styles.groupCard}>
+      {rows.map((row, index) => {
+        const isOpen = open === row.position;
+        return (
+          <View key={row.position} style={index < rows.length - 1 ? styles.compactDivider : undefined}>
+            <TouchableOpacity
+              style={styles.analysisRow}
+              onPress={() => setOpen(isOpen ? null : row.position)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isOpen }}
+            >
+              <PositionBadge position={row.position} />
+              <View style={[styles.analysisDot, { backgroundColor: ANALYSIS_TONE_COLOR(row.tone, colors) }]} />
+              <AppText style={styles.analysisStatus}>{row.status}</AppText>
+              <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+            {isOpen ? <AppText style={styles.analysisBody}>{row.body}</AppText> : null}
+          </View>
+        );
+      })}
+    </AnimatedCard>
   );
 }
 
-/**
- * Bench keeps the exact same PlayerIdentityRow family and roster structure
- * (brief §14 — never remove bench players), just a touch quieter than
- * Starters: the trailing value number drops from the cyan accent to a plain
- * secondary tone so cyan stays reserved for the roster's actual starting
- * value (Magna Carta §2 — "cyan second"), not a completely different row
- * design.
- *
- * Split into up to three grouped cards — plain Bench, Injured Reserve, Taxi
- * Squad — using the server's real Sleeper `roster_slot` (see
- * LineupPlayer.roster_slot), not `injury_label`: a healthy player can be
- * parked on IR just as easily as an actually-hurt one can sit in a plain
- * bench slot, so this is strictly "where the manager placed them," kept
- * distinct from the injury tag each row already renders via LineupRow.
- * Reuses the same SectionHeaderRow/sectionLabel/AnimatedCard/LineupRow
- * building blocks as the rest of this screen rather than a new pattern —
- * an IR/Taxi group with nothing in it simply doesn't render.
- */
-function BenchFullSection({
-  bench,
-  onPressPlayer,
-  keepers = null,
-}: {
-  keepers?: KeepersResponse | null;
-  bench: LineupPlayer[];
-  onPressPlayer: (player: LineupPlayer) => void;
-}) {
+function RosterCompositionBar({ segments }: { segments: CompositionSegment[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const activeBench = bench.filter((p) => p.roster_slot !== 'ir' && p.roster_slot !== 'taxi');
-  const irBench = bench.filter((p) => p.roster_slot === 'ir');
-  const taxiBench = bench.filter((p) => p.roster_slot === 'taxi');
+  const colorFor = (key: string) =>
+    key === 'bench' ? colors.textSecondary : key === 'ir' ? colors.danger : key === 'taxi' ? colors.premium : colors.accent;
   return (
-    <View>
-      <SectionHeading title="Bench" topGap={12} />
-      {bench.length === 0 ? (
-        <EmptyState icon="people-outline" title="No bench players." />
-      ) : (
-        <>
-          {activeBench.length > 0 ? (
-            <AnimatedCard style={styles.groupCard}>
-              {activeBench.map((player, index) => (
-                <LineupRow
-                  key={player.player_id}
-                  player={player}
-                  keeper={keepers?.players?.[player.player_id]}
-                  showDivider={index < activeBench.length - 1}
-                  onPress={() => onPressPlayer(player)}
-                  muted
-                />
-              ))}
-            </AnimatedCard>
-          ) : null}
-          {irBench.length > 0 ? (
-            <BenchSlotGroup label="Injured Reserve" players={irBench} onPressPlayer={onPressPlayer} />
-          ) : null}
-          {taxiBench.length > 0 ? (
-            <BenchSlotGroup label="Taxi Squad" players={taxiBench} onPressPlayer={onPressPlayer} />
-          ) : null}
-        </>
-      )}
-    </View>
-  );
-}
-
-function BenchSlotGroup({
-  label,
-  players,
-  onPressPlayer,
-}: {
-  label: string;
-  players: LineupPlayer[];
-  onPressPlayer: (player: LineupPlayer) => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View>
-      <SectionHeading title={label} topGap={12} />
-      <AnimatedCard style={styles.groupCard}>
-        {players.map((player, index) => (
-          <LineupRow
-            key={player.player_id}
-            player={player}
-            showDivider={index < players.length - 1}
-            onPress={() => onPressPlayer(player)}
-            muted
-          />
+    <AnimatedCard>
+      <View
+        style={styles.compBar}
+        accessible
+        accessibilityLabel={segments.map((s) => `${s.label} ${s.percent}%`).join(', ')}
+      >
+        {segments.map((segment) => (
+          <View key={segment.key} style={{ width: `${segment.percent}%`, backgroundColor: colorFor(segment.key) }} />
         ))}
-      </AnimatedCard>
-    </View>
-  );
-}
-
-/** Tappable text-plus-chevron affordance, borderless
- * and untethered from block flow — for sitting inline inside a card's own
- * header row (`AnalyticsSection`'s `footer` slot) next to the section
- * title, e.g. Team Snapshot's "View Analysis" in coridian_'s concept
- * mockup, rather than as a separate row beneath the card's content. */
-function HeaderLink({ label, onPress }: { label: string; onPress: () => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <TouchableOpacity style={styles.headerLink} onPress={onPress} activeOpacity={0.7} hitSlop={6}>
-      <AppText style={styles.linkRowText}>{label}</AppText>
-      <Ionicons name="chevron-forward" size={13} color={colors.accent} />
-    </TouchableOpacity>
+      </View>
+      <View style={styles.compLegend}>
+        {segments.map((segment) => (
+          <View key={segment.key} style={styles.compLegendItem}>
+            <View style={[styles.compDot, { backgroundColor: colorFor(segment.key) }]} />
+            <AppText style={styles.compLegendText}>{segment.label}</AppText>
+            <AppText style={styles.compLegendPct}>{`${segment.percent}%`}</AppText>
+          </View>
+        ))}
+      </View>
+    </AnimatedCard>
   );
 }
 
@@ -700,6 +545,7 @@ function LineupRow({
           </AppText>
         ) : null}
       </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
     </TouchableOpacity>
   );
 }
@@ -755,6 +601,21 @@ function createStyles(colors: ThemeColors) {
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   tabBar: { marginBottom: spacing.sm },
+  skeletonBlock: { backgroundColor: colors.border, borderRadius: radii.md, marginBottom: spacing.lg, opacity: 0.5 },
+  analysisRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  analysisDot: { width: 10, height: 10, borderRadius: 5 },
+  analysisStatus: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  analysisBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingBottom: spacing.sm },
+  analysisNotes: { marginTop: spacing.sm },
+  teamValueLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
+  teamValueNumber: { fontSize: 24, fontWeight: '800', color: colors.textPrimary },
+  compBar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: spacing.md },
+  compLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  compLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  compDot: { width: 8, height: 8, borderRadius: 4 },
+  compLegendText: { fontSize: 12, color: colors.textSecondary },
+  compLegendPct: { fontSize: 12, fontWeight: '800', color: colors.textPrimary },
+  rosterEmpty: { fontSize: 13, color: colors.textTertiary, paddingVertical: spacing.md },
   center: {
     flex: 1,
     alignItems: 'center',

@@ -503,6 +503,23 @@ export interface KeepersResponse {
   unpriced_count?: number;
 }
 
+export interface PositionNeedGroup {
+  position: string;
+  classification: 'covered' | 'short_term_need' | 'future_risk' | string;
+  reasons: string[];
+  upgrade_opportunity: boolean;
+  temporary_injury_pressure: boolean;
+}
+
+/** GET .../my-team-needs: the per-position room assessments My Team's Team Analysis reads. */
+export interface MyTeamNeedsResponse {
+  ok: boolean;
+  reason: string;
+  strengths: string[];
+  weaknesses: string[];
+  position_groups: PositionNeedGroup[];
+}
+
 export interface MyTeamResponse {
   ok: true;
   starters: LineupPlayer[];
@@ -2272,6 +2289,14 @@ export const api = {
     const query = params.toString();
     return authorizedFetch<MyTeamResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/my-team${query ? `?${query}` : ''}`,
+    );
+  },
+  getLeagueMyTeamNeeds: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<MyTeamNeedsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/my-team-needs${query ? `?${query}` : ''}`,
     );
   },
   getLeagueKeepers: (leagueId: string, options?: { lens?: ValuationLens }) => {

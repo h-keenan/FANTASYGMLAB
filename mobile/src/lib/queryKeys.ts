@@ -54,6 +54,7 @@ export const queryKeys = {
   // that one's still a plain fetch-on-mount (out of scope for this pass).
   keepers: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'keepers'] as const,
   myTeam: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'my-team'] as const,
+  myTeamNeeds: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'my-team-needs'] as const,
   // PlayerDetailScreen's Stats tab payload — keyed by player id only (no
   // other params affect the response), but still user-scoped: the response
   // includes user-specific fields (e.g. premium-entitlement gating), so a
