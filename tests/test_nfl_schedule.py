@@ -429,3 +429,44 @@ def test_defensive_ratings_see_newly_completed_games_despite_the_schedule_cache(
     assert after["KC"]["games_played"] == 4
     assert after["KC"]["points_allowed_avg"] > before["KC"]["points_allowed_avg"]
     nfl_schedule.clear_load_games_cache()
+
+
+# --- per-frame schedule index (perf audit 2026-10-21) -----------------------
+
+
+def test_team_schedule_builds_each_season_once_per_games_frame():
+    games = _games_frame()
+    with patch.object(nfl_schedule, "_build_season_schedule_index", wraps=nfl_schedule._build_season_schedule_index) as build:
+        first = [nfl_schedule.team_schedule(team, 2026, games=games) for team in ("BUF", "KC", "LAR", "NE")]
+        second = [nfl_schedule.team_schedule(team, 2026, games=games) for team in ("BUF", "KC", "LAR", "NE")]
+    assert build.call_count == 1
+    assert first == second
+
+
+def test_team_schedule_rows_are_independent_copies():
+    games = _games_frame()
+    rows = nfl_schedule.team_schedule("BUF", 2026, games=games)
+    rows[0]["opponent"] = "MUTATED"
+    rows.clear()
+    again = nfl_schedule.team_schedule("BUF", 2026, games=games)
+    assert again and again[0]["opponent"] == "KC"
+
+
+def test_team_schedule_never_reuses_an_index_across_different_frames():
+    games = _games_frame()
+    assert nfl_schedule.team_schedule("BUF", 2026, games=games)[0]["spread_line"] == 2.5
+    changed = _games_frame()
+    changed.loc[changed["week"] == 1, "spread_line"] = -7.0
+    # A refreshed frame (new object) must read its own data, not the old index.
+    assert nfl_schedule.team_schedule("BUF", 2026, games=changed)[0]["spread_line"] == 7.0
+    assert nfl_schedule.team_schedule("BUF", 2026, games=games)[0]["spread_line"] == 2.5
+
+
+def test_team_schedule_index_matches_a_per_team_rebuild_for_every_team():
+    games = _games_frame()
+    for team in ("KC", "BUF", "LAR", "LA", "NE", "ZZZ"):
+        expected = nfl_schedule._build_season_schedule_index(games, 2026).get(
+            nfl_schedule.TEAM_CODE_ALIASES.get(team, team), []
+        )
+        assert nfl_schedule.team_schedule(team, 2026, games=games) == expected
+    assert nfl_schedule.team_schedule("BUF", 2031, games=games) == []
