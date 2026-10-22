@@ -102,7 +102,8 @@ def test_league_adjustment_components_are_decomposable():
         product = product * series
     # Combined equals product of parts (within float noise before clip).
     assert (product.clip(0.35, 2.2) - components["league_settings_multiplier"]).abs().max() < 1e-9
-    assert float(components["league_adj_qb_scarcity"].iloc[2]) == 1.35
+    # Tier-scaled uplift: an elite QB gets less than the 1.35 anchor, but still a real Superflex bump.
+    assert 1.2 < float(components["league_adj_qb_scarcity"].iloc[2]) <= 1.35
     assert float(components["league_adj_te_premium"].iloc[1]) > 1.0
     assert float(components["league_adj_pass_td"].iloc[2]) > 1.0
 

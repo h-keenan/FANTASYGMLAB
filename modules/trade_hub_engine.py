@@ -78,34 +78,39 @@ def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) 
     positions = df.get("position", pd.Series("", index=df.index)).fillna("").astype(str).str.upper()
     multiplier = pd.Series(1.0, index=df.index, dtype="float64")
 
+    sd = league_value_settings.smooth_decline
+    sy = league_value_settings.smooth_youth_bonus
+
+    def decline(pos_list, start, floor):
+        return sd(ages, start, floor).where(positions.isin(pos_list), 1.0)
+
     if strategy_key == "contender":
-        multiplier = multiplier.mask(ages.ge(25) & ages.le(30), 1.04)
-        multiplier = multiplier.mask(ages.le(22), 0.98)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(29), 0.94)
+        multiplier = sy(ages, ((22.0, 0.98), (25.0, 1.04), (30.0, 1.04), (32.0, 1.0)))
+        multiplier = multiplier * decline(["RB"], 29, 0.94)
     elif strategy_key == "fringe_contender":
-        multiplier = multiplier.mask(ages.ge(24) & ages.le(29), 1.025)
-        multiplier = multiplier.mask(ages.le(24), 1.01)
-        multiplier = multiplier.mask((positions.isin(["RB", "WR", "TE"])) & ages.ge(31), 0.96)
+        multiplier = sy(ages, ((22.0, 1.01), (24.0, 1.01), (25.0, 1.025), (29.0, 1.025), (31.0, 1.0)))
+        multiplier = multiplier * decline(["RB", "WR", "TE"], 31, 0.96)
     elif strategy_key == "retool":
-        multiplier = multiplier.mask(ages.le(25), 1.04)
-        multiplier = multiplier.mask(ages.ge(26) & ages.le(29), 1.01)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(28), 0.91)
-        multiplier = multiplier.mask((positions.isin(["WR", "TE"])) & ages.ge(31), 0.94)
+        multiplier = sy(ages, ((22.0, 1.04), (25.0, 1.04), (26.0, 1.01), (29.0, 1.01), (31.0, 1.0)))
+        multiplier = multiplier * decline(["RB"], 28, 0.91) * decline(["WR", "TE"], 31, 0.94)
     elif strategy_key == "rebuild":
-        multiplier = multiplier.mask(ages.le(23), 1.10)
-        multiplier = multiplier.mask(ages.gt(23) & ages.le(25), 1.06)
-        multiplier = multiplier.mask(ages.gt(25) & ages.le(26), 1.02)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(28), 0.82)
-        multiplier = multiplier.mask((positions == "WR") & ages.ge(30), 0.86)
-        multiplier = multiplier.mask((positions == "TE") & ages.ge(31), 0.88)
-        multiplier = multiplier.mask((positions == "QB") & ages.ge(34), 0.92)
+        multiplier = sy(ages, ((23.0, 1.10), (25.0, 1.06), (26.0, 1.02), (28.0, 1.0)))
+        multiplier = (
+            multiplier
+            * decline(["RB"], 28, 0.82)
+            * decline(["WR"], 30, 0.86)
+            * decline(["TE"], 31, 0.88)
+            * decline(["QB"], 34, 0.92)
+        )
     elif strategy_key == "tank":
-        multiplier = multiplier.mask(ages.le(23), 1.15)
-        multiplier = multiplier.mask(ages.gt(23) & ages.le(25), 1.09)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(27), 0.75)
-        multiplier = multiplier.mask((positions == "WR") & ages.ge(30), 0.80)
-        multiplier = multiplier.mask((positions == "TE") & ages.ge(31), 0.84)
-        multiplier = multiplier.mask((positions == "QB") & ages.ge(34), 0.88)
+        multiplier = sy(ages, ((23.0, 1.15), (25.0, 1.09), (26.0, 1.0)))
+        multiplier = (
+            multiplier
+            * decline(["RB"], 27, 0.75)
+            * decline(["WR"], 30, 0.80)
+            * decline(["TE"], 31, 0.84)
+            * decline(["QB"], 34, 0.88)
+        )
 
     for column, league_column in (
         ("dynasty_score", "league_dynasty_score"),
