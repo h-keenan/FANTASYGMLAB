@@ -8,7 +8,7 @@ import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile } from "@/components/SnapshotTile";
@@ -61,16 +61,13 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
       <PositionBadge position={player.position} />
       <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
       <div className="flex flex-col min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
-          <PlayerInjuryBadge status={injury.label} />
-        </div>
-        <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+        <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+          {player.name || "Unknown player"}
+        </span>
+        <PlayerMetaLine injuryStatus={injury.label}>
           {player.team || "FA"}
           {contextLine ? ` · ${contextLine}` : ""}
-        </span>
+        </PlayerMetaLine>
         {trending ? (
           <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
             {trending}

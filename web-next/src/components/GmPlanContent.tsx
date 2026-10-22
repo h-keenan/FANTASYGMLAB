@@ -24,7 +24,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { PlayerInjuryBadge, PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
@@ -144,11 +144,7 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
                   </span>
                 ) : null}
               </PlayerIdentityTrigger>
-              {player.injury_status ? (
-                <span className="ml-auto text-xs font-bold" style={{ color: "var(--color-danger)" }}>
-                  {player.injury_status}
-                </span>
-              ) : null}
+              <PlayerInjuryBadge status={player.injury_status} />
             </div>
           ))}
         </div>
@@ -269,15 +265,10 @@ function ProtectPlayerRow({
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="sm" />
         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {player.name || "Unknown player"}
-            </span>
-            <PlayerInjuryBadge status={player.injury_label} />
-          </div>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {player.team || "FA"}
+          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {player.name || "Unknown player"}
           </span>
+          <PlayerMetaLine injuryStatus={player.injury_label}>{player.team || "FA"}</PlayerMetaLine>
         </div>
       </PlayerIdentityTrigger>
       <button
@@ -328,16 +319,13 @@ function TargetRowView({
         >
           <PositionBadge position={player?.position} />
           <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-                {name}
-              </span>
-              <PlayerInjuryBadge status={injury.label} />
-            </div>
-            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {name}
+            </span>
+            <PlayerMetaLine injuryStatus={injury.label}>
               {player?.team || "—"}
               {contextLine ? ` · ${contextLine}` : ""}
-            </span>
+            </PlayerMetaLine>
           </div>
         </PlayerIdentityTrigger>
         <div className="flex items-center gap-2 shrink-0">
