@@ -160,6 +160,7 @@ from modules import (
     guess_the_player_leaderboard,
     injury_ui,
     launch_analytics,
+    league_calendar,
     league_format_context,
     league_history,
     league_glance,
@@ -4212,7 +4213,19 @@ def post_trade_analyzer(
         except Exception:
             pass
 
-    return {"ok": True, "verdict": verdict.to_public_dict(), "reason": ""}
+    # Trade Analyzer stays fully usable after the trade deadline — it's the
+    # offseason-planning tool — but says so instead of implying the trade
+    # can be sent today (modules.league_calendar).
+    trade_window = league_calendar.trade_window(league)
+    return {
+        "ok": True,
+        "verdict": verdict.to_public_dict(),
+        "reason": "",
+        "trade_window": trade_window,
+        "planning_note": (
+            league_calendar.TRADE_ANALYZER_DEADLINE_NOTE if trade_window["trade_deadline_passed"] else ""
+        ),
+    }
 
 
 @app.get("/v1/leagues/{league_id}/recap")
@@ -8218,19 +8231,24 @@ def get_league_dashboard(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
     trade_idea_records = None
-    try:
-        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
-            league_id=league_id,
-            roster_id=int(my_roster.get("roster_id")),
-            strategy=team_strategy,
-            lens=lens,
-            players_db_path=PLAYERS_DB_PATH,
-            untouchable_player_ids=gm_untouchable_ids,
-            gm_target_player_ids=gm_target_ids,
-            team_stance=declared_team_stance,
-        )
-    except (TypeError, ValueError):
-        pass
+    if league_calendar.trade_deadline_passed(league):
+        # Past the trade deadline: no Top Trade Opportunity tile — an empty
+        # (not None) list keeps compose_next_move_briefing from regenerating.
+        trade_idea_records = []
+    else:
+        try:
+            trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+                league_id=league_id,
+                roster_id=int(my_roster.get("roster_id")),
+                strategy=team_strategy,
+                lens=lens,
+                players_db_path=PLAYERS_DB_PATH,
+                untouchable_player_ids=gm_untouchable_ids,
+                gm_target_player_ids=gm_target_ids,
+                team_stance=declared_team_stance,
+            )
+        except (TypeError, ValueError):
+            pass
 
     # Computed once and threaded into compose_next_move_briefing below (as
     # an optional override, same pattern as trade_idea_records) *and* reused
@@ -9218,7 +9236,14 @@ def get_gm_plan(
     raw_settings = league.get("settings") or {}
     current_week = raw_settings.get("leg") or raw_settings.get("week")
     playoff_week_start = raw_settings.get("playoff_week_start")
-    season_phase = gm_plan.derive_season_phase(current_week, playoff_week_start)
+    # Sleeper's real settings.trade_deadline drives the deadline phase
+    # (modules.league_calendar), not the old hardcoded weeks 4-11.
+    trade_window = league_calendar.trade_window(league)
+    season_phase = gm_plan.derive_season_phase(
+        current_week,
+        playoff_week_start,
+        league_calendar.trade_deadline_week(league) if league_calendar.is_in_season(league) else None,
+    )
 
     declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
 
@@ -9278,25 +9303,28 @@ def get_gm_plan(
             break
 
     trade_idea_records: list[dict[str, Any]] = []
-    try:
-        team_strategy, _ = _fetch_gm_stance_with_set_flag(
-            config, access_token, user_id=user_id, league_id=league_id
-        )
-        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
-            config, user_id, access_token, league_id
-        )
-        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
-            league_id=league_id,
-            roster_id=int(my_roster.get("roster_id")),
-            strategy=team_strategy,
-            lens=lens,
-            players_db_path=PLAYERS_DB_PATH,
-            untouchable_player_ids=gm_untouchable_ids,
-            gm_target_player_ids=gm_target_ids,
-            team_stance=declared_team_stance,
-        )
-    except (TypeError, ValueError):
-        trade_idea_records = []
+    # Past the deadline: skip idea generation entirely — GM Plan shows the
+    # "trades reopen after the season" state instead (modules.gm_plan).
+    if not trade_window["trade_deadline_passed"]:
+        try:
+            team_strategy, _ = _fetch_gm_stance_with_set_flag(
+                config, access_token, user_id=user_id, league_id=league_id
+            )
+            gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+                config, user_id, access_token, league_id
+            )
+            trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+                league_id=league_id,
+                roster_id=int(my_roster.get("roster_id")),
+                strategy=team_strategy,
+                lens=lens,
+                players_db_path=PLAYERS_DB_PATH,
+                untouchable_player_ids=gm_untouchable_ids,
+                gm_target_player_ids=gm_target_ids,
+                team_stance=declared_team_stance,
+            )
+        except (TypeError, ValueError):
+            trade_idea_records = []
 
     roster_settings = my_roster.get("settings") or {}
     record = {
@@ -9314,9 +9342,18 @@ def get_gm_plan(
         playoff_odds=my_playoff_odds,
         trade_ideas=trade_idea_records,
         injury_context=injury_context,
+        trade_deadline_passed=bool(trade_window["trade_deadline_passed"]),
     )
 
-    return {"ok": True, "quiet": False, "reason": "", "is_premium": True, "upsell": None, **plan}
+    return {
+        "ok": True,
+        "quiet": False,
+        "reason": "",
+        "is_premium": True,
+        "upsell": None,
+        **plan,
+        "trade_window": trade_window,
+    }
 
 
 # Display order for My Team's starters section — matches
@@ -9850,6 +9887,7 @@ def get_league_my_team(
     )
     lineup_basis = lineup_meta.get("lineup_basis", SEASON_VALUE_BASIS)
 
+    best_ball = league_calendar.is_best_ball(league)
     return {
         "ok": True,
         "starters": starters,
@@ -9861,6 +9899,13 @@ def get_league_my_team(
         "lineup_basis": lineup_basis,
         "lineup_basis_label": _LINEUP_BASIS_LABELS.get(lineup_basis, SEASON_VALUE_BASIS_LABEL),
         "open_slots": lineup_meta.get("open_slots", []),
+        # Additive league-calendar context (modules.league_calendar): in a
+        # best ball league Sleeper picks the lineup itself, so clients hide
+        # the suggested-lineup/start-sit framing; Trade Finder reads
+        # trade_window to show the deadline-passed state up front.
+        "best_ball": best_ball,
+        "lineup_advice_message": league_calendar.BEST_BALL_LINEUP_MESSAGE if best_ball else "",
+        "trade_window": league_calendar.trade_window(league),
     }
 
 
@@ -10740,6 +10785,12 @@ def get_league_matchup(
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": "",
+        # Best ball: Sleeper sets lineups itself, so clients hide the
+        # suggested-lineup/start-sit sections (modules.league_calendar).
+        "best_ball": league_calendar.is_best_ball(league),
+        "lineup_advice_message": (
+            league_calendar.BEST_BALL_LINEUP_MESSAGE if league_calendar.is_best_ball(league) else ""
+        ),
     }
 
 
@@ -10956,6 +11007,12 @@ def get_league_waivers(
             if str(pos).upper() in {"QB", "RB", "WR", "TE", "K"}
         }
         injured_starters = int(injury_context.get("injured_starters") or 0)
+        if league_calendar.is_best_ball(league):
+            # Best ball: Sleeper auto-starts the best scorers each week, so an
+            # injured "starter" is covered by roster depth automatically —
+            # there's no lineup slot to fill off the wire. Waiver needs fall
+            # back to genuine roster-construction needs only.
+            injury_positions = set()
         # coridian_, 2026-10-18: "this says current need none when i
         # beluve i have needs for my team" — get_needed_positions(...,
         # include_fallback=False) only returns strict true_needs, which
@@ -11159,6 +11216,7 @@ def get_league_waivers(
         # without re-deriving roster_injury_context client-side.
         "injured_starters": injured_starters,
         "injury_positions": sorted(injury_positions),
+        "best_ball": league_calendar.is_best_ball(league),
         # coridian_, 2026-10-18: "our backend can read current ffa
         # balance! ... i think we set it up just assuming it couldnt
         # read that info" — faab_budget (Sleeper's authoritative
@@ -11306,6 +11364,19 @@ def get_trade_hub_ideas(
     if roster_id is None:
         return {"ok": True, "ideas": [], "reason": "empty_roster"}
 
+    # Past Sleeper's settings.trade_deadline the board stops pushing
+    # in-season trades (modules.league_calendar). Trade Analyzer stays open
+    # for offseason planning; this only gates idea generation.
+    trade_window = league_calendar.trade_window(league)
+    if trade_window["trade_deadline_passed"]:
+        return {
+            "ok": True,
+            "ideas": [],
+            "reason": league_calendar.TRADE_DEADLINE_PASSED_REASON,
+            "message": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
+            "trade_window": trade_window,
+        }
+
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
@@ -11349,6 +11420,7 @@ def get_trade_hub_ideas(
         # the effective strategy so the client can label it, instead of
         # silently showing a number that just looks inconsistent.
         "team_strategy": strategy,
+        "trade_window": trade_window,
         "entitlement": {
             "is_premium": is_premium,
             "approved_count": approved_count,
@@ -11531,6 +11603,19 @@ def get_trade_finder_ideas(
     if roster_id is None:
         return {"ok": True, "ideas": [], "reason": "empty_roster", "is_premium": True, "upsell": None}
 
+    league = sleeper.get_league(league_id) or {}
+    trade_window = league_calendar.trade_window(league)
+    if trade_window["trade_deadline_passed"]:
+        return {
+            "ok": True,
+            "ideas": [],
+            "reason": league_calendar.TRADE_DEADLINE_PASSED_REASON,
+            "message": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
+            "is_premium": True,
+            "upsell": None,
+            "trade_window": trade_window,
+        }
+
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
@@ -11551,7 +11636,14 @@ def get_trade_finder_ideas(
         require_receive_picks=bool(return_picks),
     )
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
-    return {"ok": True, "ideas": ranked, "reason": "", "is_premium": True, "upsell": None}
+    return {
+        "ok": True,
+        "ideas": ranked,
+        "reason": "",
+        "is_premium": True,
+        "upsell": None,
+        "trade_window": trade_window,
+    }
 
 
 @app.get("/v1/leagues/{league_id}/all-trades")
@@ -11597,6 +11689,27 @@ def get_league_all_trades(
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
+
+    trade_window = league_calendar.trade_window(league)
+    if trade_window["trade_deadline_passed"]:
+        return {
+            "ok": True,
+            "ideas": [],
+            "has_more": False,
+            "next_cursor": max(0, cursor),
+            "total_teams": 0,
+            "reason": league_calendar.TRADE_DEADLINE_PASSED_REASON,
+            "message": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
+            "trade_window": trade_window,
+            "entitlement": {
+                "is_premium": is_premium,
+                "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+                "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
+                "max_ad_unlocks": MAX_AD_UNLOCKS,
+                "ad_unlocks_applied": 0,
+                "remaining_free": 0,
+            },
+        }
 
     my_roster, _reason = _resolve_my_roster(user, league_id, profile=profile)
     my_roster_id = int(my_roster.get("roster_id")) if my_roster and my_roster.get("roster_id") is not None else None

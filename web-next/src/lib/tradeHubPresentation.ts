@@ -149,7 +149,12 @@ export function impactTagConfig(tag: string | null | undefined): ImpactTagConfig
  * myTeamPresentation.ts's "see your lineup" copy. The shared classification
  * lives in lib/notReadyMessages.ts (consolidated there in Revision 4 out of
  * three byte-identical reason sets — see that file's own comment). */
+/** modules/league_calendar.py's TRADE_DEADLINE_PASSED_MESSAGE — Trade Hub
+ * and Trade Finder's reason === "trade_deadline_passed" state. */
+export const TRADE_DEADLINE_PASSED_MESSAGE = "Trade deadline has passed; trades reopen after the season.";
+
 export function tradeHubReasonMessage(reason: string): string | null {
+  if (reason === "trade_deadline_passed") return TRADE_DEADLINE_PASSED_MESSAGE;
   return notReadyReasonMessage(reason, {
     linkAccount: "Link your Sleeper account and join this league from Home to see trade ideas for your roster.",
     emptyRoster: "Your roster in this league looks empty, so there's nothing to build trade ideas around yet.",

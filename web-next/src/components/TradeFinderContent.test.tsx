@@ -312,3 +312,26 @@ describe("TradeFinderContent", () => {
     expect(screen.queryByRole("button", { name: /Find Realistic Trades/ })).not.toBeInTheDocument();
   });
 });
+
+describe("TradeFinderContent trade deadline", () => {
+  it("shows the deadline-passed state up front once the league's deadline has passed", () => {
+    vi.mocked(api.getTeamStance).mockResolvedValue({ ok: true, stance: "" });
+    vi.mocked(api.getLeagueDraftPicks).mockResolvedValue({ ok: true, picks: [], reason: "" });
+    render(
+      <TradeFinderContent
+        leagueId="123"
+        leagueName="Dynasty Overlords"
+        myTeam={myTeam({
+          trade_window: {
+            trade_deadline_week: 11,
+            current_week: 12,
+            trade_deadline_passed: true,
+            message: "Trade deadline has passed; trades reopen after the season.",
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText("Trade deadline has passed; trades reopen after the season.")).toBeInTheDocument();
+    expect(screen.queryByText(/Find Realistic Trades/)).not.toBeInTheDocument();
+  });
+});

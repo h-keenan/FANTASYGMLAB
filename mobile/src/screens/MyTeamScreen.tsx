@@ -187,8 +187,22 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 
   const myTeamData = myTeamQuery.data;
-  const starters: LineupPlayer[] = myTeamData?.starters ?? [];
-  const bench: LineupPlayer[] = myTeamData?.bench ?? [];
+  // Best ball (Sleeper settings.best_ball): Sleeper sets the lineup itself
+  // from the highest weekly scorers, so the suggested starters/bench split is
+  // replaced by one roster list (suggested slot labels stripped), with
+  // IR/Taxi still on the Bench tab.
+  const bestBall = myTeamData?.best_ball === true;
+  const rawStarters: LineupPlayer[] = myTeamData?.starters ?? [];
+  const rawBench: LineupPlayer[] = myTeamData?.bench ?? [];
+  const starters: LineupPlayer[] = bestBall
+    ? [...rawStarters, ...rawBench.filter((p) => p.roster_slot !== 'ir' && p.roster_slot !== 'taxi')].map((p) => ({
+        ...p,
+        slot: 'BENCH',
+      }))
+    : rawStarters;
+  const bench: LineupPlayer[] = bestBall
+    ? rawBench.filter((p) => p.roster_slot === 'ir' || p.roster_slot === 'taxi')
+    : rawBench;
   const notice = myTeamData?.reason ? reasonMessage(myTeamData.reason) : null;
   const leagueSize = teamRankingsQuery.data?.teams.length ?? 0;
   const myTeam: TeamRanking | null = myTeamData?.roster_id
@@ -256,11 +270,15 @@ export default function MyTeamScreen({ route, navigation }: Props) {
                 onViewAnalysis={hasRosterAnalysis(myTeam) ? () => setActiveTab('analysis') : undefined}
               />
             ) : null}
+            {bestBall && myTeamData?.lineup_advice_message ? (
+              <AppText style={styles.bestBallNote}>{myTeamData.lineup_advice_message}</AppText>
+            ) : null}
             <StartersSection
               starters={starters}
-              totalValue={totalStartersValue}
+              totalValue={bestBall ? 0 : totalStartersValue}
+              label={bestBall ? 'Roster' : 'Starters'}
               onPressPlayer={goToPlayer}
-              openSlotsNote={openSlotsMessage(myTeamData?.open_slots)}
+              openSlotsNote={bestBall ? null : openSlotsMessage(myTeamData?.open_slots)}
             />
           </>
         ) : null}
@@ -441,11 +459,13 @@ function formatTotalStartersValue(totalValue: number): string | null {
 function StartersSection({
   starters,
   totalValue,
+  label = 'Starters',
   onPressPlayer,
   openSlotsNote = null,
 }: {
   starters: LineupPlayer[];
   totalValue: number;
+  label?: string;
   onPressPlayer: (player: LineupPlayer) => void;
   /** lib/lineupAvailability.openSlotsMessage — slots nobody eligible can fill this week. */
   openSlotsNote?: string | null;
@@ -454,7 +474,7 @@ function StartersSection({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View>
-      <SectionHeaderRow label="Starters" total={formatTotalStartersValue(totalValue)} />
+      <SectionHeaderRow label={label} total={formatTotalStartersValue(totalValue)} />
       {openSlotsNote ? <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsNote}</AppText> : null}
       {starters.length === 0 ? (
         <EmptyState icon="people-outline" title="No suggested starters yet." />
@@ -768,6 +788,7 @@ function createStyles(colors: ThemeColors) {
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   linkRowText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
+  bestBallNote: { color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.md },
   error: { color: colors.danger, textAlign: 'center' },
   });
 }

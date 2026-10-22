@@ -493,6 +493,18 @@ export interface LineupPlayer {
 
 export type LineupBasis = "season_value" | "weekly_projection" | "weekly_availability";
 
+/** League trade-window state from Sleeper's settings.trade_deadline
+ * (services: modules.league_calendar.trade_window). Additive — absent on
+ * older servers. Trades are allowed through `trade_deadline_week`; once an
+ * in-season league's current week passes it, `trade_deadline_passed` is
+ * true and `message` carries the user-facing copy. */
+export interface TradeWindow {
+  trade_deadline_week: number | null;
+  current_week: number | null;
+  trade_deadline_passed: boolean;
+  message: string;
+}
+
 export interface MyTeamResponse {
   ok: boolean;
   starters: LineupPlayer[];
@@ -506,6 +518,12 @@ export interface MyTeamResponse {
   /** Starting slots left open because no eligible player could fill them
    * this week (everyone at that spot is on bye or ruled out). */
   open_slots?: string[];
+
+  /** Sleeper settings.best_ball — Sleeper sets the lineup itself, so the
+   * suggested starters/bench split is hidden in favor of one roster list. */
+  best_ball?: boolean;
+  lineup_advice_message?: string;
+  trade_window?: TradeWindow;
 }
 
 /** One position room's need classification — GET .../my-team-needs'
@@ -732,6 +750,9 @@ export interface TradeHubResponse {
    * plain valuation pipeline doesn't, so the same player can show a
    * different number here. Logic audit, 2026-10-18. */
   team_strategy: string;
+  /** reason === "trade_deadline_passed" carries this user-facing copy. */
+  message?: string;
+  trade_window?: TradeWindow;
 }
 
 /** GET .../trade-finder's response — the same TradeIdea card shape as
@@ -751,6 +772,8 @@ export interface TradeFinderResponse {
    * real search results. */
   is_premium: boolean;
   upsell: PremiumUpsell | null;
+  message?: string;
+  trade_window?: TradeWindow;
 }
 
 // player_id/name/position/team/age/status/injury_status/tier/score mirror
@@ -1025,6 +1048,9 @@ export interface MatchupResponse {
   basis: "season_value";
   basis_label: string;
   reason: string;
+  /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
+  best_ball?: boolean;
+  lineup_advice_message?: string;
 }
 
 export type RosterRelationship = "starter" | "bench" | "taxi" | "ir" | null;
@@ -1230,6 +1256,7 @@ export interface PortfolioLeagueResponse {
 export type GmPlanSeasonPhase =
   | "early_season"
   | "trade_deadline_approach"
+  | "post_deadline"
   | "playoff_push"
   | "offseason_adjacent";
 
@@ -1346,6 +1373,7 @@ export interface GmPlanResponse {
   team_stance_label?: string;
   headline?: string;
   focus_areas: GmPlanFocusArea[];
+  trade_window?: TradeWindow;
 }
 
 /** One position-relevant raw season stat on a RankedPlayer (Players'
@@ -2134,6 +2162,10 @@ export interface TradeAnalyzerResponse {
   ok: boolean;
   verdict: TradeVerdict | null;
   reason: TradeAnalyzerReason;
+  /** Non-empty once the league's trade deadline has passed — the analyzer
+   * stays usable for offseason planning, this just says so. */
+  planning_note?: string;
+  trade_window?: TradeWindow;
 }
 
 /** Trade History (Revision 18) — modules/trade_outcome_results.py's quiet

@@ -263,3 +263,17 @@ describe("MatchupContent", () => {
     expect(screen.queryByText(/Win odds:/)).not.toBeInTheDocument();
   });
 });
+
+describe("MatchupContent best ball", () => {
+  it("hides the suggested lineups and start/sit disclosure in a best ball league", () => {
+    render(
+      <MatchupContent
+        leagueName="My League"
+        matchup={{ ...BASE_RESPONSE, best_ball: true, lineup_advice_message: "Best ball league: no start/sit." }}
+      />,
+    );
+    expect(screen.getByText("Best ball league: no start/sit.")).toBeInTheDocument();
+    expect(screen.queryByText("Your suggested starters")).not.toBeInTheDocument();
+    expect(screen.queryByText(/each roster's best available lineup by season-long value/)).not.toBeInTheDocument();
+  });
+});

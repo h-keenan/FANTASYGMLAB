@@ -40,12 +40,14 @@ from modules.rankings import injury_display_label
 
 PHASE_EARLY_SEASON = "early_season"
 PHASE_TRADE_DEADLINE_APPROACH = "trade_deadline_approach"
+PHASE_POST_DEADLINE = "post_deadline"
 PHASE_PLAYOFF_PUSH = "playoff_push"
 PHASE_OFFSEASON_ADJACENT = "offseason_adjacent"
 
 SEASON_PHASES: tuple[str, ...] = (
     PHASE_EARLY_SEASON,
     PHASE_TRADE_DEADLINE_APPROACH,
+    PHASE_POST_DEADLINE,
     PHASE_PLAYOFF_PUSH,
     PHASE_OFFSEASON_ADJACENT,
 )
@@ -53,6 +55,7 @@ SEASON_PHASES: tuple[str, ...] = (
 PHASE_LABELS: dict[str, str] = {
     PHASE_EARLY_SEASON: "Early Season",
     PHASE_TRADE_DEADLINE_APPROACH: "Trade Deadline Approaching",
+    PHASE_POST_DEADLINE: "Past the Trade Deadline",
     PHASE_PLAYOFF_PUSH: "Playoff Push",
     PHASE_OFFSEASON_ADJACENT: "Offseason-Adjacent",
 }
@@ -85,7 +88,11 @@ def _safe_week_int(value: Any) -> int:
     return parsed
 
 
-def derive_season_phase(current_week: Any, playoff_week_start: Any = None) -> str:
+def derive_season_phase(
+    current_week: Any,
+    playoff_week_start: Any = None,
+    trade_deadline_week: Any = None,
+) -> str:
     """Bucket a real week number into a coarse season-arc phase.
 
     `current_week` should be derived by the caller the same way
@@ -93,8 +100,15 @@ def derive_season_phase(current_week: Any, playoff_week_start: Any = None) -> st
     (`league_settings.get("leg") or league_settings.get("week")`) — this
     function does not fetch or infer a week on its own, only buckets one.
 
+    `trade_deadline_week` is the league's real last trade week
+    (modules.league_calendar.trade_deadline_week). When known, the deadline
+    phase runs up to and including that week, and weeks after it read as
+    PHASE_POST_DEADLINE (or PHASE_PLAYOFF_PUSH once playoffs are close).
+    When unknown, the original week-only buckets apply.
+
     Returns one of PHASE_EARLY_SEASON, PHASE_TRADE_DEADLINE_APPROACH,
-    PHASE_PLAYOFF_PUSH, or PHASE_OFFSEASON_ADJACENT (the honest fallback
+    PHASE_POST_DEADLINE, PHASE_PLAYOFF_PUSH, or PHASE_OFFSEASON_ADJACENT
+    (the honest fallback
     when there's no usable week — before week 1, past a realistic season
     length, or simply missing).
     """
@@ -107,7 +121,21 @@ def derive_season_phase(current_week: Any, playoff_week_start: Any = None) -> st
     if pws <= 0:
         pws = DEFAULT_PLAYOFF_WEEK_START
 
-    if week >= max(1, pws - PLAYOFF_PUSH_LOOKBACK_WEEKS):
+    playoff_push_start = max(1, pws - PLAYOFF_PUSH_LOOKBACK_WEEKS)
+
+    deadline = _safe_week_int(trade_deadline_week)
+    if 0 < deadline < MAX_LEAGUE_WEEK:
+        # The league's real deadline (Sleeper settings.trade_deadline — the
+        # last week trades are allowed, see modules.league_calendar) drives
+        # the deadline phase instead of the old hardcoded weeks 4-11.
+        if week > deadline:
+            return PHASE_PLAYOFF_PUSH if week >= playoff_push_start else PHASE_POST_DEADLINE
+        if week <= EARLY_SEASON_WEEK_CEILING and deadline > EARLY_SEASON_WEEK_CEILING:
+            return PHASE_EARLY_SEASON
+        return PHASE_TRADE_DEADLINE_APPROACH
+
+    # No deadline known (or none set): the original week-only buckets.
+    if week >= playoff_push_start:
         return PHASE_PLAYOFF_PUSH
     if week <= EARLY_SEASON_WEEK_CEILING:
         return PHASE_EARLY_SEASON
@@ -128,6 +156,7 @@ def phase_label(phase: str) -> str:
 PHASE_HEADLINES: dict[str, str] = {
     PHASE_EARLY_SEASON: "Early season — the picture is still forming.",
     PHASE_TRADE_DEADLINE_APPROACH: "The trade market is most active right now.",
+    PHASE_POST_DEADLINE: "The trade deadline has passed — lineups and waivers decide the rest of your season.",
     PHASE_PLAYOFF_PUSH: "Playoff push — decisions carry more weight from here.",
     PHASE_OFFSEASON_ADJACENT: "No live week detected — this reads as an offseason-adjacent plan.",
 }
@@ -159,6 +188,11 @@ TRADE_NO_SIGNAL_WATCH_FOR = (
     "partner with surplus at one of your weaker spots, or a market shift once waivers "
     "process or injury news lands."
 )
+
+# Shown in place of trade ideas once the league's trade deadline has passed
+# (modules.league_calendar.trade_deadline_passed) — GM Plan stops pushing
+# in-season trades rather than listing ideas that can't be executed.
+TRADE_DEADLINE_PASSED_WATCH_FOR = "Trade deadline has passed; trades reopen after the season."
 
 STANDING_NO_SIGNAL_WATCH_FOR = "No power rank data is available for this league yet."
 
@@ -302,7 +336,18 @@ def _trade_focus_area(
     stance: str,
     trade_ideas: Sequence[Mapping[str, Any]],
     max_ideas: int,
+    trade_deadline_passed: bool = False,
 ) -> dict[str, Any]:
+    if trade_deadline_passed:
+        return {
+            "key": FOCUS_TRADE,
+            "title": "Trade Opportunities",
+            "framing": TRADE_STANCE_EMPHASIS.get(stance, NO_TRADE_STANCE_EMPHASIS),
+            "status": STATUS_NO_SIGNAL,
+            "items": [],
+            "watch_for": TRADE_DEADLINE_PASSED_WATCH_FOR,
+            "trade_deadline_passed": True,
+        }
     items: list[dict[str, Any]] = []
     for idea in list(trade_ideas)[: max(0, max_ideas)]:
         if not isinstance(idea, Mapping):
@@ -494,6 +539,7 @@ def build_gm_plan(
     max_trade_ideas: int = 3,
     playoff_odds: Mapping[str, Any] | None = None,
     injury_context: Mapping[str, Any] | None = None,
+    trade_deadline_passed: bool = False,
 ) -> dict[str, Any]:
     """Assemble a GM Plan from already-computed signals.
 
@@ -513,6 +559,9 @@ def build_gm_plan(
     roster — the same roster-awareness signal get_league_dashboard and
     get_league_waivers already surface elsewhere; GM Plan previously built
     its roadmap with no awareness of it at all (connectivity-audit finding).
+    `trade_deadline_passed` (modules.league_calendar.trade_deadline_passed)
+    replaces the Trade Opportunities items with a "deadline has passed"
+    state, so the plan stops pushing trades that can't be made in season.
     """
 
     stance = team_stance_module.normalize_stance(team_stance)
@@ -526,7 +575,9 @@ def build_gm_plan(
         "headline": _headline(stance, phase),
         "focus_areas": [
             _standing_focus_area(rankings_row, total_teams, record, playoff_odds),
-            _trade_focus_area(stance, trade_ideas or [], max_trade_ideas),
+            _trade_focus_area(
+                stance, trade_ideas or [], max_trade_ideas, trade_deadline_passed=trade_deadline_passed
+            ),
             _roster_focus_area(rankings_row, total_teams, injury_context),
         ],
     }

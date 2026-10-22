@@ -200,6 +200,8 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: "This roster doesn't have any players yet.",
   no_player_data: "Player data isn't available right now.",
+  // modules/league_calendar.py's TRADE_DEADLINE_PASSED_MESSAGE.
+  trade_deadline_passed: 'Trade deadline has passed; trades reopen after the season.',
 };
 
 export default function TradeHubScreen({ leagueId, leagueName, navigation }: Props) {
@@ -335,6 +337,9 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   }, [strategy, lens]);
 
   const isForYou = viewMode === 'for_you';
+  // The deadline-passed state applies to the whole league, so it also
+  // replaces All Trades' empty state rather than only For You's.
+  const showNotReady = Boolean(notReadyReason && (isForYou || notReadyReason === 'trade_deadline_passed'));
   const activeLoading = isForYou ? loading : allTradesLoading;
   const activeError = isForYou ? error : allTradesError;
   // IdeaSummaryRow's chips filter this same `ideas` list by impact_tag —
@@ -391,9 +396,9 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
             </View>
           ) : null}
           {activeError ? <AppText style={styles.error}>{activeError}</AppText> : null}
-          {isForYou && notReadyReason ? (
+          {showNotReady ? (
             <AppText style={styles.notReadyText}>
-              {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build Trade Hub ideas for this league."}
+              {NOT_READY_MESSAGES[notReadyReason ?? ""] ?? "Couldn't build Trade Hub ideas for this league."}
             </AppText>
           ) : null}
         </View>
@@ -402,7 +407,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
         <TradeIdeaCard idea={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       )}
       ListEmptyComponent={
-        !activeLoading && !activeError && !(isForYou && notReadyReason) ? (
+        !activeLoading && !activeError && !showNotReady ? (
           impactFilterActiveWithNoResults ? (
             <EmptyState
               icon="filter-outline"
