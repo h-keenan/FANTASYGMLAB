@@ -232,6 +232,7 @@ from modules import (
     weekly_box_scores,
 )
 from modules import idp_scoring
+from modules import guillotine as guillotine_module
 from modules import keepers as keepers_module
 from modules.team_eval import (
     build_league_summary,
@@ -10764,6 +10765,128 @@ def set_league_keeper_settings(
     payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
     ok, _ = account_store.upsert_user_settings(config, access_token, payload)
     return {"ok": bool(ok), "round_penalty": body.round_penalty}
+
+
+def _stored_league_type_override(config: dict, user_id: str, access_token: str, league_id: str) -> str | None:
+    """User-set league type override (user_settings blob); None when unset or on any failure."""
+
+    if not user_id:
+        return None
+    try:
+        current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+        if error:
+            return None
+        stored = (current.get("settings") or {}).get("league_type_override_by_league") or {}
+        return guillotine_module.clean_override(stored.get(league_id))
+    except Exception:
+        return None
+
+
+@app.get("/v1/leagues/{league_id}/guillotine")
+def get_league_guillotine(
+    league_id: str = Depends(resolve_league_path_id),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Survival status and this week's chop line for guillotine/chopped leagues.
+
+    Real Sleeper data only (see modules.guillotine). `chop_line` is null
+    unless every alive roster has a real projection.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(status_code=422, detail="Unknown lens.")
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, token) if user_id else {}
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    not_gl = {"ok": True, "is_guillotine": False, "reason": reason}
+    if my_roster is None:
+        return not_gl
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    rosters = sleeper.get_rosters(league_id) or []
+    override = _stored_league_type_override(config, user_id, token, league_id)
+    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    try:
+        week = int(league_settings.get("leg") or 0)
+    except (TypeError, ValueError):
+        week = 0
+    in_season = str(league.get("status") or "") == "in_season" and week > 0
+    past_weeks = {w: sleeper.get_matchups(league_id, w) or [] for w in range(1, week)} if in_season else {}
+    detected = guillotine_module.detect(league, rosters, override, past_weeks)
+    if not detected["is_guillotine"]:
+        return {**not_gl, "reason": "not_guillotine", "league_type_override": override}
+    status = guillotine_module.survival_status(my_roster, rosters, past_weeks)
+
+    chop = None
+    if in_season and status["alive"]:
+        matchups = sleeper.get_matchups(league_id, week) or []
+        entries = {str(m.get("roster_id")): m for m in matchups}
+        alive_ids = [str(r.get("roster_id")) for r in rosters if r.get("players")]
+        valued = league_value_settings.build_valued_players_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        projection_context = _build_projection_context(week)
+        if not valued.empty and projection_context is not None and all(rid in entries for rid in alive_ids):
+            settings = league_value_settings.detect_league_value_settings_from_payload(league)
+            score_field = league_value_settings.valuation_score_field(lens)
+            positions = league.get("roster_positions") if isinstance(league.get("roster_positions"), list) else []
+            projected: dict[str, float | None] = {}
+            for rid in alive_ids:
+                lineup = _real_current_lineup(
+                    entries[rid], valued, score_field,
+                    projection_context=projection_context, settings=settings, roster_positions=positions,
+                )
+                points = [matchup_win_probability.starter_expected_points(s) for s in lineup.get("real_starters") or []]
+                complete = bool(points) and not lineup.get("real_empty_slots") and all(p is not None for p in points)
+                projected[rid] = sum(points) if complete else None
+            chop = guillotine_module.chop_line(alive_ids, projected, str(my_roster.get("roster_id")))
+    return {
+        "ok": True,
+        "is_guillotine": True,
+        "reason": "",
+        "source": detected["source"],
+        "league_type_override": override,
+        "week": week if in_season else None,
+        **status,
+        "chop_line": chop,
+    }
+
+
+class LeagueTypeRequest(BaseModel):
+    league_type: str
+
+
+@app.post("/v1/leagues/{league_id}/league-type")
+def set_league_type(
+    body: LeagueTypeRequest,
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Store a manual guillotine/standard override for this league ("auto" clears it)."""
+
+    value = guillotine_module.clean_override(body.league_type)
+    if value is None and body.league_type != "auto":
+        raise HTTPException(status_code=422, detail="league_type must be guillotine, standard or auto")
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "league_type": None}
+    settings = dict(current.get("settings") or {})
+    by_league = dict(settings.get("league_type_override_by_league") or {})
+    if value is None:
+        by_league.pop(league_id, None)
+    else:
+        by_league[league_id] = value
+    settings["league_type_override_by_league"] = by_league
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, _ = account_store.upsert_user_settings(config, access_token, payload)
+    return {"ok": bool(ok), "league_type": value}
 
 
 def _empty_my_team_needs_response(settings: dict[str, Any], *, reason: str) -> dict[str, Any]:
