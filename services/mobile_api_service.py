@@ -231,6 +231,7 @@ from modules import (
     waivers_ui,
     weekly_box_scores,
 )
+from modules import idp_scoring
 from modules import keepers as keepers_module
 from modules.team_eval import (
     build_league_summary,
@@ -10503,6 +10504,35 @@ def _started_game_player_ids(roster_df: pd.DataFrame, projection_context: "_Proj
 _PROJECTION_STATUSES_WITH_RESOLVED_GAME = frozenset({"insufficient_player_data", "no_opponent"})
 
 
+def _league_idp_result(league_id: str, league: dict[str, Any]) -> dict[str, Any]:
+    """Cached IDP model output for a league; empty on any failure so My Team
+    and Waivers never break over a defender-stats hiccup."""
+
+    if not idp_scoring.league_has_idp(league.get("roster_positions")):
+        return {"idp": False, "players": []}
+    try:
+        from modules import idp_league_values
+
+        return idp_league_values.cached_league_idp_values(league_id, league)
+    except Exception:
+        return {"idp": False, "players": []}
+
+
+def _my_team_idp_rows(
+    league_id: str, league: dict[str, Any], roster_player_ids: Any, players_lookup: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    from modules import idp_roster_rows
+
+    return idp_roster_rows.roster_idp_rows(_league_idp_result(league_id, league), roster_player_ids, players_lookup)
+
+
+def _waivers_idp_rows(league_id: str, league: dict[str, Any], rosters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    from modules import idp_roster_rows
+
+    rostered = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
+    return idp_roster_rows.free_agent_idp_rows(_league_idp_result(league_id, league), rostered)
+
+
 @app.get("/v1/leagues/{league_id}/my-team")
 @_with_sleeper_as_of
 def get_league_my_team(
@@ -10584,6 +10614,8 @@ def get_league_my_team(
         "ok": True,
         "starters": starters,
         "bench": bench,
+        # Additive: rostered defenders, IDP leagues only ([] otherwise).
+        "idp_players": _my_team_idp_rows(league_id, league, roster_player_ids, my_team_players_lookup),
         "reason": "",
         "roster_id": str(my_roster.get("roster_id") or ""),
         # Additive (older clients ignore these).
@@ -12565,6 +12597,8 @@ def get_league_waivers(
     return {
         "ok": True,
         "players": players,
+        # Additive: unrostered defenders, IDP leagues only ([] otherwise).
+        "idp_players": _waivers_idp_rows(league_id, league, rosters),
         "priority_adds": priority_adds,
         "needed_positions": needed_positions,
         "available_count": int(len(free_agents)),

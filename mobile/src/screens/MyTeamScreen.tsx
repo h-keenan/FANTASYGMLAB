@@ -77,7 +77,7 @@ function toRankedPlayer(player: LineupPlayer) {
   };
 }
 
-type RosterTabKey = 'starters' | 'bench' | 'ir' | 'taxi';
+type RosterTabKey = 'starters' | 'bench' | 'ir' | 'taxi' | 'idp';
 
 const ANALYSIS_TONE_COLOR = (tone: TeamAnalysisRow['tone'], colors: ThemeColors): string =>
   tone === 'success'
@@ -250,6 +250,9 @@ export default function MyTeamScreen({ route, navigation }: Props) {
       ];
   if (irBench.length > 0) rosterTabs.push({ key: 'ir', label: 'IR', players: irBench });
   if (taxiBench.length > 0) rosterTabs.push({ key: 'taxi', label: 'Taxi', players: taxiBench });
+  // IDP leagues only: rostered defenders (model value); absent otherwise.
+  const idpRoster = myTeamData?.idp_players ?? [];
+  if (idpRoster.length > 0) rosterTabs.push({ key: 'idp', label: 'IDP', players: idpRoster });
   const currentTab = rosterTabs.find((tab) => tab.key === rosterTab) ?? rosterTabs[0];
 
   return (

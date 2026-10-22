@@ -574,6 +574,8 @@ export interface MyTeamResponse {
   ok: boolean;
   starters: LineupPlayer[];
   bench: LineupPlayer[];
+  /** Rostered defenders (DL/LB/DB) in IDP leagues only; `score` is the IDP model value, null below replacement. Absent/empty otherwise. */
+  idp_players?: LineupPlayer[];
   reason: string;
   roster_id?: string;
   /** NFL week the suggested lineup is for (null in the offseason). */
@@ -921,6 +923,8 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
 export interface WaiversResponse {
   ok: boolean;
   players: WaiverPlayer[];
+  /** Free-agent defenders (DL/LB/DB) in IDP leagues only. Absent/empty otherwise. */
+  idp_players?: WaiverPlayer[];
   priority_adds: WaiverPriorityAdd[];
   needed_positions: string[];
   available_count?: number;

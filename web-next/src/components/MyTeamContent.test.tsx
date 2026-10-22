@@ -354,4 +354,23 @@ describe("MyTeamContent best ball", () => {
     fireEvent.click(screen.getByRole("button", { name: "IR" }));
     expect(screen.getByText("Test IR Tight End")).toBeInTheDocument();
   });
+
+  it("adds an IDP tab with model values only in IDP leagues", () => {
+    const idp = [
+      player({ player_id: "dl1", name: "Test Edge", position: "DL", score: 900, tier: null, overall_rating: null, slot: null }),
+      player({ player_id: "lb1", name: "Test Backer", position: "LB", score: null, tier: null, overall_rating: null, slot: null }),
+    ];
+    render(
+      <MyTeamContent leagueName="IDP League" myTeam={{ ...MY_TEAM, idp_players: idp }} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "IDP" }));
+    expect(screen.getByText("Test Edge")).toBeInTheDocument();
+    expect(screen.getByText("Test Backer")).toBeInTheDocument();
+    expect(screen.getByText("900")).toBeInTheDocument();
+  });
+
+  it("shows no IDP tab in a non-IDP league", () => {
+    render(<MyTeamContent leagueName="Std" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />);
+    expect(screen.queryByRole("button", { name: "IDP" })).not.toBeInTheDocument();
+  });
 });

@@ -7,6 +7,7 @@ import {
   idpRowsAsRankedPlayers,
   isIdpPositionFilter,
   playersPositionOptions,
+  withIdpPositionOptions,
 } from "./idpPresentation";
 
 const BASE = ["ALL", "QB", "RB", "WR", "TE", "K"];
@@ -65,5 +66,13 @@ describe("idpPresentation", () => {
     expect(idpMethodNote(IDP)).toContain("not market prices");
     expect(idpMethodNote(IDP)).toContain("bonus_def_int_td_50p");
     expect(idpMethodNote(null)).toBeNull();
+  });
+});
+
+describe("withIdpPositionOptions", () => {
+  it("adds DL/LB/DB only when defenders are present", () => {
+    expect(withIdpPositionOptions(BASE, [])).toEqual(BASE);
+    expect(withIdpPositionOptions(BASE, undefined)).toEqual(BASE);
+    expect(withIdpPositionOptions(BASE, [{}])).toEqual([...BASE, "DL", "LB", "DB"]);
   });
 });
