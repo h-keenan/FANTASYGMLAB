@@ -15239,3 +15239,98 @@ def test_waivers_in_best_ball_drops_lineup_slot_injury_replacement_needs(monkeyp
     assert best_ball["best_ball"] is True
     assert best_ball["injury_positions"] == []
     assert all(not p.get("injury_replacement_fit") for p in best_ball["players"])
+
+
+def _mv(pid, pos, slot, pts):
+    return {
+        "player_id": pid,
+        "name": pid,
+        "position": pos,
+        "slot": slot,
+        "actual_points": None,
+        "projection": {"status": "ok", "point_estimate": pts, "low": pts - 2, "high": pts + 2},
+    }
+
+
+def _moves_side(suggested, actual, empty=()):
+    return {
+        "has_live_data": True,
+        "starters": suggested,
+        "real_starters": actual,
+        "real_empty_slots": list(empty),
+    }
+
+
+def test_suggested_moves_owner_case_never_puts_a_wr_over_an_rb_slot():
+    """Owner's Revivalry lineup: the suggested lineup moves a WR into W/R and
+    a bench RB into RB2; the old order-based pairing labelled the WR as
+    replacing the RB2 starter."""
+
+    from services import mobile_api_service as svc
+
+    actual = [
+        _mv("rb1", "RB", "RB", 15), _mv("tracy", "RB", "RB", 5.0),
+        _mv("wr1", "WR", "WR", 14), _mv("wr2", "WR", "WR", 13), _mv("wr3", "WR", "WR", 12),
+        _mv("flexrb", "RB", "FLEX", 9), _mv("wrflex", "WR", "WR/RB", 8),
+    ]
+    suggested = [
+        _mv("rb1", "RB", "RB", 15), _mv("benchrb", "RB", "RB", 6.0),
+        _mv("wr1", "WR", "WR", 14), _mv("wr2", "WR", "WR", 13), _mv("wr3", "WR", "WR", 12),
+        _mv("flexrb", "RB", "FLEX", 9), _mv("tucker", "WR", "WR/RB", 12.5),
+    ]
+    moves = svc._suggested_lineup_moves(_moves_side(suggested, actual))
+    assert len(moves) == 2
+    for move in moves:
+        assert move["start"]["position"] in svc._SLOT_ELIGIBLE_POSITIONS[move["slot"]]
+    by = {m["start"]["player_id"]: m for m in moves}
+    assert (by["tucker"]["slot"], by["tucker"]["over"]["player_id"]) == ("WR/RB", "wrflex")
+    assert (by["benchrb"]["slot"], by["benchrb"]["over"]["player_id"]) == ("RB", "tracy")
+    assert round(sum(m["gain"] for m in moves), 1) == round(12.5 + 6.0 - 8 - 5.0, 1)
+
+
+def test_suggested_moves_flex_swap_stays_in_flex():
+    from services import mobile_api_service as svc
+
+    actual = [_mv("rb1", "RB", "RB", 10), _mv("te1", "TE", "TE", 8), _mv("x", "RB", "FLEX", 4)]
+    suggested = [_mv("rb1", "RB", "RB", 10), _mv("te1", "TE", "TE", 8), _mv("wr", "WR", "FLEX", 9)]
+    moves = svc._suggested_lineup_moves(_moves_side(suggested, actual))
+    assert [(m["slot"], m["start"]["player_id"], m["over"]["player_id"], m["gain"]) for m in moves] == [
+        ("FLEX", "wr", "x", 5.0)
+    ]
+
+
+def test_suggested_moves_chain_when_a_flex_player_must_move_into_a_narrow_slot():
+    """Actual: RB2=Tracy, W/R=Zed (RB). Suggested: Zed to RB2, a WR into W/R.
+    A WR cannot take the RB slot, so it is a chain whose gains sum to the
+    true difference."""
+
+    from services import mobile_api_service as svc
+
+    actual = [_mv("rb1", "RB", "RB", 15), _mv("tracy", "RB", "RB", 5.0), _mv("zed", "RB", "WR/RB", 9)]
+    suggested = [_mv("rb1", "RB", "RB", 15), _mv("zed", "RB", "RB", 9), _mv("wrx", "WR", "WR/RB", 11)]
+    moves = svc._suggested_lineup_moves(_moves_side(suggested, actual))
+    assert len(moves) == 2
+    assert moves[0]["chain_id"] == moves[1]["chain_id"]
+    assert (moves[0]["slot"], moves[0]["start"]["player_id"], moves[0]["over"]["player_id"]) == ("WR/RB", "wrx", "zed")
+    assert (moves[1]["slot"], moves[1]["start"]["player_id"], moves[1]["over"]["player_id"]) == ("RB", "zed", "tracy")
+    assert round(sum(m["gain"] for m in moves), 1) == 6.0
+
+
+def test_suggested_moves_fill_an_unfilled_slot_only_with_an_eligible_player():
+    from services import mobile_api_service as svc
+
+    actual = [_mv("qb", "QB", "QB", 20)]
+    suggested = [_mv("qb", "QB", "QB", 20), _mv("rb", "RB", "RB", 7), _mv("wr", "WR", "WR", 6)]
+    moves = svc._suggested_lineup_moves(_moves_side(suggested, actual, empty=["WR", "RB"]))
+    got = {m["slot"]: (m["start"]["player_id"], m["over"], m["over_reason"], m["gain"]) for m in moves}
+    assert got == {"RB": ("rb", None, "empty_slot", 7.0), "WR": ("wr", None, "empty_slot", 6.0)}
+
+
+def test_suggested_moves_bye_starter_counts_zero_and_no_live_lineup_is_none():
+    from services import mobile_api_service as svc
+
+    bye = _mv("bye", "RB", "RB", 9)
+    bye["projection"] = {"status": "bye_week", "point_estimate": None}
+    moves = svc._suggested_lineup_moves(_moves_side([_mv("ok", "RB", "RB", 8)], [bye]))
+    assert moves[0]["over_reason"] == "bye_week" and moves[0]["gain"] == 8.0
+    assert svc._suggested_lineup_moves({"has_live_data": False}) is None
