@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { api, type TradeIdea } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
+import { ToneBadge } from "@/components/ToneBadge";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { shareImageOrText } from "@/lib/shareImage";
+import { ideaTags, shortReason } from "@/lib/tradeHubFilters";
 import {
   LOW_CONFIDENCE_USER_NOTE,
   categoryColor,
@@ -17,7 +19,6 @@ import {
   confidenceRingPercent,
   fairnessBandColor,
   formatTradeGain,
-  impactTagConfig,
   levelToRingTone,
   realismLevel,
   realismRingPercent,
@@ -86,12 +87,12 @@ export function ShareTradeButton({
       // border/background), indistinguishable from a navigation link.
       // Same small bordered-pill treatment the value-edge badge right
       // beside it already uses in this row.
-      className="inline-flex items-center gap-1.5 px-3 text-xs font-bold shrink-0"
+      className="inline-flex flex-1 items-center justify-center gap-1.5 px-3 text-sm font-bold"
       style={{
         color: "var(--color-accent)",
         border: "1px solid var(--color-accent)",
         background: "transparent",
-        minHeight: "2.25rem",
+        minHeight: "2.75rem",
       }}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -99,7 +100,7 @@ export function ShareTradeButton({
         <path d="M16 6l-4-4-4 4" />
         <path d="M12 2v13" />
       </svg>
-      {preparingImage ? "Preparing…" : copied ? "Copied!" : "Share"}
+      {preparingImage ? "Preparing…" : copied ? "Copied!" : "Share Trade"}
     </button>
   );
 }
@@ -165,7 +166,6 @@ export function TradeIdeaCardView({
   const deltaText = formatTradeGain(gain);
   const deltaColor = gain > 0 ? "var(--color-success)" : gain < 0 ? "var(--color-danger)" : "var(--color-text-secondary)";
   const accent = categoryColor(idea.category);
-  const impact = impactTagConfig(idea.impact_tag);
   const isLowConfidence = idea.confidence_label.trim().toLowerCase() === "low";
   const landedNames = (idea.landed_gm_target_player_ids || [])
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
@@ -175,6 +175,12 @@ export function TradeIdeaCardView({
   const realismLvl = realismLevel(idea.market_realism_label);
   const copy = useExperienceCopy();
 
+  const tags = ideaTags(idea);
+  const reason = shortReason(idea.rationale);
+  const moreReason = (idea.rationale || "").trim().slice(reason.length).trim();
+  const sendTotal = Math.round(idea.send_score || 0).toLocaleString();
+  const receiveTotal = Math.round(idea.receive_score || 0).toLocaleString();
+
   return (
     <AccentCard
       accent={accent}
@@ -182,27 +188,22 @@ export function TradeIdeaCardView({
       data-highlighted={highlighted ? "true" : undefined}
       style={highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : undefined}
     >
-      {idea.category || impact ? (
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span
-            className="flex items-center gap-1 px-1.5 py-0.5 uppercase text-xs font-extrabold"
-            style={{
-              color: accent,
-              background: "var(--color-surface-muted)",
-              letterSpacing: "var(--letter-spacing-badge)",
-            }}
-          >
-            <TradeCategoryGlyph category={idea.category} />
-            {idea.category}
-          </span>
-          {impact ? (
+      {tags.length > 0 ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          {tags.map((tag) => (
             <span
-              className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
-              style={{ color: impact.color, border: `1px solid ${impact.color}80`, letterSpacing: "var(--letter-spacing-badge)" }}
+              key={tag.label}
+              className="flex items-center gap-1 px-1.5 py-0.5 uppercase text-xs font-extrabold"
+              style={{
+                color: tag.color,
+                background: "var(--color-surface-muted)",
+                letterSpacing: "var(--letter-spacing-badge)",
+              }}
             >
-              {impact.label}
+              {tag.kind === "category" ? <TradeCategoryGlyph category={idea.category} /> : null}
+              {tag.label}
             </span>
-          ) : null}
+          ))}
         </div>
       ) : null}
       <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} />
@@ -213,64 +214,56 @@ export function TradeIdeaCardView({
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
-          <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {idea.partner_team_name}
-          </h3>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {idea.value_edge_band ? (
-            <span
-              className="px-1.5 py-0.5 text-xs font-bold uppercase"
-              style={{ color: fairnessBandColor(idea.value_edge_band), border: `1px solid ${fairnessBandColor(idea.value_edge_band)}` }}
-            >
-              {idea.value_edge_band}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col min-w-0 gap-0.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
+            <h3 className="text-lg font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {idea.partner_team_name}
+            </h3>
+          </div>
+          {idea.partner_team_archetype_label ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {idea.partner_team_archetype_label}
             </span>
           ) : null}
-          <ShareTradeButton idea={idea} leagueId={leagueId} strategy={strategy} lens={lens} />
         </div>
+        {idea.value_edge_band ? (
+          <ToneBadge label={idea.value_edge_band} color={fairnessBandColor(idea.value_edge_band)} />
+        ) : null}
       </div>
-      {idea.partner_team_archetype_label ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {idea.partner_team_archetype_label}
-        </span>
+      {reason ? (
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          {reason}
+        </p>
       ) : null}
       <ManagerTendenciesCard leagueId={leagueId} teamName={idea.partner_team_name} />
+
+      {/* Width-fill fix (PR #1050, reconfirmed here): minmax(0,1fr) on both
+          exchange columns, never max-content/auto-sized. */}
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
+        <ExchangeSide
+          label="You send"
+          dotColor="var(--color-danger)"
+          assets={idea.package.send}
+          total={{ text: sendTotal, color: "var(--color-text-secondary)" }}
+        />
+        <ExchangeSide
+          label="You get"
+          dotColor="var(--color-success)"
+          assets={idea.package.receive}
+          total={{ text: receiveTotal, color: "var(--color-text-secondary)" }}
+        />
+      </div>
 
       <div className="flex items-baseline gap-2">
         <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           Balance
         </span>
-        <span className="text-2xl font-black" style={{ color: deltaColor, fontVariantNumeric: "tabular-nums" }}>
+        <span className="text-xl font-black" style={{ color: deltaColor, fontVariantNumeric: "tabular-nums" }}>
           {deltaText}
         </span>
       </div>
-
-      {/* Width-fill fix (PR #1050, reconfirmed here): minmax(0,1fr) on both
-          exchange columns, never max-content/auto-sized — the same
-          dead-space-on-the-right bug that hit .dg-gp-trade-visual and
-          .dg-trade-matchup in Streamlit three separate times tonight. */}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-3 items-start">
-        <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={idea.package.send} />
-        <div
-          className="hidden sm:flex items-center justify-center text-xs font-bold uppercase self-stretch"
-          style={{ color: "var(--color-accent)" }}
-          aria-hidden="true"
-        >
-          FOR
-        </div>
-        <ExchangeSide label="You get" dotColor="var(--color-success)" assets={idea.package.receive} />
-      </div>
-
-      {/* Discrepancy bar moved below the give/get package (coridian_,
-          2026-10-16: "I think the overall trade value discrepancy bar
-          should be underneath the trade, like underneath the players and
-          picks") — previously sat directly under the Balance figure, above
-          the package. */}
-      <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
-      <BeginnerHelp term="ideaBalance" />
 
       {isLowConfidence ? (
         <p className="text-xs" style={{ color: "var(--color-warning)" }}>
@@ -278,28 +271,38 @@ export function TradeIdeaCardView({
         </p>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="self-start text-sm font-bold"
-        style={{ color: "var(--color-accent)" }}
-        aria-expanded={expanded}
-      >
-        {expanded ? "Hide details" : "Review package →"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="inline-flex flex-1 items-center justify-center px-3 text-sm font-bold"
+          style={{
+            color: "var(--color-accent)",
+            border: "1px solid var(--color-accent)",
+            background: "color-mix(in srgb, var(--color-accent) 10%, transparent)",
+            minHeight: "2.75rem",
+          }}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Hide details" : "View details"}
+        </button>
+        <ShareTradeButton idea={idea} leagueId={leagueId} strategy={strategy} lens={lens} />
+      </div>
 
       {expanded ? (
         <div className="flex flex-col gap-3 pt-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
-          {idea.rationale ? (
+          {moreReason ? (
             <div className="flex flex-col gap-1">
               <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
                 Why this works
               </span>
               <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                {idea.rationale}
+                {moreReason}
               </p>
             </div>
           ) : null}
+          <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
+          <BeginnerHelp term="ideaBalance" />
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex flex-col items-center gap-1">
               <ValueRing

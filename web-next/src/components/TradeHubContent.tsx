@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { TradeHubResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { EmptyState } from "@/components/EmptyState";
+import { TradeHubFilters } from "@/components/TradeHubFilters";
+import { filterTradeIdeas } from "@/lib/tradeHubFilters";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -108,6 +111,8 @@ export function TradeHubContent({
    * every other idea on the board. Stale/absent ids simply match nothing. */
   highlightPlayerId?: string;
 }) {
+  const [filter, setFilter] = useState<{ impact: string | null; position: string | null }>({ impact: null, position: null });
+  const visibleIdeas = useMemo(() => filterTradeIdeas(data.ideas, filter), [data.ideas, filter]);
   const notice = data.reason ? tradeHubReasonMessage(data.reason) : null;
   if (notice) {
     return (
@@ -126,9 +131,6 @@ export function TradeHubContent({
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Trade Hub
-        </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Ideas built around your roster.
@@ -143,20 +145,34 @@ export function TradeHubContent({
         {data.team_strategy ? <StrategyExplainer strategy={data.team_strategy} /> : null}
       </header>
 
+      {data.ideas.length > 0 ? <TradeHubFilters ideas={data.ideas} filter={filter} onChange={setFilter} /> : null}
+
       {data.ideas.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No trade ideas right now. Check back after rosters move this week.
-        </p>
+        <EmptyState
+          title="No trade ideas right now"
+          subtitle="Ideas appear when rosters move. Build your own in Trade Finder."
+        >
+          <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="text-sm font-bold mt-2" style={{ color: "var(--color-accent)" }}>
+            Open Trade Finder →
+          </Link>
+        </EmptyState>
+      ) : visibleIdeas.length === 0 ? (
+        <EmptyState
+          title="No ideas match these filters"
+          subtitle="Clear a filter to see the rest of the board."
+          actionLabel="Show all"
+          onAction={() => setFilter({ impact: null, position: null })}
+        />
       ) : (
         <div className="flex flex-col gap-4">
-          {data.ideas.map((idea, index) => {
+          {visibleIdeas.map((idea, index) => {
             const highlighted = Boolean(
               highlightPlayerId &&
                 [...idea.package.send, ...idea.package.receive].some((asset) => asset.player_id === highlightPlayerId),
             );
             return (
               <TradeIdeaCardView
-                key={`${idea.partner_team_name}-${index}`}
+                key={`${idea.partner_team_name}-${idea.recommendation_id ?? index}`}
                 idea={idea}
                 leagueId={leagueId}
                 strategy={data.team_strategy}

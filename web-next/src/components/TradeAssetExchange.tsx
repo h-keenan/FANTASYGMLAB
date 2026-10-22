@@ -105,10 +105,13 @@ export function ExchangeSide({
   label,
   dotColor,
   assets,
+  total,
 }: {
   label: string;
   dotColor: string;
   assets: TradeAsset[];
+  /** Optional side total shown at the right of the label row. */
+  total?: { text: string; color: string };
 }) {
   return (
     <div className="flex flex-col gap-1 min-w-0">
@@ -120,6 +123,11 @@ export function ExchangeSide({
         >
           {label}
         </span>
+        {total ? (
+          <span className="ml-auto text-sm font-black" style={{ color: total.color, fontVariantNumeric: "tabular-nums" }}>
+            {total.text}
+          </span>
+        ) : null}
       </div>
       {assets.length === 0 ? (
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>

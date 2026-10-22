@@ -76,12 +76,11 @@ describe("TradeHubContent", () => {
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
   });
 
-  it("reveals rationale and confidence/realism rings only after Review package is clicked", () => {
+  it("reveals the full rationale and confidence/realism rings only after View details is clicked", () => {
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 
-    expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Review package/ }));
-    expect(screen.getByText("Why this works")).toBeInTheDocument();
+    expect(screen.queryByText(/Confidence · High/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /View details/ }));
     expect(screen.getByText(/Confidence · High/)).toBeInTheDocument();
     expect(screen.getByText(/Realism · Realistic/)).toBeInTheDocument();
   });
@@ -157,7 +156,7 @@ describe("TradeHubContent", () => {
     it("leaves every idea collapsed and unmarked without a highlightPlayerId (current/before behavior)", () => {
       const { container } = render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={twoIdeas} />);
       expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
-      expect(screen.queryByText("A completely different idea.")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Confidence ·/)).not.toBeInTheDocument();
     });
 
     it("highlights and auto-expands only the idea naming the given player id", () => {
@@ -168,10 +167,9 @@ describe("TradeHubContent", () => {
       const highlighted = container.querySelectorAll('[data-highlighted="true"]');
       expect(highlighted).toHaveLength(1);
       expect(highlighted[0].textContent).toContain("Other GM");
-      // Auto-expanded: its rationale shows without clicking "Review package".
-      expect(screen.getByText("A completely different idea.")).toBeInTheDocument();
-      // The non-matching idea stays collapsed.
-      expect(screen.queryByText("Clear value upgrade at a position of need.")).not.toBeInTheDocument();
+      // Auto-expanded: its detail block shows without clicking "View details";
+      // the non-matching idea stays collapsed.
+      expect(screen.getAllByText(/Confidence ·/)).toHaveLength(1);
     });
 
     it("matches a send-side (give-away) player id too, not just the receive side", () => {

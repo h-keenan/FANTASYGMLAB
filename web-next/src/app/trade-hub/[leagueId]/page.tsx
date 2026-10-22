@@ -9,7 +9,8 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { api, type TradeHubResponse } from "@/lib/api";
 import { TradeHubContent } from "@/components/TradeHubContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
-import { LoadingScreen } from "@/components/LoadingScreen";
+import { TradeHubSkeleton } from "@/components/TradeHubFilters";
+import { TradesTabBar } from "@/components/TradesTabBar";
 
 export default function TradeHubPage() {
   const params = useParams<{ leagueId: string }>();
@@ -77,7 +78,10 @@ export default function TradeHubPage() {
 
   if (authLoading || (!tradeHub && !error)) {
     return (
-      <LoadingScreen status="Loading Trade Hub…" />
+      <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+        <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
+        <TradeHubSkeleton />
+      </main>
     );
   }
 
