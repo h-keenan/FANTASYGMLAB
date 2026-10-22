@@ -1,4 +1,4 @@
-import type { CommunityTradeAsset, TradeAsset } from "@/lib/api";
+import type { CommunityTradeAsset, SharedCommunityTrade, TradeAsset } from "@/lib/api";
 
 /**
  * Community Trade Feed (Social/community layer, docs/roadmap.md)
@@ -24,4 +24,32 @@ export function formatCommunityTradeDate(iso: string | null | undefined): string
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** Opt-in shared trades: map a stored asset to the shared TradeAsset shape. */
+export function toSharedTradeAssets(assets: SharedCommunityTrade["send"]): TradeAsset[] {
+  return assets.map((asset) =>
+    asset.asset_type === "pick"
+      ? { asset_type: "pick" as const, label: asset.name }
+      : {
+          asset_type: "player" as const,
+          player_id: asset.player_id || undefined,
+          name: asset.name,
+          position: asset.position,
+        },
+  );
+}
+
+/** Same tone mapping as the Trade Analyzer's verdict card. */
+export function sharedTradeGradeColor(grade: string): string {
+  switch (grade) {
+    case "ACCEPT":
+      return "var(--color-success)";
+    case "DECLINE":
+      return "var(--color-danger)";
+    case "COUNTER":
+      return "var(--color-accent)";
+    default:
+      return "var(--color-text-secondary)";
+  }
 }

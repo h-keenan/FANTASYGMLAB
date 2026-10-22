@@ -1246,6 +1246,26 @@ export interface TradeCounterAction {
   label: string;
 }
 
+/** Opt-in shared trade (GET /v1/community/shared-trades). No user id. */
+export interface SharedCommunityTrade {
+  id: string;
+  display_name: string;
+  send: Array<{ asset_type: 'player' | 'pick'; name: string; position?: string; player_id?: string }>;
+  receive: Array<{ asset_type: 'player' | 'pick'; name: string; position?: string; player_id?: string }>;
+  grade: string;
+  band: string;
+  why: string;
+  created_at: string | null;
+  mine: boolean;
+}
+
+/** available=false: storage not set up, hide the feed and the toggle. */
+export interface SharedCommunityTradesResponse {
+  ok: boolean;
+  available: boolean;
+  trades: SharedCommunityTrade[];
+}
+
 export interface TradeVerdict {
   band: string;
   ui_verdict: 'ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR' | 'IDEA';
@@ -2785,6 +2805,20 @@ export const api = {
       },
     ),
   getPendingTradeOutcomes: () => authorizedFetch<PendingTradeOutcomesResponse>('/v1/trade-outcomes/pending'),
+  getSharedCommunityTrades: (limit = 30) =>
+    authorizedFetch<SharedCommunityTradesResponse>(`/v1/community/shared-trades?limit=${limit}`),
+  shareCommunityTrade: (body: {
+    send: unknown[];
+    receive: unknown[];
+    grade: string;
+    band: string;
+    why: string;
+    display_name: string;
+  }) => authorizedPost<{ ok: boolean; available?: boolean; trade?: SharedCommunityTrade }>('/v1/community/shared-trades', body),
+  deleteSharedCommunityTrade: (id: string) =>
+    authorizedDelete<{ ok: boolean }>(`/v1/community/shared-trades/${encodeURIComponent(id)}`),
+  reportSharedCommunityTrade: (id: string, reason = '') =>
+    authorizedPost<{ ok: boolean }>(`/v1/community/shared-trades/${encodeURIComponent(id)}/report`, { reason }),
   getTradeOutcomeHistory: () => authorizedFetch<TradeOutcomeHistoryResponse>('/v1/trade-outcomes/history'),
   answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>
     authorizedPost<{ ok: boolean; reason: string }>(

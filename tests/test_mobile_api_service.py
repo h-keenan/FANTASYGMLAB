@@ -788,6 +788,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
         "guess_the_player_streaks",
         "guess_the_player_name_match_streaks",
         "community_trade_reactions",
+        "community_shared_trades",
     }
     assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
 

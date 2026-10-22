@@ -132,6 +132,7 @@ _TABLE_SETUP_DOCS: dict[str, str] = {
     "guess_the_player_streaks": "docs/supabase_guess_the_player.sql",
     "guess_the_player_name_match_streaks": "docs/supabase_guess_the_player_name_match.sql",
     "community_trade_reactions": "docs/supabase_community_trade_reactions.sql",
+    "community_shared_trades": "docs/supabase_community_trades.sql",
 }
 
 
@@ -649,6 +650,7 @@ EXPORTABLE_USER_TABLES = (
     "guess_the_player_streaks",
     "guess_the_player_name_match_streaks",
     "community_trade_reactions",
+    "community_shared_trades",
 )
 
 

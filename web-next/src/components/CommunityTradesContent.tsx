@@ -9,6 +9,8 @@ import { VerdictCallout } from "@/components/VerdictCallout";
 import { toCommunityTradeAssets, formatCommunityTradeDate } from "@/lib/communityTradesPresentation";
 import { verdictDetailText, verdictToneColorVar } from "@/lib/tradeHistoryPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { SharedTradesFeed } from "@/components/SharedTradesFeed";
+import type { SharedCommunityTrade } from "@/lib/api";
 
 /**
  * Social/community layer (docs/roadmap.md), coridian_ 2026-10-19: an
@@ -129,12 +131,20 @@ export function CommunityTradesContent({
   optedOut,
   onReact,
   onToggleOptOut,
+  shared,
 }: {
   trades: CommunityTradeItem[];
   reactionEmoji: string[];
   optedOut: boolean;
   onReact: (outcomeId: string, emoji: string, active: boolean) => void;
   onToggleOptOut: (nextOptedOut: boolean) => void;
+  /** Opt-in shared trades; omitted or available=false hides the section. */
+  shared?: {
+    available: boolean;
+    trades: SharedCommunityTrade[];
+    onDelete: (id: string) => void | Promise<unknown>;
+    onReport: (id: string) => void | Promise<unknown>;
+  };
 }) {
   const [togglingOptOut, setTogglingOptOut] = useState(false);
 
@@ -184,6 +194,7 @@ export function CommunityTradesContent({
           ))}
         </div>
       )}
+      {shared ? <SharedTradesFeed {...shared} /> : null}
       <ValuesCredit />
     </main>
   );
