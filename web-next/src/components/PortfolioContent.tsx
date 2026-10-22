@@ -13,6 +13,8 @@ import {
 } from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
 import { BriefingItemPlayers, briefingItemIsSinglePlayer } from "@/components/BriefingItemPlayers";
+import { PillRow } from "@/components/PillRow";
+import { PortfolioExposureView } from "@/components/PortfolioExposureView";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -393,6 +395,7 @@ export function PortfolioContent({
 }) {
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
+  const [view, setView] = useState<"leagues" | "exposure">("leagues");
   const allFailedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
   const draftingLeagues = allFailedLeagues.filter((league) => league.reason === "empty_roster");
   const espnLeagues = allFailedLeagues.filter((league) => league.reason === "espn_not_supported");
@@ -451,6 +454,19 @@ export function PortfolioContent({
         <AddLeagueLink />
       </header>
 
+      <PillRow
+        options={[
+          { label: "Leagues", value: "leagues" },
+          { label: "Exposure", value: "exposure" },
+        ]}
+        active={view}
+        onSelect={(value) => setView(value as "leagues" | "exposure")}
+      />
+
+      {view === "exposure" ? (
+        <PortfolioExposureView lens={data.lens} />
+      ) : (
+        <>
       {draftingLeagues.length > 0 ? <DraftingLeaguesNote leagues={draftingLeagues} /> : null}
 
       {espnLeagues.length > 0 ? <EspnLeaguesNote leagues={espnLeagues} /> : null}
@@ -474,6 +490,8 @@ export function PortfolioContent({
           )}
         </div>
       ) : null}
+        </>
+      )}
     </main>
   );
 }

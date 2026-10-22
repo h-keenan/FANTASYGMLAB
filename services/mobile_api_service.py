@@ -50,6 +50,7 @@ Deployment topology (Render):
   - POST /v1/push/test        — send a test push to all of the caller's tokens
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
   - GET  /v1/portfolio              — cross-league standing/needs/opportunities, one row per saved league (Premium)
+  - GET  /v1/portfolio/exposure     — which players the caller owns across saved leagues, with concentration (Pro)
   - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
   - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
@@ -190,6 +191,7 @@ from modules import (
     player_background_profile,
     player_eligibility,
     performance,
+    portfolio_exposure,
     pick_flow,
     player_history,
     player_projections,
@@ -9155,6 +9157,111 @@ def get_portfolio_league(
         "failed_league": failed_league,
         "upsell": None,
     }
+
+
+_PORTFOLIO_EXPOSURE_UPSELL = {
+    "title": "See your player exposure",
+    "body": (
+        "Exposure is a Pro feature: which players you own across every league, "
+        "how much of your portfolio value rides on a few of them, and your "
+        "position mix. Upgrade to Pro to unlock it."
+    ),
+}
+
+
+@app.get("/v1/portfolio/exposure")
+def get_portfolio_exposure(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Cross-league player exposure (Pro). "You own Bijan Robinson in 3 of 5 leagues."
+
+    Product decision (owner): this is a Pro feature. `premium.has_cross_league_exposure`
+    was defined at Front Office tier but never called by any feature, and Front
+    Office is no longer sold; the Pro gate here overrides it.
+
+    The entitlement gate runs first: a Free caller gets only the upsell, with no
+    saved-league read, no Sleeper call and no valuation work. Per-league rosters
+    and values come from the same cached building blocks Portfolio's league rows
+    use (modules.portfolio_exposure). ESPN leagues are skipped (their rosters are
+    not available to the valuation engines yet) and reported in `skipped_leagues`.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+    if not premium.has_cross_league_exposure(profile.get("entitlement")):
+        return {
+            "ok": True,
+            "is_premium": False,
+            "lens": lens,
+            "exposure": None,
+            "skipped_leagues": [],
+            "upsell": _PORTFOLIO_EXPOSURE_UPSELL,
+        }
+
+    base = {"ok": True, "is_premium": True, "lens": lens, "upsell": None}
+    saved_rows, error = _fetch_saved_leagues_cached(config, access_token, user_id) if user_id else ([], None)
+    if error:
+        return {**base, "exposure": None, "skipped_leagues": [], "reason": "saved_leagues_unavailable"}
+
+    skipped: list[dict[str, Any]] = []
+    targets: list[tuple[str, str, str]] = []
+    default_username = str(profile.get("sleeper_username") or "")
+    seen: set[str] = set()
+    for row in saved_rows or []:
+        league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+        if not league_id or league_id in seen:
+            continue
+        seen.add(league_id)
+        league_name = str(row.get("league_name") or "").strip() or league_id
+        if espn_leagues.is_espn_league_key(league_id):
+            skipped.append(
+                {"league_id": league_id, "league_name": league_name, "reason": espn_leagues.ESPN_NOT_AVAILABLE_REASON}
+            )
+            continue
+        targets.append((league_id, league_name, str(row.get("sleeper_username") or "") or default_username))
+
+    def _one(target: tuple[str, str, str]) -> dict[str, Any]:
+        league_id, league_name, username = target
+        return portfolio_exposure.build_league_ownership(
+            league_id=league_id,
+            league_name=league_name,
+            lens=lens,
+            sleeper_username=username,
+            players_db_path=PLAYERS_DB_PATH,
+        )
+
+    results: list[dict[str, Any]] = []
+    if targets:
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(len(targets), _PORTFOLIO_FANOUT_MAX_WORKERS), thread_name_prefix="dgm-portfolio-exposure"
+        )
+        try:
+            futures = [executor.submit(_one, t) for t in targets]
+            concurrent.futures.wait(futures, timeout=_PORTFOLIO_FANOUT_TIMEOUT_SECONDS)
+            for (league_id, league_name, _), future in zip(targets, futures):
+                reason = "timed_out"
+                if future.done():
+                    try:
+                        result = future.result()
+                    except Exception:
+                        result = {"ok": False}
+                        reason = "unavailable"
+                    else:
+                        reason = str(result.get("reason") or "unavailable")
+                    if result.get("ok"):
+                        results.append(result)
+                        continue
+                skipped.append({"league_id": league_id, "league_name": league_name, "reason": reason})
+        finally:
+            executor.shutdown(wait=False)
+
+    exposure = portfolio_exposure.aggregate_exposure(results)
+    return {**base, "exposure": exposure, "skipped_leagues": skipped}
 
 
 @app.get("/v1/portfolio")
