@@ -11,8 +11,10 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
+import PortfolioExposurePanel from '../components/PortfolioExposurePanel';
 import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock from '../components/SkeletonBlock';
 import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSavedLeague } from '../lib/api';
 import { composePortfolio, type PortfolioLeagueState } from '../lib/portfolioProgress';
@@ -76,6 +78,7 @@ export default function PortfolioScreen() {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
+  const [view, setView] = useState<'leagues' | 'exposure'>('leagues');
 
   // The persisted AsyncStorage cache restores asynchronously — gating on it
   // (same convention as DashboardScreen) keeps this query from firing (and
@@ -195,10 +198,21 @@ export default function PortfolioScreen() {
       <FlatList
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-        data={rows}
+        data={view === 'leagues' ? rows : []}
         keyExtractor={(item) => item.league.league_id}
+        ListFooterComponent={view === 'exposure' ? <PortfolioExposurePanel /> : null}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
+            <SegmentedTabBar
+              options={[
+                { key: 'leagues', label: 'Leagues' },
+                { key: 'exposure', label: 'Exposure' },
+              ]}
+              active={view}
+              onChange={setView}
+            />
+            {view === 'leagues' ? (
+              <>
             <View style={styles.infoNoteRow}>
               <ScreenInfoNote
                 label="Portfolio"
@@ -224,6 +238,8 @@ export default function PortfolioScreen() {
             ) : null}
             {realFailedLeagues.length > 0 ? (
               <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} />
+            ) : null}
+              </>
             ) : null}
           </View>
         }

@@ -2153,6 +2153,45 @@ export interface PortfolioIndexResponse extends PortfolioResponse {
   reason?: string;
 }
 
+/** One player across the caller's leagues (GET /v1/portfolio/exposure). */
+export interface PortfolioExposurePlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  leagues_owned: number;
+  league_names: string[];
+  leagues: Array<{ league_id: string; league_name: string; value: number }>;
+  share_of_leagues: number;
+  value: number;
+  share_of_value: number;
+}
+
+export interface PortfolioExposure {
+  league_count: number;
+  player_count: number;
+  total_value: number;
+  players: PortfolioExposurePlayer[];
+  by_position: Array<{ position: string; value: number; share_of_value: number; roster_spots: number }>;
+  concentration: {
+    top_n: number;
+    top_share_of_value: number;
+    top_players: Array<{ player_id: string; name: string; value: number }>;
+  };
+}
+
+/** GET /v1/portfolio/exposure (Pro). A Free caller gets `upsell` and no
+ * `exposure`. ESPN leagues, and any that can't be read, are in `skipped_leagues`. */
+export interface PortfolioExposureResponse {
+  ok: boolean;
+  is_premium: boolean;
+  lens: string;
+  exposure: PortfolioExposure | null;
+  skipped_leagues: PortfolioFailedLeague[];
+  upsell: { title: string; body: string } | null;
+  reason?: string;
+}
+
 /** GET /v1/portfolio/leagues/{leagueId} — one saved league's Portfolio row.
  * Exactly one of `league` / `failed_league` is set for a Premium caller. */
 export interface PortfolioLeagueResponse {
@@ -2470,6 +2509,8 @@ export const api = {
    * saved league (fired concurrently) so each row paints as soon as its own
    * summary is ready instead of after the slowest league's. */
   getPortfolioIndex: () => authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues'),
+  /** Player exposure across saved leagues (Pro). */
+  getPortfolioExposure: () => authorizedFetch<PortfolioExposureResponse>('/v1/portfolio/exposure'),
   getPortfolioLeague: (leagueId: string) =>
     authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`),
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).

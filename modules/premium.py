@@ -134,9 +134,10 @@ def can_export_share_card(entitlement: Any = None) -> bool:
 
 
 def has_cross_league_exposure(entitlement: Any) -> bool:
-    """Front Office's cross-league player-ownership view."""
+    """Cross-league player-ownership view (Portfolio Exposure). Pro and up: the
+    owner moved this from Front Office (no longer sold) to Pro."""
 
-    return _normalize_tier(entitlement) == FRONT_OFFICE
+    return is_at_least(entitlement, PRO)
 
 
 def has_early_access_flag(entitlement: Any) -> bool:

@@ -70,5 +70,6 @@ export const queryKeys = {
   // each league's own row, cached independently so a revisit paints every
   // row instantly and only refetches what's stale.
   portfolioIndex: () => [...userScopeKey(), 'portfolio', 'index'] as const,
+  portfolioExposure: () => [...userScopeKey(), 'portfolio', 'exposure'] as const,
   portfolioLeague: (leagueId: string) => [...userScopeKey(), 'portfolio', 'league', leagueId] as const,
 };
