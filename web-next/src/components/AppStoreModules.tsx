@@ -3,11 +3,11 @@ import { APP_STORE_LINKS, type AppStoreLinks } from "@/lib/appStoreLinks";
 /**
  * App Store + Google Play slots for the logged-out landing page.
  *
- * Neither native app is publicly live yet, so by default (see
- * lib/appStoreLinks.ts) both slots render a plain "Coming soon" module:
- * store name, a generic device glyph, no link, no date, no download claim.
- * The official "Download on the App Store" / "Get it on Google Play" badges
- * are deliberately NOT used for that state: Apple's and Google's badge
+ * A slot whose URL is null in lib/appStoreLinks.ts (an app that isn't
+ * publicly live) renders a plain "Coming soon" module: store name, a
+ * generic device glyph, no link, no date, no download claim. The official
+ * "Download on the App Store" / "Get it on Google Play" badges are
+ * deliberately NOT used for that state: Apple's and Google's badge
  * guidelines reserve them for apps that are actually downloadable, and the
  * Apple logo / Google Play logo themselves aren't ours to draw in a custom
  * module either, hence the neutral phone glyph instead of either mark.

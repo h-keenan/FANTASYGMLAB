@@ -1,10 +1,14 @@
 /**
  * Public store listings for the native FantasyDesk apps.
  *
- * Neither app is publicly live yet, so both URLs are null and the landing
- * page's AppStoreModules renders a "Coming soon" state with no link at all
+ * A null URL means that app isn't publicly live, and the landing page's
+ * AppStoreModules renders a "Coming soon" state for it with no link at all
  * (never a dead or placeholder link). Going live is a one-line change: set
  * the real listing URL here and that slot becomes a real link.
+ *
+ * Status (2026-10-21): the Android app is live on Google Play. The iOS app
+ * is still in App Store review with no public listing (the iTunes lookup
+ * for com.fantasygmlab.app returns zero results), so appStoreUrl stays null.
  *
  * `*BadgeSrc` is the hook for the official "Download on the App Store" /
  * "Get it on Google Play" badge artwork. Apple's and Google's badge
@@ -23,7 +27,7 @@ export interface AppStoreLinks {
 
 export const APP_STORE_LINKS: AppStoreLinks = {
   appStoreUrl: null,
-  playStoreUrl: null,
+  playStoreUrl: "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
   appStoreBadgeSrc: null,
   playStoreBadgeSrc: null,
 };

@@ -160,13 +160,15 @@ describe("LandingPage welcome-page analytics", () => {
 });
 
 describe("LandingPage app store modules", () => {
-  it("shows the App Store and Google Play coming-soon slots to a signed-out visitor", async () => {
+  it("shows App Store coming soon and a live Google Play link to a signed-out visitor", async () => {
     mockAuth(null);
     render(<LandingPage />);
 
     expect(await screen.findByText("SignInForm")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: /Google Play app for Android: coming soon/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
+      "href",
+      "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
+    );
   });
 });

@@ -7,9 +7,19 @@ import { APP_STORE_LINKS } from "@/lib/appStoreLinks";
 const NONE = { appStoreUrl: null, playStoreUrl: null, appStoreBadgeSrc: null, playStoreBadgeSrc: null };
 
 describe("AppStoreModules", () => {
-  it("ships with both stores unset (neither app is publicly live yet)", () => {
+  it("ships with Google Play live and the App Store still unset (iOS is in review)", () => {
     expect(APP_STORE_LINKS.appStoreUrl).toBeNull();
-    expect(APP_STORE_LINKS.playStoreUrl).toBeNull();
+    expect(APP_STORE_LINKS.playStoreUrl).toBe("https://play.google.com/store/apps/details?id=com.fantasygmlab.app");
+  });
+
+  it("renders the shipped config as App Store coming soon + a real Google Play link", () => {
+    render(<AppStoreModules />);
+    expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
+      "href",
+      "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
+    );
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
   it("renders both slots as Coming soon with no link when URLs are null", () => {

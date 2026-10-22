@@ -190,8 +190,8 @@ function LandingPageContent() {
       </div>
 
       {/* Native app store slots, below the primary sign-in action so they
-          never compete with it. Both apps are still "Coming soon" — see
-          lib/appStoreLinks.ts for the one-line go-live switch. */}
+          never compete with it. Each slot is "Coming soon" until its URL
+          is set in lib/appStoreLinks.ts (the one-line go-live switch). */}
       <AppStoreModules />
     </main>
   );
