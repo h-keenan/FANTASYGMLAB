@@ -214,11 +214,11 @@ export function TradeIdeaCardView({
         </p>
       ) : null}
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col min-w-0 gap-0.5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col min-w-0 flex-1 basis-48 gap-0.5">
           <div className="flex items-center gap-2 min-w-0">
             <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
-            <h3 className="text-lg font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
+            <h3 className="text-lg font-extrabold break-words min-w-0" style={{ color: "var(--color-text-primary)" }}>
               {idea.partner_team_name}
             </h3>
           </div>

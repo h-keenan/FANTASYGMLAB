@@ -158,7 +158,7 @@ function PlayerRow({
   const injury = waiverInjuryDisplay(player.injury_status);
   return (
     <div
-      className="flex items-center justify-between gap-3 py-2"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
       <PlayerIdentity
@@ -168,10 +168,11 @@ function PlayerRow({
         position={player.position}
         tier={player.tier}
         injuryStatus={injury.label}
+        className="flex-1 basis-48 min-w-0"
       >
         {player.team || "—"}
       </PlayerIdentity>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">
         <SortedStatTile player={player} sortOption={sortOption} sortMode={sortMode} />
         {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
             should say in small print value above it so its not glaring
@@ -201,7 +202,7 @@ function PlayerRow({
         {idpConfidence ? null : (
           <a
             href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-            className="px-2 py-1 text-xs font-bold"
+            className="inline-flex items-center min-h-10 px-3 text-xs font-bold"
             style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
           >
             Compare
@@ -219,7 +220,7 @@ function PlayerRow({
         {idpConfidence ? null : (
           <a
             href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
-            className="px-2 py-1 text-xs font-bold"
+            className="inline-flex items-center min-h-10 px-3 text-xs font-bold"
             style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
           >
             Add to Trade
