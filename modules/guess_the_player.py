@@ -32,7 +32,7 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
-from modules import player_tier_identity, rankings
+from modules import player_tier_identity, rankings, sleeper
 
 # A breakout week needs a real "normal" to be surprising relative to — same
 # spirit as rankings.recency_trend_display's own >= 4 usable games gate, so
@@ -79,13 +79,19 @@ def usable_weeks(weekly: Sequence[Mapping[str, Any]] | None) -> list[dict[str, A
 
     if not weekly:
         return []
-    return [
-        dict(week)
-        for week in weekly
-        if isinstance(week, Mapping)
-        and rankings.week_observation_usable(week)
-        and week.get("fantasy_points_ppr") is not None
-    ]
+    usable: list[dict[str, Any]] = []
+    for week in weekly:
+        if not isinstance(week, Mapping) or not rankings.week_observation_usable(week):
+            continue
+        row = dict(week)
+        # A played week with no pts_ppr key is a real 0 (Sleeper omits
+        # zero-valued stats), so it counts toward the player's baseline.
+        points = sleeper.week_row_fantasy_points_ppr(row)
+        if points is None:
+            continue
+        row["fantasy_points_ppr"] = points
+        usable.append(row)
+    return usable
 
 
 def find_surprise_candidates(

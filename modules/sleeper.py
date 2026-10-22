@@ -110,6 +110,93 @@ WEEKLY_BOX_SCORE_FLOAT_FIELDS = frozenset({"fantasy_points_standard", "fantasy_p
 WEEKLY_BOX_SCORE_SCHEMA_MARKER_FIELD = "fantasy_points_half_ppr"
 
 
+# Fantasy-point fields Sleeper omits from a weekly payload when a player who
+# PLAYED scored exactly 0 under that format. Sleeper drops every zero-valued
+# stat key, so a played 0-point game has no ``pts_ppr`` at all; reading that
+# absence as "did not play" silently dropped real zeros from every weekly
+# consumer (recency trends, projections, usage, box scores).
+PLAYED_ZERO_POINT_FIELDS = ("fantasy_points_ppr",)
+PLAYED_ZERO_BOX_SCORE_POINT_FIELDS = ("fantasy_points_half_ppr", "fantasy_points_standard")
+
+
+def week_row_played(row: Dict[str, Any] | None) -> bool:
+    """True when a weekly row is a game the player actually appeared in.
+
+    The participation signal is Sleeper's own ``gp`` (games played; kept on
+    weekly rows as ``games_played``). It was chosen over the alternatives
+    after checking real Sleeper weekly payloads (2024 weeks 1-18):
+
+    - ``gp`` is present only when the player appeared in the game. An
+      inactive, injured (e.g. Christian McCaffrey on IR, 2024 week 5) or
+      bye-week player's row has no ``gp`` at all, while a player who appeared
+      and scored 0 still has ``gp: 1``.
+    - ``gms_active`` is ``1`` on every row, inactive players included, so it
+      carries no signal.
+    - Offensive snaps (``off_snp``, and so ``snap_share``) are never present
+      for kickers, and ``tm_off_snp`` is missing from some real weeks, so a
+      snap gate drops real games played.
+
+    A game where the player only played special teams counts as played: his
+    fantasy result really was 0.
+    """
+
+    if not isinstance(row, dict):
+        return False
+    try:
+        return float(row.get("games_played") or 0) >= 1
+    except (TypeError, ValueError):
+        return False
+
+
+def week_row_fantasy_points_ppr(row: Dict[str, Any] | None) -> float | None:
+    """A weekly row's real PPR points: Sleeper's ``pts_ppr`` when present, a
+    real 0.0 when the player played (``week_row_played``) but Sleeper omitted
+    the zero, and None when he did not play (inactive, injured, bye)."""
+
+    if not isinstance(row, dict):
+        return None
+    value = row.get("fantasy_points_ppr")
+    if value is not None:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+    return 0.0 if week_row_played(row) else None
+
+
+def _fill_played_zero_points(row: Dict[str, Any], *, include_box_score_points: bool) -> None:
+    if not week_row_played(row):
+        return
+    fields = PLAYED_ZERO_POINT_FIELDS
+    if include_box_score_points:
+        fields = fields + PLAYED_ZERO_BOX_SCORE_POINT_FIELDS
+    for field in fields:
+        if row.get(field) is None:
+            row[field] = 0.0
+
+
+def backfill_played_zero_points(cached: Dict[str, Any] | None) -> Dict[str, Any] | None:
+    """Fill the real 0-point fields on played weekly rows of a season cache
+    written before ``_extract_week_observation`` did so itself (in place).
+
+    Half-PPR / standard points are only filled when the cache retained
+    box-score fields at all (``season_stats_cache_has_box_scores``); filling
+    them on an older cache would make it look as if it had box scores.
+    """
+
+    if not isinstance(cached, dict):
+        return cached
+    include_box = season_stats_cache_has_box_scores(cached)
+    for values in cached.values():
+        weekly = values.get("weekly") if isinstance(values, dict) else None
+        if not isinstance(weekly, list):
+            continue
+        for row in weekly:
+            if isinstance(row, dict):
+                _fill_played_zero_points(row, include_box_score_points=include_box)
+    return cached
+
+
 def default_player_stats_season(now: time.struct_time | None = None) -> int:
     """Canonical active NFL stats season (Sep+ → calendar year, else prior year)."""
 
@@ -184,6 +271,8 @@ def _extract_week_observation(week: int, raw_stats: Dict[str, Any]) -> Dict[str,
     # Drop internal-only keys if snaps missing
     row.pop("_offensive_snaps", None)
     row.pop("_team_offensive_snaps", None)
+    # A played game with no points key scored a real 0 (see week_row_played).
+    _fill_played_zero_points(row, include_box_score_points=True)
     return row if len(row) > 1 else None
 
 
@@ -356,7 +445,11 @@ def cached_season_player_weekly(player_id: str, season: int | None = None) -> Li
     weekly = record.get("weekly") if isinstance(record, dict) else None
     if not isinstance(weekly, list):
         return []
-    return [row for row in weekly if isinstance(row, dict)]
+    include_box = season_stats_cache_has_box_scores(cached)
+    rows = [row for row in weekly if isinstance(row, dict)]
+    for row in rows:
+        _fill_played_zero_points(row, include_box_score_points=include_box)
+    return rows
 
 
 def get_season_player_stats(
@@ -400,6 +493,7 @@ def get_season_player_stats(
                 with open(cache_path, "r", encoding="utf-8") as handle:
                     cached = json.load(handle)
                 if isinstance(cached, dict):
+                    backfill_played_zero_points(cached)
                     has_weekly = any(
                         isinstance(values, dict)
                         and isinstance(values.get("weekly"), list)
@@ -453,7 +547,7 @@ def get_season_player_stats(
             with open(cache_path, "r", encoding="utf-8") as handle:
                 cached = json.load(handle)
             if isinstance(cached, dict):
-                return cached
+                return backfill_played_zero_points(cached)
         except Exception:
             pass
     return {}

@@ -298,7 +298,7 @@ def _team_defense_points_allowed_by_position_uncached(
             if not isinstance(row, dict):
                 continue
             week = row.get("week")
-            points = row.get("fantasy_points_ppr")
+            points = sleeper.week_row_fantasy_points_ppr(row)
             if week is None or points is None:
                 continue
             week = int(week)
@@ -815,7 +815,7 @@ def _most_recent_played_week(weekly_rows: List[Dict[str, Any]], *, before_week: 
         for row in (weekly_rows or [])
         if isinstance(row, dict)
         and row.get("week") is not None
-        and row.get("fantasy_points_ppr") is not None
+        and sleeper.week_row_fantasy_points_ppr(row) is not None
         and int(row["week"]) < int(before_week)
     ]
     return max(played_weeks) if played_weeks else int(before_week) - 1
@@ -833,7 +833,7 @@ def _player_recent_trend(
         for row in (weekly_rows or [])
         if isinstance(row, dict)
         and row.get("week") is not None
-        and row.get("fantasy_points_ppr") is not None
+        and sleeper.week_row_fantasy_points_ppr(row) is not None
         and (upto_week is None or int(row["week"]) <= int(upto_week))
     ]
     if not usable:
@@ -847,7 +847,9 @@ def _player_recent_trend(
     ]
     if not recent:
         return None
-    values_by_week = {int(row["week"]): float(row["fantasy_points_ppr"]) for row in recent}
+    # A played week Sleeper omitted ``pts_ppr`` for is a real 0, not a DNP
+    # (see ``sleeper.week_row_played``); a true DNP never reaches here.
+    values_by_week = {int(row["week"]): float(sleeper.week_row_fantasy_points_ppr(row)) for row in recent}
     weighted = _weighted_mean(values_by_week, reference_week, half_life_weeks)
     if weighted is None:
         return None

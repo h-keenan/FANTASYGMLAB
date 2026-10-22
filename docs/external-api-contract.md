@@ -1395,7 +1395,9 @@ receiving TDs), and `field_goals_4`. They need box-score fields, so
 - Sleeper omits zero-valued stats from its weekly payload. A box-score
   field is `null` whenever Sleeper reported nothing for it. That is most
   often a real zero (no touchdowns, say), but it is never filled in as 0
-  here.
+  here. Fantasy points are the exception: when Sleeper credits the player
+  with playing the game (`gp`), an omitted point total is a real `0.0`
+  score, not `null`.
 
 ### Example: `GET /v1/external/players/4034/week-result?season=2026&week=6`
 
