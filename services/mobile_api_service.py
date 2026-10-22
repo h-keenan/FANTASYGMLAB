@@ -10962,7 +10962,12 @@ _SLOT_ELIGIBLE_POSITIONS: dict[str, set[str]] = {
     "DEF": {"DEF"},
     "FLEX": {"RB", "WR", "TE"},
     "WR/RB": {"RB", "WR"},
+    "REC_FLEX": {"WR", "TE"},
     "SUPER_FLEX": {"QB", "RB", "WR", "TE"},
+    "DL": {"DL"},
+    "LB": {"LB"},
+    "DB": {"DB"},
+    "IDP_FLEX": {"DL", "LB", "DB"},
 }
 
 
@@ -11046,22 +11051,31 @@ def _benched_reason(player: dict[str, Any]) -> str | None:
 
 def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | None:
     """The changes that turn this roster's ACTUAL Sleeper lineup into its
-    suggested one: "start X over Y", one per player who differs.
+    suggested one, as real one-for-one swaps: "start X (slot) over Y", where
+    Y is the player CURRENTLY in that slot and X is eligible for it.
 
     None when Sleeper hasn't posted an actual lineup yet (nothing to diff).
     Only slots the suggested lineup fills are compared, so a team DEF or an
-    IDP slot never produces a phantom move. Each suggested-only player is
-    paired with the actual-only starter in the same slot first, then an
-    empty slot of that kind, then any slot his position can fill, then
-    whatever remains.
+    IDP slot never produces a phantom move.
+
+    Pairing is by slot eligibility (never list order): each suggested-only
+    player is matched to an actual-only starter (or an empty slot) whose
+    slot his position can fill, preferring the identical slot. When that
+    is impossible directly (a WR must move into the W/R slot because the
+    RB slot needs the bench RB), the change is a two-leg chain through a
+    player who is already starting: "start X over S" in S's slot, then
+    "start S over Y" in Y's slot; both legs carry the same `chain_id`. A
+    change that needs a longer chain is not shown rather than shown wrong.
 
     `gain` is the difference in the two players' expected points (see
     matchup_win_probability.starter_expected_points). A bye-week or
     ruled-out starter counts as 0 because he cannot score; a player with no
-    modeled number leaves `gain` None rather than guessed. `locked` is True
-    once either player's own game has kicked off, because Sleeper no longer
-    allows that swap. FantasyDesk can't set Sleeper lineups, so this is a
-    planner and the client says so.
+    modeled number leaves `gain` None rather than guessed. Gains are exact
+    differences (no double counting), so the shown moves sum to suggested
+    total minus actual total, to within 0.05 per move of rounding.
+    `locked` is True once either player's own game has kicked off, because
+    Sleeper no longer allows that swap. FantasyDesk can't set Sleeper
+    lineups, so this is a planner and the client says so.
     """
 
     if not my_side.get("has_live_data"):
@@ -11073,71 +11087,126 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
     suggested_ids = {str(p.get("player_id") or "") for p in suggested}
     actual_ids = {str(p.get("player_id") or "") for p in actual}
 
+    def eligible(player: dict[str, Any], slot: str) -> bool:
+        return str(player.get("position") or "").upper() in _SLOT_ELIGIBLE_POSITIONS.get(slot, set())
+
     ins = [p for p in suggested if str(p.get("player_id") or "") not in actual_ids]
-    outs: list[dict[str, Any] | None] = [
-        p
+    # Targets: the actual-only starters (to be replaced) and empty slots.
+    targets: list[dict[str, Any]] = [
+        {"slot": str(p.get("slot") or ""), "player": p}
         for p in actual
         if str(p.get("player_id") or "") not in suggested_ids and str(p.get("slot") or "") in suggested_slots
     ]
-    empty_slots = [slot for slot in (my_side.get("real_empty_slots") or []) if slot in suggested_slots]
+    targets += [
+        {"slot": str(slot), "player": None} for slot in (my_side.get("real_empty_slots") or []) if slot in suggested_slots
+    ]
+    stayers = [p for p in actual if str(p.get("player_id") or "") in suggested_ids]
 
-    def pick(predicate: Any) -> dict[str, Any] | None:
-        for index, candidate in enumerate(outs):
-            if candidate is not None and predicate(candidate):
-                outs[index] = None
-                return candidate
-        return None
+    # Maximum matching of suggested-only players to targets by slot
+    # eligibility (Kuhn), trying the identical slot first.
+    owner: dict[int, int] = {}
 
-    moves: list[dict[str, Any]] = []
-    for starter in ins:
-        slot = str(starter.get("slot") or "")
-        position = str(starter.get("position") or "").upper()
-        filled_empty = False
+    def augment(i: int, seen: set[int]) -> bool:
+        order = sorted(range(len(targets)), key=lambda t: targets[t]["slot"] != str(ins[i].get("slot") or ""))
+        for t in order:
+            if t in seen or not eligible(ins[i], targets[t]["slot"]):
+                continue
+            seen.add(t)
+            if t not in owner or augment(owner[t], seen):
+                owner[t] = i
+                return True
+        return False
 
-        over = pick(lambda c: str(c.get("slot") or "") == slot)
-        if over is None and slot in empty_slots:
-            empty_slots.remove(slot)
-            filled_empty = True
-            move_slot = slot
-        else:
-            if over is None:
-                over = pick(lambda c: position in _SLOT_ELIGIBLE_POSITIONS.get(str(c.get("slot") or ""), set()))
-            if over is None:
-                over = pick(lambda c: True)
-            if over is not None:
-                move_slot = str(over.get("slot") or slot)
-            elif empty_slots:
-                move_slot = empty_slots.pop(0)
-                filled_empty = True
-            else:
-                move_slot = slot
+    for i in range(len(ins)):
+        augment(i, set())
+    matched_in = {i: t for t, i in owner.items()}
 
+    def points_of(player: dict[str, Any] | None, *, zero: bool = False) -> float | None:
+        if zero:
+            return 0.0
+        return matchup_win_probability.starter_expected_points(player) if player is not None else None
+
+    def build(
+        slot: str,
+        starter: dict[str, Any],
+        over: dict[str, Any] | None,
+        *,
+        empty: bool = False,
+        chain_id: int | None = None,
+    ) -> dict[str, Any]:
         start_fields = _move_player_fields(starter)
         over_fields = _move_player_fields(over) if over is not None else None
-        reason = "empty_slot" if filled_empty else (_benched_reason(over) if over is not None else None)
+        reason = "empty_slot" if empty else (_benched_reason(over) if over is not None else None)
         if over_fields is not None and reason in {"bye_week", "ruled_out"}:
             over_fields["points"] = 0.0
-        over_points = 0.0 if filled_empty else (over_fields["points"] if over_fields is not None else None)
+        over_points = 0.0 if empty else (over_fields["points"] if over_fields is not None else None)
         start_points = start_fields["points"]
         gain = (
             round(float(start_points) - float(over_points), 1)
             if start_points is not None and over_points is not None
             else None
         )
-        moves.append(
-            {
-                "slot": move_slot,
-                "start": start_fields,
-                "over": over_fields,
-                "over_reason": reason,
-                "gain": gain,
-                "locked": starter.get("game_started") is True
-                or (over is not None and over.get("game_started") is True),
-            }
+        move = {
+            "slot": slot,
+            "start": start_fields,
+            "over": over_fields,
+            "over_reason": reason,
+            "gain": gain,
+            "locked": starter.get("game_started") is True
+            or (over is not None and over.get("game_started") is True),
+        }
+        if chain_id is not None:
+            move["chain_id"] = chain_id
+        return move
+
+    groups: list[list[dict[str, Any]]] = []
+    for i, t in matched_in.items():
+        target = targets[t]
+        groups.append(
+            [build(target["slot"], ins[i], target["player"], empty=target["player"] is None)]
         )
 
-    moves.sort(key=lambda move: (move["locked"], move["gain"] is None, -(move["gain"] or 0.0)))
-    return moves
+    free_targets = [t for t in range(len(targets)) if t not in owner]
+    used_stayers: set[str] = set()
+    chain_id = 0
+    for i in range(len(ins)):
+        if i in matched_in:
+            continue
+        done = False
+        for t in list(free_targets):
+            target = targets[t]
+            for stayer in stayers:
+                sid = str(stayer.get("player_id") or "")
+                s_slot = str(stayer.get("slot") or "")
+                if sid in used_stayers or not eligible(ins[i], s_slot) or not eligible(stayer, target["slot"]):
+                    continue
+                chain_id += 1
+                used_stayers.add(sid)
+                free_targets.remove(t)
+                groups.append(
+                    [
+                        build(s_slot, ins[i], stayer, chain_id=chain_id),
+                        build(
+                            target["slot"],
+                            stayer,
+                            target["player"],
+                            empty=target["player"] is None,
+                            chain_id=chain_id,
+                        ),
+                    ]
+                )
+                done = True
+                break
+            if done:
+                break
+
+    def group_key(group: list[dict[str, Any]]) -> tuple[Any, ...]:
+        gains = [m["gain"] for m in group]
+        total = None if any(g is None for g in gains) else sum(gains)
+        return (any(m["locked"] for m in group), total is None, -(total or 0.0))
+
+    groups.sort(key=group_key)
+    return [move for group in groups for move in group]
 
 
 def _matchup_game_state(my_side: dict[str, Any], opponent_side: dict[str, Any]) -> str | None:
