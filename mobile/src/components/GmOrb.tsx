@@ -29,7 +29,7 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
 import BrandMark from './BrandMark';
-import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
+import { currentLeagueContext, navigationRef, switchLeagueKeepingScreen } from '../navigation/navigationRef';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -720,9 +720,7 @@ export default function GmOrb() {
     closeSheet();
     const target = { leagueId: row.league_id, leagueName: row.league_name || 'League' };
     void setLastLeague(target);
-    if (navigationRef.isReady()) {
-      navigationRef.dispatch(StackActions.popTo('LeagueDetail', target));
-    }
+    switchLeagueKeepingScreen(target, league?.leagueId);
   };
 
   const orbAnimatedStyle = useAnimatedStyle(() => ({

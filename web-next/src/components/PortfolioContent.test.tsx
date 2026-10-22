@@ -411,4 +411,19 @@ describe("PortfolioContent", () => {
     expect(screen.queryByText("No saved leagues yet")).not.toBeInTheDocument();
     expect(screen.getByText("Loading Dynasty Overlords…")).toBeInTheDocument();
   });
+
+  it("links to /connect-league from the header so a league can be added without opening one first", () => {
+    render(<PortfolioContent data={BASE_RESPONSE} />);
+    expect(screen.getByRole("link", { name: "+ Add a league" })).toHaveAttribute("href", "/connect-league");
+  });
+
+  it("offers Add a league on the empty state too", () => {
+    render(<PortfolioContent data={{ ...BASE_RESPONSE, leagues: [] }} />);
+    expect(screen.getByRole("link", { name: "+ Add a league" })).toHaveAttribute("href", "/connect-league");
+  });
+
+  it("shows free accounts the upsell (their upgrade path), not the add link", () => {
+    render(<PortfolioContent data={{ ...BASE_RESPONSE, is_premium: false }} />);
+    expect(screen.queryByRole("link", { name: "+ Add a league" })).not.toBeInTheDocument();
+  });
 });
