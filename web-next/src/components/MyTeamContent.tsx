@@ -1,8 +1,9 @@
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
+import { ToneBadge } from "@/components/ToneBadge";
 import { ValueStat } from "@/components/ValueStat";
 import type { ReactNode } from "react";
-import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
+import type { KeeperPlayerInfo, KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -64,7 +65,26 @@ function joinRooms(rooms: string[]): ReactNode {
   ));
 }
 
-function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
+const KEEPER_BASIS_LABEL: Record<string, string> = {
+  league_setting: "from the league setting",
+  previous_draft: "from last year's draft keepers",
+  declared_keepers: "from your declared keepers",
+};
+
+function surplusText(info: KeeperPlayerInfo | undefined): string | null {
+  if (!info || info.surplus == null || info.cost_round == null) return null;
+  return `${info.kept_round ? "Kept" : "Est."} R${info.cost_round} · ${info.surplus > 0 ? "+" : ""}${info.surplus}`;
+}
+
+function LineupRow({
+  player,
+  muted = false,
+  keeper,
+}: {
+  player: LineupPlayer;
+  muted?: boolean;
+  keeper?: KeeperPlayerInfo;
+}) {
   const ineligibleTag = lineupIneligibleTag(player);
   return (
     <div
@@ -87,6 +107,12 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
             {` · ${ineligibleTag}`}
           </span>
         ) : null}
+        {keeper?.is_keeper ? (
+          <span className="ml-1">
+            <ToneBadge label="Keeper" color="var(--color-information)" />
+          </span>
+        ) : null}
+        {surplusText(keeper) ? ` · ${surplusText(keeper)}` : ""}
       </PlayerIdentity>
       <div className="flex items-center gap-2 shrink-0">
         <OvrGauge rating={player.overall_rating} size="sm" />
@@ -103,6 +129,7 @@ export function MyTeamContent({
   teamRanking,
   leagueSize,
   highlightPlayerId,
+  keepers = null,
 }: {
   leagueName: string;
   myTeam: MyTeamResponse;
@@ -113,6 +140,8 @@ export function MyTeamContent({
    * value-trend tile's specific roster player, threaded through as
    * ?playerId= (gamePlanTileHref). */
   highlightPlayerId?: string;
+  /** GET .../keepers (keeper leagues only); null/absent renders nothing. */
+  keepers?: KeepersResponse | null;
 }) {
   const notice = myTeam.reason ? myTeamReasonMessage(myTeam.reason) : null;
   if (notice) {
@@ -352,7 +381,7 @@ export function MyTeamContent({
           <div className="glass-surface flex flex-col">
             {starters.map((player) => (
               <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                <LineupRow player={player} />
+                <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} />
               </HighlightTarget>
             ))}
           </div>
@@ -372,7 +401,7 @@ export function MyTeamContent({
               <div className="glass-surface flex flex-col">
                 {activeBench.map((player) => (
                   <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                    <LineupRow player={player} muted={!bestBall} />
+                    <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} muted={!bestBall} />
                   </HighlightTarget>
                 ))}
               </div>
@@ -385,7 +414,7 @@ export function MyTeamContent({
                 <div className="glass-surface flex flex-col">
                   {irBench.map((player) => (
                     <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                      <LineupRow player={player} muted />
+                      <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} muted />
                     </HighlightTarget>
                   ))}
                 </div>
@@ -399,7 +428,7 @@ export function MyTeamContent({
                 <div className="glass-surface flex flex-col">
                   {taxiBench.map((player) => (
                     <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                      <LineupRow player={player} muted />
+                      <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} muted />
                     </HighlightTarget>
                   ))}
                 </div>
@@ -408,6 +437,39 @@ export function MyTeamContent({
           </div>
         )}
       </section>
+      {keepers?.is_keeper_league && (keepers.candidates?.length ?? 0) > 0 ? (
+        <section className="flex flex-col gap-3" aria-labelledby="keeper-candidates-heading">
+          <SectionHeading>
+            <span id="keeper-candidates-heading">Keeper candidates</span>
+          </SectionHeading>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Keep up to {keepers.keep_count} {KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ""] ?? ""}. Rounds and
+            surplus are estimates.
+          </p>
+          <div>
+            {keepers.candidates!.map((c) => (
+              <div
+                key={c.player_id}
+                className="flex items-center gap-3 py-2"
+                style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+              >
+                <PlayerIdentity
+                  identity={{ player_id: c.player_id, name: c.name, position: c.position, sourceLabel: "My Team" }}
+                  playerId={c.player_id}
+                  name={c.name}
+                  position={c.position}
+                  className="flex-1 min-w-0"
+                >
+                  {c.reason}
+                </PlayerIdentity>
+                {keepers.recommended_ids?.includes(c.player_id) ? (
+                  <ToneBadge label="Keep" color="var(--color-success)" />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <ValuesCredit />
     </main>
   );

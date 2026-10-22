@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
-import { api, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
+import { api, type KeepersResponse, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -41,6 +41,7 @@ export default function MyTeamPage() {
   const [needs, setNeeds] = useState<MyTeamNeedsResponse | null>(null);
   const [teamRanking, setTeamRanking] = useState<TeamRanking | null>(null);
   const [leagueSize, setLeagueSize] = useState(0);
+  const [keepers, setKeepers] = useState<KeepersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,6 +68,15 @@ export default function MyTeamPage() {
       })
       .catch(() => {
         /* best-effort — Strength & Pressure/Position Groups just don't render */
+      });
+
+    api
+      .getKeepers(leagueId, lens)
+      .then((result) => {
+        if (!cancelled) setKeepers(result);
+      })
+      .catch(() => {
+        /* best-effort: keeper tags/candidates just don't render */
       });
 
     return () => {
@@ -115,6 +125,7 @@ export default function MyTeamPage() {
       needs={needs}
       teamRanking={teamRanking}
       leagueSize={leagueSize}
+      keepers={keepers}
       highlightPlayerId={highlightPlayerId}
     />
   );

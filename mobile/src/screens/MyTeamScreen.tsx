@@ -25,9 +25,10 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
 import TeamAvatar from '../components/TeamAvatar';
+import ToneBadge from '../components/ToneBadge';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import ValuesCredit from '../components/ValuesCredit';
-import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
+import { api, type KeeperPlayerInfo, type KeepersResponse, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isByeOnlyLabel, lineupStatusLabel, openSlotsMessage } from '../lib/lineupAvailability';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -162,6 +163,14 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     enabled: !isRestoring && Boolean(myTeamQuery.data?.roster_id),
   });
 
+  // Best-effort: only keeper leagues return tags/candidates.
+  const keepersQuery = useQuery({
+    queryKey: queryKeys.keepers(leagueId),
+    queryFn: () => api.getLeagueKeepers(leagueId),
+    enabled: !isRestoring && Boolean(myTeamQuery.data?.roster_id),
+  });
+  const keepers = keepersQuery.data?.is_keeper_league ? keepersQuery.data : null;
+
   useScreenHeaderTitle(navigation, 'My Team', leagueName);
 
   useEffect(() => {
@@ -280,11 +289,13 @@ export default function MyTeamScreen({ route, navigation }: Props) {
               label={bestBall ? 'Roster' : 'Starters'}
               onPressPlayer={goToPlayer}
               openSlotsNote={bestBall ? null : openSlotsMessage(myTeamData?.open_slots)}
+              keepers={keepers}
             />
+            <KeeperCandidatesSection keepers={keepers} />
           </>
         ) : null}
 
-        {activeTab === 'bench' ? <BenchFullSection bench={bench} onPressPlayer={goToPlayer} /> : null}
+        {activeTab === 'bench' ? <BenchFullSection bench={bench} onPressPlayer={goToPlayer} keepers={keepers} /> : null}
 
         {activeTab === 'analysis' ? (
           myTeam ? (
@@ -463,7 +474,9 @@ function StartersSection({
   label = 'Starters',
   onPressPlayer,
   openSlotsNote = null,
+  keepers = null,
 }: {
+  keepers?: KeepersResponse | null;
   starters: LineupPlayer[];
   totalValue: number;
   label?: string;
@@ -485,6 +498,7 @@ function StartersSection({
             <LineupRow
               key={player.player_id}
               player={player}
+              keeper={keepers?.players?.[player.player_id]}
               showDivider={index < starters.length - 1}
               onPress={() => onPressPlayer(player)}
             />
@@ -516,7 +530,9 @@ function StartersSection({
 function BenchFullSection({
   bench,
   onPressPlayer,
+  keepers = null,
 }: {
+  keepers?: KeepersResponse | null;
   bench: LineupPlayer[];
   onPressPlayer: (player: LineupPlayer) => void;
 }) {
@@ -538,6 +554,7 @@ function BenchFullSection({
                 <LineupRow
                   key={player.player_id}
                   player={player}
+                  keeper={keepers?.players?.[player.player_id]}
                   showDivider={index < activeBench.length - 1}
                   onPress={() => onPressPlayer(player)}
                   muted
@@ -633,7 +650,9 @@ function LineupRow({
   onPress,
   showDivider,
   muted = false,
+  keeper,
 }: {
+  keeper?: KeeperPlayerInfo;
   player: LineupPlayer;
   onPress: () => void;
   showDivider: boolean;
@@ -674,8 +693,58 @@ function LineupRow({
         </AppText>
         <AppText style={styles.valueLabel}>VALUE</AppText>
         <OverallRatingBadge rating={player.overall_rating} />
+        {keeper?.is_keeper ? <ToneBadge label="Keeper" color={colors.accent} /> : null}
+        {keeper?.surplus != null && keeper.cost_round != null ? (
+          <AppText style={styles.valueLabel}>
+            {`${keeper.kept_round ? 'R' : '~R'}${keeper.cost_round} ${keeper.surplus > 0 ? '+' : ''}${keeper.surplus}`}
+          </AppText>
+        ) : null}
       </View>
     </TouchableOpacity>
+  );
+}
+
+const KEEPER_BASIS_LABEL: Record<string, string> = {
+  league_setting: 'from the league setting',
+  previous_draft: "from last year's draft keepers",
+  declared_keepers: 'from your declared keepers',
+};
+
+/** Keep-or-cut candidates ranked by estimated surplus (keeper leagues only). */
+function KeeperCandidatesSection({ keepers }: { keepers: KeepersResponse | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const candidates = keepers?.candidates ?? [];
+  if (!keepers || candidates.length === 0) return null;
+  return (
+    <View>
+      <SectionHeading title="Keeper candidates" topGap={12} />
+      <AppText style={styles.disclaimer}>
+        {`Keep up to ${keepers.keep_count} ${KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ''] ?? ''}. Rounds and surplus are estimates.`}
+      </AppText>
+      <AnimatedCard style={styles.groupCard}>
+        {candidates.map((c, index) => (
+          <View
+            key={c.player_id}
+            style={[styles.compactRow, index < candidates.length - 1 && styles.compactDivider]}
+          >
+            <View style={styles.compactIdentity}>
+              <PlayerIdentityRow
+                playerId={c.player_id}
+                name={c.name}
+                position={c.position}
+                team={c.team}
+                slot={c.reason}
+                showDivider={false}
+              />
+            </View>
+            {keepers.recommended_ids?.includes(c.player_id) ? (
+              <ToneBadge label="Keep" color={colors.success} />
+            ) : null}
+          </View>
+        ))}
+      </AnimatedCard>
+    </View>
   );
 }
 

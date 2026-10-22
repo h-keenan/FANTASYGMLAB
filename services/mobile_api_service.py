@@ -220,6 +220,7 @@ from modules import (
     waivers_ui,
     weekly_box_scores,
 )
+from modules import keepers as keepers_module
 from modules.team_eval import (
     build_league_summary,
     get_team_vs_league,
@@ -9953,6 +9954,69 @@ def get_league_my_team(
         "best_ball": best_ball,
         "lineup_advice_message": league_calendar.BEST_BALL_LINEUP_MESSAGE if best_ball else "",
         "trade_window": league_calendar.trade_window(league),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/keepers")
+def get_league_keepers(
+    league_id: str = Depends(resolve_league_path_id),
+    lens: str = "Dynasty",
+    round_penalty: int = 0,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Keeper tags, estimated surplus and keep-or-cut candidates (keeper leagues).
+
+    Uses only real Sleeper data (see modules.keepers); cost rounds are
+    estimates because Sleeper exposes no machine-readable keeper cost rule.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(status_code=422, detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD))
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "is_keeper_league": False, "reason": reason}
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    if not settings.get("_keeper_mode"):
+        return {"ok": True, "is_keeper_league": False, "reason": "not_keeper_league"}
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    league_settings = league.get("settings") or {}
+    current_picks = keepers_module.latest_draft_picks(
+        sleeper.get_league_drafts(league_id), sleeper.get_draft_picks
+    )
+    previous_id = str(league.get("previous_league_id") or "")
+    previous_picks = (
+        keepers_module.latest_draft_picks(sleeper.get_league_drafts(previous_id), sleeper.get_draft_picks)
+        if previous_id and previous_id != "0"
+        else []
+    )
+    report = keepers_module.build_keeper_report(
+        roster=my_roster,
+        valued=valued,
+        score_field=league_value_settings.valuation_score_field(lens),
+        num_teams=int(league.get("total_rosters") or league_settings.get("num_teams") or 12),
+        max_keepers=league_settings.get("max_keepers"),
+        current_picks=current_picks,
+        previous_picks=previous_picks,
+        round_penalty=round_penalty,
+    )
+    return {
+        "ok": True,
+        "is_keeper_league": True,
+        "reason": "",
+        "estimate_note": (
+            "Sleeper has no machine-readable keeper cost rule. Cost round is the player's last draft round "
+            "(or the round a keeper pick was assigned), shifted by your round penalty; surplus is estimated "
+            "against the typical player taken at that round."
+        ),
+        **report,
     }
 
 

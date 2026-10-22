@@ -52,6 +52,7 @@ export const queryKeys = {
   // MyTeamScreen's suggested starters/bench — also the same endpoint
   // PlayerDetailScreen's roster-recommendation enrichment fetch hits, though
   // that one's still a plain fetch-on-mount (out of scope for this pass).
+  keepers: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'keepers'] as const,
   myTeam: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'my-team'] as const,
   // PlayerDetailScreen's Stats tab payload — keyed by player id only (no
   // other params affect the response), but still user-scoped: the response
