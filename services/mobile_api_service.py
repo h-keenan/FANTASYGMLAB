@@ -10441,8 +10441,16 @@ def _matchup_side(
     *,
     players_lookup: dict[str, Any] | None = None,
     projection_context: "_ProjectionContext | None" = None,
+    matchup_entry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One team's side of the matchup: identity, suggested starters, season-value total.
+
+    `matchup_entry` (this roster's Sleeper matchup row), when given, lets
+    each suggested starter carry the same live fields a real starter does:
+    `actual_points` from Sleeper's `players_points` (every rostered player's
+    real score this week, bench included) and `game_started`/`game_status`
+    from his own NFL game. That keeps the Suggested and Actual lineup views
+    on one scale while games are in progress.
 
     Both sides run the SAME modules.team_eval.suggest_optimal_lineup pass
     (via _suggested_lineup_split), so the comparison is apples-to-apples.
@@ -10491,6 +10499,8 @@ def _matchup_side(
         # every row when a projection context exists (one computation per
         # player, reused here).
         player.setdefault("projection", None)
+        player.update(_player_game_state(player.get("team"), projection_context))
+        player["actual_points"] = _players_points_for(matchup_entry, player.get("player_id"))
 
     season_value_total = round(
         sum(float(p["score"]) for p in starters if isinstance(p.get("score"), (int, float))), 1
@@ -10516,6 +10526,20 @@ def _matchup_side(
         ),
         "open_slots": lineup_meta.get("open_slots", []),
     }
+
+
+def _players_points_for(matchup_entry: dict[str, Any] | None, player_id: Any) -> float | None:
+    """This player's real points this week from Sleeper's `players_points`
+    (keyed by player_id, bench included). None when Sleeper hasn't posted
+    lineups yet or doesn't list him, never a fabricated 0."""
+
+    if not matchup_entry or not matchup_entry.get("starters"):
+        return None
+    points_by_id = matchup_entry.get("players_points")
+    if not isinstance(points_by_id, dict):
+        return None
+    value = points_by_id.get(str(player_id or ""))
+    return round(float(value), 2) if isinstance(value, (int, float)) else None
 
 
 def _player_game_state(team: Any, projection_context: "_ProjectionContext | None") -> dict[str, Any]:
@@ -10549,7 +10573,12 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
     guessed" contract as `game_started`.
     """
 
-    state: dict[str, Any] = {"game_started": None, "game_final": None, "game_kickoff_at": None}
+    state: dict[str, Any] = {
+        "game_started": None,
+        "game_final": None,
+        "game_kickoff_at": None,
+        "game_status": None,
+    }
     if projection_context is None or projection_context.games is None or not team:
         return state
     try:
@@ -10563,6 +10592,10 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
         # Final implies kicked off (game_has_started is True once played).
         state["game_final"] = bool(matchup.get("played")) and state["game_started"] is True
         state["game_kickoff_at"] = matchup.get("kickoff_at") or None
+        try:
+            state["game_status"] = nfl_schedule.game_phase(matchup)
+        except Exception:
+            state["game_status"] = None
     return state
 
 
@@ -10572,6 +10605,7 @@ def _project_real_starter_row(
     actual_points: Any,
     *,
     projection_context: "_ProjectionContext | None",
+    slot: str | None = None,
 ) -> dict[str, Any]:
     """One REAL current-week starter row: a player Sleeper says is actually
     starting this week, enriched via the same identity helper the suggested
@@ -10597,6 +10631,7 @@ def _project_real_starter_row(
         else None
     )
     fields.update(_player_game_state(fields.get("team"), projection_context))
+    fields["slot"] = slot
     return fields
 
 
@@ -10678,8 +10713,16 @@ def _real_current_lineup(
     *,
     projection_context: "_ProjectionContext | None" = None,
     settings: dict[str, Any] | None = None,
+    roster_positions: list[Any] | None = None,
 ) -> dict[str, Any]:
     """This roster's ACTUAL current-week lineup and points, straight from Sleeper.
+
+    `roster_positions` (the league's own Sleeper `roster_positions`) labels
+    each real starter with the lineup `slot` he occupies — Sleeper's
+    `starters` array is in the same order as the league's non-bench
+    roster positions, and an unfilled slot is reported as "0". Unfilled
+    slots are listed in `real_empty_slots` rather than dropped silently, so
+    a partial lineup reads as partial.
 
     modules.sleeper.get_matchups already returns, per roster, `starters`
     (the player_ids this manager genuinely has starting this week in
@@ -10697,11 +10740,19 @@ def _real_current_lineup(
     real (nobody has scored yet) and is reported as such.
     """
 
-    starter_ids = [str(pid) for pid in (matchup_entry.get("starters") or []) if pid and str(pid) != "0"]
+    raw_starters = [str(pid or "") for pid in (matchup_entry.get("starters") or [])]
+    starter_ids = [pid for pid in raw_starters if pid and pid != "0"]
     if not starter_ids:
-        return {"real_starters": [], "real_points": None, "has_live_data": False, "real_starters_basis": REAL_LINEUP_BASIS}
+        return {
+            "real_starters": [],
+            "real_points": None,
+            "has_live_data": False,
+            "real_starters_basis": REAL_LINEUP_BASIS,
+            "real_empty_slots": [],
+        }
 
     starters_points = matchup_entry.get("starters_points") or []
+    slot_labels = _starter_slot_labels(roster_positions)
 
     valued_by_id: dict[str, pd.Series] = {}
     if "player_id" in valued.columns:
@@ -10734,7 +10785,17 @@ def _real_current_lineup(
         }
 
     rows: list[dict[str, Any]] = []
-    for index, player_id in enumerate(starter_ids):
+    empty_slots: list[str] = []
+    # Indexes run over Sleeper's RAW starters array (empty "0" slots
+    # included): `starters_points` is parallel to that raw array, so
+    # skipping an empty slot before indexing would hand every later starter
+    # his neighbour's points.
+    for index, player_id in enumerate(raw_starters):
+        slot = slot_labels[index] if index < len(slot_labels) else None
+        if not player_id or player_id == "0":
+            if slot:
+                empty_slots.append(slot)
+            continue
         actual_points = starters_points[index] if index < len(starters_points) else None
         row = valued_by_id.get(player_id)
         if row is None:
@@ -10742,7 +10803,7 @@ def _real_current_lineup(
         if row is not None:
             rows.append(
                 _project_real_starter_row(
-                    row, score_field, actual_points, projection_context=projection_context
+                    row, score_field, actual_points, projection_context=projection_context, slot=slot
                 )
             )
         else:
@@ -10789,6 +10850,8 @@ def _real_current_lineup(
                     "game_started": None,
                     "game_final": None,
                     "game_kickoff_at": None,
+                    "game_status": None,
+                    "slot": slot,
                 }
             )
 
@@ -10798,7 +10861,43 @@ def _real_current_lineup(
         "real_points": round(float(team_points), 2) if isinstance(team_points, (int, float)) else None,
         "has_live_data": True,
         "real_starters_basis": REAL_LINEUP_BASIS,
+        "real_empty_slots": empty_slots,
     }
+
+
+# Sleeper roster_positions spellings -> the slot names
+# modules.team_eval.suggest_optimal_lineup assigns, so a suggested starter's
+# `slot` and a real starter's `slot` compare directly. Anything unlisted
+# (DEF, IDP slots, REC_FLEX) passes through as Sleeper spells it: the
+# suggested lineup never fills those, and they're labelled honestly rather
+# than folded into a slot they aren't.
+_SLEEPER_SLOT_ALIASES = {
+    "DST": "DEF",
+    "D/ST": "DEF",
+    "W/R/T": "FLEX",
+    "RB/WR/TE": "FLEX",
+    "WR/RB/TE": "FLEX",
+    "WRRB_FLEX": "WR/RB",
+    "W/R": "WR/RB",
+    "RB/WR": "WR/RB",
+    "OP": "SUPER_FLEX",
+}
+_NON_STARTER_ROSTER_POSITIONS = {"BN", "BE", "BENCH", "IR", "TAXI"}
+
+
+def _canonical_lineup_slot(position: Any) -> str:
+    label = str(position or "").strip().upper()
+    return _SLEEPER_SLOT_ALIASES.get(label, label)
+
+
+def _starter_slot_labels(roster_positions: list[Any] | None) -> list[str]:
+    """The league's starting slots, in Sleeper's own `starters` order."""
+
+    return [
+        _canonical_lineup_slot(pos)
+        for pos in (roster_positions or [])
+        if str(pos or "").strip() and str(pos or "").strip().upper() not in _NON_STARTER_ROSTER_POSITIONS
+    ]
 
 
 def _real_matchup_comparison(my_side: dict[str, Any], opponent_side: dict[str, Any]) -> dict[str, Any] | None:
@@ -10854,6 +10953,219 @@ def _matchup_comparison(my_total: float, opponent_total: float) -> dict[str, Any
     }
 
 
+_SLOT_ELIGIBLE_POSITIONS: dict[str, set[str]] = {
+    "QB": {"QB"},
+    "RB": {"RB"},
+    "WR": {"WR"},
+    "TE": {"TE"},
+    "K": {"K"},
+    "DEF": {"DEF"},
+    "FLEX": {"RB", "WR", "TE"},
+    "WR/RB": {"RB", "WR"},
+    "SUPER_FLEX": {"QB", "RB", "WR", "TE"},
+}
+
+
+def _position_edges(my_starters: list[dict[str, Any]], opponent_starters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-position expected-points edge between two lineups.
+
+    Each starter counts at his real position, not his lineup slot (a FLEX
+    RB adds to RB), and contributes modules.matchup_win_probability.
+    starter_expected_points: his real score once his game has started, this
+    week's projection before that. That is the same per-player figure the
+    win probability sums. A starter with no usable number is counted in
+    `unmodeled`, never as a guessed 0. Sorted strongest edge for you first.
+    """
+
+    totals: dict[str, dict[str, Any]] = {}
+
+    def add(starters: list[dict[str, Any]], points_key: str, count_key: str) -> None:
+        for starter in starters:
+            position = str(starter.get("position") or "").strip().upper()
+            if not position:
+                continue
+            bucket = totals.setdefault(
+                position,
+                {"my_points": 0.0, "opponent_points": 0.0, "my_count": 0, "opponent_count": 0, "unmodeled": 0},
+            )
+            bucket[count_key] += 1
+            points = matchup_win_probability.starter_expected_points(starter)
+            if points is None:
+                bucket["unmodeled"] += 1
+                continue
+            bucket[points_key] += points
+
+    add(my_starters, "my_points", "my_count")
+    add(opponent_starters, "opponent_points", "opponent_count")
+
+    edges = [
+        {
+            "position": position,
+            "my_points": round(bucket["my_points"], 1),
+            "opponent_points": round(bucket["opponent_points"], 1),
+            "edge": round(bucket["my_points"] - bucket["opponent_points"], 1),
+            "my_count": bucket["my_count"],
+            "opponent_count": bucket["opponent_count"],
+            "unmodeled": bucket["unmodeled"],
+        }
+        for position, bucket in totals.items()
+        # A position where no starter on either side is modeled has no real
+        # number to compare, only two zeros.
+        if bucket["unmodeled"] < bucket["my_count"] + bucket["opponent_count"]
+    ]
+    edges.sort(key=lambda item: item["edge"], reverse=True)
+    return edges
+
+
+def _move_player_fields(player: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "player_id": player.get("player_id"),
+        "name": player.get("name"),
+        "position": player.get("position"),
+        "team": player.get("team"),
+        "tier": player.get("tier"),
+        "slot": player.get("slot"),
+        "points": matchup_win_probability.starter_expected_points(player),
+        "projection_status": (player.get("projection") or {}).get("status"),
+        "injury_label": player.get("injury_label") or "",
+    }
+
+
+def _benched_reason(player: dict[str, Any]) -> str | None:
+    """Why the suggested lineup sits this ACTUAL starter, when it is a hard
+    availability fact (bye, ruled out) rather than a value call."""
+
+    if (player.get("projection") or {}).get("status") == "bye_week":
+        return "bye_week"
+    from modules.rankings import is_ruled_out  # local: same import-cycle guard team_eval uses
+
+    if is_ruled_out(str(player.get("status") or ""), str(player.get("injury_status") or "")):
+        return "ruled_out"
+    return None
+
+
+def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """The changes that turn this roster's ACTUAL Sleeper lineup into its
+    suggested one: "start X over Y", one per player who differs.
+
+    None when Sleeper hasn't posted an actual lineup yet (nothing to diff).
+    Only slots the suggested lineup fills are compared, so a team DEF or an
+    IDP slot never produces a phantom move. Each suggested-only player is
+    paired with the actual-only starter in the same slot first, then an
+    empty slot of that kind, then any slot his position can fill, then
+    whatever remains.
+
+    `gain` is the difference in the two players' expected points (see
+    matchup_win_probability.starter_expected_points). A bye-week or
+    ruled-out starter counts as 0 because he cannot score; a player with no
+    modeled number leaves `gain` None rather than guessed. `locked` is True
+    once either player's own game has kicked off, because Sleeper no longer
+    allows that swap. FantasyDesk can't set Sleeper lineups, so this is a
+    planner and the client says so.
+    """
+
+    if not my_side.get("has_live_data"):
+        return None
+
+    suggested = list(my_side.get("starters") or [])
+    actual = list(my_side.get("real_starters") or [])
+    suggested_slots = {str(p.get("slot") or "") for p in suggested if p.get("slot")}
+    suggested_ids = {str(p.get("player_id") or "") for p in suggested}
+    actual_ids = {str(p.get("player_id") or "") for p in actual}
+
+    ins = [p for p in suggested if str(p.get("player_id") or "") not in actual_ids]
+    outs: list[dict[str, Any] | None] = [
+        p
+        for p in actual
+        if str(p.get("player_id") or "") not in suggested_ids and str(p.get("slot") or "") in suggested_slots
+    ]
+    empty_slots = [slot for slot in (my_side.get("real_empty_slots") or []) if slot in suggested_slots]
+
+    def pick(predicate: Any) -> dict[str, Any] | None:
+        for index, candidate in enumerate(outs):
+            if candidate is not None and predicate(candidate):
+                outs[index] = None
+                return candidate
+        return None
+
+    moves: list[dict[str, Any]] = []
+    for starter in ins:
+        slot = str(starter.get("slot") or "")
+        position = str(starter.get("position") or "").upper()
+        filled_empty = False
+
+        over = pick(lambda c: str(c.get("slot") or "") == slot)
+        if over is None and slot in empty_slots:
+            empty_slots.remove(slot)
+            filled_empty = True
+            move_slot = slot
+        else:
+            if over is None:
+                over = pick(lambda c: position in _SLOT_ELIGIBLE_POSITIONS.get(str(c.get("slot") or ""), set()))
+            if over is None:
+                over = pick(lambda c: True)
+            if over is not None:
+                move_slot = str(over.get("slot") or slot)
+            elif empty_slots:
+                move_slot = empty_slots.pop(0)
+                filled_empty = True
+            else:
+                move_slot = slot
+
+        start_fields = _move_player_fields(starter)
+        over_fields = _move_player_fields(over) if over is not None else None
+        reason = "empty_slot" if filled_empty else (_benched_reason(over) if over is not None else None)
+        if over_fields is not None and reason in {"bye_week", "ruled_out"}:
+            over_fields["points"] = 0.0
+        over_points = 0.0 if filled_empty else (over_fields["points"] if over_fields is not None else None)
+        start_points = start_fields["points"]
+        gain = (
+            round(float(start_points) - float(over_points), 1)
+            if start_points is not None and over_points is not None
+            else None
+        )
+        moves.append(
+            {
+                "slot": move_slot,
+                "start": start_fields,
+                "over": over_fields,
+                "over_reason": reason,
+                "gain": gain,
+                "locked": starter.get("game_started") is True
+                or (over is not None and over.get("game_started") is True),
+            }
+        )
+
+    moves.sort(key=lambda move: (move["locked"], move["gain"] is None, -(move["gain"] or 0.0)))
+    return moves
+
+
+def _matchup_game_state(my_side: dict[str, Any], opponent_side: dict[str, Any]) -> str | None:
+    """Where this fantasy week stands, from every real starter's own NFL
+    game: "live" while any is in progress, "final" once every known game is
+    final, "pregame" before any has kicked off, and "between_games" when
+    some are done and the rest haven't started (no LIVE badge then). None
+    when no starter's game status is known (lineups not posted, schedule
+    missing).
+    """
+
+    statuses = [
+        starter.get("game_status")
+        for side in (my_side, opponent_side)
+        for starter in (side.get("real_starters") or [])
+        if starter.get("game_status")
+    ]
+    if not statuses:
+        return None
+    if "in_progress" in statuses:
+        return "live"
+    if all(status == "final" for status in statuses):
+        return "final"
+    if all(status == "scheduled" for status in statuses):
+        return "pregame"
+    return "between_games"
+
+
 def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
     return {
         "ok": True,
@@ -10863,6 +11175,9 @@ def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
         "comparison": None,
         "real_comparison": None,
         "win_probability": None,
+        "game_state": None,
+        "position_edges": None,
+        "suggested_moves": None,
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": reason,
@@ -11008,6 +11323,7 @@ def get_league_matchup(
         score_field,
         players_lookup=matchup_players_lookup,
         projection_context=projection_context,
+        matchup_entry=my_entry,
     )
     opponent_side = _matchup_side(
         opponent_roster_id,
@@ -11018,6 +11334,7 @@ def get_league_matchup(
         score_field,
         players_lookup=matchup_players_lookup,
         projection_context=projection_context,
+        matchup_entry=opponent_entry,
     )
     if not my_side["starters"] and not opponent_side["starters"]:
         return _empty_matchup("empty_roster", week=current_week)
@@ -11031,12 +11348,25 @@ def get_league_matchup(
     # computed from data fetched ONCE for the whole request (both rosters),
     # not once per player, via `_ProjectionContext`/`_weekly_projection_for_
     # player`/`_player_game_state`.
+    roster_positions = league.get("roster_positions") if isinstance(league.get("roster_positions"), list) else []
     my_side.update(
-        _real_current_lineup(my_entry, valued, score_field, projection_context=projection_context, settings=settings)
+        _real_current_lineup(
+            my_entry,
+            valued,
+            score_field,
+            projection_context=projection_context,
+            settings=settings,
+            roster_positions=roster_positions,
+        )
     )
     opponent_side.update(
         _real_current_lineup(
-            opponent_entry, valued, score_field, projection_context=projection_context, settings=settings
+            opponent_entry,
+            valued,
+            score_field,
+            projection_context=projection_context,
+            settings=settings,
+            roster_positions=roster_positions,
         )
     )
 
@@ -11062,6 +11392,18 @@ def get_league_matchup(
         ),
         "real_comparison": _real_matchup_comparison(my_side, opponent_side),
         "win_probability": win_probability,
+        "game_state": _matchup_game_state(my_side, opponent_side),
+        # Per-position expected-points edges for each lineup view. `actual`
+        # is null until both sides have a real Sleeper lineup posted.
+        "position_edges": {
+            "actual": (
+                _position_edges(my_side["real_starters"], opponent_side["real_starters"])
+                if my_side.get("has_live_data") and opponent_side.get("has_live_data")
+                else None
+            ),
+            "suggested": _position_edges(my_side["starters"], opponent_side["starters"]),
+        },
+        "suggested_moves": None if league_calendar.is_best_ball(league) else _suggested_lineup_moves(my_side),
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": "",

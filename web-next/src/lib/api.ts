@@ -961,7 +961,17 @@ export interface MatchupStarter extends LineupPlayer {
    * _matchup_side docstring). coridian_, 2026-10-17: "everyy player on the
    * matchup screen needs a projection." */
   projection: PlayerWeekProjection | null;
+  /** This player's real points this week from Sleeper's `players_points`
+   * (bench included), so the Suggested view scores live too. Null before
+   * Sleeper posts lineups. Optional: absent on older payloads. */
+  actual_points?: number | null;
+  /** Same per-game signals a real starter carries — see MatchupRealStarter. */
+  game_started?: boolean | null;
+  game_status?: MatchupGameStatus | null;
 }
+
+/** modules.nfl_schedule.game_phase for one player's own NFL game. */
+export type MatchupGameStatus = "scheduled" | "in_progress" | "final";
 
 /**
  * A player Sleeper reports as ACTUALLY starting this week for this roster —
@@ -998,6 +1008,14 @@ export interface MatchupRealStarter {
   game_final?: boolean | null;
   /** Real kickoff instant (ISO-8601 UTC) for this player's game, or null. */
   game_kickoff_at?: string | null;
+
+  /** "scheduled" / "in_progress" / "final" for this player's own game —
+   * null when unknown. Optional: absent on older payloads. */
+  game_status?: MatchupGameStatus | null;
+  /** The league lineup slot he fills (Sleeper's roster_positions, mapped to
+   * the suggested lineup's slot names: QB/RB/WR/TE/FLEX/WR/RB/SUPER_FLEX/K,
+   * plus DEF and IDP slots as Sleeper spells them). */
+  slot?: string | null;
 }
 
 export interface MatchupSide {
@@ -1031,7 +1049,51 @@ export interface MatchupSide {
    * design, not a real 0. */
   has_live_data: boolean;
   real_starters_basis: "sleeper_actual_lineup";
+  /** Starting slots this roster left unfilled in Sleeper (an "Empty" row). */
+  real_empty_slots?: string[];
 }
+
+/** One position's expected-points edge between two lineups — each starter
+ * at his real position, real points once his game started, projection
+ * before. `unmodeled` starters had no usable number and add nothing. */
+export interface MatchupPositionEdge {
+  position: string;
+  my_points: number;
+  opponent_points: number;
+  edge: number;
+  my_count: number;
+  opponent_count: number;
+  unmodeled: number;
+}
+
+export interface MatchupMovePlayer {
+  player_id: string | null;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  slot: string | null;
+  /** Expected points (same figure as the win probability); null when the
+   * player isn't modeled. 0 for a bye-week or ruled-out starter. */
+  points: number | null;
+  projection_status: PlayerWeekProjection["status"] | null;
+  injury_label: string;
+}
+
+/** One "start X over Y" change turning the actual Sleeper lineup into the
+ * suggested one. FantasyDesk can't set Sleeper lineups — a planner only. */
+export interface MatchupSuggestedMove {
+  slot: string;
+  start: MatchupMovePlayer;
+  /** Null when X fills an empty slot. */
+  over: MatchupMovePlayer | null;
+  over_reason: "bye_week" | "ruled_out" | "empty_slot" | null;
+  gain: number | null;
+  /** True once either player's game has kicked off (Sleeper locks it). */
+  locked: boolean;
+}
+
+export type MatchupGameState = "pregame" | "live" | "between_games" | "final";
 
 export interface MatchupComparison {
   my_season_value: number;
@@ -1082,6 +1144,13 @@ export interface MatchupResponse {
    * data yet. */
   real_comparison: MatchupRealComparison | null;
   win_probability: MatchupWinProbability | null;
+  /** From every real starter's own NFL game; null when unknown. LIVE shows
+   * only for "live". Optional: absent on older payloads. */
+  game_state?: MatchupGameState | null;
+  /** `actual` is null until both sides have a real Sleeper lineup. */
+  position_edges?: { actual: MatchupPositionEdge[] | null; suggested: MatchupPositionEdge[] } | null;
+  /** Null until Sleeper has your actual lineup to diff against. */
+  suggested_moves?: MatchupSuggestedMove[] | null;
   basis: "season_value";
   basis_label: string;
   reason: string;

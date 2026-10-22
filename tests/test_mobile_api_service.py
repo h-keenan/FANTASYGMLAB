@@ -12645,7 +12645,15 @@ def test_matchup_response_carries_a_live_win_probability(monkeypatch):
         "opponent": "BUF",
     }
 
-    with _matchup_world(matchups):
+    # The opponent's starter plays for a different NFL team, so each side's
+    # game status is routed by team rather than by call order (suggested
+    # starters now carry game status too, so the call count isn't fixed).
+    players = _matchup_frame_with("opp1", team="BUF")
+
+    def fake_team_matchup(team, week, season, games=None):
+        return {"week": 5, "opponent": "NYJ", "kickoff_at": None, "played": team == "BUF"}
+
+    with _matchup_world(matchups, players=players):
         # _matchup_world already patches modules.sleeper.get_league with a
         # real-shaped league fixture (_MATCHUP_LEAGUE) that
         # resolve_league_path_id's own rollover check also reads via that
@@ -12658,17 +12666,12 @@ def test_matchup_response_carries_a_live_win_probability(monkeypatch):
                 with patch.object(player_projections, "team_defense_points_allowed_by_position", return_value={}):
                     with patch.object(player_projections, "project_player_week", return_value=fake_projection):
                         with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
-                            with patch(
-                                "modules.nfl_schedule.team_matchup_for_week",
-                                return_value={"week": 5, "opponent": "BUF", "kickoff_at": None, "played": True},
-                            ):
+                            with patch("modules.nfl_schedule.team_matchup_for_week", side_effect=fake_team_matchup):
                                 # My starter hasn't played; opponent's has
-                                # (and already finished) — distinct per
-                                # roster via side effect, same order
-                                # _real_current_lineup processes them in
-                                # (my_entry then opponent_entry).
+                                # (and already finished).
                                 with patch(
-                                    "modules.nfl_schedule.game_has_started", side_effect=[False, True]
+                                    "modules.nfl_schedule.game_has_started",
+                                    side_effect=lambda row, **kwargs: bool(row["played"]),
                                 ):
                                     response = client.get(
                                         "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
@@ -12725,7 +12728,7 @@ def test_matchup_win_probability_treats_an_in_progress_game_as_partial_not_final
                                 return_value={"week": 5, "opponent": "BUF", "kickoff_at": kickoff, "played": False},
                             ):
                                 with patch(
-                                    "modules.nfl_schedule.game_has_started", side_effect=[True, False]
+                                    "modules.nfl_schedule.game_has_started", return_value=True
                                 ):
                                     response = client.get(
                                         "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
@@ -12758,6 +12761,177 @@ def test_matchup_win_probability_is_honestly_unavailable_before_real_lineups_loc
     win_probability = response.json()["win_probability"]
     assert win_probability["available"] is False
     assert win_probability["reason"] == "no_starters"
+
+
+def _flat_projection_world(matchups, *, players=None, game_phase=None):
+    """_matchup_world plus every projection/schedule seam pinned: every
+    player projects exactly 10.0, and no game has a known kickoff unless
+    `game_phase` overrides modules.nfl_schedule.game_phase."""
+
+    from modules import player_projections
+
+    flat = {"status": "ok", "point_estimate": 10.0, "low": 8.0, "high": 12.0, "confidence": "high", "opponent": "BUF"}
+    stack = contextlib.ExitStack()
+    stack.enter_context(_matchup_world(matchups, players=players))
+    stack.enter_context(patch("modules.sleeper.get_players", return_value={}))
+    stack.enter_context(patch("modules.sleeper.get_season_player_stats", return_value={}))
+    stack.enter_context(patch.object(player_projections, "team_defense_points_allowed_by_position", return_value={}))
+    stack.enter_context(patch.object(player_projections, "project_player_week", return_value=flat))
+    stack.enter_context(patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()))
+    stack.enter_context(
+        patch(
+            "modules.nfl_schedule.team_matchup_for_week",
+            return_value={"week": 5, "opponent": "BUF", "kickoff_at": None, "played": False},
+        )
+    )
+    if game_phase is not None:
+        stack.enter_context(patch("modules.nfl_schedule.game_phase", return_value=game_phase))
+    return stack
+
+
+_FULL_MY_LINEUP = [f"mine{i}" for i in range(1, 9)]
+_FULL_OPP_LINEUP = [f"opp{i}" for i in range(1, 9)]
+
+
+def test_matchup_real_starters_carry_their_lineup_slot_and_keep_points_aligned_past_an_empty_slot(monkeypatch):
+    """Sleeper's `starters` array follows the league's non-bench
+    roster_positions and marks an unfilled slot "0". Each real starter is
+    labelled with the slot he fills, the empty slot is reported (not
+    dropped), and `starters_points` stays aligned with the RAW array — the
+    starter after an empty slot gets his own points, not his neighbour's."""
+
+    client = _client(monkeypatch)
+    # RB2 (index 2) left empty.
+    my_starters = ["mine1", "mine2", "0", "mine4", "mine5", "mine6", "mine7", "mine8"]
+    my_points = [11.0, 12.0, 0.0, 14.0, 15.0, 16.0, 17.0, 18.0]
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": my_starters, "starters_points": my_points, "points": 103.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": _FULL_OPP_LINEUP, "starters_points": [1.0] * 8, "points": 8.0},
+    ]
+
+    with _flat_projection_world(matchups):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine = response.json()["my_team"]
+    real = mine["real_starters"]
+    assert [p["player_id"] for p in real] == ["mine1", "mine2", "mine4", "mine5", "mine6", "mine7", "mine8"]
+    assert [p["slot"] for p in real] == ["QB", "RB", "WR", "WR", "WR", "TE", "FLEX"]
+    assert [p["actual_points"] for p in real] == [11.0, 12.0, 14.0, 15.0, 16.0, 17.0, 18.0]
+    assert mine["real_empty_slots"] == ["RB"]
+
+
+def test_matchup_suggested_moves_diff_the_actual_lineup_against_the_suggested_one(monkeypatch):
+    """A ruled-out player starting in Sleeper, and an empty slot, each turn
+    into a "start X over Y" move. The ruled-out starter counts as 0 points
+    (he can't score), so the gain is the starter's full projection."""
+
+    client = _client(monkeypatch)
+    # mine9 (WR) is Out: the suggested lineup benches him, but the manager
+    # started him in Sleeper over mine6 and left FLEX empty.
+    players = _matchup_frame_with("mine9", injury_status="Out")
+    my_starters = ["mine1", "mine2", "mine3", "mine4", "mine5", "mine9", "mine7", "0"]
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": my_starters, "starters_points": [0.0] * 8, "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": _FULL_OPP_LINEUP, "starters_points": [0.0] * 8, "points": 0.0},
+    ]
+
+    with _flat_projection_world(matchups, players=players):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    suggested_ids = {p["player_id"] for p in body["my_team"]["starters"]}
+    assert "mine9" not in suggested_ids
+    assert {"mine6", "mine8"} <= suggested_ids
+
+    moves = body["suggested_moves"]
+    assert len(moves) == 2
+    by_start = {move["start"]["player_id"]: move for move in moves}
+
+    over_out = by_start["mine6"]
+    assert over_out["slot"] == "WR"
+    assert over_out["over"]["player_id"] == "mine9"
+    assert over_out["over_reason"] == "ruled_out"
+    assert over_out["over"]["points"] == 0.0
+    assert over_out["gain"] == 10.0
+    assert over_out["locked"] is False
+
+    fills_empty = by_start["mine8"]
+    assert fills_empty["slot"] == "FLEX"
+    assert fills_empty["over"] is None
+    assert fills_empty["over_reason"] == "empty_slot"
+    assert fills_empty["gain"] == 10.0
+
+
+def test_matchup_suggested_moves_are_empty_when_lineups_match_and_null_before_sleeper_posts_one(monkeypatch):
+    client = _client(monkeypatch)
+    matched = [
+        {"roster_id": 1, "matchup_id": 3, "starters": _FULL_MY_LINEUP, "starters_points": [0.0] * 8, "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": _FULL_OPP_LINEUP, "starters_points": [0.0] * 8, "points": 0.0},
+    ]
+    # mine9 benched in the fixture's suggested lineup? Both RB3 and WR4 tie
+    # on value, so pin the FLEX: drop mine9 below everyone.
+    players = _matchup_frame_with("mine9", score=1, dynasty_score=1, value_score=1, rebuild_score=1)
+    with _flat_projection_world(matched, players=players):
+        matched_body = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}).json()
+    assert matched_body["suggested_moves"] == []
+
+    not_posted = [{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}]
+    with _matchup_world(not_posted):
+        not_posted_body = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}).json()
+    assert not_posted_body["suggested_moves"] is None
+    assert not_posted_body["position_edges"]["actual"] is None
+    assert not_posted_body["game_state"] is None
+
+
+def test_matchup_position_edges_sum_each_positions_expected_points(monkeypatch):
+    """Per-position edges come from the same per-starter expected points the
+    win probability uses. The opponent left TE empty, so TE is a clean
+    +10 edge; every other position is level."""
+
+    client = _client(monkeypatch)
+    opp_starters = ["opp1", "opp2", "opp3", "opp4", "opp5", "opp6", "0", "opp8"]
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": _FULL_MY_LINEUP, "starters_points": [0.0] * 8, "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": opp_starters, "starters_points": [0.0] * 8, "points": 0.0},
+    ]
+
+    with _flat_projection_world(matchups):
+        body = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}).json()
+
+    edges = {edge["position"]: edge for edge in body["position_edges"]["actual"]}
+    assert edges["TE"] == {
+        "position": "TE",
+        "my_points": 10.0,
+        "opponent_points": 0.0,
+        "edge": 10.0,
+        "my_count": 1,
+        "opponent_count": 0,
+        "unmodeled": 0,
+    }
+    assert edges["QB"]["edge"] == 0.0
+    assert edges["WR"]["my_points"] == 30.0
+    # Strongest edge for you first.
+    assert body["position_edges"]["actual"][0]["position"] == "TE"
+    assert body["position_edges"]["suggested"]
+    assert body["opponent"]["real_empty_slots"] == ["TE"]
+
+
+def test_matchup_game_state_is_live_only_while_a_starters_game_is_in_progress(monkeypatch):
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": _FULL_MY_LINEUP, "starters_points": [0.0] * 8, "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": _FULL_OPP_LINEUP, "starters_points": [0.0] * 8, "points": 0.0},
+    ]
+
+    states = {}
+    for phase in ("scheduled", "in_progress", "final"):
+        with _flat_projection_world(matchups, game_phase=phase):
+            body = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}).json()
+        states[phase] = body["game_state"]
+        assert body["my_team"]["real_starters"][0]["game_status"] == phase
+        assert body["my_team"]["starters"][0]["game_status"] == phase
+
+    assert states == {"scheduled": "pregame", "in_progress": "live", "final": "final"}
 
 
 def test_trade_outcomes_requires_auth(monkeypatch):

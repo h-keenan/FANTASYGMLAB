@@ -20,7 +20,7 @@ import os
 import threading
 import time
 import weakref
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -447,3 +447,45 @@ def game_has_started(game_row: dict[str, Any] | None, *, now: datetime | None = 
         return None
     reference = now if now is not None else datetime.now(timezone.utc)
     return reference >= kickoff
+
+
+# Upper bound on how long one NFL game stays "in progress" after its real
+# kickoff. nflverse's games.csv (cached up to GAMES_CACHE_TTL_SECONDS) can
+# lag hours behind the final whistle before it publishes a score, so
+# `played` alone would keep a long-finished game "live" well into the
+# night. Regulation plus overtime and stoppages runs about 3.5 hours; this
+# leaves margin without stretching into the next window of games.
+GAME_IN_PROGRESS_WINDOW = timedelta(hours=4, minutes=30)
+
+
+def game_phase(game_row: dict[str, Any] | None, *, now: datetime | None = None) -> str | None:
+    """Where one game (a `team_matchup_for_week` row) stands right now:
+    "scheduled" (not kicked off), "in_progress" (kicked off, no final yet,
+    still inside GAME_IN_PROGRESS_WINDOW), or "final" (nflverse has a final
+    score, or the window has passed). None when `game_has_started` can't
+    tell (bye, no kickoff time), so a caller never guesses.
+
+    Matchup's LIVE indicator is driven by this: it shows only while at least
+    one starter's own game is genuinely in progress, never just because the
+    fantasy week has started.
+    """
+
+    if game_row is None:
+        return None
+    if game_row.get("played"):
+        return "final"
+    started = game_has_started(game_row, now=now)
+    if started is None:
+        return None
+    if not started:
+        return "scheduled"
+    kickoff_at = game_row.get("kickoff_at")
+    if kickoff_at:
+        try:
+            kickoff = datetime.fromisoformat(kickoff_at)
+        except ValueError:
+            kickoff = None
+        reference = now if now is not None else datetime.now(timezone.utc)
+        if kickoff is not None and reference >= kickoff + GAME_IN_PROGRESS_WINDOW:
+            return "final"
+    return "in_progress"

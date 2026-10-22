@@ -535,7 +535,16 @@ export interface MyTeamResponse {
 export interface MatchupStarter extends LineupPlayer {
   /** Season-form reasoning: tier, workload/opportunity label, season-value rank, injury tag. */
   why: string;
+  /** This week's projection; null when no projection context exists. */
+  projection?: PlayerWeekProjection | null;
+  /** Real points this week (Sleeper players_points); null before lineups post. */
+  actual_points?: number | null;
+  game_started?: boolean | null;
+  game_status?: MatchupGameStatus | null;
 }
+
+/** modules.nfl_schedule.game_phase for one player's own NFL game. */
+export type MatchupGameStatus = 'scheduled' | 'in_progress' | 'final';
 
 /**
  * A player Sleeper reports as ACTUALLY starting this week for this roster —
@@ -578,6 +587,10 @@ export interface MatchupRealStarter {
    * schedule fetch hiccup) — treat as unknown, never as "started".
    */
   game_started: boolean | null;
+  /** "scheduled" / "in_progress" / "final" for his own game; null when unknown. */
+  game_status?: MatchupGameStatus | null;
+  /** The league lineup slot he fills, named like the suggested lineup's slots. */
+  slot?: string | null;
 }
 
 export interface MatchupSide {
@@ -616,6 +629,52 @@ export interface MatchupSide {
    */
   has_live_data: boolean;
   real_starters_basis: 'sleeper_actual_lineup';
+  /** Starting slots this roster left unfilled in Sleeper. */
+  real_empty_slots?: string[];
+}
+
+/** One position's expected-points edge between two lineups. */
+export interface MatchupPositionEdge {
+  position: string;
+  my_points: number;
+  opponent_points: number;
+  edge: number;
+  my_count: number;
+  opponent_count: number;
+  unmodeled: number;
+}
+
+export interface MatchupMovePlayer {
+  player_id: string | null;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  slot: string | null;
+  points: number | null;
+  projection_status: PlayerWeekProjection['status'] | null;
+  injury_label: string;
+}
+
+/** One "start X over Y" change from the Sleeper lineup to the suggested one. Planner only. */
+export interface MatchupSuggestedMove {
+  slot: string;
+  start: MatchupMovePlayer;
+  over: MatchupMovePlayer | null;
+  over_reason: 'bye_week' | 'ruled_out' | 'empty_slot' | null;
+  gain: number | null;
+  locked: boolean;
+}
+
+export type MatchupGameState = 'pregame' | 'live' | 'between_games' | 'final';
+
+/** modules.matchup_win_probability output; `available` false when coverage is too thin. */
+export interface MatchupWinProbability {
+  available: boolean;
+  reason?: 'no_starters' | 'insufficient_coverage';
+  probability?: number;
+  my_projected_total?: number;
+  opponent_projected_total?: number;
 }
 
 export interface MatchupComparison {
@@ -650,6 +709,10 @@ export interface MatchupResponse {
   basis: 'season_value';
   basis_label: string;
   reason: string;
+  win_probability?: MatchupWinProbability | null;
+  game_state?: MatchupGameState | null;
+  position_edges?: { actual: MatchupPositionEdge[] | null; suggested: MatchupPositionEdge[] } | null;
+  suggested_moves?: MatchupSuggestedMove[] | null;
   /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
   best_ball?: boolean;
   lineup_advice_message?: string;
