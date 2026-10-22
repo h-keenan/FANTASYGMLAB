@@ -85,9 +85,19 @@ export function ShareTradeButton({
       // border/background), indistinguishable from a navigation link.
       // Same small bordered-pill treatment the value-edge badge right
       // beside it already uses in this row.
-      className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
-      style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
+      className="inline-flex items-center gap-1.5 px-3 text-xs font-bold shrink-0"
+      style={{
+        color: "var(--color-accent)",
+        border: "1px solid var(--color-accent)",
+        background: "transparent",
+        minHeight: "2.25rem",
+      }}
     >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+        <path d="M16 6l-4-4-4 4" />
+        <path d="M12 2v13" />
+      </svg>
       {preparingImage ? "Preparing…" : copied ? "Copied!" : "Share"}
     </button>
   );

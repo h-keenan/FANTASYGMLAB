@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { MatchupContent } from "./MatchupContent";
@@ -171,6 +171,7 @@ describe("MatchupContent", () => {
   it("shows the suggested-lineup disclosure and each side's best lineup", () => {
     render(<MatchupContent leagueName="My League" matchup={BASE_RESPONSE} />);
 
+    fireEvent.click(screen.getByRole("button", { name: /Suggested starters, not set lineups/ }));
     expect(screen.getByText(/each roster's best available lineup by season-long value/)).toBeInTheDocument();
     expect(screen.getByText("Your suggested starters")).toBeInTheDocument();
     expect(screen.getByText("Rival Squad's best lineup")).toBeInTheDocument();

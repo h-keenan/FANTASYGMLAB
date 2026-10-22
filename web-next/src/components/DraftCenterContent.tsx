@@ -60,7 +60,7 @@ export function DraftCenterContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Your draft posture, pick values, and who to call before you open Trade Hub.
+          Draft posture and pick values.
         </p>
       </header>
 
@@ -174,8 +174,7 @@ export function DraftCenterContent({
           More Draft Tools
         </h2>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          The live draft board (with manual pick overrides), draft history, and future-class scouting still live on
-          the classic page.
+          Live board, draft history and scouting are on the classic page.
         </p>
         <a
           href={streamlitPageUrl("draft_summary")}

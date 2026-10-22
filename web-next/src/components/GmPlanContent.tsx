@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/InfoTip";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -514,17 +515,17 @@ export function GmPlanContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Your season-arc roadmap, declared stance, and protected/watched players — all in one place.
+          Roadmap, stance, and watched players.
         </p>
       </header>
 
       {teamStance ? (
         <section className="flex flex-col gap-2">
           <h2 style={{ font: "var(--type-section-title)" }}>Team Situation</h2>
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <InfoTip label="How you see this team">
             Tell us how you see this team right now. We&apos;ll lean trade-idea language toward that stance, and use
             it to shape your trade and lineup value adjustments too.
-          </p>
+          </InfoTip>
           <PillRow
             options={TEAM_STANCE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
             active={stance}
@@ -601,10 +602,10 @@ export function GmPlanContent({
       {myTeam && leagueId ? (
         <section className="flex flex-col gap-2">
           <h2 style={{ font: "var(--type-section-title)" }}>Protected Players</h2>
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <InfoTip label="Players you won&apos;t trade">
             Mark players you don&apos;t want traded away. This is the same protection the Watching list below uses
             — toggling it here or there shows up in both places.
-          </p>
+          </InfoTip>
 
           {noRoster ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -647,7 +648,7 @@ export function GmPlanContent({
         <section className="flex flex-col gap-2">
           <h2 style={{ font: "var(--type-section-title)" }}>Watching</h2>
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Players you&apos;re considering buying, selling, adding, or monitoring — not trade-protected.
+            Considering or monitoring; not trade-protected.
           </p>
           {watching.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

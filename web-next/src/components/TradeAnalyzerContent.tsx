@@ -475,8 +475,7 @@ function VerdictCard({
       ) : null}
 
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        There&apos;s no in-app accept, decline, or counter here — reply to your trade partner directly
-        (Sleeper, group chat, etc.).
+        Reply to your partner directly — no in-app accept.
       </p>
     </section>
   );
@@ -748,7 +747,7 @@ export function TradeAnalyzerContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Evaluate an offer you received — build it exactly, get a real accept / decline / counter verdict.
+          Build an offer, get a verdict.
         </p>
       </header>
 

@@ -432,7 +432,7 @@ export function PortfolioContent({
           <AddLeagueLink />
         </header>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Save a league to see your standing, record, and top need or opportunity across every league here.
+          Save a league to see it here.
         </p>
       </main>
     );
@@ -446,7 +446,7 @@ export function PortfolioContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>Your leagues</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Your standing, record, and top need or opportunity across every saved league.
+          Standing, record, and top need per league.
         </p>
         <AddLeagueLink />
       </header>
