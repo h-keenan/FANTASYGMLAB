@@ -1984,9 +1984,21 @@ a {
 .onboarding-footer {
   margin-top: auto;
   padding: var(--space-lg) 0 var(--space-xl);
+  display: flex;
+  gap: var(--space-sm);
+}
+.onboarding-back {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-button);
+  cursor: pointer;
 }
 .onboarding-next {
-  width: 100%;
+  flex: 1;
   padding: var(--space-md);
   border-radius: var(--radius-control);
   background: var(--color-accent-strong);
@@ -2099,50 +2111,34 @@ a {
   line-height: 1.5;
   margin-top: 2px;
 }
-.onboarding-preview {
-  padding: var(--space-md);
-  display: flex;
-  flex-direction: column;
+.onboarding-feature {
   gap: var(--space-sm);
-  text-align: left;
 }
-.onboarding-preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.onboarding-preview-title {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-eyebrow);
-  color: var(--color-accent);
-}
-.onboarding-preview-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  font-size: var(--font-size-body);
-  font-weight: 600;
-}
-.onboarding-preview-arrow {
-  color: var(--color-text-muted);
-}
-.onboarding-preview-stat {
-  font-size: var(--font-size-numeric);
-  color: var(--color-success);
-}
-.onboarding-preview-bar {
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-border);
+.onboarding-phone {
+  height: clamp(17rem, 64vh, 36rem);
+  aspect-ratio: 600 / 1298;
+  max-width: 100%;
+  margin-top: var(--space-sm);
+  border: 5px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
-.onboarding-preview-bar span {
+.onboarding-phone-img {
   display: block;
+  width: 100%;
   height: 100%;
-  background: var(--color-success);
+  object-fit: cover;
+  object-position: top;
+}
+.onboarding-benefit {
+  margin: var(--space-sm) 0 0;
+  max-width: 20rem;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-metadata);
+  line-height: var(--line-height-body);
+  color: var(--color-text-secondary);
 }
 .onboarding-steps {
   margin-top: var(--space-lg);

@@ -1,11 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { ConfidenceMeter } from "@/components/ConfidenceMeter";
-import { LeanBarMeter } from "@/components/LeanBarMeter";
-import { ToneBadge } from "@/components/ToneBadge";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
@@ -14,30 +11,45 @@ import type { ExperienceLevel } from "@/lib/experienceCopy";
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
  * onboarding. We need at least 3 pgs on sign up abt who we are and what we
  * solve and how it works and ask if the user is a beginner or advanced."
- * Shown once, right after a brand-new account's first sign-in, before
- * OnboardingPaywall — mirrors mobile's own OnboardingScreen.tsx timing
- * ("shown once after sign-in"), just a focused 4-step version instead of
- * mobile's full 6-slide tutorial (that one also covers the GM orb and
- * Premium, which don't exist as concepts on web yet).
+ * Reworked 2026-10-22 (owner: the sample-card slide was "too basic"): one
+ * swipeable slide per feature, each led by a real screenshot of that page
+ * in a phone frame with a one-line benefit below, then Connect, then the
+ * experience picker. Shown once, right after a brand-new account's first
+ * sign-in, before OnboardingPaywall.
  *
- * Steps 1-3's copy is verbatim from mobile's OnboardingScreen.tsx SLIDES
- * array ("Copy approved by coridian_ via Discord brainstorm, 2026-09-26 —
- * do not rephrase without re-checking with product") — not rewritten here.
- * Step 4 (experience level) is new; the only approved copy for it is this
- * component's own.
+ * The screenshots (public/onboarding/*.webp, mirrored in mobile/assets/
+ * onboarding/) are captured from this app's real UI against a generic
+ * sample league: no real users' data. Keep FEATURES in lockstep with
+ * mobile's OnboardingScreen.tsx.
  *
  * Deliberately a fixed dark/cinematic treatment regardless of the app's
- * normal light/dark theme toggle (prefers-color-scheme) — this is a
- * one-time, brief intro screen, not a persistent themed surface, and the
- * animated field-line background only reads correctly on black.
+ * normal light/dark theme toggle — this is a one-time, brief intro screen,
+ * not a persistent themed surface.
  */
+export const ONBOARDING_FEATURES = [
+  { key: "gameplan", title: "Game Plan", benefit: "One clear top priority every time you open the app." },
+  { key: "tradehub", title: "Trade Hub", benefit: "Trade ideas your league partners would actually accept." },
+  { key: "matchup", title: "Matchup", benefit: "Win odds for your week, before kickoff." },
+  { key: "planner", title: "Lineup Planner", benefit: "See what a swap does to your win odds." },
+  { key: "pqv", title: "Player Quick View", benefit: "Value, usage, and fit for any player in one tap." },
+  { key: "playoff", title: "Playoff Odds", benefit: "Simulated playoff odds for every team in your league." },
+  { key: "tendencies", title: "Manager Tendencies", benefit: "Know how each manager trades before you pitch." },
+  { key: "waivers", title: "Waivers", benefit: "Priority Adds ranked for your roster, with FAAB ranges." },
+] as const;
+
+const SWIPE_THRESHOLD_PX = 50;
+
 export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
   const [saving, setSaving] = useState(false);
+  const touchStartX = useRef<number | null>(null);
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
 
-  const totalSteps = 4;
+  const featureCount = ONBOARDING_FEATURES.length;
+  const connectStep = featureCount;
+  const levelStep = featureCount + 1;
+  const totalSteps = featureCount + 2;
 
   const finish = async () => {
     if (!level) return;
@@ -57,19 +69,38 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   };
 
   const next = () => {
-    if (step === totalSteps - 1) {
+    if (step === levelStep) {
       void finish();
       return;
     }
     setStep((s) => s + 1);
   };
+  const back = () => setStep((s) => Math.max(0, s - 1));
+
+  const onTouchEnd = (clientX: number) => {
+    const start = touchStartX.current;
+    touchStartX.current = null;
+    if (start === null) return;
+    const dx = clientX - start;
+    // The last step ends in an explicit choice, so a swipe never skips it.
+    if (dx <= -SWIPE_THRESHOLD_PX && step < levelStep) setStep(step + 1);
+    else if (dx >= SWIPE_THRESHOLD_PX) back();
+  };
+
+  const feature = step < featureCount ? ONBOARDING_FEATURES[step] : null;
 
   return (
     <div className="onboarding-shell">
       <div className="onboarding-field" aria-hidden="true" />
       <div className="onboarding-sweep" aria-hidden="true" />
 
-      <div className="onboarding-content">
+      <div
+        className="onboarding-content"
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0]?.clientX ?? null;
+        }}
+        onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
+      >
         <div className="onboarding-topbar">
           <div className="onboarding-dots">
             {Array.from({ length: totalSteps }).map((_, i) => (
@@ -81,109 +112,33 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
           </button>
         </div>
 
-        {step === 0 ? (
+        {feature ? (
+          <div className="onboarding-section onboarding-section--center onboarding-feature">
+            <span className="onboarding-eyebrow">{feature.title}</span>
+            <div className="onboarding-phone">
+              <Image
+                src={`/onboarding/onboarding-${feature.key}.webp`}
+                alt={`${feature.title} screen, shown with sample league data`}
+                width={600}
+                height={1298}
+                priority={step === 0}
+                className="onboarding-phone-img"
+              />
+            </div>
+            <p className="onboarding-benefit">{feature.benefit}</p>
+          </div>
+        ) : null}
+
+        {step === connectStep ? (
           <div className="onboarding-hero">
             <Image src="/brand-mark-white.png" alt="" width={56} height={56} className="onboarding-mark" />
-            <span className="onboarding-eyebrow">Who we are</span>
-            <h1 className="onboarding-headline">Your fantasy front office, not just a stats app.</h1>
-            <p className="onboarding-body">
-              Real recommendations across your Trade Hub, Waivers, and Game Plan — not raw data you have to interpret
-              yourself.
-            </p>
+            <span className="onboarding-eyebrow">One setup step</span>
+            <h1 className="onboarding-headline onboarding-headline--sm">Connect Sleeper or ESPN</h1>
+            <p className="onboarding-body">Every recommendation is built around your league.</p>
           </div>
         ) : null}
 
-        {step === 1 ? (
-          <div className="onboarding-section">
-            <span className="onboarding-eyebrow">What we solve</span>
-            <h1 className="onboarding-headline onboarding-headline--sm">
-              Dynasty data is everywhere.
-              <br />
-              Decisions are hard.
-            </h1>
-            <div className="onboarding-cards">
-              <div className="onboarding-glass onboarding-preview" aria-label="Sample Game Plan card">
-                <div className="onboarding-preview-head">
-                  <span className="onboarding-preview-title">Game Plan</span>
-                  <ToneBadge label="Sample" color="var(--color-text-muted)" />
-                </div>
-                <div className="onboarding-preview-line">Top priority: upgrade your weakest starter</div>
-                <ConfidenceMeter label="Confidence" value="High" color="var(--color-success)" />
-              </div>
-              <div className="onboarding-glass onboarding-preview" aria-label="Sample Trade Hub idea">
-                <div className="onboarding-preview-head">
-                  <span className="onboarding-preview-title">Trade Hub</span>
-                  <ToneBadge label="Sample" color="var(--color-text-muted)" />
-                </div>
-                <div className="onboarding-preview-line">
-                  <span>Your WR2 + 2027 2nd</span>
-                  <span className="onboarding-preview-arrow" aria-hidden="true">
-                    &rarr;
-                  </span>
-                  <span>Their RB1</span>
-                </div>
-                <LeanBarMeter sendScore={4200} receiveScore={5000} />
-              </div>
-              <div className="onboarding-glass onboarding-preview" aria-label="Sample matchup win probability">
-                <div className="onboarding-preview-head">
-                  <span className="onboarding-preview-title">Matchup</span>
-                  <ToneBadge label="Sample" color="var(--color-text-muted)" />
-                </div>
-                <div className="onboarding-preview-line">
-                  <span>Win probability</span>
-                  <strong className="onboarding-preview-stat">64%</strong>
-                </div>
-                <div className="onboarding-preview-bar" role="img" aria-label="64 percent win probability">
-                  <span style={{ width: "64%" }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div className="onboarding-section">
-            <span className="onboarding-eyebrow">How it works</span>
-            <h1 className="onboarding-headline onboarding-headline--sm">Three steps. That&apos;s it.</h1>
-            <div className="onboarding-steps">
-              <div className="onboarding-step">
-                <span className="onboarding-step-n" style={{ background: "var(--color-accent-strong)", color: "#061014" }}>
-                  1
-                </span>
-                <div className="onboarding-glass onboarding-step-card">
-                  <div className="onboarding-row-title">Connect Sleeper or ESPN</div>
-                  <div className="onboarding-row-body">
-                    The one setup step. Every recommendation depends on it.
-                  </div>
-                </div>
-              </div>
-              <div className="onboarding-step">
-                <span className="onboarding-step-n" style={{ background: "var(--color-premium)", color: "#1a1400" }}>
-                  2
-                </span>
-                <div className="onboarding-glass onboarding-step-card">
-                  <div className="onboarding-row-title">Get your Game Plan</div>
-                  <div className="onboarding-row-body">
-                    The Dashboard leads with your top priority action first.
-                  </div>
-                </div>
-              </div>
-              <div className="onboarding-step">
-                <span className="onboarding-step-n" style={{ background: "var(--color-success)", color: "#06210f" }}>
-                  3
-                </span>
-                <div className="onboarding-glass onboarding-step-card">
-                  <div className="onboarding-row-title">Make your move</div>
-                  <div className="onboarding-row-body">
-                    Act straight from Trade Hub or Waivers — recommendation and action, same place.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {step === 3 ? (
+        {step === levelStep ? (
           <div className="onboarding-section onboarding-section--center">
             <span className="onboarding-eyebrow">Last thing</span>
             <h1 className="onboarding-headline onboarding-headline--sm">How much dynasty experience do you have?</h1>
@@ -225,13 +180,18 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
         ) : null}
 
         <div className="onboarding-footer">
+          {step > 0 ? (
+            <button type="button" onClick={back} className="onboarding-back">
+              Back
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={next}
-            disabled={(step === totalSteps - 1 && !level) || saving}
+            disabled={(step === levelStep && !level) || saving}
             className="onboarding-next"
           >
-            {step === totalSteps - 1
+            {step === levelStep
               ? saving
                 ? `Setting up ${BRAND_NAME}…`
                 : "Start my 7-day free trial"
