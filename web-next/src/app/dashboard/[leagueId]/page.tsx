@@ -8,6 +8,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
 import { ErrorState } from "@/components/ErrorState";
+import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function DashboardPage() {
@@ -46,12 +47,16 @@ export default function DashboardPage() {
     rankings.catch(() => {
       /* the tile renders nothing on failure; avoid an unhandled rejection */
     });
+    // Handed down right away so League Pulse can paint while the (slower)
+    // Dashboard request is still running.
+    void Promise.resolve().then(() => {
+      if (!cancelled) setTeamRankings(rankings);
+    });
     api
       .getDashboard(leagueId, lens)
       .then((result) => {
         if (!cancelled) {
           setData(result);
-          setTeamRankings(rankings);
           setError(null);
         }
       })
@@ -63,9 +68,22 @@ export default function DashboardPage() {
     };
   }, [authLoading, session, leagueId, lens, lensReady, router, retryToken]);
 
-  if (authLoading || (!data && !error)) {
+  if (authLoading) {
+    return <LoadingScreen status="Loading Dashboard…" />;
+  }
+
+  if (!data && !error) {
+    // Show what is ready first: the page frame with height-reserving
+    // skeletons, and League Pulse as soon as its own request lands, instead
+    // of a splash until the slowest request finishes.
     return (
-      <LoadingScreen status="Loading Dashboard…" />
+      <main className="flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto" aria-busy="true">
+        <h1 className="sr-only">{leagueName}</h1>
+        <div className="pqv-skeleton-chart w-full" style={{ height: 120 }} aria-hidden="true" />
+        <div className="pqv-skeleton-chart w-full" style={{ height: 160 }} aria-hidden="true" />
+        {teamRankings ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}
+        <div className="pqv-skeleton-chart w-full" style={{ height: 120 }} aria-hidden="true" />
+      </main>
     );
   }
 

@@ -21,9 +21,16 @@ def _client(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key-for-tests")
 
+    from modules import league_warmup
     from services import mobile_api_service
 
-    return TestClient(mobile_api_service.app)
+    # Saving a league queues a background warm-up; keep it inert here and
+    # let tests assert on the recorded call.
+    warmup = Mock(return_value=True)
+    monkeypatch.setattr(league_warmup, "start_warmup", warmup)
+    client = TestClient(mobile_api_service.app)
+    client.warmup_mock = warmup
+    return client
 
 
 # A fixture named `_clear_trade_hub_ideas_cache` used to live here,
@@ -15418,3 +15425,77 @@ def test_percentile_explorer_small_pool_has_no_chart(monkeypatch):
     body = _explorer_get(monkeypatch, _pool_with_subject(4), "stat=ppr_ppg").json()
     assert body["reason"] == "insufficient_pool"
     assert "bins" not in body
+def _save_with_profile(client, league_id="new-league", entitlement="premium", existing=None, **extra):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": entitlement, "sleeper_username": "gm_dynasty"}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = existing if existing is not None else []
+    write_response = Mock(status_code=201)
+    write_response.json.return_value = []
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": league_id, "name": "L"}):
+            with patch("modules.sleeper.get_user_roster_id", return_value=4), patch(
+                "requests.patch", return_value=Mock(status_code=204)
+            ):
+                with patch("requests.post", return_value=write_response):
+                    return client.post(
+                        "/v1/leagues/save",
+                        json={"league_id": league_id, **extra},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+
+def test_save_league_kicks_off_one_warmup_after_the_response(monkeypatch):
+    client = _client(monkeypatch)
+    response = _save_with_profile(client)
+    assert response.json()["ok"] is True
+    assert response.json()["warming"] is True
+    client.warmup_mock.assert_called_once()
+    kwargs = client.warmup_mock.call_args.kwargs
+    assert kwargs["user_id"] == "user-123" and kwargs["league_id"] == "new-league"
+    assert set(kwargs["steps"]) == {"roster", "values", "trades"}
+
+
+def test_save_league_does_not_warm_up_espn_leagues(monkeypatch):
+    client = _client(monkeypatch)
+    with patch("modules.espn_leagues.get_league_snapshot", return_value=None):
+        response = client.post(
+            "/v1/leagues/save",
+            json={"league_id": "espn:1:2026", "roster_id": "1"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    client.warmup_mock.assert_not_called()
+    assert response.json()["ok"] is False
+
+
+def test_save_league_over_cap_does_not_warm_up(monkeypatch):
+    client = _client(monkeypatch)
+    response = _save_with_profile(client, entitlement="free", existing=[{"league_id": "already-saved"}])
+    assert response.json()["reason"] == "at_cap"
+    client.warmup_mock.assert_not_called()
+
+
+def test_save_league_still_succeeds_when_warmup_cannot_run(monkeypatch):
+    client = _client(monkeypatch)
+    client.warmup_mock.side_effect = RuntimeError("boom")
+    response = _save_with_profile(client)
+    assert response.status_code == 200 and response.json()["ok"] is True
+
+
+def test_warmup_status_endpoint_reports_stages(monkeypatch):
+    from modules import league_warmup
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    league_warmup._write_state("user-123", "lg1", "running", ["roster", "values"])
+    with patch("requests.get", side_effect=[auth_user_response]):
+        with patch("services.mobile_api_service.resolve_league_path_id", return_value="lg1"):
+            response = client.get(
+                "/v1/leagues/lg1/warmup-status", headers={"Authorization": "Bearer good-token"}
+            )
+    body = response.json()
+    assert body["state"] == "running"
+    assert body["stages"] == {"roster": True, "values": True, "trades": False}

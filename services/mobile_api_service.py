@@ -168,6 +168,7 @@ from modules import (
     league_history,
     league_glance,
     league_rankings,
+    league_warmup,
     league_recaps,
     league_standings,
     league_storylines,
@@ -1718,10 +1719,14 @@ def save_league(
         # ESPN roster resolution reads roster_id from this row, so the very
         # next My Team request must not see a pre-save cached copy.
         _forget_saved_leagues_cache(user_id)
+    warming = False
+    if not is_espn:
+        warming = _start_league_warmup(user_id, league_id, roster_id)
     return {
         "ok": True,
         "reason": "",
         "cap": cap,
+        "warming": warming,
         "league": {
             "league_id": league_id,
             "league_name": league_name,
@@ -1729,6 +1734,65 @@ def save_league(
             "platform": espn_leagues.league_platform(league_id),
         },
     }
+
+
+def _build_warmup_steps(league_id: str, roster_id: Any) -> dict[str, Any]:
+    """The same cached builders the Dashboard, My Team and Trade Hub call, at
+    their defaults for a brand-new league (Dynasty lens, no declared Team
+    Situation, no GM Targets), so the first real request is a cache hit."""
+
+    lens = "Dynasty"
+
+    def roster_step() -> None:
+        sleeper.get_league(league_id)
+        sleeper.get_rosters(league_id)
+
+    def values_step() -> None:
+        league_value_settings.build_valued_players_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+
+    def trades_step() -> None:
+        if roster_id in (None, ""):
+            return
+        league = sleeper.get_league(league_id) or {}
+        if league_calendar.trade_deadline_passed(league):
+            return
+        trade_hub_engine.generate_trade_idea_records_cached(
+            league_id=league_id,
+            roster_id=int(roster_id),
+            strategy=team_stance.team_strategy_for_stance(""),
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            untouchable_player_ids=(),
+            gm_target_player_ids=(),
+            team_stance="",
+        )
+
+    return {"roster": roster_step, "values": values_step, "trades": trades_step}
+
+
+def _start_league_warmup(user_id: str, league_id: str, roster_id: Any) -> bool:
+    """Start the best-effort warm-up thread (low priority, off the request).
+    start_warmup only does two Redis calls and a thread spawn, so it cannot
+    hold up the save response. True means the status endpoint will report
+    progress; False (rate-limited, busy, Redis down) means nothing to wait
+    for. Never raises."""
+
+    try:
+        return bool(
+            league_warmup.start_warmup(
+                user_id=user_id,
+                league_id=league_id,
+                steps=_build_warmup_steps(league_id, roster_id),
+            )
+        )
+    except Exception:
+        logger.debug("league warm-up could not start", exc_info=True)
+        return False
 
 
 # Sleeper leagues only ever grow a "next season" successor once the
@@ -1943,6 +2007,17 @@ def remove_saved_league(
             )
 
     return {"ok": True, "reason": ""}
+
+
+@app.get("/v1/leagues/{league_id}/warmup-status")
+def get_league_warmup_status(
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Which first-load stages of a just-saved league are ready. `state` is
+    none (nothing to wait for), running, done or error."""
+
+    return {"ok": True, **league_warmup.read_status(str(user.get("id") or ""), league_id)}
 
 
 @app.get("/v1/leagues/{league_id}")
