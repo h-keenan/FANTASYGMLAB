@@ -25,6 +25,7 @@ from modules.record_signal import (
     season_progress_fraction as _season_progress_fraction,
 )
 from modules.team_eval import (
+    MAX_KNOWN_PLAYER_AGE,
     get_team_vs_league,
     normalize_team_strategy,
     suggest_optimal_lineup,
@@ -1013,7 +1014,9 @@ def _asset_avg_age(assets: List[Dict[str, Any]]) -> float | None:
             age = float(asset.get("age") or 0)
         except Exception:
             age = 0
-        if age > 0:
+        # Skip the age-99 "unknown birth date" placeholder (see
+        # team_eval.MAX_KNOWN_PLAYER_AGE).
+        if 0 < age <= MAX_KNOWN_PLAYER_AGE:
             ages.append(age)
     if not ages:
         return None
