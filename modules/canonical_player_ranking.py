@@ -245,7 +245,21 @@ def _eligible_mask(frame: pd.DataFrame) -> pd.Series:
         .astype(str)
         .str.casefold()
     )
-    eligible = eligible & ~status.isin({"retired", "inactive", "not active", "excused"})
+    # Sleeper sends rostered IR players as status "Inactive" + injury_status
+    # IR/PUP/NFI/Out; that is a reserve designation, not an exclusion.
+    injury = (
+        frame.get("injury_status", pd.Series("", index=frame.index))
+        .fillna("")
+        .astype(str)
+        .str.casefold()
+    )
+    reserve_injury = injury.isin(
+        {"ir", "pup", "nfi", "out", "injured reserve", "physically unable to perform",
+         "non football injury", "non-football injury"}
+    )
+    eligible = eligible & (
+        ~status.isin({"retired", "inactive", "not active", "excused"}) | reserve_injury
+    )
     return eligible
 
 
