@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { UsageTrend } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { ToneBadge } from "@/components/ToneBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
@@ -41,7 +42,13 @@ export function PlayerHeroHeader({
   depthChartNote,
   valueNote,
   loadingIdentity = false,
+  byeWeek = null,
+  onByeThisWeek = false,
 }: {
+  /** Team bye week (null when unknown / free agent). */
+  byeWeek?: number | null;
+  /** True when the current NFL week is that bye. */
+  onByeThisWeek?: boolean;
   /** Why the Value tile is empty (server-provided), e.g. "No market value yet". */
   valueNote?: string | null;
   /** True while server-resolved identity may still fill team/value. */
@@ -104,6 +111,14 @@ export function PlayerHeroHeader({
               <span aria-hidden="true">•</span>
               <span>Age {age ?? (loadingIdentity ? "—" : "N/A")}</span>
             </span>
+            {byeWeek != null ? (
+              <span className="pqv-meta-pill" data-testid="pqv-bye-pill">
+                Bye: Wk {byeWeek}
+              </span>
+            ) : null}
+            {byeWeek != null && onByeThisWeek ? (
+              <ToneBadge label="On bye this week" color="var(--color-warning)" />
+            ) : null}
           </div>
         </div>
 

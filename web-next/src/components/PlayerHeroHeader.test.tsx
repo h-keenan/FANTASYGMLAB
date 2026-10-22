@@ -127,3 +127,20 @@ describe("DecisionFitCard", () => {
     expect(screen.getByText("Market value is the biggest driver.")).toBeInTheDocument();
   });
 });
+
+describe("PlayerHeroHeader bye week", () => {
+  it("shows nothing without a bye week", () => {
+    renderHero({ byeWeek: null, onByeThisWeek: true });
+    expect(screen.queryByTestId("pqv-bye-pill")).toBeNull();
+    expect(screen.queryByText("On bye this week")).toBeNull();
+  });
+  it("shows the bye pill only when it is not this week", () => {
+    renderHero({ byeWeek: 9, onByeThisWeek: false });
+    expect(screen.getByTestId("pqv-bye-pill").textContent).toBe("Bye: Wk 9");
+    expect(screen.queryByText("On bye this week")).toBeNull();
+  });
+  it("adds the warning pill on the bye week", () => {
+    renderHero({ byeWeek: 9, onByeThisWeek: true });
+    expect(screen.getByText("On bye this week")).toBeTruthy();
+  });
+});

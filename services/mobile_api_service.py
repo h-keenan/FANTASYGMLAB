@@ -126,7 +126,7 @@ import sys
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -182,6 +182,7 @@ from modules import (
     news_intelligence,
     news_signal,
     nfl_schedule,
+    trade_grade,
     player_awards,
     player_background_profile,
     player_eligibility,
@@ -6077,6 +6078,29 @@ def get_player_quick_view(
     }
 
 
+def _quick_view_bye(team: str | None, *, today: date | None = None) -> tuple[int | None, bool]:
+    """(bye week, is it this NFL week) from the real nflverse schedule.
+
+    No team (free agent) or no schedule -> (None, False); never invented.
+    Jan-Feb belongs to the finished season, so it reports no bye. The
+    "this week" flag is only ever True in season (trade_grade's calendar
+    week is 0 in the offseason).
+    """
+
+    if not team:
+        return None, False
+    today = today or datetime.now(timezone.utc).date()
+    if today.month < 3:
+        return None, False
+    try:
+        bye = nfl_schedule.team_bye_week(team, today.year)
+    except Exception:
+        return None, False
+    if bye is None:
+        return None, False
+    return bye, trade_grade.estimate_nfl_week(today) == bye
+
+
 def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any]:
     """Identity (name/team/position/age) plus an honest value read for the
     quick view. Team/position/age come from the valued row when present and
@@ -6138,7 +6162,10 @@ def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any
     value = _clean_json_value(_from_row("value_score"))
     if isinstance(value, (int, float)) and value <= 0:
         value = None
+    bye_week, on_bye_this_week = _quick_view_bye(str(team) if team else None)
     return {
+        "bye_week": bye_week,
+        "on_bye_this_week": on_bye_this_week,
         "player_id": str(player_id),
         "name": str(name or ""),
         "team": str(team) if team else None,

@@ -184,6 +184,8 @@ export function PlayerProfileContent({
         tier={player.tier}
         score={player.score ?? detail?.identity?.value_score ?? null}
         valueNote={detail?.identity?.value_note}
+        byeWeek={detail?.identity?.bye_week ?? null}
+        onByeThisWeek={detail?.identity?.on_bye_this_week ?? false}
         loadingIdentity={loading}
         overallRating={overallRating}
         overallRank={player.overall_rank}

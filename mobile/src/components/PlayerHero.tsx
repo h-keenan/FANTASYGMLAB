@@ -6,8 +6,10 @@ import AppText from './AppText';
 import CircularProgressRing from './CircularProgressRing';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
+import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageTrend } from '../lib/api';
+import { byePills } from '../lib/playerByePresentation';
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from '../lib/usageTrendPresentation';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -44,6 +46,8 @@ export default function PlayerHero({
   usageTrend,
   usageLoading = false,
   valueNote,
+  byeWeek = null,
+  onByeThisWeek = false,
   expanded,
   onToggleExpand,
   children,
@@ -67,6 +71,10 @@ export default function PlayerHero({
   usageLoading?: boolean;
   /** Server-provided reason the Value tile is empty (e.g. "No market value yet"). */
   valueNote?: string | null;
+  /** Team bye week (null when unknown / free agent). */
+  byeWeek?: number | null;
+  /** True when the current NFL week is that bye. */
+  onByeThisWeek?: boolean;
   /** Whether the caller's Snapshot detail is currently shown. */
   expanded?: boolean;
   /** Supplying this turns the score tile into the expand toggle for the
@@ -76,6 +84,7 @@ export default function PlayerHero({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const bye = byePills(byeWeek, onByeThisWeek);
 
   const scoreTileBody = (
     <>
@@ -127,6 +136,12 @@ export default function PlayerHero({
               <AppText style={styles.metaPillDot}>•</AppText>
               <AppText style={styles.metaPillText}>Age {age ?? (usageLoading ? '—' : 'N/A')}</AppText>
             </View>
+            {bye.label ? (
+              <View style={styles.metaPill} testID="pqv-bye-pill">
+                <AppText style={styles.metaPillText}>{bye.label}</AppText>
+              </View>
+            ) : null}
+            {bye.thisWeek ? <ToneBadge label="On bye this week" color={colors.premium} /> : null}
           </View>
         </View>
       </View>

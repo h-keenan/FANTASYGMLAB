@@ -15334,3 +15334,45 @@ def test_suggested_moves_bye_starter_counts_zero_and_no_live_lineup_is_none():
     moves = svc._suggested_lineup_moves(_moves_side([_mv("ok", "RB", "RB", 8)], [bye]))
     assert moves[0]["over_reason"] == "bye_week" and moves[0]["gain"] == 8.0
     assert svc._suggested_lineup_moves({"has_live_data": False}) is None
+def _bye_games():
+    rows = []
+    for week in range(1, 19):
+        if week != 9:
+            rows.append({"season": 2026, "week": week, "game_type": "REG", "home_team": "CHI", "away_team": "GB", "home_score": None, "away_score": None})
+        if week != 5:
+            rows.append({"season": 2026, "week": week, "game_type": "REG", "home_team": "DAL", "away_team": "NYG", "home_score": None, "away_score": None})
+    return pd.DataFrame(rows)
+
+
+def test_quick_view_bye_week_and_current_week_flag():
+    from datetime import date
+    from unittest.mock import patch
+
+    from services import mobile_api_service as svc
+
+    with patch("modules.nfl_schedule.load_games", return_value=_bye_games()):
+        assert svc._quick_view_bye("CHI", today=date(2026, 10, 20)) == (9, False)
+        assert svc._quick_view_bye("CHI", today=date(2026, 11, 4)) == (9, True)
+        assert svc._quick_view_bye("DAL", today=date(2026, 10, 7)) == (5, True)
+
+
+def test_quick_view_bye_none_for_free_agent_unknown_team_and_deep_offseason():
+    from datetime import date
+    from unittest.mock import patch
+
+    from services import mobile_api_service as svc
+
+    with patch("modules.nfl_schedule.load_games", return_value=_bye_games()):
+        assert svc._quick_view_bye(None, today=date(2026, 10, 20)) == (None, False)
+        assert svc._quick_view_bye("ZZZ", today=date(2026, 10, 20)) == (None, False)
+        assert svc._quick_view_bye("CHI", today=date(2026, 2, 1)) == (None, False)
+
+
+def test_quick_view_bye_offseason_has_week_but_no_this_week_flag():
+    from datetime import date
+    from unittest.mock import patch
+
+    from services import mobile_api_service as svc
+
+    with patch("modules.nfl_schedule.load_games", return_value=_bye_games()):
+        assert svc._quick_view_bye("CHI", today=date(2026, 6, 1)) == (9, False)

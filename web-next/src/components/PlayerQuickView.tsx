@@ -200,6 +200,8 @@ export function PlayerQuickView({
           score={identity.score ?? resolved?.value_score ?? null}
           valueNote={resolved?.value_note}
           loadingIdentity={loading}
+          byeWeek={resolved?.bye_week ?? null}
+          onByeThisWeek={resolved?.on_bye_this_week ?? false}
           overallRating={overallRating}
           overallRank={identity.overall_rank}
           positionRank={identity.position_rank}
