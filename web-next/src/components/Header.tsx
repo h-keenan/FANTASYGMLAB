@@ -271,7 +271,7 @@ function HeaderPageTitle() {
   const title = PAGE_TITLE_BY_SEGMENT[segment];
   if (!title) return null;
   return (
-    <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
+    <span className="text-xs font-bold uppercase truncate" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
       {title}
     </span>
   );
@@ -354,7 +354,7 @@ export function Header() {
       <div className="flex items-center gap-3 min-w-0">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
-          <span className="text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
+          <span className="hidden sm:inline text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
             {BRAND_NAME}
           </span>
         </Link>
