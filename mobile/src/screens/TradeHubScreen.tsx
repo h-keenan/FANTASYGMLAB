@@ -692,7 +692,6 @@ function createStyles(colors: ThemeColors) {
   skeletonWrap: { marginTop: spacing.sm },
   skeletonCard: { padding: spacing.md },
   skeletonValueBlock: { marginTop: spacing.md },
-  error: { color: colors.danger, textAlign: 'center', marginTop: spacing.lg },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, lineHeight: 20 },
   card: { padding: 0, marginBottom: spacing.md },

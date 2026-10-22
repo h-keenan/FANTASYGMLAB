@@ -1337,6 +1337,5 @@ function createStyles(colors: ThemeColors) {
   },
   emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
-  error: { color: colors.danger, textAlign: 'center' },
   });
 }

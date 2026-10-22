@@ -22,7 +22,6 @@ import FilterDropdownButton from '../components/FilterDropdownButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
-import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -856,6 +855,5 @@ function createStyles(colors: ThemeColors) {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }
