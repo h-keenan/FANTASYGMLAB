@@ -92,6 +92,40 @@ class TestPlayerIdentity(unittest.TestCase):
         )
         self.assertEqual(player_identity.normalize_player_name("Odell Beckham Jr."), "odell beckham")
 
+    def test_normalize_player_name_joins_apostrophes_and_initials(self):
+        normalize = player_identity.normalize_player_name
+        self.assertEqual(normalize("De'Von Achane"), "devon achane")
+        self.assertEqual(normalize("De'Von Achane"), normalize("DeVon Achane"))
+        self.assertEqual(normalize("Ja\u2019Marr Chase"), normalize("Ja'Marr Chase"))
+        self.assertEqual(normalize("A.J. Brown"), normalize("AJ Brown"))
+        self.assertEqual(normalize("Amon-Ra St. Brown"), "amon ra st brown")
+
+    def test_resolve_identity_candidates_narrows_by_position_team_then_active(self):
+        resolve = player_identity.resolve_identity_candidates
+        lamars = [
+            {"id": "4881", "position": "QB", "team": "BAL", "active": True},
+            {"id": "6994", "position": "CB", "team": "", "active": True},
+        ]
+        self.assertEqual(resolve(lamars, position="QB", team="BAL"), ("4881", False))
+        # A player who changed teams still matches on position alone.
+        self.assertEqual(resolve(lamars, position="QB", team="NYJ"), ("4881", False))
+        # Position is a hard filter: never map a QB onto the namesake CB.
+        self.assertEqual(resolve(lamars[1:], position="QB", team="BAL"), (None, False))
+
+        same_position = [
+            {"id": "a", "position": "RB", "team": "DAL", "active": True},
+            {"id": "b", "position": "RB", "team": "NYG", "active": True},
+        ]
+        self.assertEqual(resolve(same_position, position="RB", team="NYG"), ("b", False))
+        self.assertEqual(resolve(same_position, position="RB", team="KC"), (None, True))
+
+        one_active = [
+            {"id": "a", "position": "WR", "team": "DAL", "active": True},
+            {"id": "b", "position": "WR", "team": "", "active": False},
+        ]
+        self.assertEqual(resolve(one_active, position="WR", team="KC"), ("a", False))
+        self.assertEqual(resolve([], position="WR"), (None, False))
+
     def test_match_by_identity_resolves_despite_source_suffix_mismatch(self):
         df = pd.DataFrame(
             [

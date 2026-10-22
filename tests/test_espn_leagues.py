@@ -80,6 +80,8 @@ def _fake_espn(monkeypatch):
 
     monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda: factory)
     monkeypatch.setattr(espn_leagues, "players_frame_provider", lambda: PLAYERS.copy())
+    monkeypatch.setattr(espn_leagues, "sleeper_players_provider", lambda: {})
+    monkeypatch.setattr(espn_leagues, "espn_crosswalk_provider", lambda _players: {})
     espn_leagues.clear_snapshot_cache()
     yield calls
     espn_leagues.clear_snapshot_cache()
@@ -120,14 +122,53 @@ def test_snapshot_is_sleeper_shaped_maps_players_and_keeps_no_owner_secrets(_fak
     assert league["settings"]["type"] == 0  # no keepers -> redraft
 
     first = snapshot["rosters"][0]
-    # Suffix-stripped name match ("Kenneth Walker III"), D/ST unmatched.
-    assert first["players"] == ["9493", "8151"]
-    assert first["starters"] == ["9493"]
+    # Suffix-stripped name match ("Kenneth Walker III"); the D/ST maps to
+    # Sleeper's team-abbreviation DEF id.
+    assert first["players"] == ["9493", "8151", "SEA"]
+    assert first["starters"] == ["9493", "SEA"]
     assert first["settings"]["fpts"] == 622 and first["settings"]["fpts_against"] == 580
     assert snapshot["users"][0]["display_name"] == "K5cents"
     assert "SECRET" not in repr(snapshot["users"]) + repr(snapshot["teams"])
-    assert snapshot["diagnostics"]["canonical_matched_count"] == 3
+    assert snapshot["diagnostics"]["canonical_matched_count"] == 4
     assert snapshot["diagnostics"]["total_espn_players_seen"] == 4
+
+
+def test_snapshot_maps_by_espn_id_crosswalk_and_the_full_sleeper_dump(monkeypatch):
+    """Live league 42654852 regression: De'Von Achane and Davante Adams were
+    reported unmatched because they were missing from the valued player
+    table. The ESPN id crosswalk and Sleeper's full dump resolve them."""
+
+    def league():
+        settings = _league().settings
+        roster = [
+            _player(4429160, "De'Von Achane", "RB", "MIA", "RB"),
+            _player(16800, "Davante Adams", "WR", "LAR", "BE"),
+            _player(3916387, "Lamar Jackson", "QB", "BAL", "QB"),
+        ]
+        return SimpleNamespace(settings=settings, teams=[_team(1, "One", "GM", roster)], year=2026, current_week=7)
+
+    dump = {
+        "9226": {"full_name": "De'Von Achane", "position": "RB", "team": "MIA", "active": True},
+        "2133": {"full_name": "Davante Adams", "position": "WR", "team": "LAR", "active": True},
+        "4881": {"full_name": "Lamar Jackson", "position": "QB", "team": "BAL", "active": True, "espn_id": 3916387},
+        "6994": {"full_name": "Lamar Jackson", "position": "CB", "team": None, "active": True, "espn_id": 4034849},
+    }
+    seen = {}
+
+    def crosswalk(players):
+        seen["players"] = players
+        return {"4429160": "9226"}
+
+    monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda: lambda **_kwargs: league())
+    monkeypatch.setattr(espn_leagues, "players_frame_provider", lambda: PLAYERS.copy())
+    monkeypatch.setattr(espn_leagues, "sleeper_players_provider", lambda: dump)
+    monkeypatch.setattr(espn_leagues, "espn_crosswalk_provider", crosswalk)
+
+    snapshot = espn_leagues.load_league_snapshot(KEY)
+
+    assert seen["players"] is dump
+    assert snapshot["rosters"][0]["players"] == ["9226", "2133", "4881"]
+    assert snapshot["diagnostics"]["matched_rate"] == 1.0
 
 
 def test_private_and_missing_leagues_map_to_stable_reasons(monkeypatch):

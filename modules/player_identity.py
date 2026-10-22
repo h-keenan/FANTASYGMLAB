@@ -30,12 +30,16 @@ def normalize_player_id(value: Any) -> str:
 
 
 _NAME_GENERATIONAL_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+# Apostrophes and periods join the letters around them instead of splitting
+# a name into extra tokens, so "De'Von" / "DeVon" and "A.J." / "AJ" compare
+# equal. Hyphens and spaces still separate tokens.
+_NAME_JOINING_PUNCTUATION = re.compile(r"[\'\u2018\u2019\u02bc`.]")
 
 
 def normalize_player_name(name: Any) -> str:
     if name is None:
         return ""
-    text = str(name).casefold().strip()
+    text = _NAME_JOINING_PUNCTUATION.sub("", str(name).casefold().strip())
     normalized = re.sub(r"[^a-z0-9]+", " ", text).strip()
     tokens = normalized.split()
     while tokens and tokens[-1] in _NAME_GENERATIONAL_SUFFIXES:
@@ -174,6 +178,64 @@ def match_player_by_identity(
         }
     )
     return canonical_ids[0] if len(canonical_ids) == 1 else None
+
+
+def resolve_identity_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    position: Any = None,
+    team: Any = None,
+) -> tuple[str | None, bool]:
+    """Pick one player from same-name candidates.
+
+    Each candidate is ``{"id", "position", "team", "active"}`` (``position``
+    may also be a set of eligible positions). Narrows by position, then NFL
+    team, then active status, and returns ``(id, False)`` once one id is
+    left. Position is a hard filter: a QB is never mapped onto a namesake
+    CB. Team and active status only break ties, so a player who changed
+    teams still matches. Returns ``(None, True)`` when several ids remain
+    after every tiebreaker, and ``(None, False)`` when nothing fits.
+    """
+
+    def unique_id(rows: list[dict[str, Any]]) -> str | None:
+        ids = {normalize_player_id(row.get("id")) for row in rows}
+        ids.discard("")
+        return next(iter(ids)) if len(ids) == 1 else None
+
+    working = [row for row in candidates or [] if normalize_player_id(row.get("id"))]
+    if not working:
+        return None, False
+    position_key = str(position or "").strip().upper()
+    if position_key:
+
+        def positions_of(row: dict[str, Any]) -> set[str]:
+            value = row.get("position")
+            values = value if isinstance(value, (set, list, tuple, frozenset)) else [value]
+            return {str(item or "").strip().upper() for item in values}
+
+        same_position = [row for row in working if position_key in positions_of(row)]
+        if not same_position:
+            # Several namesakes, none at this position: reported as ambiguous
+            # (never mapped), a single wrong-position namesake as no match.
+            return None, unique_id(working) is None
+        working = same_position
+    found = unique_id(working)
+    if found:
+        return found, False
+    team_key = str(team or "").strip().upper()
+    if team_key:
+        same_team = [row for row in working if str(row.get("team") or "").strip().upper() == team_key]
+        if same_team:
+            working = same_team
+            found = unique_id(working)
+            if found:
+                return found, False
+    active = [row for row in working if row.get("active") is True and str(row.get("team") or "").strip()]
+    if active:
+        found = unique_id(active)
+        if found:
+            return found, False
+    return None, True
 
 
 def resolve_player_row(
