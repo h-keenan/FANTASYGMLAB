@@ -630,7 +630,14 @@ def decide_offer_verdict(
     if band == VERDICT_FAIR and not counter:
         counter = ""
 
-    value_summary = _value_direction_label(value_delta)
+    # The label talks about raw asset value, so it reads the raw delta; the
+    # band above uses the posture-adjusted value_delta (consolidation,
+    # starter strength, injury availability -- see modules.trade_grade).
+    try:
+        raw_value_delta = int(fit.get("raw_value_delta", value_delta))
+    except (TypeError, ValueError):
+        raw_value_delta = value_delta
+    value_summary = _value_direction_label(raw_value_delta)
     roster_summary = lineup_summary or (f"Roster fit: {roster_fit}." if roster_fit else "Roster impact is limited.")
     if not strategy_summary:
         strategy_summary = "Strategy fit is mixed for your current plan."

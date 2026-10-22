@@ -35,6 +35,18 @@ def _summary():
     )
 
 
+def _bypass_analyzer_gate(monkeypatch):
+    """These tests cover a generation stage (market realism, shallow-position
+    gating), not the user-side Trade Analyzer gate that runs at final
+    selection. Their tiny fixtures have no package the Analyzer grades at
+    least FAIR, so without this they would pass or fail on the gate instead
+    of the stage they test. The gate has its own invariant test in
+    tests/test_trade_hub_analyzer_consistency.py.
+    """
+
+    monkeypatch.setattr(trade_ideas._UserSideAnalyzerGate, "passes", lambda self, idea: True)
+
+
 def _install_deterministic_context(monkeypatch):
     monkeypatch.setattr(trade_ideas, "_build_roster_pick_assets", lambda *args, **kwargs: {1: [], 2: [], 3: []})
     monkeypatch.setattr(
@@ -174,7 +186,7 @@ def test_direct_one_for_one_swap_fires_when_no_picks_are_in_play(monkeypatch):
     )
 
 
-def test_trade_finder_surfaces_ideas_for_a_single_protected_asset_on_a_rebuild_team():
+def test_trade_finder_surfaces_ideas_for_a_single_protected_asset_on_a_rebuild_team(monkeypatch):
     """Regression for coridian_'s second "0 plausible trades" Trade Finder
     report: selecting a single core/protected asset (an Elite-tier WR,
     young, on a Rebuild/Asset-Consolidator team) returned zero ideas even
@@ -197,6 +209,10 @@ def test_trade_finder_surfaces_ideas_for_a_single_protected_asset_on_a_rebuild_t
 
     from scripts.profile_trade_hub import FixtureSpec, build_fixture
 
+    # Every package for this lone 8,600 asset costs the user ~1,000+ raw
+    # value (the partner has nothing comparable), so the Analyzer grades
+    # them COUNTER/DECLINE and the final-selection gate would drop them.
+    _bypass_analyzer_gate(monkeypatch)
     fixture = build_fixture(FixtureSpec("rebuild-single-focus", 12, 14, "1 QB", strategy="rebuild"))
     players = fixture["players"]
     focal_id = "F01-06"
@@ -368,6 +384,7 @@ def test_pattern_1b_can_still_acquire_a_kicker_that_is_a_genuine_true_need(monke
         }
 
     monkeypatch.setattr(trade_ideas, "_build_team_shape", shape_missing_kicker)
+    _bypass_analyzer_gate(monkeypatch)
 
     players = _players_with_shallow_targets()
     players.loc[players["player_id"] == "mine-a", "value_score"] = 4800
@@ -518,6 +535,7 @@ def test_missing_kicker_can_still_surface_an_acquire_suggestion(monkeypatch):
     """
 
     _install_deterministic_context(monkeypatch)
+    _bypass_analyzer_gate(monkeypatch)
     monkeypatch.setattr(trade_ideas, "_build_team_shape", _shape_with_needs(["QB", "K"]))
 
     players = _players_with_kicker()
