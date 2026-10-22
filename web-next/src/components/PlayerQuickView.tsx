@@ -6,14 +6,10 @@ import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ModelRadarChart } from "@/components/ModelRadarChart";
-import { OvrGauge } from "@/components/OvrGauge";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
-import { PositionBadge } from "@/components/PositionBadge";
 import { SheetHandle } from "@/components/SheetHandle";
 import { CHART_HEIGHT } from "@/components/WeeklyPointsChart";
-import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
-import { resolvePlayerTier } from "@/lib/playerTier";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
@@ -190,87 +186,23 @@ export function PlayerQuickView({
 
         <div className="pqv-scroll">
 
-        {/* coridian_, 2026-10-19: "theres nothing to the right of pfp and
-            name and thats just wasted space. also the elite tag should be
-            right under pfp" / "Overall and usage and anything else thats
-            up there and not positioned properly" — the prior layout (PR
-            from 2026-10-18) fixed the avatar/copy from fighting the rank
-            strip and chips for width, but then left that same width empty
-            below the name on anything wider than the ~480px bottom-sheet
-            breakpoint. Tier now sits under the avatar (matching its own
-            prestige-ring color, same as before); OVR gauge, rank cells,
-            and the usage-trend chip move up beside the name/meta instead
-            of dropping to their own full-width rows underneath. */}
-        <header className="pqv-hero">
-          <div className="pqv-hero-avatar-col">
-            <PlayerAvatar playerId={identity.player_id} tier={identity.tier} size={112} />
-            {identity.tier ? (
-              <span
-                className="pqv-chip pqv-tier-chip"
-                style={{ borderColor: `var(${resolvePlayerTier(identity.tier).colorVar})`, color: `var(${resolvePlayerTier(identity.tier).colorVar})` }}
-              >
-                {identity.tier}
-              </span>
-            ) : null}
-          </div>
-          <div className="pqv-hero-copy">
-            {identity.sourceLabel ? <div className="pqv-source-label">{identity.sourceLabel}</div> : null}
-            <h2 id="pqv-name" className="pqv-name">
-              {name}
-            </h2>
-            <div className="pqv-meta">
-              <PositionBadge position={identity.position} />
-              <span>{identity.team || "FA"}</span>
-              <span>·</span>
-              <span>Age {identity.age ?? "N/A"}</span>
-            </div>
-            <div className="pqv-rank-strip">
-              <OvrGauge rating={overallRating} size="lg" />
-              <div className="pqv-rank-cells">
-                {identity.score != null ? (
-                  <div className="pqv-rank-cell">
-                    <span>Value</span>
-                    <strong>{formatScore(identity.score)}</strong>
-                  </div>
-                ) : null}
-                {identity.overall_rank ? (
-                  <div className="pqv-rank-cell">
-                    <span>Overall rank</span>
-                    <strong>{formatRank(identity.overall_rank)}</strong>
-                  </div>
-                ) : null}
-                {identity.position_rank ? (
-                  <div className="pqv-rank-cell">
-                    <span>Position rank</span>
-                    <strong>
-                      {identity.position || ""}
-                      {identity.position_rank}
-                    </strong>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            {/* coridian_, 2026-10-18: "Starter and usage still need to be
-                color coordinated" — usage uses its own real tone
-                (positive/negative) the API already computes
-                (modules.rankings.recency_trend_display), not a new rule. */}
-            {model?.usage_trend ? (
-              <span
-                className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}
-                title={model.usage_trend.detail}
-              >
-                {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
-              </span>
-            ) : null}
-            {/* coridian_, 2026-10-19: "was there any way for us to predict
-                (scenario) something like cam skattebo having 0 snaps and
-                relaying that to USERS?" — a depth-chart-order move is a
-                leading indicator games-played/injury-status signals can't
-                catch (a coaching-decision role change has no injury
-                signal at all). */}
-            {model?.depth_chart_note ? <p className="pqv-tier-mismatch-note">{model.depth_chart_note}</p> : null}
-          </div>
-        </header>
+        <PlayerHeroHeader
+          playerId={identity.player_id}
+          name={name}
+          nameId="pqv-name"
+          contextLabel={identity.sourceLabel}
+          position={identity.position}
+          team={identity.team}
+          age={identity.age}
+          tier={identity.tier}
+          score={identity.score}
+          overallRating={overallRating}
+          overallRank={identity.overall_rank}
+          positionRank={identity.position_rank}
+          usageTrend={model?.usage_trend ?? null}
+          usageLoading={loading}
+          depthChartNote={model?.depth_chart_note}
+        />
 
         <div className="pqv-signal-row">
           {identity.opportunity_label ? <span className="pqv-chip">{identity.opportunity_label}</span> : null}
@@ -300,12 +232,7 @@ export function PlayerQuickView({
             <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
           ) : (
             <>
-              {model?.decision_fit_narrative ? (
-                <section className="pqv-decision-fit">
-                  <h3>Decision Fit</h3>
-                  <p>{model.decision_fit_narrative}</p>
-                </section>
-              ) : null}
+              {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
 
               <PlayerTrendsPanel
                 playerId={identity.player_id}

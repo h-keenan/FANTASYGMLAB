@@ -988,23 +988,30 @@ a {
   max-height: min(88vh, 900px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl) var(--space-xl);
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
 }
+/* PQV header redesign (owner concept, 2026-10-21) — components/
+   PlayerHeroHeader.tsx, shared with the Player Profile page. The context
+   label sits top-left on the same line as a round X; the old layout left a
+   tall empty band above the header. */
 .pqv-close {
   position: absolute;
-  top: var(--space-md);
-  right: var(--space-md);
+  top: var(--space-lg);
+  right: var(--space-lg);
   z-index: 2;
-  background: transparent;
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-raised) 45%, transparent);
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-secondary);
-  width: 2rem;
-  height: 2rem;
   line-height: 1;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   cursor: pointer;
 }
 .pqv-close:hover,
@@ -1012,70 +1019,229 @@ a {
   color: var(--color-text-primary);
   border-color: var(--color-border-strong);
 }
-.pqv-hero {
-  display: flex;
-  gap: var(--space-lg);
-  align-items: flex-start;
-  padding-right: var(--space-2xl);
+/* The grab bar floats in the top padding, centered between the context
+   label and the X, so it adds no height. */
+.pqv-modal > .sheet-handle {
+  position: absolute;
+  top: 0;
+  left: 35%;
+  right: 35%;
+  z-index: 2;
 }
-/* coridian_, 2026-10-19: "the elite tag should be right under pfp" — a
-   narrow fixed-width column so the tier chip centers under the avatar
-   instead of stretching to match pqv-hero-copy's width. */
+/* Container (not viewport) queries, so the header adapts to the sheet's
+   own width — the same on the PQV sheet and the Player Profile page. */
+.pqv-hero-shell {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.pqv-topbar {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+}
+.pqv-modal .pqv-topbar {
+  padding-right: 2.75rem;
+}
+.pqv-source-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-badge);
+  color: var(--color-text-muted);
+}
+.pqv-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-lg);
+  row-gap: var(--space-md);
+  align-items: start;
+}
 .pqv-hero-avatar-col {
+  grid-row: 1 / span 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-xs);
-  flex-shrink: 0;
+  gap: var(--space-sm);
 }
-.pqv-tier-chip {
-  text-align: center;
+.pqv-avatar-glow {
+  display: inline-flex;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent),
+    0 0 26px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+/* Archetype (tier) pill: rounded, with an icon, bordered in the tier's own
+   prestige color — same color the avatar ring already uses. */
+.pqv-archetype-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 8.5rem;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-pill);
+  border: var(--border-width-default) solid var(--archetype-color, var(--color-border-strong));
+  background: color-mix(in srgb, var(--color-surface-raised) 40%, transparent);
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pqv-archetype-glyph {
+  flex-shrink: 0;
+  color: var(--archetype-color, var(--color-text-muted));
 }
 .pqv-hero-copy {
+  grid-column: 2;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   min-width: 0;
 }
-.pqv-source-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-}
+/* Larger and bolder than before; a long name wraps to two lines rather
+   than truncating. */
 .pqv-name {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--color-text-primary);
   margin: 0;
+  font-size: clamp(1.45rem, 8cqi, 2.1rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .pqv-meta {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.pqv-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 2px var(--space-md);
+  border-radius: var(--radius-pill);
+  border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-secondary);
   font-size: 0.85rem;
+  white-space: nowrap;
 }
-.pqv-rank-strip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-lg);
-  margin-top: var(--space-xs);
+.pqv-meta-pill > span[aria-hidden="true"] {
+  color: var(--color-text-muted);
+  font-size: 0.6rem;
 }
-.pqv-rank-cells {
-  display: flex;
-  gap: var(--space-lg);
-  flex-wrap: wrap;
+.pqv-stat-tiles {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
 }
-.pqv-rank-cell {
+.pqv-stat-tile {
   display: flex;
   flex-direction: column;
-  font-size: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  min-height: 5.75rem;
+  padding: var(--space-sm) var(--space-xs);
+  border-radius: var(--radius-md);
+  border: var(--border-width-default) solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-raised) 30%, transparent);
+  text-align: center;
+}
+.pqv-stat-tile-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pqv-stat-tile-value--empty {
   color: var(--color-text-muted);
 }
-.pqv-rank-cell strong {
-  font-size: 0.95rem;
-  color: var(--color-text-primary);
+.pqv-stat-tile-caption {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-badge);
+  color: var(--color-text-muted);
+}
+.pqv-stat-tile-note {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+.pqv-stat-tile-divider {
+  align-self: stretch;
+  height: 1px;
+  margin: 2px var(--space-xs);
+  background: var(--color-border);
+}
+.pqv-stat-tile-confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+/* Usage tile tones follow the trend's real direction and severity
+   (lib/playerQuickViewPresentation.ts usageTrendTone): semantic success /
+   danger tokens, neutral for a mild decline. */
+.pqv-stat-tile--positive {
+  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
+  background: var(--color-success-soft);
+}
+.pqv-stat-tile--positive .pqv-stat-tile-trend,
+.pqv-stat-tile--positive .pqv-stat-tile-confidence {
+  color: var(--color-success);
+}
+.pqv-stat-tile--danger {
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+  background: var(--color-danger-soft);
+}
+.pqv-stat-tile--danger .pqv-stat-tile-trend,
+.pqv-stat-tile--danger .pqv-stat-tile-confidence {
+  color: var(--color-danger);
+}
+.pqv-stat-tile--neutral .pqv-stat-tile-trend,
+.pqv-stat-tile--neutral .pqv-stat-tile-confidence {
+  color: var(--color-text-secondary);
+}
+.pqv-stat-tile--positive .pqv-stat-tile-divider {
+  background: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.pqv-stat-tile--danger .pqv-stat-tile-divider {
+  background: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.pqv-hero-footnote {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.pqv-rank-line {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+/* Phone-width sheets: tiles take the full width under the avatar and name,
+   so each tile has room for its number and caption. */
+@container (max-width: 440px) {
+  .pqv-hero-avatar-col {
+    grid-row: 1;
+  }
+  .pqv-stat-tiles {
+    grid-column: 1 / -1;
+  }
 }
 .pqv-signal-row {
   display: flex;
@@ -1204,7 +1370,6 @@ a {
   height: 1.6rem;
   border-radius: var(--radius-sm);
 }
-.pqv-decision-fit,
 .pqv-model-row,
 .pqv-stat-season,
 .pqv-awards,
@@ -1212,7 +1377,6 @@ a {
   border-top: var(--border-width-default) solid var(--color-border);
   padding-top: var(--space-md);
 }
-.pqv-decision-fit h3,
 .pqv-model-row h3,
 .pqv-stat-season h3,
 .pqv-awards h3,
@@ -1223,9 +1387,44 @@ a {
   color: var(--color-text-muted);
   margin: 0 0 var(--space-sm) 0;
 }
+/* Decision Fit card (owner concept, 2026-10-21): icon on the left, accent
+   label, faint accent-tinted surface. */
+.pqv-decision-fit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  border: var(--border-width-default) solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+.pqv-decision-fit-icon {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.pqv-decision-fit-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.pqv-decision-fit h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-badge);
+  color: var(--color-accent);
+}
 .pqv-decision-fit p {
   color: var(--color-text-secondary);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   margin: 0;
 }
 .pqv-stat-group h4 {

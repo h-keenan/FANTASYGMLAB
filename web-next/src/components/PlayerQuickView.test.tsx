@@ -214,10 +214,14 @@ describe("PlayerQuickView", () => {
     // color (same resolvePlayerTier source), and the usage chip carries
     // its real positive/negative tone instead of the same flat gray as
     // every other inert chip.
-    const tierChip = screen.getByText("starter");
-    expect(tierChip.style.color).toBe("var(--color-tier-starter)");
-    const usageChip = screen.getByText(/12% usage/);
-    expect(usageChip.className).toContain("pqv-chip--positive");
+    // Header redesign (owner concept, 2026-10-21): the tier is a rounded
+    // archetype pill bordered in that same prestige color, and usage is a
+    // stat tile toned by the trend's direction.
+    const tierChip = screen.getByText("starter").closest(".pqv-archetype-pill") as HTMLElement;
+    expect(tierChip.style.getPropertyValue("--archetype-color")).toBe("var(--color-tier-starter)");
+    const usageTile = screen.getByTestId("pqv-usage-tile");
+    expect(usageTile).toHaveAttribute("data-tone", "positive");
+    expect(usageTile).toHaveTextContent("12%");
 
     // coridian_, 2026-10-20 (screenshots): "this takes up way too much
     // space for the information that is displaying" — each stat is a

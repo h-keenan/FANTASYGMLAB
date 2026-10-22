@@ -10,15 +10,11 @@ import {
   type RankedPlayer,
 } from "@/lib/api";
 import { AwardsStrip, BioGrid, StatGroup, SubRatingRow } from "@/components/PlayerQuickView";
-import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerCareerTab } from "@/components/PlayerCareerTab";
 import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
-import { PositionBadge } from "@/components/PositionBadge";
-import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
-import { resolvePlayerTier } from "@/lib/playerTier";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
@@ -136,69 +132,24 @@ export function PlayerProfileContent({
 
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
-      <header className="pqv-hero">
-        <div className="pqv-hero-avatar-col">
-          <PlayerAvatar playerId={player.player_id} tier={player.tier} size={112} />
-          {player.tier ? (
-            <span
-              className="pqv-chip pqv-tier-chip"
-              style={{
-                borderColor: `var(${resolvePlayerTier(player.tier).colorVar})`,
-                color: `var(${resolvePlayerTier(player.tier).colorVar})`,
-              }}
-            >
-              {player.tier}
-            </span>
-          ) : null}
-        </div>
-        <div className="pqv-hero-copy">
-          <span className="pqv-source-label">{leagueName}</span>
-          <h1 id="profile-name" className="pqv-name" style={{ font: "var(--font-page-title)" }}>
-            {name}
-          </h1>
-          <div className="pqv-meta">
-            <PositionBadge position={player.position} />
-            <span>{player.team || "FA"}</span>
-            <span>·</span>
-            <span>Age {player.age ?? "N/A"}</span>
-          </div>
-          <div className="pqv-rank-strip">
-            <OvrGauge rating={overallRating} size="lg" />
-            <div className="pqv-rank-cells">
-              {player.score != null ? (
-                <div className="pqv-rank-cell">
-                  <span>Value</span>
-                  <strong>{formatScore(player.score)}</strong>
-                </div>
-              ) : null}
-              {player.overall_rank ? (
-                <div className="pqv-rank-cell">
-                  <span>Overall rank</span>
-                  <strong>{formatRank(player.overall_rank)}</strong>
-                </div>
-              ) : null}
-              {player.position_rank ? (
-                <div className="pqv-rank-cell">
-                  <span>Position rank</span>
-                  <strong>
-                    {player.position || ""}
-                    {player.position_rank}
-                  </strong>
-                </div>
-              ) : null}
-            </div>
-          </div>
-          {model?.usage_trend ? (
-            <span
-              className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}
-              title={model.usage_trend.detail}
-            >
-              {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
-            </span>
-          ) : null}
-          {model?.depth_chart_note ? <p className="pqv-tier-mismatch-note">{model.depth_chart_note}</p> : null}
-        </div>
-      </header>
+      <PlayerHeroHeader
+        playerId={player.player_id}
+        name={name}
+        nameId="profile-name"
+        headingLevel={1}
+        contextLabel={leagueName}
+        position={player.position}
+        team={player.team}
+        age={player.age}
+        tier={player.tier}
+        score={player.score}
+        overallRating={overallRating}
+        overallRank={player.overall_rank}
+        positionRank={player.position_rank}
+        usageTrend={model?.usage_trend ?? null}
+        usageLoading={loading}
+        depthChartNote={model?.depth_chart_note}
+      />
 
       <div className="pqv-signal-row">
         {player.opportunity_label ? <span className="pqv-chip">{player.opportunity_label}</span> : null}
@@ -219,12 +170,7 @@ export function PlayerProfileContent({
           </p>
         ) : (
           <>
-            {model?.decision_fit_narrative ? (
-              <section className="pqv-decision-fit">
-                <h3>Decision Fit</h3>
-                <p>{model.decision_fit_narrative}</p>
-              </section>
-            ) : null}
+            {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
 
             <PillRow
               options={PROFILE_TABS.map((option) => ({ label: option.label, value: option.value }))}
