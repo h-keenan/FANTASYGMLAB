@@ -1109,6 +1109,32 @@ export interface PortfolioResponse {
   reason?: string;
 }
 
+/** One saved league as listed by GET /v1/portfolio/leagues — just enough to
+ * render a placeholder card and request that league's own row. */
+export interface PortfolioSavedLeague {
+  league_id: string;
+  league_name: string;
+}
+
+/** GET /v1/portfolio/leagues — Portfolio's cheap index (Premium gate + the
+ * caller's saved leagues, no per-league valuation work). Same gate/upsell
+ * fields as PortfolioResponse; `leagues`/`failed_leagues` are always empty
+ * here — each league's row comes from getPortfolioLeague. */
+export interface PortfolioIndexResponse extends PortfolioResponse {
+  saved_leagues: PortfolioSavedLeague[];
+}
+
+/** GET /v1/portfolio/leagues/{leagueId} — one saved league's Portfolio row.
+ * Exactly one of `league` / `failed_league` is set for a Premium caller. */
+export interface PortfolioLeagueResponse {
+  ok: boolean;
+  is_premium: boolean;
+  lens: string;
+  league: PortfolioLeague | null;
+  failed_league: PortfolioFailedLeague | null;
+  upsell: PremiumUpsell | null;
+}
+
 /** GM Plan — a season-arc roadmap: where the caller stands, their best
  * trade paths, and their roster construction, framed by their declared
  * Team Situation stance (modules.team_stance — Rebuilding/Competing/
@@ -2641,6 +2667,17 @@ export const api = {
   // every saved league at once, unlike every other call above.
   getPortfolio: (lens: string = "Dynasty") =>
     authorizedRequest<PortfolioResponse>(`/v1/portfolio?lens=${encodeURIComponent(lens)}`),
+
+  // Progressive Portfolio: the cheap index first, then one request per saved
+  // league (fired concurrently) so each card paints as soon as its own
+  // summary is ready instead of after the slowest league's.
+  getPortfolioIndex: (lens: string = "Dynasty") =>
+    authorizedRequest<PortfolioIndexResponse>(`/v1/portfolio/leagues?lens=${encodeURIComponent(lens)}`),
+
+  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<PortfolioLeagueResponse>(
+      `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}`,
+    ),
 
   getGmPlan: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<GmPlanResponse>(

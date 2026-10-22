@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
-import { useIsRestoring, useQuery } from '@tanstack/react-query';
+import { useIsRestoring, useQueries, useQuery } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
@@ -13,7 +13,9 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import { api, type PortfolioFailedLeague, type PortfolioLeague } from '../lib/api';
+import SkeletonBlock from '../components/SkeletonBlock';
+import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSavedLeague } from '../lib/api';
+import { composePortfolio, type PortfolioLeagueState } from '../lib/portfolioProgress';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
 import { queryKeys } from '../lib/queryKeys';
@@ -79,20 +81,42 @@ export default function PortfolioScreen() {
   // racing/overwriting) before last session's cached response has been
   // hydrated back into the in-memory QueryClient.
   const isRestoring = useIsRestoring();
-  const portfolioQuery = useQuery({
-    queryKey: queryKeys.portfolio(),
-    queryFn: () => api.getPortfolio(),
+  // Progressive load (lib/portfolioProgress.ts): the cheap saved-leagues
+  // index is the only thing the full-screen spinner waits on; each league's
+  // own row is a separate query fired concurrently, so rows replace their
+  // skeletons as they arrive instead of the whole screen waiting on the
+  // slowest league (and the requests spread across the API's worker
+  // processes instead of sharing one).
+  const indexQuery = useQuery({
+    queryKey: queryKeys.portfolioIndex(),
+    queryFn: () => api.getPortfolioIndex(),
     enabled: !isRestoring,
   });
-  const data = portfolioQuery.data ?? null;
-  // No data at all yet (neither a persisted cache hit nor a prior in-memory
+  const index = indexQuery.data ?? null;
+  const savedLeagues = index?.is_premium ? index.saved_leagues ?? [] : [];
+  const leagueQueries = useQueries({
+    queries: savedLeagues.map((league) => ({
+      queryKey: queryKeys.portfolioLeague(league.league_id),
+      queryFn: () => api.getPortfolioLeague(league.league_id),
+      enabled: !isRestoring,
+    })),
+  });
+  const leagueStates: Record<string, PortfolioLeagueState> = {};
+  savedLeagues.forEach((league, position) => {
+    const query = leagueQueries[position];
+    if (query?.data) leagueStates[league.league_id] = { status: 'success', data: query.data };
+    else if (query?.isError) leagueStates[league.league_id] = { status: 'error' };
+    else leagueStates[league.league_id] = { status: 'pending' };
+  });
+  const composed = index ? composePortfolio(index, leagueStates) : null;
+  // No index at all yet (neither a persisted cache hit nor a prior in-memory
   // fetch) is the one case that still needs a blank-slate spinner — once
   // any data exists, it paints immediately and a failed background refetch
   // (e.g. a focus refresh after the 30s staleTime window) never blanks it.
-  const loading = isRestoring || portfolioQuery.isPending;
+  const loading = isRestoring || indexQuery.isPending;
   const error =
-    portfolioQuery.isError && !data
-      ? toUserErrorMessage(portfolioQuery.error, 'Failed to load your portfolio.')
+    indexQuery.isError && !index
+      ? toUserErrorMessage(indexQuery.error, 'Failed to load your portfolio.')
       : null;
 
   const openLeague = useCallback(
@@ -115,17 +139,17 @@ export default function PortfolioScreen() {
     );
   }
 
-  if (!data) return null;
+  if (!index || !composed) return null;
 
-  if (!data.is_premium) {
+  if (!index.is_premium) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
         <EmptyState
           icon="star-outline"
-          title={data.upsell?.title ?? 'Portfolio is a Premium feature'}
+          title={index.upsell?.title ?? 'Portfolio is a Premium feature'}
           subtitle={
-            data.upsell?.body ??
+            index.upsell?.body ??
             'Upgrade to Premium to see your standing across every saved league in one place.'
           }
           actionLabel="Upgrade to Premium"
@@ -140,10 +164,11 @@ export default function PortfolioScreen() {
   // scary "Couldn't load" note as a genuine failure (no linked account,
   // league gone, Sleeper down). Split the two so a drafting league gets a
   // calm, informational note instead.
-  const draftingLeagues = data.failed_leagues.filter((league) => league.reason === 'empty_roster');
-  const realFailedLeagues = data.failed_leagues.filter((league) => league.reason !== 'empty_roster');
+  const draftingLeagues = composed.failedLeagues.filter((league) => league.reason === 'empty_roster');
+  const realFailedLeagues = composed.failedLeagues.filter((league) => league.reason !== 'empty_roster');
+  const rows = composed.rows;
 
-  if (data.leagues.length === 0 && data.failed_leagues.length === 0) {
+  if (rows.length === 0 && composed.failedLeagues.length === 0) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
@@ -164,8 +189,8 @@ export default function PortfolioScreen() {
       <FlatList
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-        data={data.leagues}
-        keyExtractor={(item) => item.league_id}
+        data={rows}
+        keyExtractor={(item) => item.league.league_id}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
             <View style={styles.infoNoteRow}>
@@ -173,7 +198,9 @@ export default function PortfolioScreen() {
                 label="Portfolio"
                 text="Your standing, record, and top need or opportunity across every saved league — tap a league to open its Dashboard."
               />
-              {data.leagues.length > 0 ? (
+              {/* Share waits for every row: a share card of a half-loaded
+                  portfolio would silently leave leagues out. */}
+              {composed.settled && composed.leagues.length > 0 ? (
                 <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
                   <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
                   <AppText style={styles.shareButtonText}>Share</AppText>
@@ -188,21 +215,30 @@ export default function PortfolioScreen() {
             ) : null}
           </View>
         }
-        renderItem={({ item, index }) => (
-          <PortfolioLeagueCard
-            league={item}
-            isFirst={index === 0}
-            isLast={index === data.leagues.length - 1}
-            colors={colors}
-            styles={styles}
-            onPress={() => openLeague(item)}
-          />
-        )}
+        renderItem={({ item, index: position }) =>
+          item.kind === 'league' ? (
+            <PortfolioLeagueCard
+              league={item.league}
+              isFirst={position === 0}
+              isLast={position === rows.length - 1}
+              colors={colors}
+              styles={styles}
+              onPress={() => openLeague(item.league)}
+            />
+          ) : (
+            <PortfolioLeagueSkeleton
+              league={item.league}
+              isFirst={position === 0}
+              isLast={position === rows.length - 1}
+              styles={styles}
+            />
+          )
+        }
       />
       <PortfolioSharePreviewModal
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
-        leagues={data.leagues}
+        leagues={composed.leagues}
       />
     </View>
   );
@@ -246,6 +282,49 @@ function FailedLeaguesNote({
       <AppText style={styles.failedNoteText}>
         {`Couldn't load ${leagues.length} ${plural} right now: ${names}. Everything else below is up to date.`}
       </AppText>
+    </View>
+  );
+}
+
+/**
+ * Placeholder row for a saved league whose summary is still loading —
+ * same row container and header layout as PortfolioLeagueCard (identity
+ * group + rank pill, then signal lines) so swapping the real row in
+ * doesn't visibly jump the list. The league name is real (it comes from
+ * the index), so it's shown instead of a bar.
+ */
+function PortfolioLeagueSkeleton({
+  league,
+  isFirst,
+  isLast,
+  styles,
+}: {
+  league: PortfolioSavedLeague;
+  isFirst: boolean;
+  isLast: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View
+      accessibilityLabel={`Loading ${league.league_name}`}
+      style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, !isLast && styles.rowDivider]}
+    >
+      <View style={styles.headerRow}>
+        <View style={styles.identityGroup}>
+          <SkeletonBlock width="55%" height={18} />
+          <AppText style={styles.leagueName} numberOfLines={1}>
+            {league.league_name}
+          </AppText>
+          <SkeletonBlock width="25%" height={12} style={styles.skeletonGap} />
+        </View>
+        <SkeletonBlock width={52} height={38} />
+      </View>
+      <View style={styles.skeletonSignals}>
+        <SkeletonBlock width="85%" height={14} />
+        <SkeletonBlock width="65%" height={12} />
+        <SkeletonBlock width="80%" height={14} style={styles.skeletonGap} />
+        <SkeletonBlock width="60%" height={12} />
+      </View>
     </View>
   );
 }
@@ -413,5 +492,7 @@ function createStyles(colors: ThemeColors) {
     rankValue: { fontSize: 15, fontWeight: '700' },
     rankPillFirst: { backgroundColor: `${colors.premium}1F` },
     rankTrophy: { marginBottom: 1 },
+    skeletonGap: { marginTop: spacing.xs },
+    skeletonSignals: { gap: spacing.xs, paddingBottom: spacing.md },
   });
 }
