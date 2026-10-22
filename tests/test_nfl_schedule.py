@@ -470,3 +470,21 @@ def test_team_schedule_index_matches_a_per_team_rebuild_for_every_team():
         )
         assert nfl_schedule.team_schedule(team, 2026, games=games) == expected
     assert nfl_schedule.team_schedule("BUF", 2031, games=games) == []
+
+def test_game_phase_tracks_scheduled_in_progress_and_final():
+    from datetime import datetime, timezone
+
+    row = {"played": False, "kickoff_at": "2026-10-18T17:00:00+00:00"}
+    before = datetime(2026, 10, 18, 16, 0, tzinfo=timezone.utc)
+    during = datetime(2026, 10, 18, 18, 30, tzinfo=timezone.utc)
+    long_after = datetime(2026, 10, 18, 22, 0, tzinfo=timezone.utc)
+
+    assert nfl_schedule.game_phase(row, now=before) == "scheduled"
+    assert nfl_schedule.game_phase(row, now=during) == "in_progress"
+    # nflverse can lag hours behind the final whistle; past the window the
+    # game reads as final even before a score is published.
+    assert nfl_schedule.game_phase(row, now=long_after) == "final"
+    assert nfl_schedule.game_phase({**row, "played": True}, now=during) == "final"
+    # Unknown stays unknown: a bye (no row) or a row with no kickoff time.
+    assert nfl_schedule.game_phase(None) is None
+    assert nfl_schedule.game_phase({"played": False, "kickoff_at": None}) is None

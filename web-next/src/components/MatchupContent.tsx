@@ -1,371 +1,487 @@
-import { InfoTip } from "@/components/InfoTip";
-import type { MatchupRealStarter, MatchupResponse, MatchupSide, MatchupStarter } from "@/lib/api";
-import { OvrGauge } from "@/components/OvrGauge";
+"use client";
+
+import { useState } from "react";
+
+import type {
+  MatchupPositionEdge,
+  MatchupResponse,
+  MatchupSide,
+  MatchupSuggestedMove,
+} from "@/lib/api";
+import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
+import { StatStrip } from "@/components/StatStrip";
 import { TeamAvatar } from "@/components/TeamAvatar";
-import { leanBar } from "@/lib/tradeHubPresentation";
-import { openSlotsMessage } from "@/lib/myTeamPresentation";
-import {
-  deriveContextLine,
-  formatSeasonValue,
-  matchupReasonMessage,
-  projectionDisplay,
-  realStarterPointsDisplay,
-  recordLabel,
-} from "@/lib/matchupPresentation";
+import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import {
+  edgeExplanation,
+  formatSeasonValue,
+  formatSigned,
+  hasKickedOff,
+  lineupComparisonRows,
+  lineupPlayerPoints,
+  matchupReasonMessage,
+  matchupVerdict,
+  moveOverLine,
+  moveSlotLabel,
+  recordLabel,
+  slotDisplayLabel,
+  winProbabilityUnavailableMessage,
+  type LineupPlayer,
+  type VerdictTone,
+} from "@/lib/matchupPresentation";
+import { positionColorVar } from "@/lib/playerPresentation";
 
 /**
- * Ports modules/web_matchup_ui.py's render_matchup_page for Revision 5 — the
- * real Streamlit Matchup page's own section order: hero verdict, each
- * side's REAL current-week lineup (only once Sleeper has it), the
- * suggested-lineup disclosure, then each side's suggested best lineup.
- * Backed by the same GET .../leagues/{id}/matchup mobile's MatchupScreen.tsx
- * already uses — this page and mobile can never disagree about what "this
- * week's real matchup" means, since both read the one endpoint.
+ * Weekly Matchup, laid out to the owner's concept (2026-10-21): header with
+ * week + LIVE, scoreboard, Matchup Insights, Lineup Comparison with
+ * Suggested | Actual tabs, and Suggested Moves. Every number is from
+ * GET .../leagues/{id}/matchup (the same endpoint mobile reads); this file
+ * only arranges it. The concept's own colors/chrome are mapped onto the
+ * shared tokens and components (glass-surface cards, SnapshotTile,
+ * PillRow, PositionBadge, ToneBadge, .winprob-bar-*).
  *
- * Deliberately NOT ported from mobile: the client-side "Injury Watch"
- * roll-up section. That's a mobile-only presentation grouping of starters
- * already visible on both lineups below (not a distinct ground-truth
- * section of the real Streamlit page this revision ports) — each injured
- * starter still surfaces, in place, on its own lineup row here via the same
- * injury pill My Team uses.
+ * FantasyDesk can't set a Sleeper lineup, so the Suggested tab and the
+ * moves list are a planner; the copy says so. Interactive swap editing is
+ * the next phase: it slots in on SuggestedMoves' cards and the Suggested
+ * tab's rows without changing this data shape.
  */
 
-function edgeColor(edge: "you" | "opponent" | "even"): string {
-  if (edge === "you") return "var(--color-success)";
-  if (edge === "opponent") return "var(--color-danger)";
-  return "var(--color-text-muted)";
+const MOVES_PREVIEW_COUNT = 3;
+
+function toneColor(tone: VerdictTone): string {
+  if (tone === "positive") return "var(--color-success)";
+  if (tone === "risk") return "var(--color-danger)";
+  return "var(--color-text-primary)";
 }
 
-function VersusSide({
+function signedTone(value: number | null | undefined): "positive" | "risk" | "neutral" {
+  if (value == null || Math.abs(value) < 0.05) return "neutral";
+  return value > 0 ? "positive" : "risk";
+}
+
+function MatchupHeader({ week, live, leagueName }: { week: number | null; live: boolean; leagueName: string }) {
+  return (
+    <header className="flex items-baseline gap-3 flex-wrap">
+      <h1 style={{ font: "var(--font-page-title)" }}>Matchup</h1>
+      {week != null ? (
+        <span className="text-sm font-bold" style={{ color: "var(--color-text-secondary)" }}>
+          Week {week}
+        </span>
+      ) : null}
+      {live ? (
+        <span className="self-center" aria-label="Games in progress">
+          <ToneBadge label="● Live" color="var(--color-success)" />
+        </span>
+      ) : null}
+      <span className="ml-auto text-xs truncate max-w-full" style={{ color: "var(--color-text-muted)" }}>
+        {leagueName}
+      </span>
+    </header>
+  );
+}
+
+function ScoreSide({
   side,
-  value,
-  subValue,
-  highlighted,
+  mine,
+  score,
+  projected,
+  kickedOff,
 }: {
   side: MatchupSide;
-  value: string;
-  subValue: string | null;
-  highlighted: boolean;
+  mine: boolean;
+  score: number | null;
+  projected: number | null;
+  kickedOff: boolean;
 }) {
+  // Before any game kicks off, Sleeper's 0.0 isn't a score yet, so the
+  // projection leads; once games start the real score leads.
+  const headline = kickedOff && score != null ? score.toFixed(1) : projected != null ? projected.toFixed(1) : "—";
+  const caption = kickedOff && score != null ? (projected != null ? `Proj ${projected.toFixed(1)}` : null) : "Projected";
   return (
-    <div className="flex-1 flex flex-col items-center text-center gap-0.5 min-w-0">
-      <TeamAvatar avatarUrl={side.avatar_url} size={40} ringColor={highlighted ? "var(--color-accent)" : "var(--color-border)"} />
+    <div className="flex-1 flex flex-col items-center text-center gap-1 min-w-0">
+      <TeamAvatar
+        avatarUrl={side.avatar_url}
+        size={56}
+        ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
+      />
       <span className="text-sm font-bold truncate w-full" style={{ color: "var(--color-text-primary)" }}>
         {side.team_name}
       </span>
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         {recordLabel(side)}
       </span>
-      <span
-        style={{
-          font: "var(--type-primary-metric)",
-          color: highlighted ? "var(--color-accent)" : "var(--color-text-primary)",
-          marginTop: "var(--space-xs)",
-        }}
-      >
-        {value}
-      </span>
-      {subValue ? (
+      <span style={{ font: "var(--type-primary-metric)", color: "var(--color-text-primary)" }}>{headline}</span>
+      {caption ? (
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {subValue}
+          {caption}
         </span>
       ) : null}
     </div>
   );
 }
 
-function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
-  const mine = matchup.my_team as MatchupSide;
-  const opponent = matchup.opponent as MatchupSide;
+function Scoreboard({ matchup }: { matchup: MatchupResponse }) {
+  const mine = matchup.my_team!;
+  const opponent = matchup.opponent!;
   const comparison = matchup.comparison!;
-  const realComparison = matchup.real_comparison;
-  const week = matchup.week;
-
-  const myValue = realComparison ? realComparison.my_points.toFixed(1) : formatSeasonValue(comparison.my_season_value);
-  const opponentValue = realComparison
-    ? realComparison.opponent_points.toFixed(1)
-    : formatSeasonValue(comparison.opponent_season_value);
-  const mySub = realComparison ? `${formatSeasonValue(comparison.my_season_value)} season value` : null;
-  const opponentSub = realComparison ? `${formatSeasonValue(comparison.opponent_season_value)} season value` : null;
-
-  const edge = realComparison ? realComparison.edge : comparison.edge;
-  let headline = realComparison
-    ? realComparison.edge === "you"
-      ? "You're ahead on live points"
-      : realComparison.edge === "opponent"
-        ? "Your opponent is ahead on live points"
-        : "It's tied on live points right now"
-    : comparison.headline;
-  if (edge !== "even") {
-    const margin = realComparison ? realComparison.margin : comparison.margin;
-    const rounded = realComparison ? margin.toFixed(1) : formatSeasonValue(margin).toString();
-    headline += ` (${margin > 0 ? "+" : ""}${rounded})`;
-  }
-  const basisLabel = realComparison ? realComparison.basis_label : comparison.basis_label;
-  const secondary =
-    realComparison && comparison.headline
-      ? `By season value: ${comparison.headline}${
-          comparison.edge === "even" ? "" : ` (${comparison.margin > 0 ? "+" : ""}${formatSeasonValue(comparison.margin)})`
-        }`
-      : null;
-
-  // "need team pfp and a bar saying whos winnig/ projected to win" /
-  // "we need real win odds we CANNOT have any loose ends" — coridian_,
-  // 2026-10-17. win_probability (modules.matchup_win_probability) is a
-  // real Normal-difference model over each side's real_starters, honestly
-  // unavailable (never a guessed 50/50) when either side's modeled
-  // coverage is too thin. Falls back to the current value/points lean
-  // (same leanBar() math + .lean-bar-* CSS Trade Hub/Analyzer ship) only
-  // when a real probability isn't available yet.
-  const winProbability = matchup.win_probability;
-  const hasRealOdds = winProbability?.available === true && winProbability.probability != null;
-  const myLeanScore = hasRealOdds
-    ? winProbability.probability!
-    : realComparison
-      ? realComparison.my_points
-      : comparison.my_season_value;
-  const opponentLeanScore = hasRealOdds
-    ? 1 - winProbability.probability!
-    : realComparison
-      ? realComparison.opponent_points
-      : comparison.opponent_season_value;
-  // leanBar's "pos" (green) fires when the second arg exceeds the first, so
-  // opponent goes first here — "pos" means I'm ahead, matching the
-  // success/danger color sense everywhere else in this app.
-  const { polarity: leanPolarity, halfTrackPercent } = leanBar(opponentLeanScore, myLeanScore);
-  const leanLabel = hasRealOdds
-    ? `Live win probability: you ${Math.round(winProbability.probability! * 100)}%, opponent ${Math.round(
-        (1 - winProbability.probability!) * 100,
-      )}%.`
-    : `${realComparison ? "Live points" : "Season value"} lean: you ${myLeanScore.toFixed(
-        1,
-      )}, opponent ${opponentLeanScore.toFixed(1)}.`;
+  const odds = matchup.win_probability;
+  const hasOdds = odds?.available === true && odds.probability != null;
+  const myPct = hasOdds ? Math.round(odds!.probability! * 100) : null;
+  const myProjected = hasOdds ? (odds!.my_projected_total ?? null) : null;
+  const opponentProjected = hasOdds ? (odds!.opponent_projected_total ?? null) : null;
+  const projectedMargin = myProjected != null && opponentProjected != null ? myProjected - opponentProjected : null;
+  const kickedOff = hasKickedOff(matchup);
 
   return (
-    <div
-      className="flex flex-col gap-3 p-4"
-      style={{
-        background: "var(--color-surface-raised)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
-      <div className="flex items-center gap-2">
+    <section className="glass-surface flex flex-col gap-4 p-4" aria-label="Scoreboard">
+      <div className="flex items-start gap-2">
+        <ScoreSide
+          side={mine}
+          mine
+          score={mine.has_live_data ? mine.real_points : null}
+          projected={myProjected}
+          kickedOff={kickedOff}
+        />
         <span
-          className="uppercase font-extrabold"
-          style={{ font: "var(--type-supporting-metadata)", color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}
-        >
-          {week != null ? `WEEK ${week}` : "THIS WEEK"}
-        </span>
-        {realComparison ? (
-          <span
-            className="px-1.5 uppercase font-extrabold"
-            style={{
-              background: "var(--color-accent-soft)",
-              color: "var(--color-accent)",
-              font: "var(--type-supporting-metadata)",
-              letterSpacing: "var(--letter-spacing-badge)",
-              borderRadius: "var(--radius-pill)",
-            }}
-          >
-            Live
-          </span>
-        ) : null}
-      </div>
-
-      <div className="flex items-start gap-3">
-        <VersusSide side={mine} value={myValue} subValue={mySub} highlighted={edge === "you"} />
-        <span
-          className="text-xs font-extrabold self-center"
+          className="self-center text-xs font-extrabold"
           style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
         >
           VS
         </span>
-        <VersusSide side={opponent} value={opponentValue} subValue={opponentSub} highlighted={edge === "opponent"} />
+        <ScoreSide
+          side={opponent}
+          mine={false}
+          score={opponent.has_live_data ? opponent.real_points : null}
+          projected={opponentProjected}
+          kickedOff={kickedOff}
+        />
       </div>
 
-      {hasRealOdds ? (
-        <div className="winprob-bar-track" role="img" aria-label={leanLabel}>
-          <span
-            className="winprob-bar-fill"
-            style={{ width: `${Math.round(winProbability.probability! * 100)}%` }}
-            aria-hidden="true"
-          />
+      {hasOdds ? (
+        <div className="flex flex-col gap-1.5">
+          <div
+            className="winprob-bar-track"
+            role="img"
+            aria-label={`Win probability: you ${myPct}%, opponent ${100 - myPct!}%.`}
+          >
+            <span className="winprob-bar-fill" style={{ width: `${myPct}%` }} aria-hidden="true" />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-base font-extrabold" style={{ color: "var(--color-success)" }}>
+              {myPct}%
+            </span>
+            <span
+              className="uppercase"
+              style={{
+                font: "var(--type-supporting-metadata)",
+                color: "var(--color-text-muted)",
+                letterSpacing: "var(--letter-spacing-badge)",
+              }}
+            >
+              Win probability
+            </span>
+            <span className="text-base font-extrabold" style={{ color: "var(--color-text-secondary)" }}>
+              {100 - myPct!}%
+            </span>
+          </div>
         </div>
       ) : (
-        <div className="lean-bar-track" role="img" aria-label={leanLabel}>
-          <span className="lean-bar-tick" aria-hidden="true" />
-          {halfTrackPercent > 0 ? (
-            <span
-              className={`lean-bar-fill lean-bar-fill--${leanPolarity}`}
-              style={{ width: `${halfTrackPercent}%` }}
-              aria-hidden="true"
-            />
-          ) : null}
-        </div>
+        <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+          {winProbabilityUnavailableMessage(matchup)}
+        </p>
       )}
-      {hasRealOdds ? (
-        <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
-          Win odds: you {Math.round(winProbability.probability! * 100)}% · opponent{" "}
-          {Math.round((1 - winProbability.probability!) * 100)}%
-        </span>
-      ) : null}
 
-      <div className="flex flex-col gap-0.5">
-        <span className="text-base font-extrabold" style={{ color: edgeColor(edge) }}>
-          {headline}
-        </span>
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {basisLabel}
-        </span>
-        {secondary ? (
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {secondary}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
-  const contextLine = deriveContextLine(player);
-  // coridian_, 2026-10-17: "everyy player on the matchup screen needs a
-  // projection" — this view previously showed only season-long VALUE.
-  const projection = projectionDisplay(player.projection);
-  return (
-    <div
-      className="flex items-center gap-3 py-2"
-      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      <PlayerIdentityTrigger
-        identity={{ ...player, sourceLabel: "Matchup" }}
-        className="flex-1 flex items-center gap-3 min-w-0"
-      >
-        <PositionBadge position={player.position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
-          <PlayerMetaLine injuryStatus={player.injury_label}>
-            {contextLine || `${player.team || "FA"}${player.slot ? ` · ${player.slot}` : ""}`}
-          </PlayerMetaLine>
-          {projection.value ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {projection.value}
-              {projection.caption ? ` · ${projection.caption}` : ""}
-            </span>
-          ) : null}
-        </div>
-      </PlayerIdentityTrigger>
-      <div className="flex items-center gap-2 shrink-0">
-        <OvrGauge rating={player.overall_rating} size="sm" />
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-            {player.score != null ? Math.round(player.score) : "—"}
-          </span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            VALUE
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RealStarterRow({ player }: { player: MatchupRealStarter }) {
-  const display = realStarterPointsDisplay(player);
-  return (
-    <div
-      className="flex items-center gap-3 py-2"
-      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      <PlayerIdentityTrigger
-        identity={{ ...player, sourceLabel: "Matchup" }}
-        className="flex-1 flex items-center gap-3 min-w-0"
-      >
-        <PositionBadge position={player.position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
-          <PlayerMetaLine injuryStatus={player.injury_label}>{player.team || "FA"}</PlayerMetaLine>
-        </div>
-      </PlayerIdentityTrigger>
-      <div className="flex items-center gap-2 shrink-0">
-        <OvrGauge rating={player.overall_rating} size="sm" />
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-            {display.value}
-          </span>
-          {display.caption ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {display.caption}
-            </span>
-          ) : null}
-          {display.secondaryValue ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {display.secondaryValue}
-              {display.secondaryCaption ? ` · ${display.secondaryCaption}` : ""}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RealLineupSection({ title, side }: { title: string; side: MatchupSide }) {
-  if (!side.has_live_data || side.real_starters.length === 0) return null;
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <SectionHeading>{title}</SectionHeading>
-        {side.real_points != null ? (
-          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-            {side.real_points.toFixed(1)} PTS
-          </span>
-        ) : null}
-      </div>
-      <div className="glass-surface flex flex-col">
-        {side.real_starters.map((player, index) => (
-          <RealStarterRow key={`${side.roster_id}-real-${player.player_id}-${index}`} player={player} />
-        ))}
-      </div>
+      {/* Symmetric: each team's season value on the outside, the two
+          matchup-level margins inside. */}
+      <StatStrip
+        columns={4}
+        items={[
+          { glyph: "starter", label: "Your value", value: formatSeasonValue(comparison.my_season_value) },
+          {
+            glyph: "power",
+            label: "Proj margin",
+            value: projectedMargin != null ? formatSigned(projectedMargin) : "—",
+            tone: signedTone(projectedMargin),
+          },
+          { glyph: "starter", label: "Their value", value: formatSeasonValue(comparison.opponent_season_value) },
+          {
+            glyph: "franchise",
+            label: "Value margin",
+            value:
+              comparison.margin === 0
+                ? "0"
+                : `${comparison.margin > 0 ? "+" : "-"}${formatSeasonValue(Math.abs(comparison.margin))}`,
+            tone: comparison.edge === "you" ? "positive" : comparison.edge === "opponent" ? "risk" : "neutral",
+          },
+        ]}
+      />
     </section>
   );
 }
 
-function SuggestedLineupSection({ title, side }: { title: string; side: MatchupSide }) {
+function EdgeArrow({ edge }: { edge: number }) {
+  const tone = signedTone(edge);
+  const color =
+    tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <SectionHeading>{title}</SectionHeading>
-        <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-          {formatSeasonValue(side.season_value_total)} SEASON VALUE
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" style={{ color }}>
+      {tone === "neutral" ? (
+        <path d="M3 7h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      ) : (
+        <path
+          d={tone === "positive" ? "M7 12V2M3 6l4-4 4 4" : "M7 2v10M3 8l4 4 4-4"}
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      )}
+    </svg>
+  );
+}
+
+function EdgeList({ edges }: { edges: MatchupPositionEdge[] }) {
+  return (
+    <ul className="flex flex-col" aria-label="Position edges">
+      {edges.map((edge) => {
+        const tone = signedTone(edge.edge);
+        const color =
+          tone === "positive"
+            ? "var(--color-success)"
+            : tone === "risk"
+              ? "var(--color-danger)"
+              : "var(--color-text-muted)";
+        return (
+          <li
+            key={edge.position}
+            className="flex items-center gap-2 py-1.5"
+            style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+          >
+            <EdgeArrow edge={edge.edge} />
+            <PositionBadge position={edge.position} />
+            <span className="ml-auto pl-3 text-sm font-extrabold tabular-nums" style={{ color }}>
+              {formatSigned(edge.edge)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function MatchupInsights({ matchup }: { matchup: MatchupResponse }) {
+  const verdict = matchupVerdict(matchup);
+  const actualEdges = matchup.position_edges?.actual ?? null;
+  const edges = actualEdges ?? matchup.position_edges?.suggested ?? [];
+  const explanation = edgeExplanation(edges);
+  const basis = actualEdges
+    ? hasKickedOff(matchup)
+      ? "Position edges: your Sleeper lineups, real points for started games plus projections."
+      : "Position edges: this week's projections for your Sleeper lineups."
+    : "Position edges: projections for each team's suggested lineup (Sleeper lineups aren't posted yet).";
+
+  return (
+    <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby="matchup-insights-title">
+      <SectionHeading id="matchup-insights-title">Matchup Insights</SectionHeading>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <p className="text-lg font-extrabold" style={{ color: toneColor(verdict.tone) }}>
+            {verdict.headline}
+          </p>
+          {explanation ? (
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              {explanation}
+            </p>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              No position projections yet to compare.
+            </p>
+          )}
+        </div>
+        {edges.length ? <EdgeList edges={edges} /> : null}
+      </div>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {basis}
+      </p>
+    </section>
+  );
+}
+
+function PointsBar({ value, max, mine }: { value: number | null; max: number; mine: boolean }) {
+  const pct = value != null && max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  return (
+    <span
+      className="block h-1 w-full"
+      style={{ background: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}
+      aria-hidden="true"
+    >
+      <span
+        className="block h-full"
+        style={{
+          width: `${pct}%`,
+          marginLeft: mine ? 0 : "auto",
+          background: mine ? "var(--color-accent)" : "var(--color-text-muted)",
+        }}
+      />
+    </span>
+  );
+}
+
+function LineupCell({
+  player,
+  mine,
+  maxValue,
+}: {
+  player: LineupPlayer | "empty" | null;
+  mine: boolean;
+  maxValue: number;
+}) {
+  if (player === null) return <div />;
+  if (player === "empty") {
+    return (
+      <div className={`flex items-center py-2 ${mine ? "" : "justify-end"}`}>
+        <span className="text-xs italic" style={{ color: "var(--color-text-muted)" }}>
+          Empty slot
         </span>
       </div>
-      {openSlotsMessage(side.open_slots) ? (
-        <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
-          {openSlotsMessage(side.open_slots)}
-        </p>
-      ) : null}
-      {side.starters.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No startable players on this roster right now.
+    );
+  }
+  const points = lineupPlayerPoints(player);
+  const valueText = points.value != null ? points.value.toFixed(1) : points.note === "bye" ? null : "—";
+  const reverse = mine ? "" : "flex-row-reverse";
+  return (
+    <PlayerIdentityTrigger
+      identity={{ ...player, sourceLabel: "Matchup" }}
+      className={`flex items-center gap-1.5 sm:gap-2 py-2 w-full ${reverse}`}
+    >
+      <span className="inline-flex shrink-0">
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={28} />
+      </span>
+      <div className={`flex-1 flex flex-col gap-1 min-w-0 ${mine ? "" : "items-end"}`}>
+        {/* Name gets its own full-width line so it survives phone widths;
+            team + number share the second line, the bar the third. */}
+        <span
+          className={`text-sm font-bold truncate w-full ${mine ? "" : "text-right"}`}
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          {player.name || "Unknown player"}
+        </span>
+        <div className={`flex items-center justify-between gap-1 w-full ${reverse}`}>
+          <span className={`flex items-center gap-1 min-w-0 ${reverse}`}>
+            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+              {player.team || "FA"}
+            </span>
+            <PlayerInjuryBadge status={player.injury_label} />
+          </span>
+          {valueText ? (
+            <span
+              className="text-sm font-extrabold tabular-nums shrink-0"
+              style={{ color: points.kind === "pts" ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
+              title={points.kind === "pts" ? "Real points" : "Projected points"}
+            >
+              {valueText}
+            </span>
+          ) : (
+            <ToneBadge label="Bye" color="var(--color-warning)" />
+          )}
+        </div>
+        <PointsBar value={points.value} max={maxValue} mine={mine} />
+      </div>
+    </PlayerIdentityTrigger>
+  );
+}
+
+type LineupView = "suggested" | "actual";
+
+function LineupComparison({
+  matchup,
+  view,
+  onViewChange,
+}: {
+  matchup: MatchupResponse;
+  view: LineupView;
+  onViewChange: (view: LineupView) => void;
+}) {
+  const mine = matchup.my_team!;
+  const opponent = matchup.opponent!;
+  const bestBall = matchup.best_ball === true;
+  const actual = bestBall || view === "actual";
+  const rows = actual
+    ? lineupComparisonRows(
+        mine.has_live_data ? mine.real_starters : [],
+        opponent.has_live_data ? opponent.real_starters : [],
+        mine.real_empty_slots ?? [],
+        opponent.real_empty_slots ?? [],
+      )
+    : lineupComparisonRows(mine.starters, opponent.starters);
+  const maxValue = Math.max(
+    0,
+    ...rows.flatMap((row) =>
+      [row.mine, row.opponent].map((cell) =>
+        cell && cell !== "empty" ? (lineupPlayerPoints(cell).value ?? 0) : 0,
+      ),
+    ),
+  );
+  const caption = actual
+    ? "Lineups as set in Sleeper."
+    : "Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.";
+
+  return (
+    <section className="glass-surface flex flex-col gap-3 p-3 sm:p-4" aria-labelledby="lineup-comparison-title">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <SectionHeading id="lineup-comparison-title">Lineup Comparison</SectionHeading>
+        {bestBall ? null : (
+        <PillRow
+          options={[
+            { label: "Suggested Lineup", value: "suggested" },
+            { label: "Actual Lineup", value: "actual" },
+          ]}
+          active={view}
+          onSelect={(value) => onViewChange(value as LineupView)}
+        />
+        )}
+      </div>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {caption}
+        {hasKickedOff(matchup) ? " Started games show real points; the rest show projections." : " Numbers are this week's projections."}
+      </p>
+
+      {rows.length === 0 ? (
+        <p className="text-sm py-4 text-center" style={{ color: "var(--color-text-muted)" }}>
+          {actual
+            ? "Sleeper hasn't posted lineups for this week yet."
+            : "No startable players on either roster right now."}
         </p>
       ) : (
-        <div className="glass-surface flex flex-col">
-          {side.starters.map((player) => (
-            <SuggestedStarterRow key={player.player_id} player={player} />
+        <div role="table" aria-label={actual ? "Actual lineups" : "Suggested lineups"} className="flex flex-col">
+          {rows.map((row, index) => (
+            <div
+              role="row"
+              key={`${row.slot}-${index}`}
+              className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] gap-1.5 sm:gap-2 items-center"
+              style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+            >
+              <div role="cell" className="min-w-0">
+                <LineupCell player={row.mine} mine maxValue={maxValue} />
+              </div>
+              <div
+                role="cell"
+                className="self-stretch flex items-center justify-center text-xs font-bold"
+                style={{ background: "var(--color-muted-soft)", color: "var(--color-text-secondary)" }}
+              >
+                {slotDisplayLabel(row.slot)}
+              </div>
+              <div role="cell" className="min-w-0">
+                <LineupCell player={row.opponent} mine={false} maxValue={maxValue} />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -373,56 +489,146 @@ function SuggestedLineupSection({ title, side }: { title: string; side: MatchupS
   );
 }
 
+function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: string }) {
+  const tone = signedTone(move.gain);
+  const gainColor =
+    tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
+  const slotColorVar = positionColorVar(move.slot);
+  return (
+    <li
+      className="flex items-center gap-3 p-3"
+      style={{ border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-muted-soft)" }}
+    >
+      <PlayerIdentityTrigger
+        identity={{
+          player_id: move.start.player_id ?? "",
+          name: move.start.name,
+          position: move.start.position,
+          team: move.start.team,
+          tier: move.start.tier,
+          sourceLabel: "Matchup",
+        }}
+        className="flex-1 flex items-center gap-3 min-w-0"
+      >
+        <span className="inline-flex shrink-0">
+          <PlayerAvatar playerId={move.start.player_id} tier={move.start.tier} size={40} />
+        </span>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="flex items-center gap-2">
+            <ToneBadge label={slotLabel} color={slotColorVar ? `var(${slotColorVar})` : "var(--color-text-secondary)"} />
+            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : "No projection yet"}
+            </span>
+          </span>
+          <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+            <span style={{ color: "var(--color-success)" }}>Start</span> {move.start.name || "Unknown player"}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {moveOverLine(move)}
+          </span>
+        </div>
+      </PlayerIdentityTrigger>
+      <div className="flex flex-col items-center gap-1 shrink-0">
+        <div
+          className="flex flex-col items-center px-2.5 py-1.5"
+          style={{
+            background: `color-mix(in srgb, ${gainColor} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${gainColor} 35%, transparent)`,
+          }}
+        >
+          <span className="text-base font-extrabold tabular-nums" style={{ color: gainColor }}>
+            {move.gain != null ? formatSigned(move.gain) : "—"}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Proj pts
+          </span>
+        </div>
+        {move.locked ? <ToneBadge label="Locked" color="var(--color-text-muted)" /> : null}
+      </div>
+    </li>
+  );
+}
+
+function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
+  const [expanded, setExpanded] = useState(false);
+  const moves = matchup.suggested_moves ?? null;
+  const actualStarters = matchup.my_team?.real_starters ?? [];
+  const shown = moves ? (expanded ? moves : moves.slice(0, MOVES_PREVIEW_COUNT)) : [];
+  const hiddenCount = moves ? moves.length - MOVES_PREVIEW_COUNT : 0;
+
+  return (
+    <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby="suggested-moves-title">
+      <div className="flex items-center justify-between gap-3">
+        <SectionHeading id="suggested-moves-title">Suggested Moves</SectionHeading>
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((open) => !open)}
+            aria-expanded={expanded}
+            className="text-xs font-bold"
+            style={{ color: "var(--color-accent)" }}
+          >
+            {expanded ? "Show fewer" : `View all (${moves!.length})`}
+          </button>
+        ) : null}
+      </div>
+      {moves === null ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          Suggested moves appear once Sleeper has your lineup for this week.
+        </p>
+      ) : moves.length === 0 ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          Your Sleeper lineup already matches our suggested lineup.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {shown.map((move) => (
+            <MoveCard
+              key={`${move.start.player_id}-${move.slot}`}
+              move={move}
+              slotLabel={moveSlotLabel(move, actualStarters)}
+            />
+          ))}
+        </ul>
+      )}
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        The suggested lineup ranks by season-long value; gains are this week&apos;s projected points. FantasyDesk
+        can&apos;t change your Sleeper lineup, so make any swap in Sleeper.
+      </p>
+    </section>
+  );
+}
+
 export function MatchupContent({ leagueName, matchup }: { leagueName: string; matchup: MatchupResponse }) {
-  const notReady = !matchup.ok || !matchup.my_team || !matchup.opponent || !matchup.comparison;
-  if (notReady) {
+  const ready = matchup.ok && matchup.my_team && matchup.opponent && matchup.comparison;
+  const defaultView: LineupView = matchup.my_team?.has_live_data ? "actual" : "suggested";
+  const [view, setView] = useState<LineupView>(defaultView);
+
+  if (!ready) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
+      <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+        <MatchupHeader week={matchup.week} live={false} leagueName={leagueName} />
+        <p className="glass-surface text-sm text-center p-6" style={{ color: "var(--color-text-muted)" }}>
           {matchupReasonMessage(matchup.reason)}
         </p>
       </main>
     );
   }
 
-  const mine = matchup.my_team!;
-  const opponent = matchup.opponent!;
-
   return (
-    <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
-      <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Matchup
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
-      </header>
-
-      <MatchupHero matchup={matchup} />
-
-      <RealLineupSection title="Your actual lineup this week" side={mine} />
-      <RealLineupSection title={`${opponent.team_name}'s actual lineup`} side={opponent} />
-
+    <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
+      <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
+      <Scoreboard matchup={matchup} />
+      <MatchupInsights matchup={matchup} />
+      <LineupComparison matchup={matchup} view={view} onViewChange={setView} />
       {matchup.best_ball ? (
         // Best ball: Sleeper sets both lineups from the highest weekly
-        // scorers, so there's no suggested lineup or start/sit call to make.
+        // scorers, so there is no suggested lineup or start/sit call.
         <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
           {matchup.lineup_advice_message}
         </p>
       ) : (
-        <>
-      <div className="glass-surface p-4">
-        <InfoTip label="Suggested starters, not set lineups">
-          The suggested starters below are each roster&apos;s best available lineup by season-long value — the same
-          optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. This is a
-          recommendation, not necessarily the lineup either manager has actually set in Sleeper. Weekly projections
-          (where shown) come from this player&apos;s own recent-week trend — see each real-lineup row&apos;s projection
-          note for the honest range and confidence.
-        </InfoTip>
-      </div>
-
-      <SuggestedLineupSection title="Your suggested starters" side={mine} />
-      <SuggestedLineupSection title={`${opponent.team_name}'s best lineup`} side={opponent} />
-        </>
+        <SuggestedMoves matchup={matchup} />
       )}
       <ValuesCredit />
     </main>

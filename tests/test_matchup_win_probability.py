@@ -44,6 +44,16 @@ def _live(actual: float, *, kickoff: datetime = KICKOFF, started: bool = True):
     """15 +/- 7 projection; game kicked off at `kickoff`."""
     return _projected_starter(15.0, 8.0, 22.0, started=started, actual=actual, kickoff_at=kickoff.isoformat())
 
+def test_starter_expected_points_matches_the_win_probability_model():
+    from modules.matchup_win_probability import starter_expected_points
+
+    # Not started: the projection's point estimate.
+    assert starter_expected_points(_projected_starter(14.0, 10.0, 18.0)) == 14.0
+    # Started: the real score, whatever the projection said.
+    assert starter_expected_points(_projected_starter(14.0, 10.0, 18.0, started=True, actual=3.5)) == 3.5
+    # No usable projection: not modeled, never a guessed 0.
+    assert starter_expected_points({"projection": {"status": "bye_week"}, "game_started": None}) is None
+
 
 def _unmodeled_starter():
     return {"actual_points": None, "game_started": False, "projection": {"status": "unsupported_position"}}

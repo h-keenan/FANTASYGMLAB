@@ -123,6 +123,20 @@ def _projection_moments(starter: dict[str, Any]) -> tuple[float, float] | None:
     return float(point_estimate), half_width * half_width
 
 
+def starter_expected_points(starter: dict[str, Any], *, now: datetime | None = None) -> float | None:
+    """One starter's expected weekly points under this module's model (his
+    real score once his game has started, his projection's point estimate
+    otherwise), or None when he isn't modeled at all.
+
+    Public so other Matchup numbers (per-position edges, suggested-move
+    gains) read the exact figure the win probability uses, and pick up any
+    change to `_starter_distribution` without a second copy of its rules.
+    """
+
+    mean, _variance, modeled = _starter_distribution(starter, now=now)
+    return mean if modeled else None
+
+
 def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = None) -> tuple[float, float, bool]:
     """One starter's (mean, variance, modeled) contribution to his team's
     weekly point total: real points so far plus the remaining share of his
