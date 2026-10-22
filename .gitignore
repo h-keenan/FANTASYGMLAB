@@ -93,3 +93,6 @@ data/*measurement*.json
 data/*_measurement.json
 data/*benchmark*.json
 settings.local.json
+
+# Cross-process refresh lock for data/sleeper_players.json (modules/sleeper.py)
+data/*.lock
