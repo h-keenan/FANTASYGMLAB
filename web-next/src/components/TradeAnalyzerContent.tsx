@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   api,
@@ -65,6 +65,12 @@ import { ValuesCredit } from "@/components/ValuesCredit";
  * "always receive" reading. Fails open silently (plain Trade Analyzer view,
  * no crash) when the id is missing, stale, or isn't on any roster in this
  * league — there is no toast/error state for "couldn't find that player".
+ *
+ * Tap-depth audit 2026-10, proposal 1: after a quick-add the builder flips
+ * to the OTHER (still empty) side and focuses the search box, so the next
+ * tap picks the counter-asset. The owning team stays selected for when the
+ * user comes back to "You receive". Used by Players' "Add to Trade" and the
+ * Player Quick View / Player Profile "Add to Trade" action.
  *
  * Revision 21 (coridian_, "add picks to all trade sections" audit): "Build
  * the counter" used to only ever appear/apply for a counter_action whose
@@ -505,6 +511,13 @@ export function TradeAnalyzerContent({
   // same render, so addPlayer would still see the OLD side and file the
   // player on the wrong list.
   const [appliedQuickAddPlayerId, setAppliedQuickAddPlayerId] = useState<string | null>(null);
+  const [quickAddFocusPending, setQuickAddFocusPending] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  // Focus is a DOM side effect, not state, so it runs after commit. The
+  // pending flag is cleared by the input's own onFocus handler.
+  useEffect(() => {
+    if (quickAddFocusPending) searchInputRef.current?.focus({ preventScroll: true });
+  }, [quickAddFocusPending]);
   if (quickAddPlayerId && quickAddPlayerId !== appliedQuickAddPlayerId) {
     setAppliedQuickAddPlayerId(quickAddPlayerId);
     const quickAddPlayer = rankings.find((p) => p.player_id === quickAddPlayerId);
@@ -512,14 +525,16 @@ export function TradeAnalyzerContent({
       if (myRosterIds.has(quickAddPlayerId)) {
         // On the user's own roster: "receive" (the only side the search
         // pool ever draws from, see searchPool above) would be nonsensical.
-        setActiveSide("send");
+        setActiveSide("receive");
+        setQuickAddFocusPending(true);
         setSendPlayers((prev) =>
           prev.some((p) => p.player_id === quickAddPlayer.player_id) ? prev : [...prev, quickAddPlayer],
         );
       } else {
         const owner = otherTeams.find((team) => team.playerIds.has(quickAddPlayerId));
         if (owner) {
-          setActiveSide("receive");
+          setActiveSide("send");
+          setQuickAddFocusPending(true);
           setSelectedTeamId(owner.rosterId);
           setReceivePlayers((prev) =>
             prev.some((p) => p.player_id === quickAddPlayer.player_id) ? prev : [...prev, quickAddPlayer],
@@ -692,6 +707,8 @@ export function TradeAnalyzerContent({
         ) : null}
 
         <input
+          ref={searchInputRef}
+          onFocus={() => setQuickAddFocusPending(false)}
           type="text"
           value={search}
           onChange={(event) => setSearch(event.target.value)}

@@ -299,6 +299,47 @@ describe("TradeFinderContent", () => {
     expect(screen.queryByRole("button", { name: /Find Realistic Trades/ })).not.toBeInTheDocument();
   });
 
+  describe("Find trades deep link (initialPlayerId)", () => {
+    it("pre-selects a roster player and runs the search once, under the declared strategy", async () => {
+      vi.mocked(api.getTeamStance).mockResolvedValue({ ok: true, stance: "competing", strategy: "contender" });
+      vi.mocked(api.getTradeFinderIdeas).mockClear();
+      vi.mocked(api.getTradeFinderIdeas).mockResolvedValue({ ok: true, ideas: [idea({})], reason: "", is_premium: true, upsell: null });
+
+      render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} initialPlayerId="p2" />);
+      await act(async () => {});
+
+      expect(api.getTradeFinderIdeas).toHaveBeenCalledTimes(1);
+      expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p2"], "contender", "Dynasty", { pickIds: [], returnPicks: false });
+      expect(screen.getByText("Bench Guy").closest("button")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText("Rival GM")).toBeInTheDocument();
+    });
+
+    it("shows the Premium upsell for a Free caller, same as a manual search", async () => {
+      vi.mocked(api.getTradeFinderIdeas).mockResolvedValue({
+        ok: true,
+        ideas: [],
+        reason: "",
+        is_premium: false,
+        upsell: { title: "Build and search for a trade", body: "Upgrade to Premium to unlock it." },
+      });
+
+      render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} initialPlayerId="p1" />);
+      await act(async () => {});
+
+      expect(screen.getByRole("heading", { name: "Build and search for a trade" })).toBeInTheDocument();
+    });
+
+    it("ignores a player who isn't on this roster", async () => {
+      vi.mocked(api.getTradeFinderIdeas).mockClear();
+
+      render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} initialPlayerId="someone-else" />);
+      await act(async () => {});
+
+      expect(api.getTradeFinderIdeas).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /Find Realistic Trades/ })).toBeDisabled();
+    });
+  });
+
   it("shows the roster-not-ready message instead of a picker when `reason` is set", () => {
     render(
       <TradeFinderContent

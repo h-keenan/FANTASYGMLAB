@@ -18,6 +18,8 @@ export default function TradeFinderPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  // "Find trades" from Player Quick View / Player Profile.
+  const initialPlayerId = searchParams.get("playerId") || undefined;
   const { lens } = useValuationLens(leagueId);
 
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
@@ -57,5 +59,5 @@ export default function TradeFinderPage() {
     );
   }
 
-  return <TradeFinderContent leagueId={leagueId} leagueName={leagueName} myTeam={myTeam} lens={lens} />;
+  return <TradeFinderContent leagueId={leagueId} leagueName={leagueName} myTeam={myTeam} lens={lens} initialPlayerId={initialPlayerId} />;
 }

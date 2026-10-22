@@ -7,6 +7,7 @@ import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ModelRadarChart } from "@/components/ModelRadarChart";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
+import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { SheetHandle } from "@/components/SheetHandle";
 import { CHART_HEIGHT } from "@/components/WeeklyPointsChart";
@@ -280,6 +281,12 @@ export function PlayerQuickView({
 
         {identity.leagueId ? (
           <div className="pqv-actions">
+            <PlayerLeagueActions
+              leagueId={identity.leagueId}
+              leagueName={identity.leagueName || ""}
+              playerId={identity.player_id}
+              sourceSurface="player_quick_view"
+            />
             {/* coridian_, 2026-10-19: "the pqv on the app has tabs that the
                 site doesnt. Thats a consistency error" — this is the real
                 product fix: a destination for mobile's Stats/Trends/

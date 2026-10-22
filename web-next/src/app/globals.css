@@ -1582,8 +1582,29 @@ a {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--color-accent);
+  background: transparent;
   border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-pill);
   padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+}
+.pqv-action-link:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: default;
+}
+/* The contextual trade actions (PlayerLeagueActions.tsx) lead the row in
+   the accent's soft fill; profile/compare stay outlined. */
+.pqv-action-link--primary,
+.pqv-action-link--active {
+  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+.pqv-action-message {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  text-align: right;
+  color: var(--color-warning);
 }
 
 @media (max-width: 480px) {
