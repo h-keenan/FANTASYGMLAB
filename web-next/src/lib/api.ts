@@ -2241,6 +2241,43 @@ export interface RecordTradeShareAsset {
   value_score?: number | null;
 }
 
+export interface ManagerTendencySignal {
+  status: "ok" | "insufficient_data";
+  label: string | null;
+  summary: string;
+  sample_size: number;
+  min_sample: number;
+  evidence: string[];
+}
+
+export interface ManagerTendencySummaryRow {
+  roster_id: number;
+  team_name: string | null;
+  owner_handle: string | null;
+  headline: string | null;
+  sample: { trades: number; wire_moves: number; seasons: number } | null;
+}
+
+export interface ManagerTendenciesSummaryResponse {
+  ok: boolean;
+  is_premium: boolean;
+  upsell: { title: string; body: string } | null;
+  managers: ManagerTendencySummaryRow[];
+}
+
+export interface ManagerTendenciesDetailResponse {
+  ok: boolean;
+  is_premium: boolean;
+  upsell: { title: string; body: string } | null;
+  manager: {
+    team_name: string | null;
+    owner_handle: string | null;
+    headline: string | null;
+    sample: { trades: number; wire_moves: number; seasons: number } | null;
+    signals: Record<string, ManagerTendencySignal>;
+  } | null;
+}
+
 export interface RecordTradeShareBody {
   partnerTeamName?: string;
   send: RecordTradeShareAsset[];
@@ -2747,6 +2784,15 @@ export const api = {
   getTeamRankings: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<LeagueTeamRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getManagerTendencies: (leagueId: string) =>
+    authorizedRequest<ManagerTendenciesSummaryResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/managers/tendencies`,
+    ),
+  getManagerTendencyDetail: (leagueId: string, rosterId: string | number) =>
+    authorizedRequest<ManagerTendenciesDetailResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
     ),
 
   getLeaguePlayoffOdds: (leagueId: string, lens: string = "Dynasty") =>

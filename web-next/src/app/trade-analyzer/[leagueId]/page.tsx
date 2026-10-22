@@ -114,6 +114,7 @@ export default function TradeAnalyzerPage() {
       rosters={data.rosters}
       teamProfiles={data.teamProfiles}
       quickAddPlayerId={quickAddPlayerId}
+          lens={lens}
     />
   );
 }

@@ -24,6 +24,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import CircularProgressRing from '../components/CircularProgressRing';
 import TeamAvatar from '../components/TeamAvatar';
+import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -548,6 +549,14 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             </TouchableOpacity>
           ))}
         </View>
+      ) : null}
+
+      {selectedTeamId !== ALL_TEAMS_ID ? (
+        <ManagerTendenciesChips
+          leagueId={leagueId}
+          teamName=""
+          rosterId={selectedTeamId}
+        />
       ) : null}
 
       {quickMode ? (

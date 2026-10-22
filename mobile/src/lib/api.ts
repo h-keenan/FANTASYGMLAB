@@ -5,6 +5,10 @@ import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
+import type {
+  ManagerTendenciesDetailResponse,
+  ManagerTendenciesSummaryResponse,
+} from './managerTendencies';
 
 /**
  * Client for services/mobile_api_service.py. Every call attaches the current
@@ -2116,6 +2120,14 @@ export const api = {
   getLeagueTeamRankings: (leagueId: string) =>
     authorizedFetch<LeagueTeamRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings`,
+    ),
+  getManagerTendencies: (leagueId: string) =>
+    authorizedFetch<ManagerTendenciesSummaryResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/managers/tendencies`,
+    ),
+  getManagerTendencyDetail: (leagueId: string, rosterId: string | number) =>
+    authorizedFetch<ManagerTendenciesDetailResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
     ),
   getLeaguePlayoffOdds: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
