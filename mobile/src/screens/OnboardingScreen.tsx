@@ -17,6 +17,9 @@ import AppText from '../components/AppText';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
+import MeterRow from '../components/ConfidenceMeter';
+import ToneBadge from '../components/ToneBadge';
+import TradeValueBar from '../components/TradeValueBar';
 import type { ExperienceLevelValue } from '../lib/api';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -39,31 +42,10 @@ type StepKey = (typeof STEP_KEYS)[number];
 // rephrase without re-checking with product. 'orb' is the one mobile-only
 // step: web's carousel omits it only because the GM orb doesn't exist on web.
 
-const SOLVE_ROWS: { icon: IconName; color: ColorKey; title: string; body: string }[] = [
-  {
-    icon: 'swap-horizontal-outline',
-    color: 'premium',
-    title: 'Trade Hub',
-    body: 'Real, believable trade ideas — ones your league partners would actually say yes to.',
-  },
-  {
-    icon: 'add-circle-outline',
-    color: 'success',
-    title: 'Waivers',
-    body: 'Priority Adds ranked for your roster, not a generic most-added list.',
-  },
-  {
-    icon: 'flash-outline',
-    color: 'accent',
-    title: 'Next Move',
-    body: 'One clear top priority every time you open the app.',
-  },
-];
-
 const HOW_STEPS: { color: ColorKey; title: string; body: string }[] = [
   {
     color: 'accent',
-    title: 'Connect your Sleeper league',
+    title: 'Connect Sleeper or ESPN',
     body: 'The one setup step. Every recommendation depends on it.',
   },
   {
@@ -165,7 +147,7 @@ export default function OnboardingScreen({ navigation }: Props) {
             <AppText style={styles.eyebrow}>Who we are</AppText>
             <AppText style={styles.headline}>Your fantasy front office, not just a stats app.</AppText>
             <AppText style={styles.body}>
-              Real recommendations across your Trade Hub, Waivers, and Next Move — not raw data you have to
+              Real recommendations across your Trade Hub, Waivers, and Game Plan — not raw data you have to
               interpret yourself.
             </AppText>
           </>
@@ -176,15 +158,35 @@ export default function OnboardingScreen({ navigation }: Props) {
             <AppText style={styles.eyebrow}>What we solve</AppText>
             <AppText style={styles.headlineSm}>{'Dynasty data is everywhere.\nDecisions are hard.'}</AppText>
             <View style={styles.cards}>
-              {SOLVE_ROWS.map((row) => (
-                <GlassPanel key={row.title} style={styles.rowCard}>
-                  <Ionicons name={row.icon} size={20} color={colors[row.color]} style={styles.rowIcon} />
-                  <View style={styles.rowText}>
-                    <AppText style={styles.rowTitle}>{row.title}</AppText>
-                    <AppText style={styles.rowBody}>{row.body}</AppText>
-                  </View>
-                </GlassPanel>
-              ))}
+              <GlassPanel style={styles.previewCard}>
+                <View style={styles.previewHead}>
+                  <AppText style={styles.previewTitle}>Game Plan</AppText>
+                  <ToneBadge label="Sample" color={colors.textSecondary} />
+                </View>
+                <AppText style={styles.previewLine}>Top priority: upgrade your weakest starter</AppText>
+                <MeterRow label="Confidence" value="High" level={3} color={colors.success} />
+              </GlassPanel>
+              <GlassPanel style={styles.previewCard}>
+                <View style={styles.previewHead}>
+                  <AppText style={styles.previewTitle}>Trade Hub</AppText>
+                  <ToneBadge label="Sample" color={colors.textSecondary} />
+                </View>
+                <AppText style={styles.previewLine}>Your WR2 + 2027 2nd → Their RB1</AppText>
+                <TradeValueBar delta={800} />
+              </GlassPanel>
+              <GlassPanel style={styles.previewCard}>
+                <View style={styles.previewHead}>
+                  <AppText style={styles.previewTitle}>Matchup</AppText>
+                  <ToneBadge label="Sample" color={colors.textSecondary} />
+                </View>
+                <View style={styles.previewSplit}>
+                  <AppText style={styles.previewLine}>Win probability</AppText>
+                  <AppText style={[styles.previewStat, { color: colors.success }]}>64%</AppText>
+                </View>
+                <View style={styles.previewTrack} accessible accessibilityLabel="64 percent win probability">
+                  <View style={[styles.previewFill, { width: '64%', backgroundColor: colors.success }]} />
+                </View>
+              </GlassPanel>
             </View>
           </>
         );
@@ -380,9 +382,20 @@ function createStyles(colors: ThemeColors) {
       maxWidth: 340,
     },
     cards: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.md },
-    rowCard: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing.md },
-    rowIcon: { marginRight: spacing.md, marginTop: 2 },
-    rowText: { flex: 1 },
+    previewCard: { padding: spacing.md, gap: spacing.sm },
+    previewHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    previewTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      color: colors.accent,
+    },
+    previewLine: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+    previewSplit: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    previewStat: { fontSize: 22, fontWeight: '800' },
+    previewTrack: { height: 6, borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
+    previewFill: { height: 6 },
     rowTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     rowBody: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: 2 },
     howRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

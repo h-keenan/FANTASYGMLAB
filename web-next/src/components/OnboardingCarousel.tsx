@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useState } from "react";
 
+import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { ToneBadge } from "@/components/ToneBadge";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
@@ -84,7 +87,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
             <span className="onboarding-eyebrow">Who we are</span>
             <h1 className="onboarding-headline">Your fantasy front office, not just a stats app.</h1>
             <p className="onboarding-body">
-              Real recommendations across your Trade Hub, Waivers, and Next Move — not raw data you have to interpret
+              Real recommendations across your Trade Hub, Waivers, and Game Plan — not raw data you have to interpret
               yourself.
             </p>
           </div>
@@ -99,43 +102,39 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
               Decisions are hard.
             </h1>
             <div className="onboarding-cards">
-              <div className="onboarding-glass onboarding-row">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-premium)" strokeWidth="2">
-                  <path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" />
-                </svg>
-                <div>
-                  <div className="onboarding-row-title">Trade Hub</div>
-                  <div className="onboarding-row-body">
-                    Real, believable trade ideas — ones your league partners would actually say yes to.
-                  </div>
+              <div className="onboarding-glass onboarding-preview" aria-label="Sample Game Plan card">
+                <div className="onboarding-preview-head">
+                  <span className="onboarding-preview-title">Game Plan</span>
+                  <ToneBadge label="Sample" color="var(--color-text-muted)" />
                 </div>
+                <div className="onboarding-preview-line">Top priority: upgrade your weakest starter</div>
+                <ConfidenceMeter label="Confidence" value="High" color="var(--color-success)" />
               </div>
-              <div className="onboarding-glass onboarding-row">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2">
-                  <circle cx="12" cy="12" r="8" />
-                  <path d="M12 8v8M8 12h8" />
-                </svg>
-                <div>
-                  <div className="onboarding-row-title">Waivers</div>
-                  <div className="onboarding-row-body">
-                    Priority Adds ranked for your roster, not a generic most-added list.
-                  </div>
+              <div className="onboarding-glass onboarding-preview" aria-label="Sample Trade Hub idea">
+                <div className="onboarding-preview-head">
+                  <span className="onboarding-preview-title">Trade Hub</span>
+                  <ToneBadge label="Sample" color="var(--color-text-muted)" />
                 </div>
+                <div className="onboarding-preview-line">
+                  <span>Your WR2 + 2027 2nd</span>
+                  <span className="onboarding-preview-arrow" aria-hidden="true">
+                    &rarr;
+                  </span>
+                  <span>Their RB1</span>
+                </div>
+                <LeanBarMeter sendScore={4200} receiveScore={5000} />
               </div>
-              <div className="onboarding-glass onboarding-row">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--color-accent-strong)"
-                  strokeWidth="2"
-                >
-                  <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" strokeLinejoin="round" />
-                </svg>
-                <div>
-                  <div className="onboarding-row-title">Next Move</div>
-                  <div className="onboarding-row-body">One clear top priority every time you open the app.</div>
+              <div className="onboarding-glass onboarding-preview" aria-label="Sample matchup win probability">
+                <div className="onboarding-preview-head">
+                  <span className="onboarding-preview-title">Matchup</span>
+                  <ToneBadge label="Sample" color="var(--color-text-muted)" />
+                </div>
+                <div className="onboarding-preview-line">
+                  <span>Win probability</span>
+                  <strong className="onboarding-preview-stat">64%</strong>
+                </div>
+                <div className="onboarding-preview-bar" role="img" aria-label="64 percent win probability">
+                  <span style={{ width: "64%" }} />
                 </div>
               </div>
             </div>
@@ -152,7 +151,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
                   1
                 </span>
                 <div className="onboarding-glass onboarding-step-card">
-                  <div className="onboarding-row-title">Connect your Sleeper league</div>
+                  <div className="onboarding-row-title">Connect Sleeper or ESPN</div>
                   <div className="onboarding-row-body">
                     The one setup step. Every recommendation depends on it.
                   </div>
