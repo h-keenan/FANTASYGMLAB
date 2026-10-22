@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { AlertItem, AlertsResponse } from "@/lib/api";
-import { api } from "@/lib/api";
+import { markAlertReadSynced, overlayPendingAlertReads, reconcileAlertReads } from "@/lib/alertReadSync";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -196,12 +196,30 @@ export function AlertsContent({
   leagueId,
   leagueName,
   data,
+  userId = "",
 }: {
   leagueId: string;
   leagueName: string;
   data: AlertsResponse;
+  /** Scopes this browser's not-yet-synced reads to the signed-in account. */
+  userId?: string;
 }) {
-  const [items, setItems] = useState<AlertItem[]>(data.items);
+  // `read` comes from the server's cross-device read table (the same one
+  // the mobile app writes), overlaid with any read tapped here that hasn't
+  // reached the server yet — see lib/alertReadSync.ts.
+  const [tappedRead, setTappedRead] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    // Side effects only: drop pending reads the server now confirms and
+    // re-send the rest. Rendering below already shows them as read.
+    reconcileAlertReads(userId, leagueId, data.items);
+  }, [userId, leagueId, data]);
+  const items = useMemo(
+    () =>
+      overlayPendingAlertReads(userId, leagueId, data.items).map((row) =>
+        !row.read && tappedRead.has(row.alert_key) ? { ...row, read: true } : row,
+      ),
+    [userId, leagueId, data, tappedRead],
+  );
 
   const notice = data.reason ? alertsReasonMessage(data.reason) : null;
   if (notice) {
@@ -216,11 +234,11 @@ export function AlertsContent({
 
   const openAndMarkRead = (alert: AlertItem) => {
     if (!alert.read) {
-      setItems((prev) => prev.map((row) => (row.alert_key === alert.alert_key ? { ...row, read: true } : row)));
-      // Fire-and-forget: read state is a soft-fail nicety (the backend
-      // "fails closed" on this write — see mark_league_alert_read's
-      // docstring), never worth blocking or erroring the tap on.
-      api.markAlertRead(leagueId, alert.alert_key).catch(() => {});
+      setTappedRead((prev) => new Set(prev).add(alert.alert_key));
+      // Never blocks or errors the tap: the read is remembered locally and
+      // retried on the next load if this POST fails or the backend answers
+      // ok: false (see mark_league_alert_read's docstring).
+      void markAlertReadSynced(userId, leagueId, alert.alert_key);
     }
   };
 

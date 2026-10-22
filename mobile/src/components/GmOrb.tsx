@@ -30,6 +30,7 @@ import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
 import BrandMark from './BrandMark';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
+import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { queryKeys } from '../lib/queryKeys';
@@ -618,10 +619,17 @@ export default function GmOrb() {
       return;
     }
     let cancelled = false;
+    const leagueId = league.leagueId;
     api
-      .getLeagueAlerts(league.leagueId, 12)
-      .then((result) => {
-        if (!cancelled) setUnreadAlertCount(result.items.filter((item) => !item.read).length);
+      .getLeagueAlerts(leagueId, 12)
+      // Same read state the Alerts screen shows: server (cross-device)
+      // plus reads tapped on this phone that haven't synced yet.
+      .then(async (result) => {
+        const userId = await currentAlertReadUserId();
+        return alertReadSync.overlayPending(userId, leagueId, result.items);
+      })
+      .then((items) => {
+        if (!cancelled) setUnreadAlertCount(items.filter((item) => !item.read).length);
       })
       .catch(() => {
         if (!cancelled) setUnreadAlertCount(0);
