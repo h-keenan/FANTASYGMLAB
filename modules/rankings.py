@@ -4,6 +4,7 @@ import os
 import sqlite3
 import threading
 import time
+from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, List, Sequence
 
@@ -2127,14 +2128,7 @@ def _opportunity_group_sort_key_values(
     return (slot_num, projected, market, age_num)
 
 
-def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return df
-
-    enriched = df.copy()
-    if "team" not in enriched.columns or "position" not in enriched.columns:
-        return enriched
-
+def _normalize_opportunity_inputs(enriched: pd.DataFrame) -> None:
     enriched["opportunity_label"] = enriched.get("opportunity_label", "").fillna("").astype(str)
     enriched["opportunity_explanation"] = enriched.get("opportunity_explanation", "").fillna("").astype(str)
     enriched["workload_trend"] = enriched.get("workload_trend", "Unknown").fillna("Unknown").astype(str)
@@ -2167,6 +2161,18 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
         enriched.get("age", pd.Series(99.0, index=enriched.index)),
         errors="coerce",
     ).fillna(99.0)
+
+
+def _enrich_opportunity_context_full(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
+    enriched = df.copy()
+    if "team" not in enriched.columns or "position" not in enriched.columns:
+        return enriched
+
+    _normalize_opportunity_inputs(enriched)
+
 
     for (_, _), group in enriched.groupby(
         [
@@ -2283,6 +2289,275 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
             enriched.at[idx, "opportunity_explanation"] = explanation.rstrip(".") + "."
             enriched.at[idx, "workload_trend"] = workload_trend
 
+    return enriched
+
+
+# Per-(team, position) group memo for enrich_opportunity_context. Each group's
+# output is a pure function of its rows' inputs (see _opportunity_group_memo_key),
+# the row order, and this module's code, so a refresh that changes a handful of
+# players only recomputes the groups those players belong to.
+_OPP_GROUP_MEMO: "OrderedDict[bytes, tuple]" = OrderedDict()
+_OPP_GROUP_MEMO_MAX = 4096
+_OPP_GROUP_MEMO_LOCK = threading.Lock()
+_OPP_GROUP_MEMO_STATS = {"hits": 0, "misses": 0, "uncacheable": 0}
+_OPP_CODE_DIGEST: list[str] = []
+_OPP_OUTPUT_COLUMNS = (
+    "opportunity_label",
+    "opportunity_score",
+    "opportunity_confidence",
+    "opportunity_source_flags",
+    "opportunity_explanation",
+    "workload_trend",
+)
+
+
+def clear_opportunity_group_memo() -> None:
+    with _OPP_GROUP_MEMO_LOCK:
+        _OPP_GROUP_MEMO.clear()
+        for key in _OPP_GROUP_MEMO_STATS:
+            _OPP_GROUP_MEMO_STATS[key] = 0
+
+
+def opportunity_group_memo_stats() -> dict[str, int]:
+    return dict(_OPP_GROUP_MEMO_STATS)
+
+
+def _opportunity_code_digest() -> str:
+    if not _OPP_CODE_DIGEST:
+        try:
+            with open(__file__, "rb") as handle:
+                _OPP_CODE_DIGEST.append(hashlib.sha256(handle.read()).hexdigest())
+        except OSError:
+            _OPP_CODE_DIGEST.append("")
+    if not _OPP_CODE_DIGEST[0]:
+        return ""
+    behavior = (
+        _opportunity_group_sort_key_values,
+        _injury_level_cached,
+        _append_source_flag,
+        _append_display_sentence,
+        _source_flag_string,
+    )
+    return _OPP_CODE_DIGEST[0] + "|" + ",".join(str(id(fn)) for fn in behavior)
+
+
+def _single_row_opportunity(row: tuple) -> tuple:
+    label, explanation, score, confidence, flags, trend = row[:6]
+    if str(label or "") in {"Strong Opportunity", "Elite Opportunity"} and trend == "Stable":
+        explanation = (
+            str(explanation).rstrip(".")
+            + " Depth-chart competition looks light inside the current team feed."
+        )
+        confidence = int(max(0, min(100, int(confidence or 0) + 4)))
+    return (label, score, confidence, flags, explanation, trend)
+
+
+def _multi_row_opportunity(rows: list[tuple]) -> list[tuple]:
+    ordered = sorted(
+        range(len(rows)),
+        key=lambda i: _opportunity_group_sort_key_values(
+            rows[i][6], rows[i][7], rows[i][8], rows[i][9]
+        ),
+    )
+    ahead_injury_flags = []
+    for i in ordered:
+        level = _injury_level_cached(
+            str(rows[i][11] or "").strip().lower(),
+            str(rows[i][12] or "").strip().lower(),
+        )
+        ahead_injury_flags.append(level in {"major", "moderate"})
+    out: list[tuple | None] = [None] * len(rows)
+    for order_idx, i in enumerate(ordered):
+        row = rows[i]
+        current_slot = int(row[6] or (order_idx + 1))
+        label = str(row[0] or "")
+        explanation = str(row[1] or "").rstrip(".")
+        workload_trend = str(row[5] or "Unknown")
+        score = int(row[2] or 0)
+        confidence = int(row[3] or 0)
+        market = float(row[8] or 0.0)
+        source_flags = [
+            part.strip().lower()
+            for part in str(row[4] or "").split("|")
+            if part.strip()
+        ]
+        ahead_injury = any(ahead_injury_flags[:order_idx])
+        next_row = rows[ordered[order_idx + 1]] if order_idx + 1 < len(ordered) else None
+        next_market = float(next_row[8] or 0.0) if next_row is not None else 0.0
+        young_upside = float(row[9] or 99.0) <= 24 or float(row[10] or 99.0) <= 2
+
+        if current_slot == 1:
+            if next_row is not None and next_market >= market * 0.72 and label in {"Strong Opportunity", "Elite Opportunity"}:
+                label = "Starter At Risk"
+                score = max(6200, int(round(score * 0.88)))
+                explanation = (
+                    "Player is still the projected starter, but the next option on the depth chart carries enough weight to threaten a truly secure workload"
+                )
+                workload_trend = "Fragile"
+                confidence = min(100, max(confidence, 82))
+                _append_source_flag(source_flags, "team_competition")
+            elif label == "Starter At Risk" and next_row is not None:
+                explanation = explanation + " There is also credible pressure behind him on the current depth chart"
+                workload_trend = "Fragile"
+                confidence = min(100, max(confidence, 80))
+                _append_source_flag(source_flags, "team_competition")
+        else:
+            if ahead_injury and label in {"Backup With Upside", "Handcuff", "Committee Back"}:
+                score = min(10000, score + (900 if label == "Backup With Upside" else 650))
+                workload_trend = "Rising"
+                if label == "Handcuff" and young_upside:
+                    label = "Backup With Upside"
+                explanation = _append_display_sentence(
+                    explanation,
+                    "Player benefits from injury uncertainty ahead on the depth chart.",
+                )
+                confidence = min(100, max(confidence, 78))
+                _append_source_flag(source_flags, "team_competition")
+                _append_source_flag(source_flags, "injury_overlay")
+            elif label == "Backup With Upside" and current_slot == 2:
+                explanation = _append_display_sentence(
+                    explanation,
+                    "Player projects for increased opportunity if the room softens or the starter misses time.",
+                )
+                workload_trend = "Rising"
+                confidence = min(100, max(confidence, 76))
+                _append_source_flag(source_flags, "team_competition")
+            elif label == "Buried Depth" and current_slot >= 3 and any(
+                ahead_injury_flags[max(0, order_idx - 2) : order_idx]
+            ):
+                explanation = _append_display_sentence(
+                    explanation,
+                    "There is at least some injury-driven path to short-term opportunity ahead.",
+                )
+                workload_trend = "Rising"
+                confidence = min(100, max(confidence, 68))
+                _append_source_flag(source_flags, "team_competition")
+                _append_source_flag(source_flags, "injury_overlay")
+
+        out[i] = (
+            label,
+            int(max(0, min(10000, score))),
+            int(max(0, min(100, confidence))),
+            _source_flag_string(source_flags),
+            explanation.rstrip(".") + ".",
+            workload_trend,
+        )
+    return out  # type: ignore[return-value]
+
+
+def _opportunity_group_memo_key(rows: list[tuple], code_digest: str) -> bytes | None:
+    if not code_digest:
+        return None
+    try:
+        tokens = [
+            (
+                *row[:6],
+                row[6],
+                bool(row[7]),
+                row[8],
+                row[9],
+                row[10],
+                str(row[11] or "").strip().lower(),
+                str(row[12] or "").strip().lower(),
+            )
+            for row in rows
+        ]
+    except Exception:
+        return None
+    return hashlib.sha256((code_digest + "\x00" + repr(tokens)).encode("utf-8", "surrogatepass")).digest()
+
+
+def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
+    """Same result as _enrich_opportunity_context_full, computed per
+    (team, position) group over plain lists, with a per-group memo."""
+
+    if df is None or df.empty:
+        return df
+    if "team" not in df.columns or "position" not in df.columns:
+        return df.copy()
+    if not df.index.is_unique or not df.columns.is_unique:
+        return _enrich_opportunity_context_full(df)
+
+    enriched = df.copy()
+    _normalize_opportunity_inputs(enriched)
+    size = len(enriched)
+    teams = enriched["team"].fillna("").astype(str).str.upper().tolist()
+    positions = enriched["position"].fillna("").astype(str).str.upper().tolist()
+    groups: dict[tuple[str, str], list[int]] = {}
+    for i, key in enumerate(zip(teams, positions)):
+        groups.setdefault(key, []).append(i)
+
+    outputs = {col: enriched[col].tolist() for col in _OPP_OUTPUT_COLUMNS}
+    slots = enriched["depth_chart_slot"].tolist()
+    markets = enriched["market_score"].tolist()
+    ages = enriched["age"].tolist()
+    years = enriched["years_exp"].tolist()
+    starters = enriched["projected_starter"].tolist() if "projected_starter" in enriched.columns else [False] * size
+    statuses = enriched["status"].tolist() if "status" in enriched.columns else [""] * size
+    injuries = enriched["injury_status"].tolist() if "injury_status" in enriched.columns else [""] * size
+
+    code_digest = _opportunity_code_digest()
+    hits = misses = uncacheable = 0
+    fresh: list[tuple[bytes, tuple]] = []
+    for members in groups.values():
+        rows = [
+            (
+                outputs["opportunity_label"][i],
+                outputs["opportunity_explanation"][i],
+                outputs["opportunity_score"][i],
+                outputs["opportunity_confidence"][i],
+                outputs["opportunity_source_flags"][i],
+                outputs["workload_trend"][i],
+                slots[i],
+                starters[i],
+                markets[i],
+                ages[i],
+                years[i],
+                statuses[i],
+                injuries[i],
+            )
+            for i in members
+        ]
+        if len(rows) == 1:
+            result = [_single_row_opportunity(rows[0])]
+        else:
+            key = _opportunity_group_memo_key(rows, code_digest)
+            cached = None
+            if key is not None:
+                with _OPP_GROUP_MEMO_LOCK:
+                    cached = _OPP_GROUP_MEMO.get(key)
+                    if cached is not None:
+                        _OPP_GROUP_MEMO.move_to_end(key)
+            if cached is not None:
+                hits += 1
+                result = list(cached)
+            else:
+                result = _multi_row_opportunity(rows)
+                if key is None:
+                    uncacheable += 1
+                else:
+                    misses += 1
+                    fresh.append((key, tuple(result)))
+        for i, (label, score, confidence, flags, explanation, trend) in zip(members, result):
+            outputs["opportunity_label"][i] = label
+            outputs["opportunity_score"][i] = score
+            outputs["opportunity_confidence"][i] = confidence
+            outputs["opportunity_source_flags"][i] = flags
+            outputs["opportunity_explanation"][i] = explanation
+            outputs["workload_trend"][i] = trend
+
+    if fresh or hits or uncacheable:
+        with _OPP_GROUP_MEMO_LOCK:
+            for key, value in fresh:
+                _OPP_GROUP_MEMO[key] = value
+            while len(_OPP_GROUP_MEMO) > _OPP_GROUP_MEMO_MAX:
+                _OPP_GROUP_MEMO.popitem(last=False)
+            _OPP_GROUP_MEMO_STATS["hits"] += hits
+            _OPP_GROUP_MEMO_STATS["misses"] += misses
+            _OPP_GROUP_MEMO_STATS["uncacheable"] += uncacheable
+
+    for col in _OPP_OUTPUT_COLUMNS:
+        enriched[col] = pd.Series(outputs[col], index=enriched.index, dtype=enriched[col].dtype)
     return enriched
 
 
