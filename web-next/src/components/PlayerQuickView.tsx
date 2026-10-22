@@ -9,7 +9,10 @@ import { ModelRadarChart } from "@/components/ModelRadarChart";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
+import { PercentileExplorerSheet } from "@/components/PercentileExplorerSheet";
 import { SheetHandle } from "@/components/SheetHandle";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/WeeklyPointsChart";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
@@ -253,7 +256,7 @@ export function PlayerQuickView({
                     {season.games != null ? ` · ${season.games} games` : ""}
                   </h3>
                   {seasonStatGroups(season).map((group) => (
-                    <StatGroup key={group.title} title={group.title} items={group.items} />
+                    <StatGroup key={group.title} title={group.title} items={group.items} playerId={identity.player_id} />
                   ))}
                 </section>
               ))}
@@ -384,32 +387,67 @@ export function StatGroup({
   title,
   items,
   hideTitle = false,
+  playerId,
 }: {
   title: string;
   items: { label: string; value: string; note: string; percentile: number | null }[];
   hideTitle?: boolean;
+  /** When set, tiles that carry a percentile open the Percentile Explorer. */
+  playerId?: string;
 }) {
+  const [explorer, setExplorer] = useState<{ key: string; label: string } | null>(null);
+  const { openPlayer } = usePlayerQuickView();
   if (items.length === 0) return null;
   return (
     <div className="pqv-stat-group">
       {hideTitle ? null : <h4>{title}</h4>}
       <div className="pqv-stat-grid">
-        {items.map((item) => (
-          <div key={item.label} className="pqv-stat-row">
-            <div className="pqv-stat-label">{item.label}</div>
-            <div className="pqv-stat-value">{item.value}</div>
-            {item.percentile != null ? (
-              <div
-                className={`pqv-percentile pqv-percentile--${statPercentileBand(item.percentile)}`}
-                title={`${ordinal(Math.round(item.percentile))} percentile at ${item.label}`}
-              >
-                <span className="pqv-percentile-dot" aria-hidden="true" />
-                <span className="pqv-percentile-label">{ordinal(Math.round(item.percentile))} pct</span>
-              </div>
-            ) : null}
-          </div>
-        ))}
+        {items.map((item) => {
+          const statKey = playerId && item.percentile != null ? explorerStatKey(item.label) : null;
+          const content = (
+            <>
+              <div className="pqv-stat-label">{item.label}</div>
+              <div className="pqv-stat-value">{item.value}</div>
+              {item.percentile != null ? (
+                <div
+                  className={`pqv-percentile pqv-percentile--${statPercentileBand(item.percentile)}`}
+                  title={`${ordinal(Math.round(item.percentile))} percentile at ${item.label}`}
+                >
+                  <span className="pqv-percentile-dot" aria-hidden="true" />
+                  <span className="pqv-percentile-label">{ordinal(Math.round(item.percentile))} pct</span>
+                </div>
+              ) : null}
+            </>
+          );
+          return statKey ? (
+            <button
+              key={item.label}
+              type="button"
+              className="pqv-stat-row pqv-stat-row--tap"
+              aria-label={`${item.label} percentile explorer`}
+              onClick={() => setExplorer({ key: statKey, label: item.label })}
+            >
+              {content}
+            </button>
+          ) : (
+            <div key={item.label} className="pqv-stat-row">
+              {content}
+            </div>
+          );
+        })}
       </div>
+      {explorer && playerId ? (
+        <PercentileExplorerSheet
+          playerId={playerId}
+          statKey={explorer.key}
+          statLabel={explorer.label}
+          onClose={() => setExplorer(null)}
+          onOpenPlayer={(player) => {
+            setExplorer(null);
+            openPlayer({ ...player, sourceLabel: "Percentile Explorer" });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

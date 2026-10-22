@@ -36,6 +36,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
+  - GET  /v1/players/{id}/percentile-explorer — distribution + nearby players behind one stat tile
   - GET  /v1/players/{id}/weekly-stats   — per-week fantasy points + snap share for one season
   - GET  /v1/players/{id}/career         — every verified season on record, not just current
   - GET  /v1/players/{id}/schedule       — real opponent/home-away/Vegas lines per week (context only)
@@ -191,6 +192,7 @@ from modules import (
     pick_flow,
     player_history,
     player_projections,
+    percentile_explorer,
     player_quick_view,
     player_rating_history,
     player_state_authority,
@@ -6102,6 +6104,34 @@ def get_player_quick_view(
         "identity": _quick_view_identity(player_id, row),
         "reason": "",
     }
+
+
+@app.get("/v1/players/{player_id}/percentile-explorer")
+def get_player_percentile_explorer(
+    player_id: str,
+    stat: str,
+    pool: str = "position",
+    season: int | None = None,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Distribution + nearby real players behind one quick-view stat tile.
+
+    Same pool/percentile primitive as the tiles (modules.percentile_explorer),
+    and gated exactly like quick-view: any signed-in user, because the tile
+    percentiles themselves are not Pro-gated. Only the loaded season exists, so
+    a different `season` returns reason "season_unavailable".
+    """
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    matches = players_df[players_df["player_id"] == player_id]
+    if matches.empty:
+        return {"ok": True, "stat": stat, "pool": pool, "reason": "no_data", "scopes": ["season"]}
+    payload = percentile_explorer.build_explorer(players_df, matches.iloc[0], stat=stat, pool=pool)
+    if season is not None and payload.get("season") not in (None, season):
+        return {**payload, "ok": True, "reason": "season_unavailable", "bins": [], "nearby": [], "player": None}
+    return _clean_json_value({"ok": True, **payload})
 
 
 def _quick_view_bye(team: str | None, *, today: date | None = None) -> tuple[int | None, bool]:

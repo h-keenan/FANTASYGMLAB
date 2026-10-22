@@ -22,6 +22,8 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import MetricCard from '../components/MetricCard';
+import PercentileExplorerSheet from '../components/PercentileExplorerSheet';
+import { explorerStatKey, type ExplorerPlayer } from '../lib/percentileExplorer';
 import PlayerHero from '../components/PlayerHero';
 import DecisionFitCard from '../components/DecisionFitCard';
 import PlayerSharePreviewModal from '../components/PlayerSharePreviewModal';
@@ -1247,6 +1249,34 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   // true, same as Dashboard/Matchup/Teams/MyTeam.
   const loading = isRestoring || quickViewQuery.isPending;
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
+  const [explorer, setExplorer] = useState<{ key: string; label: string } | null>(null);
+  // Tiles with a percentile open the Percentile Explorer; others stay plain.
+  const explorerPress = (label: string, percentile: number | null | undefined) => {
+    const key = percentile != null ? explorerStatKey(label) : null;
+    return key ? () => setExplorer({ key, label }) : undefined;
+  };
+  const openExplorerPlayer = (other: ExplorerPlayer) => {
+    setExplorer(null);
+    navigation.push('PlayerDetail', {
+      player: {
+        player_id: other.player_id,
+        name: other.name,
+        position: other.position,
+        team: other.team || null,
+        age: null,
+        status: null,
+        injury_status: null,
+        tier: null,
+        score: null,
+        overall_rank: null,
+        position_rank: null,
+        rank_unavailable_reason: null,
+        opportunity_label: null,
+      },
+      leagueId,
+      leagueName,
+    });
+  };
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
@@ -1752,6 +1782,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                   key={`${item.label}-${index}`}
                   label={item.label}
                   icon={statLabelIcon(item.label)}
+                  onPress={explorerPress(item.label, item.percentile)}
                   value={item.value || null}
                   percentile={item.percentile}
                   periodLabel={fantasyPeriodLabel(item.label)}
@@ -1773,6 +1804,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                   key={`${item.label}-${index}`}
                   label={item.label}
                   icon={statLabelIcon(item.label)}
+                  onPress={explorerPress(item.label, item.percentile)}
                   value={item.value || null}
                   percentile={item.percentile}
                   style={cardStyle}
@@ -1810,6 +1842,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                     key={`${item.label}-${index}`}
                     label={item.label}
                     icon={statLabelIcon(item.label)}
+                    onPress={explorerPress(item.label, item.percentile)}
                     value={item.value || null}
                     percentile={item.percentile}
                     style={cardStyle}
@@ -1859,6 +1892,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                   key={`${item.label}-${index}`}
                   label={item.label}
                   icon={statLabelIcon(item.label)}
+                  onPress={explorerPress(item.label, item.percentile)}
                   value={item.value || null}
                   percentile={item.percentile}
                   style={cardStyle}
@@ -1879,6 +1913,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                   key={`${item.label}-${index}`}
                   label={item.label}
                   icon={statLabelIcon(item.label)}
+                  onPress={explorerPress(item.label, item.percentile)}
                   value={item.value || null}
                   percentile={item.percentile}
                   style={cardStyle}
@@ -2025,6 +2060,15 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       {content}
     </ScrollView>
     </View>
+    {explorer ? (
+      <PercentileExplorerSheet
+        playerId={player.player_id}
+        statKey={explorer.key}
+        statLabel={explorer.label}
+        onClose={() => setExplorer(null)}
+        onOpenPlayer={openExplorerPlayer}
+      />
+    ) : null}
     <NewsImpactModal visible={newsModalOpen} items={newsItems} onClose={() => setNewsModalOpen(false)} />
     <PlayerSharePreviewModal
       visible={shareOpen}

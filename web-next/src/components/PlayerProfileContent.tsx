@@ -55,7 +55,7 @@ const PROFILE_TABS: Array<{ label: string; value: ProfileTab }> = [
   { label: "Model", value: "model" },
 ];
 
-function StatsTab({ stats }: { stats: QuickViewStats | null }) {
+function StatsTab({ stats, playerId }: { stats: QuickViewStats | null; playerId: string }) {
   if (!stats || (stats.seasons.length === 0 && stats.college.length === 0)) {
     return <p className="pqv-status-text">No stats available for this player yet.</p>;
   }
@@ -68,7 +68,7 @@ function StatsTab({ stats }: { stats: QuickViewStats | null }) {
             {season.games != null ? ` · ${season.games} games` : ""}
           </h3>
           {seasonStatGroups(season).map((group) => (
-            <StatGroup key={group.title} title={group.title} items={group.items} />
+            <StatGroup key={group.title} title={group.title} items={group.items} playerId={playerId} />
           ))}
         </section>
       ))}
@@ -223,7 +223,7 @@ export function PlayerProfileContent({
             />
 
             <div className="flex flex-col gap-4">
-              {tab === "stats" ? <StatsTab stats={stats} /> : null}
+              {tab === "stats" ? <StatsTab stats={stats} playerId={player.player_id} /> : null}
               {tab === "trends" ? (
                 <PlayerTrendsPanel playerId={player.player_id} name={name} gradientId="profile-weekly-fill" />
               ) : null}
