@@ -178,11 +178,13 @@ export function PlayerProfileContent({
         nameId="profile-name"
         headingLevel={1}
         contextLabel={leagueName}
-        position={player.position}
-        team={player.team}
-        age={player.age}
+        position={player.position || detail?.identity?.position}
+        team={player.team || detail?.identity?.team}
+        age={player.age ?? detail?.identity?.age ?? null}
         tier={player.tier}
-        score={player.score}
+        score={player.score ?? detail?.identity?.value_score ?? null}
+        valueNote={detail?.identity?.value_note}
+        loadingIdentity={loading}
         overallRating={overallRating}
         overallRank={player.overall_rank}
         positionRank={player.position_rank}

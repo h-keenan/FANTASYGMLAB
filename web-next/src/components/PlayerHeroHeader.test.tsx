@@ -101,6 +101,23 @@ describe("PlayerHeroHeader", () => {
     expect(screen.getByText("FA")).toBeInTheDocument();
     expect(screen.getByText("Age N/A")).toBeInTheDocument();
   });
+
+  it("does not claim FA while identity is still loading, and explains a missing value", () => {
+    renderHero({ team: null, age: null, score: null, loadingIdentity: true });
+    expect(screen.queryByText("FA")).not.toBeInTheDocument();
+    expect(screen.queryByText("No market value yet")).not.toBeInTheDocument();
+  });
+
+  it("explains an empty Value tile instead of a bare dash", () => {
+    renderHero({ score: null, valueNote: null });
+    expect(screen.getByText("No market value yet")).toBeInTheDocument();
+  });
+
+  it("renders resolved team and age for a Loveland-like player", () => {
+    renderHero({ position: "TE", team: "CHI", age: 22, score: null, valueNote: "No market value yet" });
+    expect(screen.getByText("CHI")).toBeInTheDocument();
+    expect(screen.queryByText("FA")).not.toBeInTheDocument();
+  });
 });
 
 describe("DecisionFitCard", () => {

@@ -6050,7 +6050,17 @@ def get_player_quick_view(
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     matches = players_df[players_df["player_id"] == player_id]
     if matches.empty:
-        return {"ok": True, "stats": None, "bio": None, "model": None, "reason": "not_found"}
+        # Not in the valued frame (no FantasyCalc row, filtered out, ...):
+        # identity still resolves from Sleeper's directory so the client
+        # never has to render "FA" for a player Sleeper lists on a team.
+        return {
+            "ok": True,
+            "stats": None,
+            "bio": None,
+            "model": None,
+            "identity": _quick_view_identity(player_id, None),
+            "reason": "not_found",
+        }
 
     row = matches.iloc[0]
     # The full frame (not `matches`) is the percentile pool: build_stats_view
@@ -6062,7 +6072,82 @@ def get_player_quick_view(
         "stats": _quick_view_stats_dict(stats),
         "bio": dataclasses.asdict(bio),
         "model": _project_player_model(row, players_df),
+        "identity": _quick_view_identity(player_id, row),
         "reason": "",
+    }
+
+
+def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any]:
+    """Identity (name/team/position/age) plus an honest value read for the
+    quick view. Team/position/age come from the valued row when present and
+    otherwise from Sleeper's directory, so a player Sleeper lists on a team
+    is never "FA" just because our valuation (e.g. a FantasyCalc row) is
+    missing. ``value_note`` explains an absent value instead of a bare dash.
+    """
+
+    def _blank(value: Any) -> bool:
+        if value is None:
+            return True
+        try:
+            if pd.isna(value):
+                return True
+        except (TypeError, ValueError):
+            pass
+        return not str(value).strip()
+
+    def _from_row(key: str) -> Any:
+        if row is None or key not in row.index:
+            return None
+        value = row.get(key)
+        return None if _blank(value) else value
+
+    directory: dict[str, Any] = {}
+    try:
+        raw = (sleeper.get_players() or {}).get(str(player_id))
+        if isinstance(raw, dict):
+            directory = raw
+    except Exception:
+        directory = {}
+
+    name = _from_row("name") or directory.get("full_name") or " ".join(
+        str(part) for part in (directory.get("first_name"), directory.get("last_name")) if part
+    )
+    team = _from_row("team") or directory.get("team") or None
+    position = _from_row("position") or directory.get("position") or None
+    age: int | None = None
+    raw_age = _from_row("age")
+    if raw_age is not None:
+        try:
+            parsed = float(raw_age)
+            if 0 < parsed < 99:
+                age = int(parsed)
+        except (TypeError, ValueError):
+            age = None
+    if age is None:
+        raw_dir_age = directory.get("age")
+        if isinstance(raw_dir_age, (int, float)) and 0 < raw_dir_age < 99:
+            age = int(raw_dir_age)
+        else:
+            birth = str(directory.get("birth_date") or "").strip()[:10]
+            try:
+                born = datetime.strptime(birth, "%Y-%m-%d")
+                age = int((datetime.now() - born).days // 365.25)
+            except ValueError:
+                age = None
+
+    value = _clean_json_value(_from_row("value_score"))
+    if isinstance(value, (int, float)) and value <= 0:
+        value = None
+    return {
+        "player_id": str(player_id),
+        "name": str(name or ""),
+        "team": str(team) if team else None,
+        "position": str(position) if position else None,
+        "age": age,
+        "status": str(_from_row("status") or directory.get("status") or "") or None,
+        "value_score": value,
+        "overall_rating": _clean_json_value(_from_row("overall_rating")),
+        "value_note": "" if value is not None else "No market value yet",
     }
 
 

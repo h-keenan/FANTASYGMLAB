@@ -39,7 +39,13 @@ export function PlayerHeroHeader({
   usageTrend,
   usageLoading = false,
   depthChartNote,
+  valueNote,
+  loadingIdentity = false,
 }: {
+  /** Why the Value tile is empty (server-provided), e.g. "No market value yet". */
+  valueNote?: string | null;
+  /** True while server-resolved identity may still fill team/value. */
+  loadingIdentity?: boolean;
   playerId: string;
   name: string;
   nameId: string;
@@ -94,9 +100,9 @@ export function PlayerHeroHeader({
           <div className="pqv-meta">
             <PositionBadge position={position} />
             <span className="pqv-meta-pill">
-              <span>{team || "FA"}</span>
+              <span>{team || (loadingIdentity ? "—" : "FA")}</span>
               <span aria-hidden="true">•</span>
-              <span>Age {age ?? "N/A"}</span>
+              <span>Age {age ?? (loadingIdentity ? "—" : "N/A")}</span>
             </span>
           </div>
         </div>
@@ -115,6 +121,9 @@ export function PlayerHeroHeader({
             <span className={`pqv-stat-tile-value${score != null ? "" : " pqv-stat-tile-value--empty"}`}>
               {score != null ? formatScore(score) : "—"}
             </span>
+            {score == null && !loadingIdentity ? (
+              <span className="pqv-stat-tile-caption">{valueNote || "No market value yet"}</span>
+            ) : null}
           </div>
           <UsageTile trend={usageTrend} loading={usageLoading} />
         </div>

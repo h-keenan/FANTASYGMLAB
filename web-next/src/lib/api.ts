@@ -1649,7 +1649,22 @@ export interface QuickViewResponse {
   stats: QuickViewStats | null;
   bio: QuickViewBio | null;
   model: QuickViewModel | null;
+  /** Server-resolved identity (valued row, else Sleeper's directory) so a
+   * caller that opened the view with sparse identity never shows "FA". */
+  identity?: QuickViewIdentity | null;
   reason: "" | "not_found";
+}
+
+export interface QuickViewIdentity {
+  player_id: string;
+  name: string;
+  team: string | null;
+  position: string | null;
+  age: number | null;
+  status: string | null;
+  value_score: number | null;
+  overall_rating: number | null;
+  value_note: string;
 }
 
 /** GET /v1/players/{id}/awards' response — mirrors

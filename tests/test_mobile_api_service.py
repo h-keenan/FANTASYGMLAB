@@ -3969,6 +3969,54 @@ def test_quick_view_reports_not_found_for_unknown_player(monkeypatch):
     assert body["reason"] == "not_found"
 
 
+def _qv_identity(player_id, row):
+    from services import mobile_api_service
+
+    return mobile_api_service._quick_view_identity(player_id, row)
+
+
+_LOVELAND_DIRECTORY = {
+    "12517": {
+        "full_name": "Colston Loveland",
+        "team": "CHI",
+        "position": "TE",
+        "status": "Active",
+        "birth_date": "2004-04-09",
+        "years_exp": 1,
+    }
+}
+
+
+def test_quick_view_identity_resolves_from_sleeper_when_row_lacks_it():
+    # Active TE on a team, but our valued row has no team/position/age/value
+    # (e.g. no FantasyCalc row): identity must come from Sleeper's directory.
+    row = pd.Series({"player_id": "12517", "name": "Colston Loveland", "value_score": None})
+    with patch("modules.sleeper.get_players", return_value=_LOVELAND_DIRECTORY):
+        identity = _qv_identity("12517", row)
+    assert identity["team"] == "CHI"
+    assert identity["position"] == "TE"
+    assert identity["age"] is not None and 20 <= identity["age"] <= 30
+    assert identity["value_score"] is None
+    assert identity["value_note"] == "No market value yet"
+
+
+def test_quick_view_identity_for_player_missing_from_valued_frame():
+    with patch("modules.sleeper.get_players", return_value=_LOVELAND_DIRECTORY):
+        identity = _qv_identity("12517", None)
+    assert identity["name"] == "Colston Loveland"
+    assert identity["team"] == "CHI"
+    assert identity["position"] == "TE"
+
+
+def test_quick_view_identity_keeps_real_value_and_leaves_genuine_free_agent_teamless():
+    row = pd.Series({"player_id": "1", "name": "A", "team": "", "position": "WR", "age": 25, "value_score": 3100})
+    with patch("modules.sleeper.get_players", return_value={"1": {"team": None, "position": "WR"}}):
+        identity = _qv_identity("1", row)
+    assert identity["team"] is None
+    assert identity["value_score"] == 3100
+    assert identity["value_note"] == ""
+
+
 def test_quick_view_returns_real_season_stats_and_bio(monkeypatch):
     client = _client(monkeypatch)
 
