@@ -47,6 +47,7 @@ from modules.player_state_authority import (
 from modules.waivers_ui import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
+from modules import trade_grade
 from modules import team_stance as team_stance_module
 
 BASE_PICK_VALUES = {
@@ -1143,10 +1144,13 @@ def _cornerstone_consolidation_premium(
     headliner_ratio: float,
     first_round_count: int,
 ) -> tuple[int, int]:
-    gap = max(0.0, 1.0 - min(1.0, float(headliner_ratio or 0.0)))
-    required = int(round(max(0, int(target_score)) * (0.08 + 0.24 * gap)))
-    unmet = max(0, required - max(0, int(first_round_count)) * 850)
-    return required, unmet
+    # One formula for both sides: the Trade Analyzer credits/debits the
+    # user's side with the same premium (modules.trade_grade).
+    return trade_grade.cornerstone_consolidation_premium(
+        target_score=target_score,
+        headliner_ratio=headliner_ratio,
+        first_round_count=first_round_count,
+    )
 
 
 def _explicit_acquisition_quality_score(
@@ -3762,6 +3766,59 @@ def build_trade_ideas(
         profile.emit()
 
 
+class _UserSideAnalyzerGate:
+    """Trade Analyzer verdict for a Hub idea, from the user's side, cached per idea.
+
+    Uses modules.trade_grade.grade_trade_for_user -- the Analyzer's own
+    evaluate_trade_analyzer_fit + decide_offer_verdict -- on the same
+    strategy-adjusted pool and asset scores Hub built the idea from, so a
+    Hub idea and an Analyzer run of that package cannot disagree. An idea
+    the Analyzer cannot grade at all (no roster/fit) is kept rather than
+    silently dropped, matching the Analyzer returning no verdict.
+    """
+
+    def __init__(self, *, my_team_df, all_players_df, strategy, league_settings, score_field):
+        self._my_team_df = my_team_df
+        self._all_players_df = all_players_df
+        self._strategy = strategy
+        self._league_settings = dict(league_settings or {})
+        self._score_field = score_field
+        self._results: Dict[int, bool] = {}
+        self._current_context: Dict[str, Any] | None = None
+
+    def passes(self, idea: Dict[str, Any]) -> bool:
+        key = id(idea)
+        if key in self._results:
+            return self._results[key]
+        if self._my_team_df is None or self._my_team_df.empty:
+            self._results[key] = True
+            return True
+        if self._current_context is None:
+            from modules.trade_analyzer_fit import prepare_current_roster_context
+
+            self._current_context = prepare_current_roster_context(
+                self._my_team_df, None, self._strategy, self._league_settings, self._score_field
+            ) or {}
+        _fit, verdict = trade_grade.grade_trade_for_user(
+            my_team_df=self._my_team_df,
+            all_players_df=self._all_players_df,
+            send_assets=list(idea.get("send_assets") or []),
+            receive_assets=list(idea.get("receive_assets") or []),
+            strategy=self._strategy,
+            lineup_settings=self._league_settings,
+            score_field=self._score_field,
+            current_context=self._current_context or None,
+        )
+        if verdict is None:
+            self._results[key] = True
+            return True
+        idea["analyzer_verdict"] = verdict.ui_verdict
+        idea["analyzer_value_delta"] = int(verdict.value_delta)
+        passed = verdict.ui_verdict in trade_grade.PASSING_UI_VERDICTS
+        self._results[key] = passed
+        return passed
+
+
 def _build_trade_ideas_impl(
     df_players: pd.DataFrame,
     league_id: str,
@@ -4539,6 +4596,17 @@ def _build_trade_ideas_impl(
 
     with profile.stage("final_sorting"):
         ideas.sort(key=_trade_surface_sort_key, reverse=True)
+
+    # Every surfaced idea must grade at least FAIR in the Trade Analyzer for
+    # the user's side. Graded lazily in surface order, so only the ideas the
+    # selection actually reaches pay for an Analyzer run.
+    analyzer_gate = _UserSideAnalyzerGate(
+        my_team_df=my_team_df,
+        all_players_df=df_players,
+        strategy=active_strategy,
+        league_settings=league_settings,
+        score_field=score_field,
+    )
     selected: List[Dict[str, Any]] = []
     tag_counts: Dict[str, int] = {}
     partner_counts: Dict[str, int] = {}
@@ -4553,6 +4621,8 @@ def _build_trade_ideas_impl(
             continue
         if receive_counts.get(receive, 0) >= 2:
             continue
+        if not analyzer_gate.passes(idea):
+            continue
         selected.append(idea)
         tag_counts[tag] = tag_counts.get(tag, 0) + 1
         partner_counts[partner] = partner_counts.get(partner, 0) + 1
@@ -4561,7 +4631,7 @@ def _build_trade_ideas_impl(
             return selected
 
     for idea in ideas:
-        if idea not in selected:
+        if idea not in selected and analyzer_gate.passes(idea):
             selected.append(idea)
         if len(selected) >= max_ideas:
             break

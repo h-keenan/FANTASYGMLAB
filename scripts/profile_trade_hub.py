@@ -196,6 +196,10 @@ def build_fixture(spec: FixtureSpec) -> dict[str, Any]:
         "taxi_count": 3,
         "ir_count": 3,
         "max_roster_size": spec.roster_size,
+        # NOW is 2026-07-30, the offseason. Pinned so the Trade Analyzer
+        # gate's injury model (modules.trade_grade.season_window) never
+        # falls back to the real calendar and drifts the golden output.
+        "current_week": 0,
     }
     frame = annotate_player_eligibility(pd.DataFrame(players), now=NOW)
     return {

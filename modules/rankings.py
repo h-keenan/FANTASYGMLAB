@@ -3897,6 +3897,11 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "hashtag": hashtag,
         "team_abbr": team_abbr,
         "injury_status": injury_status,
+        # Context for modules.trade_grade's injury-duration estimate. Sleeper
+        # never fills injury_start_date, so body part and notes are the only
+        # duration evidence it gives.
+        "injury_body_part": p.get("injury_body_part") or "",
+        "injury_notes": p.get("injury_notes") or "",
         "sport": p.get("sport") or "",
         "fantasy_positions": "|".join(str(pos).upper() for pos in (p.get("fantasy_positions") or []) if pos),
     }

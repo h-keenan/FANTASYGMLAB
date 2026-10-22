@@ -13,6 +13,12 @@ it returns the `fit` mapping that `modules.trade_offer_analyzer.
 decide_offer_verdict` consumes to produce the accept/decline/counter
 verdict. Does not invent a new fit formula or retune anything — same rule
 as `modules/canonical_player_ranking.py` and `modules/league_value_settings.py`.
+
+Since the Trade Hub / Trade Analyzer unification, `value_delta` is the
+user-side value shared with Trade Hub's idea gate: the raw asset delta
+(`raw_value_delta`) plus the consolidation premium, the posture-weighted
+starter-strength change, and the duration-aware injury availability cost.
+All three live in `modules.trade_grade`, which documents the weights.
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ from typing import Any
 import pandas as pd
 
 from modules import runtime_trace
+from modules import trade_grade
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_workspace_ui import _format_score
@@ -180,10 +187,11 @@ def _simulate_post_trade_roster(
     if not receive_ids:
         return post_df.reset_index(drop=True)
 
-    player_pool = normalize_player_ids(all_players_df.copy()) if all_players_df is not None else pd.DataFrame()
-    if not player_pool.empty and "player_id" in player_pool.columns:
-        player_pool["player_id"] = player_pool["player_id"].astype(str)
-        receive_df = player_pool[player_pool["player_id"].isin(receive_ids)].copy()
+    # Select the received rows before copying: copying the whole player pool
+    # for every evaluated package was the dominant cost of a fit call.
+    if all_players_df is not None and not all_players_df.empty and "player_id" in all_players_df.columns:
+        receive_df = all_players_df[all_players_df["player_id"].astype(str).isin(receive_ids)].copy()
+        receive_df["player_id"] = receive_df["player_id"].astype(str)
     else:
         receive_df = pd.DataFrame()
 
@@ -278,21 +286,59 @@ def get_needed_positions(
     return list(dict.fromkeys(ordered_positions))[:4]
 
 
-def evaluate_trade_analyzer_fit(
+def _starter_ids(snapshot: dict | None) -> set[str]:
+    lineup_df = (snapshot or {}).get("lineup_df")
+    if lineup_df is None or lineup_df.empty or "suggested_starter" not in lineup_df.columns:
+        return set()
+    starters = lineup_df[lineup_df["suggested_starter"].fillna(False)]
+    if "player_id" not in starters.columns:
+        return set()
+    return {str(pid) for pid in starters["player_id"].tolist()}
+
+
+def _asset_rows_by_id(
     my_team_df: pd.DataFrame,
-    all_players_df: pd.DataFrame,
+    all_players_df: pd.DataFrame | None,
     send_assets: list[dict],
     receive_assets: list[dict],
+) -> dict[str, dict]:
+    wanted = {
+        str(asset.get("player_id") or "")
+        for asset in list(send_assets or ()) + list(receive_assets or ())
+        if isinstance(asset, dict) and asset.get("asset_type") == "player" and asset.get("player_id")
+    }
+    rows: dict[str, dict] = {}
+    for frame in (my_team_df, all_players_df):
+        if frame is None or frame.empty or "player_id" not in frame.columns or not wanted:
+            continue
+        matches = frame[frame["player_id"].astype(str).isin(wanted - set(rows))]
+        for record in matches.to_dict("records"):
+            rows.setdefault(str(record.get("player_id")), record)
+    return rows
+
+
+def _current_context_key(metrics, strategy, lineup_settings, score_field) -> tuple:
+    def freeze(value):
+        if isinstance(value, dict):
+            return tuple(sorted((str(k), freeze(v)) for k, v in value.items()))
+        if isinstance(value, (list, tuple, set)):
+            return tuple(freeze(v) for v in value)
+        return repr(value)
+
+    return (freeze(metrics or {}), str(strategy or ""), freeze(lineup_settings or {}), str(score_field or ""))
+
+
+def prepare_current_roster_context(
+    my_team_df: pd.DataFrame,
     metrics: dict | None,
     strategy: str,
     lineup_settings: dict | None,
     score_field: str,
 ) -> dict | None:
+    """The before-trade half of evaluate_trade_analyzer_fit, for reuse."""
+
     if my_team_df is None or my_team_df.empty:
         return None
-    if not send_assets and not receive_assets:
-        return None
-
     score_column = (
         "value_score"
         if "value_score" in my_team_df.columns
@@ -302,23 +348,115 @@ def evaluate_trade_analyzer_fit(
     )
     if score_column not in my_team_df.columns:
         return None
+    # Starter strength is measured on healthy-equivalent rosters: an injured
+    # player keeps his lineup spot and healthy value here, and the weeks he
+    # is expected to miss are charged once, by the injury model (see
+    # modules.trade_grade).
+    window = trade_grade.season_window(lineup_settings)
+    snapshot = _starter_lineup_snapshot(
+        trade_grade.healthy_equivalent_roster(my_team_df, score_column=score_column, window=window),
+        score_column,
+        lineup_settings,
+    )
+    if not snapshot:
+        return None
+    return {
+        "my_team_df": my_team_df,
+        "key": _current_context_key(metrics, strategy, lineup_settings, score_field),
+        "score_column": score_column,
+        "window": window,
+        "snapshot": snapshot,
+        "needs": get_needed_positions(
+            my_team_df,
+            metrics,
+            lineup_settings,
+            include_fallback=False,
+        ),
+        "health": roster_injury_context(my_team_df, snapshot.get("lineup_df", pd.DataFrame())),
+    }
 
-    current_snapshot = _starter_lineup_snapshot(my_team_df, score_column, lineup_settings)
+
+def evaluate_trade_analyzer_fit(
+    my_team_df: pd.DataFrame,
+    all_players_df: pd.DataFrame,
+    send_assets: list[dict],
+    receive_assets: list[dict],
+    metrics: dict | None,
+    strategy: str,
+    lineup_settings: dict | None,
+    score_field: str,
+    *,
+    current_context: dict | None = None,
+) -> dict | None:
+    if my_team_df is None or my_team_df.empty:
+        return None
+    if not send_assets and not receive_assets:
+        return None
+
+    # `current_context` lets a caller grading many packages for one roster
+    # (Trade Hub's Analyzer gate) compute the before-trade half once. It is
+    # only reused when it was built from this exact roster frame and inputs.
+    if not (
+        current_context
+        and current_context.get("my_team_df") is my_team_df
+        and current_context.get("key") == _current_context_key(metrics, strategy, lineup_settings, score_field)
+    ):
+        current_context = prepare_current_roster_context(
+            my_team_df, metrics, strategy, lineup_settings, score_field
+        )
+    if current_context is None:
+        return None
+    score_column = current_context["score_column"]
+    window = current_context["window"]
+    current_snapshot = current_context["snapshot"]
     post_team_df = _simulate_post_trade_roster(my_team_df, all_players_df, send_assets, receive_assets)
-    post_snapshot = _starter_lineup_snapshot(post_team_df, score_column, lineup_settings)
+    post_snapshot = _starter_lineup_snapshot(
+        trade_grade.healthy_equivalent_roster(post_team_df, score_column=score_column, window=window),
+        score_column,
+        lineup_settings,
+    )
     if not current_snapshot or not post_snapshot:
         return None
 
-    value_delta = int(sum(score_asset_value(asset) for asset in receive_assets) - sum(score_asset_value(asset) for asset in send_assets))
+    raw_value_delta = int(sum(score_asset_value(asset) for asset in receive_assets) - sum(score_asset_value(asset) for asset in send_assets))
     lineup_delta = int(round(float(post_snapshot["starter_score"]) - float(current_snapshot["starter_score"])))
 
     strategy_key = normalize_team_strategy(strategy)
-    current_needs = get_needed_positions(
-        my_team_df,
-        metrics,
-        lineup_settings,
-        include_fallback=False,
+
+    rows_by_id = _asset_rows_by_id(my_team_df, all_players_df, send_assets, receive_assets)
+    receive_values, receive_injury_lines = trade_grade.price_injured_assets(
+        receive_assets,
+        side="receive",
+        rows_by_id=rows_by_id,
+        starter_ids=_starter_ids(post_snapshot),
+        score_field=score_field,
+        strategy=strategy_key,
+        window=window,
     )
+    send_values, send_injury_lines = trade_grade.price_injured_assets(
+        send_assets,
+        side="send",
+        rows_by_id=rows_by_id,
+        starter_ids=_starter_ids(current_snapshot),
+        score_field=score_field,
+        strategy=strategy_key,
+        window=window,
+    )
+    injury_lines = receive_injury_lines + send_injury_lines
+    injury_value_adjustment = int(
+        round(
+            sum(line.adjusted_value - line.listed_value for line in receive_injury_lines)
+            - sum(line.adjusted_value - line.listed_value for line in send_injury_lines)
+        )
+    )
+    consolidation_adjustment, consolidation_note = trade_grade.user_consolidation_adjustment(
+        send_assets,
+        receive_assets,
+        values={**receive_values, **send_values},
+    )
+    starter_adjustment = trade_grade.starter_strength_adjustment(lineup_delta, strategy_key)
+    value_delta = int(raw_value_delta + injury_value_adjustment + consolidation_adjustment + starter_adjustment)
+    current_needs = current_context["needs"]
     need_set = {str(pos).upper() for pos in current_needs}
     strength_set = {str(pos).upper() for pos in (metrics or {}).get("strengths", []) or []}
 
@@ -382,7 +520,7 @@ def evaluate_trade_analyzer_fit(
         if not post_lineup_df.empty and "suggested_starter" in post_lineup_df.columns
         else pd.DataFrame()
     )
-    current_health_ctx = roster_injury_context(my_team_df, current_lineup_df)
+    current_health_ctx = current_context["health"]
     post_health_ctx = roster_injury_context(post_team_df, post_lineup_df)
     current_injured_starters = int(current_health_ctx.get("injured_starters") or 0)
     post_injured_starters = int(post_health_ctx.get("injured_starters") or 0)
@@ -498,21 +636,15 @@ def evaluate_trade_analyzer_fit(
         if depth_losses:
             strategy_component -= 1
 
+    # Injured players' missed weeks are priced in value_delta (posture- and
+    # duration-aware, see modules.trade_grade). The component keeps only the
+    # positional-cover signal, so an injury is not also charged here as a
+    # flat per-player penalty.
     injury_component = 0
-    if post_injured_starters < current_injured_starters:
-        injury_component += min(2, current_injured_starters - post_injured_starters)
-    elif post_injured_starters > current_injured_starters:
-        injury_component -= min(2, post_injured_starters - current_injured_starters)
     if injury_reinforcements:
         injury_component += 1
     if injury_exposure:
         injury_component -= 1
-    if strategy_key in {"contender", "fringe_contender"}:
-        injury_component -= (incoming_major_injuries * 2) + incoming_moderate_injuries
-    elif strategy_key == "retool":
-        injury_component -= incoming_major_injuries
-    else:
-        injury_component -= max(0, incoming_major_injuries - 1)
     injury_burden_delta = post_injury_burden - current_injury_burden
 
     fit_total = (
@@ -601,8 +733,10 @@ def evaluate_trade_analyzer_fit(
 
     positives = []
     negatives = []
-    if value_delta > 0:
+    if raw_value_delta > 0:
         positives.append("wins on raw value")
+    if consolidation_adjustment > 0:
+        positives.append("consolidates into the best asset in the deal")
     if lineup_delta > 0:
         positives.append("improves the starting lineup")
     if filled_needs:
@@ -614,10 +748,12 @@ def evaluate_trade_analyzer_fit(
     if injury_reinforcements or post_injured_starters < current_injured_starters:
         positives.append("improves injury cover")
 
-    if value_delta < 0:
+    if raw_value_delta < 0:
         negatives.append("pays a raw-value premium")
     if lineup_delta < 0:
         negatives.append("costs starter strength")
+    if consolidation_adjustment < 0:
+        negatives.append("breaks up the best asset in the deal for depth")
     if exposed_needs:
         negatives.append(f"moves from a weak {' / '.join(exposed_needs[:2])} room")
     if depth_losses:
@@ -673,10 +809,52 @@ def evaluate_trade_analyzer_fit(
         )
     else:
         injury_summary = "Health context stays close to neutral."
+    if injury_lines:
+        injury_summary += " " + " ".join(line.note(strategy_key, window) for line in injury_lines)
 
     return {
         "available": True,
         "value_delta": value_delta,
+        "raw_value_delta": raw_value_delta,
+        "value_adjustments": {
+            "injury": injury_value_adjustment,
+            "consolidation": consolidation_adjustment,
+            "starter_strength": starter_adjustment,
+        },
+        "value_adjustment_notes": [
+            note
+            for note in (
+                consolidation_note,
+                (
+                    f"starter-lineup change {lineup_delta:+,} weighted x"
+                    f"{trade_grade.starter_strength_weight(strategy_key):.2f} for this posture ({starter_adjustment:+,})"
+                    if starter_adjustment
+                    else ""
+                ),
+            )
+            if note
+        ],
+        "injury_lines": [
+            {
+                "player_id": line.player_id,
+                "name": line.name,
+                "side": line.side,
+                "status": line.absence.status_label,
+                "estimated_weeks_out": line.absence.weeks,
+                "season_ending": line.absence.season_ending,
+                "basis": line.absence.basis,
+                "listed_value": line.listed_value,
+                "healthy_value": line.healthy_value,
+                "availability_cost": line.cost,
+            }
+            for line in injury_lines
+        ],
+        "season_week": {
+            "current_week": window.current_week,
+            "remaining_weeks": window.remaining_weeks,
+            "in_season": window.in_season,
+            "source": window.source,
+        },
         "value_verdict": trade_value_verdict(value_delta),
         "roster_fit_verdict": roster_fit_verdict,
         "lineup_delta": lineup_delta,

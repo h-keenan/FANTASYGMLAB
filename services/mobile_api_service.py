@@ -4049,6 +4049,12 @@ def post_trade_analyzer(
         return {"ok": True, "verdict": None, "reason": "no_player_data"}
 
     score_field = league_value_settings.valuation_score_field(body.lens)
+    # Same strategy-adjusted scale Trade Hub prices its ideas on
+    # (trade_hub_engine.generate_trade_idea_records) and the web Trade
+    # Analyzer already used, so a Hub idea and an Analyzer run of the same
+    # package grade identically -- see modules.trade_grade.
+    valued = trade_hub_engine.apply_strategy_age_curve(valued, body.strategy, score_field)
+    pick_score_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, body.strategy)
 
     my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
     my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
@@ -4094,7 +4100,7 @@ def post_trade_analyzer(
 
             def resolve_picks(pick_ids: list[str]) -> list[dict[str, Any]]:
                 return [
-                    pick_asset_from_mapping(picks_by_id[pick_id])
+                    pick_asset_from_mapping(picks_by_id[pick_id], pick_score_multiplier=pick_score_multiplier)
                     for pick_id in pick_ids
                     if pick_id in picks_by_id
                 ]
@@ -4172,9 +4178,9 @@ def post_trade_analyzer(
                 ):
                     owner = str(pick.get("owner_roster_id") or "")
                     if owner == my_roster_id_str:
-                        my_asset_pool.append(pick_asset_from_mapping(pick))
+                        my_asset_pool.append(pick_asset_from_mapping(pick, pick_score_multiplier=pick_score_multiplier))
                     elif body.partner_roster_id and owner == str(body.partner_roster_id):
-                        partner_asset_pool.append(pick_asset_from_mapping(pick))
+                        partner_asset_pool.append(pick_asset_from_mapping(pick, pick_score_multiplier=pick_score_multiplier))
 
             my_needs = trade_analyzer_fit.get_needed_positions(my_team_df, None, settings)
 
