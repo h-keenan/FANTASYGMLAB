@@ -175,6 +175,9 @@ def candidates_for_slot(
     base_points = _points(occupant)
     slot_locked = occupant is not None and _is_locked(occupant)
 
+    starting_ids = {
+        str(entry.get("player_id")) for entry in lineup if entry.get("player_id") not in (None, "")
+    }
     out: list[dict[str, Any]] = []
     for player_id, player in pool.items():
         if player_id == str(occupant_id or ""):
@@ -209,6 +212,7 @@ def candidates_for_slot(
             {
                 "player": dict(player),
                 "selectable": blocked is None,
+                "currently_starting": player_id in starting_ids,
                 "blocked_reason": blocked,
                 "points_delta": points_delta,
                 "win_probability_delta": win_delta,
@@ -220,6 +224,9 @@ def candidates_for_slot(
     out.sort(
         key=lambda c: (
             not c["selectable"],
+            # Bench and other non-starters first; swapping places with another
+            # starter is the less common move, so those come after.
+            bool(c["currently_starting"]),
             -(c["win_probability_delta"] if c["win_probability_delta"] is not None else -999),
             -(c["points_delta"] if c["points_delta"] is not None else -999),
             str(c["player"].get("name") or ""),

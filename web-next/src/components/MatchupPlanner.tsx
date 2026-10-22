@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 
 import {
   api,
@@ -302,13 +302,24 @@ export function SwapSheet({
             </p>
           ) : (
             <ul className="flex flex-col" aria-label="Eligible players">
-              {candidates.map((candidate) => (
-                <CandidateRow
-                  key={candidate.player.player_id}
-                  candidate={candidate}
-                  onPick={() => onPick(candidate)}
-                />
-              ))}
+              {candidates.map((candidate, index) => {
+                const previous = candidates[index - 1];
+                const startsGroup = candidate.selectable && !!candidate.currently_starting
+                  && (!previous || !previous.currently_starting || !previous.selectable);
+                return (
+                  <Fragment key={candidate.player.player_id}>
+                    {startsGroup && index > 0 ? (
+                      <li
+                        className="pt-3 pb-1 text-xs font-bold uppercase"
+                        style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
+                      >
+                        Swap with another starter
+                      </li>
+                    ) : null}
+                    <CandidateRow candidate={candidate} onPick={() => onPick(candidate)} />
+                  </Fragment>
+                );
+              })}
             </ul>
           )}
         </div>
