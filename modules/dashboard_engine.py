@@ -56,6 +56,7 @@ from modules import (
     trade_hub_engine,
 )
 from modules.canonical_recommendation_narrative import build_waiver_narrative
+from modules import league_calendar
 from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_workspace_ui import _format_score
@@ -949,19 +950,24 @@ def build_league_summary(
     team_strategy = team_stance.team_strategy_for_stance(team_stance_value)
 
     trade_idea_records = None
-    try:
-        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
-            league_id=league_id,
-            roster_id=int(roster_id),
-            strategy=team_strategy,
-            lens=lens,
-            players_db_path=players_db_path,
-            untouchable_player_ids=gm_untouchable_player_ids,
-            gm_target_player_ids=gm_target_player_ids,
-            team_stance=team_stance_value,
-        )
-    except (TypeError, ValueError):
-        pass
+    if league_calendar.trade_deadline_passed(league):
+        # Past the trade deadline: no in-season trade tile (see
+        # modules.league_calendar); [] keeps the briefing from regenerating.
+        trade_idea_records = []
+    else:
+        try:
+            trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+                league_id=league_id,
+                roster_id=int(roster_id),
+                strategy=team_strategy,
+                lens=lens,
+                players_db_path=players_db_path,
+                untouchable_player_ids=gm_untouchable_player_ids,
+                gm_target_player_ids=gm_target_player_ids,
+                team_stance=team_stance_value,
+            )
+        except (TypeError, ValueError):
+            pass
 
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)

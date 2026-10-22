@@ -14645,3 +14645,232 @@ def test_waivers_faab_league_passes_starter_week_strategy_and_min_bid(monkeypatc
     assert call["waiver_mode"] == "faab"
     assert call["competition"] is not None and call["competition"].rival_count == 1
     assert call["wire_scores"]
+
+
+# --- Trade deadline / best ball (modules.league_calendar) ------------------
+#
+# Settings mirror real Sleeper payloads: an in-season league past its
+# trade_deadline week (leg > trade_deadline), and settings.best_ball == 1.
+
+_PAST_DEADLINE_LEAGUE = {
+    **_TRADE_ANALYZER_LEAGUE,
+    "status": "in_season",
+    "settings": {"type": 2, "leg": 12, "trade_deadline": 11, "playoff_week_start": 15},
+}
+_BEST_BALL_LEAGUE = {
+    **_TRADE_ANALYZER_LEAGUE,
+    "status": "in_season",
+    "settings": {"type": 2, "leg": 7, "trade_deadline": 11, "best_ball": 1},
+}
+_DEADLINE_MESSAGE = "Trade deadline has passed; trades reopen after the season."
+
+
+def _deadline_auth_responses(entitlement="premium"):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": entitlement, "sleeper_username": "gm_dynasty"}]
+    return [auth_user_response, profile_response]
+
+
+def _deadline_rosters():
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    return [
+        {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+        {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+    ]
+
+
+def test_trade_hub_stops_pushing_trades_after_the_deadline(monkeypatch):
+    client = _client(monkeypatch)
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses("free")))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=_deadline_rosters()))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_PAST_DEADLINE_LEAGUE))
+        generate = stack.enter_context(
+            patch("services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached")
+        )
+        response = client.get("/v1/leagues/abc/trade-hub", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ideas"] == []
+    assert body["reason"] == "trade_deadline_passed"
+    assert body["message"] == _DEADLINE_MESSAGE
+    assert body["trade_window"]["trade_deadline_week"] == 11
+    assert body["trade_window"]["trade_deadline_passed"] is True
+    generate.assert_not_called()
+
+
+def test_trade_finder_stops_searching_after_the_deadline(monkeypatch):
+    client = _client(monkeypatch)
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses()))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=_deadline_rosters()))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_PAST_DEADLINE_LEAGUE))
+        stack.enter_context(patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ())))
+        stack.enter_context(patch("services.mobile_api_service._fetch_team_stance", return_value=""))
+        generate = stack.enter_context(
+            patch("services.mobile_api_service.trade_hub_engine.generate_trade_finder_records")
+        )
+        response = client.get(
+            "/v1/leagues/abc/trade-finder?player_ids=my1",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    body = response.json()
+    assert body["ideas"] == []
+    assert body["reason"] == "trade_deadline_passed"
+    assert body["message"] == _DEADLINE_MESSAGE
+    generate.assert_not_called()
+
+
+def test_all_trades_stops_after_the_deadline(monkeypatch):
+    client = _client(monkeypatch)
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses()))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_PAST_DEADLINE_LEAGUE))
+        generate = stack.enter_context(
+            patch("services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached")
+        )
+        response = client.get("/v1/leagues/abc/all-trades", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    assert body["ideas"] == []
+    assert body["has_more"] is False
+    assert body["reason"] == "trade_deadline_passed"
+    assert body["entitlement"]["is_premium"] is True
+    generate.assert_not_called()
+
+
+def test_trade_hub_keeps_ideas_through_the_deadline_week(monkeypatch):
+    client = _client(monkeypatch)
+    league = {**_PAST_DEADLINE_LEAGUE, "settings": {"type": 2, "leg": 11, "trade_deadline": 11}}
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses()))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=_deadline_rosters()))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=league))
+        stack.enter_context(patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ())))
+        stack.enter_context(patch("services.mobile_api_service._fetch_team_stance", return_value=""))
+        stack.enter_context(patch("modules.sleeper.get_league_roster_profiles", return_value={}))
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=pd.DataFrame(),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached",
+                return_value=[_fake_idea_record("Rival GM", gain=25)],
+            )
+        )
+        response = client.get("/v1/leagues/abc/trade-hub", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    assert body["reason"] == ""
+    assert len(body["ideas"]) == 1
+    assert body["trade_window"]["trade_deadline_passed"] is False
+
+
+def test_gm_plan_uses_the_real_deadline_and_stops_pushing_trades_after_it(monkeypatch):
+    client = _client(monkeypatch)
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses()))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=_deadline_rosters()))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_PAST_DEADLINE_LEAGUE))
+        stack.enter_context(patch("services.mobile_api_service._fetch_team_stance", return_value="competing"))
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=pd.DataFrame(),
+            )
+        )
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+        stack.enter_context(
+            patch("modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kwargs: df)
+        )
+        generate = stack.enter_context(
+            patch("services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached")
+        )
+        response = client.get("/v1/leagues/abc/gm-plan", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    # Week 12 with deadline 11 and playoffs at 15 is inside the playoff-push
+    # window — and crucially no longer "Trade Deadline Approaching".
+    assert body["season_phase"] == "playoff_push"
+    trade_area = next(fa for fa in body["focus_areas"] if fa["key"] == "trade_opportunities")
+    assert trade_area["items"] == []
+    assert trade_area["watch_for"] == _DEADLINE_MESSAGE
+    assert body["trade_window"]["trade_deadline_passed"] is True
+    generate.assert_not_called()
+
+
+def test_my_team_flags_best_ball_and_carries_the_trade_window(monkeypatch):
+    client = _client(monkeypatch)
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses("free")))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=_deadline_rosters()))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_BEST_BALL_LEAGUE))
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+        stack.enter_context(
+            patch("modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kwargs: df)
+        )
+        response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    assert body["reason"] == ""
+    assert body["best_ball"] is True
+    assert "Best ball" in body["lineup_advice_message"]
+    assert body["trade_window"]["trade_deadline_passed"] is False
+    # Roster rows stay on the wire so older clients keep rendering.
+    assert len(body["starters"]) + len(body["bench"]) == 10
+
+
+def test_waivers_in_best_ball_drops_lineup_slot_injury_replacement_needs(monkeypatch):
+    """`_fake_roster_frame` rosters one TE (my7). Injuring him normally makes
+    TE an injury-replacement need; in best ball Sleeper auto-starts roster
+    depth, so that lineup-slot driver must not recommend waiver adds."""
+
+    injured_frame = _fake_roster_frame()
+    injured_frame["news_updated"] = time.time()
+    injured_frame.loc[injured_frame["player_id"] == "my7", "injury_status"] = "Out"
+    injured_frame.loc[injured_frame["player_id"] == "my7", "status"] = "Injured Reserve"
+
+    def _waivers(league, league_id):
+        client = _client(monkeypatch)
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch("requests.get", side_effect=_deadline_auth_responses("free")))
+            stack.enter_context(
+                patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1")
+            )
+            stack.enter_context(patch("modules.sleeper.get_rosters", return_value=_deadline_rosters()))
+            stack.enter_context(patch("modules.sleeper.get_league", return_value=league))
+            stack.enter_context(patch("modules.sleeper.default_player_stats_season", return_value=2026))
+            stack.enter_context(patch("modules.sleeper.get_players", return_value={}))
+            stack.enter_context(patch("modules.sleeper.get_season_player_stats", return_value={}))
+            stack.enter_context(patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()))
+            stack.enter_context(patch("modules.nfl_schedule.team_matchup_for_week", return_value=None))
+            stack.enter_context(patch("modules.rankings.load_players", return_value=injured_frame))
+            for target in (
+                "modules.player_eligibility.filter_current_fantasy_players",
+                "modules.player_state_authority.filter_current_fantasy_players",
+            ):
+                stack.enter_context(patch(target, side_effect=lambda df, **kwargs: df))
+            return client.get(
+                f"/v1/leagues/{league_id}/waivers", headers={"Authorization": "Bearer good-token"}
+            ).json()
+
+    normal = _waivers({**_BEST_BALL_LEAGUE, "settings": {"type": 2, "leg": 7}}, "bb-normal")
+    best_ball = _waivers(_BEST_BALL_LEAGUE, "bb-best-ball")
+
+    assert normal["best_ball"] is False
+    assert "TE" in normal["injury_positions"]
+    assert best_ball["best_ball"] is True
+    assert best_ball["injury_positions"] == []
+    assert all(not p.get("injury_replacement_fit") for p in best_ball["players"])

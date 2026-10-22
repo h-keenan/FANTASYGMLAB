@@ -401,6 +401,14 @@ export function MatchupContent({ leagueName, matchup }: { leagueName: string; ma
       <RealLineupSection title="Your actual lineup this week" side={mine} />
       <RealLineupSection title={`${opponent.team_name}'s actual lineup`} side={opponent} />
 
+      {matchup.best_ball ? (
+        // Best ball: Sleeper sets both lineups from the highest weekly
+        // scorers, so there's no suggested lineup or start/sit call to make.
+        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
+          {matchup.lineup_advice_message}
+        </p>
+      ) : (
+        <>
       <p
         className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}
       >
@@ -413,6 +421,8 @@ export function MatchupContent({ leagueName, matchup }: { leagueName: string; ma
 
       <SuggestedLineupSection title="Your suggested starters" side={mine} />
       <SuggestedLineupSection title={`${opponent.team_name}'s best lineup`} side={opponent} />
+        </>
+      )}
       <ValuesCredit />
     </main>
   );

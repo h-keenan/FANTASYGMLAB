@@ -463,6 +463,12 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
         <InjuryWatchSection mine={mine} opponent={opponent} onPressPlayer={openPlayer} />
 
+        {matchup?.best_ball ? (
+          // Best ball: Sleeper sets both lineups from the highest weekly
+          // scorers, so there's no suggested lineup / start-sit call to make.
+          <AppText style={styles.bestBallNote}>{matchup?.lineup_advice_message}</AppText>
+        ) : (
+          <>
         <ScreenInfoNote
           text="The suggested starters below are each roster's best available lineup by season-long value — the same optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. This is a recommendation, not necessarily the lineup either manager has actually set in Sleeper, and it doesn't account for this week's opponent defenses or weather."
         />
@@ -474,6 +480,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
           onPressPlayer={openPlayer}
           accent={colors.violet}
         />
+          </>
+        )}
         <ValuesCredit />
       </ScrollView>
     </View>
@@ -693,6 +701,7 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
+  bestBallNote: { color: colors.textSecondary, lineHeight: 20, marginVertical: spacing.md },
   center: {
     flex: 1,
     alignItems: 'center',

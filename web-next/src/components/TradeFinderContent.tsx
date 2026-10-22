@@ -17,7 +17,7 @@ import { TradeAssetRow } from "@/components/TradeAssetExchange";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
-import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
+import { TRADE_DEADLINE_PASSED_MESSAGE, tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 
 /** Mirrors modules.trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS — the server
@@ -191,7 +191,13 @@ export function TradeFinderContent({
   myTeam: MyTeamResponse;
   lens?: string;
 }) {
-  const reasonMessage = myTeam.reason ? tradeHubReasonMessage(myTeam.reason) : null;
+  // Past the league's trade deadline Trade Finder stops searching for
+  // in-season trades (GET .../my-team's additive trade_window).
+  const reasonMessage = myTeam.reason
+    ? tradeHubReasonMessage(myTeam.reason)
+    : myTeam.trade_window?.trade_deadline_passed
+      ? myTeam.trade_window.message || TRADE_DEADLINE_PASSED_MESSAGE
+      : null;
 
   const roster = useMemo(
     () => [...myTeam.starters, ...myTeam.bench].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
@@ -288,6 +294,8 @@ export function TradeFinderContent({
       setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
       if (result.ideas.length === 0 && result.reason === "no_players_selected") {
         setSearchError("Select at least one player or pick to search with.");
+      } else if (result.reason === "trade_deadline_passed") {
+        setSearchError(result.message || TRADE_DEADLINE_PASSED_MESSAGE);
       }
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : "Could not search for trades.");

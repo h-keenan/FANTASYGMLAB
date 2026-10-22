@@ -193,3 +193,11 @@ describe("TradeHubContent", () => {
     });
   });
 });
+
+describe("TradeHubContent trade deadline", () => {
+  it("shows the deadline-passed state instead of a board after the trade deadline", () => {
+    const passed: TradeHubResponse = { ...RESPONSE, ideas: [], reason: "trade_deadline_passed" };
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={passed} />);
+    expect(screen.getByText("Trade deadline has passed; trades reopen after the season.")).toBeInTheDocument();
+  });
+});

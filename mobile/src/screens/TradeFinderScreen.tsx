@@ -463,6 +463,10 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
           if (cancelled) return;
           if (result.reason) {
             setRosterError("Couldn't load your roster for this league.");
+          } else if (result.trade_window?.trade_deadline_passed) {
+            // Past the league's trade deadline Trade Finder stops searching
+            // for in-season trades (GET .../my-team's additive trade_window).
+            setRosterError(result.trade_window.message || 'Trade deadline has passed; trades reopen after the season.');
           } else {
             setRoster([...result.starters, ...result.bench]);
             // Your own picks to offer — GET .../draft-picks already reflects
@@ -519,7 +523,9 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         setSearchError(
           result.reason === 'no_players_selected'
             ? 'Select at least one player or pick to search with.'
-            : "Couldn't search for trades right now.",
+            : result.reason === 'trade_deadline_passed'
+              ? result.message || 'Trade deadline has passed; trades reopen after the season.'
+              : "Couldn't search for trades right now.",
         );
       }
     } catch (err) {

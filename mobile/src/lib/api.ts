@@ -452,6 +452,18 @@ export interface LineupPlayer {
 
 export type LineupBasis = 'season_value' | 'weekly_projection' | 'weekly_availability';
 
+/** League trade-window state from Sleeper's settings.trade_deadline
+ * (backend: modules.league_calendar.trade_window). Additive — absent on
+ * older servers. Trades are allowed through `trade_deadline_week`; once an
+ * in-season league's current week passes it, `trade_deadline_passed` is
+ * true and `message` carries the user-facing copy. */
+export interface TradeWindow {
+  trade_deadline_week: number | null;
+  current_week: number | null;
+  trade_deadline_passed: boolean;
+  message: string;
+}
+
 export interface MyTeamResponse {
   ok: true;
   starters: LineupPlayer[];
@@ -464,6 +476,12 @@ export interface MyTeamResponse {
   lineup_basis_label?: string;
   /** Starting slots left open: nobody eligible this week (bye / ruled out). */
   open_slots?: string[];
+
+  /** Sleeper settings.best_ball — Sleeper sets the lineup itself, so the
+   * suggested starters/bench split is replaced by one roster list. */
+  best_ball?: boolean;
+  lineup_advice_message?: string;
+  trade_window?: TradeWindow;
 }
 
 /**
@@ -593,6 +611,9 @@ export interface MatchupResponse {
   basis: 'season_value';
   basis_label: string;
   reason: string;
+  /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
+  best_ball?: boolean;
+  lineup_advice_message?: string;
 }
 
 export interface PlayerSummary {
@@ -913,6 +934,7 @@ export function teamStrategyForStance(stance: TeamStance | ''): TeamStrategy {
 export type GmPlanSeasonPhase =
   | 'early_season'
   | 'trade_deadline_approach'
+  | 'post_deadline'
   | 'playoff_push'
   | 'offseason_adjacent';
 
@@ -1009,6 +1031,7 @@ export interface GmPlanResponse {
   team_stance_label?: string;
   headline?: string;
   focus_areas: GmPlanFocusArea[];
+  trade_window?: TradeWindow;
 }
 
 export interface TradeCounterAction {
@@ -1053,6 +1076,10 @@ export interface TradeAnalyzerResponse {
   ok: true;
   verdict: TradeVerdict | null;
   reason: TradeAnalyzerReason;
+  /** Non-empty once the league's trade deadline has passed — the analyzer
+   * stays usable for offseason planning, this just says so. */
+  planning_note?: string;
+  trade_window?: TradeWindow;
 }
 
 export interface DraftPickAsset {
@@ -2034,6 +2061,9 @@ export interface TradeHubResponse {
   ideas: TradeIdea[];
   reason: string;
   entitlement?: TradeHubEntitlement;
+  /** reason === 'trade_deadline_passed' carries this user-facing copy. */
+  message?: string;
+  trade_window?: TradeWindow;
 }
 
 export interface AllTradesEntitlement {

@@ -434,6 +434,9 @@ export function TradeAnalyzerContent({
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  // Non-empty once the league's trade deadline has passed — the analyzer
+  // stays open for offseason planning, this note just says so.
+  const [planningNote, setPlanningNote] = useState("");
 
   const selectedPlayerIds = useMemo(
     () => new Set([...sendPlayers, ...receivePlayers].map((p) => p.player_id)),
@@ -558,6 +561,7 @@ export function TradeAnalyzerContent({
         receivePickIds: receivePicks.map((p) => p.pick_id),
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
       });
+      setPlanningNote(result.planning_note ?? "");
       if (result.verdict) {
         setVerdict(result.verdict);
       } else {
@@ -752,6 +756,12 @@ export function TradeAnalyzerContent({
           </p>
         ) : null}
       </div>
+
+      {planningNote ? (
+        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
+          {planningNote}
+        </p>
+      ) : null}
 
       {verdict ? (
         <VerdictCard

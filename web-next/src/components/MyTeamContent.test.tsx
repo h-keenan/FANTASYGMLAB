@@ -307,3 +307,28 @@ describe("MyTeamContent", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 });
+
+describe("MyTeamContent best ball", () => {
+  it("replaces the suggested Starters/Bench split with one roster list and the best ball note", () => {
+    render(
+      <MyTeamContent
+        leagueName="Best Ball League"
+        myTeam={{
+          ...MY_TEAM,
+          best_ball: true,
+          lineup_advice_message: "Best ball league: Sleeper sets your lineup automatically.",
+        }}
+        needs={NEEDS}
+        teamRanking={TEAM_RANKING}
+        leagueSize={10}
+      />,
+    );
+    expect(screen.getByText("Best ball league: Sleeper sets your lineup automatically.")).toBeInTheDocument();
+    expect(screen.queryByText("Starters")).not.toBeInTheDocument();
+    expect(screen.getByText("Roster")).toBeInTheDocument();
+    // Suggested starters and active bench share the one roster list.
+    expect(screen.getByText("Test Quarterback")).toBeInTheDocument();
+    expect(screen.getByText("Test Bench Receiver")).toBeInTheDocument();
+    expect(screen.getByText("Test IR Tight End")).toBeInTheDocument();
+  });
+});

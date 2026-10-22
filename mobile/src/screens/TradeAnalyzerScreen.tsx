@@ -156,6 +156,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [planningNote, setPlanningNote] = useState('');
 
   const orbClearance = useOrbClearance();
 
@@ -412,6 +413,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         lens,
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
+      setPlanningNote(result.planning_note ?? '');
       if (result.verdict) {
         setVerdict(result.verdict);
       } else {
@@ -570,6 +572,9 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           </TouchableOpacity>
 
           {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
+          {/* Past the trade deadline the analyzer stays open for offseason
+              planning — this note just says the trade can't be sent yet. */}
+          {planningNote ? <AppText style={styles.planningNote}>{planningNote}</AppText> : null}
           {verdict ? (
             <VerdictCard
               verdict={verdict}
@@ -1106,5 +1111,6 @@ function createStyles(colors: ThemeColors) {
   pickInfoButton: { marginLeft: spacing.sm },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
+  planningNote: { color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: spacing.sm },
   });
 }

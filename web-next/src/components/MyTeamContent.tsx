@@ -144,7 +144,16 @@ export function MyTeamContent({
   // position group the existing value order is preserved.
   const byPosition = (list: LineupPlayer[]) =>
     [...list].sort((a, b) => positionSortIndex(a.position) - positionSortIndex(b.position));
-  const activeBench = byPosition(bench.filter((p) => p.roster_slot !== "ir" && p.roster_slot !== "taxi"));
+  // Best ball (Sleeper settings.best_ball): Sleeper sets the lineup itself
+  // from the highest weekly scorers, so there's no suggested starters/bench
+  // split to recommend — one position-ordered roster list instead, with the
+  // optimizer's suggested slot labels stripped.
+  const bestBall = myTeam.best_ball === true;
+  const activeBench = byPosition(
+    [...(bestBall ? starters : []), ...bench.filter((p) => p.roster_slot !== "ir" && p.roster_slot !== "taxi")].map(
+      (p) => (bestBall ? { ...p, slot: null } : p),
+    ),
+  );
   const irBench = byPosition(bench.filter((p) => p.roster_slot === "ir"));
   const taxiBench = byPosition(bench.filter((p) => p.roster_slot === "taxi"));
 
@@ -323,6 +332,11 @@ export function MyTeamContent({
         </section>
       ) : null}
 
+      {bestBall ? (
+        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
+          {myTeam.lineup_advice_message}
+        </p>
+      ) : (
       <section className="flex flex-col gap-3" aria-labelledby="starters-heading">
         <div className="flex items-baseline justify-between">
           <SectionHeading>
@@ -357,12 +371,13 @@ export function MyTeamContent({
           </div>
         )}
       </section>
+      )}
 
       <section className="flex flex-col gap-3" aria-labelledby="bench-heading">
         <SectionHeading>
-          <span id="bench-heading">Bench</span>
+          <span id="bench-heading">{bestBall ? "Roster" : "Bench"}</span>
         </SectionHeading>
-        {bench.length === 0 ? (
+        {activeBench.length + irBench.length + taxiBench.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             No bench players.
           </p>
@@ -372,7 +387,7 @@ export function MyTeamContent({
               <div className="glass-surface flex flex-col">
                 {activeBench.map((player) => (
                   <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                    <LineupRow player={player} muted />
+                    <LineupRow player={player} muted={!bestBall} />
                   </HighlightTarget>
                 ))}
               </div>
