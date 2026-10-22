@@ -3698,6 +3698,30 @@ class _TradePipelineProfile:
 
 
 @runtime_trace.traced("trade_board_generation", phase="trade_generation")
+def _partner_is_managed(partner_row) -> bool:
+    """False for an orphan team: Sleeper reports ``owner_id`` null when nobody
+    manages the roster, so no one could ever see or accept an offer to it.
+    Rows without an ``owner_id`` field at all (callers that never carried it)
+    are treated as managed -- absence of the field is not evidence of an orphan."""
+
+    getter = getattr(partner_row, "get", None)
+    if getter is None:
+        return True
+    try:
+        keys = partner_row.keys()
+    except Exception:
+        keys = ()
+    if "owner_id" not in keys:
+        return True
+    owner = getter("owner_id")
+    try:
+        if owner is None or owner != owner:  # None or NaN
+            return False
+    except Exception:
+        pass
+    return bool(str(owner).strip()) and str(owner).strip().lower() not in {"none", "nan", "null"}
+
+
 def _partner_complement_score(partner_row, my_needs: List[str], my_strengths: List[str]) -> int:
     """Cheap partner order for reduced Dashboard search — not a second scorer."""
 
@@ -4063,6 +4087,8 @@ def _build_trade_ideas_impl(
     partner_rows = []
     for _, partner_row in df_summary.iterrows():
         if _safe_int(partner_row["roster_id"]) == my_roster_key:
+            continue
+        if not _partner_is_managed(partner_row):
             continue
         partner_rows.append(partner_row)
     if dashboard_budget:
@@ -6166,6 +6192,9 @@ def _build_my_player_fallback_ideas(
     for _, partner_row in df_summary.iterrows():
         partner_roster_id = _safe_int(partner_row.get("roster_id"))
         if partner_roster_id <= 0 or partner_roster_id == my_roster_key:
+            continue
+        if not _partner_is_managed(partner_row):
+            diagnostics["partners_skipped_orphan"] = _safe_int(diagnostics.get("partners_skipped_orphan"), 0) + 1
             continue
         partner_name = str(partner_row.get("team_name") or "Partner")
         partner_player_ids = roster_players_map.get(partner_roster_id, [])
