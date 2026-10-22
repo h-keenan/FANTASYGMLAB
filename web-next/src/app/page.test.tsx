@@ -158,3 +158,15 @@ describe("LandingPage welcome-page analytics", () => {
     expect(trackFeatureUse).toHaveBeenCalledWith("landing_viewed", { props: { source_surface: "landing_hero" } });
   });
 });
+
+describe("LandingPage app store modules", () => {
+  it("shows the App Store and Google Play coming-soon slots to a signed-out visitor", async () => {
+    mockAuth(null);
+    render(<LandingPage />);
+
+    expect(await screen.findByText("SignInForm")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /Google Play app for Android: coming soon/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+});
