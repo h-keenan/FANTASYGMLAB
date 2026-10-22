@@ -48,6 +48,8 @@ import LoadingScreen from '../screens/LoadingScreen';
 import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
 import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
+import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -103,6 +105,39 @@ export type RootStackParamList = {
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
+
+/**
+ * ESPN leagues (league id "espn:{id}:{season}", lib/leaguePlatform.ts) can
+ * feed only some league screens. Every other league screen is registered
+ * through this wrapper, which shows EspnUnavailableScreen for an ESPN
+ * league instead of loading a Sleeper-only screen. One check here instead
+ * of a copy per screen; Sleeper leagues render the screen unchanged.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- wraps screens with different param lists
+function withEspnGate(Screen: React.ComponentType<any>): React.ComponentType<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function EspnGatedScreen(props: any) {
+    const params = (props.route?.params ?? {}) as { leagueId?: string; leagueName?: string };
+    if (isEspnLeagueId(params.leagueId)) {
+      return <EspnUnavailableScreen leagueId={params.leagueId as string} leagueName={params.leagueName || 'This league'} />;
+    }
+    return <Screen {...props} />;
+  }
+  return EspnGatedScreen;
+}
+
+const EspnLeagueDetailScreen = withEspnGate(LeagueDetailScreen);
+const EspnWaiversScreen = withEspnGate(WaiversScreen);
+const EspnRecapScreen = withEspnGate(RecapScreen);
+const EspnDashboardScreen = withEspnGate(DashboardScreen);
+const EspnPlayoffOddsScreen = withEspnGate(PlayoffOddsScreen);
+const EspnDraftCenterScreen = withEspnGate(DraftCenterScreen);
+const EspnPickDetailScreen = withEspnGate(PickDetailScreen);
+const EspnMatchupScreen = withEspnGate(MatchupScreen);
+const EspnAlertsScreen = withEspnGate(AlertsScreen);
+const EspnGmTargetsScreen = withEspnGate(GmTargetsScreen);
+const EspnTeamStanceScreen = withEspnGate(TeamStanceScreen);
+const EspnGmPlanScreen = withEspnGate(GmPlanScreen);
 const AuthStack = createNativeStackNavigator();
 
 export default function RootNavigator() {
@@ -211,7 +246,7 @@ export default function RootNavigator() {
               ),
             })}
           />
-          <AppStack.Screen name="LeagueDetail" component={LeagueDetailScreen} />
+          <AppStack.Screen name="LeagueDetail" component={EspnLeagueDetailScreen} />
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
@@ -224,22 +259,22 @@ export default function RootNavigator() {
           <AppStack.Screen name="Players" component={PlayersScreen} />
           <AppStack.Screen name="PlayerDetail" component={PlayerDetailScreen} />
           <AppStack.Screen name="PlayerCompare" component={PlayerCompareScreen} />
-          <AppStack.Screen name="Waivers" component={WaiversScreen} />
-          <AppStack.Screen name="Recap" component={RecapScreen} />
-          <AppStack.Screen name="Dashboard" component={DashboardScreen} />
+          <AppStack.Screen name="Waivers" component={EspnWaiversScreen} />
+          <AppStack.Screen name="Recap" component={EspnRecapScreen} />
+          <AppStack.Screen name="Dashboard" component={EspnDashboardScreen} />
           <AppStack.Screen name="Trades" component={TradesScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
-          <AppStack.Screen name="PlayoffOdds" component={PlayoffOddsScreen} />
-          <AppStack.Screen name="DraftCenter" component={DraftCenterScreen} />
-          <AppStack.Screen name="PickDetail" component={PickDetailScreen} />
+          <AppStack.Screen name="PlayoffOdds" component={EspnPlayoffOddsScreen} />
+          <AppStack.Screen name="DraftCenter" component={EspnDraftCenterScreen} />
+          <AppStack.Screen name="PickDetail" component={EspnPickDetailScreen} />
           <AppStack.Screen name="MyTeam" component={MyTeamScreen} />
-          <AppStack.Screen name="Matchup" component={MatchupScreen} />
-          <AppStack.Screen name="Alerts" component={AlertsScreen} />
-          <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
+          <AppStack.Screen name="Matchup" component={EspnMatchupScreen} />
+          <AppStack.Screen name="Alerts" component={EspnAlertsScreen} />
+          <AppStack.Screen name="GmTargets" component={EspnGmTargetsScreen} />
           <AppStack.Screen name="CollegeProspects" component={CollegeProspectsScreen} />
           <AppStack.Screen name="CollegeProspectDetail" component={ProspectScoutingDetailScreen} />
-          <AppStack.Screen name="TeamStance" component={TeamStanceScreen} />
-          <AppStack.Screen name="GmPlan" component={GmPlanScreen} />
+          <AppStack.Screen name="TeamStance" component={EspnTeamStanceScreen} />
+          <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
           <AppStack.Screen

@@ -10,6 +10,7 @@ import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse } from "@/lib/analytics";
 import { setLandingPending } from "@/lib/landingPending";
+import { leagueHomePath } from "@/lib/leaguePlatform";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -109,9 +110,7 @@ export function LandingAuthIsland() {
         const leagues = data ?? [];
         if (leagues.length === 1) {
           const only = leagues[0];
-          router.replace(
-            `/dashboard/${encodeURIComponent(only.league_id)}?name=${encodeURIComponent(only.league_name || only.league_id)}`,
-          );
+          router.replace(leagueHomePath(only.league_id, only.league_name || only.league_id));
           return;
         }
         if (leagues.length > 1) {
@@ -168,7 +167,8 @@ export function LandingAuthIsland() {
   }, [loading, session, checkingSavedLeagues]);
 
   const handleLeagueChosen = (leagueId: string, leagueName: string) => {
-    router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`);
+    // Dashboard for Sleeper, My Team for ESPN (no ESPN Dashboard yet).
+    router.push(leagueHomePath(leagueId, leagueName));
   };
 
   if (loading || checkingSavedLeagues) {

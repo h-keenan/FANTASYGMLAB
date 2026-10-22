@@ -1,8 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/context/AuthContext";
+import { EspnUnavailableState } from "@/components/EspnUnavailableState";
+import { espnUnavailableLeagueId } from "@/lib/leaguePlatform";
 
 /**
  * coridian_, 2026-10-19, screenshot: "still weird clipping and scaling on
@@ -17,8 +20,26 @@ import { useAuth } from "@/context/AuthContext";
  * exactly the "two sources of truth" bug class this fixes by reading the
  * same `session` check once, here, so the content can never be padded for
  * a sidebar that isn't actually there.
+ *
+ * Also the one place ESPN leagues are kept off pages they can't feed yet
+ * (lib/leaguePlatform.ts): every league page renders through here, so one
+ * check covers all of them instead of a copy per page.
  */
 export function AppContentShell({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  return <div className={`flex flex-col flex-1 ${session ? "md:pl-60" : ""}`}>{children}</div>;
+  const pathname = usePathname();
+  const espnLeagueId = espnUnavailableLeagueId(pathname);
+  return (
+    <div className={`flex flex-col flex-1 ${session ? "md:pl-60" : ""}`}>
+      {espnLeagueId ? (
+        // EspnUnavailableState reads ?name= (useSearchParams), which Next
+        // requires to sit under a Suspense boundary.
+        <Suspense fallback={null}>
+          <EspnUnavailableState leagueId={espnLeagueId} />
+        </Suspense>
+      ) : (
+        children
+      )}
+    </div>
+  );
 }

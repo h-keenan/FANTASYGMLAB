@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
+import { leagueHomePath } from "@/lib/leaguePlatform";
 
 // coridian_, screenshot of the league switcher: "how do i add leauges" —
 // SleeperImportForm (the real "load my Sleeper leagues, pick one, save it"
@@ -35,15 +36,11 @@ export default function ConnectLeaguePage() {
       <div className="w-full max-w-sm flex flex-col gap-1 text-center">
         <h1 style={{ font: "var(--font-page-title)" }}>Add a league</h1>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Load leagues for a Sleeper username and pick one to add alongside the leagues you already have.
+          Add a Sleeper or public ESPN league alongside the leagues you already have.
         </p>
       </div>
       <div className="w-full max-w-sm">
-        <SleeperImportForm
-          onLeagueChosen={(leagueId, leagueName) =>
-            router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`)
-          }
-        />
+        <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(leagueHomePath(leagueId, leagueName))} />
       </div>
     </main>
   );

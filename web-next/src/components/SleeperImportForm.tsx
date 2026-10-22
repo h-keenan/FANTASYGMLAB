@@ -5,6 +5,8 @@ import { useState } from "react";
 import { api, type SleeperLeagueSummary } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
+import { EspnImportForm } from "@/components/EspnImportForm";
+import { PillRow } from "@/components/PillRow";
 
 /**
  * Ports app.py's guest Sleeper-username import (load_leagues_for_username /
@@ -28,7 +30,40 @@ import { trackFeatureUse } from "@/lib/analytics";
  * exactly, so Founder Analytics' funnel keeps the same semantics it
  * already has for the legacy surface.
  */
+type LeaguePlatform = "sleeper" | "espn";
+
+const PLATFORM_OPTIONS: { label: string; value: LeaguePlatform }[] = [
+  { label: "Sleeper", value: "sleeper" },
+  { label: "ESPN", value: "espn" },
+];
+
+/**
+ * The Connect League flow, with the league's platform as its first choice.
+ * Sleeper (the default) is the username lookup below; ESPN is
+ * EspnImportForm (public leagues, a subset of features; see
+ * lib/leaguePlatform.ts). Same component, same callers, so ESPN lives in
+ * the existing onboarding and /connect-league flow rather than a new page.
+ */
 export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: string, leagueName: string) => void }) {
+  const [platform, setPlatform] = useState<LeaguePlatform>("sleeper");
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
+          Your league is on
+        </span>
+        <PillRow options={PLATFORM_OPTIONS} active={platform} onSelect={(value) => setPlatform(value as LeaguePlatform)} />
+      </div>
+      {platform === "espn" ? (
+        <EspnImportForm onLeagueChosen={onLeagueChosen} />
+      ) : (
+        <SleeperUsernameImport onLeagueChosen={onLeagueChosen} />
+      )}
+    </div>
+  );
+}
+
+function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: string, leagueName: string) => void }) {
   const { signInAsGuest, session } = useAuth();
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");

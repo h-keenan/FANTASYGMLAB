@@ -54,9 +54,13 @@ export default function LandingPage() {
               — a new addition here, not a rephrase of the hero copy above
               (that's approved, do-not-rephrase product copy). The actual
               field label/explanation already said "Sleeper" (onboarding
-              audit, 2026-10-18), but nothing said so before reaching it. */}
+              audit, 2026-10-18), but nothing said so before reaching it.
+              ESPN import (modules/espn_leagues.py) now covers exactly the
+              pages named here; keep this line in step with
+              ESPN_SUPPORTED_SEGMENTS in lib/leaguePlatform.ts. */}
           <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
-            Works with your Sleeper league — ESPN support is on the way.
+            Works with your Sleeper league. Public ESPN leagues work for My Team, Trade Analyzer, Players and League
+            Rankings, with more on the way.
           </p>
 
           {/* useSearchParams() (for ?billing=success, see the island's

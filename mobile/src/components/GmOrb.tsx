@@ -33,6 +33,7 @@ import { currentLeagueContext, navigationRef } from '../navigation/navigationRef
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { queryKeys } from '../lib/queryKeys';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
@@ -527,7 +528,9 @@ export default function GmOrb() {
   const recapQuery = useQuery({
     queryKey: queryKeys.recap(league?.leagueId ?? ''),
     queryFn: () => api.getLeagueRecap(league!.leagueId),
-    enabled: !isRestoring && open && Boolean(league?.leagueId),
+    // ESPN leagues have no recap/alerts/Trade Hub yet (lib/leaguePlatform.ts);
+    // the API would refuse these, so don't ask.
+    enabled: !isRestoring && open && Boolean(league?.leagueId) && !isEspnLeagueId(league?.leagueId),
   });
   const recapReady = Boolean(recapQuery.data?.recap && !recapQuery.data.recap.incomplete);
 
@@ -614,7 +617,7 @@ export default function GmOrb() {
   }, [open]);
 
   useEffect(() => {
-    if (!open || !league) {
+    if (!open || !league || isEspnLeagueId(league.leagueId)) {
       setUnreadAlertCount(0);
       return;
     }
@@ -648,7 +651,7 @@ export default function GmOrb() {
   // live idea count exceed what this device last actually viewed on the
   // Trade Hub screen."
   useEffect(() => {
-    if (!open || !league) {
+    if (!open || !league || isEspnLeagueId(league.leagueId)) {
       setTradeHubHasNew(false);
       return;
     }
