@@ -35,6 +35,7 @@ FEATURE_ATTRIBUTION: Mapping[str, str] = {
     "more next moves": "more_next_moves",
     "premium league pulse": "league_pulse",
     "full league pulse": "league_pulse",
+    "league pulse leaders": "league_pulse",
     "premium trade hub": "trade_depth",
     "full trade idea board": "trade_depth",
     "player-focused trade search": "trade_depth",

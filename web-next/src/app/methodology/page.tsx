@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ValuesCredit } from "@/components/ValuesCredit";
 import methodologyContent from "@/data/methodologyContent.json";
 
 /**
@@ -66,6 +67,12 @@ export default function MethodologyPage() {
           </div>
         ))}
       </div>
+
+      {/* FantasyCalc's Terms of Usage require at least one attribution link
+          that's public (no login or paywall) and in the initial HTML without
+          JavaScript. This page is a server-rendered, unauthenticated route,
+          so this credit is that link. See ValuesCredit.tsx. */}
+      <ValuesCredit />
     </main>
   );
 }

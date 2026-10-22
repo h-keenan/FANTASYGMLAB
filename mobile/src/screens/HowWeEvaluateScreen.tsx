@@ -5,6 +5,7 @@ import GridBackground from '../components/GridBackground';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import ContentSections, { type ContentSection } from '../components/ContentSections';
+import ValuesCredit from '../components/ValuesCredit';
 import methodologyContent from '../data/methodologyContent.json';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -32,6 +33,7 @@ export default function HowWeEvaluateScreen() {
         <AppText style={styles.kicker}>{CONTENT.kicker}</AppText>
         <AppText style={styles.note}>{CONTENT.note}</AppText>
         <ContentSections sections={CONTENT.sections} />
+        <ValuesCredit />
       </ScrollView>
     </View>
   );

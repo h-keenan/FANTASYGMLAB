@@ -31,6 +31,7 @@ import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonChart, SkeletonRow } from '../components/SkeletonBlock';
 import SubRatingRow from '../components/SubRatingRow';
+import ValuesCredit from '../components/ValuesCredit';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
@@ -1962,6 +1963,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       );
     }
   }
+  // Appended last so it never shifts the tab bar's stickyHeaderIndices slot.
+  content.push(<ValuesCredit key="values-credit" />);
 
   return (
     <>

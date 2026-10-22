@@ -6,6 +6,7 @@ import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Ports modules/trade_hub_ui.py's render_trade_idea_card (the "You Send /
@@ -180,6 +181,7 @@ export function TradeHubContent({
           </Link>
         </div>
       ) : null}
+      <ValuesCredit />
     </main>
   );
 }

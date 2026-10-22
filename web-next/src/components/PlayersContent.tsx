@@ -34,6 +34,7 @@ import {
   type PlayersSortOption,
   type PlayersStatusFilter,
 } from "@/lib/playersPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Players / Asset Explorer (Revision 16, extended in Revision 17) — ports
@@ -470,6 +471,7 @@ export function PlayersContent({
           ))}
         </div>
       )}
+      <ValuesCredit />
     </main>
   );
 }

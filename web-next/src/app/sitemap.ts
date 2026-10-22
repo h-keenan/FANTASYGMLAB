@@ -8,7 +8,7 @@ import legalContent from "@/data/legalContent.json";
 const BASE_URL = "https://app.fantasygmlab.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const staticRoutes = ["", "/premium", "/news", "/college-scouting", "/trade-history"];
+  const staticRoutes = ["", "/premium", "/news", "/college-scouting", "/trade-history", "/methodology"];
   const legalRoutes = Object.keys(legalContent.pages).map((pageKey) => `/legal/${pageKey}`);
 
   return [...staticRoutes, ...legalRoutes].map((path) => ({
