@@ -105,7 +105,7 @@ function CommunityTradeCard({
 
       <VerdictCallout color={verdictToneColorVar(item.verdict)} label={item.verdict_label} detail={detailText} />
 
-      <div className="grid grid-cols-2 gap-4 mt-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
         <ExchangeSide label="Team A sent" dotColor="var(--color-danger)" assets={toCommunityTradeAssets(item.send)} />
         <ExchangeSide
           label="Team A received"
