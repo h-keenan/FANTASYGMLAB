@@ -14,6 +14,7 @@ import { PillRow } from "@/components/PillRow";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerCareerTab } from "@/components/PlayerCareerTab";
 import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
+import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
@@ -201,6 +202,12 @@ export function PlayerProfileContent({
       </div>
 
       <div className="pqv-actions">
+        <PlayerLeagueActions
+          leagueId={leagueId}
+          leagueName={leagueName}
+          playerId={player.player_id}
+          sourceSurface="player_profile"
+        />
         <a
           className="pqv-action-link"
           href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}

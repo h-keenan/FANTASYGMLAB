@@ -218,10 +218,14 @@ describe("TradeAnalyzerContent", () => {
       );
 
       expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
-      // "Rival Team · Rival Owner" is the resolved owning team's pill label.
-      expect(screen.getByText(/Rival Team/)).toBeInTheDocument();
-      // activeSide flipped to "receive" (its label renders in the active color).
-      expect(screen.getByText("You receive")).toHaveStyle({ color: "var(--color-accent)" });
+      // Then the builder flips to the still-empty "You send" side and
+      // focuses the search, so the next tap picks the counter-asset.
+      expect(screen.getByText("You send")).toHaveStyle({ color: "var(--color-accent)" });
+      expect(screen.getByPlaceholderText("Search your roster")).toHaveFocus();
+      // The owning team stays selected for when the user returns to
+      // "You receive" ("Rival Team · Rival Owner" is its pill label).
+      fireEvent.click(screen.getByText("You receive"));
+      expect(screen.getByPlaceholderText(/Search Rival Team/)).toBeInTheDocument();
     });
 
     it("pre-populates You Send (not Receive) for a player already on the user's own roster", () => {
@@ -240,6 +244,9 @@ describe("TradeAnalyzerContent", () => {
 
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove Their WR" })).not.toBeInTheDocument();
+      // Flipped to the empty "You receive" side, searching every other team.
+      expect(screen.getByText("You receive")).toHaveStyle({ color: "var(--color-accent)" });
+      expect(screen.getByPlaceholderText("Search players to receive")).toHaveFocus();
     });
 
     it("fails open to the plain builder when the player id is missing/stale or on no roster in this league", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   api,
@@ -185,11 +185,18 @@ export function TradeFinderContent({
   leagueName,
   myTeam,
   lens = "Dynasty",
+  initialPlayerId,
 }: {
   leagueId: string;
   leagueName: string;
   myTeam: MyTeamResponse;
   lens?: string;
+  /** ?playerId= from a "Find trades" action (Player Quick View / Player
+   * Profile, tap-depth audit 2026-10 proposal 2). When that player is on
+   * this roster it starts selected and the search runs once, under the
+   * caller's real Team Situation strategy. Anyone else is ignored. Free
+   * users get the same Premium upsell a manual search shows. */
+  initialPlayerId?: string;
 }) {
   // Past the league's trade deadline Trade Finder stops searching for
   // in-season trades (GET .../my-team's additive trade_window).
@@ -204,7 +211,12 @@ export function TradeFinderContent({
     [myTeam],
   );
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const autoSearchPlayerId =
+    initialPlayerId && !reasonMessage && roster.some((player) => player.player_id === initialPlayerId) ? initialPlayerId : null;
+  const autoSearchStarted = useRef(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() =>
+    autoSearchPlayerId ? new Set([autoSearchPlayerId]) : new Set(),
+  );
   const [ownedPicks, setOwnedPicks] = useState<DraftPickAsset[]>([]);
   const [selectedPickIds, setSelectedPickIds] = useState<Set<string>>(new Set());
   const [returnPicks, setReturnPicks] = useState(false);
@@ -220,21 +232,55 @@ export function TradeFinderContent({
   // resolves, matching mobile's useGmStance AUTO_STRATEGY fallback.
   const [strategy, setStrategy] = useState("retool");
 
+  const runSearch = useCallback(
+    async (playerIds: Set<string>, pickIds: Set<string>, withReturnPicks: boolean, strategyKey: string) => {
+      setSearchError(null);
+      setSearching(true);
+      try {
+        const result = await api.getTradeFinderIdeas(leagueId, Array.from(playerIds), strategyKey, lens, {
+          pickIds: Array.from(pickIds),
+          returnPicks: withReturnPicks,
+        });
+        setIdeas(result.ideas);
+        setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
+        if (result.ideas.length === 0 && result.reason === "no_players_selected") {
+          setSearchError("Select at least one player or pick to search with.");
+        } else if (result.reason === "trade_deadline_passed") {
+          setSearchError(result.message || TRADE_DEADLINE_PASSED_MESSAGE);
+        }
+      } catch (err) {
+        setSearchError(err instanceof Error ? err.message : "Could not search for trades.");
+      } finally {
+        setSearching(false);
+      }
+    },
+    [leagueId, lens],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    // A "Find trades" deep link runs its search once the strategy is known
+    // (or failed to load), so it searches the same way a manual tap would.
+    const runAutoSearch = (strategyKey: string) => {
+      if (cancelled || !autoSearchPlayerId || autoSearchStarted.current) return;
+      autoSearchStarted.current = true;
+      void runSearch(new Set([autoSearchPlayerId]), new Set(), false, strategyKey);
+    };
     api
       .getTeamStance(leagueId)
       .then((result) => {
         if (!cancelled && result.strategy) setStrategy(result.strategy);
+        runAutoSearch(result.strategy || "retool");
       })
       .catch(() => {
         // Team Situation fetch failing is never fatal — search still runs
         // under the same "retool" default it always has.
+        runAutoSearch("retool");
       });
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, autoSearchPlayerId, runSearch]);
 
   useEffect(() => {
     const myRosterId = myTeam.roster_id ? String(myTeam.roster_id) : "";
@@ -281,27 +327,9 @@ export function TradeFinderContent({
     setSearchError(null);
   }
 
-  async function search() {
+  function search() {
     if (selectionCount === 0) return;
-    setSearchError(null);
-    setSearching(true);
-    try {
-      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens, {
-        pickIds: Array.from(selectedPickIds),
-        returnPicks,
-      });
-      setIdeas(result.ideas);
-      setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
-      if (result.ideas.length === 0 && result.reason === "no_players_selected") {
-        setSearchError("Select at least one player or pick to search with.");
-      } else if (result.reason === "trade_deadline_passed") {
-        setSearchError(result.message || TRADE_DEADLINE_PASSED_MESSAGE);
-      }
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Could not search for trades.");
-    } finally {
-      setSearching(false);
-    }
+    void runSearch(selectedIds, selectedPickIds, returnPicks, strategy);
   }
 
   if (reasonMessage) {
