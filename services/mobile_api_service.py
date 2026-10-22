@@ -11152,6 +11152,7 @@ def get_league_waivers(
             week=current_week or None,
             team_strategy=faab_strategy,
             season_stats=faab_season_stats,
+            best_ball=league_calendar.is_best_ball(league),
         )
         priority_adds.append(
             _project_priority_add(row, score_field, guidance, opponent_by_team, defense_strength_by_position)

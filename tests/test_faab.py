@@ -331,3 +331,29 @@ def test_market_from_real_payload_shapes():
     assert guidance.high_bid <= 40
     assert guidance.reasons[0] == "1 team needs a RB and 1 of them has more FAAB than you"
     assert "Fills a starting RB need for you" in guidance.reasons
+
+
+def test_best_ball_bid_gets_no_lineup_slot_starter_boost():
+    league = {"settings": {"waiver_budget": 100, "waiver_type": 2}, "roster_positions": ["RB", "RB", "BN"]}
+    rosters = [
+        {"roster_id": 1, "players": ["m1"], "settings": {"waiver_budget_used": 0}},
+        {"roster_id": 2, "players": ["r2a"], "settings": {"waiver_budget_used": 0}},
+    ]
+    frame = _market_frame()
+    market = faab.build_faab_market(
+        league=league, rosters=rosters, my_roster_id=1, valued=frame, score_field="dynasty_score"
+    )
+    row = frame[frame["player_id"] == "fa1"].iloc[0]
+    kwargs = dict(
+        score_field="dynasty_score",
+        league_settings=BASE,
+        waiver_mode="faab",
+        market=market,
+        budget_initial=100,
+        remaining_budget=100,
+    )
+    normal = faab.faab_guidance_for_free_agent(row, **kwargs)
+    best_ball = faab.faab_guidance_for_free_agent(row, best_ball=True, **kwargs)
+    assert any("for you" in reason for reason in normal.reasons)
+    assert not any("for you" in reason for reason in best_ball.reasons)
+    assert best_ball.point_bid < normal.point_bid

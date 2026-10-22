@@ -978,8 +978,12 @@ def faab_guidance_for_free_agent(
     team_strategy: str = "",
     season_stats: Mapping[str, Mapping] | None = None,
     scoring_key: str = "fantasy_points_ppr",
+    best_ball: bool = False,
 ) -> FaabGuidance:
     """Full-context FAAB guidance for one wire player.
+
+    ``best_ball`` (Sleeper ``settings.best_ball``): lineups set themselves,
+    so the bid never gets a lineup-slot "would start for you" boost.
 
     One place that derives every market input from real data (starter
     status, competition, wire depth, catalysts) so the mobile/web-next
@@ -998,7 +1002,7 @@ def faab_guidance_for_free_agent(
     player_id = str(row.get("player_id") or "")
 
     competition = estimate_competition(market, position, player_score) if market and market.rivals else None
-    is_starter = market_starter_status(market, position, player_score) if market else False
+    is_starter = (market_starter_status(market, position, player_score) if market else False) and not best_ball
 
     catalysts: list[WaiverCatalyst] = []
     if season_stats and player_id:
