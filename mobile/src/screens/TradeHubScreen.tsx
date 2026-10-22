@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -225,6 +225,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   // tile). Client-side only — filters the same `ideas` the summary row
   // already counted, never re-requests or re-ranks anything.
   const [impactFilter, setImpactFilter] = useState<ImpactTagKey | null>(null);
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const { lens } = useValuationLens(leagueId);
 
   // "All Trades" — the concept sheet's second Trade Hub tab: browse ideas
@@ -347,16 +348,20 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   // IdeaSummaryRow's chips filter this same `ideas` list by impact_tag —
   // client-side only, same data, same ranking, just a narrower view of it.
   const filteredIdeas = useMemo(() => {
-    if (!ideas || !impactFilter) return ideas;
-    return ideas.filter((idea) => idea.impact_tag === impactFilter);
-  }, [ideas, impactFilter]);
+    if (!ideas || (!impactFilter && !positionFilter)) return ideas;
+    return ideas.filter(
+      (idea) =>
+        (!impactFilter || idea.impact_tag === impactFilter) &&
+        (!positionFilter || ideaPositions(idea).includes(positionFilter)),
+    );
+  }, [ideas, impactFilter, positionFilter]);
   const activeData = isForYou
     ? activeLoading || activeError || notReadyReason
       ? []
       : filteredIdeas ?? []
     : allTradesIdeas;
   const impactFilterActiveWithNoResults = Boolean(
-    isForYou && impactFilter && ideas && ideas.length > 0 && filteredIdeas && filteredIdeas.length === 0,
+    isForYou && (impactFilter || positionFilter) && ideas && ideas.length > 0 && filteredIdeas && filteredIdeas.length === 0,
   );
 
   return (
@@ -390,6 +395,9 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
             <IdeaSummaryRow ideas={ideas} activeFilter={impactFilter} onToggleFilter={setImpactFilter} />
           ) : null}
+          {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
+            <PositionFilterRow ideas={ideas} active={positionFilter} onSelect={setPositionFilter} />
+          ) : null}
           {activeLoading ? (
             <View style={styles.skeletonWrap}>
               <TradeIdeaSkeletonCard />
@@ -413,7 +421,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
           impactFilterActiveWithNoResults ? (
             <EmptyState
               icon="filter-outline"
-              title={`No ${impactTagConfig(colors)[impactFilter as string]?.label ?? 'matching'} ideas`}
+              title={`No ${impactFilter ? impactTagConfig(colors)[impactFilter]?.label ?? 'matching' : positionFilter} ideas`}
               subtitle="Clear the filter above to see every trade idea for this strategy."
             />
           ) : (
@@ -828,6 +836,56 @@ function IdeaSummaryRow({
   );
 }
 
+const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
+
+function ideaPositions(idea: TradeIdea): string[] {
+  const seen = new Set<string>();
+  for (const asset of [...idea.package.send, ...idea.package.receive]) {
+    if (asset.asset_type === 'player' && asset.position) seen.add(asset.position);
+  }
+  return [...seen];
+}
+
+/** Positions filter chips (All + each position on the board). */
+function PositionFilterRow({
+  ideas,
+  active,
+  onSelect,
+}: {
+  ideas: TradeIdea[];
+  active: string | null;
+  onSelect: (position: string | null) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const positions = useMemo(() => {
+    const all = new Set<string>();
+    for (const idea of ideas) for (const pos of ideaPositions(idea)) all.add(pos);
+    const rank = (pos: string) => (POSITION_ORDER.indexOf(pos) === -1 ? 99 : POSITION_ORDER.indexOf(pos));
+    return [...all].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  }, [ideas]);
+  if (positions.length < 2) return null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.positionChipRow}>
+      {[null, ...positions].map((pos) => {
+        const isActive = pos === active;
+        return (
+          <TouchableOpacity
+            key={pos ?? 'all'}
+            style={[styles.positionChip, isActive && styles.summaryTileActive]}
+            onPress={() => onSelect(pos)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={pos ? `Show ${pos} trade ideas` : 'Show all positions'}
+          >
+            <AppText style={styles.summaryLabel}>{pos ?? 'All positions'}</AppText>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 /**
  * The card's own rationale is clipped to 3 lines to keep the feed scannable
  * (see `styles.rationale`'s `numberOfLines={3}`) — this is the tap target
@@ -1001,7 +1059,7 @@ function TradeIdeaCard({
           accessibilityLabel="Share this trade"
         >
           <Ionicons name="share-outline" size={16} color={colors.accent} />
-          <AppText style={styles.shareButtonText}>Share</AppText>
+          <AppText style={styles.shareButtonText}>Share Trade</AppText>
         </TouchableOpacity>
       </View>
 
@@ -1041,6 +1099,7 @@ function TradeIdeaCard({
           <View style={styles.exchangeLabelRow}>
             <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
             <AppText style={styles.exchangeLabel}>You Send</AppText>
+            <AppText style={styles.exchangeTotal}>{Math.round(idea.send_score || 0).toLocaleString()}</AppText>
           </View>
           <ExchangeAssetList assets={idea.package.send} onPressPlayer={openPlayer} onPressPick={openPick} />
         </View>
@@ -1052,7 +1111,8 @@ function TradeIdeaCard({
         <View style={styles.exchangeSide}>
           <View style={styles.exchangeLabelRow}>
             <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
-            <AppText style={styles.exchangeLabel}>You Receive</AppText>
+            <AppText style={styles.exchangeLabel}>You Get</AppText>
+            <AppText style={styles.exchangeTotal}>{Math.round(idea.receive_score || 0).toLocaleString()}</AppText>
           </View>
           <ExchangeAssetList assets={idea.package.receive} onPressPlayer={openPlayer} onPressPick={openPick} />
         </View>
@@ -1064,7 +1124,7 @@ function TradeIdeaCard({
           <AppText style={styles.rationale} numberOfLines={3}>
             {idea.rationale}
           </AppText>
-          <AppText style={styles.rationaleExpandHint}>Read full explanation</AppText>
+          <AppText style={styles.rationaleExpandHint}>View details</AppText>
         </TouchableOpacity>
       ) : null}
 
@@ -1356,6 +1416,15 @@ function createStyles(colors: ThemeColors) {
   },
   exchangeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
   exchangeDot: { width: 6, height: 6, borderRadius: 3 },
+  exchangeTotal: { marginLeft: 'auto', fontSize: 12, fontWeight: '800', color: colors.textSecondary },
+  positionChipRow: { gap: spacing.xs, paddingBottom: spacing.md },
+  positionChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
   exchangeLabel: {
     fontSize: 10,
     fontWeight: '700',

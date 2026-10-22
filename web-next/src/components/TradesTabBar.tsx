@@ -33,11 +33,11 @@ export function TradesTabBar({
   ];
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-col gap-2">
       <div
         role="tablist"
         aria-label="Trades section"
-        className="flex flex-wrap gap-0"
+        className="flex w-full"
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
         {tabs.map((tab) => {
@@ -56,7 +56,7 @@ export function TradesTabBar({
               href={tab.href}
               role="tab"
               aria-selected={isActive}
-              className="px-3 py-2 text-xs font-bold uppercase"
+              className="flex-1 py-2.5 text-center text-xs font-bold uppercase"
               style={style}
             >
               {tab.label}
@@ -64,7 +64,7 @@ export function TradesTabBar({
           );
         })}
       </div>
-      <Link href="/trade-history" className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)" }}>
+      <Link href="/trade-history" className="text-xs font-bold uppercase self-end" style={{ color: "var(--color-accent)" }}>
         Trade History →
       </Link>
     </div>
