@@ -22,6 +22,7 @@ import {
   movementGlyph,
   type LiveDraftRankFilter,
 } from "@/lib/liveDraftPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Live Draft (Revision 21) — the last page on the original migration punch
@@ -586,6 +587,7 @@ export function LiveDraftContent({
           )}
         </>
       )}
+      <ValuesCredit />
     </main>
   );
 }

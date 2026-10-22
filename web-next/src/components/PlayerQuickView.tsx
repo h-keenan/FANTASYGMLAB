@@ -23,6 +23,7 @@ import {
   statPercentileBand,
   tierOpportunityMismatchCaption,
 } from "@/lib/playerQuickViewPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Player Quick View (Revision 22) — the web port of app.py's Player Quick
@@ -407,6 +408,7 @@ export function PlayerQuickView({
             </a>
           </div>
         ) : null}
+        <ValuesCredit className="text-center" />
         </div>
       </div>
     </div>

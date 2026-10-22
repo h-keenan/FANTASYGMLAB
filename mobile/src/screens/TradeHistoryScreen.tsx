@@ -11,6 +11,7 @@ import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type PastTradeOutcome, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -106,7 +107,12 @@ export default function TradeHistoryScreen({ navigation }: Props) {
             />
           ) : null
         }
-        ListFooterComponent={error ? <AppText style={styles.error}>{error}</AppText> : null}
+        ListFooterComponent={
+          <>
+            {error ? <AppText style={styles.error}>{error}</AppText> : null}
+            <ValuesCredit />
+          </>
+        }
       />
     </View>
   );

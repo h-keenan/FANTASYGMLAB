@@ -29,6 +29,7 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import BeginnerHelp from '../components/BeginnerHelp';
 import ViewModeToggle from '../components/ViewModeToggle';
+import ValuesCredit from '../components/ValuesCredit';
 import WaiverRecommendationCard, {
   waiverInjuryDisplay,
   waiverOpponentContext,
@@ -238,6 +239,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
         <BrandedSpinner style={styles.loading} />
       ) : (
         <FlatList
+          ListFooterComponent={<ValuesCredit />}
           key={viewMode}
           data={filtered}
           keyExtractor={(item) => item.player_id}

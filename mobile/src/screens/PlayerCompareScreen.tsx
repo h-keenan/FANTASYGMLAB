@@ -17,6 +17,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { injuryTone } from '../lib/injuryDisplay';
@@ -421,6 +422,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
               <NarrativeCompareBlock sideA={sides[0]} sideB={sides[1]} narrative={narrative} />
             </AnalyticsSection>
           ) : null}
+          <ValuesCredit />
         </ScrollView>
       )}
       {sides ? (

@@ -18,6 +18,7 @@ import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /** Mirrors modules.trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS — the server
  * ignores any selected pick past this many, so the picker stops there too. */
@@ -450,6 +451,7 @@ export function TradeFinderContent({
           ) : null}
         </>
       )}
+      <ValuesCredit />
     </main>
   );
 }

@@ -19,6 +19,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import UsageTrendPill from '../components/UsageTrendPill';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
+import ValuesCredit from '../components/ValuesCredit';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -270,6 +271,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <FlatList
+        ListFooterComponent={<ValuesCredit />}
         data={watchingRows}
         keyExtractor={(row) => row.target.player_id}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
