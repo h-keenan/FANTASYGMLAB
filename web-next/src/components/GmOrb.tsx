@@ -3,13 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { SheetHandle } from "@/components/SheetHandle";
 
 /**
  * web-next's counterpart to mobile's GmOrb.tsx and the Streamlit web app's
@@ -32,32 +34,20 @@ import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
  */
 export function GmOrb() {
   const [open, setOpen] = useState(false);
-  // Swipe-down-to-dismiss, same pattern PlayerQuickView.tsx already uses
-  // for its own bottom sheet — coridian_, 2026-10-18: "you should be able
-  // to swipe down from the GM orb to exit out of it or tap off of it to
-  // exit out of it" (tap-off already worked, via the backdrop button below).
-  const dragStartY = useRef<number | null>(null);
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const DISMISS_THRESHOLD_PX = 110;
-
-  function handleDragStart(event: React.PointerEvent<HTMLDivElement>) {
-    dragStartY.current = event.clientY;
-    setIsDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-  function handleDragMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (dragStartY.current === null) return;
-    setDragY(Math.max(0, event.clientY - dragStartY.current));
-  }
-  function handleDragEnd() {
-    if (dragY > DISMISS_THRESHOLD_PX) {
-      setOpen(false);
+  // Swipe-down-to-dismiss (coridian_, 2026-10-18: "you should be able to
+  // swipe down from the GM orb to exit out of it or tap off of it to exit
+  // out of it") — the shared sheet gesture, lib/useSheetDragDismiss.ts.
+  // Tap-off is the backdrop button below; Esc is handled here too.
+  const closeSheet = useCallback(() => setOpen(false), []);
+  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: closeSheet, enabled: open });
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
     }
-    dragStartY.current = null;
-    setIsDragging(false);
-    setDragY(0);
-  }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
   const { session } = useAuth();
   const pathname = usePathname();
   const params = useParams<{ leagueId?: string }>();
@@ -143,6 +133,7 @@ export function GmOrb() {
             onClick={() => setOpen(false)}
           />
           <div
+            ref={sheetRef}
             className="gm-orb-sheet"
             style={{
               position: "absolute",
@@ -152,8 +143,7 @@ export function GmOrb() {
               borderTopLeftRadius: "var(--radius-lg, 0)",
               borderTopRightRadius: "var(--radius-lg, 0)",
               boxShadow: "var(--shadow-card)",
-              transform: dragY ? `translateY(${dragY}px)` : undefined,
-              transition: isDragging ? "none" : "transform 180ms ease",
+              ...sheetStyle,
             }}
           >
             {/* Same animated field-line + sweep texture used app-wide,
@@ -170,16 +160,7 @@ export function GmOrb() {
               className="flex flex-col gap-4 px-5 pt-2 pb-8 overflow-y-auto"
               style={{ position: "relative", zIndex: 1, maxHeight: "78vh" }}
             >
-              <div
-                className="gm-orb-drag-handle"
-                onPointerDown={handleDragStart}
-                onPointerMove={handleDragMove}
-                onPointerUp={handleDragEnd}
-                onPointerCancel={handleDragEnd}
-                aria-hidden="true"
-              >
-                <span className="gm-orb-drag-handle-bar" />
-              </div>
+              <SheetHandle />
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "0.03em" }}>
                   {BRAND_NAME}

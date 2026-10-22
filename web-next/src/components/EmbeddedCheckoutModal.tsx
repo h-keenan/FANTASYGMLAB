@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
+
+import { SheetHandle } from "@/components/SheetHandle";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
 /**
  * Zach, 2026-10-19: "We need to try to embed stripe so theres not a
@@ -46,6 +49,16 @@ export function EmbeddedCheckoutModal({
   onClose: () => void;
 }) {
   const stripePromise = useMemo(() => stripePromiseFor(publishableKey), [publishableKey]);
+  // Swipe down (touch) and Esc close it like the X. Stripe's iframe keeps
+  // its own touches, so the swipe starts from the header/handle area.
+  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: onClose });
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-4"
@@ -55,14 +68,18 @@ export function EmbeddedCheckoutModal({
       }}
     >
       <div
+        ref={sheetRef}
         className="flex flex-col gap-2 w-full max-w-lg"
         style={{
+          ...sheetStyle,
           background: "var(--color-surface-raised)",
           border: "var(--border-width-default) solid var(--color-border)",
           maxHeight: "90vh",
           overflowY: "auto",
+          overscrollBehavior: "contain",
         }}
       >
+        <SheetHandle />
         <div className="flex items-center justify-between px-4 pt-3">
           <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
             Checkout

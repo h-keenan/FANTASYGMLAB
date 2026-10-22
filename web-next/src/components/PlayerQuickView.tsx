@@ -10,9 +10,11 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SheetHandle } from "@/components/SheetHandle";
 import { CHART_HEIGHT } from "@/components/WeeklyPointsChart";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
   SUB_RATING_DISPLAY,
@@ -67,34 +69,10 @@ export function PlayerQuickView({
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Swipe-down-to-dismiss, via the drag handle only (not the whole modal —
-  // the body itself needs to stay normally scrollable). Pointer events
-  // cover touch and mouse in one handler; dragStartY stays a ref since it's
-  // write-only bookkeeping between pointerdown/pointermove, not something a
-  // render needs to react to.
-  const dragStartY = useRef<number | null>(null);
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const DISMISS_THRESHOLD_PX = 110;
-
-  function handleDragStart(event: React.PointerEvent<HTMLDivElement>) {
-    dragStartY.current = event.clientY;
-    setIsDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-  function handleDragMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (dragStartY.current === null) return;
-    setDragY(Math.max(0, event.clientY - dragStartY.current));
-  }
-  function handleDragEnd() {
-    if (dragY > DISMISS_THRESHOLD_PX) {
-      onClose();
-      return;
-    }
-    dragStartY.current = null;
-    setIsDragging(false);
-    setDragY(0);
-  }
+  // Swipe-down-to-dismiss on touch devices: the shared sheet gesture (see
+  // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
+  // its top, so scrolling back up inside a long PQV never closes it.
+  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: onClose });
   const [loadError, setLoadError] = useState(false);
 
   // Fetch detail/awards for this player. The provider mounts one
@@ -182,16 +160,16 @@ export function PlayerQuickView({
       }}
     >
       <div
-        ref={dialogRef}
+        ref={(node) => {
+          dialogRef.current = node;
+          sheetRef.current = node;
+        }}
         className="pqv-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pqv-name"
         onKeyDown={handleKeyDown}
-        style={{
-          transform: dragY ? `translateY(${dragY}px)` : undefined,
-          transition: isDragging ? "none" : "transform 180ms ease",
-        }}
+        style={sheetStyle}
       >
         {/* coridian_, 2026-10-18: "Also need that moving background behind
             the pqv" — same field/sweep texture as the GM orb sheet,
@@ -199,16 +177,7 @@ export function PlayerQuickView({
             layer (which sits behind this modal's own opaque background). */}
         <div className="pqv-field" aria-hidden="true" />
         <div className="pqv-sweep" aria-hidden="true" />
-        <div
-          className="pqv-drag-handle"
-          onPointerDown={handleDragStart}
-          onPointerMove={handleDragMove}
-          onPointerUp={handleDragEnd}
-          onPointerCancel={handleDragEnd}
-          aria-hidden="true"
-        >
-          <span className="pqv-drag-handle-bar" />
-        </div>
+        <SheetHandle />
         <button
           ref={closeButtonRef}
           type="button"
