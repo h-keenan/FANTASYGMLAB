@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { GamePlanCard } from "@/components/GamePlanCard";
-import { GuillotineCard, useGuillotine } from "@/components/GuillotineCard";
+import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
@@ -50,7 +50,7 @@ export function DashboardContent({
   teamRankings?: Promise<LeagueTeamRankingsResponse>;
 }) {
   const snapshot = data.team_snapshot;
-  const guillotine = useGuillotine(leagueId);
+  const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(leagueId);
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
@@ -190,6 +190,7 @@ export function DashboardContent({
           />
         </section>
       ) : null}
+      <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />
     </main>
   );
 }

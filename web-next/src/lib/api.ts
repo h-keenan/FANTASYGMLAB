@@ -560,6 +560,8 @@ export interface GuillotineResponse {
   is_guillotine: boolean;
   reason: string;
   source?: string;
+  /** The user's manual league-type setting; null/absent means Auto. */
+  league_type_override?: 'guillotine' | 'standard' | null;
   week?: number | null;
   alive?: boolean;
   weeks_survived?: number;

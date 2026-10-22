@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { PillRow } from "@/components/PillRow";
 import { AccentCard } from "@/components/AccentCard";
 import { StatStrip } from "@/components/StatStrip";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -10,7 +11,12 @@ import { guillotineView } from "@/lib/guillotine";
 
 /** Fetches guillotine status for a league; null while loading, on error, or for normal leagues. */
 export function useGuillotine(leagueId: string | undefined, lens: string = "Dynasty"): GuillotineResponse | null {
+  return useGuillotineState(leagueId, lens).data;
+}
+
+export function useGuillotineState(leagueId: string | undefined, lens: string = "Dynasty") {
   const [data, setData] = useState<GuillotineResponse | null>(null);
+  const [nonce, setNonce] = useState(0);
   useEffect(() => {
     if (!leagueId) return;
     let cancelled = false;
@@ -25,8 +31,45 @@ export function useGuillotine(leagueId: string | undefined, lens: string = "Dyna
     return () => {
       cancelled = true;
     };
-  }, [leagueId, lens]);
-  return data;
+  }, [leagueId, lens, nonce]);
+  return { data, reload: () => setNonce((n) => n + 1) };
+}
+
+const TYPE_OPTIONS = [
+  { label: "Auto", value: "auto" },
+  { label: "Guillotine", value: "guillotine" },
+  { label: "Standard", value: "standard" },
+];
+
+/** Manual league-type override (Auto / Guillotine / Standard). Hidden until status has loaded. */
+export function LeagueTypeControl({
+  leagueId,
+  data,
+  onChanged,
+}: {
+  leagueId: string;
+  data: GuillotineResponse | null;
+  onChanged: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  if (!data || !data.ok || data.league_type_override === undefined) return null;
+  const select = (value: string) => {
+    if (saving) return;
+    setSaving(true);
+    api
+      .setLeagueType(leagueId, value as "guillotine" | "standard" | "auto")
+      .then(onChanged)
+      .catch(() => {})
+      .finally(() => setSaving(false));
+  };
+  return (
+    <section className="flex flex-col gap-1" aria-label="League type">
+      <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
+        League type
+      </span>
+      <PillRow options={TYPE_OPTIONS} active={data.league_type_override ?? "auto"} onSelect={select} />
+    </section>
+  );
 }
 
 const GLYPHS = ["record", "power", "franchise", "starter"] as const;

@@ -18,15 +18,22 @@ def test_name_and_flag_signals():
     assert not g.detect(_league(metadata={"guillotine": "false"}))["is_guillotine"]
 
 
-def test_structural_empty_rosters_signal():
-    rosters = [{"roster_id": 1, "players": ["a"]}, {"roster_id": 2, "players": []}, {"roster_id": 3, "players": ["b"]}]
-    assert g.detect(_league(), rosters)["source"] == "empty_rosters"
-    # Week 1: nothing could have been chopped yet.
-    assert not g.detect(_league(settings={"leg": 1}), rosters)["is_guillotine"]
-    # More empty rosters than completed weeks is not a chop pattern.
-    many = [{"roster_id": i, "players": []} for i in range(3)] + [{"roster_id": 9, "players": ["x"]}]
-    assert not g.detect(_league(settings={"leg": 2}), many)["is_guillotine"]
-    assert not g.detect(_league(), [{"roster_id": 1, "players": ["a"]}])["is_guillotine"]
+def _hist(zero_weeks):
+    # roster 2 scores weeks 1-2 then is chopped; roster 1 always scores.
+    out = {}
+    for w in (1, 2, 3, 4):
+        out[w] = [{"roster_id": 1, "points": 100.0}, {"roster_id": 2, "points": 0 if w in zero_weeks else 90.0}]
+    return out
+
+
+def test_chop_history_requires_real_elimination_pattern():
+    rosters = [{"roster_id": 1, "players": ["a"]}, {"roster_id": 2, "players": []}]
+    assert g.detect(_league(), rosters, None, _hist({3, 4}))["source"] == "chop_history"
+    # Normal league: abandoned team with an empty roster but no chop history stays standard.
+    assert not g.detect(_league(), rosters, None, None)["is_guillotine"]
+    assert not g.detect(_league(), rosters, None, _hist(set()))["is_guillotine"]
+    # Scored again after a zero week: not a chop.
+    assert not g.detect(_league(), rosters, None, _hist({2}))["is_guillotine"]
 
 
 def test_survival_status_counts_scoring_weeks():

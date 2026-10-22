@@ -27,6 +27,7 @@ import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import GuillotineCard from '../components/GuillotineCard';
+import LeagueTypeControl from '../components/LeagueTypeControl';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import {
   api,
@@ -535,6 +536,11 @@ export default function DashboardScreen({ route, navigation }: Props) {
           inSeason={isInSeason(matchup?.week)}
         />
       </View>
+      <LeagueTypeControl
+        leagueId={leagueId}
+        data={guillotineQuery.data}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.guillotine(leagueId) })}
+      />
       <View style={styles.activityRow}>
         {teamRankings && teamRankings.length > 0 ? (
           entitlement && !entitlement.is_premium ? (

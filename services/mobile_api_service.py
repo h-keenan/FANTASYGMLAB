@@ -10809,10 +10809,6 @@ def get_league_guillotine(
         raise HTTPException(status_code=404, detail="League not found.")
     rosters = sleeper.get_rosters(league_id) or []
     override = _stored_league_type_override(config, user_id, token, league_id)
-    detected = guillotine_module.detect(league, rosters, override)
-    if not detected["is_guillotine"]:
-        return {**not_gl, "reason": "not_guillotine"}
-
     league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
     try:
         week = int(league_settings.get("leg") or 0)
@@ -10820,6 +10816,9 @@ def get_league_guillotine(
         week = 0
     in_season = str(league.get("status") or "") == "in_season" and week > 0
     past_weeks = {w: sleeper.get_matchups(league_id, w) or [] for w in range(1, week)} if in_season else {}
+    detected = guillotine_module.detect(league, rosters, override, past_weeks)
+    if not detected["is_guillotine"]:
+        return {**not_gl, "reason": "not_guillotine", "league_type_override": override}
     status = guillotine_module.survival_status(my_roster, rosters, past_weeks)
 
     chop = None
@@ -10850,6 +10849,7 @@ def get_league_guillotine(
         "is_guillotine": True,
         "reason": "",
         "source": detected["source"],
+        "league_type_override": override,
         "week": week if in_season else None,
         **status,
         "chop_line": chop,

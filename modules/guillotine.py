@@ -37,12 +37,15 @@ def detect(
     league: Mapping[str, Any] | None,
     rosters: Sequence[Mapping[str, Any]] | None = None,
     override: str | None = None,
+    past_weeks: Mapping[int, Sequence[Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Return ``{"is_guillotine": bool, "source": str}``.
 
     Order: manual override, explicit flag/name, then structural. Structural
-    signal: in season past week 1, at least one fully emptied roster, and no
-    more emptied rosters than completed weeks (one chop per week).
+    signal (conservative): every emptied roster must show a real chop history
+    in the weekly scores (scored, then zero from its first zero week onward)
+    and no two rosters may drop out in the same week. An empty roster alone
+    (an abandoned team in a normal league) never counts.
     """
 
     forced = clean_override(override)
@@ -63,11 +66,30 @@ def detect(
         leg = int(settings.get("leg") or 0)
     except (TypeError, ValueError):
         leg = 0
-    if rosters and str(league.get("status") or "") == "in_season" and leg >= 2:
+    if rosters and past_weeks and str(league.get("status") or "") == "in_season" and leg >= 2:
         empties = empty_roster_ids(rosters)
-        if empties and len(empties) <= leg - 1 and len(empties) < len(rosters):
-            return {"is_guillotine": True, "source": "empty_rosters"}
+        if empties and len(empties) < len(rosters) and _is_chop_history(empties, past_weeks):
+            return {"is_guillotine": True, "source": "chop_history"}
     return {"is_guillotine": False, "source": "none"}
+
+
+def _is_chop_history(empties: Sequence[str], past_weeks: Mapping[int, Sequence[Mapping[str, Any]]]) -> bool:
+    first_zero_weeks: list[int] = []
+    for rid in empties:
+        series = []
+        for week in sorted(past_weeks):
+            entry = next((m for m in past_weeks[week] or [] if str(m.get("roster_id")) == rid), None)
+            pts = _points(entry)
+            if pts is None:
+                return False
+            series.append((week, pts))
+        zero_from = next((i for i, (_, p) in enumerate(series) if p <= 0), None)
+        if zero_from is None or zero_from == 0:
+            return False
+        if any(p > 0 for _, p in series[zero_from:]):
+            return False
+        first_zero_weeks.append(series[zero_from][0])
+    return len(set(first_zero_weeks)) == len(first_zero_weeks)
 
 
 def _points(entry: Mapping[str, Any] | None) -> float | None:
