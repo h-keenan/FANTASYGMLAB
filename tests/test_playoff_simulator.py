@@ -360,3 +360,72 @@ def test_playoff_odds_cache_hit_in_one_call_serves_a_separate_call_without_recom
 
     assert call_count == 1, "the second call must hit the Redis-shared cache entry, not recompute"
     assert first == second == {"ok": True, "reason": "", "league_id": "league-cache-hit", "lens": "Dynasty"}
+
+
+def _four_team_kwargs(**over):
+    kw = dict(
+        roster_ids=["A", "B", "C", "D"],
+        power_scores=[100.0, 100.0, 100.0, 100.0],
+        current_wins=[0, 0, 0, 0],
+        current_losses=[0, 0, 0, 0],
+        current_ties=[0, 0, 0, 0],
+        points_for=[1, 1, 1, 1],
+        points_against=[1, 1, 1, 1],
+        team_names=["a", "b", "c", "d"],
+        completed_games=[],
+        remaining_games=[("A", "B"), ("C", "D")],
+        playoff_teams=2,
+        n_trials=2000,
+        rng=np.random.default_rng(3),
+    )
+    kw.update(over)
+    return kw
+
+
+def test_league_median_adds_a_second_result_per_week():
+    weeks = [[("A", "B"), ("C", "D")]] * 3
+    off = sim.simulate_playoff_odds(**_four_team_kwargs(remaining_games=[g for w in weeks for g in w]))
+    on = sim.simulate_playoff_odds(
+        **_four_team_kwargs(
+            remaining_games=[g for w in weeks for g in w],
+            remaining_weeks=weeks,
+            league_median=True,
+        )
+    )
+    # 3 head-to-head + 3 median games each.
+    assert off["teams"]["A"]["remaining_games"] == 3
+    assert on["teams"]["A"]["remaining_games"] == 6
+    wins_plus_losses = on["teams"]["A"]["median_final_wins"] + on["teams"]["A"]["median_final_losses"]
+    assert wins_plus_losses == 6
+
+
+def test_league_median_rewards_the_strong_team_beyond_head_to_head():
+    weeks = [[("A", "B"), ("C", "D")]] * 6
+    kw = _four_team_kwargs(
+        power_scores=[300.0, 100.0, 100.0, 100.0],
+        remaining_games=[g for w in weeks for g in w],
+        remaining_weeks=weeks,
+        league_median=True,
+        playoff_teams=1,
+    )
+    result = sim.simulate_playoff_odds(**kw)
+    assert result["teams"]["A"]["median_final_wins"] > 6  # more than the 6 h2h games alone allow
+
+
+def test_division_winner_is_seeded_over_better_record_wildcard():
+    # A and B (div 1) have the best records; C (div 2) is a division winner
+    # with a worse record. 2 playoff spots: A (div winner) and C (div winner).
+    kw = _four_team_kwargs(
+        current_wins=[10, 9, 5, 1],
+        current_losses=[0, 1, 5, 9],
+        remaining_games=[],
+        divisions=[1, 1, 2, 2],
+    )
+    result = sim.simulate_playoff_odds(**kw)
+    assert result["teams"]["A"]["playoff_probability"] == 100.0
+    assert result["teams"]["B"]["playoff_probability"] == 0.0
+    assert result["teams"]["C"]["playoff_probability"] == 100.0
+    # without divisions B gets in
+    plain = sim.simulate_playoff_odds(**_four_team_kwargs(
+        current_wins=[10, 9, 5, 1], current_losses=[0, 1, 5, 9], remaining_games=[]))
+    assert plain["teams"]["B"]["playoff_probability"] == 100.0

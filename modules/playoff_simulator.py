@@ -232,6 +232,9 @@ def simulate_playoff_odds(
     playoff_teams: int,
     n_trials: int = 3000,
     rng: np.random.Generator | None = None,
+    remaining_weeks: Sequence[Sequence[tuple[str, str]]] | None = None,
+    league_median: bool = False,
+    divisions: Sequence[int | None] | None = None,
 ) -> dict[str, Any]:
     """Pure Monte Carlo simulation — no network/IO, fully unit-testable.
 
@@ -240,6 +243,21 @@ def simulate_playoff_odds(
     probability slope — see ``fit_win_probability_slope``). ``winner`` must
     be one of the two roster ids; skip ties before calling (fantasy ties
     are vanishingly rare with decimal scoring and are not modeled).
+    Median scoring (``league_median`` + ``remaining_weeks``): Sleeper's
+    ``settings.league_average_match = 1`` also credits every team a win or
+    loss each week against the league median score. Verified against live
+    leagues: roster ``settings.wins/losses`` already include those results, so
+    the current record needs no adjustment; only the remaining weeks do.
+    ``remaining_weeks`` is the per-week pairing lists; each week the sim draws
+    a weekly score per team (``a * z + N(0, 1)`` with ``a`` chosen so the
+    pairwise win probability matches the logistic slope), decides the
+    head-to-head games from those scores, and credits a median win to every
+    team scoring above the median of that week's participants.
+
+    Divisions (``divisions`` = per-team division id or None): Sleeper seeds
+    division winners above all wildcard teams (verified against the live
+    playoff brackets of divisional leagues), then everyone else by record.
+
     ``remaining_games`` is ``(roster_a, roster_b)`` for every real
     not-yet-played matchup still on the schedule — one call simulates the
     whole remaining season across all weeks at once (win totals are
@@ -303,7 +321,34 @@ def simulate_playoff_odds(
 
     n_games = len(pair_indices)
     wins_added = np.zeros((n_trials, n), dtype=int)
-    if n_games:
+    if league_median and remaining_weeks:
+        # score = a*z + N(0,1);  P(A>B) = Phi(a*dz/sqrt2) ~= sigmoid(slope*dz)
+        # using sigmoid(x) ~= Phi(x/1.702)  =>  a = sqrt(2)*slope/1.702.
+        a_coef = float(np.sqrt(2.0) * slope / 1.702)
+        pair_indices = []
+        remaining_games_count = np.zeros(n, dtype=int)
+        for week_pairs in remaining_weeks:
+            week_idx = [
+                (index_of[ra], index_of[rb])
+                for ra, rb in week_pairs
+                if ra in index_of and rb in index_of
+            ]
+            if not week_idx:
+                continue
+            scores = a_coef * z[None, :] + rng.standard_normal(size=(n_trials, n))
+            participants = sorted({i for pair in week_idx for i in pair})
+            median = np.median(scores[:, participants], axis=1)
+            for ia, ib in week_idx:
+                pair_indices.append((ia, ib))
+                outcome = scores[:, ia] > scores[:, ib]
+                wins_added[:, ia] += outcome
+                wins_added[:, ib] += ~outcome
+                remaining_games_count[ia] += 1
+                remaining_games_count[ib] += 1
+            for i in participants:
+                wins_added[:, i] += scores[:, i] > median
+                remaining_games_count[i] += 1
+    elif n_games:
         probs = np.asarray(pair_probs, dtype=float)
         draws = rng.random(size=(n_trials, n_games))
         a_wins = draws < probs[None, :]
@@ -319,6 +364,17 @@ def simulate_playoff_odds(
     # above the static tiebreak's 0..n-1 range), static real tiebreak
     # settles ties. Lower key = better.
     sort_key = -(final_win_equiv * (n + 1)) + static_tiebreak[None, :]
+    if divisions is not None:
+        # Division winners (best sort_key inside each division) are seeded
+        # above every other team: shift them below all non-winners' keys.
+        division_ids = list(divisions)
+        winner_bonus = np.zeros((n_trials, n), dtype=float)
+        big = float((final_win_equiv.max() + 2) * (n + 1) + n)
+        for division in {d for d in division_ids if d}:
+            members = [i for i, d in enumerate(division_ids) if d == division]
+            best = np.argmin(sort_key[:, members], axis=1)
+            winner_bonus[np.arange(n_trials), np.asarray(members)[best]] = big
+        sort_key = sort_key - winner_bonus
     order = np.argsort(sort_key, axis=1)
     ranks = np.empty_like(order)
     trial_idx = np.arange(n_trials)[:, None]
@@ -377,6 +433,13 @@ PLAYOFF_ODDS_TTL_SECONDS = 10800
 
 def _playoff_odds_cache_bucket() -> int:
     return int(time.time() // PLAYOFF_ODDS_TTL_SECONDS)
+
+
+def _safe_int(value: object, default: int = 0) -> int:
+    try:
+        return int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return default
 
 
 def _roster_id_str(value: object) -> str:
@@ -521,8 +584,23 @@ def build_league_playoff_odds(
         completed_games.extend(_group_completed_week_games(sleeper.get_matchups(league_id, week)))
 
     remaining_games: list[tuple[str, str]] = []
+    remaining_weeks: list[list[tuple[str, str]]] = []
     for week in range(max(current_week, 1), regular_season_end + 1):
-        remaining_games.extend(_group_remaining_week_pairs(sleeper.get_matchups(league_id, week)))
+        week_pairs = _group_remaining_week_pairs(sleeper.get_matchups(league_id, week))
+        remaining_games.extend(week_pairs)
+        remaining_weeks.append(week_pairs)
+
+    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    league_median = bool(_safe_int(league_settings.get("league_average_match")))
+    divisions: list[int | None] | None = None
+    if _safe_int(league_settings.get("divisions")) > 0:
+        by_rid = {
+            _roster_id_str(row.get("roster_id")): row.get("division_id")
+            for _, row in frame.iterrows()
+        }
+        divisions = [_safe_int(by_rid.get(rid)) or None for rid in roster_ids]
+        if not any(divisions):
+            divisions = None
 
     simulation = simulate_playoff_odds(
         roster_ids=roster_ids,
@@ -538,6 +616,9 @@ def build_league_playoff_odds(
         playoff_teams=int(playoff_teams),
         n_trials=n_trials,
         rng=rng,
+        remaining_weeks=remaining_weeks,
+        league_median=league_median,
+        divisions=divisions,
     )
 
     teams: list[dict[str, Any]] = []
