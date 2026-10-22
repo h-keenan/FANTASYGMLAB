@@ -143,7 +143,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   return (
     <AnimatedCard style={styles.card}>
       <View style={styles.headerRow}>
-        <AppText style={styles.partner} numberOfLines={1}>
+        <AppText style={styles.partner} numberOfLines={2}>
           {partner}
         </AppText>
         <View style={[styles.outcomeBadge, { backgroundColor: `${outcomeTone}22` }]}>

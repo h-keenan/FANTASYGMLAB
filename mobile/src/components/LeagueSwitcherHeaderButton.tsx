@@ -70,7 +70,7 @@ export default function LeagueSwitcherHeaderButton({
   return (
     <>
       <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
-        <Ionicons name="swap-vertical" size={14} color={colors.textPrimary} />
+        <Ionicons name="swap-vertical" size={18} color={colors.textPrimary} />
       </TouchableOpacity>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
@@ -129,8 +129,8 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.cardBorder,
       borderRadius: radii.pill,
-      width: 28,
-      height: 28,
+      width: 40,
+      height: 40,
     },
     backdrop: {
       flex: 1,

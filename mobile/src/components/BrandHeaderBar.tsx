@@ -129,9 +129,10 @@ function createStyles(colors: ThemeColors) {
     gap: spacing.sm,
   },
   iconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    // 40pt tap target (phone layout audit: header controls).
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     alignItems: 'center',

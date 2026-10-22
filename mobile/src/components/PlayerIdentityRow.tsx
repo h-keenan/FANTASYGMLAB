@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 import AppText from './AppText';
@@ -114,6 +115,18 @@ export interface PlayerIdentityRowProps {
   /** One short line under `secondaryTrailingValue`, e.g. "med conf".
    * Ignored when `secondaryTrailingValue` is absent. */
   secondaryTrailingCaption?: string | null;
+  /** Color of `trailingValue`: default is primary text, 'accent' is the cyan
+   * value emphasis My Team uses, 'muted' is the quieter bench/IR variant. */
+  trailingTone?: 'accent' | 'muted';
+  /** Extra content stacked under the trailing block (e.g. a Keeper badge).
+   * Row layout only. */
+  trailingExtra?: React.ReactNode;
+  /** Show a trailing chevron (row layout) to signal the row opens a detail
+   * screen. */
+  chevron?: boolean;
+  /** Let a long name wrap onto a second line instead of degrading to
+   * "F. Lastname" (phone layout audit: crowded rows with trailing actions). */
+  wrapName?: boolean;
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. Ignored when
@@ -180,6 +193,10 @@ export default function PlayerIdentityRow({
   trailingCaption,
   secondaryTrailingValue,
   secondaryTrailingCaption,
+  trailingTone,
+  trailingExtra,
+  chevron = false,
+  wrapName = false,
   onPress,
   showDivider = false,
   style,
@@ -344,7 +361,13 @@ export default function PlayerIdentityRow({
            * exchange columns, 2026-09-27. This is the one shared row used
            * across My Team/Waivers/Trade Hub/Matchup/etc., so the fix here
            * covers every consumer at once. */}
-          <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} />
+          {wrapName ? (
+            <AppText style={styles.name} numberOfLines={2}>
+              {name ?? 'Unknown player'}
+            </AppText>
+          ) : (
+            <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} />
+          )}
         </View>
         <View style={styles.metaRow}>
           <PositionBadge position={position} />
@@ -380,17 +403,29 @@ export default function PlayerIdentityRow({
           </AppText>
         ) : null}
       </View>
-      {trailingValue ? (
+      {trailingValue || trailingExtra ? (
         <View style={styles.trailingBlock}>
-          <AppText style={styles.trailingValue} numberOfLines={1}>
-            {trailingValue}
-          </AppText>
-          {trailingCaption ? (
-            <AppText style={styles.trailingCaption} numberOfLines={1}>
-              {trailingCaption}
-            </AppText>
+          {trailingValue ? (
+            <>
+              <AppText
+                style={[
+                  styles.trailingValue,
+                  trailingTone === 'accent' && { color: colors.accent },
+                  trailingTone === 'muted' && { color: colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {trailingValue}
+              </AppText>
+              {trailingCaption ? (
+                <AppText style={styles.trailingCaption} numberOfLines={1}>
+                  {trailingCaption}
+                </AppText>
+              ) : null}
+            </>
           ) : null}
-          {secondaryTrailingValue ? (
+          {trailingExtra}
+          {trailingValue && secondaryTrailingValue ? (
             <View style={styles.secondaryTrailingRow}>
               <AppText style={styles.secondaryTrailingValue} numberOfLines={1}>
                 {secondaryTrailingValue}
@@ -404,6 +439,9 @@ export default function PlayerIdentityRow({
             </View>
           ) : null}
         </View>
+      ) : null}
+      {chevron ? (
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
       ) : null}
     </TouchableOpacity>
   );
@@ -456,6 +494,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 1,
     },
     injuryText: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.3 },
+    chevron: { marginLeft: spacing.sm },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     trailingCaption: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },

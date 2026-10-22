@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, type ViewStyle } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import PickPlate from '../components/PickPlate';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,8 +8,10 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
-import BrandedSpinner from '../components/BrandedSpinner';
+import Button from '../components/Button';
+import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import ErrorState from '../components/ErrorState';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -20,8 +22,7 @@ import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
 import NewBadge from '../components/NewBadge';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
@@ -45,7 +46,6 @@ import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
-import OverallRatingBadge from '../components/OverallRatingBadge';
 import ToneBadge from '../components/ToneBadge';
 import ValueStat from '../components/ValueStat';
 import { requestOrbSearch } from '../lib/orbEvents';
@@ -369,7 +369,25 @@ export default function DashboardScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    // Height-reserving skeleton in the loaded screen's order (stat strip,
+    // Today card, watchlist rows, activity cards) so nothing jumps on load.
+    return (
+      <View style={styles.root}>
+        <GridBackground />
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+          scrollEnabled={false}
+        >
+          <SkeletonCard rows={4} />
+          <SkeletonCard rows={2} />
+          <AnimatedCard style={styles.groupCard}>
+            <SkeletonRows count={4} />
+          </AnimatedCard>
+          <SkeletonCard rows={2} />
+        </ScrollView>
+      </View>
+    );
   }
 
   if (error) {
@@ -653,15 +671,15 @@ function DestinationButton({
   const routeName = DESTINATION_ROUTE[item.destination];
   if (!label || !routeName) return null;
   return (
-    <TouchableOpacity
+    <Button
+      variant="secondary"
       style={styles.destButton}
+      label={label.toUpperCase()}
       onPress={() => {
         if (!routeName) return;
         (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName });
       }}
-    >
-      <AppText style={styles.destButtonText}>{label.toUpperCase()}</AppText>
-    </TouchableOpacity>
+    />
   );
 }
 
@@ -672,35 +690,22 @@ export function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
     return (
       <View style={styles.assetRow}>
         <PickPlate round={asset.round ? Number(asset.round) : null} pickNo={asset.pick_no ? Number(asset.pick_no) : null} />
-        <AppText style={styles.assetName} numberOfLines={1}>
-          {asset.label || 'Draft pick'}
-        </AppText>
+        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
       </View>
     );
   }
   return (
-    <View style={styles.assetRow}>
-      <PlayerAvatar playerId={asset.player_id} size={32} tier={asset.tier} style={styles.assetAvatar} />
-      <View style={styles.assetTextGroup}>
-        <AppText style={styles.assetName} numberOfLines={1}>
-          {asset.name ?? 'Unknown'}
-        </AppText>
-        <View style={styles.assetMetaRow}>
-          <PositionBadge position={asset.position} />
-          <AppText style={styles.assetMeta} numberOfLines={1}>
-            {asset.team}
-          </AppText>
-          {asset.injury_status ? (
-            <ToneBadge
-              label={injuryShortCode(asset.injury_status)}
-              color={/^(out|ir|injured reserve|sus)/i.test(asset.injury_status) ? colors.danger : colors.premium}
-            />
-          ) : null}
-        </View>
-      </View>
-      <OverallRatingBadge rating={asset.overall_rating} />
-      <ValueStat value={asset.score != null ? Math.round(asset.score) : null} />
-    </View>
+    <PlayerIdentityRow
+      playerId={asset.player_id}
+      name={asset.name ?? 'Unknown'}
+      position={asset.position}
+      team={asset.team}
+      tier={asset.tier}
+      overallRating={asset.overall_rating}
+      injuryLabel={asset.injury_status ? injuryShortCode(asset.injury_status) : null}
+      injuryTone={asset.injury_status && /^(out|ir|injured reserve|sus)/i.test(asset.injury_status) ? 'risk' : 'watch'}
+      trailingExtra={<ValueStat value={asset.score != null ? Math.round(asset.score) : null} />}
+    />
   );
 }
 
@@ -851,9 +856,10 @@ function TopPriorityTradeCard({
   const routeName = DESTINATION_ROUTE[item.destination];
 
   return (
-    <AnimatedCard
+    <AccentCard
       glow
-      style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}
+      accent={colors.accent}
+      style={styles.card}
       onPress={
         routeName
           ? () => (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName })
@@ -919,7 +925,7 @@ function TopPriorityTradeCard({
 
       {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
-    </AnimatedCard>
+    </AccentCard>
   );
 }
 
@@ -967,11 +973,7 @@ function BriefingCard({
     ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
     : undefined;
   return (
-    <AnimatedCard
-      glow
-      style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}
-      onPress={openPlayer}
-    >
+    <AccentCard glow accent={meta.color} style={styles.card} onPress={openPlayer}>
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>
@@ -989,7 +991,7 @@ function BriefingCard({
       <AppText style={styles.cardHeadline}>{item.headline}</AppText>
       {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
-    </AnimatedCard>
+    </AccentCard>
   );
 }
 
@@ -1252,11 +1254,7 @@ function createStyles(colors: ThemeColors) {
   // only) — see the comment at the call site.
   snapshotTileThird: { minWidth: '30%', flexBasis: '30%' },
   snapshotTileHalf: { minWidth: '48%', flexBasis: '48%' },
-  card: {
-    borderLeftWidth: 4,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-  },
+  card: { gap: 0, marginBottom: spacing.sm },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
   cardIcon: { marginRight: spacing.xs },
   cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
@@ -1284,19 +1282,7 @@ function createStyles(colors: ThemeColors) {
     letterSpacing: 0.5,
   },
   assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  assetAvatar: {},
-  pickDisc: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.backgroundElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  assetTextGroup: { flex: 1 },
-  assetName: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  assetMeta: { fontSize: 11, color: colors.textSecondary },
-  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 1 },
+  assetName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1321,15 +1307,7 @@ function createStyles(colors: ThemeColors) {
   meterSegments: { flexDirection: 'row', gap: 3 },
   meterSegment: { width: 18, height: 5, borderRadius: radii.pill },
   meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-  destButton: {
-    marginTop: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-    borderRadius: radii.sm,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  destButtonText: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
+  destButton: { marginTop: spacing.md, borderColor: colors.accent, paddingVertical: spacing.sm },
   emptyCard: {
     alignItems: 'center',
     padding: spacing.xl,

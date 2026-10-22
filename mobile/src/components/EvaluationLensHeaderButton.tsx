@@ -90,6 +90,8 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
+    minHeight: 40,
+    justifyContent: 'center',
     maxWidth: 110,
   },
   buttonText: { fontSize: 12, fontWeight: '700', color: colors.premium, flexShrink: 1 },

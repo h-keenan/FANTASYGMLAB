@@ -19,7 +19,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
 import { TradeAssetRow } from './DashboardScreen';
 import {
@@ -198,9 +198,11 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         <GridBackground />
         <View style={styles.scrollContent}>
           <SkeletonBlock height={44} style={styles.skeleton} />
-          <SkeletonBlock height={170} style={styles.skeleton} />
-          <SkeletonBlock height={230} style={styles.skeleton} />
-          <SkeletonBlock height={300} style={styles.skeleton} />
+          <SkeletonCard rows={4} style={styles.skeleton} />
+          <SkeletonCard rows={6} style={styles.skeleton} />
+          <AnimatedCard style={styles.skeleton}>
+            <SkeletonRows count={4} />
+          </AnimatedCard>
         </View>
       </View>
     );
