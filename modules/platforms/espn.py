@@ -8,9 +8,56 @@ import pandas as pd
 from modules.player_identity import (
     canonicalize_player_id,
     ensure_identity_columns,
-    match_player_by_identity,
     normalize_player_id,
+    normalize_player_name,
+    resolve_identity_candidates,
 )
+
+# Sleeper's team defenses use the team abbreviation as the player id.
+SLEEPER_DEF_IDS = frozenset(
+    {
+        "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET",
+        "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA", "MIN", "NE",
+        "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS",
+    }
+)
+# ESPN team abbreviations that differ from Sleeper's.
+ESPN_TEAM_ALIASES = {"WSH": "WAS", "JAC": "JAX", "OAK": "LV", "SD": "LAC", "STL": "LAR", "LA": "LAR"}
+_DST_POSITIONS = {"D/ST", "DST", "DEF"}
+
+
+def normalize_espn_team(team: Any) -> str:
+    text = str(team or "").strip().upper()
+    return ESPN_TEAM_ALIASES.get(text, text)
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip().casefold()
+    if text in {"1", "1.0", "true", "yes"}:
+        return True
+    if text in {"0", "0.0", "false", "no"}:
+        return False
+    return None
+
+
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    return str(value).strip()
 
 
 class ESPNAdapterUnavailable(RuntimeError):
@@ -90,10 +137,27 @@ class ESPNPlatformAdapter:
         identity_map: dict[str, dict[str, str]] | None = None,
         df_players: pd.DataFrame | None = None,
         league_factory: Callable[..., Any] | None = None,
+        espn_crosswalk: dict[str, str] | None = None,
+        sleeper_players: dict[str, Any] | None = None,
     ):
         self.identity_map = identity_map
         self.df_players = ensure_identity_columns(df_players)
         self.league_factory = league_factory
+        # ESPN player id -> Sleeper (canonical) player id. A player table
+        # that carries an espn_id column contributes to it too.
+        self.espn_crosswalk = dict(espn_crosswalk or {})
+        if "espn_id" in self.df_players.columns:
+            for espn_id, canonical in zip(self.df_players["espn_id"], self.df_players["canonical_player_id"]):
+                espn_key, canonical_key = normalize_player_id(espn_id), normalize_player_id(canonical)
+                if espn_key and canonical_key:
+                    self.espn_crosswalk.setdefault(espn_key, canonical_key)
+        # Sleeper's full players/nfl dump: a superset of the valued player
+        # table, used to sanity check crosswalk hits and as the last name
+        # matching pool. A player missing from the valued table is still the
+        # same Sleeper player, exactly as he would be on a Sleeper roster.
+        self.sleeper_players = sleeper_players or {}
+        self._table_name_index: dict[str, list[dict[str, Any]]] | None = None
+        self._sleeper_name_index: dict[str, list[dict[str, Any]]] | None = None
         self.diagnostics = ESPNMappingDiagnostics()
         self.last_error = ""
 
@@ -129,11 +193,83 @@ class ESPNPlatformAdapter:
     def canonicalize_player_id(self, raw_id: Any) -> str | None:
         return canonicalize_player_id(self.platform, raw_id, self.identity_map)
 
+    def _table_candidates(self, name_key: str) -> list[dict[str, Any]]:
+        if self._table_name_index is None:
+            index: dict[str, list[dict[str, Any]]] = {}
+            df = self.df_players
+            if not df.empty and "name" in df.columns:
+                blank = pd.Series([None] * len(df), index=df.index)
+                for name, canonical, position, team, active in zip(
+                    df["name"],
+                    df["canonical_player_id"],
+                    df["position"] if "position" in df.columns else blank,
+                    df["team"] if "team" in df.columns else blank,
+                    df["active"] if "active" in df.columns else blank,
+                ):
+                    key = normalize_player_name(name)
+                    if key:
+                        index.setdefault(key, []).append(
+                            {
+                                "id": normalize_player_id(canonical),
+                                "position": _clean_text(position).upper(),
+                                "team": normalize_espn_team(_clean_text(team)),
+                                "active": _optional_bool(active),
+                            }
+                        )
+            self._table_name_index = index
+        return self._table_name_index.get(name_key, [])
+
+    def _sleeper_candidates(self, name_key: str) -> list[dict[str, Any]]:
+        if self._sleeper_name_index is None:
+            index: dict[str, list[dict[str, Any]]] = {}
+            for sleeper_id, record in self.sleeper_players.items():
+                if not isinstance(record, dict) or _clean_text(record.get("position")).upper() == "DEF":
+                    continue
+                full_name = record.get("full_name") or " ".join(
+                    _clean_text(part) for part in (record.get("first_name"), record.get("last_name")) if part
+                )
+                key = normalize_player_name(full_name)
+                if key:
+                    index.setdefault(key, []).append(
+                        {
+                            "id": normalize_player_id(record.get("player_id") or sleeper_id),
+                            "position": self._sleeper_positions(record),
+                            "team": _clean_text(record.get("team")).upper(),
+                            "active": _optional_bool(record.get("active")),
+                        }
+                    )
+            self._sleeper_name_index = index
+        return self._sleeper_name_index.get(name_key, [])
+
+    @staticmethod
+    def _sleeper_positions(record: dict[str, Any]) -> set[str]:
+        positions = {_clean_text(record.get("position")).upper()}
+        for item in record.get("fantasy_positions") or []:
+            positions.add(_clean_text(item).upper())
+        positions.discard("")
+        return positions
+
+    def _crosswalk_match(self, raw_id: Any, name: Any, position: str) -> str | None:
+        canonical = self.espn_crosswalk.get(normalize_player_id(raw_id))
+        if not canonical:
+            return None
+        record = self.sleeper_players.get(canonical)
+        if not isinstance(record, dict):
+            return canonical
+        # Guard against a bad crosswalk row: the Sleeper record must agree
+        # with ESPN on either position or name.
+        if position and position in self._sleeper_positions(record):
+            return canonical
+        name_key = normalize_player_name(name)
+        if name_key and name_key == normalize_player_name(record.get("full_name")):
+            return canonical
+        return None
+
     def _canonicalize_player(self, player: Any) -> tuple[str | None, str]:
         raw_id = _read(player, "playerId", "player_id", "id", default="")
         name = _read(player, "name", "fullName", "playerName", default="")
         position = _position_from_player(player)
-        team = _team_from_player(player)
+        team = normalize_espn_team(_team_from_player(player))
         self.diagnostics.total_players_seen += 1
 
         canonical_id = self.canonicalize_player_id(raw_id)
@@ -141,28 +277,45 @@ class ESPNPlatformAdapter:
             self.diagnostics.canonical_matched_count += 1
             return canonical_id, "espn_id"
 
-        if self.df_players.empty:
-            self._record_unmatched(raw_id, name, position, team, "No player table was provided for canonical matching.")
+        # ESPN team defenses (negative ids, "Seahawks D/ST") are Sleeper's
+        # DEF entries, whose player id is the team abbreviation.
+        if position in _DST_POSITIONS:
+            if team in SLEEPER_DEF_IDS:
+                self.diagnostics.canonical_matched_count += 1
+                return team, "dst_team"
+            self._record_unmatched(raw_id, name, position, team, "Unknown NFL team for this team defense.")
             return None, "unmatched"
 
-        canonical_id = match_player_by_identity(self.df_players, name, team=team, position=position)
+        # Exact ESPN id -> Sleeper id crosswalk first, names only after.
+        canonical_id = self._crosswalk_match(raw_id, name, position)
         if canonical_id:
             self.diagnostics.canonical_matched_count += 1
-            return canonical_id, "name_team_position"
+            return canonical_id, "espn_id_crosswalk"
 
-        canonical_id = match_player_by_identity(self.df_players, name, position=position)
-        if canonical_id:
-            self.diagnostics.canonical_matched_count += 1
-            return canonical_id, "name_position"
+        if self.df_players.empty and not self.sleeper_players:
+            self._record_unmatched(raw_id, name, position, team, "No player table was provided for canonical matching.")
+            return None, "unmatched"
+        name_key = normalize_player_name(name)
+        if not name_key:
+            self._record_unmatched(raw_id, name, position, team, "ESPN sent no player name.")
+            return None, "unmatched"
 
-        if name and not self.df_players.empty and "name" in self.df_players.columns:
-            by_name = self.df_players[
-                self.df_players["name"].fillna("").astype(str).str.casefold().eq(str(name).casefold())
-            ]
-            if len(set(by_name.get("canonical_player_id", pd.Series(dtype="object")).map(normalize_player_id))) > 1:
-                self._record_ambiguous(raw_id, name, position, team)
-                return None, "ambiguous"
+        # The valued player table first, then Sleeper's full dump. Same-name
+        # players are narrowed by position, then NFL team, then active status.
+        ambiguous = False
+        for method, candidates in (
+            ("name_position_team", self._table_candidates(name_key)),
+            ("sleeper_name_position_team", self._sleeper_candidates(name_key)),
+        ):
+            canonical_id, is_ambiguous = resolve_identity_candidates(candidates, position=position, team=team)
+            if canonical_id:
+                self.diagnostics.canonical_matched_count += 1
+                return canonical_id, method
+            ambiguous = ambiguous or is_ambiguous
 
+        if ambiguous:
+            self._record_ambiguous(raw_id, name, position, team)
+            return None, "ambiguous"
         self._record_unmatched(raw_id, name, position, team, "No unique high-confidence player match.")
         return None, "unmatched"
 
@@ -399,5 +552,13 @@ def get_espn_adapter(
     identity_map: dict[str, dict[str, str]] | None = None,
     df_players: pd.DataFrame | None = None,
     league_factory: Callable[..., Any] | None = None,
+    espn_crosswalk: dict[str, str] | None = None,
+    sleeper_players: dict[str, Any] | None = None,
 ) -> ESPNPlatformAdapter:
-    return ESPNPlatformAdapter(identity_map=identity_map, df_players=df_players, league_factory=league_factory)
+    return ESPNPlatformAdapter(
+        identity_map=identity_map,
+        df_players=df_players,
+        league_factory=league_factory,
+        espn_crosswalk=espn_crosswalk,
+        sleeper_players=sleeper_players,
+    )

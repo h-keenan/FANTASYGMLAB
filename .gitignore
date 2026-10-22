@@ -86,6 +86,10 @@ data/nfl_games.csv
 # above, never a committed fixture.
 data/nflverse_historical_contracts.csv.gz
 data/nflverse_historical_contracts_timestamp.json
+
+# Runtime-fetched DynastyProcess player id table (modules.espn_player_crosswalk),
+# the ESPN id -> Sleeper id crosswalk for ESPN import. Never a committed fixture.
+data/dynastyprocess_playerids.csv
 .streamlit/cache/
 
 # Local measurement dumps (scripts default to artifacts/measurements/)

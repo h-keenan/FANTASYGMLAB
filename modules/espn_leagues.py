@@ -342,12 +342,22 @@ def build_snapshot(
     league_key: str,
     df_players: pd.DataFrame | None,
     adapter_factory: Callable[..., Any] | None = None,
+    sleeper_players: dict[str, Any] | None = None,
+    espn_crosswalk: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Translate a loaded espn_api League into the payloads the API serves."""
+    """Translate a loaded espn_api League into the payloads the API serves.
+
+    ``espn_crosswalk`` (ESPN id -> Sleeper id) and ``sleeper_players``
+    (Sleeper's players/nfl dump) let the adapter map players by exact id and
+    match names against every Sleeper player, not only the valued table."""
 
     from modules.platforms.espn import get_espn_adapter
 
-    adapter = (adapter_factory or get_espn_adapter)(df_players=df_players)
+    adapter = (adapter_factory or get_espn_adapter)(
+        df_players=df_players,
+        sleeper_players=sleeper_players,
+        espn_crosswalk=espn_crosswalk,
+    )
     settings = getattr(raw_league, "settings", None)
     slot_counts = getattr(settings, "position_slot_counts", None) or {}
     roster_positions = _roster_positions(slot_counts if isinstance(slot_counts, dict) else {})
@@ -485,10 +495,26 @@ def _default_players_frame() -> pd.DataFrame:
     return rankings.load_players(PLAYERS_DB_PATH)
 
 
-# Indirection points for tests: the real factory hits ESPN's API and the real
-# frame reads data/players.db.
+def _default_sleeper_players() -> dict[str, Any]:
+    from modules import sleeper
+
+    players = sleeper.get_players()
+    return players if isinstance(players, dict) else {}
+
+
+def _default_espn_crosswalk(sleeper_players: dict[str, Any]) -> dict[str, str]:
+    from modules import espn_player_crosswalk
+
+    return espn_player_crosswalk.load_espn_crosswalk(sleeper_players)
+
+
+# Indirection points for tests: the real factory hits ESPN's API, the real
+# frame reads data/players.db, the Sleeper dump reads data/sleeper_players.json
+# and the crosswalk fetches DynastyProcess's public player id table.
 league_factory_provider: Callable[[], Callable[..., Any]] = _default_league_factory
 players_frame_provider: Callable[[], pd.DataFrame] = _default_players_frame
+sleeper_players_provider: Callable[[], dict[str, Any]] = _default_sleeper_players
+espn_crosswalk_provider: Callable[[dict[str, Any]], dict[str, str]] = _default_espn_crosswalk
 
 
 def _classify_load_error(exc: Exception) -> ESPNLeagueError:
@@ -518,7 +544,21 @@ def load_league_snapshot(league_key: str) -> dict[str, Any]:
         df_players = players_frame_provider()
     except Exception:
         df_players = pd.DataFrame()
-    snapshot = build_snapshot(raw_league, league_key=league_key, df_players=df_players)
+    try:
+        sleeper_players = sleeper_players_provider() or {}
+    except Exception:
+        sleeper_players = {}
+    try:
+        espn_crosswalk = espn_crosswalk_provider(sleeper_players) or {}
+    except Exception:
+        espn_crosswalk = {}
+    snapshot = build_snapshot(
+        raw_league,
+        league_key=league_key,
+        df_players=df_players,
+        sleeper_players=sleeper_players,
+        espn_crosswalk=espn_crosswalk,
+    )
     if not snapshot["rosters"]:
         raise ESPNLeagueError("no_teams", ERROR_MESSAGES["no_teams"])
     return snapshot

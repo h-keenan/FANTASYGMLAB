@@ -118,6 +118,108 @@ class TestESPNPlatformAdapter(unittest.TestCase):
         self.assertEqual(roster["players"], [])
         self.assertEqual(adapter.mapping_diagnostics()["ambiguous_count"], 1)
 
+    def test_apostrophe_spellings_match_either_way(self):
+        df = pd.DataFrame([{"player_id": "9226", "name": "DeVon Achane", "position": "RB", "team": "MIA"}])
+        adapter = ESPNPlatformAdapter(df_players=df)
+
+        roster = adapter.normalize_roster(FakeTeam(1, "One", [FakePlayer(4429160, "De'Von Achane", "RB", "MIA")]))
+
+        self.assertEqual(roster["players"], ["9226"])
+
+    def test_duplicate_name_is_disambiguated_by_position_team_and_active(self):
+        df = pd.DataFrame(
+            [
+                {"player_id": "4881", "name": "Lamar Jackson", "position": "QB", "team": "BAL", "active": 1},
+                {"player_id": "6994", "name": "Lamar Jackson", "position": "CB", "team": None, "active": 1},
+                {"player_id": "r1", "name": "Same Name", "position": "RB", "team": "DAL", "active": 1},
+                {"player_id": "r2", "name": "Same Name", "position": "RB", "team": None, "active": 0},
+            ]
+        )
+        adapter = ESPNPlatformAdapter(df_players=df)
+
+        roster = adapter.normalize_roster(
+            FakeTeam(
+                1,
+                "One",
+                [FakePlayer(1, "Lamar Jackson", "QB", "BAL"), FakePlayer(2, "Same Name", "RB", "KC")],
+            )
+        )
+
+        # Position separates the Lamars; active status (with a team) breaks
+        # the RB tie after the ESPN team matched neither.
+        self.assertEqual(roster["players"], ["4881", "r1"])
+        self.assertEqual(adapter.mapping_diagnostics()["ambiguous_count"], 0)
+
+    def test_espn_id_crosswalk_is_preferred_over_names(self):
+        df = pd.DataFrame(
+            [
+                {"player_id": "x1", "name": "Shared Name", "position": "WR", "team": "DAL"},
+                {"player_id": "x2", "name": "Shared Name", "position": "WR", "team": "DAL"},
+            ]
+        )
+        sleeper_players = {
+            "x2": {"full_name": "Shared Name", "position": "WR", "team": "DAL", "active": True},
+            "k9": {"full_name": "Kicker Guy", "position": "K", "team": "DAL", "active": True},
+        }
+        adapter = ESPNPlatformAdapter(
+            df_players=df,
+            sleeper_players=sleeper_players,
+            espn_crosswalk={"700": "x2", "701": "k9", "702": "9226"},
+        )
+
+        roster = adapter.normalize_roster(
+            FakeTeam(
+                1,
+                "One",
+                [
+                    FakePlayer(700, "Shared Name", "WR", "DAL"),
+                    # A crosswalk row that disagrees on both position and
+                    # name is ignored rather than trusted.
+                    FakePlayer(701, "Some Receiver", "WR", "DAL"),
+                    # Not in the valued table or the dump: the id still maps.
+                    FakePlayer(702, "De'Von Achane", "RB", "MIA"),
+                ],
+            )
+        )
+
+        self.assertEqual(roster["players"], ["x2", "9226"])
+        self.assertEqual(roster["unmatched_players"][0]["espn_id"], "701")
+
+    def test_sleeper_dump_matches_players_missing_from_the_valued_table(self):
+        sleeper_players = {
+            "2133": {"full_name": "Davante Adams", "position": "WR", "team": "LAR", "active": True},
+            "7543": {"full_name": "Travis Etienne Jr.", "position": "RB", "team": "NO", "active": True},
+        }
+        adapter = ESPNPlatformAdapter(df_players=player_table(), sleeper_players=sleeper_players)
+
+        roster = adapter.normalize_roster(
+            FakeTeam(
+                1,
+                "One",
+                [FakePlayer(16800, "Davante Adams", "WR", "LAR"), FakePlayer(4239996, "Travis Etienne Jr.", "RB", "NO")],
+            )
+        )
+
+        self.assertEqual(roster["players"], ["2133", "7543"])
+
+    def test_team_defenses_map_to_sleeper_def_ids(self):
+        adapter = ESPNPlatformAdapter(df_players=player_table())
+
+        roster = adapter.normalize_roster(
+            FakeTeam(
+                1,
+                "One",
+                [
+                    FakePlayer(-16026, "Seahawks D/ST", "D/ST", "SEA"),
+                    FakePlayer(-16028, "Commanders D/ST", "D/ST", "WSH"),
+                    FakePlayer(-16099, "Nowhere D/ST", "D/ST", "XYZ"),
+                ],
+            )
+        )
+
+        self.assertEqual(roster["players"], ["SEA", "WAS"])
+        self.assertEqual(roster["unmatched_players"][0]["espn_id"], "-16099")
+
     def test_get_draft_picks_normalizes_player_identity(self):
         adapter = ESPNPlatformAdapter(df_players=player_table(), league_factory=FakeLeague)
 
