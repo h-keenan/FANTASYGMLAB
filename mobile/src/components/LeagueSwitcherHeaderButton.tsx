@@ -4,7 +4,7 @@ import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { StackActions } from '@react-navigation/routers';
 
-import { navigationRef } from '../navigation/navigationRef';
+import { navigationRef, switchLeagueKeepingScreen } from '../navigation/navigationRef';
 import { setLastLeague } from '../lib/lastLeague';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
@@ -21,10 +21,16 @@ interface SavedLeagueRow {
  * coridian_: "the league switcher should be built into the header as well" —
  * switching leagues used to require opening GM Orb's full menu just to reach
  * its "Switch League" section at the bottom. Same saved_leagues query and
- * switchToLeague behavior as GmOrb (popTo LeagueDetail with the new league's
- * params), just surfaced as its own compact header control so it's reachable
- * without a detour through the orb. Hidden entirely for an account with one
- * or zero saved leagues — nothing to switch to.
+ * switchToLeague behavior as GmOrb (switchLeagueKeepingScreen: stay on this
+ * screen with the new league, like web's swapLeagueIdInPath), just surfaced
+ * as its own compact header control so it's reachable without a detour
+ * through the orb.
+ *
+ * The sheet ends with "Add a league" (tap-depth audit #4, web's switcher
+ * already has one), which opens Home's existing Add League sheet; a free
+ * account at its league cap gets that sheet's existing upgrade lock instead.
+ * Because of that row the button now shows from one saved league up (it
+ * used to need two); still hidden with zero.
  */
 export default function LeagueSwitcherHeaderButton({
   leagueId,
@@ -51,15 +57,13 @@ export default function LeagueSwitcherHeaderButton({
     };
   }, []);
 
-  if (savedLeagues.length < 2) return null;
+  if (savedLeagues.length < 1) return null;
 
   const switchToLeague = (row: SavedLeagueRow) => {
     setOpen(false);
     const target = { leagueId: row.league_id, leagueName: row.league_name || 'League' };
     void setLastLeague(target);
-    if (navigationRef.isReady()) {
-      navigationRef.dispatch(StackActions.popTo('LeagueDetail', target));
-    }
+    switchLeagueKeepingScreen(target, leagueId);
   };
 
   return (
@@ -94,6 +98,20 @@ export default function LeagueSwitcherHeaderButton({
                 );
               })}
             </ScrollView>
+            <TouchableOpacity
+              style={styles.addRow}
+              onPress={() => {
+                setOpen(false);
+                if (navigationRef.isReady()) {
+                  navigationRef.dispatch(StackActions.popTo('Home', { openAddLeague: true }));
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add a league"
+            >
+              <Ionicons name="add" size={18} color={colors.accentOnTint} style={styles.optionIcon} />
+              <AppText style={[styles.optionText, styles.optionTextActive]}>Add a league</AppText>
+            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -137,6 +155,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     optionIcon: { marginRight: spacing.sm },
+    addRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginTop: spacing.xs },
     optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
     // accentOnTint: plain accent measures only 4.02:1 against this sheet's
     // backgroundElevated surface on light mode, under AA (color-system

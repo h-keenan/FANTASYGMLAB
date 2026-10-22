@@ -56,7 +56,7 @@ interface SavedLeague {
   is_default: boolean;
 }
 
-export default function HomeScreen({ navigation }: Props) {
+export default function HomeScreen({ navigation, route }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -326,7 +326,25 @@ export default function HomeScreen({ navigation }: Props) {
   // approved) — Portfolio's own row-tap (PortfolioScreen's openLeague)
   // still reaches any one league's Dashboard directly, just one tap
   // further than the old single-league auto-jump below.
+  // Header league switcher's "Add a league" row (tap-depth audit #4): open
+  // the Add League sheet once leagues have loaded. At the free cap the sheet
+  // stays closed and Home's existing "Add another league" upgrade lock (in
+  // place of the Add league button, -> Paywall) is what they land on, not a
+  // form the server would refuse. Also stops the auto-jump below from
+  // bouncing the user straight back into a league.
+  const openAddLeague = route.params?.openAddLeague === true;
   useEffect(() => {
+    if (!openAddLeague || !leagues) return;
+    autoNavigated.current = true;
+    navigation.setParams({ openAddLeague: undefined });
+    if (atLeagueCap) return;
+    setAddQuery(me?.sleeper_username ?? '');
+    setAddOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot per param
+  }, [openAddLeague, leagues]);
+
+  useEffect(() => {
+    if (openAddLeague) autoNavigated.current = true;
     if (autoNavigated.current || !leagues || leagues.length === 0) return;
     autoNavigated.current = true;
     (async () => {

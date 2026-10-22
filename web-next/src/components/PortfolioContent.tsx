@@ -367,6 +367,19 @@ function PortfolioLeagueSkeleton({ league }: { league: PortfolioSavedLeague }) {
   );
 }
 
+/** "Add a league" (tap-depth audit #4): Portfolio is the multi-league
+ * landing page and has no header league switcher, so this is the same
+ * /connect-league route the switcher's "+ Add another league" row uses.
+ * Only on the Premium views. A free account sees the upsell card instead,
+ * which is already its upgrade path past the one-league cap. */
+function AddLeagueLink() {
+  return (
+    <Link href="/connect-league" className="self-start text-sm font-bold mt-1" style={{ color: "var(--color-accent)" }}>
+      + Add a league
+    </Link>
+  );
+}
+
 export function PortfolioContent({
   data,
   order,
@@ -416,6 +429,7 @@ export function PortfolioContent({
             Portfolio
           </span>
           <h1 style={{ font: "var(--font-page-title)" }}>No saved leagues yet</h1>
+          <AddLeagueLink />
         </header>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Save a league to see your standing, record, and top need or opportunity across every league here.
@@ -434,6 +448,7 @@ export function PortfolioContent({
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Your standing, record, and top need or opportunity across every saved league.
         </p>
+        <AddLeagueLink />
       </header>
 
       {draftingLeagues.length > 0 ? <DraftingLeaguesNote leagues={draftingLeagues} /> : null}
