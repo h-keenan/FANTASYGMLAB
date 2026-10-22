@@ -220,16 +220,22 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     if starter_positions:
         settings["starter_count"] = len(starter_positions)
         settings["_sources"]["starter_count"] = "Sleeper"
+    wrrb_flex_slots = {"W/R", "WR/RB", "RB/WR", "WRRB_FLEX"}
+    # IDP_FLEX is a defensive slot; WRRB_FLEX is counted once, below, as a
+    # WR/RB flex. Both contain "FLEX", so the substring test used to count
+    # them as an extra RB/WR/TE flex too (a WRRB_FLEX league got 9 lineup
+    # slots for 8 starters; an IDP league got an offensive flex it lacks).
     regular_flex_positions = [
         pos
         for pos in starter_positions
-        if pos not in {"SUPER_FLEX", "OP"}
+        if pos not in {"SUPER_FLEX", "OP", "IDP_FLEX"}
+        and pos not in wrrb_flex_slots
         and ("FLEX" in pos or pos in {"W/R/T", "RB/WR/TE", "WR/RB/TE"})
     ]
     wrrb_flex_positions = [
         pos
         for pos in starter_positions
-        if pos in {"W/R", "WR/RB", "RB/WR", "WRRB_FLEX"}
+        if pos in wrrb_flex_slots
     ]
     if starter_positions:
         settings["regular_flex_count"] = len(regular_flex_positions)
