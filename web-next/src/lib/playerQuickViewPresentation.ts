@@ -101,3 +101,36 @@ export function tierOpportunityMismatchCaption(tier: string | null | undefined, 
   if (!LOW_PLAYER_TIERS.has(tier) || !HIGH_OPPORTUNITY_LABELS.has(opportunityLabel)) return null;
   return `${tier} reflects value over the full season — this role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
 }
+
+/** Color family for the PQV usage-trend tile, by the trend's real
+ * direction and severity. Rising usage is positive (green). A decline is
+ * danger (red) when it is a confirmed read: high confidence, or a drop of
+ * 20% or more. That is the same "declining role reads red" rule PR #1308
+ * applied to mobile's Player Quick View. A smaller, moderate-confidence
+ * decline is neutral, never green. */
+export function usageTrendTone(trend: {
+  direction: "up" | "down";
+  trend_pct: number;
+  confidence_label: string;
+}): "positive" | "danger" | "neutral" {
+  if (trend.direction === "up") return "positive";
+  const highConfidence = trend.confidence_label.trim().toLowerCase().startsWith("high");
+  if (highConfidence || Math.abs(trend.trend_pct) >= 20) return "danger";
+  return "neutral";
+}
+
+/** Lit bars (of 3) for the usage tile's confidence glyph: the backend only
+ * narrates "high" or "moderate" reads (modules.rankings
+ * .recency_trend_display), so 3 or 2; anything else shows 1. */
+export function usageConfidenceBars(confidenceLabel: string): 1 | 2 | 3 {
+  const normalized = confidenceLabel.trim().toLowerCase();
+  if (normalized.startsWith("high")) return 3;
+  if (normalized.startsWith("moderate")) return 2;
+  return 1;
+}
+
+/** "High confidence" from the backend's "high confidence". */
+export function sentenceCase(text: string): string {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() + trimmed.slice(1) : "";
+}
