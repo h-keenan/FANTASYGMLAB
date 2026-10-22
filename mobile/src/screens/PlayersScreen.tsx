@@ -20,7 +20,14 @@ import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
-import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
+import { api, type LeagueIdpValuesResponse, type RankedPlayer, type ValuationLens } from '../lib/api';
+import {
+  IDP_CONFIDENCE_LABEL,
+  idpMethodNote,
+  idpRowsAsRankedPlayers,
+  isIdpPositionFilter,
+  playersPositionOptions,
+} from '../lib/idpPresentation';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -134,7 +141,10 @@ function PlayerRankRow({
   onPress,
   onAddToTrade,
   onFindTrades,
+  idpConfidence,
 }: {
+  /** Set only for IDP rows: shows the projection basis instead of OVR. */
+  idpConfidence?: string;
   player: RankedPlayer;
   isFirst: boolean;
   isLast: boolean;
@@ -184,7 +194,13 @@ function PlayerRankRow({
                 </AppText>
               </View>
             ) : null}
-            <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+            {idpConfidence ? (
+              <View style={styles.positionRankPill}>
+                <AppText style={styles.positionRankText}>{IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence}</AppText>
+              </View>
+            ) : (
+              <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+            )}
             {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
           </View>
         </TouchableOpacity>
@@ -230,7 +246,13 @@ function PlayerRankRow({
               </AppText>
             </View>
           ) : null}
-          <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+          {idpConfidence ? (
+            <View style={styles.positionRankPill}>
+              <AppText style={styles.positionRankText}>{IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence}</AppText>
+            </View>
+          ) : (
+            <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+          )}
           {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
         </View>
       </TouchableOpacity>
@@ -252,6 +274,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('ALL');
   const [search, setSearch] = useState('');
   const [players, setPlayers] = useState<RankedPlayer[] | null>(null);
+  const [idp, setIdp] = useState<LeagueIdpValuesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { viewMode, setViewMode } = usePlayerListViewMode('players');
@@ -278,6 +301,9 @@ export default function PlayersScreen({ route, navigation }: Props) {
       try {
         const result = await api.getLeagueRankings(leagueId, { lens, limit: 300 });
         if (!cancelled) setPlayers(result.players);
+        // Optional: non-IDP leagues get `idp: false`; a failure leaves offense untouched.
+        const idpResult = await api.getLeagueIdpValues(leagueId).catch(() => null);
+        if (!cancelled) setIdp(idpResult);
       } catch (err) {
         if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load players.'));
       } finally {
@@ -289,16 +315,28 @@ export default function PlayersScreen({ route, navigation }: Props) {
     };
   }, [leagueId, lens]);
 
+  // Defenders only form the pool under a DL/LB/DB chip, so offensive ranks
+  // never mix with the model-value scale.
+  const idpPlayers = useMemo(() => idpRowsAsRankedPlayers(idp), [idp]);
+  const idpConfidenceById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of idp?.players ?? []) map.set(row.player_id, row.confidence);
+    return map;
+  }, [idp]);
+  const positionOptions = useMemo(() => playersPositionOptions(POSITIONS, idp), [idp]);
+  const idpSelected = idpPlayers.length > 0 && isIdpPositionFilter(position);
+
   const filtered = useMemo(() => {
-    if (!players) return [];
+    const pool = idpSelected ? idpPlayers : players;
+    if (!pool) return [];
     const query = search.trim().toLowerCase();
-    return players
+    return pool
       .filter((p) => position === 'ALL' || p.position === position)
       .filter((p) => matchesAge(p.age, ageFilter))
       .filter((p) => matchesStatus(p.status, statusFilter))
       .filter((p) => matchesAvailability(p.injury_status, availabilityFilter))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
-  }, [players, position, ageFilter, statusFilter, availabilityFilter, search]);
+  }, [players, idpPlayers, idpSelected, position, ageFilter, statusFilter, availabilityFilter, search]);
 
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
@@ -318,7 +356,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
           placeholderTextColor={colors.textTertiary}
         />
         <View style={styles.filterRow}>
-          <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+          <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
           <FilterDropdownButton label="Age" options={AGE_FILTERS} value={ageFilter} onChange={setAgeFilter} />
           <FilterDropdownButton label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
           <FilterDropdownButton
@@ -349,9 +387,13 @@ export default function PlayersScreen({ route, navigation }: Props) {
           maxToRenderPerBatch={16}
           windowSize={9}
           renderItem={({ item, index }) => {
-            const shortcuts = tradeShortcutsFor(item.player_id, ownership);
+            // Trade shortcuts are offense-only until the trade engines value defenders.
+            const shortcuts = idpSelected
+              ? { canAddToTrade: false, canFindTrades: false }
+              : tradeShortcutsFor(item.player_id, ownership);
             return (
               <PlayerRankRow
+                idpConfidence={idpSelected ? idpConfidenceById.get(item.player_id) ?? 'low' : undefined}
                 player={item}
                 isFirst={index === 0}
                 isLast={index === filtered.length - 1}
@@ -370,7 +412,14 @@ export default function PlayersScreen({ route, navigation }: Props) {
               />
             );
           }}
-          ListFooterComponent={filtered.length > 0 ? <ValuesCredit /> : null}
+          ListFooterComponent={
+            filtered.length > 0 ? (
+              <>
+                {idpSelected ? <AppText style={styles.idpNote}>{idpMethodNote(idp)}</AppText> : null}
+                <ValuesCredit />
+              </>
+            ) : null
+          }
           ListEmptyComponent={
             <EmptyState
               icon="search-outline"
@@ -481,6 +530,7 @@ function createStyles(colors: ThemeColors) {
   },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: spacing.xs },
   rowActionButton: { padding: spacing.xs },
+  idpNote: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.md },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }

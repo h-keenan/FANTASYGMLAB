@@ -1534,6 +1534,38 @@ export interface LeagueRankingsResponse {
   players: RankedPlayer[];
 }
 
+/** One defender's IDP model value (GET .../idp/values). `value` is on the
+ * same 0-10,000 scale as offensive values but is a model estimate, not a
+ * market price. */
+export interface IdpValueRow {
+  player_id: string;
+  name: string;
+  position: string;
+  family: "DL" | "LB" | "DB";
+  team: string | null;
+  age: number | null;
+  injury_status: string | null;
+  value: number;
+  ppg: number;
+  projected_points: number;
+  points_over_replacement: number;
+  confidence: "high" | "medium" | "low";
+  idp_rank: number;
+}
+
+/** GET .../leagues/{id}/idp/values - `idp: false` (and no rows) for any
+ * league that does not start defenders. */
+export interface LeagueIdpValuesResponse {
+  ok: boolean;
+  idp: boolean;
+  players: IdpValueRow[];
+  /** Defenders projected but not above this league's replacement level. */
+  below_replacement_ids?: string[];
+  unscored_keys?: string[];
+  reason?: string;
+  method?: string;
+}
+
 /** A saved GM Targets watchlist row (GET/POST/DELETE/PATCH .../gm-targets) —
  * preference data only (identity + the one user-set `untouchable` flag);
  * name/position/team/rank are joined client-side from LeagueRankingsResponse,
@@ -3036,6 +3068,8 @@ export const api = {
   // League-adjusted player rankings — GM Targets (Revision 11) joins this
   // against getGmTargets' bare preference rows for name/position/team/rank/
   // injury, the same client-side join mobile's GmTargetsScreen.tsx does.
+  getLeagueIdpValues: (leagueId: string) =>
+    authorizedRequest<LeagueIdpValuesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/idp/values`),
   getLeagueRankings: (leagueId: string, lens: string = "Dynasty", limit: number = 300) =>
     authorizedRequest<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?lens=${encodeURIComponent(lens)}&limit=${limit}`,

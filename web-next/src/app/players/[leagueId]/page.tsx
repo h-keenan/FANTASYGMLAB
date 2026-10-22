@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
-import { api, type DraftPickAsset, type LeagueRankingsResponse } from "@/lib/api";
+import { api, type DraftPickAsset, type LeagueIdpValuesResponse, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayersContent } from "@/components/PlayersContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -14,6 +14,7 @@ interface LoadedData {
   rankings: LeagueRankingsResponse;
   picks: DraftPickAsset[];
   rosters: Array<Record<string, unknown>>;
+  idp: LeagueIdpValuesResponse | null;
 }
 
 export default function PlayersPage() {
@@ -45,10 +46,13 @@ export default function PlayersPage() {
       // page.tsx already uses for these same two endpoints.
       api.getLeagueDraftPicks(leagueId, lens).catch(() => ({ ok: true as const, picks: [], reason: "unavailable" })),
       api.getLeagueRosters(leagueId).catch(() => ({ ok: true as const, rosters: [] })),
+      // IDP values are optional: non-IDP leagues get `idp: false`, and any
+      // failure just leaves the offense board exactly as it was.
+      api.getLeagueIdpValues(leagueId).catch(() => null),
     ])
-      .then(([rankings, picksResult, rostersResult]) => {
+      .then(([rankings, picksResult, rostersResult, idp]) => {
         if (!cancelled) {
-          setData({ rankings, picks: picksResult.picks, rosters: rostersResult.rosters });
+          setData({ rankings, picks: picksResult.picks, rosters: rostersResult.rosters, idp });
         }
       })
       .catch((err) => {
@@ -79,6 +83,7 @@ export default function PlayersPage() {
       data={data.rankings}
       picks={data.picks}
       rosters={data.rosters}
+      idp={data.idp}
     />
   );
 }
