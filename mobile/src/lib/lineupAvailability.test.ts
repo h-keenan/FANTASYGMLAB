@@ -10,6 +10,14 @@ test('bye-week player gets a Bye pill; injury label wins when present', () => {
   assert.equal(isByeOnlyLabel({ injury_label: 'Out', on_bye: true }), false);
 });
 
+test('a started game on the bench reads as Locked in the calm tone', () => {
+  const locked = { injury_label: '', game_locked: true, start_ineligible_reason: 'Game started' };
+  assert.equal(lineupStatusLabel(locked), 'Locked');
+  assert.equal(isByeOnlyLabel(locked), true);
+  assert.equal(lineupStatusLabel({ ...locked, injury_label: 'Out' }), 'Out');
+  assert.equal(lineupStatusLabel({ injury_label: '', game_locked: true }), '');
+});
+
 test('older API responses without weekly fields render unchanged', () => {
   assert.equal(lineupStatusLabel({ injury_label: '' }), '');
   assert.equal(lineupStatusLabel({ injury_label: 'Questionable' }), 'Questionable');

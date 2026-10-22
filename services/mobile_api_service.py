@@ -9922,6 +9922,9 @@ def _project_lineup_row(
             # Null everywhere when there's no current week (offseason).
             "start_ineligible_reason": _clean_json_value(row.get("start_ineligible_reason")),
             "on_bye": bool(row.get("on_bye") or False),
+            # True when this player's own NFL game has kicked off, so Sleeper
+            # has locked him (a started player on the bench cannot be started).
+            "game_locked": bool(row.get("game_locked") or False),
             # The points figure this week's lineup was ranked on, and where
             # it came from: "projection" (this week's real projection),
             # "value_estimate" (no projection — matched to the projected
@@ -10191,12 +10194,18 @@ def _suggested_lineup_split(
     projections_by_id: dict[str, dict[str, Any]] = {}
     if projection_context is not None:
         projections_by_id, weekly_points, bye_ids = _weekly_lineup_inputs(roster_df, projection_context)
+        current_starters = {str(pid) for pid in (roster.get("starters") or []) if pid and str(pid) != "0"}
+        # Without a real lineup on record we cannot tell who is locked in vs
+        # locked out, so the kickoff lock only applies to a roster that has one.
+        started_ids = _started_game_player_ids(roster_df, projection_context) if current_starters else set()
         lineup_df = suggest_optimal_lineup(
             roster_df,
             settings,
             score_field=score_field,
             weekly_points=weekly_points,
             bye_player_ids=bye_ids,
+            started_player_ids=started_ids,
+            locked_starter_ids=started_ids & current_starters,
         )
     else:
         lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
@@ -10294,6 +10303,29 @@ def _weekly_lineup_inputs(
             # fall back to the roster frame's team.
             bye_ids.add(player_id)
     return projections, weekly_points, bye_ids
+
+
+def _started_game_player_ids(roster_df: pd.DataFrame, projection_context: "_ProjectionContext") -> set[str]:
+    """Players on this roster whose own NFL game has kicked off this week
+    (Sleeper locks them in or out of the lineup from that moment). Unknown
+    kickoff data means "not started": the lock never invents itself."""
+
+    started: set[str] = set()
+    if roster_df.empty or "player_id" not in roster_df.columns or projection_context.games is None:
+        return started
+    teams = roster_df["team"].tolist() if "team" in roster_df.columns else [None] * len(roster_df)
+    started_by_team: dict[str, bool] = {}
+    for player_id, team in zip(roster_df["player_id"].astype(str).tolist(), teams):
+        team_code = str(team or "").strip().upper() if isinstance(team, str) else ""
+        if not player_id or not team_code:
+            continue
+        if team_code not in started_by_team:
+            started_by_team[team_code] = bool(
+                _player_game_state(team_code, projection_context).get("game_started")
+            )
+        if started_by_team[team_code]:
+            started.add(player_id)
+    return started
 
 
 _PROJECTION_STATUSES_WITH_RESOLVED_GAME = frozenset({"insufficient_player_data", "no_opponent"})

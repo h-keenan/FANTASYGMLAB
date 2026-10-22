@@ -453,6 +453,7 @@ export interface LineupPlayer {
    * from older API builds. See lib/lineupAvailability.ts. */
   start_ineligible_reason?: string | null;
   on_bye?: boolean;
+  game_locked?: boolean;
   /** The points figure this week's lineup ranked him on, and its source. */
   lineup_points?: number | null;
   lineup_points_basis?: 'projection' | 'value_estimate' | 'value' | null;
