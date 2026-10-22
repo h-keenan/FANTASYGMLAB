@@ -1811,6 +1811,33 @@ export interface PortfolioResponse {
   upsell: PortfolioUpsell | null;
 }
 
+/** One saved league as listed by GET /v1/portfolio/leagues — just enough to
+ * hold its place with a skeleton row and request that league's own row. */
+export interface PortfolioSavedLeague {
+  league_id: string;
+  league_name: string;
+}
+
+/** GET /v1/portfolio/leagues — Portfolio's cheap index (Premium gate + the
+ * caller's saved leagues, no per-league valuation work). `leagues`/
+ * `failed_leagues` are always empty here; each league's row comes from
+ * getPortfolioLeague. */
+export interface PortfolioIndexResponse extends PortfolioResponse {
+  saved_leagues: PortfolioSavedLeague[];
+  reason?: string;
+}
+
+/** GET /v1/portfolio/leagues/{leagueId} — one saved league's Portfolio row.
+ * Exactly one of `league` / `failed_league` is set for a Premium caller. */
+export interface PortfolioLeagueResponse {
+  ok: true;
+  is_premium: boolean;
+  lens: string;
+  league: PortfolioLeague | null;
+  failed_league: PortfolioFailedLeague | null;
+  upsell: PortfolioUpsell | null;
+}
+
 export interface PresentationAsset {
   asset_type: 'player' | 'pick';
   label?: string;
@@ -2077,6 +2104,12 @@ export const api = {
     }),
   /** Cross-league Portfolio — one row per saved league (Premium). */
   getPortfolio: () => authorizedFetch<PortfolioResponse>('/v1/portfolio'),
+  /** Progressive Portfolio: the cheap index first, then one request per
+   * saved league (fired concurrently) so each row paints as soon as its own
+   * summary is ready instead of after the slowest league's. */
+  getPortfolioIndex: () => authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues'),
+  getPortfolioLeague: (leagueId: string) =>
+    authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`),
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).
    * Server-cached per league for a few minutes (cache_ttl_seconds). */
   getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),

@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { api, type BriefingItem, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioResponse } from "@/lib/api";
+import {
+  api,
+  type BriefingItem,
+  type PortfolioFailedLeague,
+  type PortfolioLeague,
+  type PortfolioResponse,
+  type PortfolioSavedLeague,
+} from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
 import { BriefingItemPlayers, briefingItemIsSinglePlayer } from "@/components/BriefingItemPlayers";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -312,7 +319,48 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
   );
 }
 
-export function PortfolioContent({ data }: { data: PortfolioResponse }) {
+/**
+ * Placeholder for a saved league whose row is still loading (progressive
+ * Portfolio — see lib/portfolioProgress.ts). Shaped like
+ * PortfolioLeagueCard (avatar + title/metadata, a few signal lines, the
+ * Dashboard link) so swapping the real card in doesn't visibly jump the
+ * page. Reuses the shared .pqv-skeleton-line shimmer rather than a new
+ * loading treatment. The league name is real (it comes from the index), so
+ * it's shown instead of a bar.
+ */
+function PortfolioLeagueSkeleton({ league }: { league: PortfolioSavedLeague }) {
+  return (
+    <article className="glass-surface flex flex-col p-4" aria-busy="true">
+      <span className="sr-only">Loading {league.league_name}…</span>
+      <div className="flex items-start gap-2" aria-hidden="true">
+        <span className="pqv-skeleton-line" style={{ width: 32, height: 32, borderRadius: "var(--radius-pill)" }} />
+        <div className="flex flex-col gap-2 min-w-0 flex-1">
+          <h3 style={{ font: "var(--font-card-title)", color: "var(--color-text-muted)" }}>{league.league_name}</h3>
+          <span className="pqv-skeleton-line" style={{ width: "35%", height: 12 }} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3 mt-4" aria-hidden="true">
+        <span className="pqv-skeleton-line" style={{ width: "85%", height: 14 }} />
+        <span className="pqv-skeleton-line" style={{ width: "70%", height: 12 }} />
+        <span className="pqv-skeleton-line" style={{ width: "80%", height: 14 }} />
+        <span className="pqv-skeleton-line" style={{ width: "60%", height: 12 }} />
+      </div>
+      <span className="pqv-skeleton-line mt-4" aria-hidden="true" style={{ width: "45%", height: 14 }} />
+    </article>
+  );
+}
+
+export function PortfolioContent({
+  data,
+  order,
+  pending = [],
+}: {
+  data: PortfolioResponse;
+  /** Saved-league order (progressive loading); defaults to data.leagues' own order. */
+  order?: string[];
+  /** Saved leagues whose row hasn't arrived yet — rendered as skeleton cards in place. */
+  pending?: PortfolioSavedLeague[];
+}) {
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
   const allFailedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
@@ -340,7 +388,7 @@ export function PortfolioContent({ data }: { data: PortfolioResponse }) {
     );
   }
 
-  if (data.leagues.length === 0 && allFailedLeagues.length === 0) {
+  if (data.leagues.length === 0 && allFailedLeagues.length === 0 && pending.length === 0) {
     return (
       <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
         <header className="flex flex-col gap-1">
@@ -374,17 +422,50 @@ export function PortfolioContent({ data }: { data: PortfolioResponse }) {
         <FailedLeaguesNote leagues={failedLeagues} busyLeagueId={busyLeagueId} onRemove={removeFailedLeague} />
       ) : null}
 
-      {data.leagues.length === 0 && failedLeagues.length > 0 ? (
+      {data.leagues.length === 0 && pending.length === 0 && failedLeagues.length > 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           None of your saved leagues could be loaded right now. Try again in a moment.
         </p>
-      ) : data.leagues.length > 0 ? (
+      ) : data.leagues.length > 0 || pending.length > 0 ? (
         <div className="flex flex-col gap-4">
-          {data.leagues.map((league) => (
-            <PortfolioLeagueCard key={league.league_id} league={league} />
-          ))}
+          {cardSlots(data.leagues, pending, order).map((slot) =>
+            slot.kind === "league" ? (
+              <PortfolioLeagueCard key={slot.league.league_id} league={slot.league} />
+            ) : (
+              <PortfolioLeagueSkeleton key={slot.league.league_id} league={slot.league} />
+            ),
+          )}
         </div>
       ) : null}
     </main>
   );
+}
+
+type CardSlot = { kind: "league"; league: PortfolioLeague } | { kind: "pending"; league: PortfolioSavedLeague };
+
+/** Loaded cards and still-loading skeletons, in saved-league order (so a
+ * card never jumps position when an earlier league finishes later). */
+function cardSlots(leagues: PortfolioLeague[], pending: PortfolioSavedLeague[], order?: string[]): CardSlot[] {
+  if (!order) {
+    return [
+      ...leagues.map((league): CardSlot => ({ kind: "league", league })),
+      ...pending.map((league): CardSlot => ({ kind: "pending", league })),
+    ];
+  }
+  const loaded = new Map(leagues.map((league) => [league.league_id, league]));
+  const waiting = new Map(pending.map((league) => [league.league_id, league]));
+  const slots: CardSlot[] = [];
+  for (const leagueId of order) {
+    const league = loaded.get(leagueId);
+    if (league) {
+      slots.push({ kind: "league", league });
+      loaded.delete(leagueId);
+      continue;
+    }
+    const placeholder = waiting.get(leagueId);
+    if (placeholder) slots.push({ kind: "pending", league: placeholder });
+  }
+  // Anything not named in `order` still renders rather than vanishing.
+  for (const league of loaded.values()) slots.push({ kind: "league", league });
+  return slots;
 }

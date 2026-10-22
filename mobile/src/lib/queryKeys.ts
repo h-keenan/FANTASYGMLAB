@@ -57,4 +57,9 @@ export const queryKeys = {
   // (the lens is server-defaulted), so this is a single flat key per user,
   // same shape as any other user-scoped-but-otherwise-global query here.
   portfolio: () => [...userScopeKey(), 'portfolio'] as const,
+  // Progressive Portfolio (PortfolioScreen): the saved-leagues index and
+  // each league's own row, cached independently so a revisit paints every
+  // row instantly and only refetches what's stale.
+  portfolioIndex: () => [...userScopeKey(), 'portfolio', 'index'] as const,
+  portfolioLeague: (leagueId: string) => [...userScopeKey(), 'portfolio', 'league', leagueId] as const,
 };

@@ -2524,6 +2524,10 @@ _SAVED_LEAGUES_TTL_SECONDS = 15
 # saved_leagues row that points at it, so the first user to trigger the
 # check resolves it for every leaguemate, not just themselves.
 _LEAGUE_ROLLOVER_CACHE_TTL_SECONDS = 24 * 60 * 60
+# Bounds _apply_league_rollover_resolution's per-row concurrency (each
+# worker makes at most 3 Sleeper GETs on a cache miss); same ceiling as
+# Portfolio's own fan-out.
+_LEAGUE_ROLLOVER_MAX_WORKERS = 8
 
 
 def _resolve_league_rollover_cached(league_id: str, sleeper_username: str) -> str:
@@ -2556,18 +2560,47 @@ def _apply_league_rollover_resolution(
     effort, a failed migration never blocks using the correct id for THIS
     response -- so the next fetch, and any OTHER leaguemate's own
     leaderboard/roster query, see the fixed row too, without each member
-    having to independently trigger a resolution."""
+    having to independently trigger a resolution.
+
+    Each row's lookup runs concurrently (Portfolio perf audit,
+    2026-10-21): a cold `_resolve_league_rollover_cached` miss costs 3
+    sequential Sleeper round trips (user, this season's leagues, last
+    season's leagues), and this used to pay them row after row -- a
+    measured ~1.5s for a real 5-league account, all of it ahead of
+    Portfolio's own per-league fan-out. Rows are independent (one Redis
+    key per league_id), so they resolve in parallel and the results are
+    re-joined in the original row order."""
+
+    dict_rows = [row for row in rows if isinstance(row, dict)]
+
+    def _resolve_row(row: dict) -> str:
+        old_league_id = str(row.get("league_id") or "").strip()
+        sleeper_username = str(row.get("sleeper_username") or "").strip()
+        if not old_league_id or not sleeper_username:
+            return ""
+        return _resolve_league_rollover_cached(old_league_id, sleeper_username)
+
+    resolvable = [
+        row
+        for row in dict_rows
+        if str(row.get("league_id") or "").strip() and str(row.get("sleeper_username") or "").strip()
+    ]
+    if len(resolvable) > 1:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(len(resolvable), _LEAGUE_ROLLOVER_MAX_WORKERS),
+            thread_name_prefix="dgm-rollover",
+        ) as executor:
+            resolved_ids = list(executor.map(_resolve_row, dict_rows))
+    else:
+        resolved_ids = [_resolve_row(row) for row in dict_rows]
 
     resolved_rows: list[dict] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
+    for row, resolved_league_id in zip(dict_rows, resolved_ids):
         old_league_id = str(row.get("league_id") or "").strip()
         sleeper_username = str(row.get("sleeper_username") or "").strip()
         if not old_league_id or not sleeper_username:
             resolved_rows.append(row)
             continue
-        resolved_league_id = _resolve_league_rollover_cached(old_league_id, sleeper_username)
         if not resolved_league_id or resolved_league_id == old_league_id:
             resolved_rows.append(row)
             continue
@@ -8123,10 +8156,16 @@ def _build_portfolio_row(
     row_sleeper_username = str(row.get("sleeper_username") or "") or sleeper_username
 
     try:
-        team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
-        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
-            config, user_id, access_token, league_id
-        )
+        # The two Supabase reads are independent -- overlap them so a cold
+        # row pays one round trip instead of two back to back.
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="dgm-portfolio-gm-targets"
+        ) as side_executor:
+            gm_targets_future = side_executor.submit(
+                _fetch_gm_target_player_ids, config, user_id, access_token, league_id
+            )
+            team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
+            gm_target_ids, gm_untouchable_ids = gm_targets_future.result()
         summary = dashboard_engine.build_league_summary(
             league_id=league_id,
             lens=lens,
@@ -8161,6 +8200,245 @@ def _build_portfolio_row(
         "league_id": league_id,
         "league_name": league_name,
         "summary": summary,
+    }
+
+
+def _portfolio_context(lens: str, user: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Shared front half of every Portfolio route: lens validation, the
+    Premium gate, and the caller's (rollover-resolved) saved leagues.
+
+    Returns `(early_response, context)`. `early_response` is the complete
+    response body for every case that has no per-league work to do (Free
+    upsell, no user id, saved leagues unreadable) and `None` otherwise, in
+    which case `context` carries what the per-league builders need. Kept in
+    one place so GET /v1/portfolio, GET /v1/portfolio/leagues and GET
+    /v1/portfolio/leagues/{league_id} can never disagree about who gets
+    Portfolio or which leagues it covers.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        profile: dict[str, str] = {}
+        saved_rows_future = None
+    else:
+        # The saved-leagues read (plus its rollover check) doesn't depend on
+        # the profile, so start it alongside the profile read instead of
+        # after it -- one fewer serial Supabase round trip ahead of the
+        # per-league work. A Free caller's result is simply discarded.
+        prefetch_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="dgm-portfolio-saved-leagues"
+        )
+        saved_rows_future = prefetch_executor.submit(
+            _fetch_saved_leagues_cached, config, access_token, user_id
+        )
+        prefetch_executor.shutdown(wait=False)
+        profile = _fetch_profile_fields(config, user_id, access_token)
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+
+    if not is_premium:
+        return {
+            "ok": True,
+            "is_premium": False,
+            "lens": lens,
+            "leagues": [],
+            "failed_leagues": [],
+            "upsell": _PORTFOLIO_UPSELL,
+        }, {}
+
+    if not user_id or saved_rows_future is None:
+        return {"ok": True, "is_premium": True, "lens": lens, "leagues": [], "failed_leagues": [], "upsell": None}, {}
+
+    try:
+        saved_rows, error = saved_rows_future.result()
+    except Exception:
+        saved_rows, error = [], "saved_leagues_unavailable"
+    if error:
+        return {
+            "ok": True,
+            "is_premium": True,
+            "lens": lens,
+            "leagues": [],
+            "failed_leagues": [],
+            "upsell": None,
+            "reason": "saved_leagues_unavailable",
+        }, {}
+
+    return None, {
+        "config": config,
+        "user_id": user_id,
+        "access_token": access_token,
+        "saved_rows": saved_rows or [],
+        "sleeper_username": str(profile.get("sleeper_username") or ""),
+        "entitlement": str(profile.get("entitlement") or "free"),
+    }
+
+
+def _project_portfolio_league(result: dict[str, Any]) -> dict[str, Any]:
+    """One successful `_build_portfolio_row` result -> its response row."""
+
+    summary = result["summary"]
+    top_item = summary.get("top_item")
+    # `top_items` is the same already-ranked/deduped signal list `top_item`
+    # draws its first entry from (modules.dashboard_engine.build_league_summary),
+    # just not truncated to one — a saved league's quick-glance card wants
+    # a few short lines (value trending down / injury / news story /
+    # waiver info), not only the single highest-priority headline. Falls
+    # back to a one-item list built from `top_item` for any caller whose
+    # `summary` predates this field, so nothing regresses to an empty list.
+    top_items = summary.get("top_items")
+    if top_items is None:
+        top_items = [top_item] if top_item else []
+    return {
+        "league_id": result["league_id"],
+        "league_name": result["league_name"],
+        "team_name": summary.get("team_name") or "",
+        "team_avatar_url": summary.get("team_avatar_url") or "",
+        "wins": _clean_json_value(summary.get("wins")),
+        "losses": _clean_json_value(summary.get("losses")),
+        "ties": _clean_json_value(summary.get("ties")),
+        "health_flag": summary.get("health_flag"),
+        "power_rank": _clean_json_value(summary.get("power_rank")),
+        "power_rank_tied": bool(summary.get("power_rank_tied")),
+        "franchise_rank": _clean_json_value(summary.get("franchise_rank")),
+        "franchise_rank_tied": bool(summary.get("franchise_rank_tied")),
+        "roster_value_rank": _clean_json_value(summary.get("roster_value_rank")),
+        "roster_value_rank_tied": bool(summary.get("roster_value_rank_tied")),
+        "archetype": _clean_json_value(summary.get("archetype")),
+        "archetype_label": _clean_json_value(summary.get("archetype_label")),
+        "top_asset": _project_portfolio_top_asset(summary.get("top_asset")),
+        "top_item": _project_briefing_item_payload(top_item) if top_item else None,
+        "top_items": [_project_briefing_item_payload(item) for item in top_items if item],
+    }
+
+
+def _portfolio_saved_league_stub(row: dict[str, Any]) -> dict[str, str] | None:
+    league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+    if not league_id:
+        return None
+    return {"league_id": league_id, "league_name": str(row.get("league_name") or "").strip() or league_id}
+
+
+@app.get("/v1/portfolio/leagues")
+def get_portfolio_leagues(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Portfolio's cheap index: the Premium gate plus the caller's saved
+    leagues (id + name, already rollover-resolved), with NO per-league
+    valuation work.
+
+    Portfolio perf audit, 2026-10-21: GET /v1/portfolio answers in one
+    response only after EVERY saved league's summary is built, and those
+    builds are CPU-bound pandas work that shares one Python process (one
+    GIL) — a real 5-league account measured ~3.7s of mostly serialized
+    engine time even after the backend fixes in the same change. Clients
+    that call this index first and then GET /v1/portfolio/leagues/{id} for
+    each league concurrently (a) paint each league card as soon as its own
+    summary is ready and (b) let those per-league requests spread across
+    the mobile-api worker processes instead of queueing behind one GIL.
+    GET /v1/portfolio stays as-is for already-shipped app builds.
+    """
+
+    early_response, context = _portfolio_context(lens, user)
+    if early_response is not None:
+        return {**early_response, "saved_leagues": []}
+    saved_league_stubs = []
+    for row in context["saved_rows"]:
+        stub = _portfolio_saved_league_stub(row) if isinstance(row, dict) else None
+        if stub is not None:
+            saved_league_stubs.append(stub)
+    return {
+        "ok": True,
+        "is_premium": True,
+        "lens": lens,
+        "saved_leagues": saved_league_stubs,
+        "leagues": [],
+        "failed_leagues": [],
+        "upsell": None,
+    }
+
+
+@app.get("/v1/portfolio/leagues/{league_id}")
+def get_portfolio_league(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """One saved league's Portfolio row — exactly the row GET /v1/portfolio
+    would return for it (same `_build_portfolio_row` + projection, same
+    Premium gate, same failure reasons), for clients loading Portfolio
+    progressively (see GET /v1/portfolio/leagues).
+
+    `league_id` must be one of the caller's own saved leagues (as listed by
+    the index); anything else is a 404 rather than a summary for a league
+    the caller never saved. Exactly one of `league` / `failed_league` is
+    set on a Premium response."""
+
+    early_response, context = _portfolio_context(lens, user)
+    if early_response is not None:
+        return {**early_response, "league": None, "failed_league": None}
+
+    normalized_league_id = saved_leagues.normalize_league_id(league_id)
+    row = next(
+        (
+            saved_row
+            for saved_row in context["saved_rows"]
+            if isinstance(saved_row, dict)
+            and normalized_league_id
+            and saved_leagues.normalize_league_id(saved_row.get("league_id")) == normalized_league_id
+        ),
+        None,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="That league is not one of your saved leagues.")
+
+    stub = _portfolio_saved_league_stub(row) or {"league_id": normalized_league_id, "league_name": normalized_league_id}
+    # Same per-league deadline GET /v1/portfolio applies to each row, for
+    # the same reason (one hung Sleeper call must surface as a timed-out
+    # league, not an endless spinner).
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="dgm-portfolio-league")
+    try:
+        future = executor.submit(
+            _build_portfolio_row,
+            context["config"],
+            context["user_id"],
+            context["access_token"],
+            lens,
+            context["sleeper_username"],
+            context["entitlement"],
+            row,
+        )
+        try:
+            result = future.result(timeout=_PORTFOLIO_FANOUT_TIMEOUT_SECONDS)
+        except concurrent.futures.TimeoutError:
+            result = {"status": "failed", **stub, "reason": "timed_out"}
+        except Exception:
+            result = {"status": "failed", **stub, "reason": "unavailable"}
+    finally:
+        executor.shutdown(wait=False)
+
+    league_payload = None
+    failed_league = None
+    if result.get("status") == "ok":
+        league_payload = _project_portfolio_league(result)
+    else:
+        failed_league = {
+            "league_id": result.get("league_id") or stub["league_id"],
+            "league_name": result.get("league_name") or stub["league_name"],
+            "reason": result.get("reason") or "unavailable",
+        }
+    return {
+        "ok": True,
+        "is_premium": True,
+        "lens": lens,
+        "league": league_payload,
+        "failed_league": failed_league,
+        "upsell": None,
     }
 
 
@@ -8219,45 +8497,15 @@ def _get_portfolio_impl(lens: str, user: dict[str, Any]) -> dict[str, Any]:
     league never blanks the rest of the portfolio.
     """
 
-    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
-        raise HTTPException(
-            status_code=422,
-            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
-        )
-
-    config = auth_supabase.get_supabase_config()
-    user_id = str(user.get("id") or "")
-    access_token = str(user.get("_access_token") or "")
-    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
-    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
-
-    if not is_premium:
-        return {
-            "ok": True,
-            "is_premium": False,
-            "lens": lens,
-            "leagues": [],
-            "failed_leagues": [],
-            "upsell": _PORTFOLIO_UPSELL,
-        }
-
-    if not user_id:
-        return {"ok": True, "is_premium": True, "lens": lens, "leagues": [], "failed_leagues": [], "upsell": None}
-
-    saved_rows, error = _fetch_saved_leagues_cached(config, access_token, user_id)
-    if error:
-        return {
-            "ok": True,
-            "is_premium": True,
-            "lens": lens,
-            "leagues": [],
-            "failed_leagues": [],
-            "upsell": None,
-            "reason": "saved_leagues_unavailable",
-        }
-
-    sleeper_username = str(profile.get("sleeper_username") or "")
-    entitlement = str(profile.get("entitlement") or "free")
+    early_response, context = _portfolio_context(lens, user)
+    if early_response is not None:
+        return early_response
+    config = context["config"]
+    user_id = context["user_id"]
+    access_token = context["access_token"]
+    saved_rows = context["saved_rows"]
+    sleeper_username = context["sleeper_username"]
+    entitlement = context["entitlement"]
     leagues: list[dict[str, Any]] = []
     failed_leagues: list[dict[str, Any]] = []
 
@@ -8326,43 +8574,7 @@ def _get_portfolio_impl(lens: str, user: dict[str, Any]) -> dict[str, Any]:
             )
             continue
 
-        summary = result["summary"]
-        top_item = summary.get("top_item")
-        # `top_items` is the same already-ranked/deduped signal list `top_item`
-        # draws its first entry from (modules.dashboard_engine.build_league_summary),
-        # just not truncated to one — a saved league's quick-glance card wants
-        # a few short lines (value trending down / injury / news story /
-        # waiver info), not only the single highest-priority headline. Falls
-        # back to a one-item list built from `top_item` for any caller whose
-        # `summary` predates this field, so nothing regresses to an empty list.
-        top_items = summary.get("top_items")
-        if top_items is None:
-            top_items = [top_item] if top_item else []
-        leagues.append(
-            {
-                "league_id": result["league_id"],
-                "league_name": result["league_name"],
-                "team_name": summary.get("team_name") or "",
-                "team_avatar_url": summary.get("team_avatar_url") or "",
-                "wins": _clean_json_value(summary.get("wins")),
-                "losses": _clean_json_value(summary.get("losses")),
-                "ties": _clean_json_value(summary.get("ties")),
-                "health_flag": summary.get("health_flag"),
-                "power_rank": _clean_json_value(summary.get("power_rank")),
-                "power_rank_tied": bool(summary.get("power_rank_tied")),
-                "franchise_rank": _clean_json_value(summary.get("franchise_rank")),
-                "franchise_rank_tied": bool(summary.get("franchise_rank_tied")),
-                "roster_value_rank": _clean_json_value(summary.get("roster_value_rank")),
-                "roster_value_rank_tied": bool(summary.get("roster_value_rank_tied")),
-                "archetype": _clean_json_value(summary.get("archetype")),
-                "archetype_label": _clean_json_value(summary.get("archetype_label")),
-                "top_asset": _project_portfolio_top_asset(summary.get("top_asset")),
-                "top_item": _project_briefing_item_payload(top_item) if top_item else None,
-                "top_items": [
-                    _project_briefing_item_payload(item) for item in top_items if item
-                ],
-            }
-        )
+        leagues.append(_project_portfolio_league(result))
 
     return {
         "ok": True,

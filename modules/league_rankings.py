@@ -276,21 +276,30 @@ def build_league_rankings_frame(
     current_score_field: str = "value_score",
     league_settings: dict[str, Any] | None = None,
     adapter=None,
+    summary_and_draft_capital: tuple[pd.DataFrame, pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
     """One row per roster with power_rank, franchise_rank, draft_capital_rank,
     starter_rank, bench_rank, age_rank, avg_age — the full "Rankings" page
     computation, minus the archetype/strategy-refine layer (not needed for
     these columns; see the investigation this was built from).
+
+    `summary_and_draft_capital` lets a caller that already holds this exact
+    league's `build_league_summary_and_draft_capital` result (computed from
+    the same df_players/score_field/league_settings) pass it in instead of
+    paying for the per-roster summary pass a second time.
     """
 
-    df_summary, draft_capital_summary = build_league_summary_and_draft_capital(
-        df_players,
-        league_id,
-        score_field=score_field,
-        current_score_field=current_score_field,
-        league_settings=league_settings,
-        adapter=adapter,
-    )
+    if summary_and_draft_capital is not None:
+        df_summary, draft_capital_summary = summary_and_draft_capital
+    else:
+        df_summary, draft_capital_summary = build_league_summary_and_draft_capital(
+            df_players,
+            league_id,
+            score_field=score_field,
+            current_score_field=current_score_field,
+            league_settings=league_settings,
+            adapter=adapter,
+        )
     if df_summary.empty:
         return df_summary
 
@@ -444,7 +453,26 @@ def _build_league_rankings_frame_cached(
         return pd.DataFrame()
 
     score_field = league_value_settings.valuation_score_field(lens)
-    return build_league_rankings_frame(valued, league_id, score_field=score_field, league_settings=settings)
+    # Portfolio perf audit, 2026-10-21: the per-roster summary +
+    # draft-capital pass this frame is built on is the exact computation
+    # build_league_summary_and_draft_capital_cached already caches for the
+    # same (league_id, lens, players_db_path, bucket) key -- and every
+    # Dashboard/Portfolio build asks for that one too, via
+    # trade_hub_engine's trade-idea generation. Computing it again here
+    # profiled at ~0.45s per league on a real 12-team dynasty league, paid
+    # on every cold cache window for an identical result. Reuse the shared
+    # entry instead (same inputs: same get_league settings, same cached
+    # `valued` frame, same score_field).
+    summary_and_draft_capital = build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    return build_league_rankings_frame(
+        valued,
+        league_id,
+        score_field=score_field,
+        league_settings=settings,
+        summary_and_draft_capital=summary_and_draft_capital,
+    )
 
 
 def build_league_rankings_frame_cached(

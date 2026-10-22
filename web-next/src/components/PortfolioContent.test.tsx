@@ -381,4 +381,34 @@ describe("PortfolioContent", () => {
 
     expect(screen.getByText("No saved leagues yet")).toBeInTheDocument();
   });
+
+  it("holds a still-loading league's place with a skeleton card, in saved order", () => {
+    const { container } = render(
+      <PortfolioContent
+        data={{ ...BASE_RESPONSE, leagues: [league({ league_id: "league-2", league_name: "Second League" })] }}
+        order={["league-1", "league-2"]}
+        pending={[{ league_id: "league-1", league_name: "Dynasty Overlords" }]}
+      />,
+    );
+
+    expect(screen.getByText("Loading Dynasty Overlords…")).toBeInTheDocument();
+    const articles = Array.from(container.querySelectorAll("article"));
+    expect(articles).toHaveLength(2);
+    // The pending (first-saved) league stays first even though the second one loaded first.
+    expect(articles[0].getAttribute("aria-busy")).toBe("true");
+    expect(within(articles[1]).getByText(/The Contenders — Second League/)).toBeInTheDocument();
+  });
+
+  it("does not show the empty state while leagues are still loading", () => {
+    render(
+      <PortfolioContent
+        data={{ ...BASE_RESPONSE, leagues: [], failed_leagues: [] }}
+        order={["league-1"]}
+        pending={[{ league_id: "league-1", league_name: "Dynasty Overlords" }]}
+      />,
+    );
+
+    expect(screen.queryByText("No saved leagues yet")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading Dynasty Overlords…")).toBeInTheDocument();
+  });
 });
