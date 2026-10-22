@@ -27,6 +27,7 @@ import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import BeginnerHelp from '../components/BeginnerHelp';
 import ViewModeToggle from '../components/ViewModeToggle';
 import WaiverRecommendationCard, {
   waiverInjuryDisplay,
@@ -210,6 +211,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
         }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyDesk doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
       />
+      <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
@@ -717,6 +719,7 @@ function createStyles(colors: ThemeColors) {
   freeAgentIdentity: { flex: 1 },
   freeAgentTrailing: { alignItems: 'flex-end', gap: 2, paddingLeft: spacing.sm },
   freeAgentValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  beginnerIntro: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
   positionRankPill: {
     backgroundColor: colors.backgroundElevated,

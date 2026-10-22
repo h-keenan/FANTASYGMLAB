@@ -9,11 +9,13 @@ import {
   type TradeAsset,
   type TradeVerdict,
 } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ValueRing } from "@/components/ValueRing";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { confidenceLevel, confidenceRingPercent, formatTradeGain, levelToRingTone } from "@/lib/tradeHubPresentation";
 import {
   ALL_POSITION_OPTIONS,
@@ -203,6 +205,7 @@ function VerdictCard({
   const sendTotal = sendAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const receiveTotal = receiveAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const alternatePackages = verdict.alternate_packages ?? [];
+  const copy = useExperienceCopy();
 
   return (
     <section
@@ -225,6 +228,7 @@ function VerdictCard({
           {verdict.band}
         </span>
       ) : null}
+      <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} />
 
       {/* Trade zone: the actual give/receive matchup, visually separated
           from the analysis content below it via an elevated panel — the
@@ -253,6 +257,7 @@ function VerdictCard({
         {/* Single value bar — never duplicated alongside a second meter for
             the same number (PR #1057 removed Streamlit's own duplicate). */}
         <LeanBarMeter sendScore={sendTotal} receiveScore={receiveTotal} />
+        <BeginnerHelp term="analyzerValueBalance" />
       </div>
 
       {verdict.rationale ? (
@@ -330,6 +335,7 @@ function VerdictCard({
           </span>
         </div>
       </div>
+      <BeginnerHelp term="analyzerConfidence" />
 
       {verdict.risk_summary ? (
         <div className="flex flex-col gap-1">

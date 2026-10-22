@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
+import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { confidenceLevelFor } from './ConfidenceMeter';
 import FAABGuidance from './FAABGuidance';
 import PlayerIdentityRow from './PlayerIdentityRow';
@@ -182,6 +183,11 @@ export default function WaiverRecommendationCard({
           <View style={styles.metricsDivider} />
           <FAABGuidance faab={player.faab} size="prominent" />
         </View>
+        {/* Beginner-only explanations (lib/experienceCopy.ts); nothing renders
+            for advanced/unset accounts. Primary card only, so the compact
+            rows below stay as dense as before. */}
+        <BeginnerHelp term="waiverValue" style={styles.beginnerHelp} />
+        <BeginnerHelp term="faab" style={styles.beginnerHelp} />
         {/* Real need-fit/standout-value confidence for this recommendation
             (modules.waivers_ui.waiver_confidence_label) — the same signals
             that ranked it into Priority Adds, shown with the exact same
@@ -194,6 +200,7 @@ export default function WaiverRecommendationCard({
               level={confidenceLevelFor(player.confidence_label)}
               color={colors.premium}
             />
+            <BeginnerHelp term="waiverConfidence" style={styles.beginnerHelp} />
           </View>
         ) : null}
         <View style={styles.breakdownRow}>
@@ -257,6 +264,7 @@ function createStyles(colors: ThemeColors) {
       borderTopColor: colors.border,
     },
     confidenceRow: { marginTop: spacing.sm },
+    beginnerHelp: { marginTop: spacing.xs },
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
     scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
     scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },

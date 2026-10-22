@@ -51,6 +51,8 @@ import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useDensity } from '../context/DensityContext';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -686,6 +688,17 @@ function TeamSnapshotRow({
       : '—';
   const injuredCount = snapshot.injured_starters;
   const goToTeams = () => navigation.navigate('Teams', { leagueId, leagueName });
+  const copy = useExperienceCopy();
+  const averageAgeLabel = copy.label('averageAge', 'Avg Age');
+  // Beginner-only term explanations (lib/experienceCopy.ts) — empty for
+  // advanced/unset accounts, so today's tiles render unchanged.
+  const termHelp: Array<[string, string | null]> = copy.isBeginner
+    ? [
+        ...(snapshot.power_rank != null ? [['Roster Power', copy.help('powerRank')] as [string, string | null]] : []),
+        ...(snapshot.franchise_rank != null ? [['Franchise', copy.help('franchiseRank')] as [string, string | null]] : []),
+        [averageAgeLabel, copy.help('averageAge')],
+      ]
+    : [];
 
   return (
     <View style={styles.snapshotSection}>
@@ -717,7 +730,7 @@ function TeamSnapshotRow({
           />
         ) : null}
         <MetricCard
-          label="Avg Age"
+          label={averageAgeLabel}
           icon="hourglass-outline"
           value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'}
           style={styles.snapshotTileHalf}
@@ -730,6 +743,9 @@ function TeamSnapshotRow({
           style={styles.snapshotTileHalf}
         />
       </View>
+      {termHelp.map(([term, help]) => (
+        <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} style={styles.snapshotHelp} />
+      ))}
     </View>
   );
 }
@@ -1190,6 +1206,7 @@ function createStyles(colors: ThemeColors) {
   },
   checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
   snapshotSection: { marginBottom: spacing.md },
+  snapshotHelp: { marginTop: spacing.xs },
   snapshotRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

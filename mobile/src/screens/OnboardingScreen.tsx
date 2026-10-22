@@ -17,7 +17,8 @@ import AppText from '../components/AppText';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
-import { api, type ExperienceLevelValue } from '../lib/api';
+import type { ExperienceLevelValue } from '../lib/api';
+import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, shadows, spacing, typography, type ThemeColors } from '../theme';
@@ -109,6 +110,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { onboardingComplete, completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
+  const { setLevel: saveExperienceLevel } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
@@ -136,12 +138,10 @@ export default function OnboardingScreen({ navigation }: Props) {
   const onFinish = async () => {
     if (!level) return;
     setSaving(true);
-    try {
-      await api.setExperienceLevel(level);
-    } catch {
-      // Best-effort, same as web: a failed preference write never blocks
-      // onboarding.
-    }
+    // Applies the beginner/advanced copy immediately and saves it to
+    // /v1/preferences in the background. Best-effort, same as web: a failed
+    // preference write never blocks onboarding.
+    saveExperienceLevel(level);
     setSaving(false);
     if (isFirstRun) {
       navigation.navigate('Paywall', { fromOnboarding: 'getStarted' });

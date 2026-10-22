@@ -27,6 +27,7 @@ export function SnapshotTile({
   tone = "neutral",
   note,
   glyph,
+  wrapNote = false,
 }: {
   label: string;
   value: string;
@@ -41,6 +42,11 @@ export function SnapshotTile({
    * and no icon at all before this. Optional so a caller with no sensible
    * glyph (rare) can omit it. */
   glyph?: SnapshotGlyphName;
+  /** Caps the tile's width so a longer caption (e.g. beginner helper text
+   * from lib/experienceCopy.ts) wraps instead of stretching the tile
+   * across the whole row. Off by default, so existing callers keep their
+   * current layout. */
+  wrapNote?: boolean;
 }) {
   const toneColor =
     tone === "risk"
@@ -53,7 +59,7 @@ export function SnapshotTile({
 
   return (
     <div
-      className="glass-surface flex flex-col gap-1 p-3 min-w-[7rem]"
+      className={`glass-surface flex flex-col gap-1 p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}
       style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
     >
       <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>

@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
 import { ReferralCard } from "@/components/ReferralCard";
+import { useExperienceLevel } from "@/context/ExperienceLevelContext";
+import type { ExperienceLevel } from "@/lib/experienceCopy";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same four categories, same copy — so a user who's seen this in the app
@@ -106,6 +108,88 @@ function BillingSection({
   );
 }
 
+const EXPLANATION_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = [
+  {
+    value: "beginner",
+    label: "Beginner",
+    description: "Plain-language explanations of terms like value, tier and trade verdicts",
+  },
+  { value: "advanced", label: "Advanced", description: "The standard terse copy" },
+];
+
+/** The onboarding carousel's "How much dynasty experience do you have?"
+ * answer, editable later. Reads/writes through ExperienceLevelContext (the
+ * same /v1/preferences field), so the change applies across the app right
+ * away. An unanswered account (null) shows Advanced, which is how it
+ * already behaves. */
+function ExplanationsSetting() {
+  const { level, setLevel } = useExperienceLevel();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const active: ExperienceLevel = level ?? "advanced";
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span id="account-explanations-label" className="text-sm font-semibold">
+        Explanations
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby="account-explanations-label"
+        className="flex flex-col"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        {EXPLANATION_OPTIONS.map((option, index) => {
+          const selected = active === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={saving}
+              onClick={() => {
+                if (selected) return;
+                setSaving(true);
+                setError(null);
+                setLevel(option.value)
+                  .catch(() => setError("Couldn't save this setting. Try again."))
+                  .finally(() => setSaving(false));
+              }}
+              className="flex items-center justify-between gap-3 p-3 text-left"
+              style={{
+                borderTop: index === 0 ? "none" : "var(--border-width-default) solid var(--color-border)",
+                background: selected ? "var(--color-action-soft)" : "transparent",
+              }}
+            >
+              <span className="flex flex-col gap-0.5">
+                <span className="text-sm">{option.label}</span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {option.description}
+                </span>
+              </span>
+              <span
+                className="px-2.5 py-1 text-xs font-bold"
+                style={{
+                  border: "var(--border-width-default) solid var(--color-border)",
+                  color: selected ? "var(--color-success)" : "var(--color-text-muted)",
+                }}
+              >
+                {selected ? "On" : "Off"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {error ? (
+        <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function PreferencesSection({
   communityOptedOut,
   onToggleCommunityOptOut,
@@ -123,6 +207,8 @@ function PreferencesSection({
   return (
     <section className="glass-surface p-4 flex flex-col gap-4" aria-labelledby="account-preferences-heading">
       <SectionHeading id="account-preferences-heading">Preferences</SectionHeading>
+
+      <ExplanationsSetting />
 
       <div
         className="flex items-center justify-between gap-3 p-3"

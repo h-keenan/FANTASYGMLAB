@@ -40,6 +40,8 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { useDensity } from '../context/DensityContext';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -683,6 +685,7 @@ function VerdictCard({
 }) {
   const { colors } = useThemeMode();
   const { showExplanations } = useDensity();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
@@ -733,6 +736,7 @@ function VerdictCard({
           <AppText style={styles.shareButtonText}>Share</AppText>
         </TouchableOpacity>
       </View>
+      <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} style={styles.beginnerHelp} />
 
       {/* Quick visual: the same big color-coded value-change number the share
           PNG leads with, so the verdict reads at a glance without tapping
@@ -756,6 +760,14 @@ function VerdictCard({
           Hub's cards, applied to the verdict's own value_delta so the two
           surfaces agree on what a value edge looks like. */}
       <TradeValueBar delta={verdict.value_delta} style={styles.verdictValueBar} />
+      <BeginnerHelp
+        text={copy.help('analyzerValueBalance') && `Value balance: ${copy.help('analyzerValueBalance')}`}
+        style={styles.beginnerHelp}
+      />
+      <BeginnerHelp
+        text={copy.help('analyzerConfidence') && `Confidence: ${copy.help('analyzerConfidence')}`}
+        style={styles.beginnerHelp}
+      />
       {showExplanations ? (
         <>
           <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
@@ -876,6 +888,7 @@ function TradeSide({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    beginnerHelp: { marginBottom: spacing.xs },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {

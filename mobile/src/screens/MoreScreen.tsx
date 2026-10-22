@@ -32,6 +32,8 @@ import { currentLeagueContext } from '../navigation/navigationRef';
 import { useAuth } from '../context/AuthContext';
 import { useCollegeInterest } from '../context/CollegeInterestContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
+import { useExperienceLevel } from '../context/ExperienceLevelContext';
+import type { ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 
@@ -49,6 +51,14 @@ const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: IconName }> = [
 const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: string }> = [
   { value: 'guided', label: 'Guided', description: 'Show the reasoning behind every recommendation' },
   { value: 'compact', label: 'Compact', description: 'Just the calls — hide the explanation text' },
+];
+
+// Onboarding's "How much dynasty experience do you have?" answer, changeable
+// here later. Copy only (lib/experienceCopy.ts); an unanswered account shows
+// as Advanced because that's exactly how it behaves.
+const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = [
+  { value: 'beginner', label: 'Beginner', description: 'Plain-language explanations of terms like value, tier and trade verdicts' },
+  { value: 'advanced', label: 'Advanced', description: 'The standard terse copy' },
 ];
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string }> = [
@@ -69,6 +79,7 @@ export default function MoreScreen({ navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
+  const { level: experienceLevel, setLevel: setExperienceLevel } = useExperienceLevel();
   const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
@@ -267,6 +278,18 @@ export default function MoreScreen({ navigation }: Props) {
               description={option.description}
               active={density === option.value}
               onPress={() => setDensity(option.value)}
+            />
+          ))}
+        </View>
+        <AppText style={styles.groupCaption}>Explanations</AppText>
+        <View style={styles.optionRow}>
+          {EXPERIENCE_OPTIONS.map((option) => (
+            <OptionCard
+              key={option.value}
+              label={option.label}
+              description={option.description}
+              active={(experienceLevel ?? 'advanced') === option.value}
+              onPress={() => setExperienceLevel(option.value)}
             />
           ))}
         </View>
@@ -537,7 +560,7 @@ export default function MoreScreen({ navigation }: Props) {
 }
 
 /**
- * One selectable choice card (Density/Theme) — a compact label + supporting
+ * One selectable choice card (Density/Explanations/Theme) — a compact label + supporting
  * description, active state rendered as an accent-tinted fill + border
  * (same "illuminated" language SegmentedTabBar uses for its active segment)
  * rather than a plain border-color swap. Kept local: SegmentedTabBar itself

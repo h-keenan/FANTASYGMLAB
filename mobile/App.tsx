@@ -16,6 +16,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { AuthProvider } from './src/context/AuthContext';
 import { CollegeInterestProvider } from './src/context/CollegeInterestContext';
 import { DensityProvider } from './src/context/DensityContext';
+import { ExperienceLevelProvider } from './src/context/ExperienceLevelContext';
 import { GmStanceProvider } from './src/context/GmStanceContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { ValuationLensProvider } from './src/context/ValuationLensContext';
@@ -86,6 +87,7 @@ export default function App() {
         <SafeAreaProvider>
           <ThemeModeProvider>
             <DensityProvider>
+            <ExperienceLevelProvider>
               <GmStanceProvider>
                 <ValuationLensProvider>
                   {/* Outside AuthProvider so the masking flag is armed from
@@ -101,6 +103,7 @@ export default function App() {
                   </ShowcaseModeProvider>
                 </ValuationLensProvider>
               </GmStanceProvider>
+            </ExperienceLevelProvider>
             </DensityProvider>
             <ThemedStatusBar />
           </ThemeModeProvider>

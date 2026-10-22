@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
+import { ExperienceLevelProvider } from "@/context/ExperienceLevelContext";
 import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { AppContentShell } from "@/components/AppContentShell";
@@ -49,36 +50,38 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="app-background-sweep" aria-hidden="true" />
         <RouteAnalytics />
         <AuthProvider>
-          <ValuationLensProvider>
-            <PlayerQuickViewProvider>
-              {/* Desktop-width persistent left nav (coridian_, 2026-10-17:
-                  "desktop side menu") — fixed-position, so it sits outside
-                  this flex flow; AppContentShell pushes the real content
-                  clear of it via md:pl-60 instead, but only when the
-                  sidebar is actually showing (signed-in) — see that
-                  component's own doc comment. */}
-              <Suspense fallback={null}>
-                <DesktopSidebar />
-              </Suspense>
-              <AppContentShell>
-                {/* Header handles its own internal Suspense boundary now
-                    (just around its league-aware sub-piece), so the brand
-                    mark/wordmark render synchronously on every page instead
-                    of waiting on hydration — a real new-user-UX-audit finding,
-                    2026-10-17 (the header was invisible in the server-rendered
-                    HTML of every single page). GmOrb still needs its own
-                    Suspense wrap for useSearchParams — this app's static pages
-                    (/, /news, /portfolio, ...) would otherwise fail to
-                    prerender — but a floating button popping in a beat after
-                    first paint is far less noticeable than a missing header. */}
-                <Header />
-                {children}
-              </AppContentShell>
-              <Suspense fallback={null}>
-                <GmOrb />
-              </Suspense>
-            </PlayerQuickViewProvider>
-          </ValuationLensProvider>
+          <ExperienceLevelProvider>
+            <ValuationLensProvider>
+              <PlayerQuickViewProvider>
+                {/* Desktop-width persistent left nav (coridian_, 2026-10-17:
+                    "desktop side menu") — fixed-position, so it sits outside
+                    this flex flow; AppContentShell pushes the real content
+                    clear of it via md:pl-60 instead, but only when the
+                    sidebar is actually showing (signed-in) — see that
+                    component's own doc comment. */}
+                <Suspense fallback={null}>
+                  <DesktopSidebar />
+                </Suspense>
+                <AppContentShell>
+                  {/* Header handles its own internal Suspense boundary now
+                      (just around its league-aware sub-piece), so the brand
+                      mark/wordmark render synchronously on every page instead
+                      of waiting on hydration — a real new-user-UX-audit finding,
+                      2026-10-17 (the header was invisible in the server-rendered
+                      HTML of every single page). GmOrb still needs its own
+                      Suspense wrap for useSearchParams — this app's static pages
+                      (/, /news, /portfolio, ...) would otherwise fail to
+                      prerender — but a floating button popping in a beat after
+                      first paint is far less noticeable than a missing header. */}
+                  <Header />
+                  {children}
+                </AppContentShell>
+                <Suspense fallback={null}>
+                  <GmOrb />
+                </Suspense>
+              </PlayerQuickViewProvider>
+            </ValuationLensProvider>
+          </ExperienceLevelProvider>
         </AuthProvider>
       </body>
     </html>

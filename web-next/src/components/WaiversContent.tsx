@@ -2,12 +2,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SnapshotTile } from "@/components/SnapshotTile";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import {
   confidenceColor,
   faabRangeText,
@@ -146,9 +148,11 @@ function PriorityAddPrimaryCard({ player }: { player: WaiverPriorityAdd }) {
         </div>
         <FaabRange player={player} prominent />
       </div>
+      <BeginnerHelp term="waiverValue" />
       {player.confidence_label ? (
         <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
       ) : null}
+      {player.confidence_label ? <BeginnerHelp term="waiverConfidence" /> : null}
     </article>
   );
 }
@@ -300,6 +304,7 @@ export function WaiversContent({
 }) {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
+  const copy = useExperienceCopy();
 
   const notice = data.reason ? waiversReasonMessage(data.reason) : null;
 
@@ -359,13 +364,26 @@ export function WaiversContent({
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Free agents ranked for your roster — ordered by fit for your team, not just raw value.
         </p>
+        <BeginnerHelp term="waiversIntro" />
       </header>
 
       <div className="flex flex-wrap gap-3">
         <SnapshotTile label="Available players" value={String(data.available_count ?? data.players.length)} />
-        <SnapshotTile label="Avg Wire Score" value={String(data.avg_wire_score ?? 0)} />
+        <SnapshotTile
+          label={copy.label("averageWireValue", "Avg Wire Score")}
+          value={String(data.avg_wire_score ?? 0)}
+          note={copy.help("averageWireValue") ?? undefined}
+          wrapNote
+        />
         <SnapshotTile label="Current need" value={data.needed_positions.length > 0 ? data.needed_positions.join(" / ") : "None"} />
-        {data.faab_remaining != null ? <SnapshotTile label="Your FAAB" value={`$${data.faab_remaining}`} /> : null}
+        {data.faab_remaining != null ? (
+          <SnapshotTile
+            label={copy.label("yourFaab", "Your FAAB")}
+            value={`$${data.faab_remaining}`}
+            note={copy.help("faab") ?? undefined}
+            wrapNote
+          />
+        ) : null}
       </div>
 
       <section className="flex flex-col gap-3" aria-labelledby="priority-adds-heading">

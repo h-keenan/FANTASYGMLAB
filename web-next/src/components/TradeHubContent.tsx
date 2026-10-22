@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { TradeHubResponse } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -131,6 +132,7 @@ export function TradeHubContent({
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Trade ideas built around your roster — You Send / You Get, ranked by fit.
         </p>
+        <BeginnerHelp term="tradeHubIntro" />
         {/* Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
             strategy age-curve adjustment to player value that Waivers/
             Dashboard/PQV's plain valuation pipeline doesn't — the same
