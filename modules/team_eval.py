@@ -251,32 +251,21 @@ def _score_starter_weighted_roster(
     pick_for_pos("TE", slots["TE"])
     pick_for_pos("K", slots.get("K", 0))
 
-    flex_candidates = [
-        idx
-        for idx in df.index
-        if df.loc[idx, "position"] in ["RB", "WR", "TE"] and idx not in used_idx
-    ]
-    for idx in flex_candidates[: slots["FLEX"]]:
-        used_idx.add(idx)
-        starter_idx.append(idx)
-
-    superflex_candidates = [
-        idx
-        for idx in df.index
-        if df.loc[idx, "position"] in ["QB", "RB", "WR", "TE"] and idx not in used_idx
-    ]
-    for idx in superflex_candidates[: slots.get("SUPER_FLEX", 0)]:
-        used_idx.add(idx)
-        starter_idx.append(idx)
-
-    wrrb_candidates = [
-        idx
-        for idx in df.index
-        if df.loc[idx, "position"] in ["RB", "WR"] and idx not in used_idx
-    ]
-    for idx in wrrb_candidates[: slots["WR/RB"]]:
-        used_idx.add(idx)
-        starter_idx.append(idx)
+    # Narrowest flex first (WR/RB, then FLEX, then SUPER_FLEX) — same order
+    # as suggest_optimal_lineup's assign_slots.
+    for eligible, slot_name in (
+        (["RB", "WR"], "WR/RB"),
+        (["RB", "WR", "TE"], "FLEX"),
+        (["QB", "RB", "WR", "TE"], "SUPER_FLEX"),
+    ):
+        candidates = [
+            idx
+            for idx in df.index
+            if df.loc[idx, "position"] in eligible and idx not in used_idx
+        ]
+        for idx in candidates[: slots.get(slot_name, 0)]:
+            used_idx.add(idx)
+            starter_idx.append(idx)
 
     starter_mask = df.index.isin(starter_idx)
     bench_mask = ~starter_mask
@@ -371,9 +360,12 @@ def suggest_optimal_lineup(
         take(["WR"], "WR", slots["WR"])
         take(["TE"], "TE", slots["TE"])
         take(["K"], "K", slots["K"])
+        # Narrowest flex first: WR/RB ⊂ FLEX ⊂ SUPER_FLEX. Filling FLEX
+        # before WR/RB let FLEX take the best RB/WR and left WR/RB a worse
+        # player while a better TE sat on the bench.
+        take(["RB", "WR"], "WR/RB", slots["WR/RB"])
         take(["RB", "WR", "TE"], "FLEX", slots["FLEX"])
         take(["QB", "RB", "WR", "TE"], "SUPER_FLEX", slots.get("SUPER_FLEX", 0))
-        take(["RB", "WR"], "WR/RB", slots["WR/RB"])
         return assigned
 
     value_order = df.index.tolist()  # already season-value descending
