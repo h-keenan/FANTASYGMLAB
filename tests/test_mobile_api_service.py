@@ -1803,6 +1803,7 @@ def test_live_draft_trade_evaluator_options_lists_only_remaining_picks(monkeypat
     yet, each with a non-empty label."""
 
     client = _client(monkeypatch)
+    monkeypatch.setattr("services.mobile_api_service._manager_tendencies_gate", lambda user: True)
     league, rosters, _users, profiles = _fake_live_draft_trade_eval_context()
 
     auth_user_response = Mock(status_code=200)
@@ -1898,6 +1899,7 @@ def test_live_draft_trade_evaluator_flags_a_stale_pick_selection(monkeypatch):
     polled picks right before scoring)."""
 
     client = _client(monkeypatch)
+    monkeypatch.setattr("services.mobile_api_service._manager_tendencies_gate", lambda user: True)
     league, rosters, _users, profiles = _fake_live_draft_trade_eval_context()
 
     auth_user_response = Mock(status_code=200)
@@ -1936,6 +1938,7 @@ def test_live_draft_trade_evaluator_returns_a_real_verdict_for_a_lopsided_packag
     math via player_asset_from_mapping + trade_value_band."""
 
     client = _client(monkeypatch)
+    monkeypatch.setattr("services.mobile_api_service._manager_tendencies_gate", lambda user: True)
     league, rosters, _users, profiles = _fake_live_draft_trade_eval_context()
     fake_pool = _fake_live_draft_player_pool()
 
@@ -1992,6 +1995,7 @@ def test_live_draft_trade_evaluator_prices_a_remaining_pick_through_the_real_eng
     end, the same per-pick pricing Trade Analyzer/Draft Center share."""
 
     client = _client(monkeypatch)
+    monkeypatch.setattr("services.mobile_api_service._manager_tendencies_gate", lambda user: True)
     league, rosters, users, profiles = _fake_live_draft_trade_eval_context()
     fake_pool = _fake_live_draft_player_pool()
 
@@ -9402,6 +9406,7 @@ def test_trade_hub_resolves_partner_archetype_by_team_name(monkeypatch):
 def _fake_idea_record(name: str, *, gain: int) -> dict:
     return {
         "partner_team_name": name,
+        "partner_roster_id": name,
         "rationale": "Clear upgrade.",
         "trade_gain": gain,
         "trade_confidence_label": "High",
@@ -10054,10 +10059,14 @@ def test_all_trades_free_entitlement_stops_once_shown_count_hits_the_cap(monkeyp
                                     "modules.trade_hub_engine.generate_trade_idea_records",
                                     return_value=fake_cards,
                                 ):
-                                    # free_limit is 2 (trade_hub_ui.FREE_VISIBLE_IDEAS); shown_count=2
-                                    # means this Free user already used their whole cap on prior pages.
+                                    # free_limit is 2 (trade_hub_ui.FREE_VISIBLE_IDEAS); the server-side
+                                    # pool already holds this Free user's whole allowance (shown_count is
+                                    # no longer trusted from the client).
+                                    from modules import free_tier_ledger
+
+                                    free_tier_ledger.claim_trade_ideas("user-123", ["seen-a", "seen-b"], 2)
                                     response = client.get(
-                                        "/v1/leagues/abc/all-trades?page_size=3&cursor=0&shown_count=2",
+                                        "/v1/leagues/abc/all-trades?page_size=3&cursor=0&shown_count=0",
                                         headers={"Authorization": "Bearer good-token"},
                                     )
 

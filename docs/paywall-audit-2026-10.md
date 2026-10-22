@@ -1,0 +1,64 @@
+# Paywall circumvention audit, 2026-10
+
+Scope: `services/mobile_api_service.py` (the API behind web-next and mobile), found by reading the routes, not the UI.
+Tiers: Free, Pro (`premium.PRO`, stored as raw `premium`), Front Office. Pro and Front Office behave identically here.
+
+## Inventory (what Free gets, where the check lives)
+
+| Surface | Route(s) | Free gets | Check |
+|---|---|---|---|
+| Trade Hub | `GET /leagues/{id}/trade-hub` | top 2 ideas + server-granted ad bonus, one shared per-user pool | `is_at_least` + `free_tier_ledger` pool (fixed) |
+| All Trades | `GET .../all-trades` | same pool | same (fixed; `shown_count` now ignored) |
+| Trade Finder | `GET .../trade-finder` | nothing (upsell) | `is_at_least` in route |
+| Trade share card | `GET .../trade-hub/{rec}/share-card.png` | only ideas already revealed to them | pool check (fixed) |
+| GM Plan | `GET .../gm-plan` | nothing (upsell) | `is_at_least` in route |
+| Dashboard | `GET .../dashboard` | first 4 items; Top Trade tile only if it fits the pool | `FREE_DASHBOARD_VISIBLE_ITEMS` + pool (fixed) |
+| Portfolio (incl. Today / headline idea) | `GET /portfolio`, `/portfolio/leagues`, `/portfolio/leagues/{id}` | nothing (upsell) | `_portfolio_context` |
+| Home leagues-glance | `GET /leagues-glance` | nothing (upsell) | `is_at_least` in route |
+| Alerts / briefings | `GET .../alerts` | roster news only; carries no trade ideas | n/a |
+| External API | `/v1/external/*`, `/v1/content/feed` | player/news data only, no league or trade data | service token |
+| Manager Tendencies | `.../managers/tendencies`, `.../{roster}/tendencies` | upsell | `_manager_tendencies_gate` |
+| Live Draft | `.../live-draft`, `.../live-draft/{id}` | discovery only; state withheld | `is_at_least` |
+| Live Draft trade evaluator | `.../live-draft/{id}/trade-evaluator` GET/POST | nothing (was open) | `_manager_tendencies_gate` (fixed) |
+| Waivers | `.../waivers` | pool; Priority Adds / FAAB guidance withheld | `is_at_least` |
+| GM Targets (add) | `POST .../gm-targets` | capped count | `is_at_least` |
+| Saved leagues | `POST /leagues/save` | 1 league (`MAX_LEAGUES_FREE`) | `saved_leagues.is_at_cap` |
+| Trade Analyzer | `POST .../trade-analyzer` | 3 evaluations/week | web only before; now server-side (fixed) |
+| Player exposure | not present in the API yet | n/a | n/a |
+| Playoff Odds, Team Rankings, Draft Center, My Team Needs, Team Situation, College Scouting | various | full data (ungated) | none, see Recommended |
+
+## Leaks found and fixed (all server-side)
+
+1. **Forged ad unlocks.** `ad_unlocks` came straight from the query string: `trade-hub?ad_unlocks=3` returned 8 ideas to a Free user. Now the server owns the count (`free_tier_ledger`): the client number is only a hint that can raise the stored count by 1 per 10 s, max 3 per UTC day.
+2. **Per-board allowance.** Each (league, strategy, lens, filters) board was gated separately, so switching strategy or lens yielded 2 new ideas each time. Now one per-user pool of revealed idea ids per UTC day (Redis), shared by every page.
+3. **`shown_count` reset on All Trades.** The cap was a client-reported tally, so `shown_count=0` on each page reset it. Now ignored; All Trades draws from the same pool as Trade Hub.
+4. **Dashboard headline idea** was outside any pool. It is now claimed from the same pool, or withheld.
+5. **Share card** rendered a branded PNG for any idea on the full unredacted board, including hidden ones. Free can now share only ideas it was shown.
+6. **Free league cap on the read side.** `save_league` enforced the cap, but every roster-resolved route resolved the caller's roster in any Sleeper league they belong to, saved or not. A Free user could read Trade Hub, Dashboard and All Trades for every league. `_resolve_my_roster` now allows only saved leagues, plus unsaved ones while the account has spare cap (tracked server-side), and returns reason `free_league_cap`.
+7. **Live Draft trade evaluator** (GET options and POST verdict) was open to Free although Live Draft is locked. Now Pro-only.
+8. **Weekly Trade Analyzer limit** (3/week) existed only in the Streamlit app. Now enforced on `POST .../trade-analyzer` (reason `weekly_limit_reached`, HTTP 200, same shape as other not-ready states).
+
+Checked and not leaking: ESPN import and `/leagues/save` use the same `is_at_cap`; the rollover migration (`migrate_saved_league`) moves one row (upsert then delete), it never adds a league; cache keys: trade-idea records are cached unfiltered and gated after the cache, profile and saved-league caches are keyed by user id, and the web share-card cache is keyed by the caller's bearer token.
+
+## Degradation for shipped builds
+
+Response shapes are unchanged. Free responses carry fewer or zero ideas, `ad_unlocks_applied` now reports the server's count, and new `reason` values (`free_league_cap`, `weekly_limit_reached`, `premium_required`) are 200s like the existing not-ready reasons.
+
+## Stricter readings chosen (owner can relax)
+
+- Pool resets daily (UTC), not per session; constant is in `modules/free_tier_ledger.py`.
+- If a Free user's pool is full of ideas that later change, they see no new ideas until the next UTC day.
+- Free with zero saved leagues may use exactly one unsaved league (so first-time import works).
+- Dashboard drops the trade tile rather than blurring it.
+- Weekly analyzer evaluation is consumed once the roster resolves, even if the verdict later fails.
+
+## Recommended, not changed (product intent unclear)
+
+- **Ad unlock verification.** Without rewarded-ad server-side verification (AdMob SSV) a determined client can still earn 3 unlocks per day by claiming them. Real fix: a signed ad-callback endpoint.
+- **College Scouting** is Pro on web but ungated on the API (`/scouting/*`). Playoff Odds, Team Rankings detail, Draft Center, My Team strategy/needs are ungated; decide which are meant to be Pro.
+- **Database-level cap.** `saved_leagues` and `user_settings` are writable by the user's own token under RLS, so a direct Supabase client can bypass the app-level 1-league cap. Add a Postgres trigger enforcing the cap by entitlement.
+- Pool/ad counters degrade to a per-process memory ledger if Redis is down (cap still holds per worker).
+
+## Verification
+
+Local only: every fix has a regression test in `tests/test_paywall_leaks.py` (real FastAPI TestClient, fake auth, Free profile) that fails on `origin/main` and passes here. Not verified against production as a Free user (no account), real Redis, or real Sleeper/Supabase.

@@ -141,6 +141,8 @@ import pandas as pd
 import requests
 
 from modules import (
+    free_tier_ledger,
+    trade_eval_usage,
     account_store,
     app_config,
     auth_supabase,
@@ -2783,6 +2785,38 @@ def _fetch_saved_leagues_cached(config: dict, access_token: str, user_id: str) -
     return _apply_league_rollover_resolution(config, access_token, user_id, rows), error
 
 
+FREE_LEAGUE_CAP_REASON = "free_league_cap"
+
+
+def _free_league_allowed(
+    user_id: str,
+    profile: dict[str, Any],
+    league_id: str,
+    saved_rows: Any,
+) -> bool:
+    """Free league cap on the READ side. save_league enforces
+    MAX_LEAGUES_FREE when saving, but every roster-resolved endpoint
+    (Trade Hub, Dashboard, All Trades, ...) used to resolve the caller's
+    roster in ANY Sleeper league they belong to, saved or not -- so a Free
+    user could simply request other leagues' ids. A Free account may use
+    only its saved leagues, plus (while it has fewer saved leagues than
+    its cap) leagues claimed in the server-side ledger. Pro/Front Office,
+    and an errored profile read (fail-open on a transport hiccup), are
+    unaffected."""
+
+    if profile.get("status") == "error":
+        return True
+    if premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return True
+    normalized = saved_leagues.normalize_league_id(league_id)
+    rows = [row for row in (saved_rows or []) if isinstance(row, dict)]
+    saved_ids = {saved_leagues.normalize_league_id(row.get("league_id")) for row in rows}
+    if normalized in saved_ids:
+        return True
+    capacity = saved_leagues.max_leagues_for_entitlement(profile.get("entitlement")) - len(saved_ids)
+    return free_tier_ledger.claim_league(user_id, normalized, capacity)
+
+
 def _resolve_my_roster(
     user: dict[str, Any],
     league_id: str,
@@ -2822,9 +2856,11 @@ def _resolve_my_roster(
         profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
 
     sleeper_username = ""
+    saved_rows_for_cap: list[Any] | None = None
     if user_id:
         saved_rows, saved_error = _fetch_saved_leagues_cached(config, access_token, user_id)
         if not saved_error:
+            saved_rows_for_cap = list(saved_rows or [])
             normalized_league_id = saved_leagues.normalize_league_id(league_id)
             for row in saved_rows:
                 if saved_leagues.normalize_league_id(row.get("league_id")) == normalized_league_id:
@@ -2834,6 +2870,13 @@ def _resolve_my_roster(
         sleeper_username = str(profile.get("sleeper_username") or "")
     if not sleeper_username:
         return None, "no_sleeper_username_linked"
+
+    if (
+        user_id
+        and saved_rows_for_cap is not None
+        and not _free_league_allowed(user_id, profile, league_id, saved_rows_for_cap)
+    ):
+        return None, FREE_LEAGUE_CAP_REASON
 
     sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
     if not sleeper_user_id:
@@ -3262,6 +3305,13 @@ def get_live_draft_trade_evaluator_options(
     """
 
     _league, draft = _load_active_live_draft(league_id, draft_id)
+    # Live Draft is Pro-only (GET .../live-draft/{id} withholds its state);
+    # the evaluator sub-routes were reachable by Free callers directly.
+    if not _manager_tendencies_gate(_user):
+        return {
+            "ok": True, "reason": "", "pick_data_stale": False, "pick_options": [],
+            "is_premium": False, "upsell": _LIVE_DRAFT_UPSELL,
+        }
     picks, pick_error = live_draft.fetch_sleeper_draft_picks(draft_id)
     rosters = sleeper.get_rosters(league_id)
     roster_profiles = sleeper.get_league_roster_profiles(league_id)
@@ -3366,6 +3416,11 @@ def post_live_draft_trade_evaluator(
         raise HTTPException(status_code=422, detail="The same pick or player can't be on both sides of a trade.")
 
     league, draft = _load_active_live_draft(league_id, draft_id)
+    if not _manager_tendencies_gate(_user):
+        return {
+            "ok": True, "reason": "premium_required", "stale_pick_keys": [], "verdict": None,
+            "is_premium": False, "upsell": _LIVE_DRAFT_UPSELL,
+        }
     picks, _pick_error = live_draft.fetch_sleeper_draft_picks(draft_id)
     rosters = sleeper.get_rosters(league_id)
     roster_profiles = sleeper.get_league_roster_profiles(league_id)
@@ -4054,6 +4109,16 @@ def post_trade_analyzer(
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    # Free accounts get FREE_WEEKLY_TRADE_EVAL_LIMIT evaluations per week
+    # (modules.trade_eval_usage); web enforced it, this API did not. The
+    # counter is server-side (Redis), not the user-writable user_settings.
+    analyzer_user_id = str(user.get("id") or "")
+    if not _manager_tendencies_gate(user):
+        if not free_tier_ledger.consume_weekly_trade_eval(
+            analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
+        ):
+            return {"ok": True, "verdict": None, "reason": "weekly_limit_reached"}
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.
@@ -8154,6 +8219,11 @@ def _project_briefing_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_trade_briefing_item(item: Any) -> bool:
+    presentation = item.to_dict().get("presentation")
+    return isinstance(presentation, dict) and "trade_package" in presentation
+
+
 def _project_briefing_item(item: Any) -> dict[str, Any]:
     return _project_briefing_item_payload(item.to_dict())
 
@@ -8421,6 +8491,20 @@ def get_league_dashboard(
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     all_items = list(briefing.items)
     visible_items = all_items if is_premium else all_items[:FREE_DASHBOARD_VISIBLE_ITEMS]
+    if not is_premium:
+        # The Top Trade Opportunity tile is a trade idea like any other: a
+        # Free caller only sees it if that idea fits in (or is already part
+        # of) the ONE shared per-user pool Trade Hub / All Trades draw from,
+        # so Dashboard + Trade Hub + switching lens can't each hand out
+        # their own free idea.
+        headline_records = trade_hub_ui.order_trade_hub_visible_ideas(list(trade_idea_records or []))
+        headline_id = trade_hub_ui.idea_recommendation_id(headline_records[0]) if headline_records else ""
+        _applied, pool_cap = _free_trade_idea_cap(user_id)
+        trade_tile_allowed = bool(headline_id) and headline_id in free_tier_ledger.claim_trade_ideas(
+            user_id, [headline_id], pool_cap
+        )
+        if not trade_tile_allowed:
+            visible_items = [item for item in visible_items if not _is_trade_briefing_item(item)]
 
     return {
         "ok": True,
@@ -11310,6 +11394,24 @@ AD_BONUS_IDEAS_PER_UNLOCK = 2
 MAX_AD_UNLOCKS = 3
 
 
+def _free_trade_idea_cap(user_id: str, *, claimed_ad_unlocks: int | None = None) -> tuple[int, int]:
+    """(ad_unlocks_applied, pool_cap) for a Free user, from SERVER state.
+
+    Paywall audit, 2026-10: `ad_unlocks` / `shown_count` used to be trusted
+    straight from the query string, so a Free caller could pass
+    `ad_unlocks=3` for 8 ideas (or `shown_count=0` on every All Trades page)
+    and every page counted its own allowance. Now ONE per-user pool
+    (modules.free_tier_ledger) is shared by Trade Hub, All Trades, the
+    Dashboard headline and share cards; the client's ad count is only a
+    hint that can raise the server's own count by one per cooldown."""
+
+    if claimed_ad_unlocks is None:
+        applied = min(free_tier_ledger.ad_unlocks_granted(user_id), MAX_AD_UNLOCKS)
+    else:
+        applied = free_tier_ledger.grant_ad_unlock_if_claimed(user_id, claimed_ad_unlocks, MAX_AD_UNLOCKS)
+    return applied, trade_hub_ui.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * applied
+
+
 def _project_and_enrich_trade_idea_cards(
     records: list[dict[str, Any]], *, league_id: str, lens: str
 ) -> list[dict[str, Any]]:
@@ -11462,16 +11564,15 @@ def get_trade_hub_ideas(
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
     approved_count = len(ranked)
-    ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
-    effective_limit = (
-        approved_count
-        if is_premium
-        else min(
-            approved_count,
-            trade_hub_ui.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * ad_unlocks_applied,
+    if is_premium:
+        ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
+        visible = ranked
+    else:
+        ad_unlocks_applied, pool_cap = _free_trade_idea_cap(user_id, claimed_ad_unlocks=ad_unlocks)
+        allowed_ids = free_tier_ledger.claim_trade_ideas(
+            user_id, [str(card.get("recommendation_id") or "") for card in ranked], pool_cap
         )
-    )
-    visible = ranked[:effective_limit]
+        visible = [card for card in ranked if str(card.get("recommendation_id") or "") in allowed_ids][:pool_cap]
     return {
         "ok": True,
         "ideas": visible,
@@ -11577,6 +11678,13 @@ def get_trade_hub_idea_share_card(
         (record for record in records if trade_hub_ui.idea_recommendation_id(record) == recommendation_id),
         None,
     )
+    # A Free caller may only render a card for an idea already in its own
+    # revealed pool (i.e. one it was actually shown) -- the board above is
+    # the FULL, unredacted idea set, so without this any hidden idea could be
+    # pulled out as a branded PNG by guessing/enumerating recommendation ids.
+    if idea is not None and not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        if not free_tier_ledger.is_idea_revealed(user_id, recommendation_id):
+            raise HTTPException(status_code=404, detail="Unlock this idea to share it.")
 
     team_profile = sleeper.get_league_roster_profiles(league_id).get(str(roster_id), {})
     my_team_name = str(team_profile.get("team_name") or "")
@@ -11777,6 +11885,23 @@ def get_league_all_trades(
         }
 
     my_roster, _reason = _resolve_my_roster(user, league_id, profile=profile)
+    if _reason == FREE_LEAGUE_CAP_REASON:
+        return {
+            "ok": True,
+            "ideas": [],
+            "has_more": False,
+            "next_cursor": max(0, cursor),
+            "total_teams": 0,
+            "reason": _reason,
+            "entitlement": {
+                "is_premium": False,
+                "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+                "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
+                "max_ad_unlocks": MAX_AD_UNLOCKS,
+                "ad_unlocks_applied": 0,
+                "remaining_free": 0,
+            },
+        }
     my_roster_id = int(my_roster.get("roster_id")) if my_roster and my_roster.get("roster_id") is not None else None
 
     rosters = sleeper.get_rosters(league_id)
@@ -11818,9 +11943,15 @@ def get_league_all_trades(
     # Free-tier remaining budget carried in from prior pages — computed
     # once, up front, so a page never hands out more than a Free user has
     # left regardless of how many teams' ideas it touches.
-    ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
-    free_cap = trade_hub_ui.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * ad_unlocks_applied
-    remaining_free = max(0, free_cap - max(0, int(shown_count or 0)))
+    # `shown_count` is accepted for old clients but ignored: the allowance
+    # is the shared server-side pool, not a client-reported tally.
+    if is_premium:
+        ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
+        free_cap = 0
+        remaining_free = 0
+    else:
+        ad_unlocks_applied, free_cap = _free_trade_idea_cap(user_id, claimed_ad_unlocks=ad_unlocks)
+        remaining_free = max(0, free_cap - free_tier_ledger.pool_size(user_id))
 
     ideas: list[dict[str, Any]] = []
     for roster_id in page_roster_ids:
@@ -11845,8 +11976,12 @@ def get_league_all_trades(
         # "All Trades" is meant to sample across the league, not repeat
         # Trade Hub's own full-depth board once per team.
         for record in ranked_records[:2]:
-            if not is_premium and remaining_free <= 0:
-                break
+            if not is_premium:
+                if not free_tier_ledger.claim_trade_ideas(
+                    user_id, [trade_hub_ui.idea_recommendation_id(record)], free_cap
+                ):
+                    remaining_free = 0
+                    break
             card = trade_hub_engine.project_trade_idea_card(record, is_headline=False).to_dict()
             card["source_roster_id"] = str(roster_id)
             card["source_team_name"] = team_name_by_roster_id.get(str(roster_id), "")
@@ -11858,7 +11993,7 @@ def get_league_all_trades(
             ) or ""
             ideas.append(card)
             if not is_premium:
-                remaining_free -= 1
+                remaining_free = max(0, free_cap - free_tier_ledger.pool_size(user_id))
 
     next_cursor = cursor + page_size
     return {
