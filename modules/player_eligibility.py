@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import sys
+import threading
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+import numpy as np
 import pandas as pd
 
+from modules import trust_enforcement as _trust_enforcement
+from modules import trust_engine as _trust_engine
 from modules.trust_enforcement import EnforcementLevel, enforce_player_record
 from modules.trust_engine import canonical_object_key
 
@@ -304,11 +311,17 @@ def player_eligibility(
     }
 
 
-def annotate_player_eligibility(
+def _annotate_player_eligibility_full(
     players: pd.DataFrame,
     *,
     now: datetime | None = None,
 ) -> pd.DataFrame:
+    """Reference path: every row validated from scratch, no memo.
+
+    This is the pre-memo implementation, unchanged. ``annotate_player_eligibility``
+    must stay byte-identical to it (tests/test_player_eligibility_memo_parity.py).
+    It also handles empty frames and frames with duplicate column labels.
+    """
     if players is None:
         return pd.DataFrame()
     annotated = players.copy()
@@ -378,6 +391,467 @@ def annotate_player_eligibility(
     ]
     annotated["trust_validation_fingerprint"] = fingerprints
     return annotated
+
+
+def _player_id_sets(annotated: pd.DataFrame) -> tuple[frozenset[str], frozenset[str]]:
+    player_ids = annotated.get(
+        "player_id",
+        pd.Series("", index=annotated.index, dtype="object"),
+    ).fillna("").astype(str).str.strip()
+    duplicate_ids = frozenset(
+        player_id
+        for player_id, count in player_ids.value_counts().items()
+        if player_id and int(count) > 1
+    )
+    canonical_ids = frozenset(player_id for player_id in player_ids if player_id)
+    return duplicate_ids, canonical_ids
+
+
+def _write_annotation_columns(
+    annotated: pd.DataFrame,
+    results: list[tuple[bool, str, str, str, str, str]],
+) -> pd.DataFrame:
+    annotated["is_current_fantasy_eligible"] = [result[0] for result in results]
+    annotated["player_eligibility_reason"] = [result[1] for result in results]
+    annotated["trust_enforcement"] = [result[2] for result in results]
+    annotated["trust_evidence_confidence"] = [result[3] for result in results]
+    annotated["trust_block_reason"] = [result[4] for result in results]
+    annotated["trust_validation_fingerprint"] = [result[5] for result in results]
+    return annotated
+
+
+def _annotate_one_row(
+    row: pd.Series,
+    *,
+    fingerprint: str,
+    now: datetime,
+    duplicate_ids: frozenset[str],
+    canonical_ids: frozenset[str],
+) -> tuple[bool, str, str, str, str, str]:
+    evaluation = player_eligibility(row, now=now)
+    result = enforce_player_record(
+        row,
+        eligible=bool(evaluation["eligible"]),
+        eligibility_reason=str(evaluation["reason"]),
+        duplicate_ids=duplicate_ids,
+        canonical_player_ids=canonical_ids,
+    )
+    blocked = result.level is EnforcementLevel.BLOCKED
+    return (
+        bool(evaluation["eligible"]) and not blocked,
+        str(evaluation["reason"]),
+        result.level.value,
+        result.evidence.confidence.value,
+        result.reasons[0] if blocked and result.reasons else "",
+        fingerprint,
+    )
+
+
+# --- Incremental annotation -------------------------------------------------
+#
+# Every Sleeper dump refresh (5-minute TTL) changes the public-player source
+# fingerprint, and the rebuild re-validated every player from scratch, twice
+# (iterrows + to_dict + a JSON/sha256 of every full row), when typically ~9
+# players' news timestamps had actually changed. Each player's result is a
+# pure function of
+#   * the row's values in _ANNOTATION_INPUT_COLUMNS: every field that
+#     player_eligibility, enforce_player_record (validate_player) and
+#     _trust_validation_fingerprint read,
+#   * whether its player_id is duplicated / canonical in this frame,
+#   * the clock, only through: now.year, now's UTC date (fingerprint),
+#     today's UTC date (validate_player's freshness bucket), and the two
+#     news-age threshold comparisons, evaluated per row in the key,
+#   * the code and constants of this module, trust_enforcement and
+#     trust_engine, the pandas/numpy/Python versions, and the process
+#     timezone (naive datetimes in trust_engine._stable_payload).
+# The memo key covers all of it, so a hit returns exactly what a full
+# recompute would (tests/test_player_eligibility_memo_parity.py). Values the
+# key can't encode faithfully are just recomputed.
+#
+# Two tiers: a per-process LRU (the second annotate in the same rebuild is
+# then all hits) and Redis, so a cold process (a freshly started worker, or
+# the players.db rebuild subprocess that runs every refresh) reuses what any
+# other process already computed. Redis is skipped whenever any of the code
+# above is monkeypatched in-process, and fails open.
+
+_ANNOTATION_INPUT_COLUMNS = tuple(
+    dict.fromkeys((*TRUST_PLAYER_INPUT_COLUMNS, "injury_status"))
+)
+_ANNOTATION_MEMO_MAX_ENTRIES = 16384
+_ANNOTATION_MEMO: OrderedDict[bytes, tuple[bool, str, str, str, str, str]] = OrderedDict()
+_ANNOTATION_MEMO_GUARD = threading.Lock()
+_ANNOTATION_MEMO_STATS = {"hits": 0, "redis_hits": 0, "misses": 0, "uncacheable": 0}
+_REDIS_MEMO_PREFIX = b"player_annotation_memo:v1:"
+# The key embeds today's date, so entries are dead after a day anyway.
+_REDIS_MEMO_TTL_SECONDS = 26 * 60 * 60
+_REDIS_MEMO_RETRY_AFTER_SECONDS = 30.0
+_redis_memo_down_until = 0.0
+
+
+class _UncacheableValue(Exception):
+    pass
+
+
+def _memo_token(value: Any) -> Any:
+    """Hashable, type-tagged encoding that distinguishes every value the
+    validators can tell apart (1 vs 1.0 vs True vs "1", NaN, tz-aware vs
+    naive, container order). Raises for anything it can't encode exactly."""
+
+    value_type = type(value)
+    if value is None:
+        return "N"
+    if value_type is str:
+        return ("s", value)
+    if value_type is bool:
+        return ("b", value)
+    if value_type is int:
+        return ("i", value)
+    if value_type is float:
+        return ("f", repr(value))
+    if value is pd.NA:
+        return ("NA",)
+    if value is pd.NaT:
+        return ("NaT",)
+    type_name = f"{value_type.__module__}.{value_type.__qualname__}"
+    if isinstance(value, np.generic):
+        return ("np", type_name, repr(value))
+    if isinstance(value, datetime):
+        return ("dt", type_name, value.isoformat(), repr(value.tzinfo))
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return ("seq", type_name, tuple(_memo_token(item) for item in value))
+    if isinstance(value, dict):
+        return (
+            "map",
+            type_name,
+            tuple((_memo_token(key), _memo_token(item)) for key, item in value.items()),
+        )
+    raise _UncacheableValue(type_name)
+
+
+def _behavior_ids() -> tuple[int, ...]:
+    return tuple(
+        id(function)
+        for function in (
+            player_eligibility,
+            enforce_player_record,
+            _trust_validation_fingerprint,
+            _fantasy_positions,
+            _news_timestamp_seconds,
+            _safe_text,
+            _optional_bool,
+            _safe_number,
+            _trust_enforcement.validate_player,
+            _trust_enforcement._evidence,
+            _trust_engine._validate,
+            _trust_engine._cached_validation,
+            _trust_engine._validate_player,
+            _trust_engine._freshness,
+            _trust_engine._signals,
+            _trust_engine._conflicts,
+            _trust_engine._result,
+            _trust_engine._stable_payload,
+            _trust_engine._now_bucket,
+            _trust_engine.canonical_object_key,
+        )
+    )
+
+
+def _constants_repr() -> str:
+    return repr(
+        (
+            sorted(FANTASY_POSITIONS),
+            sorted(INELIGIBLE_STATUS_TERMS),
+            sorted(CURRENT_STATUS_TERMS),
+            sorted(RESERVE_STATUS_TERMS),
+            sorted(FREE_AGENT_TEAM_MARKERS),
+            NEWS_FRESHNESS_DAYS,
+            UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS,
+            VETERAN_UNSIGNED_MIN_EXPERIENCE,
+            VETERAN_UNSIGNED_MIN_AGE,
+            PLAYER_ELIGIBILITY_CONTRACT_VERSION,
+            TRUST_PLAYER_INPUT_COLUMNS,
+        )
+    )
+
+
+def _code_version_digest() -> str:
+    digest = hashlib.sha256()
+    for module_file in (__file__, _trust_enforcement.__file__, _trust_engine.__file__):
+        try:
+            with open(module_file, "rb") as handle:
+                digest.update(handle.read())
+        except OSError:
+            digest.update(f"unreadable:{module_file}".encode())
+    digest.update(f"{sys.version}|{pd.__version__}|{np.__version__}".encode())
+    return digest.hexdigest()
+
+
+def _annotation_context(columns: pd.Index, *, now: datetime) -> tuple[str, bool]:
+    """(key context, shareable across processes)."""
+
+    behavior_ids = _behavior_ids()
+    constants = _constants_repr()
+    shareable = behavior_ids == _IMPORT_BEHAVIOR_IDS and constants == _IMPORT_CONSTANTS_REPR
+    context = (
+        tuple(column for column in _ANNOTATION_INPUT_COLUMNS if column in columns),
+        now.year,
+        now.astimezone(timezone.utc).date().isoformat(),
+        _trust_engine._now_bucket(None),
+        _CODE_VERSION_DIGEST if shareable else ("patched", behavior_ids),
+        constants,
+        time.timezone,
+        time.altzone,
+        time.daylight,
+        time.tzname,
+    )
+    return repr(context), shareable
+
+
+def _row_memo_key(
+    values: Any,
+    *,
+    positions: tuple[int, ...],
+    player_id_position: int | None,
+    news_position: int | None,
+    context_repr: str,
+    now_seconds: float,
+    duplicate_ids: frozenset[str],
+    canonical_ids: frozenset[str],
+) -> bytes | None:
+    """Memo key for one row, or None (row is recomputed, not memoized) when
+    any value can't be encoded exactly or the key itself can't be built."""
+
+    try:
+        tokens = tuple(_memo_token(values[position]) for position in positions)
+        raw_player_id = values[player_id_position] if player_id_position is not None else None
+        # enforce_player_record's own normalization of the id (str(v or "").strip()).
+        player_id = str(raw_player_id or "").strip()
+        news_seconds = _news_timestamp_seconds(
+            values[news_position] if news_position is not None else None
+        )
+        news_age = (now_seconds - news_seconds) if news_seconds else None
+        payload = repr(
+            (
+                context_repr,
+                tokens,
+                player_id in duplicate_ids,
+                player_id in canonical_ids,
+                bool(news_seconds and news_age <= NEWS_FRESHNESS_DAYS * 24 * 60 * 60),
+                bool(
+                    news_seconds
+                    and news_age > UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS * 24 * 60 * 60
+                ),
+            )
+        )
+    except Exception:
+        return None
+    return hashlib.blake2b(
+        payload.encode("utf-8", "surrogatepass"),
+        digest_size=16,
+    ).digest()
+
+
+def _valid_memo_result(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == 6
+        and type(value[0]) is bool
+        and all(type(item) is str for item in value[1:])
+    )
+
+
+def _redis_memo_client() -> Any:
+    if time.monotonic() < _redis_memo_down_until:
+        return None
+    try:
+        from modules import redis_cache
+
+        return redis_cache.get_redis_client()
+    except Exception:
+        return None
+
+
+def _redis_memo_failed() -> None:
+    global _redis_memo_down_until
+    _redis_memo_down_until = time.monotonic() + _REDIS_MEMO_RETRY_AFTER_SECONDS
+
+
+def _redis_memo_get(keys: list[bytes]) -> dict[bytes, tuple[bool, str, str, str, str, str]]:
+    client = _redis_memo_client() if keys else None
+    if client is None:
+        return {}
+    try:
+        raw = client.mget([_REDIS_MEMO_PREFIX + key.hex().encode() for key in keys])
+    except Exception:
+        _redis_memo_failed()
+        return {}
+    found: dict[bytes, tuple[bool, str, str, str, str, str]] = {}
+    for key, payload in zip(keys, raw or ()):
+        if payload is None:
+            continue
+        try:
+            value = json.loads(payload)
+        except (TypeError, ValueError):
+            continue
+        if _valid_memo_result(value):
+            found[key] = tuple(value)  # type: ignore[assignment]
+    return found
+
+
+def _redis_memo_set(entries: list[tuple[bytes, tuple[bool, str, str, str, str, str]]]) -> None:
+    client = _redis_memo_client() if entries else None
+    if client is None:
+        return
+    try:
+        pipe = client.pipeline(transaction=False)
+        for key, result in entries:
+            pipe.set(
+                _REDIS_MEMO_PREFIX + key.hex().encode(),
+                json.dumps(list(result), separators=(",", ":")),
+                ex=_REDIS_MEMO_TTL_SECONDS,
+            )
+        pipe.execute()
+    except Exception:
+        _redis_memo_failed()
+
+
+def clear_player_annotation_memo() -> None:
+    """Drop this process's tier (Redis entries expire on their own)."""
+
+    global _redis_memo_down_until
+    with _ANNOTATION_MEMO_GUARD:
+        _ANNOTATION_MEMO.clear()
+        for name in _ANNOTATION_MEMO_STATS:
+            _ANNOTATION_MEMO_STATS[name] = 0
+    _redis_memo_down_until = 0.0
+
+
+def player_annotation_memo_stats() -> dict[str, int]:
+    with _ANNOTATION_MEMO_GUARD:
+        return {**_ANNOTATION_MEMO_STATS, "entries": len(_ANNOTATION_MEMO)}
+
+
+def annotate_player_eligibility(
+    players: pd.DataFrame,
+    *,
+    now: datetime | None = None,
+) -> pd.DataFrame:
+    if players is None:
+        return pd.DataFrame()
+    if not players.columns.is_unique:
+        return _annotate_player_eligibility_full(players, now=now)
+    annotated = players.copy()
+    resolved_now = now or datetime.now(timezone.utc)
+    if annotated.empty:
+        return _annotate_player_eligibility_full(players, now=resolved_now)
+
+    columns = annotated.columns
+    # Exactly the per-row objects iterrows() yields (it iterates self.values).
+    values = annotated.values
+    index = annotated.index
+    positions = tuple(
+        columns.get_loc(column) for column in _ANNOTATION_INPUT_COLUMNS if column in columns
+    )
+    player_id_position = columns.get_loc("player_id") if "player_id" in columns else None
+    news_position = columns.get_loc("news_updated") if "news_updated" in columns else None
+    duplicate_ids, canonical_ids = _player_id_sets(annotated)
+    context_repr, shareable = _annotation_context(columns, now=resolved_now)
+    now_seconds = resolved_now.timestamp()
+
+    row_count = len(values)
+    keys = [
+        _row_memo_key(
+            values[position],
+            positions=positions,
+            player_id_position=player_id_position,
+            news_position=news_position,
+            context_repr=context_repr,
+            now_seconds=now_seconds,
+            duplicate_ids=duplicate_ids,
+            canonical_ids=canonical_ids,
+        )
+        for position in range(row_count)
+    ]
+    results: list[tuple[bool, str, str, str, str, str] | None] = [None] * row_count
+    with _ANNOTATION_MEMO_GUARD:
+        for position, key in enumerate(keys):
+            if key is None:
+                continue
+            cached = _ANNOTATION_MEMO.get(key)
+            if cached is not None:
+                _ANNOTATION_MEMO.move_to_end(key)
+                results[position] = cached
+    redis_hits = 0
+    if shareable:
+        wanted = list(
+            dict.fromkeys(
+                key for key, result in zip(keys, results) if key is not None and result is None
+            )
+        )
+        shared = _redis_memo_get(wanted)
+        if shared:
+            for position, key in enumerate(keys):
+                if results[position] is None and key in shared:
+                    results[position] = shared[key]
+                    redis_hits += 1
+            with _ANNOTATION_MEMO_GUARD:
+                for key, result in shared.items():
+                    _ANNOTATION_MEMO[key] = result
+
+    row_class = annotated._constructor_sliced
+    miss_rows: dict[int, pd.Series] = {}
+    fingerprints: list[str] = []
+    for position in range(row_count):
+        cached = results[position]
+        if cached is not None:
+            fingerprints.append(cached[5])
+            continue
+        row = row_class(values[position], index=columns, name=index[position]).__finalize__(
+            annotated
+        )
+        miss_rows[position] = row
+        fingerprints.append(_trust_validation_fingerprint(row, now=resolved_now))
+
+    if TRUST_ANNOTATION_COLUMNS.issubset(columns) and all(
+        str(stored or "") == current
+        for stored, current in zip(
+            annotated["trust_validation_fingerprint"],
+            fingerprints,
+        )
+    ):
+        return annotated
+
+    fresh: list[tuple[bytes, tuple[bool, str, str, str, str, str]]] = []
+    for position, row in miss_rows.items():
+        result = _annotate_one_row(
+            row,
+            fingerprint=fingerprints[position],
+            now=resolved_now,
+            duplicate_ids=duplicate_ids,
+            canonical_ids=canonical_ids,
+        )
+        results[position] = result
+        if keys[position] is not None:
+            fresh.append((keys[position], result))
+    uncacheable = sum(1 for key in keys if key is None)
+    with _ANNOTATION_MEMO_GUARD:
+        for key, result in fresh:
+            _ANNOTATION_MEMO[key] = result
+            _ANNOTATION_MEMO.move_to_end(key)
+        while len(_ANNOTATION_MEMO) > _ANNOTATION_MEMO_MAX_ENTRIES:
+            _ANNOTATION_MEMO.popitem(last=False)
+        _ANNOTATION_MEMO_STATS["uncacheable"] += uncacheable
+        _ANNOTATION_MEMO_STATS["misses"] += len(miss_rows) - uncacheable
+        _ANNOTATION_MEMO_STATS["redis_hits"] += redis_hits
+        _ANNOTATION_MEMO_STATS["hits"] += row_count - len(miss_rows) - redis_hits
+    if shareable:
+        _redis_memo_set(fresh)
+    return _write_annotation_columns(annotated, results)  # type: ignore[arg-type]
+
+
+_CODE_VERSION_DIGEST = _code_version_digest()
+_IMPORT_BEHAVIOR_IDS = _behavior_ids()
+_IMPORT_CONSTANTS_REPR = _constants_repr()
 
 
 def eligibility_diagnostics(players: pd.DataFrame) -> dict[str, int]:

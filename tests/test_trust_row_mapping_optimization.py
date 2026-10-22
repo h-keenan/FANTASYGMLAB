@@ -9,6 +9,7 @@ import pytest
 from modules import trust_engine
 from modules.player_eligibility import (
     annotate_player_eligibility,
+    clear_player_annotation_memo,
     eligibility_diagnostics,
 )
 from modules.trust_enforcement import enforce_player_record
@@ -158,15 +159,23 @@ def test_one_series_and_one_enforcement_mapping_are_constructed_per_player():
         mappings += 1
         return original_to_dict(self, *args, **kwargs)
 
+    clear_player_annotation_memo()
     with patch.object(pd.DataFrame, "iterrows", observed_iterrows), patch.object(
         pd.Series,
         "to_dict",
         observed_to_dict,
     ):
         annotate_player_eligibility(frame, now=NOW)
-
-    assert yielded == len(frame)
-    assert mappings == len(frame)
+        # At most one row Series and exactly one enforcement mapping per
+        # player on a cold memo (rows are built straight from frame.values,
+        # the same objects iterrows() would yield).
+        assert yielded <= len(frame)
+        assert mappings == len(frame)
+        # Unchanged players are served by the per-player memo: no rows and
+        # no enforcement mappings are rebuilt.
+        mappings = 0
+        annotate_player_eligibility(frame, now=NOW)
+        assert mappings == 0
 
 
 def test_shared_mapping_is_not_mutated_by_trust_consumers():
