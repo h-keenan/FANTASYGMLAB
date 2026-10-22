@@ -134,6 +134,7 @@ const METRIC_TABS: Array<{ key: RankingMetric; label: string }> = [
 interface TeamRow {
   rosterId: number | string;
   teamName: string;
+  ownerName: string;
   avatarId: string;
   playerIds: string[];
   isMine: boolean;
@@ -184,6 +185,7 @@ function toneColor(tone: 'neutral' | 'positive' | 'negative', colors: ThemeColor
 interface BaseTeamRow {
   rosterId: number | string;
   teamName: string;
+  ownerName: string;
   avatarId: string;
   playerIds: string[];
   isMine: boolean;
@@ -204,7 +206,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
   const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
   const config = METRIC_CONFIG[metric];
   const queryClient = useQueryClient();
-  const [profileTeam, setProfileTeam] = useState<{ rosterId: number | string; teamName: string } | null>(null);
+  const [profileTeam, setProfileTeam] = useState<{ rosterId: number | string; teamName: string; ownerName: string; avatarId: string } | null>(null);
   // Gates every query below until the persisted AsyncStorage cache has
   // finished hydrating back into the in-memory QueryClient — same guard
   // Dashboard/Matchup use, so a query here never fires before last session's
@@ -288,6 +290,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
       return {
         rosterId,
         teamName: profile?.team_name || 'Unclaimed team',
+        ownerName: profile?.owner_name || '',
         avatarId: profile?.avatar_id || '',
         playerIds: players.map(String),
         isMine: Boolean(myRosterId) && rosterId === myRosterId,
@@ -313,6 +316,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
       return {
         rosterId: row.rosterId,
         teamName: row.teamName,
+        ownerName: row.ownerName,
         avatarId: row.avatarId,
         playerIds: row.playerIds,
         isMine: row.isMine,
@@ -383,7 +387,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
             showTrophy={metric === 'power'}
             colors={colors}
             styles={styles}
-            onOpenProfile={() => setProfileTeam({ rosterId: item.rosterId, teamName: item.teamName })}
+            onOpenProfile={() => setProfileTeam({ rosterId: item.rosterId, teamName: item.teamName, ownerName: item.ownerName, avatarId: item.avatarId })}
             onPress={() =>
               navigation.navigate('TeamRoster', {
                 ownerName: item.teamName,
@@ -403,6 +407,8 @@ export default function TeamsScreen({ route, navigation }: Props) {
           leagueId={leagueId}
           rosterId={profileTeam.rosterId}
           teamName={profileTeam.teamName}
+          ownerName={profileTeam.ownerName}
+          avatarId={profileTeam.avatarId}
         />
       ) : null}
     </View>

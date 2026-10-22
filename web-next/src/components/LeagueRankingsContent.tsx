@@ -131,7 +131,7 @@ function RankingRow({
   );
 }
 
-type OpenManager = (rosterId: string, teamName: string) => void;
+type OpenManager = (rosterId: string, teamName: string, ownerName: string | null, avatarUrl: string | null) => void;
 
 function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTeamRankingsResponse; myRosterId: string; onOpenManager: OpenManager }) {
   const title = data.season ? `${data.season} Standings` : "Standings";
@@ -180,7 +180,7 @@ function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTea
                 firstPlace={team.standing_rank === 1}
                 secondary={secondary}
                 badges={team.playoff_status ? [{ label: team.playoff_status, tone: "neutral" }] : undefined}
-                onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team")}
+                onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team", team.owner_name, team.avatar_url)}
               />
               {team.on_playoff_line ? (
                 <div
@@ -321,7 +321,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
               firstPlace={rank === 1}
               secondary={boardSecondaryParts(board, team)}
               badges={badges}
-              onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team")}
+              onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team", team.owner_name, team.avatar_url)}
             />
           );
         })}
@@ -347,8 +347,8 @@ export function LeagueRankingsContent({
   myRosterId?: string;
 }) {
   const notReady = !data.ok || data.teams.length === 0;
-  const [profile, setProfile] = useState<{ rosterId: string; teamName: string } | null>(null);
-  const openManager: OpenManager = (rosterId, teamName) => setProfile({ rosterId, teamName });
+  const [profile, setProfile] = useState<{ rosterId: string; teamName: string; ownerName: string | null; avatarUrl: string | null } | null>(null);
+  const openManager: OpenManager = (rosterId, teamName, ownerName, avatarUrl) => setProfile({ rosterId, teamName, ownerName, avatarUrl });
 
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
@@ -379,6 +379,8 @@ export function LeagueRankingsContent({
           leagueId={leagueId}
           rosterId={profile.rosterId}
           teamName={profile.teamName}
+          ownerName={profile.ownerName}
+          avatarUrl={profile.avatarUrl}
           onClose={() => setProfile(null)}
         />
       ) : null}

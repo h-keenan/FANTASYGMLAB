@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { api, type ManagerTendenciesDetailResponse } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
+import { TeamAvatar } from "@/components/TeamAvatar";
 import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip } from "@/components/StatStrip";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -17,11 +18,15 @@ export function ManagerProfileSheet({
   leagueId,
   rosterId,
   teamName,
+  ownerName,
+  avatarUrl,
   onClose,
 }: {
   leagueId: string;
   rosterId: string | number;
   teamName: string;
+  ownerName?: string | null;
+  avatarUrl?: string | null;
   onClose: () => void;
 }) {
   const [data, setData] = useState<ManagerTendenciesDetailResponse | null>(null);
@@ -72,13 +77,18 @@ export function ManagerProfileSheet({
           ×
         </button>
         <div className="pqv-scroll">
-          <div className="flex flex-col gap-0.5 pr-10">
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              How this manager trades
-            </span>
-            <h2 id="mgr-profile-name" className="text-lg font-extrabold">
-              {teamName}
-            </h2>
+          <div className="flex items-center gap-3 pr-10">
+            <TeamAvatar avatarUrl={avatarUrl} name={ownerName || teamName} size={48} />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h2 id="mgr-profile-name" className="text-lg font-extrabold break-words">
+                {teamName}
+              </h2>
+              {ownerName ? (
+                <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
+                  {ownerName}
+                </span>
+              ) : null}
+            </div>
           </div>
           {failed ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

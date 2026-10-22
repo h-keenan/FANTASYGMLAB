@@ -9,6 +9,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import DashboardStatRow from './DashboardStatRow';
 import SectionHeading from './SectionHeading';
+import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';
 import { api } from '../lib/api';
 import { sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone } from '../lib/managerTendencies';
@@ -23,11 +24,13 @@ interface Props {
   leagueId: string;
   rosterId: string | number;
   teamName: string;
+  ownerName?: string | null;
+  avatarId?: string | null;
 }
 
 /** Manager profile (League Rankings): every readable signal with its
  * evidence line. Fetches only while open. */
-export default function ManagerProfileModal({ visible, onClose, leagueId, rosterId, teamName }: Props) {
+export default function ManagerProfileModal({ visible, onClose, leagueId, rosterId, teamName, ownerName, avatarId }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -48,11 +51,16 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, roster
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.headerRow}>
+            <TeamAvatar avatarId={avatarId} name={ownerName || teamName} size={44} style={styles.avatar} />
             <View style={styles.titleGroup}>
-              <AppText style={styles.kicker}>How this manager trades</AppText>
               <AppText style={styles.title} numberOfLines={1}>
                 {teamName}
               </AppText>
+              {ownerName ? (
+                <AppText style={styles.kicker} numberOfLines={1}>
+                  {ownerName}
+                </AppText>
+              ) : null}
             </View>
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={colors.textSecondary} />
@@ -143,6 +151,7 @@ function createStyles(colors: ThemeColors) {
       maxHeight: '80%',
     },
     headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+    avatar: { marginRight: spacing.md },
     titleGroup: { flex: 1, marginRight: spacing.sm },
     kicker: { fontSize: 11, color: colors.textSecondary },
     title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
