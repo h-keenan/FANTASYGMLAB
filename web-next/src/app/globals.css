@@ -1611,6 +1611,24 @@ a {
   z-index: 1;
 }
 
+/* Server-rendered landing page (app/page.tsx): its marketing content is in
+   the static HTML for crawlers, but a returning signed-in visitor about to
+   be auto-redirected should see only the branded LoadingScreen, exactly as
+   before. data-landing-pending on the landing root (set by an inline
+   script before first paint, then kept in sync by LandingAuthIsland, see
+   lib/landingPending.ts) swaps one view for the other. Without the
+   attribute (new visitors, and every no-JS crawler) the marketing view
+   shows and the loader stays hidden. */
+.fd-landing-loader {
+  display: none;
+}
+[data-landing-pending] > .fd-landing-loader {
+  display: flex;
+}
+[data-landing-pending] > .fd-landing-content {
+  display: none;
+}
+
 /* OnboardingCarousel (components/OnboardingCarousel.tsx) — a deliberate,
    one-time exception to the rest of the app's sharp-cornered design
    language (--radius-panel defaults to --radius-none everywhere else):

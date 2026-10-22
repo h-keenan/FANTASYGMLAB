@@ -5,6 +5,7 @@ import LandingPage from "./page";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { trackFeatureUse } from "@/lib/analytics";
+import { LANDING_PENDING_ATTR, LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -97,6 +98,102 @@ describe("LandingPage welcome-page analytics", () => {
     mockPush.mockClear();
   });
 
+  /**
+   * SSR conversion: the marketing view is now static server HTML, and a
+   * returning signed-in visitor is kept on the LoadingScreen (never a
+   * flash of marketing copy) via the landing root's pending flag, which
+   * CSS uses to swap the loader in. These pin when that flag is set.
+   */
+  describe("returning-user pending flag", () => {
+    const root = () => document.getElementById(LANDING_ROOT_ID);
+
+    it("keeps the loader up (pending) for a returning visitor being redirected to their Dashboard", async () => {
+      mockAuth({ user: { id: "user-1" } });
+      mockSavedLeagues({ data: [{ league_id: "league-1", league_name: "My League" }] });
+      render(<LandingPage />);
+
+      await waitFor(() => expect(mockReplace).toHaveBeenCalled());
+      expect(root()).toHaveAttribute(LANDING_PENDING_ATTR);
+    });
+
+    it("keeps the loader up (pending) for a returning visitor being redirected to Portfolio", async () => {
+      mockAuth({ user: { id: "user-1" } });
+      mockSavedLeagues({
+        data: [
+          { league_id: "league-1", league_name: "League One" },
+          { league_id: "league-2", league_name: "League Two" },
+        ],
+      });
+      render(<LandingPage />);
+
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/portfolio"));
+      expect(root()).toHaveAttribute(LANDING_PENDING_ATTR);
+    });
+
+    it("reveals the page once a signed-in visitor's check finds zero saved leagues", async () => {
+      mockAuth({ user: { id: "user-1" } });
+      mockSavedLeagues({ data: [] });
+      render(<LandingPage />);
+
+      expect(await screen.findByText("OnboardingCarousel")).toBeInTheDocument();
+      expect(root()).not.toHaveAttribute(LANDING_PENDING_ATTR);
+    });
+
+    it("never flags a signed-out visitor as pending", async () => {
+      mockAuth(null);
+      render(<LandingPage />);
+
+      expect(await screen.findByText("SignInForm")).toBeInTheDocument();
+      expect(root()).not.toHaveAttribute(LANDING_PENDING_ATTR);
+    });
+
+    it("clears a pending flag the inline script set once auth resolves with no session", async () => {
+      mockAuth(null, true);
+      const { rerender } = render(<LandingPage />);
+      // Simulates the pre-paint script having guessed "returning user" from
+      // a stale/expired token: left alone while auth is still loading...
+      root()!.setAttribute(LANDING_PENDING_ATTR, "");
+      rerender(<LandingPage />);
+      expect(root()).toHaveAttribute(LANDING_PENDING_ATTR);
+
+      // ...then corrected once auth resolves to no session.
+      mockAuth(null);
+      rerender(<LandingPage />);
+      expect(await screen.findByText("SignInForm")).toBeInTheDocument();
+      expect(root()).not.toHaveAttribute(LANDING_PENDING_ATTR);
+    });
+  });
+
+  describe("pre-paint inline script", () => {
+    function runScriptOn(el: HTMLElement) {
+      document.body.appendChild(el);
+      new Function(LANDING_PENDING_SCRIPT)();
+      return el;
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+      document.getElementById(LANDING_ROOT_ID)?.remove();
+    });
+
+    it("flags the root when a persisted Supabase session token exists", () => {
+      localStorage.setItem("sb-abcdefgh-auth-token", "{}");
+      const el = document.createElement("div");
+      el.id = LANDING_ROOT_ID;
+      expect(runScriptOn(el)).toHaveAttribute(LANDING_PENDING_ATTR);
+      el.remove();
+    });
+
+    it("leaves the root alone for a brand-new visitor (no token)", () => {
+      localStorage.setItem("unrelated", "1");
+      localStorage.setItem("sb-abcdefgh-auth-token-code-verifier", "x");
+      const el = document.createElement("div");
+      el.id = LANDING_ROOT_ID;
+      expect(runScriptOn(el)).not.toHaveAttribute(LANDING_PENDING_ATTR);
+      el.remove();
+    });
+  });
+
   it("fires landing_viewed once for a brand-new (signed-out) visitor seeing the sign-in form", async () => {
     mockAuth(null);
     render(<LandingPage />);
@@ -110,7 +207,10 @@ describe("LandingPage welcome-page analytics", () => {
     mockAuth(null, true);
     render(<LandingPage />);
 
-    expect(screen.getByText("LoadingScreen")).toBeInTheDocument();
+    // The marketing content is server-rendered and present regardless; only
+    // the auth island's slot is held back until auth resolves.
+    expect(screen.getByRole("heading", { name: /Your fantasy front office/ })).toBeInTheDocument();
+    expect(screen.queryByText("SignInForm")).toBeNull();
     expect(trackFeatureUse).not.toHaveBeenCalled();
   });
 
