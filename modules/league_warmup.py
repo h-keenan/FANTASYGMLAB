@@ -17,7 +17,7 @@ import sys
 import threading
 from typing import Any, Callable
 
-from modules import redis_cache
+from modules import redis_cache, sleeper_budget
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,11 @@ def start_warmup(
     try:
         if not user_id or not league_id:
             return False
+        if sleeper_budget.over_soft_threshold():
+            # Warm-ups are pure pre-computation; skip them while Sleeper
+            # budget is tight (the first real open computes on demand).
+            sleeper_budget.note_deferred()
+            return False
         client = redis_cache.get_redis_client()
         if not client.set(_limit_key(user_id, league_id), "1", nx=True, ex=RATE_LIMIT_SECONDS):
             return False
@@ -110,6 +115,7 @@ def _run(user_id: str, league_id: str, steps: dict[str, Callable[[], None]]) -> 
     state = "done"
     try:
         _lower_thread_priority()
+        sleeper_budget.set_low_priority_for_thread()
         for stage in STAGES:
             step = steps.get(stage)
             if step is not None:
