@@ -91,18 +91,15 @@ deliberate, documented scope trade-off, not an oversight.
 
 ## Clinching / elimination
 
-There is no separate "is this team mathematically clinched/eliminated"
-solver bolted on top. It falls out of the mechanics for free: a team's
-simulated final win total is capped at (current wins + real remaining
-games) in every single trial, and every other team's simulated final win
-total is at least its current (real, already-banked) win count in every
-trial, because wins are monotonic and remaining-game counts are real and
-fixed. So if a team's maximum possible final win total can never beat at
-least ``playoff_teams`` other teams' current win floors, it scores exactly
-0% across all trials — not approximately zero due to sampling, but
-structurally zero. The same logic makes an already-clinched team land at
-exactly 100%. A league with few weeks left therefore narrows toward
-certainty on its own, without any special-cased override.
+"Clinched" and "eliminated" are claims about every possible outcome, so they
+are NOT read off the sampled probability (3,000 trials cannot tell a 0.02%
+path from an impossible one). They come from an exact, conservative bound:
+each team's final wins lie in ``[wins, wins + remaining games]``, ties on
+wins count as unresolved, and with divisions the bound also accounts for
+division winners being seeded above wildcards. A team that is neither
+certified keeps a sampled probability clamped to ``[0.05, 99.95]`` so a
+number never reads as certainty it does not have. When no games remain the
+standings are deterministic and the sampled result is exact.
 """
 
 from __future__ import annotations
@@ -215,6 +212,62 @@ def _tiebreak_rank(
     rank = np.empty(n, dtype=int)
     rank[order] = np.arange(n)
     return rank
+
+
+# A team that is not mathematically eliminated/clinched never reports exactly
+# 0 or 100: sampling 3,000 trials cannot distinguish "1 in 5,000" from "never".
+UNCERTAIN_PROBABILITY_FLOOR = 0.05
+
+
+def _certified_clinch_elimination(
+    *,
+    floor_wins: np.ndarray,
+    remaining: np.ndarray,
+    playoff_teams: int,
+    divisions: Sequence[int | None] | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Exact (conservative) clinched / eliminated flags per team.
+
+    Every team's final win total lies in ``[floor, floor + remaining]``.
+    Ties on wins are treated as unresolved (the points tiebreak is not known
+    in advance), so only strict separation certifies anything.
+
+    * Eliminated: at least ``playoff_teams`` other teams already have more
+      wins than this team can possibly reach, AND (with divisions) the team
+      cannot win its own division, since division winners are seeded ahead of
+      every wildcard.
+    * Clinched: fewer than ``playoff_teams`` other teams can still reach this
+      team's current wins, counting one extra seed for every other division
+      (a division winner can out-seed a wildcard on fewer wins).
+    """
+
+    n = len(floor_wins)
+    ceiling = floor_wins + remaining
+    clinched = np.zeros(n, dtype=bool)
+    eliminated = np.zeros(n, dtype=bool)
+    if n == 0 or playoff_teams <= 0:
+        return clinched, eliminated
+    division_ids = list(divisions) if divisions is not None else None
+    other_divisions = 0
+    if division_ids is not None:
+        other_divisions = len({d for d in division_ids if d})
+    for i in range(n):
+        others = [j for j in range(n) if j != i]
+        ahead_for_sure = sum(1 for j in others if floor_wins[j] > ceiling[i])
+        can_catch = sum(1 for j in others if ceiling[j] >= floor_wins[i])
+        can_win_division = False
+        extra_seeds = 0
+        if division_ids is not None and division_ids[i]:
+            mates = [j for j in others if division_ids[j] == division_ids[i]]
+            can_win_division = all(ceiling[i] >= floor_wins[j] for j in mates)
+            extra_seeds = max(0, other_divisions - 1)
+        elif division_ids is not None:
+            extra_seeds = other_divisions
+        if ahead_for_sure >= playoff_teams and not can_win_division:
+            eliminated[i] = True
+        if can_catch + extra_seeds < playoff_teams:
+            clinched[i] = True
+    return clinched, eliminated
 
 
 def simulate_playoff_odds(
@@ -382,18 +435,46 @@ def simulate_playoff_odds(
 
     made_playoffs = ranks <= playoff_teams
 
+    # With nothing left to play every trial is identical, so the simulated
+    # standings (including the points tiebreak and division seeding) are
+    # exact. Otherwise only the conservative bound may claim certainty.
+    season_decided = not bool(np.any(remaining_games_count))
+    if season_decided:
+        clinched_flags = made_playoffs.all(axis=0)
+        eliminated_flags = ~made_playoffs.any(axis=0)
+    else:
+        clinched_flags, eliminated_flags = _certified_clinch_elimination(
+            floor_wins=win_equiv_base,
+            remaining=remaining_games_count,
+            playoff_teams=playoff_teams,
+            divisions=divisions,
+        )
+
     results: dict[str, Any] = {}
     for rid in roster_ids:
         i = index_of[rid]
         probability = float(made_playoffs[:, i].mean() * 100.0)
+        # "Clinched"/"eliminated" are claims about every possible outcome, so
+        # they come from the exact bound above, never from a sampled 0%/100%
+        # (a team with a real 0.02% path samples to 0 in 3,000 trials). A
+        # sampled extreme that is not certified is nudged off the boundary so
+        # the number can never read as a certainty it does not have.
+        if bool(clinched_flags[i]):
+            probability = 100.0
+        elif bool(eliminated_flags[i]):
+            probability = 0.0
+        elif season_decided:
+            pass
+        else:
+            probability = min(max(probability, UNCERTAIN_PROBABILITY_FLOOR), 100.0 - UNCERTAIN_PROBABILITY_FLOOR)
         results[rid] = {
             "playoff_probability": probability,
             "median_final_wins": float(np.median(final_wins[:, i])),
             "median_final_losses": float(losses_arr[i] + remaining_games_count[i] - np.median(wins_added[:, i])),
             "median_seed": int(np.median(ranks[:, i])),
             "remaining_games": int(remaining_games_count[i]),
-            "clinched": probability >= 100.0,
-            "eliminated": probability <= 0.0,
+            "clinched": bool(clinched_flags[i]),
+            "eliminated": bool(eliminated_flags[i]),
         }
 
     return {

@@ -429,3 +429,70 @@ def test_division_winner_is_seeded_over_better_record_wildcard():
     plain = sim.simulate_playoff_odds(**_four_team_kwargs(
         current_wins=[10, 9, 5, 1], current_losses=[0, 1, 5, 9], remaining_games=[]))
     assert plain["teams"]["B"]["playoff_probability"] == 100.0
+
+
+def _small_kwargs(**over):
+    kw = dict(
+        roster_ids=["X", "Y", "Z", "T"],
+        power_scores=[100.0, 100.0, 100.0, 100.0],
+        current_wins=[0, 3, 3, 0],
+        current_losses=[0, 0, 0, 3],
+        current_ties=[0, 0, 0, 0],
+        points_for=[900, 1800, 1750, 850],
+        points_against=[1000, 800, 820, 1200],
+        team_names=["Xray", "Yankee", "Zulu", "Tango"],
+        completed_games=[],
+        remaining_games=[("X", "T")] * 3,
+        playoff_teams=2,
+        n_trials=2000,
+        rng=np.random.default_rng(5),
+    )
+    kw.update(over)
+    return kw
+
+
+def test_alive_on_a_tie_is_never_reported_eliminated():
+    """X can at best tie Y and Z on wins and would lose the points tiebreak
+    in the simulation, so the sampled odds are exactly 0. That is a sampling
+    artifact, not a mathematical elimination: the real tiebreak is decided by
+    future scoring. The result must not claim 'eliminated' or show 0%."""
+
+    team = sim.simulate_playoff_odds(**_small_kwargs())["teams"]["X"]
+    assert team["eliminated"] is False
+    assert 0.0 < team["playoff_probability"] < 1.0
+
+
+def test_tied_ceiling_is_never_reported_clinched():
+    """A has 3 wins and nothing left; B and C can each still reach 3 wins
+    (a tie decided by points). Sampling may say 100% but A is not clinched."""
+
+    kw = _small_kwargs(
+        roster_ids=["A", "B", "C", "D"],
+        current_wins=[3, 0, 0, 0],
+        current_losses=[0, 0, 0, 3],
+        remaining_games=[("B", "C")] * 3,
+        points_for=[1800, 900, 850, 800],
+        points_against=[800, 1000, 1000, 1200],
+        team_names=["Alpha", "Bravo", "Charlie", "Delta"],
+    )
+    team = sim.simulate_playoff_odds(**kw)["teams"]["A"]
+    assert team["clinched"] is False
+    assert 99.0 < team["playoff_probability"] < 100.0
+
+
+def test_division_alive_team_is_not_eliminated_by_record_alone():
+    """W trails the wildcard cut but leads nobody in its division who cannot
+    be caught: it can still win its division, so it is not eliminated."""
+
+    kw = _small_kwargs(
+        roster_ids=["W", "V", "P", "Q"],
+        current_wins=[2, 2, 8, 8],
+        current_losses=[3, 3, 0, 0],
+        remaining_games=[("W", "V")],
+        divisions=[1, 1, 2, 2],
+        playoff_teams=2,
+        team_names=["W", "V", "P", "Q"],
+    )
+    teams = sim.simulate_playoff_odds(**kw)["teams"]
+    assert teams["W"]["eliminated"] is False
+    assert teams["W"]["playoff_probability"] > 0.0
