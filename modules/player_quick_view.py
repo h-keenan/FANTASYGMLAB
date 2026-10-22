@@ -11,6 +11,7 @@ from html import escape
 from typing import Mapping, Sequence
 from urllib.parse import urlparse
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -700,7 +701,22 @@ def annotate_rankings_stat_pool(
     return frame
 
 
+_NATIVE_NUMERIC_TYPES = (bool, int, float, np.bool_, np.integer, np.floating)
+
+
 def _numeric_or_none(value: object) -> float | None:
+    # Performance audit, 2026-10-21: this runs twice per stat label for every
+    # row GET /v1/leagues/{id}/rankings returns (~4,500 calls for a 300-row
+    # page), and building a one-element Series per call was ~60% of that
+    # endpoint's CPU on every request, warm or cold. Plain numbers (what the
+    # annotated __stat_value__/__stat_pct__ columns hold) take the direct
+    # path; anything else (strings, pd.NA, Decimal, ...) still goes through
+    # the original to_numeric coercion, so results are unchanged.
+    if value is None:
+        return None
+    if isinstance(value, _NATIVE_NUMERIC_TYPES):
+        numeric = float(value)
+        return None if math.isnan(numeric) else numeric
     numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
     return None if pd.isna(numeric) else float(numeric)
 
