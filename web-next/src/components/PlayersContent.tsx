@@ -8,7 +8,7 @@ import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
@@ -157,15 +157,10 @@ function PlayerRow({
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {player.name || `Player ${player.player_id}`}
-            </span>
-            <PlayerInjuryBadge status={injury.label} />
-          </div>
-          <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
-            {player.team || "—"}
+          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {player.name || `Player ${player.player_id}`}
           </span>
+          <PlayerMetaLine injuryStatus={injury.label}>{player.team || "—"}</PlayerMetaLine>
         </div>
       </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">

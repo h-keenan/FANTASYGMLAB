@@ -2,7 +2,7 @@ import type { MatchupRealStarter, MatchupResponse, MatchupSide, MatchupStarter }
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -248,15 +248,12 @@ function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {player.name || "Unknown player"}
-            </span>
-            <PlayerInjuryBadge status={player.injury_label} />
-          </div>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {contextLine || `${player.team || "FA"}${player.slot ? ` · ${player.slot}` : ""}`}
+          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {player.name || "Unknown player"}
           </span>
+          <PlayerMetaLine injuryStatus={player.injury_label}>
+            {contextLine || `${player.team || "FA"}${player.slot ? ` · ${player.slot}` : ""}`}
+          </PlayerMetaLine>
           {projection.value ? (
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               {projection.value}
@@ -294,15 +291,10 @@ function RealStarterRow({ player }: { player: MatchupRealStarter }) {
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {player.name || "Unknown player"}
-            </span>
-            <PlayerInjuryBadge status={player.injury_label} />
-          </div>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {player.team || "FA"}
+          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {player.name || "Unknown player"}
           </span>
+          <PlayerMetaLine injuryStatus={player.injury_label}>{player.team || "FA"}</PlayerMetaLine>
         </div>
       </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">

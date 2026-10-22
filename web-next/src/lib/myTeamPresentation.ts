@@ -208,6 +208,42 @@ export function injuryTone(label: string | null | undefined): "warning" | "dange
   return "danger";
 }
 
+/** Short code for an injury status, for the compact status pill that
+ * sits on a player row's secondary line (PlayerInjuryBadge). A full word
+ * like "Questionable" on the name line used to take the name's width and
+ * cut it down to "Ja..." on a phone (owner screenshot, 2026-10-21), so rows
+ * show the code and keep the full word for title text and screen readers.
+ * Unknown statuses fall back to their own text when it is already short,
+ * or to its first three letters, so a status never disappears. */
+const INJURY_ABBREVIATIONS: Record<string, string> = {
+  questionable: "Q",
+  doubtful: "D",
+  out: "O",
+  ir: "IR",
+  "injured reserve": "IR",
+  suspended: "SUS",
+  sus: "SUS",
+  pup: "PUP",
+  probable: "P",
+  "day-to-day": "DTD",
+  "day to day": "DTD",
+  dtd: "DTD",
+  "non-football injury": "NFI",
+  nfi: "NFI",
+  covid: "COV",
+  "covid-19": "COV",
+  na: "NA",
+};
+
+export function injuryAbbreviation(label: string | null | undefined): string {
+  const trimmed = (label || "").trim();
+  if (!trimmed) return "";
+  const known = INJURY_ABBREVIATIONS[trimmed.toLowerCase()];
+  if (known) return known;
+  if (trimmed.length <= 4) return trimmed.toUpperCase();
+  return trimmed.slice(0, 3).toUpperCase();
+}
+
 /** Sum of a lineup slice's `score` field — same presentation-only
  * aggregate app.py's My Team route computes for Roster Signals/Roster
  * Core (sum of the exact per-player score already shown on each row). */
