@@ -65,10 +65,10 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
         <PlayerIdentityTrigger identity={{ ...rec, sourceLabel: "Live Draft" }} className="flex items-center gap-3 min-w-0">
           <PositionBadge position={rec.position} />
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+            <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
               {rec.name || `Player ${rec.player_id}`}
             </span>
-            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+            <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
               {rec.team || "—"} · {rec.tier || "Board Value"}
             </span>
           </div>
@@ -211,11 +211,11 @@ function TeamRankingRowView({ row }: { row: LiveDraftTeamRow }) {
           #{row.team_rank}
         </span>
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: row.is_mine ? "var(--color-accent)" : "var(--color-text-primary)" }}>
+          <span className="text-sm font-bold break-words" style={{ color: row.is_mine ? "var(--color-accent)" : "var(--color-text-primary)" }}>
             {row.team_name}
             {row.is_mine ? " (You)" : ""}
           </span>
-          <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
             {row.trend_label ? `${row.trend_label} · ` : ""}
             {row.positions || "No players yet"}
           </span>
@@ -258,10 +258,10 @@ function PickRowView({ row }: { row: LiveDraftPickRow }) {
           #{row.pick_no}
         </span>
         <PositionBadge position={row.position} />
-        <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+        <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
           {row.player_name}
         </span>
-        <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+        <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
           {row.team}
         </span>
       </PlayerIdentityTrigger>

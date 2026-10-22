@@ -88,10 +88,10 @@ function ProspectCard({
       <div className="flex items-center gap-2">
         <PositionBadge position={prospect.position} />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
             {prospect.name}
           </span>
-          <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
             {classLabel(prospect.school, prospect.draft_year)}
           </span>
         </div>

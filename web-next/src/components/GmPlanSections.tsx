@@ -111,7 +111,7 @@ function SnapshotCell({ tile }: { tile: PlanSnapshotTile }) {
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
           <SnapshotTileGlyph name={TILE_GLYPH[tile.key]} />
-          <span className="truncate">{tile.label}</span>
+          <span className="break-words min-w-0">{tile.label}</span>
         </span>
         <span style={{ font: "var(--type-primary-metric)", color: "var(--color-text-primary)", fontSize: "1.25rem" }}>
           {tile.value}

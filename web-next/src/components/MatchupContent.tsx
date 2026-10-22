@@ -81,7 +81,7 @@ function MatchupHeader({ week, live, leagueName }: { week: number | null; live: 
           <ToneBadge label="● Live" color="var(--color-success)" />
         </span>
       ) : null}
-      <span className="ml-auto text-xs truncate max-w-full" style={{ color: "var(--color-text-muted)" }}>
+      <span className="ml-auto text-xs break-words max-w-full" style={{ color: "var(--color-text-muted)" }}>
         {leagueName}
       </span>
     </header>
@@ -112,7 +112,7 @@ function ScoreSide({
         size={56}
         ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
       />
-      <span className="text-sm font-bold truncate w-full" style={{ color: "var(--color-text-primary)" }}>
+      <span className="text-sm font-bold break-words w-full" style={{ color: "var(--color-text-primary)" }}>
         {side.team_name}
       </span>
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -375,14 +375,14 @@ function LineupCell({
         {/* Name gets its own full-width line so it survives phone widths;
             team + number share the second line, the bar the third. */}
         <span
-          className={`text-sm font-bold truncate w-full ${mine ? "" : "text-right"}`}
+          className={`text-sm font-bold break-words w-full ${mine ? "" : "text-right"}`}
           style={{ color: "var(--color-text-primary)" }}
         >
           {player.name || "Unknown player"}
         </span>
         <div className={`flex items-center justify-between gap-1 w-full ${reverse}`}>
           <span className={`flex items-center gap-1 min-w-0 ${reverse}`}>
-            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+            <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
               {player.team || "FA"}
             </span>
             <PlayerInjuryBadge status={player.injury_label} />

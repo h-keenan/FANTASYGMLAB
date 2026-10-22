@@ -65,7 +65,7 @@ function CompareGridRow({
     >
       <div className="flex justify-center min-w-0">{left}</div>
       <div
-        className="text-center uppercase font-bold truncate"
+        className="text-center uppercase font-bold break-words"
         style={{
           color: "var(--color-text-secondary)",
           fontSize: "var(--font-size-badge)",
@@ -133,7 +133,7 @@ function IdentityCard({ player }: { player: RankedPlayer }) {
       className="flex flex-col items-center gap-1 min-w-0 w-full"
     >
       <OvrGauge rating={player.overall_rating ?? null} size="md" />
-      <span className="text-sm font-bold text-center truncate w-full" style={{ color: "var(--color-text-primary)" }}>
+      <span className="text-sm font-bold text-center break-words w-full" style={{ color: "var(--color-text-primary)" }}>
         {player.name || "Unknown"}
       </span>
       <div className="flex items-center gap-1.5">
@@ -201,7 +201,7 @@ function OpponentPicker({
             >
               <div className="flex items-center gap-2 min-w-0">
                 <PositionBadge position={candidate.position} />
-                <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
                   {candidate.name || "Unknown"}
                 </span>
                 <span className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>

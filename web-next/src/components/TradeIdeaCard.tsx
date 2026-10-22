@@ -218,7 +218,7 @@ export function TradeIdeaCardView({
         <div className="flex flex-col min-w-0 gap-0.5">
           <div className="flex items-center gap-2 min-w-0">
             <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
-            <h3 className="text-lg font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+            <h3 className="text-lg font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
               {idea.partner_team_name}
             </h3>
           </div>

@@ -143,7 +143,7 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
             <div key={player.player_id} className="flex items-center gap-2 py-1">
               <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "GM Plan" }} className="flex items-center gap-2 flex-1 min-w-0">
                 <PositionBadge position={player.position} />
-                <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
                   {player.name}
                 </span>
                 {player.team ? (
@@ -173,7 +173,7 @@ function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; de
   return (
     <AccentCard accent={accent}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+        <h3 className="text-base font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
           {item.partner_team_name || "Trade idea"}
         </h3>
         {hasGain ? (

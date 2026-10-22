@@ -50,7 +50,7 @@ export function PlayerInjuryBadge({ status }: { status: string | null | undefine
 
 /**
  * A player row's secondary line ("MIA · Age 23") with the injury pill
- * beside it. The text truncates, the pill never does, and neither one
+ * beside it. The text wraps, the pill never shrinks, and neither one
  * competes with the name line above for width.
  */
 export function PlayerMetaLine({
@@ -63,8 +63,8 @@ export function PlayerMetaLine({
   style?: CSSProperties;
 }) {
   return (
-    <span className="flex items-center gap-1.5 min-w-0 text-xs">
-      <span className="truncate" style={{ color: "var(--color-text-muted)", ...style }}>
+    <span className="flex flex-wrap items-center gap-x-1.5 min-w-0 text-xs">
+      <span className="break-words min-w-0" style={{ color: "var(--color-text-muted)", ...style }}>
         {children}
       </span>
       <PlayerInjuryBadge status={injuryStatus} />

@@ -349,7 +349,7 @@ function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string 
       <div className="flex items-center gap-2 min-w-0">
         <TeamAvatar avatarUrl={side.avatar_url} size={28} />
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+          <span className="text-sm font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
             {side.team_name}
           </span>
           {side.owner_handle ? (
@@ -651,7 +651,7 @@ function StorylineTeamLine({ team }: { team: StorylineTeam }) {
     <div className="flex items-center gap-2 min-w-0">
       <TeamAvatar avatarUrl={team.avatar_url} size={28} />
       <div className="flex flex-col min-w-0">
-        <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+        <span className="text-sm font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
           {team.team_name}
         </span>
         {team.owner_handle ? (
