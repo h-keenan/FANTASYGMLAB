@@ -6,6 +6,7 @@ import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 import type { WaiverFaabGuidance } from '../lib/api';
+import { faabDisplayText } from '../lib/faabDisplay';
 
 /**
  * Shared FAAB-bid treatment for waiver recommendations: a prominent bid
@@ -22,7 +23,9 @@ export default function FAABGuidance({
   faab,
   size = 'compact',
 }: {
-  faab: WaiverFaabGuidance;
+  /** Null / `applicable: false` in leagues without FAAB (Sleeper rolling or
+   * reverse-standings waivers): renders a claim label, never dollars. */
+  faab: WaiverFaabGuidance | null | undefined;
   /** 'prominent' for the top waiver target, 'compact' for denser secondary
    * rows — both keep text at a comfortable mobile size, just fewer pixels
    * of padding/font-size between them. */
@@ -30,15 +33,20 @@ export default function FAABGuidance({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const hasDollars = faab.dollars_known && faab.remaining != null;
-  const primary = hasDollars ? `$${faab.low_bid}–$${faab.high_bid}` : `${faab.pct_low}–${faab.pct_high}%`;
-  const secondary = hasDollars ? `of $${faab.remaining} remaining` : 'of remaining FAAB';
   const prominent = size === 'prominent';
+  const { isBid, primary, secondary } = faabDisplayText(faab);
   return (
     <View style={styles.wrap}>
       <View style={styles.primaryRow}>
-        <Ionicons name="cash-outline" size={prominent ? 15 : 12} color={colors.success} />
-        <AppText style={[styles.primary, prominent && styles.primaryProminent]} numberOfLines={1}>
+        <Ionicons
+          name={isBid ? 'cash-outline' : 'swap-vertical-outline'}
+          size={prominent ? 15 : 12}
+          color={isBid ? colors.success : colors.textSecondary}
+        />
+        <AppText
+          style={[isBid ? styles.primary : styles.claim, prominent && styles.primaryProminent]}
+          numberOfLines={1}
+        >
           {primary}
         </AppText>
       </View>
@@ -55,6 +63,7 @@ function createStyles(colors: ThemeColors) {
     primaryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     primary: { fontSize: 14, fontWeight: '800', color: colors.success },
     primaryProminent: { fontSize: 19, fontWeight: '800' },
+    claim: { fontSize: 14, fontWeight: '800', color: colors.textSecondary },
     secondary: { fontSize: 10, color: colors.textTertiary },
     secondaryProminent: { fontSize: 11.5 },
   });

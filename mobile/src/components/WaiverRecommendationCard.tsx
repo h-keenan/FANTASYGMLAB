@@ -183,6 +183,13 @@ export default function WaiverRecommendationCard({
           <View style={styles.metricsDivider} />
           <FAABGuidance faab={player.faab} size="prominent" />
         </View>
+        {/* Evidence-backed "why" for the bid (or the claim guidance in
+            non-FAAB leagues) — modules/faab.py FaabGuidance.why. */}
+        {player.faab?.why ? (
+          <AppText style={styles.faabWhy} numberOfLines={3}>
+            {player.faab.why}
+          </AppText>
+        ) : null}
         {/* Beginner-only explanations (lib/experienceCopy.ts); nothing renders
             for advanced/unset accounts. Primary card only, so the compact
             rows below stay as dense as before. */}
@@ -265,6 +272,7 @@ function createStyles(colors: ThemeColors) {
     },
     confidenceRow: { marginTop: spacing.sm },
     beginnerHelp: { marginTop: spacing.xs },
+    faabWhy: { marginTop: spacing.sm, fontSize: 12, lineHeight: 16, color: colors.textSecondary },
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
     scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
     scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },

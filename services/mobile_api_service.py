@@ -10624,6 +10624,9 @@ def _project_priority_add(
     confidence_label, confidence_reason = waivers_ui.waiver_confidence_label(row, position_rank)
     projected["confidence_label"] = confidence_label
     projected["confidence_reason"] = confidence_reason
+    # Always an object (never null) so installed app builds that read
+    # faab.dollars_known unconditionally keep rendering; new clients check
+    # `applicable` and show `why` / claim guidance instead of dollars.
     projected["faab"] = {
         "low_bid": guidance.low_bid,
         "high_bid": guidance.high_bid,
@@ -10632,6 +10635,11 @@ def _project_priority_add(
         "remaining": guidance.remaining,
         "dollars_known": guidance.dollars_known,
         "label": guidance.as_label(),
+        "applicable": guidance.applicable,
+        "waiver_mode": guidance.waiver_mode,
+        "why": guidance.why,
+        "reasons": list(guidance.reasons),
+        "data_confidence": guidance.data_confidence,
     }
     return projected
 
@@ -10829,23 +10837,57 @@ def get_league_waivers(
         rosters=rosters,
     )
     faab_budget = faab.sleeper_faab_budget_context(league, rosters, roster_id=roster_id)
-    needed_upper = {pos.upper() for pos in needed_positions}
+    # Sleeper settings.waiver_type: only FAAB leagues (2) get dollar bids;
+    # rolling / reverse-standings leagues get claim guidance instead.
+    waiver_mode = faab.sleeper_waiver_mode(league)
+    faab_enabled = faab.league_uses_faab(league)
+    # Full bid context the endpoint previously never passed: starter status,
+    # rival need + budgets, wire depth, catalysts, week, strategy, min bid.
+    try:
+        trending_adds = sleeper.trending_add_rank_map(lookback_hours=24, limit=50)
+    except Exception:
+        trending_adds = {}
+    faab_market = faab.build_faab_market(
+        league=league,
+        rosters=rosters,
+        my_roster_id=roster_id,
+        valued=valued,
+        score_field=score_field,
+        free_agents=free_agents,
+        trending_adds=trending_adds,
+    )
+    faab_strategy = ""
+    try:
+        stance_strategy, stance_is_set = _fetch_gm_stance_with_set_flag(
+            config, str(user.get("_access_token") or ""), user_id=user_id, league_id=league_id
+        )
+        if stance_is_set:
+            faab_strategy = stance_strategy
+    except Exception:
+        faab_strategy = ""
+    faab_season_stats: dict[str, Any] = {}
+    if current_week > 0:
+        try:
+            faab_season_stats = sleeper.get_season_player_stats(
+                season=sleeper.default_player_stats_season(), retain_weekly=True
+            )
+        except Exception:
+            faab_season_stats = {}
     priority_adds: list[dict[str, Any]] = []
     for _, row in priority_df.iterrows():
-        try:
-            player_score = int(round(float(row.get(score_field) or 0)))
-        except (TypeError, ValueError):
-            player_score = 0
-        guidance = faab.recommend_faab_guidance(
-            player_score=player_score,
-            position=str(row.get("position") or ""),
-            budget=faab_budget.initial or 100,
+        guidance = faab.faab_guidance_for_free_agent(
+            row,
+            score_field=score_field,
             league_settings=settings,
-            status=str(row.get("status") or ""),
-            injury_status=str(row.get("injury_status") or ""),
-            injury_need_match=bool(row.get("injury_replacement_fit")),
+            waiver_mode=waiver_mode,
+            market=faab_market,
+            budget_initial=faab_budget.initial,
             remaining_budget=faab_budget.remaining,
-            roster_need=str(row.get("position") or "").upper() in needed_upper,
+            needed_positions=needed_positions,
+            min_bid=faab.sleeper_min_bid(league),
+            week=current_week or None,
+            team_strategy=faab_strategy,
+            season_stats=faab_season_stats,
         )
         priority_adds.append(
             _project_priority_add(row, score_field, guidance, opponent_by_team, defense_strength_by_position)
@@ -10916,8 +10958,12 @@ def get_league_waivers(
         # settings.waiver_budget / waiver_budget_used, modules/faab.py)
         # was already computed above for each priority-add's own FAAB
         # guidance but never surfaced as its own field.
-        "faab_remaining": faab_budget.remaining,
-        "faab_initial": faab_budget.initial,
+        "faab_remaining": faab_budget.remaining if faab_enabled else None,
+        "faab_initial": faab_budget.initial if faab_enabled else None,
+        # "faab" | "rolling" | "reverse_standings" | "unknown" (Sleeper
+        # settings.waiver_type). Non-FAAB leagues carry no dollar bids.
+        "waiver_mode": waiver_mode,
+        "faab_enabled": faab_enabled,
         "stash_candidates": stash_candidates,
         "watchlist_candidates": watchlist_candidates,
         "faab_targets": faab_targets,

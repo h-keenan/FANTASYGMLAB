@@ -356,7 +356,8 @@ def _waiver_detail_note(
     parts = [part for part in (reason_text,) if part]
     if position_rank:
         parts.append(f"Wire {position} #{position_rank} under the current lens.")
-    faab_sentence = f"FAAB guidance: {faab_guidance.as_label()}. {faab_guidance.rationale}".strip()
+    faab_prefix = "FAAB guidance" if getattr(faab_guidance, "applicable", True) else "Waivers"
+    faab_sentence = f"{faab_prefix}: {faab_guidance.as_label()}. {faab_guidance.rationale}".strip()
     if faab_sentence:
         parts.append(faab_sentence)
     trending_sentence = sleeper_trending_add_sentence(row)
@@ -536,6 +537,7 @@ def waiver_faab_guidance_for_row(
         roster_need=position in needed,
         confidence=_safe_text(row.get("opportunity_confidence")),
         available=not bool(row.get("stale_free_agent")),
+        waiver_mode=_safe_text(st.session_state.get("faab_waiver_mode")) or "faab",
     )
 
 
@@ -1287,7 +1289,11 @@ def render_free_agent_cards(
                 needed_positions=needed_positions,
                 is_starter=recommendation_label == "Add",
             )
-            faab_inline_label = f"FAAB {faab_bid_range_label(faab_guidance)}"
+            faab_inline_label = (
+                f"FAAB {faab_bid_range_label(faab_guidance)}"
+                if faab_guidance.applicable
+                else faab_bid_range_label(faab_guidance)
+            )
             detail_note = _waiver_detail_note(
                 row,
                 reason_text,

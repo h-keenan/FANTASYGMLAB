@@ -689,12 +689,27 @@ export interface WaiverFaabGuidance {
   remaining: number | null;
   dollars_known: boolean;
   label: string;
+  /** False in leagues that don't run FAAB (Sleeper settings.waiver_type
+   * != 2): every dollar/percent field is zero and `why` carries the
+   * waiver-claim guidance. Absent from older servers — treat as true. */
+  applicable?: boolean;
+  waiver_mode?: WaiverMode;
+  /** Short evidence-backed explanation of the bid ("3 teams need a RB and
+   * 2 of them have more FAAB than you"), or the claim guidance. */
+  why?: string;
+  reasons?: string[];
+  /** How much real market data backed the bid; "low" means a wider range. */
+  data_confidence?: "high" | "medium" | "low";
 }
+
+/** Sleeper settings.waiver_type: 2 = faab, 1 = reverse_standings, 0 = rolling. */
+export type WaiverMode = "faab" | "rolling" | "reverse_standings" | "unknown";
 
 export interface WaiverPriorityAdd extends WaiverPlayer {
   recommendation_label: string;
   recommendation_tone: string;
-  faab: WaiverFaabGuidance;
+  /** Null-safe: clients must render a missing/non-applicable bid. */
+  faab: WaiverFaabGuidance | null;
   /** Real need-fit/standout-value confidence for this recommendation
    * (High/Medium/Low — modules.waivers_ui.waiver_confidence_label), the
    * same already-computed signals that ranked it into Priority Adds. Same
@@ -717,6 +732,11 @@ export interface WaiversResponse {
   needed_positions: string[];
   available_count?: number;
   avg_wire_score?: number;
+  faab_remaining?: number | null;
+  faab_initial?: number | null;
+  /** Sleeper settings.waiver_type; faab_enabled false = no dollar bids. */
+  waiver_mode?: WaiverMode;
+  faab_enabled?: boolean;
   // Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
   // Shortlist) — empty for Free, populated for Premium. Matches web's
   // modules/waivers_ui.py Premium-only gate.

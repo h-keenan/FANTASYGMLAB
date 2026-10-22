@@ -50,7 +50,27 @@ export function confidenceColor(label: string | null | undefined): string {
  * budget is known, a percent-of-pool range otherwise) so this never
  * diverges from — or overstates the certainty of — the server's own
  * rule-of-thumb heuristic. */
-export function faabRangeText(faab: WaiverFaabGuidance): { primary: string; secondary: string } {
+export function faabIsBid(faab: WaiverFaabGuidance | null | undefined): faab is WaiverFaabGuidance {
+  return faab != null && faab.applicable !== false;
+}
+
+/** Non-FAAB leagues (Sleeper rolling / reverse-standings waivers): no
+ * dollars, only a claim label. Missing guidance renders the same way. */
+export function waiverClaimText(faab: WaiverFaabGuidance | null | undefined): { primary: string; secondary: string } {
+  const mode = faab?.waiver_mode;
+  return {
+    primary: "Waiver claim",
+    secondary:
+      mode === "rolling"
+        ? "Rolling waivers · no FAAB"
+        : mode === "reverse_standings"
+          ? "Reverse-standings waivers · no FAAB"
+          : "No FAAB bid",
+  };
+}
+
+export function faabRangeText(faab: WaiverFaabGuidance | null | undefined): { primary: string; secondary: string } {
+  if (!faabIsBid(faab)) return waiverClaimText(faab);
   const hasDollars = faab.dollars_known && faab.remaining != null;
   return {
     primary: hasDollars ? `$${faab.low_bid}–$${faab.high_bid}` : `${faab.pct_low}–${faab.pct_high}%`,

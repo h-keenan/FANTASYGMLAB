@@ -137,6 +137,61 @@ describe("WaiversContent", () => {
     expect(screen.getByText("$94")).toBeInTheDocument();
   });
 
+  it("shows the bid's why line on the top waiver target", () => {
+    const withWhy: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [
+        priorityAdd({
+          faab: {
+            low_bid: 12,
+            high_bid: 18,
+            pct_low: 12,
+            pct_high: 18,
+            remaining: 100,
+            dollars_known: true,
+            label: "$12–$18 of $100 remaining",
+            applicable: true,
+            why: "3 teams need a RB and 2 of them have more FAAB than you.",
+          },
+        }),
+      ],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={withWhy} />);
+    expect(screen.getByText("$12–$18")).toBeInTheDocument();
+    expect(screen.getByText("3 teams need a RB and 2 of them have more FAAB than you.")).toBeInTheDocument();
+  });
+
+  it("never shows dollar bids in a non-FAAB league and handles a missing bid", () => {
+    const rolling: WaiversResponse = {
+      ...BASE_RESPONSE,
+      waiver_mode: "rolling",
+      faab_enabled: false,
+      faab_remaining: null,
+      priority_adds: [
+        priorityAdd({
+          faab: {
+            low_bid: 0,
+            high_bid: 0,
+            pct_low: 0,
+            pct_high: 0,
+            remaining: null,
+            dollars_known: false,
+            label: "Rolling waivers — no FAAB bid",
+            applicable: false,
+            waiver_mode: "rolling",
+            why: "Worth your waiver priority: he would start for you.",
+          },
+        }),
+        priorityAdd({ player_id: "p2", name: "No Bid Player", faab: null }),
+      ],
+    };
+    const { container } = render(<WaiversContent leagueName="Dynasty Overlords" data={rolling} />);
+    expect(screen.getAllByText("Waiver claim").length).toBe(2);
+    expect(screen.getByText("Rolling")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\$\d/);
+    expect(container.textContent).not.toMatch(/0–0%/);
+  });
+
   it("omits the Your FAAB tile when the backend has no balance to report", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 

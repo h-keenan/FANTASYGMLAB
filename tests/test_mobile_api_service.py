@@ -10420,6 +10420,13 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
     from modules import player_state_authority
 
     client = _client(monkeypatch)
+    # The FAAB bid reads the caller's declared Team Situation (one Supabase
+    # read per request); stub it so it doesn't consume the requests.get
+    # sequence below, which this test is counting precisely.
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_gm_stance_with_set_flag",
+        lambda *args, **kwargs: ("retool", False),
+    )
 
     auth_user_response_1 = Mock(status_code=200)
     auth_user_response_1.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -14331,3 +14338,108 @@ def test_answer_guess_the_player_name_match_fails_closed_when_table_missing(monk
     # Not durably recorded (table missing) -- the response still reports
     # the pre-guess streak rather than an un-persisted increment.
     assert body["streak"] == {"current_streak": 0, "best_streak": 0}
+
+
+def _run_waivers_for_league(monkeypatch, league_payload, roster_settings=None):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_gm_stance_with_set_flag",
+        lambda *args, **kwargs: ("contender", True),
+    )
+    captured: list[dict] = []
+    from modules import faab as faab_module
+
+    real_guidance = faab_module.recommend_faab_guidance
+
+    def _capture(*args, **kwargs):
+        captured.append(kwargs)
+        return real_guidance(*args, **kwargs)
+
+    monkeypatch.setattr(faab_module, "recommend_faab_guidance", _capture)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    settings = roster_settings or {}
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids, "settings": settings.get(1, {})},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": [], "settings": settings.get(2, {})},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=league_payload):
+                    with patch("modules.sleeper.trending_add_rank_map", return_value={}):
+                        with patch("modules.rankings.load_players", return_value=roster_frame):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                with patch(
+                                    "modules.player_state_authority.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/waivers",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+    assert response.status_code == 200
+    return response.json(), captured
+
+
+def test_waivers_non_faab_league_gets_no_dollar_bids(monkeypatch):
+    """Sleeper settings.waiver_type 0/1 (rolling / reverse standings): no
+    dollar amounts anywhere — the faab object stays (installed app builds
+    read it unconditionally) but is marked not applicable."""
+
+    league = {
+        **_TRADE_ANALYZER_LEAGUE,
+        "settings": {"type": 2, "waiver_type": 1, "waiver_budget": 100, "leg": 0},
+    }
+    body, _ = _run_waivers_for_league(
+        monkeypatch, league, {1: {"waiver_budget_used": 0}, 2: {"waiver_budget_used": 0}}
+    )
+    assert body["waiver_mode"] == "reverse_standings"
+    assert body["faab_enabled"] is False
+    assert body["faab_remaining"] is None
+    assert body["priority_adds"], "fixture should yield a Priority Add"
+    for add in body["priority_adds"]:
+        bid = add["faab"]
+        assert bid["applicable"] is False
+        assert bid["low_bid"] == bid["high_bid"] == 0
+        assert "$" not in bid["label"]
+        assert bid["why"]
+
+
+def test_waivers_faab_league_passes_starter_week_strategy_and_min_bid(monkeypatch):
+    league = {
+        **_TRADE_ANALYZER_LEAGUE,
+        "settings": {"type": 2, "waiver_type": 2, "waiver_budget": 100, "waiver_bid_min": 1, "leg": 0},
+    }
+    body, captured = _run_waivers_for_league(
+        monkeypatch, league, {1: {"waiver_budget_used": 30}, 2: {"waiver_budget_used": 0}}
+    )
+    assert body["waiver_mode"] == "faab"
+    assert body["faab_enabled"] is True
+    assert body["faab_remaining"] == 70
+    assert body["priority_adds"]
+    bid = body["priority_adds"][0]["faab"]
+    assert bid["applicable"] is True
+    assert bid["remaining"] == 70
+    assert isinstance(bid["reasons"], list)
+    assert bid["data_confidence"] in {"high", "medium", "low"}
+    assert captured, "recommend_faab_guidance should be called for each Priority Add"
+    call = captured[0]
+    assert "is_starter" in call and isinstance(call["is_starter"], bool)
+    assert call["team_strategy"] == "contender"
+    assert call["min_bid"] == 1
+    assert call["waiver_mode"] == "faab"
+    assert call["competition"] is not None and call["competition"].rival_count == 1
+    assert call["wire_scores"]
