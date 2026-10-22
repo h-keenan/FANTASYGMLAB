@@ -2,10 +2,10 @@ import type { MatchupRealStarter, MatchupResponse, MatchupSide, MatchupStarter }
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
-import { injuryTone } from "@/lib/myTeamPresentation";
 import { leanBar } from "@/lib/tradeHubPresentation";
 import {
   deriveContextLine,
@@ -232,7 +232,6 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
 }
 
 function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
-  const tone = injuryTone(player.injury_label);
   const contextLine = deriveContextLine(player);
   // coridian_, 2026-10-17: "everyy player on the matchup screen needs a
   // projection" — this view previously showed only season-long VALUE.
@@ -253,16 +252,7 @@ function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {player.name || "Unknown player"}
             </span>
-            {player.injury_label ? (
-              <span
-                className="px-1 text-xs font-bold uppercase"
-                style={{
-                  color: tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
-                }}
-              >
-                {player.injury_label}
-              </span>
-            ) : null}
+            <PlayerInjuryBadge status={player.injury_label} />
           </div>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {contextLine || `${player.team || "FA"}${player.slot ? ` · ${player.slot}` : ""}`}
@@ -291,7 +281,6 @@ function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
 }
 
 function RealStarterRow({ player }: { player: MatchupRealStarter }) {
-  const tone = injuryTone(player.injury_label);
   const display = realStarterPointsDisplay(player);
   return (
     <div
@@ -309,16 +298,7 @@ function RealStarterRow({ player }: { player: MatchupRealStarter }) {
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {player.name || "Unknown player"}
             </span>
-            {player.injury_label ? (
-              <span
-                className="px-1 text-xs font-bold uppercase"
-                style={{
-                  color: tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
-                }}
-              >
-                {player.injury_label}
-              </span>
-            ) : null}
+            <PlayerInjuryBadge status={player.injury_label} />
           </div>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "FA"}

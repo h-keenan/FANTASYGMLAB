@@ -210,7 +210,7 @@ function VerdictCard({
   return (
     <section
       className="glass-surface flex flex-col gap-3 p-4"
-      style={{ borderLeft: `3px solid ${toneColor}` }}
+      style={{ borderLeft: `var(--border-width-semantic) solid ${toneColor}` }}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span

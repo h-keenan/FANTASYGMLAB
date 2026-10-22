@@ -4,6 +4,7 @@ import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
@@ -12,7 +13,6 @@ import {
   buildConstructionObservations,
   buildPositionGroupItems,
   formatScore,
-  injuryTone,
   myTeamReasonMessage,
   sumScore,
 } from "@/lib/myTeamPresentation";
@@ -63,7 +63,6 @@ function joinRooms(rooms: string[]): ReactNode {
 }
 
 function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
-  const tone = injuryTone(player.injury_label);
   return (
     <div
       className="flex items-center gap-3 py-2"
@@ -80,16 +79,7 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
             <span className="text-sm font-bold truncate" style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}>
               {player.name || "Unknown player"}
             </span>
-            {player.injury_label ? (
-              <span
-                className="px-1 text-xs font-bold uppercase"
-                style={{
-                  color: tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
-                }}
-              >
-                {player.injury_label}
-              </span>
-            ) : null}
+            <PlayerInjuryBadge status={player.injury_label} />
           </div>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "FA"} {player.slot && player.slot !== "BENCH" ? `· ${player.slot}` : ""}

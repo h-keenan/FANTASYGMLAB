@@ -24,6 +24,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
@@ -32,7 +33,6 @@ import { gmPlanReasonMessage } from "@/lib/gmPlanPresentation";
 import { buildProtectRows, splitProtectRows, type ProtectRow } from "@/lib/teamStancePresentation";
 import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTargetsPresentation";
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
-import { injuryTone } from "@/lib/myTeamPresentation";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -68,7 +68,7 @@ function focusItemKey(item: GmPlanFocusItem, index: number): string {
 
 function FactCard({ accent, children }: { accent: string; children: ReactNode }) {
   return (
-    <article className="glass-surface flex flex-col gap-1 p-3" style={{ borderLeft: `3px solid ${accent}` }}>
+    <article className="glass-surface flex flex-col gap-1 p-3" style={{ borderLeft: `var(--border-width-semantic) solid ${accent}` }}>
       {children}
     </article>
   );
@@ -168,7 +168,7 @@ function TradeOpportunityCard({ item }: { item: GmPlanTradeItem }) {
   return (
     <article
       className="glass-surface flex flex-col gap-3 p-4"
-      style={{ borderLeft: `3px solid ${accent}` }}
+      style={{ borderLeft: `var(--border-width-semantic) solid ${accent}` }}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
@@ -254,7 +254,6 @@ function ProtectPlayerRow({
   onToggle: (playerId: string, next: boolean) => void;
 }) {
   const { player, protected: isProtected } = row;
-  const tone = injuryTone(player.injury_label);
 
   return (
     <div
@@ -273,17 +272,7 @@ function ProtectPlayerRow({
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {player.name || "Unknown player"}
             </span>
-            {player.injury_label ? (
-              <span
-                className="px-1 text-xs font-bold uppercase"
-                style={{
-                  color:
-                    tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
-                }}
-              >
-                {player.injury_label}
-              </span>
-            ) : null}
+            <PlayerInjuryBadge status={player.injury_label} />
           </div>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "FA"}
@@ -342,21 +331,7 @@ function TargetRowView({
               <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
                 {name}
               </span>
-              {injury.label ? (
-                <span
-                  className="text-xs font-bold uppercase"
-                  style={{
-                    color:
-                      injury.tone === "danger"
-                        ? "var(--color-danger)"
-                        : injury.tone === "warning"
-                          ? "var(--color-warning)"
-                          : "var(--color-text-muted)",
-                  }}
-                >
-                  {injury.label}
-                </span>
-              ) : null}
+              <PlayerInjuryBadge status={injury.label} />
             </div>
             <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
               {player?.team || "—"}

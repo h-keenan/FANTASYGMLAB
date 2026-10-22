@@ -8,9 +8,11 @@ import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile } from "@/components/SnapshotTile";
+import { ToneBadge } from "@/components/ToneBadge";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import {
   confidenceColor,
@@ -62,21 +64,7 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
           <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
             {player.name || "Unknown player"}
           </span>
-          {injury.label ? (
-            <span
-              className="text-xs font-bold uppercase"
-              style={{
-                color:
-                  injury.tone === "danger"
-                    ? "var(--color-danger)"
-                    : injury.tone === "warning"
-                      ? "var(--color-warning)"
-                      : "var(--color-text-muted)",
-              }}
-            >
-              {injury.label}
-            </span>
-          ) : null}
+          <PlayerInjuryBadge status={injury.label} />
         </div>
         <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
           {player.team || "FA"}
@@ -89,18 +77,6 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
         ) : null}
       </div>
     </PlayerIdentityTrigger>
-  );
-}
-
-function RecommendationPill({ label, tone }: { label: string; tone: string }) {
-  const color = recommendationToneColor(tone);
-  return (
-    <span
-      className="px-1.5 py-0.5 text-xs font-extrabold uppercase shrink-0"
-      style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color, border: `1px solid ${color}` }}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -183,7 +159,7 @@ function PriorityAddCompactRow({ player, showDivider }: { player: WaiverPriority
             {formatWaiverScore(player.score)}
           </span>
         </div>
-        <RecommendationPill label={player.recommendation_label} tone={player.recommendation_tone} />
+        <ToneBadge label={player.recommendation_label} color={recommendationToneColor(player.recommendation_tone)} />
       </div>
       <FaabRange player={player} />
     </div>

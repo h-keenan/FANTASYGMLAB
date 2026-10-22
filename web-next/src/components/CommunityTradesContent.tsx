@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { CommunityTradeItem } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
+import { VerdictCallout } from "@/components/VerdictCallout";
 import { toCommunityTradeAssets, formatCommunityTradeDate } from "@/lib/communityTradesPresentation";
 import { verdictDetailText, verdictToneColorVar } from "@/lib/tradeHistoryPresentation";
 
@@ -100,22 +101,7 @@ function CommunityTradeCard({
         </div>
       </div>
 
-      <div
-        className="flex flex-col gap-0.5 px-3 py-2"
-        style={{
-          border: `1px solid color-mix(in srgb, ${verdictToneColorVar(item.verdict)} 35%, transparent)`,
-          background: `color-mix(in srgb, ${verdictToneColorVar(item.verdict)} 8%, transparent)`,
-        }}
-      >
-        <span className="text-sm font-bold" style={{ color: verdictToneColorVar(item.verdict) }}>
-          {item.verdict_label}
-        </span>
-        {detailText ? (
-          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            {detailText}
-          </span>
-        ) : null}
-      </div>
+      <VerdictCallout color={verdictToneColorVar(item.verdict)} label={item.verdict_label} detail={detailText} />
 
       <div className="grid grid-cols-2 gap-4 mt-1">
         <ExchangeSide label="Team A sent" dotColor="var(--color-danger)" assets={toCommunityTradeAssets(item.send)} />

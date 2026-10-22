@@ -58,7 +58,9 @@ under **Page bodies** and are not modules in their own right.
 | `PlayerAvatar` | 17 routes | `playerId`, `tier` ring, `size` |
 | `TeamAvatar` | 7 routes | `size` |
 | `PositionBadge` | 19 routes | Square colored position badge |
-| `PlayerInjuryBadge` | 9 routes (via TradeAssetRow, BriefingItemPlayers) | `status`; renders nothing when healthy |
+| `PlayerInjuryBadge` | 14 routes | `status` (a display label); renders nothing when healthy |
+| `ToneBadge` (new) | /league-rankings, /waivers, /guess-the-player-leaderboard, /trade-history, /portfolio, /alerts | `label`, `color` (semantic token), `variant` outline/pill |
+| `VerdictCallout` (new) | /trade-history, /community | `color`, `label`, `detail` |
 | `TradeCategoryGlyph`, `NavDestinationGlyph`, `SnapshotTileGlyph`, `PremiumGlyph` | as named | Icon sets, one per domain |
 
 ### Empty / loading / error states
@@ -165,16 +167,22 @@ described), or **Justified one-off**.
   `WaiversContent.RecommendationPill`, and the Leaderboard's inline "You"
   badge. Rounded pill (tinted fill, badge tracking, no border):
   `TradeHistoryContent.Badge`, Portfolio's signal badge, and Alerts' roster
-  relationship badge. Each is byte-identical within its group. (Being
-  consolidated in the badges PR; see that PR for status.)
+  relationship badge. Each is byte-identical within its group.
+  **Consolidated (PR #1331)** into `components/ToneBadge.tsx` with
+  `variant="outline" | "pill"`, which keeps both shapes. **Needs
+  decision:** which shape is canonical. Related pills built from `-soft`
+  tokens (a 12-15% alpha, slightly off the 15% mix) are left as-is: GM
+  Plan stance chips, Portfolio rank and health pills, Matchup's edge pill,
+  and the trade-card impact pill.
 - **B10. Injury label re-implemented inline 8 times.** In PlayersContent,
   WaiversContent, GmPlanContent ×2, MyTeamContent and MatchupContent ×2,
-  next to the shared `PlayerInjuryBadge`. (Being consolidated in the
-  badges PR; see that PR for status.)
+  next to the shared `PlayerInjuryBadge`. **Consolidated (PR #1331).**
+  Players, Waivers and GM Plan's watch row gained the canonical `px-1`
+  padding, which removes 4px of drift.
 - **B11. Verdict callout duplicated.** A 35% border plus 8% tint box with
   the verdict label and detail appears in TradeHistoryContent and
-  CommunityTradesContent. (Being consolidated in the badges PR; see that PR
-  for status.)
+  CommunityTradesContent. **Consolidated (PR #1331)** into
+  `components/VerdictCallout.tsx`.
 - **B12. Player Compare `ValuePill` / `TextPill`.** These are compare-cell
   winners, a different role. **Justified one-off.**
 
@@ -206,9 +214,9 @@ described), or **Justified one-off**.
   border: `GmPlanContent.FactCard`, `TradeOpportunityCard`,
   `TradeAnalyzerContent.VerdictCard`, `TradeIdeaCardView`,
   `LeagueRecapsContent.RecapStoryCard`, and MyTeam's `.tone-*` cards. Some
-  use the `--border-width-semantic` token and some hard-code `3px`. (See
-  the badges PR for the token fix.) A shared `AccentCard` is **Needs
-  decision**: padding and gap differ per page.
+  use the `--border-width-semantic` token and some hard-coded `3px`. The
+  `3px` literals moved to the token in **PR #1331**. A shared `AccentCard`
+  is **Needs decision**: padding and gap differ per page.
 - **B18. Waivers `BestAvailableTile`.** It is a vertical player tile
   (badge, avatar, md gauge, name, value). It overlaps `SnapshotTile` in
   shape but shows a player. **Justified one-off.**

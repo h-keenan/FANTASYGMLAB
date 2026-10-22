@@ -8,6 +8,7 @@ import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
@@ -159,21 +160,7 @@ function PlayerRow({
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {player.name || `Player ${player.player_id}`}
             </span>
-            {injury.label ? (
-              <span
-                className="text-xs font-bold uppercase"
-                style={{
-                  color:
-                    injury.tone === "danger"
-                      ? "var(--color-danger)"
-                      : injury.tone === "warning"
-                        ? "var(--color-warning)"
-                        : "var(--color-text-muted)",
-                }}
-              >
-                {injury.label}
-              </span>
-            ) : null}
+            <PlayerInjuryBadge status={injury.label} />
           </div>
           <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "—"}
