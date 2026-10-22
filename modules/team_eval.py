@@ -15,6 +15,7 @@ STARTER_SLOTS = {
     "TE": 1,
     "FLEX": 1,
     "WR/RB": 1,
+    "REC_FLEX": 0,
     "SUPER_FLEX": 0,
     "K": 0,
 }
@@ -98,13 +99,17 @@ def _lineup_slots(lineup_settings: Optional[Dict[str, Any]] = None) -> Dict[str,
         return dict(STARTER_SLOTS)
 
     slots = dict(STARTER_SLOTS)
-    slots["QB"] = max(1, _safe_int(lineup_settings.get("qb_count"), slots["QB"]))
+    slots["SUPER_FLEX"] = max(0, _safe_int(lineup_settings.get("superflex_count"), 0))
+    # A SUPER_FLEX-only league has no QB slot: don't invent one (a QB can still
+    # fill the SUPER_FLEX slot).
+    min_qb = 0 if slots["SUPER_FLEX"] > 0 and _safe_int(lineup_settings.get("qb_count"), 1) <= 0 else 1
+    slots["QB"] = max(min_qb, _safe_int(lineup_settings.get("qb_count"), slots["QB"]))
     slots["RB"] = max(0, _safe_int(lineup_settings.get("rb_count"), slots["RB"]))
     slots["WR"] = max(0, _safe_int(lineup_settings.get("wr_count"), slots["WR"]))
     slots["TE"] = max(0, _safe_int(lineup_settings.get("te_count"), slots["TE"]))
     slots["FLEX"] = max(0, _safe_int(lineup_settings.get("regular_flex_count"), _safe_int(lineup_settings.get("flex_count"), slots["FLEX"])))
     slots["WR/RB"] = max(0, _safe_int(lineup_settings.get("wrrb_flex_count"), 0))
-    slots["SUPER_FLEX"] = max(0, _safe_int(lineup_settings.get("superflex_count"), 0))
+    slots["REC_FLEX"] = max(0, _safe_int(lineup_settings.get("rec_flex_count"), 0))
     if str(lineup_settings.get("qb_format") or "") == "2QB":
         slots["QB"] = max(2, slots["QB"])
     elif str(lineup_settings.get("qb_format") or "") == "Superflex":
@@ -270,6 +275,7 @@ def _score_starter_weighted_roster(
     # as suggest_optimal_lineup's assign_slots.
     for eligible, slot_name in (
         (["RB", "WR"], "WR/RB"),
+        (["WR", "TE"], "REC_FLEX"),
         (["RB", "WR", "TE"], "FLEX"),
         (["QB", "RB", "WR", "TE"], "SUPER_FLEX"),
     ):
@@ -460,7 +466,7 @@ def lineup_open_slots(
         for slot in lineup_df["slot"].tolist():
             filled[str(slot)] = filled.get(str(slot), 0) + 1
     open_slots: List[str] = []
-    for slot_name in ("QB", "RB", "WR", "TE", "K", "WR/RB", "FLEX", "SUPER_FLEX"):
+    for slot_name in ("QB", "RB", "WR", "TE", "K", "WR/RB", "REC_FLEX", "FLEX", "SUPER_FLEX"):
         missing = int(slots.get(slot_name, 0) or 0) - filled.get(slot_name, 0)
         open_slots.extend([slot_name] * max(0, missing))
     return open_slots
@@ -568,6 +574,7 @@ def suggest_optimal_lineup(
         # before WR/RB let FLEX take the best RB/WR and left WR/RB a worse
         # player while a better TE sat on the bench.
         take(["RB", "WR"], "WR/RB", slots["WR/RB"])
+        take(["WR", "TE"], "REC_FLEX", slots.get("REC_FLEX", 0))
         take(["RB", "WR", "TE"], "FLEX", slots["FLEX"])
         take(["QB", "RB", "WR", "TE"], "SUPER_FLEX", slots.get("SUPER_FLEX", 0))
         return assigned

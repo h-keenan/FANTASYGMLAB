@@ -106,6 +106,8 @@ DEFAULT_LEAGUE_VALUE_SETTINGS = {
     "taxi_count": 0,
     "ir_count": 0,
     "other_starter_count": 0,
+    "rec_flex_count": 0,
+    "non_offense_starter_count": 0,
     "league_size": 12,
 }
 
@@ -205,7 +207,9 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
         settings["qb_format"] = "1QB"
     if roster_positions:
         settings["_sources"]["qb_format"] = "Sleeper"
-        settings["qb_count"] = max(1, qb_count)
+        # Keep the true count: a SUPER_FLEX-only league has no QB slot (consumers
+        # that need at least one QB apply their own max(1, ...)).
+        settings["qb_count"] = qb_count
         settings["rb_count"] = rb_count if rb_count > 0 else settings["rb_count"]
         settings["wr_count"] = wr_count if wr_count > 0 else settings["wr_count"]
         settings["te_count"] = te_count if te_count > 0 else settings["te_count"]
@@ -223,6 +227,8 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
         settings["starter_count"] = len(starter_positions)
         settings["_sources"]["starter_count"] = "Sleeper"
     wrrb_flex_slots = {"W/R", "WR/RB", "RB/WR", "WRRB_FLEX"}
+    # REC_FLEX is WR/TE only (verified from live lineups: no RB ever starts there).
+    rec_flex_slots = {"REC_FLEX"}
     # IDP_FLEX is a defensive slot; WRRB_FLEX is counted once, below, as a
     # WR/RB flex. Both contain "FLEX", so the substring test used to count
     # them as an extra RB/WR/TE flex too (a WRRB_FLEX league got 9 lineup
@@ -232,6 +238,7 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
         for pos in starter_positions
         if pos not in {"SUPER_FLEX", "OP", "IDP_FLEX"}
         and pos not in wrrb_flex_slots
+        and pos not in rec_flex_slots
         and ("FLEX" in pos or pos in {"W/R/T", "RB/WR/TE", "WR/RB/TE"})
     ]
     wrrb_flex_positions = [
@@ -242,7 +249,18 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     if starter_positions:
         settings["regular_flex_count"] = len(regular_flex_positions)
         settings["wrrb_flex_count"] = len(wrrb_flex_positions)
-        settings["flex_count"] = len(regular_flex_positions) + len(wrrb_flex_positions)
+        rec_flex_count = sum(1 for pos in starter_positions if pos in rec_flex_slots)
+        settings["rec_flex_count"] = rec_flex_count
+        settings["flex_count"] = len(regular_flex_positions) + len(wrrb_flex_positions) + rec_flex_count
+        # Offensive starter slots only: IDP, K and DEF slots must not feed the
+        # offensive starter-pressure multiplier.
+        offense_slots = {"QB", "RB", "WR", "TE", "SUPER_FLEX", "OP"} | wrrb_flex_slots | rec_flex_slots
+        settings["non_offense_starter_count"] = sum(
+            1
+            for pos in starter_positions
+            if pos not in offense_slots and pos not in regular_flex_positions
+        )
+        settings["_sources"]["non_offense_starter_count"] = "Sleeper"
         counted_core = (
             int(settings["qb_count"])
             + int(settings["rb_count"])
@@ -426,6 +444,8 @@ def league_value_settings_key(settings: dict) -> str:
             str(int(settings.get("taxi_count") or 0)),
             str(int(settings.get("ir_count") or 0)),
             str(int(settings.get("other_starter_count") or 0)),
+            str(int(settings.get("non_offense_starter_count") or 0)),
+            str(int(settings.get("rec_flex_count") or 0)),
             str(int(settings.get("league_size") or 0)),
         ]
     )
@@ -541,7 +561,10 @@ def league_settings_adjustment_components(
     starter_count = int(settings.get("starter_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["starter_count"])
     flex_count = int(settings.get("flex_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["flex_count"])
     league_size = int(settings.get("league_size") or DEFAULT_LEAGUE_VALUE_SETTINGS["league_size"])
-    starter_pressure = max(-0.18, min(0.35, ((starter_count * league_size) - 108) / 108))
+    # Offense-only: IDP, K and DEF slots don't create offensive demand.
+    non_offense = max(0, int(settings.get("non_offense_starter_count") or 0))
+    offense_starter_count = max(1, starter_count - non_offense)
+    starter_pressure = max(-0.18, min(0.35, ((offense_starter_count * league_size) - 108) / 108))
     lineup_boost = 1 + starter_pressure * 0.18
     team_pressure = ones.mask(positions.isin(["QB", "RB", "WR", "TE"]), lineup_boost)
 
