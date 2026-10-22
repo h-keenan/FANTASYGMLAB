@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
 import type { MatchupRealStarter, MatchupResponse, MatchupSide, MatchupStarter } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { injuryTone } from "@/lib/myTeamPresentation";
 import { leanBar } from "@/lib/tradeHubPresentation";
@@ -32,14 +32,6 @@ import {
  * starter still surfaces, in place, on its own lineup row here via the same
  * injury pill My Team uses.
  */
-
-function SectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
-      {children}
-    </h2>
-  );
-}
 
 function edgeColor(edge: "you" | "opponent" | "even"): string {
   if (edge === "you") return "var(--color-success)";

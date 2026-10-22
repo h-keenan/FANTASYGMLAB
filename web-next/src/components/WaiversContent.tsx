@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile } from "@/components/SnapshotTile";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import {
@@ -257,40 +259,6 @@ const BEST_AVAILABLE_POSITIONS = ["QB", "RB", "WR", "TE", "K"];
 const FREE_AGENT_LIST_PREVIEW_ROWS = 60;
 const FILTER_POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 
-/**
- * Recommendation-compliance audit, Check 3 — CTA reachability: wraps any
- * waiver row so the one a GM Plan/Dashboard tile's CTA named (?playerId=)
- * scrolls into view and stays visually marked once this page loads, instead
- * of leaving the user to manually re-find it among every other row here.
- * `active` is simply false whenever there's no match (stale/absent id) —
- * renders exactly as before, never breaks the page.
- */
-function HighlightTarget({ active, children }: { active: boolean; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (active && ref.current && typeof ref.current.scrollIntoView === "function") {
-      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [active]);
-  return (
-    <div
-      ref={ref}
-      data-highlighted={active ? "true" : undefined}
-      style={active ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px", borderRadius: "0.25rem" } : undefined}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
-      {children}
-    </h2>
-  );
-}
-
 export function WaiversContent({
   leagueName,
   data,
@@ -298,7 +266,7 @@ export function WaiversContent({
 }: {
   leagueName: string;
   data: WaiversResponse;
-  /** See HighlightTarget above — a GM Plan/Dashboard waiver tile's specific
+  /** See components/HighlightTarget.tsx — a GM Plan/Dashboard waiver tile's specific
    * player, threaded through as ?playerId= (gamePlanTileHref). */
   highlightPlayerId?: string;
 }) {

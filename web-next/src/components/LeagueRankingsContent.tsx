@@ -17,6 +17,7 @@ import {
   teamRankingsReasonMessage,
   type RankBoardKey,
 } from "@/lib/leagueRankingsPresentation";
+import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 
 /**
@@ -39,25 +40,6 @@ import { TeamAvatar } from "@/components/TeamAvatar";
  * and would need a new decision-cards endpoint beyond team-rankings, not a
  * thin wrapper — left for a future revision rather than guessed at here.
  */
-
-function SectionHeading({ kicker, title, note }: { kicker: string; title: string; note: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span
-        className="uppercase font-extrabold"
-        style={{ font: "var(--type-supporting-metadata)", color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}
-      >
-        {kicker}
-      </span>
-      <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
-        {title}
-      </h2>
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {note}
-      </p>
-    </div>
-  );
-}
 
 function RankBadge({ label, tone = "neutral" }: { label: string; tone?: "positive" | "negative" | "neutral" }) {
   const color =
@@ -155,9 +137,10 @@ function StandingsSection({ data, myRosterId }: { data: LeagueTeamRankingsRespon
       <section className="flex flex-col gap-3">
         <SectionHeading
           kicker="Where you stand"
-          title={title}
           note="Actual results from league matchups — separate from Roster Power strength."
-        />
+        >
+          {title}
+        </SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {data.standings_message || "Standings will populate once regular-season results are available."}
         </p>
@@ -171,9 +154,10 @@ function StandingsSection({ data, myRosterId }: { data: LeagueTeamRankingsRespon
     <section className="flex flex-col gap-3">
       <SectionHeading
         kicker="Where you stand"
-        title={title}
         note={`${data.week_label ? `${data.week_label} — ` : ""}Actual results from league matchups — separate from Roster Power strength.`}
-      />
+      >
+        {title}
+      </SectionHeading>
       <div className="glass-surface flex flex-col">
         {ordered.map((team) => {
           const percentile = percentileFromRank(team.standing_rank, ordered.length);
@@ -258,9 +242,10 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
     <section className="flex flex-col gap-3">
       <SectionHeading
         kicker="What might happen next"
-        title="Playoff Odds"
         note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes."
-      />
+      >
+        Playoff Odds
+      </SectionHeading>
       {state === "idle" ? (
         <button
           type="button"
@@ -304,7 +289,7 @@ function RankBoardSection({ board, teams, myRosterId }: { board: RankBoardKey; t
 
   return (
     <section className="flex flex-col gap-3">
-      <SectionHeading kicker={config.kicker} title={config.title} note={config.note} />
+      <SectionHeading kicker={config.kicker} note={config.note}>{config.title}</SectionHeading>
       <div className="glass-surface flex flex-col">
         {ordered.map((team) => {
           const rank = team[config.rankField] as number | null;
