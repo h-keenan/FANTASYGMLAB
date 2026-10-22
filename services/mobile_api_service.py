@@ -10560,6 +10560,8 @@ def get_trade_finder_ideas(
     player_ids: str = "",
     strategy: str = "retool",
     lens: str = "Dynasty",
+    pick_ids: str = "",
+    return_picks: bool = False,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Trade Finder — "select these specific players, find who'd want
@@ -10572,6 +10574,14 @@ def get_trade_finder_ideas(
     all-invalid selection returns an empty idea list rather than silently
     falling back to the unrestricted board (a Trade Finder search that
     ignores what was actually selected would be worse than no result).
+
+    Draft picks: `pick_ids` is a comma-separated list of GET .../draft-picks
+    pick_id values ("season:round:original_roster_id") the caller wants to
+    offer — players, picks, or both make a valid selection. The engine
+    resolves them against only the picks this roster actually owns (Sleeper
+    traded-picks data); anything else is dropped, and at most
+    trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS are used. `return_picks=true`
+    keeps only packages whose return includes at least one partner pick.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -10594,7 +10604,8 @@ def get_trade_finder_ideas(
         return {"ok": True, "ideas": [], "reason": "", "is_premium": False, "upsell": _TRADE_FINDER_UPSELL}
 
     selected_ids = tuple(sorted({pid.strip() for pid in player_ids.split(",") if pid.strip()}))
-    if not selected_ids:
+    selected_pick_ids = tuple(dict.fromkeys(pid.strip() for pid in pick_ids.split(",") if pid.strip()))
+    if not selected_ids and not selected_pick_ids:
         return {"ok": True, "ideas": [], "reason": "no_players_selected", "is_premium": True, "upsell": None}
 
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
@@ -10621,6 +10632,8 @@ def get_trade_finder_ideas(
         untouchable_player_ids=gm_untouchable_ids,
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
+        trade_block_pick_ids=selected_pick_ids,
+        require_receive_picks=bool(return_picks),
     )
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
     return {"ok": True, "ideas": ranked, "reason": "", "is_premium": True, "upsell": None}

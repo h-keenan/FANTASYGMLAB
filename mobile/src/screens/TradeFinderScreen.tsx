@@ -13,6 +13,7 @@ import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import TradeValueHero from '../components/TradeValueHero';
 import {
@@ -29,6 +30,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { TRADE_FINDER_MAX_PICKS, ownedPicksForRoster, toggleCappedSelection } from '../lib/tradeFinderPicks';
 import { radii, shadows, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -191,6 +193,96 @@ function MeterRow({ label, value, level, color }: { label: string; value: string
   );
 }
 
+/**
+ * One grouped, checkbox-led selection row — shared by the roster (player)
+ * and pick lists so both selection groups read as the same control.
+ */
+function SelectableRow({
+  selected,
+  onToggle,
+  isFirst,
+  isLast,
+  accessibilityLabel,
+  disabled = false,
+  children,
+}: {
+  selected: boolean;
+  onToggle: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+  accessibilityLabel: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View
+      style={[
+        styles.rosterRow,
+        isFirst && styles.rosterRowFirst,
+        isLast && styles.rosterRowLast,
+        !isLast && styles.rosterRowDivider,
+        selected && styles.rosterRowSelected,
+        disabled && styles.rosterRowDisabled,
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onToggle}
+        disabled={disabled}
+        hitSlop={8}
+        style={styles.checkboxTouch}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected, disabled }}
+        accessibilityLabel={`${accessibilityLabel}${selected ? ', selected' : ''}`}
+      >
+        <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
+          {selected ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}
+        </View>
+      </TouchableOpacity>
+      <View style={styles.rosterIdentity}>{children}</View>
+    </View>
+  );
+}
+
+function PickSelectRow({
+  pick,
+  selected,
+  disabled,
+  onToggle,
+  isFirst,
+  isLast,
+}: {
+  pick: DraftPickAsset;
+  selected: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  return (
+    <SelectableRow
+      selected={selected}
+      onToggle={onToggle}
+      isFirst={isFirst}
+      isLast={isLast}
+      disabled={disabled}
+      accessibilityLabel={pick.label ?? 'Draft pick'}
+    >
+      <DraftPickAssetRow
+        pickId={pick.pick_id}
+        round={pick.round}
+        label={pick.label}
+        projectedRange={pick.projected_pick_range}
+        pickTier={pick.pick_tier}
+        trailingValue={pick.score != null ? String(Math.round(pick.score)) : null}
+        onPress={disabled ? undefined : onToggle}
+        showDivider={false}
+      />
+    </SelectableRow>
+  );
+}
+
 function RosterRow({
   player,
   selected,
@@ -204,51 +296,33 @@ function RosterRow({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View
-      style={[
-        styles.rosterRow,
-        isFirst && styles.rosterRowFirst,
-        isLast && styles.rosterRowLast,
-        !isLast && styles.rosterRowDivider,
-        selected && styles.rosterRowSelected,
-      ]}
+    <SelectableRow
+      selected={selected}
+      onToggle={onToggle}
+      isFirst={isFirst}
+      isLast={isLast}
+      accessibilityLabel={player.name ?? 'Player'}
     >
-      <TouchableOpacity
+      {/* overallRating matches Players/Waivers/GM Targets' rows (coridian_:
+          player rows throughout the app need the same numeric Overall
+          badge, not just a tier ring) — `overall_rating` was already on
+          LineupPlayer, it just wasn't threaded into this row. No
+          league-wide position-rank field exists on LineupPlayer, so no
+          crown here (nothing to render honestly). */}
+      <PlayerIdentityRow
+        playerId={player.player_id}
+        name={player.name}
+        position={player.position}
+        team={player.team}
+        tier={player.tier}
+        overallRating={player.overall_rating}
+        injuryLabel={player.injury_label}
+        ruledOut={player.ruled_out}
         onPress={onToggle}
-        hitSlop={8}
-        style={styles.checkboxTouch}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: selected }}
-        accessibilityLabel={`${player.name ?? 'Player'}${selected ? ', selected' : ''}`}
-      >
-        <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-          {selected ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}
-        </View>
-      </TouchableOpacity>
-      <View style={styles.rosterIdentity}>
-        {/* overallRating matches Players/Waivers/GM Targets' rows (coridian_:
-            player rows throughout the app need the same numeric Overall
-            badge, not just a tier ring) — `overall_rating` was already on
-            LineupPlayer, it just wasn't threaded into this row. No
-            league-wide position-rank field exists on LineupPlayer, so no
-            crown here (nothing to render honestly). */}
-        <PlayerIdentityRow
-          playerId={player.player_id}
-          name={player.name}
-          position={player.position}
-          team={player.team}
-          tier={player.tier}
-          overallRating={player.overall_rating}
-          injuryLabel={player.injury_label}
-          ruledOut={player.ruled_out}
-          onPress={onToggle}
-          showDivider={false}
-        />
-      </View>
-    </View>
+        showDivider={false}
+      />
+    </SelectableRow>
   );
 }
 
@@ -369,6 +443,9 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
   const [loadingRoster, setLoadingRoster] = useState(true);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [ownedPicks, setOwnedPicks] = useState<DraftPickAsset[]>([]);
+  const [selectedPickIds, setSelectedPickIds] = useState<Set<string>>(new Set());
+  const [returnScope, setReturnScope] = useState<'any' | 'picks'>('any');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
@@ -384,6 +461,17 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
             setRosterError("Couldn't load your roster for this league.");
           } else {
             setRoster([...result.starters, ...result.bench]);
+            // Your own picks to offer — GET .../draft-picks already reflects
+            // Sleeper's traded-picks ownership. Never fatal: a failed pick
+            // fetch just leaves player-only search.
+            if (result.roster_id) {
+              api
+                .getLeagueDraftPicks(leagueId, { lens })
+                .then((pickResult) => {
+                  if (!cancelled) setOwnedPicks(ownedPicksForRoster(pickResult.picks ?? [], result.roster_id));
+                })
+                .catch(() => {});
+            }
           }
         } catch (err) {
           if (!cancelled) setRosterError(toUserErrorMessage(err, 'Failed to load your roster.'));
@@ -407,16 +495,26 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
     setIdeas(null);
   };
 
+  const togglePick = (pickId: string) => {
+    setSelectedPickIds((prev) => toggleCappedSelection(prev, pickId));
+    setIdeas(null);
+  };
+
+  const selectionCount = selectedIds.size + selectedPickIds.size;
+
   const search = async () => {
     setSearchError(null);
     setSearching(true);
     try {
-      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens);
+      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), strategy, lens, {
+        pickIds: Array.from(selectedPickIds),
+        returnPicks: returnScope === 'picks',
+      });
       setIdeas(result.ideas);
       if (result.ideas.length === 0 && result.reason) {
         setSearchError(
           result.reason === 'no_players_selected'
-            ? 'Select at least one player to search with.'
+            ? 'Select at least one player or pick to search with.'
             : "Couldn't search for trades right now.",
         );
       }
@@ -457,7 +555,19 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
         ListHeaderComponent={
           <View>
             <ScreenInfoNote
-              text={`Pick the players you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
+              text={`Pick the players and draft picks you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
+            />
+            <AppText style={styles.sectionLabel}>What You Want Back</AppText>
+            <SegmentedTabBar<'any' | 'picks'>
+              options={[
+                { key: 'any', label: 'Any return' },
+                { key: 'picks', label: 'Picks back' },
+              ]}
+              active={returnScope}
+              onChange={(key) => {
+                setReturnScope(key);
+                setIdeas(null);
+              }}
             />
             {ideas !== null ? (
               <View style={styles.resultsSection}>
@@ -479,6 +589,27 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
             ) : null}
             <AppText style={styles.sectionLabel}>Your Roster</AppText>
           </View>
+        }
+        ListFooterComponent={
+          ownedPicks.length > 0 ? (
+            <View>
+              <AppText style={styles.sectionLabel}>Your Picks (up to {TRADE_FINDER_MAX_PICKS})</AppText>
+              {ownedPicks.map((pick, index) => {
+                const selected = selectedPickIds.has(pick.pick_id);
+                return (
+                  <PickSelectRow
+                    key={pick.pick_id}
+                    pick={pick}
+                    selected={selected}
+                    disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
+                    onToggle={() => togglePick(pick.pick_id)}
+                    isFirst={index === 0}
+                    isLast={index === ownedPicks.length - 1}
+                  />
+                );
+              })}
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           <EmptyState icon="people-outline" title="No roster found" subtitle="Nothing to shop yet in this league." />
@@ -505,7 +636,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
           hides the bar entirely instead of rendering a disabled one — also
           keeps this screen inside Magna Carta's "no content hidden beneath
           overlays" rule. */}
-      {selectedIds.size > 0 ? (
+      {selectionCount > 0 ? (
         <TouchableOpacity
           style={[
             styles.searchButton,
@@ -522,7 +653,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
           {searching ? (
             <ActivityIndicator color={colors.onAccent} />
           ) : (
-            <AppText style={styles.searchButtonText}>Find Trades ({selectedIds.size})</AppText>
+            <AppText style={styles.searchButtonText}>Find Trades ({selectionCount})</AppText>
           )}
         </TouchableOpacity>
       ) : null}
@@ -582,6 +713,7 @@ function createStyles(colors: ThemeColors) {
     // Cyan is the app's fixed "selected state" semantic (section 3/14) — a
     // subtle tint on the row itself, not a fresh per-screen selection color.
     rosterRowSelected: { backgroundColor: colors.accentMuted },
+    rosterRowDisabled: { opacity: 0.5 },
     checkboxTouch: { paddingVertical: spacing.sm, paddingRight: spacing.sm },
     checkbox: {
       width: 22,
