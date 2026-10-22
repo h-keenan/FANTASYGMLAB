@@ -15425,7 +15425,6 @@ def test_percentile_explorer_small_pool_has_no_chart(monkeypatch):
     body = _explorer_get(monkeypatch, _pool_with_subject(4), "stat=ppr_ppg").json()
     assert body["reason"] == "insufficient_pool"
     assert "bins" not in body
-=======
 def _save_with_profile(client, league_id="new-league", entitlement="premium", existing=None, **extra):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -15500,4 +15499,3 @@ def test_warmup_status_endpoint_reports_stages(monkeypatch):
     body = response.json()
     assert body["state"] == "running"
     assert body["stages"] == {"roster": True, "values": True, "trades": False}
->>>>>>> 5bdd99c5 (Warm up a newly saved league in the background and show real progress steps)
