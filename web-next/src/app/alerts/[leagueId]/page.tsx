@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type AlertsResponse } from "@/lib/api";
 import { AlertsContent } from "@/components/AlertsContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function AlertsPage() {
@@ -50,11 +51,7 @@ export default function AlertsPage() {
 
   if (error || !alerts) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Alerts."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Alerts."} onRetry={reloadPage} />
     );
   }
 

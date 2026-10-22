@@ -19,6 +19,7 @@ import {
   teamRanksById,
 } from "@/lib/liveDraftPresentation";
 import { LiveDraftContent } from "@/components/LiveDraftContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Matches modules/live_draft.py's LIVE_DRAFT_POLL_INTERVAL_SECONDS (12s) —
@@ -161,11 +162,7 @@ export default function LiveDraftPage() {
 
   if (discoveryError || !discovery) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {discoveryError || "Could not reach Sleeper."}
-        </p>
-      </main>
+      <ErrorState message={discoveryError || "Could not reach Sleeper."} onRetry={reloadPage} />
     );
   }
 

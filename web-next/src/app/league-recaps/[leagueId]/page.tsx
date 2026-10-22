@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type RecapResponse } from "@/lib/api";
 import { LeagueRecapsContent } from "@/components/LeagueRecapsContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function LeagueRecapsPage() {
@@ -50,11 +51,7 @@ export default function LeagueRecapsPage() {
 
   if (error || !recap) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load League Recaps."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load League Recaps."} onRetry={reloadPage} />
     );
   }
 

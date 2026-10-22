@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayerCompareContent } from "@/components/PlayerCompareContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 /**
@@ -57,11 +58,7 @@ export default function PlayerComparePage() {
 
   if (!playerAId) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          No player selected to compare.
-        </p>
-      </main>
+      <ErrorState message="No player selected to compare." />
     );
   }
 
@@ -73,22 +70,14 @@ export default function PlayerComparePage() {
 
   if (error || !rankings) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Player Compare."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Player Compare."} onRetry={reloadPage} />
     );
   }
 
   const playerA = rankings.players.find((p) => p.player_id === playerAId) ?? null;
   if (!playerA) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          That player isn&apos;t on the current rankings board.
-        </p>
-      </main>
+      <ErrorState message="That player isn't on the current rankings board." />
     );
   }
 

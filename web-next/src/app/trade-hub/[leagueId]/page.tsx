@@ -8,6 +8,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type TradeHubResponse } from "@/lib/api";
 import { TradeHubContent } from "@/components/TradeHubContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function TradeHubPage() {
@@ -95,11 +96,7 @@ export default function TradeHubPage() {
 
   if (error || !tradeHub) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Trade Hub."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Trade Hub."} onRetry={reloadPage} />
     );
   }
 

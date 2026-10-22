@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type CommunityTradeItem, type CommunityTradesResponse } from "@/lib/api";
 import { CommunityTradesContent } from "@/components/CommunityTradesContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Trade History/Portfolio, Community has no [leagueId] segment — the
@@ -80,11 +81,7 @@ export default function CommunityPage() {
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load the Community feed."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load the Community feed."} onRetry={reloadPage} />
     );
   }
 

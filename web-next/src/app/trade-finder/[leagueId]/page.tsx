@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type MyTeamResponse } from "@/lib/api";
 import { TradeFinderContent } from "@/components/TradeFinderContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function TradeFinderPage() {
@@ -52,11 +53,7 @@ export default function TradeFinderPage() {
 
   if (error || !myTeam) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Trade Finder."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Trade Finder."} onRetry={reloadPage} />
     );
   }
 
