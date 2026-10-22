@@ -117,6 +117,7 @@ import concurrent.futures
 import dataclasses
 import functools
 import hashlib
+import json
 import logging
 import os
 import re
@@ -9403,6 +9404,7 @@ def _reinstated_inactive_roster_rows(
     valued: pd.DataFrame | None = None,
     settings: dict[str, Any] | None = None,
     score_field: str = "dynasty_score",
+    valued_cache_key: str | None = None,
 ) -> list[dict[str, Any]]:
     """Real, fully-valued rows for genuinely-rostered players the valued pool
     dropped — not just identity placeholders.
@@ -9483,6 +9485,53 @@ def _reinstated_inactive_roster_rows(
             for rec in identity_rows
         ]
 
+    # Performance audit, 2026-10-21: scoring these rows re-runs the
+    # valuation pipeline (disk-cached stats/market reads plus
+    # apply_valuation_lens over the WHOLE pool) on every My Team and Matchup
+    # request, up to four times per Matchup (both sides' suggested and real
+    # lineups), warm caches or not -- most of those endpoints' CPU whenever a
+    # roster holds an Inactive player. The result is a pure function of the
+    # valued pool, these identity rows, the league settings, the score field
+    # and the disk caches hydrate reads, so it is shared under exactly that
+    # key: the valued pool's own cache version (which already embeds its
+    # 120s bucket) plus each disk cache's mtime/size. Same TTL as the pool.
+    # It can never be fresher or staler than the pool it was computed
+    # against. A frame that didn't come straight from
+    # build_valued_players_frame_cached has no version and is scored
+    # uncached, exactly as before.
+    if valued_cache_key is None:
+        valued_cache_key = league_value_settings.valued_players_frame_cache_key(valued)
+    if not valued_cache_key:
+        return _score_reinstated_inactive_rows(identity_rows, valued, settings, score_field)
+    cache_key = redis_cache.build_cache_key(
+        "reinstated_inactive_rows",
+        valued_cache_key,
+        score_field,
+        json.dumps(settings, sort_keys=True, default=str),
+        json.dumps(identity_rows, sort_keys=True, default=str),
+        rankings.reconciled_valuation_cache_versions(),
+    )
+    try:
+        rows = redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=league_value_settings.VALUED_PLAYERS_FRAME_TTL_SECONDS,
+            compute=lambda: _score_reinstated_inactive_rows(identity_rows, valued, settings, score_field),
+        )
+    except Exception:
+        rows = _score_reinstated_inactive_rows(identity_rows, valued, settings, score_field)
+    return [dict(row) for row in rows]
+
+
+def _score_reinstated_inactive_rows(
+    identity_rows: list[dict[str, Any]],
+    valued: pd.DataFrame,
+    settings: dict[str, Any],
+    score_field: str,
+) -> list[dict[str, Any]]:
+    """The scoring half of _reinstated_inactive_roster_rows (see its
+    docstring): real valuation for already-identified Inactive rows,
+    against `valued` as the reference population."""
+
     candidates = pd.DataFrame.from_records(identity_rows)
     hydrated = rankings.hydrate_reconciled_valuations_from_cache(valued, candidates)
     # valuation_lens only affects a Redraft-specific blend ratio and which
@@ -9558,6 +9607,11 @@ def _suggested_lineup_split(
 
     roster_player_ids = {str(pid) for pid in (roster.get("players") or []) if pid}
     reserve_ids, taxi_ids = _roster_reserve_taxi_ids(roster)
+    # Read before the copy below: only the exact frame the valued cache
+    # handed out carries its cache version (see
+    # _reinstated_inactive_roster_rows). The copy only adds the derived
+    # _overall_rating_col, which the reinstated scoring recomputes itself.
+    valued_cache_key = league_value_settings.valued_players_frame_cache_key(valued)
 
     # Overall rating is percentiled against the full league-eligible pool
     # (every rosterable player at the position), not the dozen players on
@@ -9582,6 +9636,7 @@ def _suggested_lineup_split(
             valued=valued,
             settings=settings,
             score_field=score_field,
+            valued_cache_key=valued_cache_key,
         )
         if reinstated_rows:
             roster_df = pd.concat([roster_df, pd.DataFrame(reinstated_rows)], ignore_index=True, sort=False)
