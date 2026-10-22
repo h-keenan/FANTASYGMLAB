@@ -363,7 +363,7 @@ export function TradeFinderContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Choose players and picks you&apos;d move and search for realistic packages the league would accept for them.
+          Pick what you&apos;d move; find realistic packages.
         </p>
       </header>
 
@@ -456,7 +456,7 @@ export function TradeFinderContent({
 
           {selectionCount === 0 ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Select one or more of your players or picks, then search for realistic trade packages built around them.
+              Select players or picks to start.
             </p>
           ) : null}
 

@@ -30,7 +30,7 @@ describe("TradeHistoryContent", () => {
     const data: TradeOutcomeHistoryResponse = { ok: true, outcomes: [] };
     render(<TradeHistoryContent data={data} />);
 
-    expect(screen.getByText("No trade history yet. Answer \"Did this trade happen?\" the next time it comes up, and it'll show up here, along with how it worked out once there's enough real data.")).toBeInTheDocument();
+    expect(screen.getByText("No trade history yet. Confirm a trade to see it here.")).toBeInTheDocument();
   });
 
   it("renders a confirmed trade's partner, date, and send/receive assets", () => {

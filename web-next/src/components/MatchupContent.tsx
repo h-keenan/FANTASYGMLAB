@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/InfoTip";
 import type { MatchupRealStarter, MatchupResponse, MatchupSide, MatchupStarter } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -409,15 +410,15 @@ export function MatchupContent({ leagueName, matchup }: { leagueName: string; ma
         </p>
       ) : (
         <>
-      <p
-        className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}
-      >
-        The suggested starters below are each roster&apos;s best available lineup by season-long value — the same
-        optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. This is a
-        recommendation, not necessarily the lineup either manager has actually set in Sleeper. Weekly projections
-        (where shown) come from this player&apos;s own recent-week trend — see each real-lineup row&apos;s projection
-        note for the honest range and confidence.
-      </p>
+      <div className="glass-surface p-4">
+        <InfoTip label="Suggested starters, not set lineups">
+          The suggested starters below are each roster&apos;s best available lineup by season-long value — the same
+          optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. This is a
+          recommendation, not necessarily the lineup either manager has actually set in Sleeper. Weekly projections
+          (where shown) come from this player&apos;s own recent-week trend — see each real-lineup row&apos;s projection
+          note for the honest range and confidence.
+        </InfoTip>
+      </div>
 
       <SuggestedLineupSection title="Your suggested starters" side={mine} />
       <SuggestedLineupSection title={`${opponent.team_name}'s best lineup`} side={opponent} />

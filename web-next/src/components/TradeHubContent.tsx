@@ -131,7 +131,7 @@ export function TradeHubContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Trade ideas built around your roster — You Send / You Get, ranked by fit.
+          Ideas built around your roster.
         </p>
         <BeginnerHelp term="tradeHubIntro" />
         {/* Logic/valuation audit, 2026-10-18: Trade Hub applies a team-

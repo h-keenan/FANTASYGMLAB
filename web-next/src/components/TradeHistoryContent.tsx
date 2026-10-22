@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/InfoTip";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -79,17 +80,21 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
           Trade History
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>Did it work out?</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Trades you&apos;ve confirmed you made. Once a confirmed trade has had a few weeks to play out, we&apos;ll
-          show a real before/after read here, using actual points scored and value trend, never a guess. Nothing
-          here changes how trades are proposed or accepted.
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+            Trades you&apos;ve confirmed you made.
+          </p>
+          <InfoTip label="How outcomes are read">
+            Once a confirmed trade has had a few weeks to play out, we&apos;ll show a real before/after read here,
+            using actual points scored and value trend, never a guess. Nothing here changes how trades are proposed or
+            accepted.
+          </InfoTip>
+        </div>
       </header>
 
       {data.outcomes.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No trade history yet. Answer &quot;Did this trade happen?&quot; the next time it comes up, and it&apos;ll
-          show up here, along with how it worked out once there&apos;s enough real data.
+          No trade history yet. Confirm a trade to see it here.
         </p>
       ) : (
         <div className="flex flex-col gap-4">

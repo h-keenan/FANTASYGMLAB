@@ -103,7 +103,7 @@ export default function TradeHistoryScreen({ navigation }: Props) {
             <EmptyState
               icon="swap-horizontal-outline"
               title="No trade history yet"
-              subtitle="Answer 'Did this trade happen?' the next time it comes up, and it'll show up here — along with how it worked out, once there's enough real data."
+              subtitle="Confirm a trade to see it here."
             />
           ) : null
         }

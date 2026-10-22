@@ -292,7 +292,7 @@ export function PlayersContent({
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {view === "players"
-            ? "Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap Compare for the full breakdown."
+            ? "Ranked by value for this league."
             : "Every tracked draft-pick asset in this league, grouped by season."}
         </p>
       </header>

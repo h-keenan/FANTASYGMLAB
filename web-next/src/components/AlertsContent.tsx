@@ -252,7 +252,7 @@ export function AlertsContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Recent news about players on your roster — injury, role, transaction, and off-field signal only.
+          News on your rostered players.
         </p>
       </header>
 
