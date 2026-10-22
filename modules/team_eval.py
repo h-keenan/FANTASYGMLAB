@@ -62,6 +62,21 @@ def team_strategy_mode(value) -> str:
     return TEAM_STRATEGY_MODE_MAP.get(normalize_team_strategy(value), "competitive")
 
 
+# modules.rankings fills a missing birth date with age 99.0, and that
+# placeholder is persisted into players.db (212 rows in the audited
+# snapshot, mostly UDFA rookies). Any age above this is treated as unknown
+# when averaging a roster, a trade side, or a team, so one rostered
+# placeholder can't add years to a team's average age.
+MAX_KNOWN_PLAYER_AGE = 50.0
+
+
+def known_player_ages(values) -> pd.Series:
+    """Numeric ages with missing and placeholder (99) values dropped."""
+
+    ages = pd.to_numeric(pd.Series(values, dtype="object"), errors="coerce")
+    return ages[(ages > 0) & (ages <= MAX_KNOWN_PLAYER_AGE)]
+
+
 def _safe_int(value, default: int = 0) -> int:
     try:
         parsed = int(value)
@@ -497,7 +512,8 @@ def build_league_summary(
             if score_field == current_score_field
             else _score_starter_weighted_roster(df_team, score_field, lineup_settings)
         )
-        avg_age = float(df_team["age"].mean()) if df_team["age"].notna().any() else None
+        team_ages = known_player_ages(df_team["age"].tolist())
+        avg_age = float(team_ages.mean()) if not team_ages.empty else None
 
         rows.append(
             {

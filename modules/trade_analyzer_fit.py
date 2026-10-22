@@ -28,6 +28,7 @@ from modules.league_workspace_ui import _format_score
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
 from modules.roster_needs import TeamNeedsAssessment, assess_team_needs
 from modules.team_eval import (
+    known_player_ages,
     normalize_team_strategy,
     suggest_optimal_lineup,
     team_strategy_label,
@@ -361,8 +362,10 @@ def evaluate_trade_analyzer_fit(
         if delta <= -120
     ]
 
-    current_avg_age = pd.to_numeric(my_team_df.get("age", pd.Series(dtype="float64")), errors="coerce").dropna()
-    post_avg_age = pd.to_numeric(post_team_df.get("age", pd.Series(dtype="float64")), errors="coerce").dropna()
+    # known_player_ages drops the age-99 "unknown birth date" placeholder,
+    # which otherwise made receiving one UDFA read as aging the roster.
+    current_avg_age = known_player_ages(list(my_team_df.get("age", pd.Series(dtype="float64"))))
+    post_avg_age = known_player_ages(list(post_team_df.get("age", pd.Series(dtype="float64"))))
     current_age = float(current_avg_age.mean()) if not current_avg_age.empty else None
     new_age = float(post_avg_age.mean()) if not post_avg_age.empty else None
     age_delta = (new_age - current_age) if current_age is not None and new_age is not None else None
