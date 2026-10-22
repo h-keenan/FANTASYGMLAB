@@ -42,6 +42,13 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import DashboardGuessCard from '../components/DashboardGuessCard';
+import DashboardStatRow from '../components/DashboardStatRow';
+import OverallRatingBadge from '../components/OverallRatingBadge';
+import ToneBadge from '../components/ToneBadge';
+import ValueStat from '../components/ValueStat';
+import { requestOrbSearch } from '../lib/orbEvents';
+import { WATCH_TAG_LABEL, usageTrendPct, watchTagKind } from '../lib/dashboardWatch';
 import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -333,7 +340,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
     };
   }, [dashboardData, leagueId]);
 
-  useScreenHeaderTitle(navigation, 'Next Move', leagueName);
+  useScreenHeaderTitle(navigation, 'Dashboard', leagueName);
 
   useEffect(() => {
     navigation.setOptions({
@@ -394,7 +401,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} title="Dashboard" onSearch={requestOrbSearch} />
       <ScreenInfoNote
         text={`The real Next Move briefing for ${leagueName} — the same roster-pressure, injury, need, and waiver signals the web app's Dashboard uses.`}
       />
@@ -408,6 +415,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
           </AppText>
         </View>
       ) : null}
+
+      {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
+
+      <SectionHeading
+        title="Today"
+        right={
+          <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={8}>
+            <AppText style={styles.viewAll}>View All ›</AppText>
+          </TouchableOpacity>
+        }
+      />
 
       {/* HERO — the single answer to "what should I do next?" (Magna Carta
           §33/§4). Everything below this supports it; nothing above it but
@@ -433,20 +451,10 @@ export default function DashboardScreen({ route, navigation }: Props) {
         ))
       )}
 
-      {/* Urgent risks. */}
-      <NeedsAttentionSection
+      {/* Watchlist & Alerts: urgent risks and opportunities in one list. */}
+      <WatchlistAlertsSection
         snapshot={teamSnapshot}
-        items={grouped.watch}
-        leagueId={leagueId}
-        leagueName={leagueName}
-        navigation={navigation}
-        newRecommendationIds={newRecommendationIds}
-        showExplanations={showExplanations}
-      />
-
-      {/* Opportunities. */}
-      <OpportunitiesSection
-        items={grouped.opportunity}
+        items={[...grouped.watch, ...grouped.opportunity]}
         leagueId={leagueId}
         leagueName={leagueName}
         navigation={navigation}
@@ -485,14 +493,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
           onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
         />
       ) : null}
-      {teamSnapshot ? (
-        <TeamSnapshotRow
-          snapshot={teamSnapshot}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          navigation={navigation}
-        />
-      ) : null}
       <View style={styles.quickActionsSection}>
         <SectionHeading title="Quick Actions" icon="apps-outline" />
         <DashboardQuickActions
@@ -505,50 +505,62 @@ export default function DashboardScreen({ route, navigation }: Props) {
           inSeason={isInSeason(matchup?.week)}
         />
       </View>
-      {teamRankings && teamRankings.length > 0 ? (
-        entitlement && !entitlement.is_premium ? (
-          <View style={styles.lockWrap}>
-            <PremiumLock
-              title="Full League Pulse"
-              description="See contender, rebuilder, draft-capital, and activity leaders across the whole league."
-            />
-          </View>
-        ) : (
-          <LeaguePulseSection teams={teamRankings} />
-        )
+      <View style={styles.activityRow}>
+        {teamRankings && teamRankings.length > 0 ? (
+          entitlement && !entitlement.is_premium ? (
+            <View style={styles.activityCell}>
+              <PremiumLock
+                title="League Activity"
+                description="See contender, rebuilder, draft-capital, and activity leaders across the whole league."
+              />
+            </View>
+          ) : (
+            <View style={styles.activityCell}>
+              <LeaguePulseSection teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+            </View>
+          )
+        ) : null}
+        <View style={styles.activityCell}>
+          <DashboardGuessCard />
+        </View>
+      </View>
+      {teamSnapshot ? (
+        <TeamSnapshotRow snapshot={teamSnapshot} />
       ) : null}
       </ScrollView>
     </View>
   );
 }
 
-function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
+function LeaguePulseSection({ teams, onPress }: { teams: TeamRanking[]; onPress: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const tiles = buildLeaguePulseTiles(teams, colors);
+  const tiles = buildLeaguePulseTiles(teams, colors).slice(0, 2);
+  if (tiles.length === 0) return null;
   return (
-    <View style={styles.pulseSection}>
-      <SectionHeading title="League Pulse" icon="podium-outline" />
-      <View style={styles.pulseGrid}>
-        {tiles.map((tile) => (
-          <View key={tile.label} style={[styles.pulseTile, { borderLeftColor: tile.color }]}>
-            <View style={styles.pulseLabelRow}>
-              <Ionicons name={tile.icon} size={12} color={tile.color} />
-              <AppText style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</AppText>
-            </View>
-            <View style={styles.pulseValueRow}>
-              <TeamAvatar avatarId={tile.avatarUrl} size={20} />
-              <AppText style={styles.pulseValue} numberOfLines={1}>
-                {tile.value}
-              </AppText>
-            </View>
-            <AppText style={styles.pulseNote} numberOfLines={1}>
-              {tile.note}
+    <AnimatedCard style={styles.pulseCard} onPress={onPress}>
+      <View style={styles.pulseHeaderRow}>
+        <AppText style={styles.pulseTitle}>League Activity</AppText>
+        <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+      </View>
+      {tiles.map((tile) => (
+        <View key={tile.label} style={styles.pulseItem}>
+          <View style={styles.pulseLabelRow}>
+            <Ionicons name={tile.icon} size={12} color={tile.color} />
+            <AppText style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</AppText>
+          </View>
+          <View style={styles.pulseValueRow}>
+            <TeamAvatar avatarId={tile.avatarUrl} size={20} />
+            <AppText style={styles.pulseValue} numberOfLines={1}>
+              {tile.value}
             </AppText>
           </View>
-        ))}
-      </View>
-    </View>
+          <AppText style={styles.pulseNote} numberOfLines={1}>
+            {tile.note}
+          </AppText>
+        </View>
+      ))}
+    </AnimatedCard>
   );
 }
 
@@ -673,10 +685,28 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
           <AppText style={styles.assetMeta} numberOfLines={1}>
             {asset.team}
           </AppText>
+          {asset.injury_status ? (
+            <ToneBadge
+              label={injuryShortCode(asset.injury_status)}
+              color={/^(out|ir|injured reserve|sus)/i.test(asset.injury_status) ? colors.danger : colors.premium}
+            />
+          ) : null}
         </View>
       </View>
+      <OverallRatingBadge rating={asset.overall_rating} />
+      <ValueStat value={asset.score != null ? Math.round(asset.score) : null} />
     </View>
   );
+}
+
+/** Short injury code for the compact pill (Q, D, O, IR); anything else shows as-is. */
+function injuryShortCode(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  if (normalized.startsWith('quest')) return 'Q';
+  if (normalized.startsWith('doubt')) return 'D';
+  if (normalized === 'out') return 'O';
+  if (normalized === 'ir' || normalized.startsWith('injured')) return 'IR';
+  return status;
 }
 
 /**
@@ -690,7 +720,7 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
  * is one), and gets `valueColor` emphasis when non-zero instead of a
  * one-off danger tile.
  */
-function TeamSnapshotRow({
+function DashboardStatStrip({
   snapshot,
   leagueId,
   leagueName,
@@ -701,69 +731,89 @@ function TeamSnapshotRow({
   leagueName: string;
   navigation: DashboardNavigation;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const record =
     snapshot.wins != null && snapshot.losses != null
       ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
       : '—';
-  const injuredCount = snapshot.injured_starters;
   const goToTeams = () => navigation.navigate('Teams', { leagueId, leagueName });
   const copy = useExperienceCopy();
   const averageAgeLabel = copy.label('averageAge', 'Avg Age');
-  // Beginner-only term explanations (lib/experienceCopy.ts) — empty for
-  // advanced/unset accounts, so today's tiles render unchanged.
+  // Beginner-only term explanations (lib/experienceCopy.ts): empty for
+  // advanced/unset accounts, so the strip stays compact.
   const termHelp: Array<[string, string | null]> = copy.isBeginner
     ? [
-        ...(snapshot.power_rank != null ? [['Roster Power', copy.help('powerRank')] as [string, string | null]] : []),
-        ...(snapshot.franchise_rank != null ? [['Franchise', copy.help('franchiseRank')] as [string, string | null]] : []),
+        ['Power Rank', copy.help('powerRank')],
+        ['Franchise Rank', copy.help('franchiseRank')],
         [averageAgeLabel, copy.help('averageAge')],
       ]
     : [];
+  return (
+    <View>
+      <DashboardStatRow
+        items={[
+          { label: 'Record', icon: 'ribbon-outline', value: record },
+          {
+            label: 'Power Rank',
+            icon: 'trophy-outline',
+            value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
+            onPress: goToTeams,
+          },
+          {
+            label: 'Franchise',
+            icon: 'shield-outline',
+            value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
+            onPress: goToTeams,
+          },
+          {
+            label: averageAgeLabel,
+            icon: 'hourglass-outline',
+            value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
+          },
+        ]}
+      />
+      {termHelp.map(([term, help]) => (
+        <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} />
+      ))}
+    </View>
+  );
+}
 
+/** Team Snapshot: Starter Strength, Bench Strength and Injuries only. The
+ * record/rank/age strip lives once at the top of the screen. */
+function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const copy = useExperienceCopy();
+  const injuredCount = snapshot.injured_starters;
+  const termHelp: Array<[string, string | null]> = copy.isBeginner
+    ? [
+        ['Starter Strength', copy.help('starterStrength')],
+        ['Bench Strength', copy.help('benchStrength')],
+      ]
+    : [];
   return (
     <View style={styles.snapshotSection}>
-      <SectionHeading title="League Snapshot" icon="stats-chart" />
-      <View style={styles.snapshotRow}>
-        {/* Concept sheet groups these as a 3-up row (Record/Roster Power/
-         * Franchise) over a 2-up row (Avg Age/Injuries) rather than an even
-         * wrap — a per-instance flexBasis override on MetricCard's existing
-         * `style` prop (same override mechanism PR #743 used for
-         * PlayerDetail), not a change to MetricCard's own shared default
-         * sizing, so no other MetricCard consumer is affected. */}
-        <MetricCard label="Record" icon="ribbon-outline" value={record} style={styles.snapshotTileThird} />
-        {snapshot.power_rank != null ? (
-          <MetricCard
-            label="Roster Power"
-            icon="flash"
-            value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
-            onPress={goToTeams}
-            style={styles.snapshotTileThird}
-          />
-        ) : null}
-        {snapshot.franchise_rank != null ? (
-          <MetricCard
-            label="Franchise"
-            icon="star"
-            value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
-            onPress={goToTeams}
-            style={styles.snapshotTileThird}
-          />
-        ) : null}
-        <MetricCard
-          label={averageAgeLabel}
-          icon="hourglass-outline"
-          value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'}
-          style={styles.snapshotTileHalf}
-        />
-        <MetricCard
-          label="Injuries"
-          icon="medkit-outline"
-          value={injuredCount != null ? String(injuredCount) : '—'}
-          valueColor={injuredCount != null && injuredCount > 0 ? colors.danger : undefined}
-          style={styles.snapshotTileHalf}
-        />
-      </View>
+      <SectionHeading title="Team Snapshot" />
+      <DashboardStatRow
+        items={[
+          {
+            label: 'Starter Strength',
+            icon: 'link-outline',
+            value: snapshot.starter_rank != null ? formatRank(snapshot.starter_rank, !!snapshot.starter_rank_tied) : '—',
+          },
+          {
+            label: 'Bench Strength',
+            icon: 'layers-outline',
+            value: snapshot.bench_rank != null ? formatRank(snapshot.bench_rank, !!snapshot.bench_rank_tied) : '—',
+          },
+          {
+            label: 'Injuries',
+            icon: 'medkit-outline',
+            value: injuredCount != null ? (injuredCount > 0 ? String(injuredCount) : 'Stable') : '—',
+            valueColor: injuredCount != null && injuredCount > 0 ? colors.danger : undefined,
+          },
+        ]}
+      />
       {termHelp.map(([term, help]) => (
         <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} style={styles.snapshotHelp} />
       ))}
@@ -961,7 +1011,11 @@ function DashboardInsightRow({
   last: boolean;
 }) {
   const { colors } = useThemeMode();
-  const meta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
+  const baseMeta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
+  const tagKind = watchTagKind(item);
+  const tagColor = tagKind === 'trending' ? colors.danger : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : baseMeta.color;
+  const meta = { ...baseMeta, label: WATCH_TAG_LABEL[tagKind] ?? baseMeta.label, color: tagColor };
+  const trendPct = usageTrendPct(item);
   const routeName = DESTINATION_ROUTE[item.destination];
   const actionLabel = DESTINATION_BUTTON_LABEL[item.destination];
   const onActionPress = routeName
@@ -998,6 +1052,7 @@ function DashboardInsightRow({
         value={item.route_player_score}
         valueLabel="VALUE"
         detail={showExplanations ? item.reason : null}
+        trailing={trendPct !== null ? <ToneBadge label={`↓ ${trendPct}%`} color={colors.danger} /> : null}
       />
     );
   }
@@ -1019,13 +1074,12 @@ function DashboardInsightRow({
 }
 
 /**
- * "Urgent risks" tier of the Next Move hierarchy (Magna Carta §33: Top
- * Priority -> urgent risks -> opportunities -> secondary context). Folds
- * the old standalone injury-detail card in as this group's leading block —
- * same information, no longer a separate bordered card sitting apart from
- * the Watch items it elaborates on.
+ * Watchlist & Alerts: urgent risks and opportunities as one list. Folds in
+ * the team-health block (key injuries) as its leading row. Each row carries a
+ * TRENDING / INJURY / WAIVER tag; a trend indicator on the right appears only
+ * when the item has a real figure (see lib/dashboardWatch.ts).
  */
-function NeedsAttentionSection({
+function WatchlistAlertsSection({
   snapshot,
   items,
   leagueId,
@@ -1047,16 +1101,21 @@ function NeedsAttentionSection({
   const showHealth = hasHealthContext(snapshot);
   if (!showHealth && items.length === 0) return null;
 
-  // Defensive only: category assignment is server-side, and a trade-shaped
-  // item should always land in top_priority in practice — but if one ever
-  // doesn't, it still gets the full send/receive treatment rather than
-  // being squeezed into a two-line row that would drop its trade package.
+  // Defensive only: a trade-shaped item should land in top_priority, but if
+  // one doesn't it still gets the full send/receive treatment.
   const richItems = items.filter((item) => item.presentation?.trade_package);
   const rowItems = items.filter((item) => !item.presentation?.trade_package);
 
   return (
     <View style={styles.groupSection}>
-      <SectionHeading title="Needs Attention" icon="eye-outline" />
+      <SectionHeading
+        title="Watchlist & Alerts"
+        right={
+          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={8}>
+            <AppText style={styles.viewAll}>View All ›</AppText>
+          </TouchableOpacity>
+        }
+      />
       {richItems.map((item, index) => (
         <TopPriorityTradeCard
           key={`watch-trade-${index}`}
@@ -1100,62 +1159,6 @@ function NeedsAttentionSection({
           {rowItems.map((item, index) => (
             <DashboardInsightRow
               key={`watch-${index}`}
-              item={item}
-              leagueId={leagueId}
-              leagueName={leagueName}
-              navigation={navigation}
-              isNew={newRecommendationIds.has(item.recommendation_id)}
-              showExplanations={showExplanations}
-              last={index === rowItems.length - 1}
-            />
-          ))}
-        </AnimatedCard>
-      ) : null}
-    </View>
-  );
-}
-
-/** "Opportunities" tier — Waiver Opportunity + League Movement items. */
-function OpportunitiesSection({
-  items,
-  leagueId,
-  leagueName,
-  navigation,
-  newRecommendationIds,
-  showExplanations,
-}: {
-  items: DashboardItem[];
-  leagueId: string;
-  leagueName: string;
-  navigation: DashboardNavigation;
-  newRecommendationIds: Set<string>;
-  showExplanations: boolean;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  if (items.length === 0) return null;
-  const richItems = items.filter((item) => item.presentation?.trade_package);
-  const rowItems = items.filter((item) => !item.presentation?.trade_package);
-
-  return (
-    <View style={styles.groupSection}>
-      <SectionHeading title="Opportunities" icon="swap-horizontal-outline" />
-      {richItems.map((item, index) => (
-        <TopPriorityTradeCard
-          key={`opportunity-trade-${index}`}
-          item={item}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          navigation={navigation}
-          isNew={newRecommendationIds.has(item.recommendation_id)}
-          showExplanations={showExplanations}
-        />
-      ))}
-      {rowItems.length > 0 ? (
-        <AnimatedCard style={styles.groupCard}>
-          {rowItems.map((item, index) => (
-            <DashboardInsightRow
-              key={`opportunity-${index}`}
               item={item}
               leagueId={leagueId}
               leagueName={leagueName}
@@ -1227,6 +1230,13 @@ function createStyles(colors: ThemeColors) {
   },
   checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
   snapshotSection: { marginBottom: spacing.md },
+  viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
+  activityRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch', marginBottom: spacing.md },
+  activityCell: { flex: 1, minWidth: 0 },
+  pulseCard: { flex: 1, padding: spacing.md, gap: spacing.sm },
+  pulseHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pulseTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 },
+  pulseItem: { gap: 2 },
   snapshotHelp: { marginTop: spacing.xs },
   snapshotRow: {
     flexDirection: 'row',

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
@@ -13,6 +13,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { PositionBadge } from "@/components/PositionBadge";
 import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
 import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from "@/lib/playerSearch";
@@ -49,6 +50,23 @@ export function GmOrb() {
   // out of it") — the shared sheet gesture, lib/useSheetDragDismiss.ts.
   // Tap-off is the backdrop button below; Esc is handled here too.
   const closeSheet = useCallback(() => setOpen(false), []);
+  // The header's search icon opens this sheet straight onto the search field.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusSearchNext = useRef(false);
+  useEffect(() => {
+    const onOpenSearch = () => {
+      focusSearchNext.current = true;
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
+    return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
+  }, []);
+  useEffect(() => {
+    if (open && focusSearchNext.current) {
+      focusSearchNext.current = false;
+      searchRef.current?.focus();
+    }
+  }, [open]);
   const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: closeSheet, enabled: open });
   useEffect(() => {
     if (!open) return;
@@ -215,6 +233,7 @@ export function GmOrb() {
               </div>
 
               <input
+                ref={searchRef}
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}

@@ -43,6 +43,7 @@ export default function PlayerInsightRow({
   value,
   valueLabel,
   detail,
+  trailing,
 }: {
   icon: IconName;
   color: string;
@@ -68,6 +69,8 @@ export default function PlayerInsightRow({
   /** Same role as InsightRow's `detail` — the reason/note text, shown only
    * when provided. */
   detail?: string | null;
+  /** Optional right-side indicator (e.g. a real trend figure), before the chevron. */
+  trailing?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -104,6 +107,7 @@ export default function PlayerInsightRow({
           contextLine={detail}
         />
       </View>
+      {trailing}
       {actionLabel && onActionPress ? (
         <TouchableOpacity style={styles.actionChip} onPress={onActionPress} hitSlop={6}>
           <AppText style={styles.actionChipText}>{actionLabel.toUpperCase()}</AppText>

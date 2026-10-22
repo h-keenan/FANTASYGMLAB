@@ -11,7 +11,7 @@ const FIXTURE: DashboardResponse = {
   reason: "",
   items: [
     {
-      category: "Top Priority",
+      category: "top_priority",
       headline: "Trade for a top-12 RB before the deadline",
       reason: "Your roster is bottom-third at RB with no clear bench answer.",
       supporting_context: null,
@@ -57,11 +57,17 @@ describe("DashboardContent", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
-    expect(screen.getByText("Today's Game Plan")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
     expect(screen.getByText("Test Back")).toBeInTheDocument();
 
     expect(screen.getByText("Team Snapshot")).toBeInTheDocument();
+    // The stat strip appears once at the top and is not repeated in Team Snapshot.
+    expect(screen.getAllByText("Record")).toHaveLength(1);
+    expect(screen.getAllByText("Power Rank")).toHaveLength(1);
+    expect(screen.getByText("Starter Strength")).toBeInTheDocument();
+    expect(screen.getByText("Bench Strength")).toBeInTheDocument();
+    expect(screen.getByText("Injuries")).toBeInTheDocument();
     expect(screen.getByText("7-6")).toBeInTheDocument();
     expect(screen.getByText("#2")).toBeInTheDocument(); // power rank
     expect(screen.getByText("T-1")).toBeInTheDocument(); // franchise rank, tied
@@ -106,6 +112,12 @@ describe("DashboardContent", () => {
     // ...but Watch and Waiver Opportunity share one card, while Top
     // Priority gets its own — exactly 2 <article> cards total, not 3.
     expect(document.querySelectorAll("article")).toHaveLength(2);
+    // Type tags, a real usage-drop indicator, and no placeholder copy.
+    expect(screen.getByText("Trending")).toBeInTheDocument();
+    expect(screen.getByText("Waiver")).toBeInTheDocument();
+    expect(screen.getByText("↓ 13%")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Watchlist/ })).toBeInTheDocument();
+    expect(document.body.textContent?.toLowerCase()).not.toContain("placeholder");
   });
 
   it("shows the quiet-state copy instead of Game Plan cards when there's nothing urgent", () => {

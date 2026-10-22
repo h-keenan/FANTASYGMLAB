@@ -167,7 +167,7 @@ describe("LeaguePulseCard", () => {
     );
     render(<LeaguePulseCard leagueId="abc" />);
 
-    await screen.findByText("League Pulse");
+    await screen.findByText("League Activity");
     expect(screen.getByText("Trade Machine")).toBeInTheDocument();
     expect(screen.getByText("11 moves")).toBeInTheDocument();
     expect(screen.getByText("Hot Hand")).toBeInTheDocument();

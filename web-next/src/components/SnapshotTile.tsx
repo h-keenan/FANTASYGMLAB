@@ -28,6 +28,7 @@ export function SnapshotTile({
   note,
   glyph,
   wrapNote = false,
+  compact = false,
 }: {
   label: string;
   value: string;
@@ -47,6 +48,8 @@ export function SnapshotTile({
    * across the whole row. Off by default, so existing callers keep their
    * current layout. */
   wrapNote?: boolean;
+  /** Equal-column strip form: no min width, tighter padding, smaller value. */
+  compact?: boolean;
 }) {
   const toneColor =
     tone === "risk"
@@ -59,10 +62,10 @@ export function SnapshotTile({
 
   return (
     <div
-      className={`glass-surface flex flex-col gap-1 p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}
+      className={`glass-surface flex flex-col gap-1 ${compact ? "p-2 min-w-0" : `p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}`}
       style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
     >
-      <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+      <span className={`flex items-center gap-1 ${compact ? "text-[0.6875rem] leading-tight" : "text-xs"}`} style={{ color: "var(--color-text-muted)" }}>
         {glyph ? (
           <span style={{ color: tone === "neutral" ? GLYPH_ACCENT[glyph] : toneColor }}>
             <SnapshotTileGlyph name={glyph} />
@@ -70,7 +73,7 @@ export function SnapshotTile({
         ) : null}
         {label}
       </span>
-      <span style={{ font: "var(--type-primary-metric)", color: toneColor }}>{value}</span>
+      <span style={{ font: "var(--type-primary-metric)", color: toneColor, ...(compact ? { fontSize: "1.25rem" } : {}) }}>{value}</span>
       {note ? (
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {note}
