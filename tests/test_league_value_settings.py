@@ -138,6 +138,50 @@ def test_build_valued_players_frame_cached_returns_empty_frame_for_missing_leagu
     assert result.empty
 
 
+_IDP_POSITIONS = (
+    ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "SUPER_FLEX"]
+    + ["DL", "DL", "LB", "LB", "DB", "DB", "IDP_FLEX", "K", "DEF"]
+    + ["BN"] * 8
+)
+
+
+def test_idp_k_def_slots_do_not_inflate_offensive_starter_pressure():
+    lvs = league_value_settings
+    idp = lvs.detect_league_value_settings_from_payload(
+        {"roster_positions": _IDP_POSITIONS, "settings": {"num_teams": 12}}
+    )
+    offense_only = lvs.detect_league_value_settings_from_payload(
+        {
+            "roster_positions": [p for p in _IDP_POSITIONS if p not in {"DL", "LB", "DB", "IDP_FLEX", "K", "DEF"}],
+            "settings": {"num_teams": 12},
+        }
+    )
+    assert idp["non_offense_starter_count"] == 9
+    frame = pd.DataFrame({"position": ["QB", "RB", "WR", "TE", "LB"], "age": [27.0] * 5})
+    with_idp = lvs.league_settings_adjustment_components(frame, lvs.resolve_league_value_settings(idp))
+    without = lvs.league_settings_adjustment_components(frame, lvs.resolve_league_value_settings(offense_only))
+    assert with_idp["league_adj_team_pressure"].tolist() == without["league_adj_team_pressure"].tolist()
+
+
+def test_rec_flex_is_wr_te_only_and_superflex_only_league_has_no_invented_qb():
+    from modules import team_eval
+
+    lvs = league_value_settings
+    rec = lvs.detect_league_value_settings_from_payload(
+        {"roster_positions": ["QB", "RB", "WR", "TE", "REC_FLEX", "BN"], "settings": {"num_teams": 10}}
+    )
+    assert rec["rec_flex_count"] == 1 and rec["regular_flex_count"] == 0
+    slots = team_eval._lineup_slots(rec)
+    assert slots["REC_FLEX"] == 1 and slots["FLEX"] == 0
+
+    sf_only = lvs.detect_league_value_settings_from_payload(
+        {"roster_positions": ["RB", "RB", "WR", "WR", "TE", "SUPER_FLEX", "BN"], "settings": {"num_teams": 12}}
+    )
+    assert sf_only["qb_count"] == 0 and sf_only["qb_format"] == "Superflex"
+    sf_slots = team_eval._lineup_slots(sf_only)
+    assert sf_slots["QB"] == 0 and sf_slots["SUPER_FLEX"] == 1
+
+
 def test_taxi_slots_setting_is_detected_and_boosts_young_skill_players():
     lvs = league_value_settings
     league = {
