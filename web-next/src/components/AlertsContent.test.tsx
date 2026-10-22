@@ -78,6 +78,28 @@ describe("AlertsContent", () => {
     expect(api.markAlertRead).not.toHaveBeenCalled();
   });
 
+  it("shows the read state right away and keeps an unsynced read across a reload", async () => {
+    window.localStorage.clear();
+    vi.mocked(api.markAlertRead).mockClear();
+    vi.mocked(api.markAlertRead).mockResolvedValueOnce({ ok: false });
+    const first = render(
+      <AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} userId="user-1" />,
+    );
+    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Test player ruled out for Week 7" }));
+    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(api.markAlertRead).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    // Server still says unread (the write didn't land): this browser keeps
+    // showing it read and re-sends the read.
+    vi.mocked(api.markAlertRead).mockResolvedValue({ ok: true });
+    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} userId="user-1" />);
+    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(api.markAlertRead).toHaveBeenCalledTimes(2));
+    window.localStorage.clear();
+  });
+
   it("shows the unconfirmed badge for speculative alerts", () => {
     render(
       <AlertsContent

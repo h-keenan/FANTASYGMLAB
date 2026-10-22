@@ -28,17 +28,28 @@ export default function AlertsPage() {
     }
     let cancelled = false;
 
-    api
-      .getLeagueAlerts(leagueId)
-      .then((result) => {
-        if (!cancelled) setAlerts(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Alerts.");
-      });
+    const load = (initial: boolean) =>
+      api
+        .getLeagueAlerts(leagueId)
+        .then((result) => {
+          if (!cancelled) setAlerts(result);
+        })
+        .catch((err) => {
+          // A failed background refresh keeps the feed already on screen.
+          if (!cancelled && initial) setError(err instanceof Error ? err.message : "Could not load Alerts.");
+        });
+
+    void load(true);
+    // Returning to this tab re-reads the feed, so an alert read on the
+    // phone in the meantime shows as read here without a manual reload.
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load(false);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [authLoading, session, leagueId, router]);
 
@@ -58,5 +69,5 @@ export default function AlertsPage() {
     );
   }
 
-  return <AlertsContent leagueId={leagueId} leagueName={leagueName} data={alerts} />;
+  return <AlertsContent leagueId={leagueId} leagueName={leagueName} data={alerts} userId={session?.user?.id ?? ""} />;
 }

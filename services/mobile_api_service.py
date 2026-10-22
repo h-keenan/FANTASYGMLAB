@@ -1700,6 +1700,9 @@ def resolve_league_path_id(
         and re-declared under the current id -- never a wrong
         roster/matchup/trade-data result, never an error, never silently
         unflagged (every exclusion has an inline comment at its route).
+        `alerts/read` additionally writes the resolved id's row itself and
+        its GET reads both ids, so alert read state never self-heals by
+        re-declaring -- it is simply shared across both ids.
 
     A handful of the READ endpoints this dependency DOES cover (Dashboard,
     Trade Hub, Trade Finder, GM Plan, the dedicated GM Stance/Team Stance/
@@ -4303,10 +4306,51 @@ def _alert_key_for_link(link: str) -> str:
     return hashlib.sha256(str(link or "").encode("utf-8")).hexdigest()[:32]
 
 
+def _alert_key_for_item(item: dict[str, Any]) -> str:
+    """The cross-device identity of one alert row.
+
+    Every client (web, the current mobile build, and future builds) reads
+    this exact value back from GET .../alerts and posts it to
+    POST .../alerts/read, so it must be a pure function of the underlying
+    article, never of the request, device, or time. RSS ingestion
+    (modules.news._entry_to_item) already drops linkless entries, so in
+    practice this is always the article-link hash existing read rows were
+    written under. The fallback only guards against a future linkless
+    source: without it every linkless item would hash "" and share ONE key,
+    so reading any of them would mark all of them read.
+    """
+
+    link = str(item.get("link") or "")
+    if link:
+        return _alert_key_for_link(link)
+    identity = "|".join(
+        str(item.get(field) or "").strip()
+        for field in ("title", "source", "published_ts", "matched_player")
+    )
+    return _alert_key_for_link(f"nolink:{identity}")
+
+
+def _alert_read_league_ids(*league_ids: str) -> list[str]:
+    """Distinct, non-empty league ids, order preserved."""
+
+    seen: list[str] = []
+    for value in league_ids:
+        clean = str(value or "").strip()
+        if clean and clean not in seen:
+            seen.append(clean)
+    return seen
+
+
 def _fetch_read_alert_keys(
-    config: dict, user_id: str, access_token: str, league_id: str
+    config: dict, user_id: str, access_token: str, league_id: str | list[str]
 ) -> set[str]:
     """Which alert_keys this user has already marked read in this league.
+
+    `league_id` may be a list: GET .../alerts passes both the raw path id
+    and its season-rollover-resolved id, because POST .../alerts/read is
+    called by whichever device happens to hold whichever id (a phone with
+    an older saved-league id, the web with the current one). Reading both
+    keeps one device's reads visible on the other.
 
     Fails closed to "none read" (never crashes the alerts feed) — covers
     the pre-migration state where mobile_alert_reads doesn't exist yet.
@@ -4314,10 +4358,18 @@ def _fetch_read_alert_keys(
 
     if not user_id:
         return set()
+    league_ids = _alert_read_league_ids(*(league_id if isinstance(league_id, list) else [league_id]))
+    if not league_ids:
+        return set()
+    if len(league_ids) == 1:
+        league_filter = f"league_id=eq.{league_ids[0]}"
+    else:
+        quoted = ",".join('"' + value.replace('"', "") + '"' for value in league_ids)
+        league_filter = f"league_id=in.({quoted})"
     url = auth_supabase.rest_api_url(
         config,
         "mobile_alert_reads",
-        f"select=alert_key&user_id=eq.{user_id}&league_id=eq.{league_id}",
+        f"select=alert_key&user_id=eq.{user_id}&{league_filter}",
     )
     try:
         response = requests.get(url, headers=auth_supabase.auth_headers(config, access_token), timeout=15)
@@ -4399,7 +4451,7 @@ def _project_alert_item(
     roster_relationship: dict[str, str],
 ) -> dict[str, Any]:
     payload = _project_news_item(item)
-    alert_key = _alert_key_for_link(str(item.get("link") or ""))
+    alert_key = _alert_key_for_item(item)
     payload["alert_key"] = alert_key
     payload["read"] = alert_key in read_keys
     matched_player = str(item.get("matched_player") or "")
@@ -4421,6 +4473,7 @@ def _project_alert_item(
 
 @app.get("/v1/leagues/{league_id}/alerts")
 def get_league_alerts(
+    request: Request,
     league_id: str = Depends(resolve_league_path_id),
     limit: int = 12,
     user: dict[str, Any] = Depends(require_user),
@@ -4480,7 +4533,14 @@ def get_league_alerts(
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
-    read_keys = _fetch_read_alert_keys(config, user_id, str(user.get("_access_token") or ""), league_id)
+    # Raw path id AND resolved id: see _fetch_read_alert_keys' docstring.
+    raw_league_id = str(request.path_params.get("league_id") or "")
+    read_keys = _fetch_read_alert_keys(
+        config,
+        user_id,
+        str(user.get("_access_token") or ""),
+        _alert_read_league_ids(league_id, raw_league_id),
+    )
     roster_relationship = _roster_relationship_map(my_roster)
 
     items = [
@@ -4503,14 +4563,13 @@ class MarkAlertReadRequest(BaseModel):
 @app.post("/v1/leagues/{league_id}/alerts/read")
 def mark_league_alert_read(
     body: MarkAlertReadRequest,
-    # NOT resolved (see resolve_league_path_id's docstring): this writes a
-    # read-state row keyed by (user_id, league_id, alert identity) -- an
-    # unresolved stale id here is self-correcting next time the caller's
-    # ALERTS LIST is fetched (via resolve_league_path_id on the GET above),
-    # at which point the alert re-renders under the current id and a fresh
-    # mark-read call lands on the right row. Resolving forward on the
-    # WRITE path instead risks marking the wrong (not-yet-existing-for-
-    # this-id) alert read, or silently no-op'ing.
+    # NOT resolved via Depends (see resolve_league_path_id's docstring): the
+    # row for the exact id the client sent is always written. The body
+    # below ALSO writes the resolved id's row when a season rollover makes
+    # them differ, so a read made on a device holding the old id still
+    # shows as read on a device holding the new one (GET .../alerts reads
+    # both ids). alert_key is an article hash, not league data, so the
+    # extra row can never mark a different alert read.
     league_id: str,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -4530,6 +4589,8 @@ def mark_league_alert_read(
     if not user_id:
         return {"ok": False, "reason": "not_available"}
 
+    league_ids = _alert_read_league_ids(league_id, resolve_league_path_id(league_id, user))
+    rows = [{"user_id": user_id, "league_id": value, "alert_key": alert_key} for value in league_ids]
     url = auth_supabase.rest_api_url(config, "mobile_alert_reads")
     headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
     headers["Prefer"] = "resolution=ignore-duplicates,return=minimal"
@@ -4537,7 +4598,10 @@ def mark_league_alert_read(
         response = requests.post(
             url,
             headers=headers,
-            json={"user_id": user_id, "league_id": league_id, "alert_key": alert_key},
+            # One object for the common case (no rollover) — exactly the
+            # shape every existing caller/test already sends; an array
+            # (PostgREST bulk insert) only when the two ids differ.
+            json=rows[0] if len(rows) == 1 else rows,
             timeout=15,
         )
     except Exception:

@@ -3789,6 +3789,7 @@ def test_mark_alert_read_rejects_empty_key(monkeypatch):
 
 def test_mark_alert_read_writes_with_callers_own_token(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -3811,6 +3812,7 @@ def test_mark_alert_read_writes_with_callers_own_token(monkeypatch):
 
 def test_mark_alert_read_fails_closed_when_table_missing(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -3826,6 +3828,82 @@ def test_mark_alert_read_fails_closed_when_table_missing(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"ok": False, "reason": "not_available"}
+
+
+def test_mark_alert_read_also_writes_rolled_over_league_id(monkeypatch):
+    """A phone holding last season's league id and the web holding the
+    current one must see the same read state: the write lands under both."""
+
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    monkeypatch.setattr(
+        mobile_api_service, "resolve_league_path_id", lambda league_id, user: "new-league"
+    )
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    post_response = Mock(status_code=201)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=post_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/old-league/alerts/read",
+                json={"alert_key": "abc123"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.json() == {"ok": True, "reason": ""}
+    assert mock_post.call_args.kwargs["json"] == [
+        {"user_id": "user-123", "league_id": "old-league", "alert_key": "abc123"},
+        {"user_id": "user-123", "league_id": "new-league", "alert_key": "abc123"},
+    ]
+
+
+def test_fetch_read_alert_keys_reads_every_league_id_alias(monkeypatch):
+    from services import mobile_api_service
+
+    rows_response = Mock(status_code=200)
+    rows_response.json.return_value = [{"alert_key": "k1"}, {"alert_key": "k2"}]
+    config = {"url": "https://example.supabase.co", "anon_key": "anon-key-for-tests"}
+    with patch("requests.get", return_value=rows_response) as mock_get:
+        keys = mobile_api_service._fetch_read_alert_keys(
+            config, "user-123", "token", ["new-league", "old-league", "new-league"]
+        )
+    assert keys == {"k1", "k2"}
+    url = mock_get.call_args.args[0]
+    assert 'league_id=in.("new-league","old-league")' in url
+    assert "user_id=eq.user-123" in url
+
+    with patch("requests.get", return_value=rows_response) as mock_get:
+        mobile_api_service._fetch_read_alert_keys(config, "user-123", "token", "only-league")
+    assert "league_id=eq.only-league" in mock_get.call_args.args[0]
+
+
+def test_fetch_read_alert_keys_fails_soft_when_table_missing():
+    from services import mobile_api_service
+
+    missing = Mock(status_code=404)
+    missing.json.return_value = {"message": "relation does not exist"}
+    config = {"url": "https://example.supabase.co", "anon_key": "anon-key-for-tests"}
+    with patch("requests.get", return_value=missing):
+        assert mobile_api_service._fetch_read_alert_keys(config, "user-123", "token", ["a", "b"]) == set()
+
+
+def test_alert_key_is_stable_across_devices_and_linkless_items_do_not_collide():
+    from services.mobile_api_service import _alert_key_for_item, _alert_key_for_link
+
+    article = {"link": "https://example.com/a", "title": "A", "published_ts": 1.0}
+    # Same article -> same key regardless of any other field (fetch time,
+    # summary rewrite, re-ranking), and identical to the key existing
+    # mobile_alert_reads rows were written under.
+    assert _alert_key_for_item(article) == _alert_key_for_link("https://example.com/a")
+    assert _alert_key_for_item({**article, "title": "A (updated)", "published_ts": 2.0}) == _alert_key_for_item(article)
+
+    linkless_one = {"link": "", "title": "One", "source": "x", "published_ts": 1.0}
+    linkless_two = {"link": "", "title": "Two", "source": "x", "published_ts": 1.0}
+    assert _alert_key_for_item(linkless_one) != _alert_key_for_item(linkless_two)
+    assert _alert_key_for_item(linkless_one) == _alert_key_for_item(dict(linkless_one))
+    assert _alert_key_for_item(linkless_one) != _alert_key_for_link("")
 
 
 def _fake_quick_view_frame():

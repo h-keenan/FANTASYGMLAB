@@ -17,6 +17,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
+import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
@@ -174,7 +175,10 @@ export default function AlertsScreen({ route, navigation }: Props) {
       if (result.reason) {
         setNotReadyReason(result.reason);
       } else {
-        setItems(result.items);
+        // `read` is the server's cross-device state (shared with the web
+        // app), overlaid with any read tapped here that hasn't synced yet.
+        const userId = await currentAlertReadUserId();
+        setItems(await alertReadSync.reconcile(userId, leagueId, result.items));
       }
     } catch (err) {
       setError(toUserErrorMessage(err, 'Failed to load alerts.'));
@@ -200,9 +204,9 @@ export default function AlertsScreen({ route, navigation }: Props) {
   const openAndMarkRead = (item: AlertItem) => {
     if (!item.read) {
       setItems((prev) => prev.map((row) => (row.alert_key === item.alert_key ? { ...row, read: true } : row)));
-      // Fire-and-forget: read state is a soft-fail nicety (see the backend's
-      // "fails closed" design), never worth blocking or erroring the tap on.
-      api.markAlertRead(leagueId, item.alert_key).catch(() => {});
+      // Never blocks or errors the tap: remembered locally and retried on
+      // the next load if offline or the backend answers ok: false.
+      void currentAlertReadUserId().then((userId) => alertReadSync.markRead(userId, leagueId, item.alert_key));
     }
     if (item.link) void Linking.openURL(item.link);
   };
