@@ -105,6 +105,8 @@ DEFAULT_CLASS_STRENGTH_BY_YEAR: Dict[int, float] = {
 # class/prospect-strength's +/-20-25% ceiling so it never dominates the
 # overall score on its own.
 TEAM_MODIFIER_BASE = 0.88
+# Sleeper league statuses that mean this season's own draft is finished.
+_SEASON_DRAFT_DONE_STATUSES = frozenset({"in_season", "post_season", "complete"})
 TEAM_MODIFIER_RANGE = 0.24
 # How much a team's real win-loss record outweighs its roster-value
 # percentile once it has actually played at least one game -- floor/ceiling/
@@ -577,14 +579,21 @@ def _pick_value_components(
     prospect_rankings_by_year: Dict[int, Any] | None = None,
     crowd_class_strength_by_year: Dict[int, Mapping[str, Any]] | None = None,
     team_context: Mapping[str, float | str] | None = None,
+    next_draft_year: int | None = None,
 ) -> Dict[str, Any]:
     context = (
         team_context
         if team_context is not None
         else _pick_team_context(original_roster_id, df_summary)
     )
-    current_year = datetime.now().year
-    years_out = max(0, season - (current_year + 1))
+    # years_out counts drafts after the league's next rookie draft. The
+    # old calendar formula (season - (this year + 1)) gave the following
+    # season's picks years_out=0 too from January until the draft, so a
+    # 2028 1st was valued like a 2027 1st all spring.
+    if next_draft_year:
+        years_out = max(0, season - int(next_draft_year))
+    else:
+        years_out = max(0, season - (datetime.now().year + 1))
     projection = _pick_range_projection(
         _safe_float(context.get("slot_percentile"), 0.5),
         years_out,
@@ -661,12 +670,24 @@ def _build_roster_pick_assets(
     # Redraft defaults to post-draft (no invented current-year board) unless
     # draft_status explicitly says current-year picks are still active.
     default_current_year_active = future_picks_are_trade_capital(league_settings)
+    # Most callers (Trade Hub, Trade Finder, Trade Analyzer, power-rank
+    # draft capital) pass no draft_status. Sleeper's league `status` only
+    # becomes "in_season"/"complete" once that season's draft is done, so
+    # the current-year picks are already spent. Without this check those
+    # callers valued and offered spent picks all season, left out the
+    # second future season, and could not resolve the pick ids
+    # GET .../draft-picks (which does pass a real draft_status) hands out.
+    if str(league.get("status") or "").strip().lower() in _SEASON_DRAFT_DONE_STATUSES:
+        default_current_year_active = False
     if "current_year_picks_active" in draft_context:
         current_year_picks_active = bool(draft_context.get("current_year_picks_active"))
     else:
         current_year_picks_active = bool(default_current_year_active)
     if draft_context.get("draft_completed"):
         current_year_picks_active = False
+    # The next rookie draft is the reference point for each pick's
+    # future discount (years_out), not the calendar year.
+    next_draft_year = current_pick_year if current_year_picks_active else current_pick_year + 1
     traded_seasons = {
         _safe_int(p.get("season"))
         for p in traded_picks
@@ -761,6 +782,7 @@ def _build_roster_pick_assets(
             prospect_rankings_by_year=prospect_rankings_by_year,
             crowd_class_strength_by_year=crowd_class_strength_by_year,
             team_context=pick_team_contexts[original_roster_id],
+            next_draft_year=next_draft_year,
         )
         value = int(value_details["score"])
         assets_by_owner[owner_id].append(
