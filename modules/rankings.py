@@ -553,10 +553,16 @@ def weekly_usage_rate(position: str, week_row: Dict[str, Any]) -> float | None:
     position = str(position or "").upper().strip()
     if not week_observation_usable(week_row):
         return None
+    # Sleeper omits every zero-valued stat key, so on a week the player really
+    # played (``gp``; see ``sleeper.week_row_played``) a missing count is a
+    # real 0 — a WR who played with no targets had a 0-usage week, which is
+    # exactly the role collapse "Cooling" must see. Off a played week, a
+    # missing key stays unknown.
+    played = sleeper_module.week_row_played(week_row)
 
     def _num(key: str) -> float | None:
         if key not in week_row or week_row.get(key) is None:
-            return None
+            return 0.0 if played else None
         try:
             value = float(week_row.get(key))
         except Exception:

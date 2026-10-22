@@ -446,7 +446,9 @@ def _historical_production_section(
     ppr_weeks: list[dict[str, Any]] = []
     weeks_with_ppr: set[int] = set()
     for row in sorted(weekly_rows, key=lambda r: int(r.get("week") or 0)):
-        points = row.get("fantasy_points_ppr")
+        # A played week with no pts_ppr key is a real 0 (Sleeper omits
+        # zero-valued stats); a DNP week stays absent.
+        points = sleeper.week_row_fantasy_points_ppr(row)
         if points is None:
             continue
         week_number = int(row.get("week"))

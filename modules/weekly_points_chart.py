@@ -72,7 +72,9 @@ def normalize_week_points(rows: Iterable[Mapping[str, Any]] | None) -> tuple[Wee
 
     A retained week can carry snaps/games without fantasy points (see
     modules.sleeper._extract_week_observation — any one retained field keeps
-    the row), so an unplayed or points-less week is not a zero, it is absent.
+    the row), so an unplayed week is not a zero, it is absent. A week the
+    player DID play (``sleeper.week_row_played``) with no PPR key is a real
+    0: Sleeper omits zero-valued stats, including a 0-point ``pts_ppr``.
     """
 
     if not rows:
@@ -87,6 +89,8 @@ def normalize_week_points(rows: Iterable[Mapping[str, Any]] | None) -> tuple[Wee
         points = _numeric(row.get("fantasy_points_ppr"))
         if points is None:
             points = _numeric(row.get("points"))
+        if points is None and isinstance(row, dict):
+            points = sleeper.week_row_fantasy_points_ppr(row)
         if points is None:
             continue
         by_week[int(week)] = float(points)

@@ -31,14 +31,17 @@ def test_normalize_keeps_played_weeks_in_order_and_drops_pointless_rows():
         [
             _week(3, 14.2),
             _week(1, 8.0),
-            # Retained for snaps only — an absent PPR total is not a zero.
+            # Played (Sleeper's gp) but no PPR key: Sleeper omits a 0-point
+            # pts_ppr, so this is a real 0, not a missing week.
             _week(2, None, snap_share=0.4, games_played=1),
+            # Retained for team snaps only, no gp: a DNP, never a zero.
+            _week(5, None, snap_share=0.0),
             {"week": 4, "fantasy_points_ppr": "not-a-number"},
             {"week": 0, "fantasy_points_ppr": 5.0},
             "junk",
         ]
     )
-    assert [(point.week, point.points) for point in weeks] == [(1, 8.0), (3, 14.2)]
+    assert [(point.week, point.points) for point in weeks] == [(1, 8.0), (2, 0.0), (3, 14.2)]
 
 
 def test_normalize_handles_empty_and_missing_input():

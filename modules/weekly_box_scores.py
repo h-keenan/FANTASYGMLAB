@@ -94,7 +94,9 @@ SCORING_NOTE = (
 ZERO_OMISSION_NOTE = (
     "Sleeper omits zero-valued stats from its weekly payload, so a box-score "
     "field is null whenever Sleeper reported nothing for it (most often a "
-    "real zero, e.g. no touchdowns). It is never filled in as 0 here."
+    "real zero, e.g. no touchdowns). It is never filled in as 0 here. "
+    "Fantasy points are the exception: for a game Sleeper credits the "
+    "player with playing (gp), an omitted point total is a real 0.0 score."
 )
 
 CORRECTION_VERSION_UNAVAILABLE_REASON = (
@@ -276,10 +278,16 @@ def _stat_line(row: Mapping[str, Any], *, has_box_scores: bool) -> dict[str, Any
             continue
         value = row.get(field)
         box_score[field] = int(value) if value is not None else None
+    # Only called for a played stat line (gp >= 1), so an omitted point
+    # total is a real 0-point game (see sleeper.week_row_played).
+    def _points(field: str) -> Any:
+        value = row.get(field)
+        return 0.0 if value is None and sleeper.week_row_played(dict(row)) else value
+
     points = {
-        "fantasy_points_ppr": row.get("fantasy_points_ppr"),
-        "fantasy_points_half_ppr": row.get("fantasy_points_half_ppr") if has_box_scores else None,
-        "fantasy_points_standard": row.get("fantasy_points_standard") if has_box_scores else None,
+        "fantasy_points_ppr": _points("fantasy_points_ppr"),
+        "fantasy_points_half_ppr": _points("fantasy_points_half_ppr") if has_box_scores else None,
+        "fantasy_points_standard": _points("fantasy_points_standard") if has_box_scores else None,
     }
     snap_share = row.get("snap_share")
     return {
