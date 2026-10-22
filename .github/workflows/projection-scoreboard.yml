@@ -1,0 +1,48 @@
+name: Projection Scoreboard
+
+# Weekly replay of the projection model against this season's results.
+# Runs Tuesday 12:00 UTC (8am ET), after Monday Night Football has finished,
+# so the previous NFL week is complete in Sleeper's public stats endpoint.
+#
+# scripts/projection_scoreboard.py rebuilds, point-in-time, what the model
+# would have projected for every completed week, scores it against actual
+# results (and against the season average and Sleeper's own projections),
+# and rewrites docs/projection-scoreboard.md. It reads only Sleeper's public
+# stats/projections endpoints: no database, no secrets beyond the built-in
+# GITHUB_TOKEN. The doc is committed straight to main with the same
+# commit/push plumbing as players-db-refresh.yml
+# (scripts/refresh_and_commit_players_db.refresh_and_commit), and only when
+# its content actually changed. A plain push to main does not chain into any
+# merge workflow (see the push-loop note in players-db-refresh.yml).
+
+on:
+  schedule:
+    - cron: "0 12 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: projection-scoreboard
+  cancel-in-progress: false
+
+jobs:
+  scoreboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The script manages its own git auth via an explicit push URL.
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Refresh and commit projection scoreboard
+        env:
+          GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
+        run: python scripts/projection_scoreboard.py --commit

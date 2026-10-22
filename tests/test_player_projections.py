@@ -270,7 +270,7 @@ def test_project_player_week_ok_for_normal_sample_player(round_robin_schedule):
     assert result["point_estimate"] > 0
 
 
-def test_project_player_week_small_sample_gets_wider_band_and_low_confidence(round_robin_schedule):
+def test_project_player_week_small_sample_is_labelled_low_confidence(round_robin_schedule):
     players = dict(_players_fixture())
     players["qb_a1_rookie"] = {"position": "QB", "team": "AAA"}
     weekly_stats = dict(_weekly_stats_fixture())
@@ -292,9 +292,12 @@ def test_project_player_week_small_sample_gets_wider_band_and_low_confidence(rou
 
     assert rookie["status"] == "ok"
     assert rookie["confidence"] == "low"
-    rookie_band = rookie["high"] - rookie["low"]
-    normal_band = normal["high"] - normal["low"]
-    assert rookie_band > normal_band
+    # v3 intervals are calibrated per position, not widened by sample size: the
+    # 2021-2026 walk-forward showed 1-game players are already covered ~70% at
+    # the position-level width (docs/projections-v3-walkforward.md), so the
+    # low-confidence label, not a wider band, carries the small-sample warning.
+    assert rookie["low"] <= rookie["point_estimate"] <= rookie["high"]
+    assert normal["confidence"] in {"medium", "high"}
 
 
 def test_project_player_week_bye_week_returns_no_projection(round_robin_schedule):

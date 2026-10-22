@@ -207,7 +207,7 @@ _MIN_TEAMS_FOR_QB_QUALITY_LEAGUE_AVERAGE = 2
 _MIN_BAND_HALF_WIDTH = 2.5
 
 # Bumped whenever the estimator changes; surfaced in ``basis.model_version``.
-PROJECTION_MODEL_VERSION = "v2-usage-eb-2026-10"
+PROJECTION_MODEL_VERSION = "v3-usage-eb-2026-10"
 
 
 def _recency_weight(weeks_ago: int, half_life_weeks: float) -> float:
@@ -931,12 +931,14 @@ def _band_half_width(trend: Dict[str, Any], *, defense_has_signal: bool) -> floa
 # ---------------------------------------------------------------------------
 #
 # Built bottom-up from our own player data; Sleeper's projections are never an
-# input (they are only the benchmark in the backtest). Every constant below was
-# fit or tuned on the 2024 season of point-in-time backtest data and then
-# validated, untouched, on 2025 (see docs/projections-v2-backtest.md).
+# input (they are only the benchmark in the backtest). v3 (2026-10): every
+# constant below was fit or tuned on the 2021-2025 seasons and validated by
+# walk-forward evaluation (each season scored with constants fit only on
+# earlier seasons; 2026 weeks 4-6 as the frozen holdout), see
+# docs/projections-v3-walkforward.md. v2 was tuned on 2024 alone.
 #
 # 1. Volume-implied points. A per-position linear map from a game's opportunity
-#    (pass attempts, carries, targets) to PPR points, fit on 2024 games
+#    (pass attempts, carries, targets) to PPR points, fit on 2021-2025 games
 #    (``_V2_USAGE_COEF``: intercept, then one coefficient per usage feature in
 #    ``_V2_USAGE_FEATURES`` order). The player's expected opportunity is the
 #    recency-weighted mean of his prior games' volume-implied points.
@@ -946,7 +948,7 @@ def _band_half_width(trend: Dict[str, Any], *, defense_has_signal: bool) -> floa
 #    ``n`` = games played and ``k`` tuned per position (empirical-Bayes
 #    shrinkage toward "average efficiency"). One game cannot swing the number.
 # 3. Honest range. Half-widths come from the observed absolute error of this
-#    exact estimator in 2024, as a piecewise-linear function of the estimate
+#    exact estimator over 2021-2025, as a piecewise-linear function of the estimate
 #    (per position), times empirical 16th/84th percentile multipliers per
 #    sample-size bucket, so the low-high range is a 68% interval.
 #
@@ -965,33 +967,40 @@ _V2_USAGE_FEATURES: Dict[str, tuple] = {
     "K": (),
 }
 _V2_USAGE_COEF: Dict[str, tuple] = {
-    "QB": (-0.0593, 0.3995, 1.0498),
-    "RB": (-0.2703, 0.7115, 1.3692),
-    "WR": (-0.0125, 1.7488, 0.8074),
-    "TE": (0.0920, 1.6841, 1.5814),
-    "K": (8.0847,),
+    "QB": (-0.1018, 0.4010, 0.9250),
+    "RB": (-0.2742, 0.6865, 1.3894),
+    "WR": (-0.0725, 1.7261, 0.9411),
+    "TE": (0.0395, 1.7234, 1.1462),
+    "K": (7.7969,),
 }
-# (usage half-life weeks | None, efficiency-residual half-life weeks | None, k)
+# (usage half-life weeks | None, efficiency-residual half-life weeks | None, k).
+# v3: one pooled setting for QB/RB/WR/TE (per-position values did not beat it
+# out of sample, see docs/projections-v3-walkforward.md). K has no usage
+# features, so only its shrinkage ``k`` matters.
 _V2_SHRINKAGE: Dict[str, tuple] = {
-    "QB": (2.0, None, 4.0),
-    "RB": (3.0, 3.0, 6.0),
-    "WR": (6.0, None, 3.0),
-    "TE": (4.0, None, 3.0),
-    "K": (2.0, None, 32.0),
+    "QB": (6.0, 6.0, 8.0),
+    "RB": (6.0, 6.0, 8.0),
+    "WR": (6.0, 6.0, 8.0),
+    "TE": (6.0, 6.0, 8.0),
+    "K": (None, None, 48.0),
 }
 # Per position: (estimate knots, mean absolute error at those knots).
 _V2_ERROR_SCALE: Dict[str, tuple] = {
-    "QB": ((10.96, 15.12, 16.6, 18.24, 21.35), (6.61, 5.51, 5.55, 5.93, 6.57)),
-    "RB": ((0.57, 3.13, 6.02, 11.61, 17.17), (1.53, 3.25, 4.23, 5.83, 6.5)),
-    "WR": ((0.87, 3.19, 6.44, 10.14, 15.35), (1.77, 3.21, 4.54, 5.88, 6.87)),
-    "TE": ((0.56, 1.83, 3.59, 6.43, 11.26), (1.28, 2.16, 3.13, 4.55, 5.76)),
-    "K": ((7.63, 7.93, 8.09, 8.28, 8.73), (4.22, 3.8, 3.35, 4.29, 3.5)),
+    "QB": ((3.76, 12.97, 15.49, 17.49, 20.71), (4.91, 6.20, 5.81, 6.14, 6.69)),
+    "RB": ((0.17, 2.21, 5.42, 10.23, 16.34), (1.16, 2.72, 4.20, 5.62, 6.80)),
+    "WR": ((0.39, 2.38, 5.23, 9.23, 15.07), (1.24, 2.82, 4.12, 5.41, 6.87)),
+    "TE": ((0.15, 1.06, 2.52, 5.25, 10.55), (0.61, 1.62, 2.58, 3.94, 5.52)),
+    "K": ((7.50, 7.70, 7.82, 7.93, 8.16), (3.74, 3.84, 3.72, 3.51, 3.88)),
 }
-# Confidence label -> (16th percentile, 84th percentile) of error / scale.
+# Position -> (16th percentile, 84th percentile) of error / scale. v3 fits
+# these per position (v2 fit them per sample-size bucket): per-position
+# coverage was off by up to 11 points under the bucket version.
 _V2_INTERVAL_Z: Dict[str, tuple] = {
-    "high": (-1.031, 1.26),
-    "medium": (-1.004, 1.15),
-    "low": (-0.801, 1.521),
+    "QB": (-1.209, 1.284),
+    "RB": (-0.979, 1.288),
+    "WR": (-1.039, 1.208),
+    "TE": (-0.903, 1.234),
+    "K": (-1.257, 1.162),
 }
 # Availability multipliers for the player's NEXT game. Out/IR/PUP/NFI/
 # Suspended are certain zeros; Doubtful/Questionable are prior-based play
@@ -1100,7 +1109,9 @@ def _v2_confidence(games_played: int) -> str:
 def _v2_range(estimate: float, position: str, confidence: str) -> tuple:
     knots, errors = _V2_ERROR_SCALE[position]
     scale = _interp(estimate, knots, errors)
-    z_low, z_high = _V2_INTERVAL_Z[confidence]
+    # ``confidence`` is kept in the signature (callers pass it) but the v3
+    # interval multipliers are per position.
+    z_low, z_high = _V2_INTERVAL_Z[position]
     return max(0.0, estimate + z_low * scale), max(0.0, estimate + z_high * scale)
 
 
