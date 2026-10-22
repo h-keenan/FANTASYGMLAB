@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 
 import { api, type PendingTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 /**
  * "Did this trade happen?" — the follow-up half of Trade Outcomes.
@@ -58,6 +59,11 @@ export default function TradeOutcomePrompt() {
     }
   };
 
+  // Swipe down = "ask me later": hides it without answering or snoozing it
+  // server-side. The next foreground check (above) asks again, same as
+  // web's close button hiding it for the session.
+  const askLater = () => setQueue([]);
+
   if (!current) return null;
 
   const summary = current.trade_summary;
@@ -66,9 +72,9 @@ export default function TradeOutcomePrompt() {
   const partner = current.partner_team_name || summary.partner_team_name || 'your trade partner';
 
   return (
-    <Modal visible transparent animationType="fade">
+    <SheetModal visible transparent animationType="fade">
       <Pressable style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <SwipeDismissCard style={styles.sheet} onDismiss={askLater}>
           <AppText style={styles.title}>Did this trade happen?</AppText>
           <AppText style={styles.subtitle}>You shared a trade with {partner}</AppText>
           <View style={styles.summaryCard}>
@@ -106,9 +112,9 @@ export default function TradeOutcomePrompt() {
               </View>
             </>
           )}
-        </View>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 

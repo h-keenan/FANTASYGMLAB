@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { StackActions } from '@react-navigation/routers';
@@ -10,6 +10,7 @@ import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 
 interface SavedLeagueRow {
   id: string;
@@ -71,11 +72,11 @@ export default function LeagueSwitcherHeaderButton({
       <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
         <Ionicons name="swap-vertical" size={14} color={colors.textPrimary} />
       </TouchableOpacity>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
             <AppText style={styles.title}>Switch League</AppText>
-            <ScrollView style={styles.list}>
+            <SheetScrollView style={styles.list}>
               {savedLeagues.map((row) => {
                 const active = row.league_id === leagueId;
                 return (
@@ -97,7 +98,7 @@ export default function LeagueSwitcherHeaderButton({
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </SheetScrollView>
             <TouchableOpacity
               style={styles.addRow}
               onPress={() => {
@@ -112,9 +113,9 @@ export default function LeagueSwitcherHeaderButton({
               <Ionicons name="add" size={18} color={colors.accentOnTint} style={styles.optionIcon} />
               <AppText style={[styles.optionText, styles.optionTextActive]}>Add a league</AppText>
             </TouchableOpacity>
-          </Pressable>
+          </SwipeDismissCard>
         </Pressable>
-      </Modal>
+      </SheetModal>
     </>
   );
 }

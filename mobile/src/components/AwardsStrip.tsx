@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { PlayerAward } from '../lib/api';
 import { awardTierColor, radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 
 // Tier -> color mapping (gold/silver/bronze, with a visible neutral-accent
 // fallback for untiered awards — modules/player_awards.py's tier=None case)
@@ -50,9 +51,9 @@ function AwardDetailSheet({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tierColor = award ? awardTierColor(award.tier, isDark, colors.accentSoft) : colors.accentSoft;
   return (
-    <Modal visible={award !== null} transparent animationType="fade" onRequestClose={onClose}>
+    <SheetModal visible={award !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+        <SwipeDismissCard style={styles.sheet} onDismiss={onClose}>
           {award ? (
             <>
               <View style={styles.sheetHeaderRow}>
@@ -70,9 +71,9 @@ function AwardDetailSheet({
               ) : null}
             </>
           ) : null}
-        </Pressable>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 
@@ -135,16 +136,16 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
 
       <AwardDetailSheet award={selectedAward} onClose={() => setSelectedAward(null)} />
 
-      <Modal visible={viewAllOpen} transparent animationType="fade" onRequestClose={() => setViewAllOpen(false)}>
+      <SheetModal visible={viewAllOpen} transparent animationType="fade" onRequestClose={() => setViewAllOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setViewAllOpen(false)}>
-          <Pressable style={styles.listSheet} onPress={(event) => event.stopPropagation()}>
+          <SwipeDismissCard style={styles.listSheet} onDismiss={() => setViewAllOpen(false)}>
             <View style={styles.listSheetHeaderRow}>
               <AppText style={styles.sheetTitle}>All Awards</AppText>
               <TouchableOpacity onPress={() => setViewAllOpen(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.listScroll}>
+            <SheetScrollView style={styles.listScroll}>
               {awards.map((award) => {
                 const tierColor = awardTierColor(award.tier, isDark, colors.accentSoft);
                 return (
@@ -169,10 +170,10 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
-          </Pressable>
+            </SheetScrollView>
+          </SwipeDismissCard>
         </Pressable>
-      </Modal>
+      </SheetModal>
     </View>
   );
 }

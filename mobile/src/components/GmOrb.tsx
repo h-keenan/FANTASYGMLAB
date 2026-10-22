@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -30,6 +28,7 @@ import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
 import BrandMark from './BrandMark';
 import PlayerIdentityRow from './PlayerIdentityRow';
+import { SheetModal, SheetScrollProvider, SheetScrollView, useSheetDismissGesture } from './SwipeDismissSheet';
 import { currentLeagueContext, navigationRef, switchLeagueKeepingScreen } from '../navigation/navigationRef';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { api, type RankedPlayer } from '../lib/api';
@@ -793,6 +792,18 @@ export default function GmOrb() {
   }));
   const backdropAnimatedStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
   const sheetAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetY.value }] }));
+  // Swipe down to close (the shared pop-up gesture, SwipeDismissSheet.tsx).
+  // It drives the sheet's own sheetY, and on release past the threshold
+  // closeSheet's existing animation finishes the close from where the
+  // finger let go. Tapping the handle or backdrop still closes it too.
+  const sheetHeight = useSharedValue(400);
+  const { gesture: sheetSwipeGesture, scrollContext: sheetScrollContext } = useSheetDismissGesture({
+    translateY: sheetY,
+    sheetHeight,
+    onDismiss: closeSheet,
+    enabled: open,
+    slideOut: false,
+  });
 
   return (
     <>
@@ -833,12 +844,17 @@ export default function GmOrb() {
         </View>
       )}
 
-      <Modal visible={visible} transparent animationType="none" onRequestClose={closeSheet}>
+      <SheetModal visible={visible} transparent animationType="none" onRequestClose={closeSheet}>
         <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
           <Animated.View style={[styles.backdrop, backdropAnimatedStyle]} />
         </Pressable>
+        <SheetScrollProvider value={sheetScrollContext}>
+        <GestureDetector gesture={sheetSwipeGesture}>
         <Animated.View
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }, sheetAnimatedStyle]}
+          onLayout={(event) => {
+            sheetHeight.value = event.nativeEvent.layout.height;
+          }}
         >
           <Pressable
             style={styles.sheetHandleRow}
@@ -862,7 +878,7 @@ export default function GmOrb() {
             accessibilityLabel={league ? 'Search destinations and players' : 'Search destinations'}
           />
 
-          <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+          <SheetScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
             {normalizedQuery ? (
               // A query flattens the categorized League/GM Tools/General
               // groups into one plain match list — same NavRow, same
@@ -985,9 +1001,11 @@ export default function GmOrb() {
                 </NavSection>
               </>
             )}
-          </ScrollView>
+          </SheetScrollView>
         </Animated.View>
-      </Modal>
+        </GestureDetector>
+        </SheetScrollProvider>
+      </SheetModal>
     </>
   );
 }

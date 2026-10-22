@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   Share,
   StyleSheet,
@@ -35,6 +34,7 @@ import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import type { ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
+import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -492,9 +492,9 @@ export default function MoreScreen({ navigation }: Props) {
         </AnimatedCard>
       </ScrollView>
 
-      <Modal visible={guestUpgradeOpen} animationType="fade" transparent onRequestClose={closeGuestUpgrade}>
+      <SheetModal visible={guestUpgradeOpen} animationType="fade" transparent onRequestClose={closeGuestUpgrade}>
         <View style={styles.guestUpgradeBackdrop}>
-          <View style={styles.guestUpgradeCard}>
+          <SwipeDismissCard style={styles.guestUpgradeCard} onDismiss={closeGuestUpgrade}>
             <AppText style={styles.guestUpgradeTitle}>Create account</AppText>
             <AppText style={styles.guestUpgradeHint}>
               Your connected league carries over automatically — nothing to re-enter.
@@ -545,9 +545,9 @@ export default function MoreScreen({ navigation }: Props) {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </SwipeDismissCard>
         </View>
-      </Modal>
+      </SheetModal>
     </View>
   );
 }

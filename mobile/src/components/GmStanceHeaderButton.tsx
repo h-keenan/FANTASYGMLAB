@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,6 +7,7 @@ import { TEAM_STANCE_OPTIONS } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 /**
  * A single header-mounted stance switcher, shared by every screen that
@@ -46,9 +47,9 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
         </AppText>
         <Ionicons name="chevron-down" size={12} color={colors.accent} />
       </TouchableOpacity>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
             <AppText style={styles.title}>Team Situation</AppText>
             <AppText style={styles.subtitle}>
               {isSet
@@ -74,9 +75,9 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
                 </TouchableOpacity>
               );
             })}
-          </Pressable>
+          </SwipeDismissCard>
         </Pressable>
-      </Modal>
+      </SheetModal>
     </>
   );
 }

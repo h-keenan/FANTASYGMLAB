@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -9,6 +9,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import type { CompareRow } from '../lib/playerCompare';
 import { radii, spacing, type ThemeColors } from '../theme';
 import CompareShareCard, { CARD_HEIGHT, CARD_WIDTH, type CompareShareCardSide } from './CompareShareCard';
+import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -81,9 +82,9 @@ export default function CompareSharePreviewModal({ visible, onClose, sideA, side
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <SheetModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <SwipeDismissCard style={styles.sheet} onDismiss={onClose}>
           <AppText style={styles.title}>Share this comparison</AppText>
           <View style={styles.previewWrap}>
             <View style={styles.previewScaled}>
@@ -114,9 +115,9 @@ export default function CompareSharePreviewModal({ visible, onClose, sideA, side
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <AppText style={styles.closeButtonText}>Cancel</AppText>
           </TouchableOpacity>
-        </Pressable>
+        </SwipeDismissCard>
       </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 
