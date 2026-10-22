@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import functools
 import os
+import threading
 import time
+import weakref
 from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -129,6 +131,8 @@ def clear_load_games_cache() -> None:
     """Drop the in-process games-table cache — tests, and any manual refresh hook."""
 
     _load_games_cached.cache_clear()
+    with _TEAM_SCHEDULE_INDEX_LOCK:
+        _TEAM_SCHEDULE_INDEX.clear()
 
 
 def load_games(*, refresh: bool = False) -> pd.DataFrame:
@@ -236,39 +240,97 @@ def team_schedule(
     if df.empty or "season" not in df.columns:
         return []
     team_code = TEAM_CODE_ALIASES.get(str(team).upper().strip(), str(team).upper().strip())
+    # Fresh row dicts per call: callers get the same independent list they
+    # always did, so mutating one never touches the shared index.
+    return [dict(row) for row in _season_schedule_index(df, season).get(team_code, ())]
+
+
+# Performance audit, 2026-10-21: team_schedule used to filter the season,
+# copy and alias-map every team code, and iterrows the result on EVERY call.
+# The Matchup screen alone calls it ~60 times per request (once per starter,
+# through player_projections.project_player_week and the game-started
+# check), so at ~9 ms each it was ~45% of that endpoint's CPU, paid again on
+# every warm revisit. A season's schedule is now built for every team in one
+# pass and kept per games frame. Keyed on the frame object itself (held by
+# weakref and compared by identity), so it can never outlive or out-date the
+# frame it came from: load_games() hands out one frame per in-process bucket
+# (LOAD_GAMES_INPROCESS_TTL_SECONDS), and a new frame, from a bucket
+# rollover or a refresh, simply misses here. No added staleness: the rows
+# are exactly what a per-call rebuild over that same frame returns.
+_TEAM_SCHEDULE_INDEX_MAX_FRAMES = 8
+_TEAM_SCHEDULE_INDEX_LOCK = threading.Lock()
+_TEAM_SCHEDULE_INDEX: dict[int, tuple[weakref.ReferenceType, dict[int, dict[str, list[dict[str, Any]]]]]] = {}
+
+
+def _bye_row(week: int) -> dict[str, Any]:
+    return {
+        "week": week,
+        "opponent": None,
+        "is_home": None,
+        "spread_line": None,
+        "total_line": None,
+        "played": False,
+        "team_score": None,
+        "opponent_score": None,
+        "bye": True,
+        "kickoff_at": None,
+        "game_id": None,
+    }
+
+
+def _build_season_schedule_index(df: pd.DataFrame, season: int) -> dict[str, list[dict[str, Any]]]:
+    """Every team's team_schedule rows for one season, built in one pass."""
+
     season_games = _normalize_team_code(df[df["season"] == season])
     if "game_type" in season_games.columns:
         season_games = season_games[season_games["game_type"] == "REG"]
 
-    rows = [_row_from_game(g, team_is_home=True) for _, g in season_games[season_games["home_team"] == team_code].iterrows()]
-    rows += [_row_from_game(g, team_is_home=False) for _, g in season_games[season_games["away_team"] == team_code].iterrows()]
-    # nflverse's games.csv has no explicit bye-week row for a team — it's
-    # just the one week number missing from that team's home/away rows
-    # within its own season span. Synthesized here (never as an extra fetch)
-    # so the schedule doesn't silently skip straight from one week to the
-    # next with no visual sign the team didn't play that week.
-    if rows:
+    home_rows: dict[str, list[dict[str, Any]]] = {}
+    away_rows: dict[str, list[dict[str, Any]]] = {}
+    for _, game in season_games.iterrows():
+        home_rows.setdefault(str(game["home_team"]), []).append(_row_from_game(game, team_is_home=True))
+        away_rows.setdefault(str(game["away_team"]), []).append(_row_from_game(game, team_is_home=False))
+
+    index: dict[str, list[dict[str, Any]]] = {}
+    for team_code in set(home_rows) | set(away_rows):
+        # Home games, then away games, then a stable week sort: the same
+        # order the per-team build produced.
+        rows = home_rows.get(team_code, []) + away_rows.get(team_code, [])
+        # nflverse's games.csv has no explicit bye-week row for a team — it's
+        # just the one week number missing from that team's home/away rows
+        # within its own season span. Synthesized here (never as an extra fetch)
+        # so the schedule doesn't silently skip straight from one week to the
+        # next with no visual sign the team didn't play that week.
         present_weeks = {row["week"] for row in rows}
         first_week, last_week = min(present_weeks), max(present_weeks)
         for week in range(first_week, last_week + 1):
             if week not in present_weeks:
-                rows.append(
-                    {
-                        "week": week,
-                        "opponent": None,
-                        "is_home": None,
-                        "spread_line": None,
-                        "total_line": None,
-                        "played": False,
-                        "team_score": None,
-                        "opponent_score": None,
-                        "bye": True,
-                        "kickoff_at": None,
-                        "game_id": None,
-                    }
-                )
-    rows.sort(key=lambda row: row["week"])
-    return rows
+                rows.append(_bye_row(week))
+        rows.sort(key=lambda row: row["week"])
+        index[team_code] = rows
+    return index
+
+
+def _season_schedule_index(df: pd.DataFrame, season: int) -> dict[str, list[dict[str, Any]]]:
+    key = id(df)
+    with _TEAM_SCHEDULE_INDEX_LOCK:
+        entry = _TEAM_SCHEDULE_INDEX.get(key)
+        if entry is not None and entry[0]() is df and season in entry[1]:
+            return entry[1][season]
+
+    built = _build_season_schedule_index(df, season)
+
+    with _TEAM_SCHEDULE_INDEX_LOCK:
+        entry = _TEAM_SCHEDULE_INDEX.get(key)
+        if entry is None or entry[0]() is not df:
+            for dead_key in [k for k, (ref, _seasons) in _TEAM_SCHEDULE_INDEX.items() if ref() is None]:
+                del _TEAM_SCHEDULE_INDEX[dead_key]
+            while len(_TEAM_SCHEDULE_INDEX) >= _TEAM_SCHEDULE_INDEX_MAX_FRAMES:
+                del _TEAM_SCHEDULE_INDEX[next(iter(_TEAM_SCHEDULE_INDEX))]
+            entry = (weakref.ref(df), {})
+            _TEAM_SCHEDULE_INDEX[key] = entry
+        entry[1][season] = built
+    return built
 
 
 def team_defense_strength(season: int, *, games: pd.DataFrame | None = None) -> dict[str, dict[str, Any]]:
