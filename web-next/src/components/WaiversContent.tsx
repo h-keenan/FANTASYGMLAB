@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { InfoTip } from "@/components/InfoTip";
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -142,22 +143,18 @@ function PriorityAddPrimaryCard({ player }: { player: WaiverPriorityAdd }) {
 }
 
 function PriorityAddCompactRow({ player, showDivider }: { player: WaiverPriorityAdd; showDivider: boolean }) {
+  // Name line first (full width), then value / recommendation / confidence /
+  // bid on a second line, so names don't truncate on phones.
   return (
     <div
-      className="flex items-center justify-between gap-3 py-2.5"
+      className="flex flex-col gap-1.5 py-2.5"
       style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined}
     >
-      <div className="flex flex-col gap-1 min-w-0 flex-1">
-        <WaiverIdentity player={player} />
-        {player.confidence_label ? (
-          <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
-        ) : null}
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <WaiverIdentity player={player} />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-1">
         {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
-            should say in small print value above it" — the top Priority
-            Add card already had this caption; these compact rows didn't. */}
-        <div className="flex flex-col items-end gap-0.5">
+            should say in small print value above it". */}
+        <div className="flex flex-col items-start gap-0.5">
           <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             Value
           </span>
@@ -166,8 +163,13 @@ function PriorityAddCompactRow({ player, showDivider }: { player: WaiverPriority
           </span>
         </div>
         <ToneBadge label={player.recommendation_label} color={recommendationToneColor(player.recommendation_tone)} />
+        {player.confidence_label ? (
+          <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
+        ) : null}
+        <div className="ml-auto">
+          <FaabRange player={player} />
+        </div>
       </div>
-      <FaabRange player={player} />
     </div>
   );
 }
@@ -175,15 +177,15 @@ function PriorityAddCompactRow({ player, showDivider }: { player: WaiverPriority
 function FreeAgentRow({ player }: { player: WaiverPlayer }) {
   return (
     <div
-      className="flex items-center justify-between gap-3 py-2"
+      className="flex flex-col gap-1 py-2"
       style={{
         borderBottom: "var(--border-width-default) solid var(--color-border)",
         opacity: player.stale_free_agent ? 0.55 : 1,
       }}
     >
       <WaiverIdentity player={player} />
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex flex-col items-end gap-0.5">
+      <div className="flex items-center gap-3 pl-1">
+        <div className="flex items-baseline gap-1">
           <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             Value
           </span>
@@ -312,7 +314,7 @@ export function WaiversContent({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Free agents ranked for your roster — ordered by fit for your team, not just raw value.
+          Ranked by fit for your team.
         </p>
         <BeginnerHelp term="waiversIntro" />
       </header>
@@ -350,22 +352,24 @@ export function WaiversContent({
         </span>
         <SectionHeading>Priority Adds</SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          {priorityNeedNote(data.needed_positions)} Need fits and injury cover rank first, then value.
+          {priorityNeedNote(data.needed_positions)}
         </p>
+        <InfoTip label="How Priority Adds rank">
+          Need fits and injury cover rank first, then value. {DISCLOSURE_TEXT}
+        </InfoTip>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {DISCLOSURE_TEXT}
+          Place claims in Sleeper — we don&apos;t submit them.
         </p>
         {data.injury_positions && data.injury_positions.length > 0 ? (
           <p className="text-xs" style={{ color: "var(--color-warning)" }}>
-            Injury replacement watch is active for {data.injury_positions.join(" / ")}. Your current lineup is carrying{" "}
-            {data.injured_starters ?? 0} injured starter{data.injured_starters === 1 ? "" : "s"}.
+            Injury cover: {data.injury_positions.join(" / ")} ({data.injured_starters ?? 0} injured starter
+            {data.injured_starters === 1 ? "" : "s"}).
           </p>
         ) : null}
 
         {!topPriority ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            No waiver option materially improves your current roster right now. Use Waiver Snapshot below for best available by
-            position.
+            No waiver option clearly helps right now. See Waiver Snapshot below.
           </p>
         ) : (
           <div className="flex flex-col gap-3">
@@ -392,10 +396,10 @@ export function WaiversContent({
           Beyond Priority Adds
         </span>
         <SectionHeading>Beyond Priority Adds</SectionHeading>
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Ranked by raw value only — includes positions you don&apos;t currently need, so a higher number here can still rank
-          below a lower one in Priority Adds above.
-        </p>
+        <InfoTip label="Ranked by raw value">
+          Includes positions you don&apos;t currently need, so a higher number here can still rank below a lower one in
+          Priority Adds above.
+        </InfoTip>
         {!data.entitlement.is_premium ? (
           <div
             className="p-4 flex flex-col gap-2"
@@ -403,8 +407,7 @@ export function WaiversContent({
           >
             <p className="text-sm font-bold">Full waiver board and FAAB shortlist</p>
             <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              Priority Adds stay free — Premium adds stash candidates, watchlist depth, and a FAAB shortlist so you don&apos;t miss
-              the next claim.
+              Priority Adds stay free. Premium adds stashes, watchlist and FAAB.
             </p>
             <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
               Upgrade →
@@ -474,7 +477,7 @@ export function WaiversContent({
             <span id="snapshot-heading">Waiver Snapshot</span>
           </SectionHeading>
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Best available options by position — broad wire scan, not roster priorities.
+            Best available by position, not roster priority.
           </p>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {bestAvailable.map(({ position: pos, player, count }) => (
@@ -488,10 +491,10 @@ export function WaiversContent({
         <SectionHeading>
           <span id="all-free-agents-heading">All Free Agents</span>
         </SectionHeading>
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Showing the best available players not currently on a roster in this league. Stale or retired profiles are pushed to the
-          bottom.
-        </p>
+        <InfoTip label="Unrostered players in this league">
+          Showing the best available players not currently on a roster in this league. Stale or retired profiles are pushed to
+          the bottom.
+        </InfoTip>
         <div className="flex flex-wrap gap-2">
           <input
             type="text"

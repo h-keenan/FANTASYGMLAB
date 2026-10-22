@@ -10800,6 +10800,40 @@ def get_league_matchup(
     }
 
 
+_NON_SKILL_WAIVER_POSITIONS = {"K", "DEF", "DST"}
+
+
+def _secondary_waiver_sections(
+    free_agents: pd.DataFrame, priority_ids: set[str], score_field: str
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Stash Candidates / Watchlist Depth / FAAB Shortlist frames.
+
+    Kickers and defenses are never stash candidates (their "upside" is not a
+    dynasty asset; an under-24 kicker used to top the list on raw value), and
+    in the watchlist and FAAB shortlist they rank below skill players.
+    """
+    positions = free_agents["position"].fillna("").astype(str).str.upper()
+    is_non_skill = positions.isin(_NON_SKILL_WAIVER_POSITIONS)
+    pid = free_agents["player_id"].astype(str)
+    age_numeric = pd.to_numeric(free_agents.get("age"), errors="coerce").fillna(99)
+    upside_labels = {"Backup With Upside", "Starter At Risk", "Committee Back"}
+    opportunity = free_agents.get("opportunity_label", pd.Series("", index=free_agents.index)).fillna("")
+    stash_mask = ((age_numeric <= 24) | opportunity.isin(upside_labels)) & ~is_non_skill
+    stash_df = free_agents[stash_mask & ~pid.isin(priority_ids)].drop_duplicates(subset=["player_id"]).head(6)
+    seen_after_stash = priority_ids | set(stash_df["player_id"].astype(str))
+    # Stable partition: skill players first, K/DEF only as a fallback.
+    ordered = free_agents.loc[list(free_agents.index[~is_non_skill]) + list(free_agents.index[is_non_skill])]
+    watchlist_df = ordered[~ordered["player_id"].astype(str).isin(seen_after_stash)].head(6)
+    seen_after_watchlist = seen_after_stash | set(watchlist_df["player_id"].astype(str))
+    score = pd.to_numeric(free_agents[score_field], errors="coerce").fillna(0)
+    faab_pool = free_agents[
+        (~free_agents["stale_free_agent"]) & (score > 0) & (~pid.isin(seen_after_watchlist))
+    ]
+    faab_pool = faab_pool.assign(_non_skill=faab_pool["position"].fillna("").astype(str).str.upper().isin(_NON_SKILL_WAIVER_POSITIONS))
+    faab_df = faab_pool.sort_values(["_non_skill", score_field], ascending=[True, False]).drop(columns="_non_skill").head(4)
+    return stash_df, watchlist_df, faab_df
+
+
 def _project_waiver_row(
     row: pd.Series,
     score_field: str,
@@ -11177,24 +11211,7 @@ def get_league_waivers(
     faab_targets: list[dict[str, Any]] = []
     if is_premium and not free_agents.empty:
         priority_ids = {str(row.get("player_id")) for _, row in priority_df.iterrows()}
-        age_numeric = pd.to_numeric(free_agents.get("age"), errors="coerce").fillna(99)
-        upside_labels = {"Backup With Upside", "Starter At Risk", "Committee Back"}
-        opportunity = free_agents.get("opportunity_label", pd.Series("", index=free_agents.index)).fillna("")
-        stash_mask = (age_numeric <= 24) | opportunity.isin(upside_labels)
-        stash_df = (
-            free_agents[stash_mask & ~free_agents["player_id"].astype(str).isin(priority_ids)]
-            .drop_duplicates(subset=["player_id"])
-            .head(6)
-        )
-        seen_after_stash = priority_ids | set(stash_df["player_id"].astype(str))
-        watchlist_df = free_agents[~free_agents["player_id"].astype(str).isin(seen_after_stash)].head(6)
-        seen_after_watchlist = seen_after_stash | set(watchlist_df["player_id"].astype(str))
-        faab_pool = free_agents[
-            (~free_agents["stale_free_agent"])
-            & (score_series > 0)
-            & (~free_agents["player_id"].astype(str).isin(seen_after_watchlist))
-        ]
-        faab_df = faab_pool.sort_values(score_field, ascending=False).head(4)
+        stash_df, watchlist_df, faab_df = _secondary_waiver_sections(free_agents, priority_ids, score_field)
 
         stash_candidates = [
             _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
