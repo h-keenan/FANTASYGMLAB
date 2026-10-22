@@ -888,7 +888,7 @@ def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str
 # fails, so this is strictly a server-side belt-and-suspenders default.
 _FALLBACK_PREMIUM_BENEFIT_LINES = [
     "Your full Next Move briefing, not just the top 4",
-    "Full League Pulse — see the whole league’s contenders and rebuilders",
+    "League Pulse leaders in the mobile app — the league’s top contender, rebuilder, draft capital, and most active manager",
     "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
     "Every Trade Hub idea, not just the first 2",
     "GM Targets watchlist up to 50 players (Free is capped at 3)",

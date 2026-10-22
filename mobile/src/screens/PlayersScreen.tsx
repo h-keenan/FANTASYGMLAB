@@ -16,6 +16,7 @@ import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import UsageTrendPill from '../components/UsageTrendPill';
+import ValuesCredit from '../components/ValuesCredit';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
@@ -295,6 +296,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
             />
           )}
+          ListFooterComponent={filtered.length > 0 ? <ValuesCredit /> : null}
           ListEmptyComponent={
             <EmptyState
               icon="search-outline"

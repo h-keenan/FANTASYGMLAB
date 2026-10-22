@@ -10,7 +10,7 @@ from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
 
 
-LAST_UPDATED = "October 17, 2026"
+LAST_UPDATED = "October 21, 2026"
 
 NO_AFFILIATION_TEXT = (
     f"{brand_identity.PRODUCT_NAME} is an independent fantasy football tool. It is not affiliated with, "
@@ -341,6 +341,10 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 (
                     "References to leagues, teams, players, platforms, logos, statistics, and other third-party material are used only to identify and analyze fantasy football information. Ownership remains with the applicable rights holders.",
                     "Availability of third-party data does not imply a partnership, endorsement, sponsorship, or official relationship.",
+                    # FantasyCalc's Terms of Usage (fantasycalc.com/terms-of-usage)
+                    # require attribution wherever their values or derivatives are
+                    # shown; the in-app credit is ValuesCredit (web-next + mobile).
+                    f"Player values in {brand_identity.PRODUCT_NAME} are informed by market values from FantasyCalc (fantasycalc.com), combined with our own model and league settings. FantasyCalc does not endorse or sponsor {brand_identity.PRODUCT_NAME}.",
                 ),
             ),
         ),

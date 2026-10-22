@@ -21,6 +21,7 @@ import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Player Profile — the real, full "Open Profile" destination
@@ -261,6 +262,7 @@ export function PlayerProfileContent({
           Compare this player
         </a>
       </div>
+      <ValuesCredit />
     </main>
   );
 }

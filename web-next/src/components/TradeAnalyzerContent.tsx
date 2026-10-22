@@ -25,6 +25,7 @@ import {
   playerToTradeAsset,
   tradeAnalyzerReasonMessage,
 } from "@/lib/tradeAnalyzerPresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Trade Analyzer (Revision 15) — the manual "evaluate an offer you
@@ -764,6 +765,7 @@ export function TradeAnalyzerContent({
           When both sides are ready, tap Analyze Trade for the verdict.
         </p>
       ) : null}
+      <ValuesCredit />
     </main>
   );
 }

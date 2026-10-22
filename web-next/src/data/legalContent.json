@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "October 17, 2026",
+  "lastUpdated": "October 21, 2026",
   "pages": {
     "about_disclaimer": {
       "title": "About / Disclaimer",
@@ -234,7 +234,8 @@
           "title": "Third-party names and data",
           "paragraphs": [
             "References to leagues, teams, players, platforms, logos, statistics, and other third-party material are used only to identify and analyze fantasy football information. Ownership remains with the applicable rights holders.",
-            "Availability of third-party data does not imply a partnership, endorsement, sponsorship, or official relationship."
+            "Availability of third-party data does not imply a partnership, endorsement, sponsorship, or official relationship.",
+            "Player values in FantasyDesk are informed by market values from FantasyCalc (fantasycalc.com), combined with our own model and league settings. FantasyCalc does not endorse or sponsor FantasyDesk."
           ],
           "bullets": []
         }

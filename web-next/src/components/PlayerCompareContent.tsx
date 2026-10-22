@@ -21,6 +21,7 @@ import {
   type CompareRow,
   type CompareTextRow,
 } from "@/lib/playerComparePresentation";
+import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
  * Head-to-head Player Compare (Revision 12) — ports app.py's CURRENT,
@@ -449,6 +450,7 @@ export function PlayerCompareContent({
           ) : null}
         </div>
       )}
+      <ValuesCredit />
     </main>
   );
 }

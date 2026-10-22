@@ -48,7 +48,7 @@ const INITIAL_LOAD_BACKOFF_MS = 900;
 // services/mobile_api_service.py actually withholds it from a Free account.
 const FALLBACK_FEATURES = [
   'Your full Next Move briefing, not just the top 4',
-  'Full League Pulse — see the whole league’s contenders and rebuilders',
+  'League Pulse leaders in the mobile app — the league’s top contender, rebuilder, draft capital, and most active manager',
   'The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist',
   'Every Trade Hub idea, not just the first 2',
   'GM Targets watchlist up to 50 players (Free is capped at 3)',

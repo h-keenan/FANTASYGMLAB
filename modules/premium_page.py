@@ -186,7 +186,14 @@ FREE_INCLUDES = (
 # Launch-ready Premium depth only — must match effective_entitlement gates.
 PREMIUM_INCLUDED_NOW = (
     ("More next moves", "Expanded Dashboard stack with deeper roster, trade, waiver, and health signals."),
-    ("Full League Pulse", "League-wide contender, rebuilder, and trading posture on Dashboard."),
+    # League Pulse is only partly Pro: the mobile Dashboard locks its leader
+    # tiles for Free (mobile/src/screens/DashboardScreen.tsx), but web-next's
+    # League Pulse activity/streak card is free (LeaguePulseCard.tsx). This
+    # names only the gated part.
+    (
+        "League Pulse leaders",
+        "Top contender, rebuilder, draft-capital, and activity leader tiles on the mobile app Dashboard.",
+    ),
     (product_copy.PREMIUM_FULL_TRADE_HUB, "More generated trade ideas, partner context, and player return search."),
     ("Full waiver board", "Stash candidates, watchlist depth, FAAB shortlist, and add/drop context."),
     ("Advanced roster decisions", "Trade-away, hold, drop, Deep Analysis, and bench-insulation reads."),
@@ -223,8 +230,8 @@ PREMIUM_EXPERIMENTAL_WHEN_ENABLED: tuple[tuple[str, str], ...] = ()
 MOBILE_PREMIUM_BENEFIT_LINES: tuple[dict[str, str], ...] = (
     {"title": "More next moves", "line": "Your full Next Move briefing, not just the top 4"},
     {
-        "title": "Full League Pulse",
-        "line": "Full League Pulse — see the whole league’s contenders and rebuilders",
+        "title": "League Pulse leaders",
+        "line": "League Pulse leaders in the mobile app — the league’s top contender, rebuilder, draft capital, and most active manager",
     },
     {
         "title": "Full waiver board",
@@ -310,7 +317,7 @@ CAPABILITY_GLYPHS = {
     "Priority Adds": "waiver",
     "Core roster view": "roster",
     "More next moves": "home",
-    "Full League Pulse": "league",
+    "League Pulse leaders": "league",
     product_copy.PREMIUM_FULL_TRADE_HUB: "trade",
     "Full waiver board": "waiver",
     "Advanced roster decisions": "roster",
