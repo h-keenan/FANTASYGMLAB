@@ -9,7 +9,27 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { api, type KeepersResponse, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
-import { LoadingScreen } from "@/components/LoadingScreen";
+
+/** Reserves the final page's block heights so the content doesn't jump. */
+function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
+  const block = (height: number, key: string) => (
+    <div key={key} className="pqv-skeleton-chart w-full" style={{ height }} aria-hidden="true" />
+  );
+  return (
+    <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto" aria-busy="true">
+      <header className="flex flex-col gap-1">
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          My Team
+        </span>
+        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+      </header>
+      <span className="sr-only" role="status">
+        Loading My Team
+      </span>
+      {[block(190, "snapshot"), block(230, "analysis"), block(420, "roster"), block(110, "composition")]}
+    </main>
+  );
+}
 
 export default function MyTeamPage() {
   const params = useParams<{ leagueId: string }>();
@@ -106,9 +126,7 @@ export default function MyTeamPage() {
   const leagueSize = myTeam?.roster_id && teamRankings ? teamRankings.length : 0;
 
   if (authLoading || (!myTeam && !error)) {
-    return (
-      <LoadingScreen status="Loading My Team…" />
-    );
+    return <MyTeamSkeleton leagueName={leagueName} />;
   }
 
   if (error || !myTeam) {

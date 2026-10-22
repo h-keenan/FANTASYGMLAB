@@ -1,19 +1,18 @@
-import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ToneBadge } from "@/components/ToneBadge";
-import { ValueStat } from "@/components/ValueStat";
+import { InfoTip } from "@/components/InfoTip";
+import { StatStrip, type StatStripItem } from "@/components/StatStrip";
+import { RosterCompositionBar, RosterTabs, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
+import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnalysis";
 import type { ReactNode } from "react";
-import type { KeeperPlayerInfo, KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
-import { HighlightTarget } from "@/components/HighlightTarget";
-import { OvrGauge } from "@/components/OvrGauge";
+import type { KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
+import { formatRank } from "@/components/SnapshotTile";
 import { ValueRing } from "@/components/ValueRing";
 import {
   buildConstructionObservations,
   buildPositionGroupItems,
   formatScore,
-  lineupIneligibleTag,
   myTeamReasonMessage,
   openSlotsMessage,
   sumScore,
@@ -70,57 +69,6 @@ const KEEPER_BASIS_LABEL: Record<string, string> = {
   previous_draft: "from last year's draft keepers",
   declared_keepers: "from your declared keepers",
 };
-
-function surplusText(info: KeeperPlayerInfo | undefined): string | null {
-  if (!info || info.surplus == null || info.cost_round == null) return null;
-  return `${info.kept_round ? "Kept" : "Est."} R${info.cost_round} · ${info.surplus > 0 ? "+" : ""}${info.surplus}`;
-}
-
-function LineupRow({
-  player,
-  muted = false,
-  keeper,
-}: {
-  player: LineupPlayer;
-  muted?: boolean;
-  keeper?: KeeperPlayerInfo;
-}) {
-  const ineligibleTag = lineupIneligibleTag(player);
-  return (
-    <div
-      className="flex items-center gap-3 py-2"
-      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      <PlayerIdentity
-        identity={{ ...player, sourceLabel: "My Team" }}
-        playerId={player.player_id}
-        name={player.name || "Unknown player"}
-        position={player.position}
-        tier={player.tier}
-        injuryStatus={player.injury_label}
-        muted={muted}
-        className="flex-1 min-w-0"
-      >
-        {player.team || "FA"} {player.slot && player.slot !== "BENCH" ? `· ${player.slot}` : ""}
-        {ineligibleTag ? (
-          <span className="font-bold" style={{ color: "var(--color-warning)" }}>
-            {` · ${ineligibleTag}`}
-          </span>
-        ) : null}
-        {keeper?.is_keeper ? (
-          <span className="ml-1">
-            <ToneBadge label="Keeper" color="var(--color-information)" />
-          </span>
-        ) : null}
-        {surplusText(keeper) ? ` · ${surplusText(keeper)}` : ""}
-      </PlayerIdentity>
-      <div className="flex items-center gap-2 shrink-0">
-        <OvrGauge rating={player.overall_rating} size="sm" />
-        <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
-      </div>
-    </div>
-  );
-}
 
 export function MyTeamContent({
   leagueName,
@@ -209,6 +157,52 @@ export function MyTeamContent({
       })
     : [];
 
+  const analysisRows = buildTeamAnalysisRows(positionGroupItems);
+
+  const tabs: RosterTab[] = bestBall
+    ? [{ value: "starters", label: "Roster", players: activeBench }]
+    : [
+        { value: "starters", label: "Starters", players: starters, showSlot: true },
+        { value: "bench", label: "Bench", players: activeBench, muted: true },
+      ];
+  if (irBench.length > 0) tabs.push({ value: "ir", label: "IR", players: irBench, muted: true });
+  if (taxiBench.length > 0) tabs.push({ value: "taxi", label: "Taxi", players: taxiBench, muted: true });
+
+  const composition = buildRosterComposition(
+    bestBall
+      ? [
+          { key: "roster", label: "Roster", players: activeBench },
+          { key: "ir", label: "IR", players: irBench },
+          { key: "taxi", label: "Taxi", players: taxiBench },
+        ]
+      : [
+          { key: "starters", label: "Starters", players: starters },
+          { key: "bench", label: "Bench", players: activeBench },
+          { key: "ir", label: "IR", players: irBench },
+          { key: "taxi", label: "Taxi", players: taxiBench },
+        ],
+  );
+
+  const record = teamRanking
+    ? `${teamRanking.wins ?? 0}-${teamRanking.losses ?? 0}${teamRanking.ties ? `-${teamRanking.ties}` : ""}`
+    : "—";
+  const snapshotItems: StatStripItem[] = [
+    { glyph: "record", label: "Record", value: record },
+    { glyph: "power", label: "Power Rank", value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false) },
+    ...(showFranchiseConstruction
+      ? [
+          {
+            glyph: "franchise" as const,
+            label: "Franchise Rank",
+            value: formatRank(teamRanking?.franchise_rank ?? null, teamRanking?.franchise_rank_tied ?? false),
+          },
+        ]
+      : []),
+    { glyph: "starter", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false) },
+    { glyph: "bench", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false) },
+    { glyph: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
+  ];
+
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
@@ -222,221 +216,119 @@ export function MyTeamContent({
         <SectionHeading>
           <span id="team-snapshot-heading">Team Snapshot</span>
         </SectionHeading>
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex flex-col items-center gap-1">
-            <ValueRing
-              percent={valuePercentile}
-              tone={metricToneBand(valuePercentile) || "mid"}
-              display={valuePercentile !== null ? String(Math.round(valuePercentile)) : "—"}
-              ariaLabel={
-                valuePercentile !== null
-                  ? `Team value ${Math.round(valuePercentile)}th percentile`
-                  : "Team value unavailable"
-              }
-            />
+        <div className="flex items-center gap-4">
+          <ValueRing
+            percent={valuePercentile}
+            tone={metricToneBand(valuePercentile) || "mid"}
+            display={valuePercentile !== null ? String(Math.round(valuePercentile)) : "—"}
+            ariaLabel={
+              valuePercentile !== null ? `Team value ${Math.round(valuePercentile)}th percentile` : "Team value unavailable"
+            }
+          />
+          <div className="flex flex-col gap-1 items-start min-w-0">
+            {teamRanking?.archetype_label ? (
+              <span
+                className="px-2 py-1 text-xs font-extrabold uppercase"
+                style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
+              >
+                {teamRanking.archetype_label}
+              </span>
+            ) : null}
             <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
               Team Value
             </span>
+            <span style={{ font: "var(--type-primary-metric)" }}>{formatScore(teamTotalValue)}</span>
           </div>
-          {teamRanking?.archetype_label ? (
-            <span
-              className="px-2 py-1 text-xs font-extrabold uppercase self-start"
-              style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
-            >
-              {teamRanking.archetype_label}
-            </span>
-          ) : null}
         </div>
-        <div className="flex flex-wrap gap-3">
-          <SnapshotTile
-            label="Record"
-            value={
-              teamRanking
-                ? `${teamRanking.wins ?? 0}-${teamRanking.losses ?? 0}${teamRanking.ties ? `-${teamRanking.ties}` : ""}`
-                : "—"
-            }
-          />
-          <SnapshotTile label="Power Rank" value={formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false)} />
-          {showFranchiseConstruction ? (
-            <SnapshotTile
-              label="Franchise Rank"
-              value={formatRank(teamRanking?.franchise_rank ?? null, teamRanking?.franchise_rank_tied ?? false)}
-            />
-          ) : null}
-          <SnapshotTile
-            label="Starter Strength"
-            value={formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false)}
-          />
-          <SnapshotTile label="Bench Strength" value={formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false)} />
-          <SnapshotTile
-            label="Avg Age"
-            value={teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—"}
-          />
-          <SnapshotTile label="Team Value" value={formatScore(teamTotalValue)} />
-        </div>
+        <StatStrip items={snapshotItems.slice(0, 3)} columns={3} />
+        <StatStrip items={snapshotItems.slice(3)} columns={3} />
       </section>
 
-      {observations.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="strength-pressure-heading">
+      {analysisRows.length > 0 ? (
+        <section className="flex flex-col gap-3" aria-labelledby="team-analysis-heading">
           <SectionHeading>
-            <span id="strength-pressure-heading">Strength &amp; Pressure</span>
+            <span id="team-analysis-heading">Team Analysis</span>
           </SectionHeading>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {observations.map((observation) => (
-              <div
-                key={observation.label + observation.titlePrefix + observation.titleSuffix}
-                className={`tone-${observation.tone} p-4 flex flex-col gap-1`}
-              >
-                <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                  {observation.label}
-                </span>
-                <span className="tone-value text-sm font-extrabold">
-                  {observation.titlePrefix}
-                  {observation.rooms.length > 0 ? joinRooms(observation.rooms) : null}
-                  {observation.titleSuffix}
-                </span>
-                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                  {observation.body}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {needs?.biggest_need ? (
-        <section className="flex flex-col gap-3" aria-labelledby="biggest-need-heading">
-          <SectionHeading>
-            <span id="biggest-need-heading">{needs.biggest_need.label}</span>
-          </SectionHeading>
-          <div className="tone-need p-4 flex flex-col gap-1">
-            <span className="tone-value text-sm font-extrabold">
-              {(() => {
-                const cls = positionTextClass(needs.biggest_need.value);
-                return cls ? <span className={cls}>{needs.biggest_need.value}</span> : needs.biggest_need.value;
-              })()}
-            </span>
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {needs.biggest_need.note}
-            </p>
-          </div>
-        </section>
-      ) : null}
-
-      {positionGroupItems.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="position-groups-heading">
-          <SectionHeading>
-            <span id="position-groups-heading">Position Groups</span>
-          </SectionHeading>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {positionGroupItems.map((item) => (
-              <div
-                key={item.position}
-                className={`tone-${item.tone} p-4 flex flex-col gap-1`}
-              >
-                <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                  {item.label}
-                </span>
-                <span className="tone-value text-sm font-extrabold">
-                  <span className={positionTextClass(item.position)}>{item.position}</span>
-                  {item.contextSuffix}
-                </span>
-                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                  {item.body}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {bestBall ? (
-        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
-          {myTeam.lineup_advice_message}
-        </p>
-      ) : (
-      <section className="flex flex-col gap-3" aria-labelledby="starters-heading">
-        <div className="flex items-baseline justify-between">
-          <SectionHeading>
-            <span id="starters-heading">Starters</span>
-          </SectionHeading>
-          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-            Total Starters Value {formatScore(startersTotalValue)}
-          </span>
-        </div>
-        {myTeam.lineup_basis_label && myTeam.lineup_basis && myTeam.lineup_basis !== "season_value" ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {myTeam.week ? `Week ${myTeam.week}. ` : ""}
-            {myTeam.lineup_basis_label}
-          </p>
-        ) : null}
-        {openSlotsMessage(myTeam.open_slots) ? (
-          <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
-            {openSlotsMessage(myTeam.open_slots)}
-          </p>
-        ) : null}
-        {starters.length === 0 ? (
-          <EmptyState title="No suggested starters yet." />
-        ) : (
-          <div className="glass-surface flex flex-col">
-            {starters.map((player) => (
-              <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} />
-              </HighlightTarget>
-            ))}
-          </div>
-        )}
-      </section>
-      )}
-
-      <section className="flex flex-col gap-3" aria-labelledby="bench-heading">
-        <SectionHeading>
-          <span id="bench-heading">{bestBall ? "Roster" : "Bench"}</span>
-        </SectionHeading>
-        {activeBench.length + irBench.length + taxiBench.length === 0 ? (
-          <EmptyState title="No bench players." />
-        ) : (
-          <div className="flex flex-col gap-4">
-            {activeBench.length > 0 ? (
-              <div className="glass-surface flex flex-col">
-                {activeBench.map((player) => (
-                  <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                    <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} muted={!bestBall} />
-                  </HighlightTarget>
+          <TeamAnalysisList rows={analysisRows} />
+          {observations.length > 0 || needs?.biggest_need ? (
+            <InfoTip label="Roster notes">
+              <div className="flex flex-col gap-2">
+                {needs?.biggest_need ? (
+                  <p>
+                    <strong>{needs.biggest_need.label}: </strong>
+                    {(() => {
+                      const cls = positionTextClass(needs.biggest_need.value);
+                      return cls ? <span className={cls}>{needs.biggest_need.value}</span> : needs.biggest_need.value;
+                    })()}
+                    {". "}
+                    {needs.biggest_need.note}
+                  </p>
+                ) : null}
+                {observations.map((observation) => (
+                  <p key={observation.label + observation.titlePrefix + observation.titleSuffix}>
+                    <strong>
+                      {observation.titlePrefix}
+                      {observation.rooms.length > 0 ? joinRooms(observation.rooms) : null}
+                      {observation.titleSuffix}
+                      {": "}
+                    </strong>
+                    {observation.body}
+                  </p>
                 ))}
               </div>
-            ) : null}
-            {irBench.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                  Injured Reserve
-                </span>
-                <div className="glass-surface flex flex-col">
-                  {irBench.map((player) => (
-                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                      <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} muted />
-                    </HighlightTarget>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {taxiBench.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                  Taxi Squad
-                </span>
-                <div className="glass-surface flex flex-col">
-                  {taxiBench.map((player) => (
-                    <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                      <LineupRow keeper={keepers?.players?.[player.player_id]} player={player} muted />
-                    </HighlightTarget>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
+            </InfoTip>
+          ) : null}
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-3" aria-labelledby="roster-heading">
+        <div className="flex items-baseline justify-between">
+          <SectionHeading>
+            <span id="roster-heading">Your Roster</span>
+          </SectionHeading>
+          {!bestBall && starters.length > 0 ? (
+            <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+              Starters Value {formatScore(startersTotalValue)}
+            </span>
+          ) : null}
+        </div>
+        {bestBall && myTeam.lineup_advice_message ? (
+          <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
+            {myTeam.lineup_advice_message}
+          </p>
+        ) : null}
+        <RosterTabs
+          tabs={tabs}
+          keepers={keepers?.players}
+          highlightPlayerId={highlightPlayerId}
+          emptyText={bestBall ? "No players on this roster." : "Nobody here yet."}
+          topNote={
+            <>
+              {myTeam.lineup_basis_label && myTeam.lineup_basis && myTeam.lineup_basis !== "season_value" && !bestBall ? (
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {myTeam.week ? `Week ${myTeam.week}. ` : ""}
+                  {myTeam.lineup_basis_label}
+                </p>
+              ) : null}
+              {openSlotsMessage(myTeam.open_slots) ? (
+                <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
+                  {openSlotsMessage(myTeam.open_slots)}
+                </p>
+              ) : null}
+            </>
+          }
+        />
       </section>
+
+      {composition.length > 0 ? (
+        <section className="flex flex-col gap-3" aria-labelledby="composition-heading">
+          <SectionHeading>
+            <span id="composition-heading">Roster Composition</span>
+          </SectionHeading>
+          <RosterCompositionBar segments={composition} />
+        </section>
+      ) : null}
+
       {keepers?.is_keeper_league && (keepers.candidates?.length ?? 0) > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="keeper-candidates-heading">
           <SectionHeading>
