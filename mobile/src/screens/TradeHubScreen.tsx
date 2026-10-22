@@ -1000,7 +1000,8 @@ function TradeIdeaCard({
           accessibilityRole="button"
           accessibilityLabel="Share this trade"
         >
-          <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
+          <Ionicons name="share-outline" size={16} color={colors.accent} />
+          <AppText style={styles.shareButtonText}>Share</AppText>
         </TouchableOpacity>
       </View>
 
@@ -1291,10 +1292,20 @@ function createStyles(colors: ThemeColors) {
   // (that read as an extra decorative surface neither concept image has).
   // hitSlop on the TouchableOpacity keeps the tap target comfortable
   // without a visible background box.
+  // Clearly visible secondary action: outlined accent, icon + label, 36pt+
+  // target. The filled "Share to Propose" button below stays the primary.
   shareButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
+  shareButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: spacing.sm },
   // Each side is its own small tinted surface (per section 6: "the
   // strongest visual element in the card") so PlayerIdentityRow/
