@@ -69,6 +69,46 @@ WEEKLY_RETAIN_FIELD_MAP = {
     "pts_ppr": "fantasy_points_ppr",
 }
 
+# Per-week box-score fields, kept on the SAME weekly rows from the SAME
+# Sleeper ``/stats/nfl/regular/{season}/{week}`` payloads this module already
+# fetches (no new provider call). Added for the external content-bot API's
+# week-result / weekly recap endpoints (docs/external-api-contract.md,
+# "Weekly recap"). Before this, per-week yards/TDs/standard points were only
+# summed into season totals (``PLAYER_STATS_SUM_FIELDS``) and then dropped
+# at the weekly grain.
+#
+# These are deliberately NOT in ``WEEKLY_RETAIN_SOURCE_FIELDS``: whether a
+# weekly row exists is still decided only by those original fields, so
+# widening retention never adds a new row (or changes which weeks count as
+# "played") for any existing weekly-stats consumer. It only adds keys to
+# rows that already existed. Sleeper omits zero-valued stat keys from its
+# weekly payload, so an absent key here means "not reported" and is never
+# written as a 0.
+WEEKLY_BOX_SCORE_FIELD_MAP = {
+    "pass_cmp": "passing_completions",
+    "pass_yd": "passing_yards",
+    "pass_td": "passing_tds",
+    "pass_int": "passing_interceptions",
+    "rush_yd": "rushing_yards",
+    "rush_td": "rushing_tds",
+    "rec_yd": "receiving_yards",
+    "rec_td": "receiving_tds",
+    "fum_lost": "fumbles_lost",
+    "fgm": "field_goals_made",
+    "fga": "field_goals_attempted",
+    "xpm": "extra_points_made",
+    "xpa": "extra_points_attempted",
+    "pts_std": "fantasy_points_standard",
+    "pts_half_ppr": "fantasy_points_half_ppr",
+}
+# Point totals stay floats; every other box-score field is a whole-number count.
+WEEKLY_BOX_SCORE_FLOAT_FIELDS = frozenset({"fantasy_points_standard", "fantasy_points_half_ppr"})
+# Sleeper publishes ``pts_half_ppr`` next to ``pts_ppr`` for every player
+# with a scored stat line, so a season cache where no weekly row carries the
+# mapped key was written before box-score retention shipped (see
+# ``season_stats_cache_has_box_scores``).
+WEEKLY_BOX_SCORE_SCHEMA_MARKER_FIELD = "fantasy_points_half_ppr"
+
 
 def default_player_stats_season(now: time.struct_time | None = None) -> int:
     """Canonical active NFL stats season (Sep+ → calendar year, else prior year)."""
@@ -127,6 +167,16 @@ def _extract_week_observation(week: int, raw_stats: Dict[str, Any]) -> Dict[str,
                     row[target] = int(round(numeric))
     if not saw_value:
         return None
+    for source_field, target in WEEKLY_BOX_SCORE_FIELD_MAP.items():
+        if source_field not in raw_stats or raw_stats.get(source_field) is None:
+            continue
+        try:
+            numeric = float(raw_stats.get(source_field))
+        except (TypeError, ValueError):
+            continue
+        if not (numeric == numeric):  # NaN
+            continue
+        row[target] = float(numeric) if target in WEEKLY_BOX_SCORE_FLOAT_FIELDS else int(round(numeric))
     off_snp = float(row.pop("_offensive_snaps", 0.0) or 0.0)
     tm_off = float(row.pop("_team_offensive_snaps", 0.0) or 0.0)
     if off_snp >= 0 and tm_off > 0:
@@ -242,6 +292,40 @@ def season_stats_cache_has_weekly(season: int | None = None) -> bool:
     except Exception:
         return False
     return False
+
+
+def season_stats_cache_has_box_scores(cached: Dict[str, Any] | None) -> bool:
+    """True when a loaded season aggregate (``get_season_player_stats``'s
+    return value) has per-week box-score fields on its weekly rows, i.e. it
+    was built after ``WEEKLY_BOX_SCORE_FIELD_MAP`` retention shipped. A
+    cache written before that (e.g. the committed prior-season files under
+    ``data/``) has weekly rows but no box-score keys. Callers must report
+    that as unavailable rather than reading the absent keys as zeros.
+    """
+
+    if not isinstance(cached, dict):
+        return False
+    for values in cached.values():
+        weekly = values.get("weekly") if isinstance(values, dict) else None
+        if not isinstance(weekly, list):
+            continue
+        for row in weekly:
+            if isinstance(row, dict) and WEEKLY_BOX_SCORE_SCHEMA_MARKER_FIELD in row:
+                return True
+    return False
+
+
+def season_stats_cache_written_at(season: int | None = None) -> float | None:
+    """Epoch mtime of this season's on-disk aggregate cache (when its Sleeper
+    weekly payloads were last fetched), or None when there is no cache file.
+    Never fetches."""
+
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    try:
+        return float(os.path.getmtime(cache_path))
+    except OSError:
+        return None
 
 
 def cached_season_player_weekly(player_id: str, season: int | None = None) -> List[Dict[str, Any]]:

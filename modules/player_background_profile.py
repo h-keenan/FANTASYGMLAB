@@ -23,9 +23,9 @@ Three sections, in the bot developer's own stated priority order:
 3. ``historical_production`` — real, already-computed per-week PPR fantasy
    points (``modules.sleeper``'s ``WEEKLY_RETAIN_FIELD_MAP``'s ``pts_ppr``),
    plus an honestly-``unavailable`` standard-format/box-score section citing
-   the exact, already-documented retention gap in
-   ``docs/external-api-contract.md``'s "Weekly recap (completed-week actual
-   production) — investigated, not yet built" section.
+   the ``GET /v1/external/players/{player_id}/week-result`` /
+   ``GET /v1/external/recap`` endpoints that now serve those per-week
+   fields (``docs/external-api-contract.md``'s "Weekly recap" section).
 
 No section here ever infers a causal narrative (e.g. "workload declined
 because of player Y") — every value is either a real, directly-sourced
@@ -120,19 +120,12 @@ _CONTRACT_NULL_FIELDS = {
 
 STANDARD_AND_BOX_SCORE_UNAVAILABLE_REASON = (
     "Per-week standard (non-PPR) fantasy points and full box-score fields "
-    "(receiving/rushing/passing yards and touchdowns) are not retained at "
-    "the per-week grain anywhere in this codebase today — only season "
-    "totals carry those (modules.sleeper.PLAYER_STATS_SUM_FIELDS); the "
-    "per-week cache (modules.sleeper.WEEKLY_RETAIN_SOURCE_FIELDS / "
-    "WEEKLY_RETAIN_FIELD_MAP) only retains games_played/targets/receptions/"
-    "rush_attempts/pass_attempts/fantasy_points_ppr. This exact gap is "
-    "already investigated and documented in "
-    "docs/external-api-contract.md's \"Weekly recap (completed-week actual "
-    "production) — investigated, not yet built\" section, which names the "
-    "documented GET /v1/external/players/{player_id}/week-result proposal "
-    "and its box-score-retention prerequisite. That work is not re-proposed "
-    "here — this section just points to it rather than silently omitting "
-    "these fields."
+    "(receiving/rushing/passing yards and touchdowns) are not duplicated in "
+    "this background profile. They are now retained per week "
+    "(modules.sleeper.WEEKLY_BOX_SCORE_FIELD_MAP) and served, with "
+    "finality checks, by GET /v1/external/players/{player_id}/week-result "
+    "and GET /v1/external/recap. See docs/external-api-contract.md's "
+    "\"Weekly recap\" section."
 )
 
 TEAMMATES_NOTE = (
@@ -445,7 +438,7 @@ def _historical_production_section(
 ) -> dict[str, Any]:
     """Priority 3 — real per-week PPR production (real, Sleeper-computed
     ``pts_ppr``) plus an honestly-``unavailable`` standard/box-score
-    sibling citing the documented retention gap. See
+    sibling pointing to the week-result/recap endpoints. See
     ``STANDARD_AND_BOX_SCORE_UNAVAILABLE_REASON`` and
     ``docs/external-api-contract.md``'s "Weekly recap" section.
     """
