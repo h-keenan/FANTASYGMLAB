@@ -16,6 +16,7 @@ import { BriefingItemPlayers, briefingItemIsSinglePlayer } from "@/components/Br
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { ToneBadge } from "@/components/ToneBadge";
 
 /**
  * Ports modules/portfolio_page.py's render_portfolio_page — the cross-
@@ -76,19 +77,7 @@ function SignalRow({ item, showDivider }: { item: BriefingItem; showDivider: boo
   const showReasonText =
     showReason && !(item.category === "watch" && hasPlayerVisual && (reasonText.includes(" | ") || reasonText.includes(" - ")));
 
-  const badge = (
-    <span
-      className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
-      style={{
-        borderRadius: "var(--radius-pill)",
-        background: `color-mix(in srgb, ${color} 15%, transparent)`,
-        color,
-        letterSpacing: "var(--letter-spacing-badge)",
-      }}
-    >
-      {label}
-    </span>
-  );
+  const badge = <ToneBadge variant="pill" label={label} color={color} />;
   const text = (
     <div className="flex flex-col flex-1 min-w-0">
       {headlineText ? (

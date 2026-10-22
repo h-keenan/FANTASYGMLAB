@@ -201,7 +201,7 @@ export function TradeIdeaCardView({
       data-highlighted={highlighted ? "true" : undefined}
       className="glass-surface flex flex-col gap-3 p-4"
       style={{
-        borderLeft: `3px solid ${accent}`,
+        borderLeft: `var(--border-width-semantic) solid ${accent}`,
         ...(highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : {}),
       }}
     >

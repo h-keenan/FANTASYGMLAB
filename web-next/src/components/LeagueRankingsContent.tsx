@@ -19,6 +19,7 @@ import {
 } from "@/lib/leagueRankingsPresentation";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { ToneBadge } from "@/components/ToneBadge";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -41,17 +42,8 @@ import { TeamAvatar } from "@/components/TeamAvatar";
  * thin wrapper — left for a future revision rather than guessed at here.
  */
 
-function RankBadge({ label, tone = "neutral" }: { label: string; tone?: "positive" | "negative" | "neutral" }) {
-  const color =
-    tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
-  return (
-    <span
-      className="px-1.5 py-0.5 text-xs font-extrabold uppercase shrink-0"
-      style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color, border: `1px solid ${color}` }}
-    >
-      {label}
-    </span>
-  );
+function rankBadgeColor(tone: "positive" | "negative" | "neutral" = "neutral"): string {
+  return tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
 }
 
 function RankingRow({
@@ -99,7 +91,7 @@ function RankingRow({
           <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
             {teamName}
           </span>
-          {isCurrent ? <RankBadge label="You" tone="positive" /> : null}
+          {isCurrent ? <ToneBadge label="You" color={rankBadgeColor("positive")} /> : null}
         </div>
         <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
           {ownerName || "Manager"}
@@ -112,7 +104,7 @@ function RankingRow({
         {badges && badges.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-0.5">
             {badges.map((badge) => (
-              <RankBadge key={badge.label} label={badge.label} tone={badge.tone} />
+              <ToneBadge key={badge.label} label={badge.label} color={rankBadgeColor(badge.tone)} />
             ))}
           </div>
         ) : null}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { api, type GuessThePlayerLeaderboardEntry, type GuessThePlayerLeaderboardResponse } from "@/lib/api";
+import { ToneBadge } from "@/components/ToneBadge";
 
 /**
  * League-scoped leaderboard across both Guess the Player mini-games' real,
@@ -49,16 +50,7 @@ function LeaderboardRow({ entry }: { entry: GuessThePlayerLeaderboardEntry }) {
           {entry.display_name}
         </span>
         {entry.is_viewer ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-extrabold uppercase shrink-0"
-            style={{
-              background: "color-mix(in srgb, var(--color-success) 15%, transparent)",
-              color: "var(--color-success)",
-              border: "1px solid var(--color-success)",
-            }}
-          >
-            You
-          </span>
+          <ToneBadge label="You" color="var(--color-success)" />
         ) : null}
       </div>
       <div className="flex flex-col items-end shrink-0">

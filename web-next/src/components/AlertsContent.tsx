@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { ToneBadge } from "@/components/ToneBadge";
 import {
   ROSTER_RELATIONSHIP_LABEL,
   alertsReasonMessage,
@@ -106,17 +107,7 @@ function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertIt
           />
         ) : null}
         {relationship ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-extrabold uppercase"
-            style={{
-              borderRadius: "var(--radius-pill)",
-              background: `color-mix(in srgb, ${rosterRelationshipColorVar(relationship)} 15%, transparent)`,
-              color: rosterRelationshipColorVar(relationship),
-              letterSpacing: "var(--letter-spacing-badge)",
-            }}
-          >
-            {ROSTER_RELATIONSHIP_LABEL[relationship]}
-          </span>
+          <ToneBadge variant="pill" label={ROSTER_RELATIONSHIP_LABEL[relationship]} color={rosterRelationshipColorVar(relationship)} />
         ) : null}
         <span className="flex-1" />
         {time ? (

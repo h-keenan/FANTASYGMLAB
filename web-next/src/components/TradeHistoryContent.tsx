@@ -1,5 +1,7 @@
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
+import { ToneBadge } from "@/components/ToneBadge";
+import { VerdictCallout } from "@/components/VerdictCallout";
 import {
   formatTradeHistoryDate,
   outcomeLabel,
@@ -23,22 +25,6 @@ import {
  * valuation or grading math: every row already comes from
  * modules.trade_outcome_results's standalone cron sweep, read back verbatim.
  */
-
-function Badge({ label, color }: { label: string; color: string }) {
-  return (
-    <span
-      className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
-      style={{
-        borderRadius: "var(--radius-pill)",
-        background: `color-mix(in srgb, ${color} 15%, transparent)`,
-        color,
-        letterSpacing: "var(--letter-spacing-badge)",
-      }}
-    >
-      {label}
-    </span>
-  );
-}
 
 function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const summary = outcome.trade_summary;
@@ -69,26 +55,11 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
             </span>
           ) : null}
         </div>
-        <Badge label={outcomeLabel(outcome.outcome)} color={outcomeToneColorVar(outcome.outcome)} />
+        <ToneBadge variant="pill" label={outcomeLabel(outcome.outcome)} color={outcomeToneColorVar(outcome.outcome)} />
       </div>
 
       {verdict && result ? (
-        <div
-          className="flex flex-col gap-0.5 px-3 py-2"
-          style={{
-            border: `1px solid color-mix(in srgb, ${verdictToneColorVar(verdict)} 35%, transparent)`,
-            background: `color-mix(in srgb, ${verdictToneColorVar(verdict)} 8%, transparent)`,
-          }}
-        >
-          <span className="text-sm font-bold" style={{ color: verdictToneColorVar(verdict) }}>
-            {result.verdict_label}
-          </span>
-          {detailText ? (
-            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              {detailText}
-            </span>
-          ) : null}
-        </div>
+        <VerdictCallout color={verdictToneColorVar(verdict)} label={result.verdict_label} detail={detailText} />
       ) : null}
 
       <div className="grid grid-cols-2 gap-4 mt-1">
