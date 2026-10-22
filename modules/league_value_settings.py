@@ -22,7 +22,9 @@ same rule as `modules/canonical_player_ranking.py`.
 
 from __future__ import annotations
 
+import threading
 import time
+import weakref
 from typing import Any, Mapping
 
 import pandas as pd
@@ -825,4 +827,48 @@ def build_valued_players_frame_cached(
         compute=lambda: _build_valued_players_frame_cached(*key),
         lock_timeout_seconds=_VALUED_PLAYERS_FRAME_LOCK_TIMEOUT_SECONDS,
     )
-    return valued.copy()
+    returned = valued.copy()
+    _remember_valued_frame_cache_key(returned, cache_key)
+    return returned
+
+
+# Which cache entry (the Redis key above, which already embeds the 120s
+# bucket) a frame handed out by build_valued_players_frame_cached came from,
+# looked up by the frame object's identity. Lets a downstream computation
+# that is a pure function of "this exact valued pool" (see
+# services.mobile_api_service._reinstated_inactive_roster_rows) cache its
+# own result under that same version, so it can never be fresher or staler
+# than the pool it was computed against. Only the exact object returned
+# above is recognized: a slice, a .copy() or any other derived frame gets
+# "" and the caller computes as before. Entries are dropped as soon as the
+# frame is garbage-collected.
+_VALUED_FRAME_CACHE_KEYS: dict[int, tuple[weakref.ReferenceType, str]] = {}
+_VALUED_FRAME_CACHE_KEYS_LOCK = threading.Lock()
+
+
+def _remember_valued_frame_cache_key(frame: pd.DataFrame, cache_key: str) -> None:
+    frame_id = id(frame)
+
+    def _forget(_ref: weakref.ReferenceType, frame_id: int = frame_id) -> None:
+        with _VALUED_FRAME_CACHE_KEYS_LOCK:
+            entry = _VALUED_FRAME_CACHE_KEYS.get(frame_id)
+            if entry is not None and entry[0] is _ref:
+                del _VALUED_FRAME_CACHE_KEYS[frame_id]
+
+    try:
+        ref = weakref.ref(frame, _forget)
+    except TypeError:
+        return
+    with _VALUED_FRAME_CACHE_KEYS_LOCK:
+        _VALUED_FRAME_CACHE_KEYS[frame_id] = (ref, cache_key)
+
+
+def valued_players_frame_cache_key(frame: Any) -> str:
+    """The valued_players_frame cache key `frame` was returned under by
+    build_valued_players_frame_cached, or "" for any other frame."""
+
+    with _VALUED_FRAME_CACHE_KEYS_LOCK:
+        entry = _VALUED_FRAME_CACHE_KEYS.get(id(frame))
+    if entry is None or entry[0]() is not frame:
+        return ""
+    return entry[1]

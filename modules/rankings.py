@@ -3722,6 +3722,27 @@ def _read_cached_json_mapping(path: str) -> dict[str, Any]:
         return {}
 
 
+def reconciled_valuation_cache_versions() -> tuple:
+    """(path, mtime_ns, size) for each disk cache
+    hydrate_reconciled_valuations_from_cache reads, so a caller caching its
+    output can key on the exact input versions (a refreshed file is a
+    different key, never a stale hit)."""
+
+    paths = (
+        FANTASYCALC_CACHE_PATH,
+        sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(season=sleeper_module.default_player_stats_season()),
+        sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(season=sleeper_module.prior_player_stats_season()),
+    )
+    versions = []
+    for path in paths:
+        try:
+            stat = os.stat(path)
+            versions.append((path, stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            versions.append((path, None, None))
+    return tuple(versions)
+
+
 def hydrate_reconciled_valuations_from_cache(
     reference_frame: pd.DataFrame,
     candidates: pd.DataFrame,
