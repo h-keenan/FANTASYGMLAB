@@ -185,4 +185,3 @@ export function PlayerShareCard({
     </ShareFrame>
   );
 }
-
