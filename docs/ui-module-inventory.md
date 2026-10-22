@@ -67,7 +67,7 @@ under **Page bodies** and are not modules in their own right.
 | Module | Where used | Props / variants |
 |---|---|---|
 | `LoadingScreen` | 29 routes | Branded splash, `status` text |
-| `ErrorState` | /dashboard, /portfolio, /account, /founder-analytics | `message`, `onRetry` (Try again button) |
+| `ErrorState` (+ `reloadPage`) | every data route | `message`, optional `onRetry` (Try again button) |
 | `PqvBodySkeleton` (PlayerQuickView.tsx), `PortfolioLeagueSkeleton` | Quick View, /portfolio | Skeletons, justified per-layout |
 
 ### Modals / sheets
@@ -90,7 +90,7 @@ No shared button component exists. See band-aid B10.
 ### Tabs / toggles
 | Module | Where used | Props / variants |
 |---|---|---|
-| `PillRow` | 8 routes | Segmented pill toggle: `options`, `active`, `onSelect` |
+| `PillRow` | 8 routes | Segmented pill toggle: `options`, `active`, `onSelect`, `fullWidth` (equal-width tab bar) |
 | `TradesTabBar` | /trade-hub, /trade-finder, /trade-analyzer | Link-based tabs with the same look as `PillRow` |
 
 ### Page bodies and shells (one per route, not reusable modules)
@@ -194,7 +194,10 @@ described), or **Justified one-off**.
   draft-center, gm-plan, league-rankings, league-recaps, live-draft,
   matchup, my-team, news, player-compare (×3), players, players/[id] (×2),
   premium, trade-analyzer, trade-finder, trade-history, trade-hub, waivers.
-  (See the states PR for status.)
+  **Consolidated (PR #1337).** Fetch errors get "Try again", which calls
+  `reloadPage`. Messages no retry can fix have no button, so `onRetry` is
+  optional. Follow-up: give these pages Dashboard's in-place `retryToken`
+  retry instead of a full reload.
 - **B14. `CollegeScoutingContent.EmptyState`** is the only named empty
   state. Other pages show a bare muted `<p>`. **Needs decision:** whether
   the glass-card empty state should be the sitewide pattern (it would add a
@@ -204,7 +207,9 @@ described), or **Justified one-off**.
 - **B15. `LeagueRecapsContent.TabBar`** re-implements `PillRow` as a
   full-width bar. It has the same colors and active underline, but uses
   `flex-1`, `py-2.5` and `--letter-spacing-badge` tracking instead of
-  `0.03em`. (See the states PR for status.)
+  `0.03em`. **Consolidated (PR #1337)** as `PillRow fullWidth`, with
+  identical markup. **Needs decision:** whether the full-width bar should
+  use the compact pills' 0.03em tracking.
 - **B16. `TradesTabBar`** restates `PillRow`'s style object, but uses
   `<Link role="tab">` instead of buttons. **Justified** (navigation, not
   state). It could share a style helper.
