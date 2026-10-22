@@ -180,6 +180,43 @@ export function FounderAnalyticsContent({
         )}
       </section>
 
+      {data.platforms ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-split">
+          Events by platform:{" "}
+          {Object.entries(data.platforms).map(([platform, count], index) => (
+            <span key={platform}>
+              {index > 0 ? " · " : ""}
+              {platform} {count.toLocaleString()}
+            </span>
+          ))}
+        </p>
+      ) : null}
+
+      {data.feature_use && data.feature_use.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          {sectionLabel("Feature use (web + mobile)")}
+          <div className="glass-surface flex flex-col">
+            {data.feature_use.map((row, index) => (
+              <div
+                key={`${row.feature}:${row.action}`}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+                style={
+                  index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined
+                }
+              >
+                <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+                  {row.feature.replace(/_/g, " ")} · {row.action.replace(/_/g, " ")}
+                </span>
+                <span className="text-xs text-right" style={{ color: "var(--color-text-muted)" }}>
+                  {row.total.toLocaleString()} · web {row.web} / ios {row.ios} / android {row.android} · free {row.free}
+                  / pro {row.pro}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-2">
         {sectionLabel("Decision engagement")}
         <NamedCountList items={data.decision_engagement} />

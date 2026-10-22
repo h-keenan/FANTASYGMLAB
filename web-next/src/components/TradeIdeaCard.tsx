@@ -11,6 +11,7 @@ import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { shareImageOrText } from "@/lib/shareImage";
+import { trackUse } from "@/lib/analytics";
 import { ideaTags, shortReason } from "@/lib/tradeHubFilters";
 import {
   LOW_CONFIDENCE_USER_NOTE,
@@ -54,6 +55,7 @@ export function ShareTradeButton({
   // send" answer covers a share that never really went out). Skipped
   // without a leagueId, since the endpoint is league-scoped.
   const recordShare = () => {
+    trackUse("share_card", "shared", { leagueId, props: { item_kind: "trade_idea" } });
     if (!leagueId) return;
     void api.recordTradeShare(leagueId, tradeIdeaShareRecord(idea, lens)).catch(() => {});
   };

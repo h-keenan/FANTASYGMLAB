@@ -25,6 +25,7 @@ import {
   type PlannerSource,
 } from '../lib/matchupPlanner';
 import { slotDisplayLabel } from '../lib/matchupPresentation';
+import { trackUse } from '../lib/analytics';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -97,6 +98,7 @@ export function useLineupPlanner(leagueId: string, matchup: MatchupResponse) {
     (source: PlannerSource, keepBaseline: boolean) => {
       const base = plannerBase(matchup, source);
       if (!base) return;
+      if (!keepBaseline) trackUse('matchup_swap_planner', 'opened', { leagueId, props: { source_surface: source } });
       setSheet(null);
       setPlan((current) => ({
         source,
@@ -109,7 +111,7 @@ export function useLineupPlanner(leagueId: string, matchup: MatchupResponse) {
       }));
       void evaluate(base.slots, source);
     },
-    [matchup, evaluate],
+    [matchup, evaluate, leagueId],
   );
 
   const exit = useCallback(() => {
@@ -138,10 +140,11 @@ export function useLineupPlanner(leagueId: string, matchup: MatchupResponse) {
     (candidate: MatchupWhatIfCandidate) => {
       if (!plan || !sheet || !candidate.selectable) return;
       const slots = applySwap(plan.slots, sheet.index, candidate);
+      trackUse('matchup_swap_planner', 'swap_applied', { leagueId });
       setSheet(null);
       void evaluate(slots, plan.source);
     },
-    [plan, sheet, evaluate],
+    [plan, sheet, evaluate, leagueId],
   );
 
   return {

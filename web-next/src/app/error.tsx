@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect } from "react";
 
+import { trackClientError } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 
 /**
@@ -18,6 +19,8 @@ import { BRAND_NAME } from "@/lib/brand";
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Unhandled app error", error);
+    // Team-visible signal: error constructor name + sanitized route only.
+    trackClientError("application_error", error);
   }, [error]);
 
   return (

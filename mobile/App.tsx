@@ -25,6 +25,7 @@ import { ThemeModeProvider, useThemeMode } from './src/context/ThemeModeContext'
 import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
+import { startAnalytics } from './src/lib/analytics';
 import { registerNotificationTapHandler } from './src/lib/pushNotifications';
 import {
   asyncStoragePersister,
@@ -57,7 +58,13 @@ export default function App() {
   useEffect(() => {
     configureRevenueCat();
     void initAds();
-    return registerNotificationTapHandler();
+    // No-op unless the build sets EXPO_PUBLIC_ANALYTICS_ENABLED=1 (ships dark).
+    const stopAnalytics = startAnalytics();
+    const stopNotificationTap = registerNotificationTapHandler();
+    return () => {
+      stopAnalytics();
+      stopNotificationTap();
+    };
   }, []);
 
   if (!fontsLoaded) {

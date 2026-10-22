@@ -1,3 +1,4 @@
+import { trackUse } from "@/lib/analytics";
 import type { TradeIdea } from "@/lib/api";
 import { type TradeIdeaFilter, boardPositions, impactTagCounts } from "@/lib/tradeHubFilters";
 
@@ -20,12 +21,19 @@ function chipStyle(active: boolean) {
 export function TradeHubFilters({
   ideas,
   filter,
-  onChange,
+  onChange: rawOnChange,
 }: {
   ideas: TradeIdea[];
   filter: TradeIdeaFilter;
   onChange: (next: TradeIdeaFilter) => void;
 }) {
+  const onChange = (next: TradeIdeaFilter) => {
+    const kind = next.impact !== filter.impact ? "impact" : "position";
+    trackUse("trade_hub_filters", "filter_changed", {
+      props: { item_kind: kind, result: (kind === "impact" ? next.impact : next.position) || "all" },
+    });
+    rawOnChange(next);
+  };
   const impacts = impactTagCounts(ideas);
   const positions = boardPositions(ideas);
   const allActive = !filter.impact && !filter.position;

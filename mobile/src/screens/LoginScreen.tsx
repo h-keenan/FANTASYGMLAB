@@ -22,6 +22,7 @@ import legalContent from '../data/legalContent.json';
 import { useAuth } from '../context/AuthContext';
 import { hasPassedAgeGate } from '../lib/ageGate';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
+import { trackUse } from '../lib/analytics';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
@@ -66,6 +67,9 @@ export default function LoginScreen() {
     const result =
       mode === 'signIn' ? await signIn(email, password) : await signUp(email, password);
     setSubmitting(false);
+    trackUse('auth', mode === 'signIn' ? 'sign_in' : 'sign_up', {
+      props: { result: result.error ? 'error' : 'ok' },
+    });
     if (result.error) {
       setError(result.error);
       return;
@@ -96,6 +100,7 @@ export default function LoginScreen() {
     setError(null);
     setNotice(null);
     const result = await signInWithApple();
+    trackUse('auth', 'sign_in_apple', { props: { result: result.error ? 'error' : 'ok' } });
     if (result.error) setError(result.error);
   };
 

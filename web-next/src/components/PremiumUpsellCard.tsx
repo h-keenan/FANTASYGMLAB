@@ -1,5 +1,9 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useEffect } from "react";
+
+import { trackUse } from "@/lib/analytics";
 import type { PremiumUpsell } from "@/lib/api";
 
 /**
@@ -33,6 +37,12 @@ export function PremiumUpsellCard({
   const title = upsell?.title ?? fallbackTitle;
   const body = upsell?.body ?? fallbackBody;
   const Wrapper = bare ? "section" : "main";
+  // Conversion-by-feature: which locked card was seen and which upsell was
+  // tapped, keyed by the kicker (stable per gated surface).
+  const gateFeature = kicker.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "premium";
+  useEffect(() => {
+    trackUse(gateFeature, "gate_seen", { tier: "free" });
+  }, [gateFeature]);
 
   return (
     <Wrapper className={bare ? "flex flex-col gap-8" : "flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto"}>
@@ -47,7 +57,10 @@ export function PremiumUpsellCard({
         style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
       >
         <p className="text-sm">{body}</p>
-        <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+        <Link
+          href="/premium"
+          onClick={() => trackUse(gateFeature, "upsell_tapped", { tier: "free" })}
+          className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
           Upgrade →
         </Link>
       </div>

@@ -21,6 +21,7 @@ import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQu
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { BRAND_NAME } from "@/lib/brand";
 import { shareImageOrText } from "@/lib/shareImage";
+import { trackUse } from "@/lib/analytics";
 
 /**
  * Player Profile — the real, full "Open Profile" destination
@@ -102,6 +103,7 @@ function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; l
       title: `${name} on ${BRAND_NAME}`,
       onPreparingImage: setPreparing,
     });
+    trackUse("share_card", "shared", { leagueId, props: { item_kind: "player", result: String(outcome ?? "") } });
     if (outcome === "copied") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

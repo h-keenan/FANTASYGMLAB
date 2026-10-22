@@ -10,6 +10,7 @@ import {
   type MatchupWhatIfResponse,
   type MatchupWhatIfSlot,
 } from "@/lib/api";
+import { trackUse } from "@/lib/analytics";
 import { Button } from "@/components/Button";
 import { PlayerRow } from "@/components/PlayerRow";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -98,6 +99,7 @@ export function useLineupPlanner(leagueId: string, lens: string, matchup: Matchu
     (source: PlannerSource) => {
       const base = plannerBase(matchup, source);
       if (!base) return;
+      trackUse("matchup_swap_planner", "opened", { leagueId, props: { source_surface: source } });
       setSheet(null);
       setPlan({
         source,
@@ -110,7 +112,7 @@ export function useLineupPlanner(leagueId: string, lens: string, matchup: Matchu
       });
       void evaluate(base.slots, source, undefined);
     },
-    [matchup, evaluate],
+    [matchup, evaluate, leagueId],
   );
 
   const resetToSuggested = useCallback(() => {
@@ -155,10 +157,11 @@ export function useLineupPlanner(leagueId: string, lens: string, matchup: Matchu
     (candidate: MatchupWhatIfCandidate) => {
       if (!plan || !sheet || !candidate.selectable) return;
       const slots = applySwap(plan.slots, sheet.index, candidate);
+      trackUse("matchup_swap_planner", "swap_applied", { leagueId });
       setSheet(null);
       void evaluate(slots, plan.source);
     },
-    [plan, sheet, evaluate],
+    [plan, sheet, evaluate, leagueId],
   );
 
   return { plan, sheet, start, resetToSuggested, exit, openSlot, pick, closeSheet: () => setSheet(null) };

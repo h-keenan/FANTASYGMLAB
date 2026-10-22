@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import SkeletonBlock from './SkeletonBlock';
 import StatStrip from './StatStrip';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { sortExposurePlayers, type ExposureSortKey } from '../lib/portfolioExposure';
 import { queryKeys } from '../lib/queryKeys';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -42,6 +43,10 @@ export default function PortfolioExposurePanel() {
   const query = useQuery({ queryKey: queryKeys.portfolioExposure(), queryFn: () => api.getPortfolioExposure() });
   const data = query.data ?? null;
   const players = useMemo(() => sortExposurePlayers(data?.exposure?.players ?? [], sort), [data, sort]);
+  const exposureTier = data ? (data.is_premium ? 'pro' : 'free') : null;
+  useEffect(() => {
+    if (exposureTier) trackUse('player_exposure', 'viewed', { tier: exposureTier });
+  }, [exposureTier]);
 
   if (query.isError && !data) {
     return <AppText style={styles.muted}>Could not load exposure. Try again in a moment.</AppText>;
@@ -58,6 +63,7 @@ export default function PortfolioExposurePanel() {
   if (!data.is_premium) {
     return (
       <PremiumLock
+        feature="exposure"
         title={data.upsell?.title ?? 'See your player exposure'}
         description={
           data.upsell?.body ??

@@ -32,6 +32,7 @@ import EspnLeagueImport from '../components/EspnLeagueImport';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
@@ -249,6 +250,9 @@ export default function HomeScreen({ navigation, route }: Props) {
         leagueId: input.leagueId,
         leagueName: input.leagueName ?? '',
         sleeperUsername: input.username ?? '',
+      });
+      trackUse('league_connect', result.ok ? 'completed' : 'failed', {
+        props: { source_surface: 'sleeper', ...(result.ok ? {} : { reason: String(result.reason ?? 'unknown') }) },
       });
       if (result.ok) {
         // Fix 1 (welcome/signup audit): a genuine-first-run onboarding

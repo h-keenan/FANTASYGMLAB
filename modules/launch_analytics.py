@@ -152,8 +152,13 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         # the referrer (see modules.referrals / modules.referral_ui).
         "referral_sent",
         "referral_connected",
+        # Cross-platform generic feature interaction (web + mobile clients):
+        # props `feature`, `action`, optional `tier`, `platform`.
+        "feature_use",
     }
 )
+
+CLIENT_PLATFORMS: frozenset[str] = frozenset({"web", "ios", "android"})
 
 LEGACY_EVENT_ALIASES: dict[str, str] = {
     "landing_visit": "landing_viewed",
@@ -922,8 +927,13 @@ def track_page_view(
     state: MutableMapping[str, Any] | None = None,
     source_surface: str = "navigation",
     changed: bool = True,
+    extra: Mapping[str, Any] | None = None,
 ) -> bool:
-    """Page/route view with Streamlit rerun protection."""
+    """Page/route view with Streamlit rerun protection.
+
+    `extra` (e.g. {"platform": "ios"}) is merged into the generic page_view
+    props only; allowlist filtering still applies.
+    """
 
     if not changed:
         return False
@@ -946,7 +956,11 @@ def track_page_view(
     return track_event(
         "page_view",
         props=build_context_props(
-            state, route=route_key, source_surface=source_surface, league_id=league
+            state,
+            route=route_key,
+            source_surface=source_surface,
+            league_id=league,
+            extra=extra,
         ),
         once_key=f"{scope}:{hash_league_id(league)}:{route_key}",
         state=state,

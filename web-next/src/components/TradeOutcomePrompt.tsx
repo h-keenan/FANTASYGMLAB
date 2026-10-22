@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { trackUse } from "@/lib/analytics";
 import { api, type PendingTradeOutcome, type TradeOutcomeAnswer } from "@/lib/api";
 import {
   isTradeOutcomePromptDismissed,
@@ -92,6 +93,7 @@ export function TradeOutcomePrompt() {
     setAnswering(true);
     try {
       await api.answerTradeOutcome(current.id, outcome);
+      trackUse("trade_outcome_prompt", "answered", { props: { result: outcome } });
       if (outcome !== "still_pending") emitTradeOutcomeAnswered();
       setPending((prev) => (prev ? { ...prev, queue: prev.queue.filter((item) => item.id !== current.id) } : prev));
     } catch {
@@ -102,6 +104,7 @@ export function TradeOutcomePrompt() {
   };
 
   const dismiss = () => {
+    trackUse("trade_outcome_prompt", "dismissed");
     setTradeOutcomePromptDismissed();
     setDismissed(true);
   };
@@ -110,6 +113,11 @@ export function TradeOutcomePrompt() {
   // Swipe down on touch devices does the same as the close button: hide it
   // for this browser session without answering (lib/useSheetDragDismiss.ts).
   const { sheetRef, sheetStyle } = useSheetDragDismiss<HTMLElement>({ onDismiss: dismiss, enabled: visible });
+
+  const shownId = visible && current ? current.id : null;
+  useEffect(() => {
+    if (shownId) trackUse("trade_outcome_prompt", "shown");
+  }, [shownId]);
 
   if (!visible || !current) return null;
 

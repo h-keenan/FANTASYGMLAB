@@ -36,6 +36,7 @@ import {
   type ValuationLens,
 } from '../lib/api';
 import { api } from '../lib/api';
+import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
@@ -291,10 +292,28 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
             legend={isForYou ? impactLegend(colors) : undefined}
           />
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
-            <IdeaSummaryRow ideas={ideas} activeFilter={impactFilter} onToggleFilter={setImpactFilter} />
+            <IdeaSummaryRow
+              ideas={ideas}
+              activeFilter={impactFilter}
+              onToggleFilter={(next) => {
+                trackUse('trade_hub_filters', 'filter_changed', {
+                  props: { item_kind: 'impact', result: next ?? 'all' },
+                });
+                setImpactFilter(next);
+              }}
+            />
           ) : null}
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
-            <PositionFilterRow ideas={ideas} active={positionFilter} onSelect={setPositionFilter} />
+            <PositionFilterRow
+              ideas={ideas}
+              active={positionFilter}
+              onSelect={(next) => {
+                trackUse('trade_hub_filters', 'filter_changed', {
+                  props: { item_kind: 'position', result: next ?? 'all' },
+                });
+                setPositionFilter(next);
+              }}
+            />
           ) : null}
           {activeLoading ? (
             <View style={styles.skeletonWrap}>

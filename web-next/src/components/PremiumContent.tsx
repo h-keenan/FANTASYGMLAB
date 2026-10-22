@@ -1,7 +1,9 @@
 "use client";
 
 import { SectionHeading } from "@/components/SectionHeading";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { trackFeatureUse } from "@/lib/analytics";
 
 import { api, type BillingPlan } from "@/lib/api";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
@@ -35,9 +37,11 @@ export function PlanCard({
   const subscribe = async () => {
     setBusy(true);
     setError(null);
+    trackFeatureUse("premium_cta_clicked", { dedupe: false, props: { tier: plan.tier, interval: plan.interval } });
     try {
       const result = await api.startBillingCheckout(plan.tier, plan.interval, returnTo, "embedded");
       if (!result.client_secret) throw new Error("Could not start checkout.");
+      trackFeatureUse("checkout_started", { dedupe: false, props: { tier: plan.tier, interval: plan.interval } });
       setClientSecret(result.client_secret);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start checkout.");
@@ -157,6 +161,9 @@ export function PremiumContent({
   plans: BillingPlan[];
   publishableKey: string;
 }) {
+  useEffect(() => {
+    trackFeatureUse("premium_viewed", { props: { tier: entitlement === "premium" ? "pro" : "free" } });
+  }, [entitlement]);
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-6 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
