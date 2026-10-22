@@ -6,6 +6,7 @@ import { api, type QuickViewModel, type RankedPlayer, type WeeklyStatPoint } fro
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SectionHeading } from "@/components/SectionHeading";
 import { WeeklyPointsChart } from "@/components/WeeklyPointsChart";
 import {
   buildModelRows,
@@ -121,22 +122,6 @@ function TextPill({ value }: { value: string | null }) {
 function CompareTextRowView({ row, isLast }: { row: CompareTextRow; isLast: boolean }) {
   return (
     <CompareGridRow isLast={isLast} left={<TextPill value={row.a} />} center={row.label} right={<TextPill value={row.b} />} />
-  );
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 mt-2">
-      <span
-        className="uppercase font-extrabold"
-        style={{ font: "var(--type-supporting-metadata)", color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}
-      >
-        Head-to-Head
-      </span>
-      <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
-        {title}
-      </h2>
-    </div>
   );
 }
 
@@ -413,7 +398,7 @@ export function PlayerCompareContent({
           ) : null}
 
           <section className="flex flex-col gap-2">
-            <SectionHeader title="Value & Rank" />
+            <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Value & Rank</SectionHeading>
             <div className="glass-surface flex flex-col px-1">
               {valueRows.map((row, index) => (
                 <CompareRowView key={row.label} row={row} isLast={index === valueRows.length - 1} />
@@ -423,7 +408,7 @@ export function PlayerCompareContent({
 
           {showModelRows ? (
             <section className="flex flex-col gap-2">
-              <SectionHeader title="Model Breakdown" />
+              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Model Breakdown</SectionHeading>
               <div className="glass-surface flex flex-col px-1">
                 {modelRows.map((row, index) => (
                   <CompareRowView key={row.label} row={row} isLast={index === modelRows.length - 1} />
@@ -434,7 +419,7 @@ export function PlayerCompareContent({
 
           {showTrendRows ? (
             <section className="flex flex-col gap-2">
-              <SectionHeader title="Trends" />
+              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Trends</SectionHeading>
               <div className="glass-surface flex flex-col px-1">
                 {trendRows.map((row, index) => (
                   <CompareTextRowView key={row.label} row={row} isLast={index === trendRows.length - 1} />
@@ -445,14 +430,14 @@ export function PlayerCompareContent({
 
           {narrative ? (
             <section className="flex flex-col gap-2">
-              <SectionHeader title="Decision Fit" />
+              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Decision Fit</SectionHeading>
               <NarrativeBlock playerA={playerA} playerB={playerB} narrative={narrative} />
             </section>
           ) : null}
 
           {showWeeklyPoints ? (
             <section className="flex flex-col gap-2">
-              <SectionHeader title="Points By Week" />
+              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Points By Week</SectionHeading>
               <WeeklyPointsChart
                 playerAName={playerA.name || "Player A"}
                 playerBName={playerB.name || "Player B"}

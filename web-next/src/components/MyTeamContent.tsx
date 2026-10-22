@@ -1,9 +1,11 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
+import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { ValueRing } from "@/components/ValueRing";
 import {
@@ -109,41 +111,6 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
   );
 }
 
-/**
- * Recommendation-compliance audit, Check 3 follow-up — same HighlightTarget
- * treatment WaiversContent/TradeHubContent got in #1293: wraps whichever
- * roster row a GM Plan/Dashboard injury-alert or value-trend tile's CTA
- * named (?playerId=, read by the my-team page) so it scrolls into view and
- * stays visually marked once this page loads. `active` is simply false
- * whenever there's no match (stale/absent id) — renders exactly as before,
- * never breaks the page.
- */
-function HighlightTarget({ active, children }: { active: boolean; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (active && ref.current && typeof ref.current.scrollIntoView === "function") {
-      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [active]);
-  return (
-    <div
-      ref={ref}
-      data-highlighted={active ? "true" : undefined}
-      style={active ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px", borderRadius: "0.25rem" } : undefined}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
-      {children}
-    </h2>
-  );
-}
-
 export function MyTeamContent({
   leagueName,
   myTeam,
@@ -157,7 +124,7 @@ export function MyTeamContent({
   needs: MyTeamNeedsResponse | null;
   teamRanking: TeamRanking | null;
   leagueSize: number;
-  /** See HighlightTarget above — a GM Plan/Dashboard injury-alert or
+  /** See components/HighlightTarget.tsx — a GM Plan/Dashboard injury-alert or
    * value-trend tile's specific roster player, threaded through as
    * ?playerId= (gamePlanTileHref). */
   highlightPlayerId?: string;
