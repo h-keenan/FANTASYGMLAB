@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type BillingPlansResponse, type MeResponse } from "@/lib/api";
 import { PremiumContent } from "@/components/PremiumContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // First real checkout surface in web-next — every other "Upgrade" link
@@ -51,11 +52,7 @@ export default function PremiumPage() {
 
   if (error || !me || !plans) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Premium."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Premium."} onRetry={reloadPage} />
     );
   }
 

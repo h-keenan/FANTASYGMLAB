@@ -8,6 +8,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function MyTeamPage() {
@@ -103,11 +104,7 @@ export default function MyTeamPage() {
 
   if (error || !myTeam) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load My Team."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load My Team."} onRetry={reloadPage} />
     );
   }
 

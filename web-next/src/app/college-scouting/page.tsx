@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type CollegeProspectsResponse } from "@/lib/api";
 import { CollegeScoutingContent } from "@/components/CollegeScoutingContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio/News/Trade History, College Scouting has no [leagueId]
@@ -51,11 +52,7 @@ export default function CollegeScoutingPage() {
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load College Scouting."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load College Scouting."} onRetry={reloadPage} />
     );
   }
 

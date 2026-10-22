@@ -8,6 +8,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type DraftCenterResponse, type DraftPickAsset } from "@/lib/api";
 import { DraftCenterContent } from "@/components/DraftCenterContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function DraftCenterPage() {
@@ -84,11 +85,7 @@ export default function DraftCenterPage() {
 
   if (error || !draftCenter) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Draft Center."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Draft Center."} onRetry={reloadPage} />
     );
   }
 

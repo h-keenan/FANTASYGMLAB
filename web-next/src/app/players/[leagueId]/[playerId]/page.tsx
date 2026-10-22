@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PlayerProfileContent } from "@/components/PlayerProfileContent";
 
@@ -67,22 +68,14 @@ export default function PlayerProfilePage() {
 
   if (error || !rankings) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load this player's profile."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load this player's profile."} onRetry={reloadPage} />
     );
   }
 
   const player = rankings.players.find((candidate) => candidate.player_id === playerId) ?? null;
   if (!player) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          That player isn&apos;t on the current rankings board for this league.
-        </p>
-      </main>
+      <ErrorState message="That player isn't on the current rankings board for this league." />
     );
   }
 

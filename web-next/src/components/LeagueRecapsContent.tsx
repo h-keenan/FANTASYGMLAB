@@ -72,34 +72,7 @@ import {
 
 type MemoryView = "Recaps" | "History" | "Storylines";
 
-function TabBar({ active, onChange }: { active: MemoryView; onChange: (view: MemoryView) => void }) {
-  const views: MemoryView[] = ["Recaps", "History", "Storylines"];
-  return (
-    <div className="flex w-full" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
-      {views.map((view) => {
-        const isActive = view === active;
-        return (
-          <button
-            key={view}
-            type="button"
-            onClick={() => onChange(view)}
-            aria-pressed={isActive}
-            className="flex-1 py-2.5 text-xs font-bold uppercase"
-            style={{
-              letterSpacing: "var(--letter-spacing-badge)",
-              background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
-              color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
-              borderLeft: view === "Recaps" ? "none" : "var(--border-width-default) solid var(--color-border)",
-            }}
-          >
-            {view}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+const MEMORY_VIEWS: MemoryView[] = ["Recaps", "History", "Storylines"];
 
 function RecapStoryCard({
   story,
@@ -1047,7 +1020,12 @@ export function LeagueRecapsContent({
           What mattered this week, and what happened. History remains the source record.
         </p>
       </header>
-      <TabBar active={view} onChange={setView} />
+      <PillRow
+        fullWidth
+        options={MEMORY_VIEWS.map((v) => ({ label: v, value: v }))}
+        active={view}
+        onSelect={(value) => setView(value as MemoryView)}
+      />
       {body}
     </main>
   );

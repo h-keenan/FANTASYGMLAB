@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DraftPickAsset, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayersContent } from "@/components/PlayersContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 interface LoadedData {
@@ -67,11 +68,7 @@ export default function PlayersPage() {
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Players."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Players."} onRetry={reloadPage} />
     );
   }
 

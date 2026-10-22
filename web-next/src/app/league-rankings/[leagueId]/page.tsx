@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { LeagueRankingsContent } from "@/components/LeagueRankingsContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function LeagueRankingsPage() {
@@ -67,11 +68,7 @@ export default function LeagueRankingsPage() {
 
   if (error || !rankings) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load League Rankings."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load League Rankings."} onRetry={reloadPage} />
     );
   }
 

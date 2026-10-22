@@ -8,6 +8,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type WaiversResponse } from "@/lib/api";
 import { WaiversContent } from "@/components/WaiversContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function WaiversPage() {
@@ -63,11 +64,7 @@ export default function WaiversPage() {
 
   if (error || !waivers) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Waivers."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load Waivers."} onRetry={reloadPage} />
     );
   }
 

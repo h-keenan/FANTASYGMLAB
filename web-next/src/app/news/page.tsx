@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type NewsResponse } from "@/lib/api";
 import { NewsContent } from "@/components/NewsContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio, News has no [leagueId] segment — GET /v1/news is a
@@ -54,11 +55,7 @@ export default function NewsPage() {
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load News."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load News."} onRetry={reloadPage} />
     );
   }
 

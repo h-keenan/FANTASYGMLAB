@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type MatchupResponse } from "@/lib/api";
 import { MatchupContent } from "@/components/MatchupContent";
+import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function MatchupPage() {
@@ -52,11 +53,7 @@ export default function MatchupPage() {
 
   if (error || !matchup) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load this week's matchup."}
-        </p>
-      </main>
+      <ErrorState message={error || "Could not load this week's matchup."} onRetry={reloadPage} />
     );
   }
 
