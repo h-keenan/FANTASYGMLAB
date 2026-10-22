@@ -1,0 +1,5005 @@
+{
+ "generated_by": "scripts/build_college_prospects_seed.py",
+ "season": 2026,
+ "sources": {
+  "candidate_boards": [
+   "https://walterfootball.com/QBRankings2027.php",
+   "https://walterfootball.com/RBRankings2027.php",
+   "https://walterfootball.com/WRRankings2027.php",
+   "https://walterfootball.com/TERankings2027.php",
+   "https://sticktothemodel.com/draft/prospect-overview/big-board"
+  ],
+  "verification": "official school athletics-site football rosters (roster_url per row)"
+ },
+ "prospects": [
+  {
+   "id": "2027-aidan-chiles-northwestern",
+   "name": "Aidan Chiles",
+   "position": "QB",
+   "school": "Northwestern",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://nusports.com/sports/football/roster",
+   "class_source_url": "https://nusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Aidan Chiles",
+     "listed_position": "QB",
+     "listed_school": "Northwestern"
+    }
+   ]
+  },
+  {
+   "id": "2027-arch-manning-texas",
+   "name": "Arch Manning",
+   "position": "QB",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Arch Manning",
+     "listed_position": "QB",
+     "listed_school": "Texas"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Arch Manning",
+     "listed_position": "QB",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-austin-simmons-missouri",
+   "name": "Austin Simmons",
+   "position": "QB",
+   "school": "Missouri",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://mutigers.com/sports/football/roster",
+   "class_source_url": "https://mutigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Austin Simmons",
+     "listed_position": "QB",
+     "listed_school": "Missouri"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Austin Simmons",
+     "listed_position": "QB",
+     "listed_school": "Missouri"
+    }
+   ]
+  },
+  {
+   "id": "2027-avery-johnson-kansas-state",
+   "name": "Avery Johnson",
+   "position": "QB",
+   "school": "Kansas State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://www.kstatesports.com/sports/football/roster",
+   "class_source_url": "https://www.kstatesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Avery Johnson",
+     "listed_position": "QB",
+     "listed_school": "Kansas State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Avery Johnson",
+     "listed_position": "QB",
+     "listed_school": "Kansas State"
+    }
+   ]
+  },
+  {
+   "id": "2027-beau-pribula-virginia",
+   "name": "Beau Pribula",
+   "position": "QB",
+   "school": "Virginia",
+   "draft_year": 2027,
+   "roster_class": "5th Year",
+   "roster_position": "QB",
+   "roster_url": "https://virginiasports.com/sports/football/roster",
+   "class_source_url": "https://virginiasports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Beau Pribula",
+     "listed_position": "QB",
+     "listed_school": "Virginia"
+    }
+   ]
+  },
+  {
+   "id": "2027-byrum-brown-auburn",
+   "name": "Byrum Brown",
+   "position": "QB",
+   "school": "Auburn",
+   "draft_year": 2027,
+   "roster_class": "Fifth Year",
+   "roster_position": "QB",
+   "roster_url": "https://auburntigers.com/sports/football/roster",
+   "class_source_url": "https://auburntigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Byrum Brown",
+     "listed_position": "QB",
+     "listed_school": "Auburn"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Byrum Brown",
+     "listed_position": "QB",
+     "listed_school": "Auburn"
+    }
+   ]
+  },
+  {
+   "id": "2027-cj-bailey-nc-state",
+   "name": "CJ Bailey",
+   "position": "QB",
+   "school": "NC State",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "QB",
+   "roster_url": "https://gopack.com/sports/football/roster",
+   "class_source_url": "https://gopack.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "CJ Bailey",
+     "listed_position": "QB",
+     "listed_school": "NC State"
+    }
+   ]
+  },
+  {
+   "id": "2027-cj-carr-notre-dame",
+   "name": "CJ Carr",
+   "position": "QB",
+   "school": "Notre Dame",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "QB",
+   "roster_url": "https://fightingirish.com/sports/football/roster",
+   "class_source_url": "https://fightingirish.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "C.J. Carr",
+     "listed_position": "QB",
+     "listed_school": "Notre Dame"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "CJ Carr",
+     "listed_position": "QB",
+     "listed_school": "Notre Dame"
+    }
+   ]
+  },
+  {
+   "id": "2027-conner-weigman-houston",
+   "name": "Conner Weigman",
+   "position": "QB",
+   "school": "Houston",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "QB",
+   "roster_url": "https://uhcougars.com/sports/football/roster",
+   "class_source_url": "https://uhcougars.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Conner Weigman",
+     "listed_position": "QB",
+     "listed_school": "Houston"
+    }
+   ]
+  },
+  {
+   "id": "2027-dante-moore-oregon",
+   "name": "Dante Moore",
+   "position": "QB",
+   "school": "Oregon",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://goducks.com/sports/football/roster",
+   "class_source_url": "https://goducks.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Dante Moore",
+     "listed_position": "QB",
+     "listed_school": "Oregon"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Dante Moore",
+     "listed_position": "QB",
+     "listed_school": "Oregon"
+    }
+   ]
+  },
+  {
+   "id": "2027-darian-mensah-miami-fl",
+   "name": "Darian Mensah",
+   "position": "QB",
+   "school": "Miami (FL)",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Junior",
+   "roster_position": "Quarterback",
+   "roster_url": "https://miamihurricanes.com/sports/football/roster",
+   "class_source_url": "https://miamihurricanes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Darian Mensah",
+     "listed_position": "QB",
+     "listed_school": "Miami (FL)"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Darian Mensah",
+     "listed_position": "QB",
+     "listed_school": "Miami (FL)"
+    }
+   ]
+  },
+  {
+   "id": "2027-davis-warren-stanford",
+   "name": "Davis Warren",
+   "position": "QB",
+   "school": "Stanford",
+   "draft_year": 2027,
+   "roster_class": "Sixth Year",
+   "roster_position": "QB",
+   "roster_url": "https://gostanford.com/sports/football/roster",
+   "class_source_url": "https://gostanford.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Davis Warren",
+     "listed_position": "QB",
+     "listed_school": "Stanford"
+    }
+   ]
+  },
+  {
+   "id": "2027-demond-williams-jr-washington",
+   "name": "Demond Williams Jr.",
+   "position": "QB",
+   "school": "Washington",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "QB",
+   "roster_url": "https://gohuskies.com/sports/football/roster",
+   "class_source_url": "https://gohuskies.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Demond Williams",
+     "listed_position": "QB",
+     "listed_school": "Washington"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Demond Williams Jr",
+     "listed_position": "QB",
+     "listed_school": "Washington"
+    }
+   ]
+  },
+  {
+   "id": "2027-devon-dampier-utah",
+   "name": "Devon Dampier",
+   "position": "QB",
+   "school": "Utah",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://utahutes.com/sports/football/roster",
+   "class_source_url": "https://utahutes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Devon Dampier",
+     "listed_position": "QB",
+     "listed_school": "Utah"
+    }
+   ]
+  },
+  {
+   "id": "2027-dj-lagway-baylor",
+   "name": "DJ Lagway",
+   "position": "QB",
+   "school": "Baylor",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "QB",
+   "roster_url": "https://baylorbears.com/sports/football/roster",
+   "class_source_url": "https://baylorbears.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "D.J. Lagway",
+     "listed_position": "QB",
+     "listed_school": "Baylor"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "DJ Lagway",
+     "listed_position": "QB",
+     "listed_school": "Baylor"
+    }
+   ]
+  },
+  {
+   "id": "2027-drake-lindsey-minnesota",
+   "name": "Drake Lindsey",
+   "position": "QB",
+   "school": "Minnesota",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "QB",
+   "roster_url": "https://gophersports.com/sports/football/roster",
+   "class_source_url": "https://gophersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Drake Lindsey",
+     "listed_position": "QB",
+     "listed_school": "Minnesota"
+    }
+   ]
+  },
+  {
+   "id": "2027-drew-mestemaker-oklahoma-state",
+   "name": "Drew Mestemaker",
+   "position": "QB",
+   "school": "Oklahoma State",
+   "draft_year": 2027,
+   "roster_class": "R-So.",
+   "roster_position": "QB",
+   "roster_url": "https://okstate.com/sports/football/roster",
+   "class_source_url": "https://okstate.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Drew Mestemaker",
+     "listed_position": "QB",
+     "listed_school": "Oklahoma State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Drew Mestemaker",
+     "listed_position": "QB",
+     "listed_school": "Oklahoma State"
+    }
+   ]
+  },
+  {
+   "id": "2027-gunner-stockton-georgia",
+   "name": "Gunner Stockton",
+   "position": "QB",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "QB",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Gunner Stockton",
+     "listed_position": "QB",
+     "listed_school": "Georgia"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Gunner Stockton",
+     "listed_position": "QB",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-jackson-arnold-unlv",
+   "name": "Jackson Arnold",
+   "position": "QB",
+   "school": "UNLV",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://unlvrebels.com/sports/football/roster",
+   "class_source_url": "https://unlvrebels.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Jackson Arnold",
+     "listed_position": "QB",
+     "listed_school": "UNLV"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jackson Arnold",
+     "listed_position": "QB",
+     "listed_school": "UNLV"
+    }
+   ]
+  },
+  {
+   "id": "2027-jaden-craig-tcu",
+   "name": "Jaden Craig",
+   "position": "QB",
+   "school": "TCU",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "QB",
+   "roster_url": "https://gofrogs.com/sports/football/roster",
+   "class_source_url": "https://gofrogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jaden Craig",
+     "listed_position": "QB",
+     "listed_school": "TCU"
+    }
+   ]
+  },
+  {
+   "id": "2027-jayden-maiava-usc",
+   "name": "Jayden Maiava",
+   "position": "QB",
+   "school": "USC",
+   "draft_year": 2027,
+   "roster_class": "R-Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://usctrojans.com/sports/football/roster",
+   "class_source_url": "https://usctrojans.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Jayden Maiava",
+     "listed_position": "QB",
+     "listed_school": "USC"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jayden Maiava",
+     "listed_position": "QB",
+     "listed_school": "USC"
+    }
+   ]
+  },
+  {
+   "id": "2027-john-mateer-oklahoma",
+   "name": "John Mateer",
+   "position": "QB",
+   "school": "Oklahoma",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "QB",
+   "roster_url": "https://soonersports.com/sports/football/roster",
+   "class_source_url": "https://soonersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "John Mateer",
+     "listed_position": "QB",
+     "listed_school": "Oklahoma"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "John Mateer",
+     "listed_position": "QB",
+     "listed_school": "Oklahoma"
+    }
+   ]
+  },
+  {
+   "id": "2027-josh-hoover-indiana",
+   "name": "Josh Hoover",
+   "position": "QB",
+   "school": "Indiana",
+   "draft_year": 2027,
+   "roster_class": "Gr.",
+   "roster_position": "QB",
+   "roster_url": "https://iuhoosiers.com/sports/football/roster",
+   "class_source_url": "https://iuhoosiers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Josh Hoover",
+     "listed_position": "QB",
+     "listed_school": "Indiana"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Josh Hoover",
+     "listed_position": "QB",
+     "listed_school": "Indiana"
+    }
+   ]
+  },
+  {
+   "id": "2027-julian-sayin-ohio-state",
+   "name": "Julian Sayin",
+   "position": "QB",
+   "school": "Ohio State",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "QB",
+   "roster_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "class_source_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Julian Sayin",
+     "listed_position": "QB",
+     "listed_school": "Ohio State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Julian Sayin",
+     "listed_position": "QB",
+     "listed_school": "Ohio State"
+    }
+   ]
+  },
+  {
+   "id": "2027-katin-houser-illinois",
+   "name": "Katin Houser",
+   "position": "QB",
+   "school": "Illinois",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "QB",
+   "roster_url": "https://fightingillini.com/sports/football/roster",
+   "class_source_url": "https://fightingillini.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Katin Houser",
+     "listed_position": "QB",
+     "listed_school": "Illinois"
+    }
+   ]
+  },
+  {
+   "id": "2027-kevin-jennings-smu",
+   "name": "Kevin Jennings",
+   "position": "QB",
+   "school": "SMU",
+   "draft_year": 2027,
+   "roster_class": "5TH YR",
+   "roster_position": "QB",
+   "roster_url": "https://smumustangs.com/sports/football/roster",
+   "class_source_url": "https://smumustangs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Kevin Jennings",
+     "listed_position": "QB",
+     "listed_school": "SMU"
+    }
+   ]
+  },
+  {
+   "id": "2027-lanorris-sellers-south-carolina",
+   "name": "LaNorris Sellers",
+   "position": "QB",
+   "school": "South Carolina",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "QB",
+   "roster_url": "https://gamecocksonline.com/sports/football/roster/",
+   "class_source_url": "https://gamecocksonline.com/sports/football/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "LaNorris Sellers",
+     "listed_position": "QB",
+     "listed_school": "South Carolina"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "LaNorris Sellers",
+     "listed_position": "QB",
+     "listed_school": "South Carolina"
+    }
+   ]
+  },
+  {
+   "id": "2027-marcel-reed-texas-a-and-m",
+   "name": "Marcel Reed",
+   "position": "QB",
+   "school": "Texas A&M",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://12thman.com/sports/football/roster",
+   "class_source_url": "https://12thman.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Marcel Reed",
+     "listed_position": "QB",
+     "listed_school": "Texas A&M"
+    }
+   ]
+  },
+  {
+   "id": "2027-nico-iamaleava-ucla",
+   "name": "Nico Iamaleava",
+   "position": "QB",
+   "school": "UCLA",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "QB",
+   "roster_url": "https://uclabruins.com/sports/football/roster",
+   "class_source_url": "https://uclabruins.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Nico Iamaleava",
+     "listed_position": "QB",
+     "listed_school": "UCLA"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Nico Iamaleava",
+     "listed_position": "QB",
+     "listed_school": "UCLA"
+    }
+   ]
+  },
+  {
+   "id": "2027-noah-fifita-arizona",
+   "name": "Noah Fifita",
+   "position": "QB",
+   "school": "Arizona",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "QB",
+   "roster_url": "https://arizonawildcats.com/sports/football/roster",
+   "class_source_url": "https://arizonawildcats.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Noah Fifita",
+     "listed_position": "QB",
+     "listed_school": "Arizona"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Noah Fifita",
+     "listed_position": "QB",
+     "listed_school": "Arizona"
+    }
+   ]
+  },
+  {
+   "id": "2027-rocco-becht-penn-state",
+   "name": "Rocco Becht",
+   "position": "QB",
+   "school": "Penn State",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Senior",
+   "roster_position": "QB",
+   "roster_url": "https://gopsusports.com/sports/football/roster",
+   "class_source_url": "https://gopsusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Rocco Becht",
+     "listed_position": "QB",
+     "listed_school": "Penn State"
+    }
+   ]
+  },
+  {
+   "id": "2027-sam-leavitt-lsu",
+   "name": "Sam Leavitt",
+   "position": "QB",
+   "school": "LSU",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Junior",
+   "roster_position": "Quarterback",
+   "roster_url": "https://lsusports.net/sports/fb/roster",
+   "class_source_url": "https://lsusports.net/sports/fb/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Sam Leavitt",
+     "listed_position": "QB",
+     "listed_school": "LSU"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Sam Leavitt",
+     "listed_position": "QB",
+     "listed_school": "LSU"
+    }
+   ]
+  },
+  {
+   "id": "2027-trinidad-chambliss-ole-miss",
+   "name": "Trinidad Chambliss",
+   "position": "QB",
+   "school": "Ole Miss",
+   "draft_year": 2027,
+   "roster_class": "5th+",
+   "roster_position": "QB",
+   "roster_url": "https://olemisssports.com/sports/football/roster",
+   "class_source_url": "https://olemisssports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_qb",
+     "url": "https://walterfootball.com/QBRankings2027.php",
+     "listed_name": "Trinidad Chambliss",
+     "listed_position": "QB",
+     "listed_school": "Ole Miss"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Trinidad Chambliss",
+     "listed_position": "QB",
+     "listed_school": "Ole Miss"
+    }
+   ]
+  },
+  {
+   "id": "2027-abu-sama-iii-wisconsin",
+   "name": "Abu Sama III",
+   "position": "RB",
+   "school": "Wisconsin",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://uwbadgers.com/sports/football/roster",
+   "class_source_url": "https://uwbadgers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Abu Sama III",
+     "listed_position": "RB",
+     "listed_school": "Wisconsin"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Abu Sama III",
+     "listed_position": "RB",
+     "listed_school": "Wisconsin"
+    }
+   ]
+  },
+  {
+   "id": "2027-adam-mohammed-california",
+   "name": "Adam Mohammed",
+   "position": "RB",
+   "school": "California",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://calbears.com/sports/football/roster",
+   "class_source_url": "https://calbears.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Adam Mohammed",
+     "listed_position": "RB",
+     "listed_school": "California"
+    }
+   ]
+  },
+  {
+   "id": "2027-ahmad-hardy-missouri",
+   "name": "Ahmad Hardy",
+   "position": "RB",
+   "school": "Missouri",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://mutigers.com/sports/football/roster",
+   "class_source_url": "https://mutigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Ahmad Hardy",
+     "listed_position": "RB",
+     "listed_school": "Missouri"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Ahmad Hardy",
+     "listed_position": "RB",
+     "listed_school": "Missouri"
+    }
+   ]
+  },
+  {
+   "id": "2027-aidan-laughery-illinois",
+   "name": "Aidan Laughery",
+   "position": "RB",
+   "school": "Illinois",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "RB",
+   "roster_url": "https://fightingillini.com/sports/football/roster",
+   "class_source_url": "https://fightingillini.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Aidan Laughery",
+     "listed_position": "RB",
+     "listed_school": "Illinois"
+    }
+   ]
+  },
+  {
+   "id": "2027-aneyas-williams-notre-dame",
+   "name": "Aneyas Williams",
+   "position": "RB",
+   "school": "Notre Dame",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "RB",
+   "roster_url": "https://fightingirish.com/sports/football/roster",
+   "class_source_url": "https://fightingirish.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Aneyas Williams",
+     "listed_position": "RB",
+     "listed_school": "Notre Dame"
+    }
+   ]
+  },
+  {
+   "id": "2027-antwan-raymond-rutgers",
+   "name": "Antwan Raymond",
+   "position": "RB",
+   "school": "Rutgers",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://scarletknights.com/sports/football/roster",
+   "class_source_url": "https://scarletknights.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Antwan Raymond",
+     "listed_position": "RB",
+     "listed_school": "Rutgers"
+    }
+   ]
+  },
+  {
+   "id": "2027-bryson-washington-auburn",
+   "name": "Bryson Washington",
+   "position": "RB",
+   "school": "Auburn",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "RB",
+   "roster_url": "https://auburntigers.com/sports/football/roster",
+   "class_source_url": "https://auburntigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Bryson Washington",
+     "listed_position": "RB",
+     "listed_school": "Auburn"
+    }
+   ]
+  },
+  {
+   "id": "2027-caden-durham-lsu",
+   "name": "Caden Durham",
+   "position": "RB",
+   "school": "LSU",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "Running Back",
+   "roster_url": "https://lsusports.net/sports/fb/roster",
+   "class_source_url": "https://lsusports.net/sports/fb/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Caden Durham",
+     "listed_position": "RB",
+     "listed_school": "LSU"
+    }
+   ]
+  },
+  {
+   "id": "2027-cam-cook-west-virginia",
+   "name": "Cam Cook",
+   "position": "RB",
+   "school": "West Virginia",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://wvusports.com/sports/football/roster",
+   "class_source_url": "https://wvusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Cam Cook",
+     "listed_position": "RB",
+     "listed_school": "West Virginia"
+    }
+   ]
+  },
+  {
+   "id": "2027-cam-edwards-michigan-state",
+   "name": "Cam Edwards",
+   "position": "RB",
+   "school": "Michigan State",
+   "draft_year": 2027,
+   "roster_class": "R-Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://msuspartans.com/sports/football/roster",
+   "class_source_url": "https://msuspartans.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Cam Edwards",
+     "listed_position": "RB",
+     "listed_school": "Michigan State"
+    }
+   ]
+  },
+  {
+   "id": "2027-carson-hansen-penn-state",
+   "name": "Carson Hansen",
+   "position": "RB",
+   "school": "Penn State",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "RB",
+   "roster_url": "https://gopsusports.com/sports/football/roster",
+   "class_source_url": "https://gopsusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Carson Hansen",
+     "listed_position": "RB",
+     "listed_school": "Penn State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Carson Hansen",
+     "listed_position": "RB",
+     "listed_school": "Penn State"
+    }
+   ]
+  },
+  {
+   "id": "2027-chauncey-bowens-georgia",
+   "name": "Chauncey Bowens",
+   "position": "RB",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chauncey Bowens",
+     "listed_position": "RB",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-cj-baxter-kentucky",
+   "name": "CJ Baxter",
+   "position": "RB",
+   "school": "Kentucky",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "Running Back -",
+   "roster_url": "https://ukathletics.com/sports/football/roster/",
+   "class_source_url": "https://ukathletics.com/sports/football/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "CJ Baxter",
+     "listed_position": "RB",
+     "listed_school": "Kentucky"
+    }
+   ]
+  },
+  {
+   "id": "2027-daniel-hill-alabama",
+   "name": "Daniel Hill",
+   "position": "RB",
+   "school": "Alabama",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://rolltide.com/sports/football/roster",
+   "class_source_url": "https://rolltide.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Daniel Hill",
+     "listed_position": "RB",
+     "listed_school": "Alabama"
+    }
+   ]
+  },
+  {
+   "id": "2027-dante-dowdell-georgia",
+   "name": "Dante Dowdell",
+   "position": "RB",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Dante Dowdell",
+     "listed_position": "RB",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-darius-taylor-minnesota",
+   "name": "Darius Taylor",
+   "position": "RB",
+   "school": "Minnesota",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://gophersports.com/sports/football/roster",
+   "class_source_url": "https://gophersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Darius Taylor",
+     "listed_position": "RB",
+     "listed_school": "Minnesota"
+    }
+   ]
+  },
+  {
+   "id": "2027-desean-bishop-tennessee",
+   "name": "DeSean Bishop",
+   "position": "RB",
+   "school": "Tennessee",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://utsports.com/sports/football/roster",
+   "class_source_url": "https://utsports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "DeSean Bishop",
+     "listed_position": "RB",
+     "listed_school": "Tennessee"
+    }
+   ]
+  },
+  {
+   "id": "2027-dilin-jones-lsu",
+   "name": "Dilin Jones",
+   "position": "RB",
+   "school": "LSU",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Sophomore",
+   "roster_position": "Running Back",
+   "roster_url": "https://lsusports.net/sports/fb/roster",
+   "class_source_url": "https://lsusports.net/sports/fb/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Dillin Jones",
+     "listed_position": "RB",
+     "listed_school": "LSU"
+    }
+   ]
+  },
+  {
+   "id": "2027-dwight-phillips-jr-georgia",
+   "name": "Dwight Phillips, Jr.",
+   "position": "RB",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Dwight Phillips Jr",
+     "listed_position": "RB",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-dylan-riley-boise-state",
+   "name": "Dylan Riley",
+   "position": "RB",
+   "school": "Boise State",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://broncosports.com/sports/football/roster",
+   "class_source_url": "https://broncosports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Dylan Riley",
+     "listed_position": "RB",
+     "listed_school": "Boise State"
+    }
+   ]
+  },
+  {
+   "id": "2027-fluff-bothwell-mississippi-state",
+   "name": "Fluff Bothwell",
+   "position": "RB",
+   "school": "Mississippi State",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://hailstate.com/sports/football/roster",
+   "class_source_url": "https://hailstate.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Fluff Bothwell",
+     "listed_position": "RB",
+     "listed_school": "Mississippi State"
+    }
+   ]
+  },
+  {
+   "id": "2027-hollywood-smothers-texas",
+   "name": "Hollywood Smothers",
+   "position": "RB",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Hollywood Smothers",
+     "listed_position": "RB",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-isaac-brown-louisville",
+   "name": "Isaac Brown",
+   "position": "RB",
+   "school": "Louisville",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://gocards.com/sports/football/roster",
+   "class_source_url": "https://gocards.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Isaac Brown",
+     "listed_position": "RB",
+     "listed_school": "Louisville"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Isaac Brown",
+     "listed_position": "RB",
+     "listed_school": "Louisville"
+    }
+   ]
+  },
+  {
+   "id": "2027-jadan-baugh-florida",
+   "name": "Jadan Baugh",
+   "position": "RB",
+   "school": "Florida",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://floridagators.com/sports/football/roster",
+   "class_source_url": "https://floridagators.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Jadan Baugh",
+     "listed_position": "RB",
+     "listed_school": "Florida"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jadan Baugh",
+     "listed_position": "RB",
+     "listed_school": "Florida"
+    }
+   ]
+  },
+  {
+   "id": "2027-jahiem-white-north-texas",
+   "name": "Jahiem White",
+   "position": "RB",
+   "school": "North Texas",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://meangreensports.com/sports/football/roster",
+   "class_source_url": "https://meangreensports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jahiem White",
+     "listed_position": "RB",
+     "listed_school": "North Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-jaiden-thomas-unlv",
+   "name": "Jai'Den Thomas",
+   "position": "RB",
+   "school": "UNLV",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://unlvrebels.com/sports/football/roster",
+   "class_source_url": "https://unlvrebels.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jai'Den Thomas",
+     "listed_position": "RB",
+     "listed_school": "UNLV"
+    }
+   ]
+  },
+  {
+   "id": "2027-jamal-roberts-missouri",
+   "name": "Jamal Roberts",
+   "position": "RB",
+   "school": "Missouri",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://mutigers.com/sports/football/roster",
+   "class_source_url": "https://mutigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Jamal Roberts",
+     "listed_position": "RB",
+     "listed_school": "Missouri"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jamal Roberts",
+     "listed_position": "RB",
+     "listed_school": "Missouri"
+    }
+   ]
+  },
+  {
+   "id": "2027-jeremiah-cobb-auburn",
+   "name": "Jeremiah Cobb",
+   "position": "RB",
+   "school": "Auburn",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "RB",
+   "roster_url": "https://auburntigers.com/sports/football/roster",
+   "class_source_url": "https://auburntigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jeremiah Cobb",
+     "listed_position": "RB",
+     "listed_school": "Auburn"
+    }
+   ]
+  },
+  {
+   "id": "2027-jeremy-payne-tcu",
+   "name": "Jeremy Payne",
+   "position": "RB",
+   "school": "TCU",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://gofrogs.com/sports/football/roster",
+   "class_source_url": "https://gofrogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jeremy Payne",
+     "listed_position": "RB",
+     "listed_school": "TCU"
+    }
+   ]
+  },
+  {
+   "id": "2027-jkoby-williams-texas-tech",
+   "name": "J'Koby Williams",
+   "position": "RB",
+   "school": "Texas Tech",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://texastech.com/sports/football/roster",
+   "class_source_url": "https://texastech.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "J'Koby Williams",
+     "listed_position": "RB",
+     "listed_school": "Texas Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-joe-jackson-kansas-state",
+   "name": "Joe Jackson",
+   "position": "RB",
+   "school": "Kansas State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://www.kstatesports.com/sports/football/roster",
+   "class_source_url": "https://www.kstatesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Joe Jackson",
+     "listed_position": "RB",
+     "listed_school": "Kansas State"
+    }
+   ]
+  },
+  {
+   "id": "2027-jordan-marshall-michigan",
+   "name": "Jordan Marshall",
+   "position": "RB",
+   "school": "Michigan",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://mgoblue.com/sports/football/roster",
+   "class_source_url": "https://mgoblue.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jordan Marshall",
+     "listed_position": "RB",
+     "listed_school": "Michigan"
+    }
+   ]
+  },
+  {
+   "id": "2027-joseph-himon-ii-northwestern",
+   "name": "Joseph Himon II",
+   "position": "RB",
+   "school": "Northwestern",
+   "draft_year": 2027,
+   "roster_class": "Gr.",
+   "roster_position": "RB",
+   "roster_url": "https://nusports.com/sports/football/roster",
+   "class_source_url": "https://nusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Joseph Himon II",
+     "listed_position": "RB",
+     "listed_school": "Northwestern"
+    }
+   ]
+  },
+  {
+   "id": "2027-justice-haynes-georgia-tech",
+   "name": "Justice Haynes",
+   "position": "RB",
+   "school": "Georgia Tech",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "RB",
+   "roster_url": "https://ramblinwreck.com/sports/m-footbl/roster",
+   "class_source_url": "https://ramblinwreck.com/sports/m-footbl/roster/season/2026-27/player/justice-haynes",
+   "roster_season": 2026,
+   "roster_parse": "nuxt+profile",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Justice Haynes",
+     "listed_position": "RB",
+     "listed_school": "Georgia Tech"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Justice Haynes",
+     "listed_position": "RB",
+     "listed_school": "Georgia Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-kamari-moulton-iowa",
+   "name": "Kamari Moulton",
+   "position": "RB",
+   "school": "Iowa",
+   "draft_year": 2027,
+   "roster_class": "4th",
+   "roster_position": "RB",
+   "roster_url": "https://hawkeyesports.com/sports/football/roster",
+   "class_source_url": "https://hawkeyesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Kamari Moulton",
+     "listed_position": "RB",
+     "listed_school": "Iowa"
+    }
+   ]
+  },
+  {
+   "id": "2027-kenji-christian-uconn",
+   "name": "Kenji Christian",
+   "position": "RB",
+   "school": "UConn",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://uconnhuskies.com/sports/football/roster",
+   "class_source_url": "https://uconnhuskies.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Kenji Christian",
+     "listed_position": "RB",
+     "listed_school": "UConn"
+    }
+   ]
+  },
+  {
+   "id": "2027-kewan-lacy-ole-miss",
+   "name": "Kewan Lacy",
+   "position": "RB",
+   "school": "Ole Miss",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://olemisssports.com/sports/football/roster",
+   "class_source_url": "https://olemisssports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Kewan Lacy",
+     "listed_position": "RB",
+     "listed_school": "Ole Miss"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Kewan Lacy",
+     "listed_position": "RB",
+     "listed_school": "Ole Miss"
+    }
+   ]
+  },
+  {
+   "id": "2027-keyjuan-brown-louisville",
+   "name": "Keyjuan Brown",
+   "position": "RB",
+   "school": "Louisville",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://gocards.com/sports/football/roster",
+   "class_source_url": "https://gocards.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Keyjuan Brown",
+     "listed_position": "RB",
+     "listed_school": "Louisville"
+    }
+   ]
+  },
+  {
+   "id": "2027-king-miller-usc",
+   "name": "King Miller",
+   "position": "RB",
+   "school": "USC",
+   "draft_year": 2027,
+   "roster_class": "R-So.",
+   "roster_position": "RB",
+   "roster_url": "https://usctrojans.com/sports/football/roster",
+   "class_source_url": "https://usctrojans.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "King Miller",
+     "listed_position": "RB",
+     "listed_school": "USC"
+    }
+   ]
+  },
+  {
+   "id": "2027-lee-beebe-jr-indiana",
+   "name": "Lee Beebe Jr.",
+   "position": "RB",
+   "school": "Indiana",
+   "draft_year": 2027,
+   "roster_class": "R-Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://iuhoosiers.com/sports/football/roster",
+   "class_source_url": "https://iuhoosiers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Lee Beebe Jr",
+     "listed_position": "RB",
+     "listed_school": "Indiana"
+    }
+   ]
+  },
+  {
+   "id": "2027-lj-martin-byu",
+   "name": "LJ Martin",
+   "position": "RB",
+   "school": "BYU",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "Running Back",
+   "roster_url": "https://byucougars.com/sports/football/roster",
+   "class_source_url": "https://byucougars.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "L.J. Martin",
+     "listed_position": "RB",
+     "listed_school": "BYU"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "LJ Martin",
+     "listed_position": "RB",
+     "listed_school": "BYU"
+    }
+   ]
+  },
+  {
+   "id": "2027-makhi-hughes-houston",
+   "name": "Makhi Hughes",
+   "position": "RB",
+   "school": "Houston",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://uhcougars.com/sports/football/roster",
+   "class_source_url": "https://uhcougars.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Makhi Hughes",
+     "listed_position": "RB",
+     "listed_school": "Oregon"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Makhi Hughes",
+     "listed_position": "RB",
+     "listed_school": "Houston"
+    }
+   ]
+  },
+  {
+   "id": "2027-malachi-hosley-georgia-tech",
+   "name": "Malachi Hosley",
+   "position": "RB",
+   "school": "Georgia Tech",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "RB",
+   "roster_url": "https://ramblinwreck.com/sports/m-footbl/roster",
+   "class_source_url": "https://ramblinwreck.com/sports/m-footbl/roster/season/2026-27/player/malachi-hosley",
+   "roster_season": 2026,
+   "roster_parse": "nuxt+profile",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Malachi Hosley",
+     "listed_position": "RB",
+     "listed_school": "Georgia Tech"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Malachi Hosley",
+     "listed_position": "RB",
+     "listed_school": "Georgia Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-marcellous-hawkins-jr-virginia-tech",
+   "name": "Marcellous Hawkins, Jr.",
+   "position": "RB",
+   "school": "Virginia Tech",
+   "draft_year": 2027,
+   "roster_class": "Fifth Year",
+   "roster_position": "RB",
+   "roster_url": "https://hokiesports.com/sports/football/roster",
+   "class_source_url": "https://hokiesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Marcellous Hawkins",
+     "listed_position": "RB",
+     "listed_school": "Virginia Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-mark-fletcher-jr-miami-fl",
+   "name": "Mark Fletcher Jr.",
+   "position": "RB",
+   "school": "Miami (FL)",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "Running Back",
+   "roster_url": "https://miamihurricanes.com/sports/football/roster",
+   "class_source_url": "https://miamihurricanes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Mark Fletcher Jr.",
+     "listed_position": "RB",
+     "listed_school": "Miami (FL)"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Mark Fletcher Jr",
+     "listed_position": "RB",
+     "listed_school": "Miami (FL)"
+    }
+   ]
+  },
+  {
+   "id": "2027-nate-frazier-georgia",
+   "name": "Nate Frazier",
+   "position": "RB",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Nate Frazier",
+     "listed_position": "RB",
+     "listed_school": "Georgia"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Nate Frazier",
+     "listed_position": "RB",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-quintrevion-wisner-florida-state",
+   "name": "Quintrevion Wisner",
+   "position": "RB",
+   "school": "Florida State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://seminoles.com/sports/football/roster",
+   "class_source_url": "https://seminoles.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Quintrevion Wisner",
+     "listed_position": "RB",
+     "listed_school": "Florida State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Quintrevion Wisner",
+     "listed_position": "RB",
+     "listed_school": "Florida State"
+    }
+   ]
+  },
+  {
+   "id": "2027-raleek-brown-texas",
+   "name": "Raleek Brown",
+   "position": "RB",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "RB",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Raleek Brown",
+     "listed_position": "RB",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-rayshon-luke-fresno-state",
+   "name": "Rayshon Luke",
+   "position": "RB",
+   "school": "Fresno State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://gobulldogs.com/sports/football/roster",
+   "class_source_url": "https://gobulldogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Rayshon Luke",
+     "listed_position": "RB",
+     "listed_school": "Fresno State"
+    }
+   ]
+  },
+  {
+   "id": "2027-richard-young-colorado",
+   "name": "Richard Young",
+   "position": "RB",
+   "school": "Colorado",
+   "draft_year": 2027,
+   "roster_class": "4th",
+   "roster_position": "RB",
+   "roster_url": "https://cubuffs.com/sports/football/roster",
+   "class_source_url": "https://cubuffs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Richard Young",
+     "listed_position": "RB",
+     "listed_school": "Colorado"
+    }
+   ]
+  },
+  {
+   "id": "2027-sutton-smith-arkansas",
+   "name": "Sutton Smith",
+   "position": "RB",
+   "school": "Arkansas",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "RB",
+   "roster_url": "https://arkansasrazorbacks.com/sport/m-footbl/roster/",
+   "class_source_url": "https://arkansasrazorbacks.com/sport/m-footbl/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Sutton Smith",
+     "listed_position": "RB",
+     "listed_school": "Arkansas"
+    }
+   ]
+  },
+  {
+   "id": "2027-turbo-richard-indiana",
+   "name": "Turbo Richard",
+   "position": "RB",
+   "school": "Indiana",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "RB",
+   "roster_url": "https://iuhoosiers.com/sports/football/roster",
+   "class_source_url": "https://iuhoosiers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Turbo Richard",
+     "listed_position": "RB",
+     "listed_school": "Indiana"
+    }
+   ]
+  },
+  {
+   "id": "2027-waymond-jordan-usc",
+   "name": "Waymond Jordan",
+   "position": "RB",
+   "school": "USC",
+   "draft_year": 2027,
+   "roster_class": "R-Sr.",
+   "roster_position": "RB",
+   "roster_url": "https://usctrojans.com/sports/football/roster",
+   "class_source_url": "https://usctrojans.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Waymond Jordan",
+     "listed_position": "RB",
+     "listed_school": "USC"
+    }
+   ]
+  },
+  {
+   "id": "2027-wayne-knight-ucla",
+   "name": "Wayne Knight",
+   "position": "RB",
+   "school": "UCLA",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "RB",
+   "roster_url": "https://uclabruins.com/sports/football/roster",
+   "class_source_url": "https://uclabruins.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Wayne Knight",
+     "listed_position": "RB",
+     "listed_school": "UCLA"
+    }
+   ]
+  },
+  {
+   "id": "2027-wayshawn-parker-utah",
+   "name": "Wayshawn Parker",
+   "position": "RB",
+   "school": "Utah",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "RB",
+   "roster_url": "https://utahutes.com/sports/football/roster",
+   "class_source_url": "https://utahutes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_rb",
+     "url": "https://walterfootball.com/RBRankings2027.php",
+     "listed_name": "Wayshawn Parker",
+     "listed_position": "RB",
+     "listed_school": "Utah"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Wayshawn Parker",
+     "listed_position": "RB",
+     "listed_school": "Utah"
+    }
+   ]
+  },
+  {
+   "id": "2027-andrew-rappleyea-penn-state",
+   "name": "Andrew Rappleyea",
+   "position": "TE",
+   "school": "Penn State",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Junior",
+   "roster_position": "TE",
+   "roster_url": "https://gopsusports.com/sports/football/roster",
+   "class_source_url": "https://gopsusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Andrew Rappleyea",
+     "listed_position": "TE",
+     "listed_school": "Penn State"
+    }
+   ]
+  },
+  {
+   "id": "2027-arlis-boardingham-auburn",
+   "name": "Arlis Boardingham",
+   "position": "TE",
+   "school": "Auburn",
+   "draft_year": 2027,
+   "roster_class": "Fifth Year",
+   "roster_position": "TE",
+   "roster_url": "https://auburntigers.com/sports/football/roster",
+   "class_source_url": "https://auburntigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Arlis Boardingham",
+     "listed_position": "TE",
+     "listed_school": "Auburn"
+    }
+   ]
+  },
+  {
+   "id": "2027-benjamin-brahmer-penn-state",
+   "name": "Benjamin Brahmer",
+   "position": "TE",
+   "school": "Penn State",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "TE",
+   "roster_url": "https://gopsusports.com/sports/football/roster",
+   "class_source_url": "https://gopsusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Benjamin Brahmer",
+     "listed_position": "TE",
+     "listed_school": "Penn State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Benjamin Brahmer",
+     "listed_position": "TE",
+     "listed_school": "Penn State"
+    }
+   ]
+  },
+  {
+   "id": "2027-brett-norfleet-missouri",
+   "name": "Brett Norfleet",
+   "position": "TE",
+   "school": "Missouri",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://mutigers.com/sports/football/roster",
+   "class_source_url": "https://mutigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Brett Norfleet",
+     "listed_position": "TE",
+     "listed_school": "Missouri"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Brett Norfleet",
+     "listed_position": "TE",
+     "listed_school": "Missouri"
+    }
+   ]
+  },
+  {
+   "id": "2027-brody-foley-louisville",
+   "name": "Brody Foley",
+   "position": "TE",
+   "school": "Louisville",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://gocards.com/sports/football/roster",
+   "class_source_url": "https://gocards.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Brody Foley",
+     "listed_position": "TE",
+     "listed_school": "Louisville"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Brody Foley",
+     "listed_position": "TE",
+     "listed_school": "Louisville"
+    }
+   ]
+  },
+  {
+   "id": "2027-caleb-odom-ole-miss",
+   "name": "Caleb Odom",
+   "position": "TE",
+   "school": "Ole Miss",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "TE",
+   "roster_url": "https://olemisssports.com/sports/football/roster",
+   "class_source_url": "https://olemisssports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Caleb Odom",
+     "listed_position": "TE",
+     "listed_school": "Ole Miss"
+    }
+   ]
+  },
+  {
+   "id": "2027-chris-corbo-georgia-tech",
+   "name": "Chris Corbo",
+   "position": "TE",
+   "school": "Georgia Tech",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://ramblinwreck.com/sports/m-footbl/roster",
+   "class_source_url": "https://ramblinwreck.com/sports/m-footbl/roster/season/2026-27/player/chris-corbo",
+   "roster_season": 2026,
+   "roster_parse": "nuxt+profile",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chris Corbo",
+     "listed_position": "TE",
+     "listed_school": "Georgia Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-cooper-flanagan-notre-dame",
+   "name": "Cooper Flanagan",
+   "position": "TE",
+   "school": "Notre Dame",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "TE",
+   "roster_url": "https://fightingirish.com/sports/football/roster",
+   "class_source_url": "https://fightingirish.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Cooper Flanagan",
+     "listed_position": "TE",
+     "listed_school": "Notre Dame"
+    }
+   ]
+  },
+  {
+   "id": "2027-decker-degraaf-washington",
+   "name": "Decker DeGraaf",
+   "position": "TE",
+   "school": "Washington",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "TE",
+   "roster_url": "https://gohuskies.com/sports/football/roster",
+   "class_source_url": "https://gohuskies.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Decker DeGraaf",
+     "listed_position": "TE",
+     "listed_school": "Washington"
+    }
+   ]
+  },
+  {
+   "id": "2027-dj-vonnahme-iowa",
+   "name": "DJ Vonnahme",
+   "position": "TE",
+   "school": "Iowa",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "TE",
+   "roster_url": "https://hawkeyesports.com/sports/football/roster",
+   "class_source_url": "https://hawkeyesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "DJ Vonnahme",
+     "listed_position": "TE",
+     "listed_school": "Iowa"
+    }
+   ]
+  },
+  {
+   "id": "2027-dorian-thomas-california",
+   "name": "Dorian Thomas",
+   "position": "TE",
+   "school": "California",
+   "draft_year": 2027,
+   "roster_class": "R-Jr.",
+   "roster_position": "TE",
+   "roster_url": "https://calbears.com/sports/football/roster",
+   "class_source_url": "https://calbears.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Dorian Thomas",
+     "listed_position": "TE",
+     "listed_school": "California"
+    }
+   ]
+  },
+  {
+   "id": "2027-dylan-wade-ucf",
+   "name": "Dylan Wade",
+   "position": "TE",
+   "school": "UCF",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "TE",
+   "roster_url": "https://ucfknights.com/sports/football/roster",
+   "class_source_url": "https://ucfknights.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Dylan Wade",
+     "listed_position": "TE",
+     "listed_school": "UCF"
+    }
+   ]
+  },
+  {
+   "id": "2027-eli-finley-louisiana-tech",
+   "name": "Eli Finley",
+   "position": "TE",
+   "school": "Louisiana Tech",
+   "draft_year": 2027,
+   "roster_class": "4th",
+   "roster_position": "TE",
+   "roster_url": "https://latechsports.com/sports/football/roster",
+   "class_source_url": "https://latechsports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Elliott Finley",
+     "listed_position": "TE",
+     "listed_school": "Louisiana Tech"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Eli Finley",
+     "listed_position": "TE",
+     "listed_school": "NA"
+    }
+   ]
+  },
+  {
+   "id": "2027-elija-lofton-miami-fl",
+   "name": "Elija Lofton",
+   "position": "TE",
+   "school": "Miami (FL)",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "Tight End",
+   "roster_url": "https://miamihurricanes.com/sports/football/roster",
+   "class_source_url": "https://miamihurricanes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Elija Lofton",
+     "listed_position": "TE",
+     "listed_school": "Miami (FL)"
+    }
+   ]
+  },
+  {
+   "id": "2027-gabe-burkle-penn-state",
+   "name": "Gabe Burkle",
+   "position": "TE",
+   "school": "Penn State",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Senior",
+   "roster_position": "TE",
+   "roster_url": "https://gopsusports.com/sports/football/roster",
+   "class_source_url": "https://gopsusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Gabe Burkle",
+     "listed_position": "TE",
+     "listed_school": "Penn State"
+    }
+   ]
+  },
+  {
+   "id": "2027-garrett-oakley-kansas-state",
+   "name": "Garrett Oakley",
+   "position": "TE",
+   "school": "Kansas State",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://www.kstatesports.com/sports/football/roster",
+   "class_source_url": "https://www.kstatesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Garrett Oakley",
+     "listed_position": "TE",
+     "listed_school": "Kansas State"
+    }
+   ]
+  },
+  {
+   "id": "2027-hayden-hansen-oklahoma",
+   "name": "Hayden Hansen",
+   "position": "TE",
+   "school": "Oklahoma",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://soonersports.com/sports/football/roster",
+   "class_source_url": "https://soonersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Hayden Hansen",
+     "listed_position": "TE",
+     "listed_school": "Oklahoma"
+    }
+   ]
+  },
+  {
+   "id": "2027-hunter-tipton-memphis",
+   "name": "Hunter Tipton",
+   "position": "TE",
+   "school": "Memphis",
+   "draft_year": 2027,
+   "roster_class": "R-Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://gotigersgo.com/sports/football/roster",
+   "class_source_url": "https://gotigersgo.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Hunter Tipton",
+     "listed_position": "TE",
+     "listed_school": "Memphis"
+    }
+   ]
+  },
+  {
+   "id": "2027-hunter-welcing-ohio-state",
+   "name": "Hunter Welcing",
+   "position": "TE",
+   "school": "Ohio State",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "class_source_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Hunter Welcing",
+     "listed_position": "TE",
+     "listed_school": "Ohio State"
+    }
+   ]
+  },
+  {
+   "id": "2027-jacob-harris-wisconsin",
+   "name": "Jacob Harris",
+   "position": "TE",
+   "school": "Wisconsin",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://uwbadgers.com/sports/football/roster",
+   "class_source_url": "https://uwbadgers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jacob Harris",
+     "listed_position": "TE",
+     "listed_school": "Wisconsin"
+    }
+   ]
+  },
+  {
+   "id": "2027-jaden-platt-arkansas",
+   "name": "Jaden Platt",
+   "position": "TE",
+   "school": "Arkansas",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://arkansasrazorbacks.com/sport/m-footbl/roster/",
+   "class_source_url": "https://arkansasrazorbacks.com/sport/m-footbl/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jaden Platt",
+     "listed_position": "TE",
+     "listed_school": "Arkansas"
+    }
+   ]
+  },
+  {
+   "id": "2027-jaden-reddell-georgia",
+   "name": "Jaden Reddell",
+   "position": "TE",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "TE",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jaden Reddell",
+     "listed_position": "TE",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-jamari-johnson-oregon",
+   "name": "Jamari Johnson",
+   "position": "TE",
+   "school": "Oregon",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://goducks.com/sports/football/roster",
+   "class_source_url": "https://goducks.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Jamari Johnson",
+     "listed_position": "TE",
+     "listed_school": "Oregon"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jamari Johnson",
+     "listed_position": "TE",
+     "listed_school": "Oregon"
+    }
+   ]
+  },
+  {
+   "id": "2027-jelani-thurman-north-carolina",
+   "name": "Jelani Thurman",
+   "position": "TE",
+   "school": "North Carolina",
+   "draft_year": 2027,
+   "roster_class": "R-Jr.",
+   "roster_position": "Tight End",
+   "roster_url": "https://goheels.com/sports/football/roster",
+   "class_source_url": "https://goheels.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jelani Thurman",
+     "listed_position": "TE",
+     "listed_school": "North Carolina"
+    }
+   ]
+  },
+  {
+   "id": "2027-jeremiah-hasley-duke",
+   "name": "Jeremiah Hasley",
+   "position": "TE",
+   "school": "Duke",
+   "draft_year": 2027,
+   "roster_class": "Gr.",
+   "roster_position": "TE",
+   "roster_url": "https://goduke.com/sports/football/roster",
+   "class_source_url": "https://goduke.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Jeremiah Hasley",
+     "listed_position": "TE",
+     "listed_school": "Duke"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jeremiah Hasley",
+     "listed_position": "TE",
+     "listed_school": "Duke"
+    }
+   ]
+  },
+  {
+   "id": "2027-lawson-luckie-georgia",
+   "name": "Lawson Luckie",
+   "position": "TE",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Lawson Luckie",
+     "listed_position": "TE",
+     "listed_school": "Georgia"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Lawson Luckie",
+     "listed_position": "TE",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-luke-dehnicke-northwestern",
+   "name": "Luke Dehnicke",
+   "position": "TE",
+   "school": "Northwestern",
+   "draft_year": 2027,
+   "roster_class": "R-So.",
+   "roster_position": "TE",
+   "roster_url": "https://nusports.com/sports/football/roster",
+   "class_source_url": "https://nusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Luke Dehnicke",
+     "listed_position": "TE",
+     "listed_school": "Northwestern"
+    }
+   ]
+  },
+  {
+   "id": "2027-luke-hasz-ole-miss",
+   "name": "Luke Hasz",
+   "position": "TE",
+   "school": "Ole Miss",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://olemisssports.com/sports/football/roster",
+   "class_source_url": "https://olemisssports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Luke Hasz",
+     "listed_position": "TE",
+     "listed_school": "Ole Miss"
+    }
+   ]
+  },
+  {
+   "id": "2027-luke-lindenmeyer-nebraska",
+   "name": "Luke Lindenmeyer",
+   "position": "TE",
+   "school": "Nebraska",
+   "draft_year": 2027,
+   "roster_class": "Fifth Year",
+   "roster_position": "TE",
+   "roster_url": "https://huskers.com/sports/football/roster",
+   "class_source_url": "https://huskers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Luke Lindenmeyer",
+     "listed_position": "TE",
+     "listed_school": "Nebraska"
+    }
+   ]
+  },
+  {
+   "id": "2027-luke-reynolds-virginia-tech",
+   "name": "Luke Reynolds",
+   "position": "TE",
+   "school": "Virginia Tech",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "TE",
+   "roster_url": "https://hokiesports.com/sports/football/roster",
+   "class_source_url": "https://hokiesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Luke Reynolds",
+     "listed_position": "TE",
+     "listed_school": "Virginia Tech"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Luke Reynolds",
+     "listed_position": "TE",
+     "listed_school": "Virginia Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-mason-williams-ohio-state",
+   "name": "Mason Williams",
+   "position": "TE",
+   "school": "Ohio State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "class_source_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Mason Williams",
+     "listed_position": "TE",
+     "listed_school": "Ohio State"
+    }
+   ]
+  },
+  {
+   "id": "2027-michael-masunas-texas",
+   "name": "Michael Masunas",
+   "position": "TE",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Michael Masunas",
+     "listed_position": "TE",
+     "listed_school": "Texas"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Michael Masunas",
+     "listed_position": "TE",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-patrick-overmyer-houston",
+   "name": "Patrick Overmyer",
+   "position": "TE",
+   "school": "Houston",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://uhcougars.com/sports/football/roster",
+   "class_source_url": "https://uhcougars.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Patrick Overmyer",
+     "listed_position": "TE",
+     "listed_school": "Houston"
+    }
+   ]
+  },
+  {
+   "id": "2027-peter-clarke-temple",
+   "name": "Peter Clarke",
+   "position": "TE",
+   "school": "Temple",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "TE",
+   "roster_url": "https://owlsports.com/sports/football/roster",
+   "class_source_url": "https://owlsports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Peter Clarke",
+     "listed_position": "TE",
+     "listed_school": "Temple"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Peter Clarke",
+     "listed_position": "TE",
+     "listed_school": "Temple"
+    }
+   ]
+  },
+  {
+   "id": "2027-rocky-beers-oklahoma",
+   "name": "Rocky Beers",
+   "position": "TE",
+   "school": "Oklahoma",
+   "draft_year": 2027,
+   "roster_class": "6th",
+   "roster_position": "TE",
+   "roster_url": "https://soonersports.com/sports/football/roster",
+   "class_source_url": "https://soonersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Rocky Beers",
+     "listed_position": "TE",
+     "listed_school": "Oklahoma"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Rocky Beers",
+     "listed_position": "TE",
+     "listed_school": "Oklahoma"
+    }
+   ]
+  },
+  {
+   "id": "2027-terrance-carter-jr-texas-tech",
+   "name": "Terrance Carter Jr.",
+   "position": "TE",
+   "school": "Texas Tech",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "TE",
+   "roster_url": "https://texastech.com/sports/football/roster",
+   "class_source_url": "https://texastech.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Terrance Carter",
+     "listed_position": "TE",
+     "listed_school": "Texas Tech"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Terrance Carter Jr",
+     "listed_position": "TE",
+     "listed_school": "Texas Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-theo-melin-ohrstrom-smu",
+   "name": "Theo Melin Öhrström",
+   "position": "TE",
+   "school": "SMU",
+   "draft_year": 2027,
+   "roster_class": "5TH YR",
+   "roster_position": "TE",
+   "roster_url": "https://smumustangs.com/sports/football/roster",
+   "class_source_url": "https://smumustangs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Theodor Melin Ohrstrom",
+     "listed_position": "TE",
+     "listed_school": "SMU"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Theo Melin Ohrstrom",
+     "listed_position": "TE",
+     "listed_school": "SMU"
+    }
+   ]
+  },
+  {
+   "id": "2027-treydez-green-lsu",
+   "name": "Trey'Dez Green",
+   "position": "TE",
+   "school": "LSU",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "Tight End",
+   "roster_url": "https://lsusports.net/sports/fb/roster",
+   "class_source_url": "https://lsusports.net/sports/fb/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Trey'Dez Green",
+     "listed_position": "TE",
+     "listed_school": "LSU"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Trey'Dez Green",
+     "listed_position": "TE",
+     "listed_school": "LSU"
+    }
+   ]
+  },
+  {
+   "id": "2027-willie-rodriguez-kentucky",
+   "name": "Willie Rodriguez",
+   "position": "TE",
+   "school": "Kentucky",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "Tight End -",
+   "roster_url": "https://ukathletics.com/sports/football/roster/",
+   "class_source_url": "https://ukathletics.com/sports/football/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_te",
+     "url": "https://walterfootball.com/TERankings2027.php",
+     "listed_name": "Willie Rodriguez",
+     "listed_position": "TE",
+     "listed_school": "Kentucky"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Willie Rodriguez",
+     "listed_position": "TE",
+     "listed_school": "Kentucky"
+    }
+   ]
+  },
+  {
+   "id": "2027-amare-thomas-houston",
+   "name": "Amare Thomas",
+   "position": "WR",
+   "school": "Houston",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://uhcougars.com/sports/football/roster",
+   "class_source_url": "https://uhcougars.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Amare Thomas",
+     "listed_position": "WR",
+     "listed_school": "Houston"
+    }
+   ]
+  },
+  {
+   "id": "2027-anthony-evans-iii-mississippi-state",
+   "name": "Anthony Evans III",
+   "position": "WR",
+   "school": "Mississippi State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://hailstate.com/sports/football/roster",
+   "class_source_url": "https://hailstate.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Anthony Evans III",
+     "listed_position": "WR",
+     "listed_school": "Mississippi State"
+    }
+   ]
+  },
+  {
+   "id": "2027-beau-sparks-texas-state",
+   "name": "Beau Sparks",
+   "position": "WR",
+   "school": "Texas State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://txst.com/sports/football/roster",
+   "class_source_url": "https://txst.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Beau Sparks",
+     "listed_position": "WR",
+     "listed_school": "Texas State"
+    }
+   ]
+  },
+  {
+   "id": "2027-braden-pegan-utah",
+   "name": "Braden Pegan",
+   "position": "WR",
+   "school": "Utah",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://utahutes.com/sports/football/roster",
+   "class_source_url": "https://utahutes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Braden Pegan",
+     "listed_position": "WR",
+     "listed_school": "Utah"
+    }
+   ]
+  },
+  {
+   "id": "2027-brandon-inniss-ohio-state",
+   "name": "Brandon Inniss",
+   "position": "WR",
+   "school": "Ohio State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "class_source_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Brandon Inniss",
+     "listed_position": "WR",
+     "listed_school": "Ohio State"
+    }
+   ]
+  },
+  {
+   "id": "2027-braylon-staley-tennessee",
+   "name": "Braylon Staley",
+   "position": "WR",
+   "school": "Tennessee",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://utsports.com/sports/football/roster",
+   "class_source_url": "https://utsports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Braylon Staley",
+     "listed_position": "WR",
+     "listed_school": "Tennessee"
+    }
+   ]
+  },
+  {
+   "id": "2027-bryant-wesco-jr-clemson",
+   "name": "Bryant Wesco Jr.",
+   "position": "WR",
+   "school": "Clemson",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://clemsontigers.com/sports/football/roster",
+   "class_source_url": "https://clemsontigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Bryant Wesco",
+     "listed_position": "WR",
+     "listed_school": "Clemson"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Bryant Wesco Jr",
+     "listed_position": "WR",
+     "listed_school": "Clemson"
+    }
+   ]
+  },
+  {
+   "id": "2027-cam-coleman-texas",
+   "name": "Cam Coleman",
+   "position": "WR",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Cam Coleman",
+     "listed_position": "WR",
+     "listed_school": "Texas"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Cam Coleman",
+     "listed_position": "WR",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-carlos-hernandez-wake-forest",
+   "name": "Carlos Hernandez",
+   "position": "WR",
+   "school": "Wake Forest",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://godeacs.com/sports/football/roster",
+   "class_source_url": "https://godeacs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Carlos Hernandez",
+     "listed_position": "WR",
+     "listed_school": "Wake Forest"
+    }
+   ]
+  },
+  {
+   "id": "2027-cayden-lee-missouri",
+   "name": "Cayden Lee",
+   "position": "WR",
+   "school": "Missouri",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://mutigers.com/sports/football/roster",
+   "class_source_url": "https://mutigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Cayden Lee",
+     "listed_position": "WR",
+     "listed_school": "Missouri"
+    }
+   ]
+  },
+  {
+   "id": "2027-charlie-becker-indiana",
+   "name": "Charlie Becker",
+   "position": "WR",
+   "school": "Indiana",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "WR",
+   "roster_url": "https://iuhoosiers.com/sports/football/roster",
+   "class_source_url": "https://iuhoosiers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Charlie Becker",
+     "listed_position": "WR",
+     "listed_school": "Indiana"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Charlie Becker",
+     "listed_position": "WR",
+     "listed_school": "Indiana"
+    }
+   ]
+  },
+  {
+   "id": "2027-chase-hendricks-california",
+   "name": "Chase Hendricks",
+   "position": "WR",
+   "school": "California",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://calbears.com/sports/football/roster",
+   "class_source_url": "https://calbears.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chase Hendricks",
+     "listed_position": "WR",
+     "listed_school": "California"
+    }
+   ]
+  },
+  {
+   "id": "2027-chase-sowell-penn-state",
+   "name": "Chase Sowell",
+   "position": "WR",
+   "school": "Penn State",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Senior",
+   "roster_position": "WR",
+   "roster_url": "https://gopsusports.com/sports/football/roster",
+   "class_source_url": "https://gopsusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chase Sowell",
+     "listed_position": "WR",
+     "listed_school": "Penn State"
+    }
+   ]
+  },
+  {
+   "id": "2027-chas-nimrod-auburn",
+   "name": "Chas Nimrod",
+   "position": "WR",
+   "school": "Auburn",
+   "draft_year": 2027,
+   "roster_class": "Fifth Year",
+   "roster_position": "WR",
+   "roster_url": "https://auburntigers.com/sports/football/roster",
+   "class_source_url": "https://auburntigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chas Nimrod",
+     "listed_position": "WR",
+     "listed_school": "Auburn"
+    }
+   ]
+  },
+  {
+   "id": "2027-chris-dawn-jr-texas-state",
+   "name": "Chris Dawn, Jr.",
+   "position": "WR",
+   "school": "Texas State",
+   "draft_year": 2027,
+   "roster_class": "R-So.",
+   "roster_position": "Wide Receiver",
+   "roster_url": "https://txst.com/sports/football/roster",
+   "class_source_url": "https://txst.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chris Dawn Jr",
+     "listed_position": "WR",
+     "listed_school": "Texas State"
+    }
+   ]
+  },
+  {
+   "id": "2027-chris-marshall-arkansas",
+   "name": "Chris Marshall",
+   "position": "WR",
+   "school": "Arkansas",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "WR",
+   "roster_url": "https://arkansasrazorbacks.com/sport/m-footbl/roster/",
+   "class_source_url": "https://arkansasrazorbacks.com/sport/m-footbl/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Chris Marshall",
+     "listed_position": "WR",
+     "listed_school": "Arkansas"
+    }
+   ]
+  },
+  {
+   "id": "2027-collin-dixon-illinois",
+   "name": "Collin Dixon",
+   "position": "WR",
+   "school": "Illinois",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://fightingillini.com/sports/football/roster",
+   "class_source_url": "https://fightingillini.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Collin Dixon",
+     "listed_position": "WR",
+     "listed_school": "Illinois"
+    }
+   ]
+  },
+  {
+   "id": "2027-cooper-barkate-miami-fl",
+   "name": "Cooper Barkate",
+   "position": "WR",
+   "school": "Miami (FL)",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Senior",
+   "roster_position": "Wide Receiver",
+   "roster_url": "https://miamihurricanes.com/sports/football/roster",
+   "class_source_url": "https://miamihurricanes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Cooper Barkate",
+     "listed_position": "WR",
+     "listed_school": "Miami (FL)"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Cooper Barkate",
+     "listed_position": "WR",
+     "listed_school": "Miami (FL)"
+    }
+   ]
+  },
+  {
+   "id": "2027-deandre-moore-jr-colorado",
+   "name": "DeAndre Moore Jr.",
+   "position": "WR",
+   "school": "Colorado",
+   "draft_year": 2027,
+   "roster_class": "4th",
+   "roster_position": "WR",
+   "roster_url": "https://cubuffs.com/sports/football/roster",
+   "class_source_url": "https://cubuffs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "DeAndre Moore",
+     "listed_position": "WR",
+     "listed_school": "Colorado"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "DeAndre Moore Jr",
+     "listed_position": "WR",
+     "listed_school": "Colorado"
+    }
+   ]
+  },
+  {
+   "id": "2027-deuce-alexander-ole-miss",
+   "name": "Deuce Alexander",
+   "position": "WR",
+   "school": "Ole Miss",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://olemisssports.com/sports/football/roster",
+   "class_source_url": "https://olemisssports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Deuce Alexander",
+     "listed_position": "WR",
+     "listed_school": "Ole Miss"
+    }
+   ]
+  },
+  {
+   "id": "2027-devin-mccuin-ohio-state",
+   "name": "Devin McCuin",
+   "position": "WR",
+   "school": "Ohio State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "class_source_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Devin McCuin",
+     "listed_position": "WR",
+     "listed_school": "Ohio State"
+    }
+   ]
+  },
+  {
+   "id": "2027-duce-robinson-florida-state",
+   "name": "Duce Robinson",
+   "position": "WR",
+   "school": "Florida State",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://seminoles.com/sports/football/roster",
+   "class_source_url": "https://seminoles.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Duce Robinson",
+     "listed_position": "WR",
+     "listed_school": "Florida State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Duce Robinson",
+     "listed_position": "WR",
+     "listed_school": "Florida State"
+    }
+   ]
+  },
+  {
+   "id": "2027-emmett-mosley-v-texas",
+   "name": "Emmett Mosley V",
+   "position": "WR",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Emmett Mosley V",
+     "listed_position": "WR",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-eric-singleton-jr-florida",
+   "name": "Eric Singleton Jr.",
+   "position": "WR",
+   "school": "Florida",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://floridagators.com/sports/football/roster",
+   "class_source_url": "https://floridagators.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Eric Singleton",
+     "listed_position": "WR",
+     "listed_school": "Florida"
+    }
+   ]
+  },
+  {
+   "id": "2027-evan-stewart-oregon",
+   "name": "Evan Stewart",
+   "position": "WR",
+   "school": "Oregon",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "WR",
+   "roster_url": "https://goducks.com/sports/football/roster",
+   "class_source_url": "https://goducks.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Evan Stewart",
+     "listed_position": "WR",
+     "listed_school": "Oregon"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Evan Stewart",
+     "listed_position": "WR",
+     "listed_school": "Oregon"
+    }
+   ]
+  },
+  {
+   "id": "2027-griffin-wilde-northwestern",
+   "name": "Griffin Wilde",
+   "position": "WR",
+   "school": "Northwestern",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://nusports.com/sports/football/roster",
+   "class_source_url": "https://nusports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Griffin Wilde",
+     "listed_position": "WR",
+     "listed_school": "Northwestern"
+    }
+   ]
+  },
+  {
+   "id": "2027-ian-strong-california",
+   "name": "Ian Strong",
+   "position": "WR",
+   "school": "California",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://calbears.com/sports/football/roster",
+   "class_source_url": "https://calbears.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Ian Strong",
+     "listed_position": "WR",
+     "listed_school": "California"
+    }
+   ]
+  },
+  {
+   "id": "2027-isaiah-horton-texas-a-and-m",
+   "name": "Isaiah Horton",
+   "position": "WR",
+   "school": "Texas A&M",
+   "draft_year": 2027,
+   "roster_class": "Gr.",
+   "roster_position": "WR",
+   "roster_url": "https://12thman.com/sports/football/roster",
+   "class_source_url": "https://12thman.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Isaiah Horton",
+     "listed_position": "WR",
+     "listed_school": "Texas A&M"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Isaiah Horton",
+     "listed_position": "WR",
+     "listed_school": "Texas A&M"
+    }
+   ]
+  },
+  {
+   "id": "2027-isaiah-sategna-iii-oklahoma",
+   "name": "Isaiah Sategna III",
+   "position": "WR",
+   "school": "Oklahoma",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "WR",
+   "roster_url": "https://soonersports.com/sports/football/roster",
+   "class_source_url": "https://soonersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Isaiah Sategna III",
+     "listed_position": "WR",
+     "listed_school": "Oklahoma"
+    }
+   ]
+  },
+  {
+   "id": "2027-jackson-harris-lsu",
+   "name": "Jackson Harris",
+   "position": "WR",
+   "school": "LSU",
+   "draft_year": 2027,
+   "roster_class": "Redshirt Junior",
+   "roster_position": "Wide Receiver",
+   "roster_url": "https://lsusports.net/sports/fb/roster",
+   "class_source_url": "https://lsusports.net/sports/fb/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jackson Harris",
+     "listed_position": "WR",
+     "listed_school": "LSU"
+    }
+   ]
+  },
+  {
+   "id": "2027-jaden-greathouse-notre-dame",
+   "name": "Jaden Greathouse",
+   "position": "WR",
+   "school": "Notre Dame",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://fightingirish.com/sports/football/roster",
+   "class_source_url": "https://fightingirish.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Jaden Greathouse",
+     "listed_position": "WR",
+     "listed_school": "Notre Dame"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jaden Greathouse",
+     "listed_position": "WR",
+     "listed_school": "Notre Dame"
+    }
+   ]
+  },
+  {
+   "id": "2027-jayce-brown-lsu",
+   "name": "Jayce Brown",
+   "position": "WR",
+   "school": "LSU",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "Wide Receiver",
+   "roster_url": "https://lsusports.net/sports/fb/roster",
+   "class_source_url": "https://lsusports.net/sports/fb/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jayce Brown",
+     "listed_position": "WR",
+     "listed_school": "LSU"
+    }
+   ]
+  },
+  {
+   "id": "2027-jeremiah-mcclellan-oregon",
+   "name": "Jeremiah McClellan",
+   "position": "WR",
+   "school": "Oregon",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://goducks.com/sports/football/roster",
+   "class_source_url": "https://goducks.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jeremiah McClellan",
+     "listed_position": "WR",
+     "listed_school": "Oregon"
+    }
+   ]
+  },
+  {
+   "id": "2027-jeremiah-smith-ohio-state",
+   "name": "Jeremiah Smith",
+   "position": "WR",
+   "school": "Ohio State",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "class_source_url": "https://ohiostatebuckeyes.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Jeremiah Smith",
+     "listed_position": "WR",
+     "listed_school": "Ohio State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jeremiah Smith",
+     "listed_position": "WR",
+     "listed_school": "Ohio State"
+    }
+   ]
+  },
+  {
+   "id": "2027-johntay-cook-ii-ole-miss",
+   "name": "Johntay Cook II",
+   "position": "WR",
+   "school": "Ole Miss",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://olemisssports.com/sports/football/roster",
+   "class_source_url": "https://olemisssports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Johntay Cook",
+     "listed_position": "WR",
+     "listed_school": "Ole Miss"
+    }
+   ]
+  },
+  {
+   "id": "2027-jordan-faison-notre-dame",
+   "name": "Jordan Faison",
+   "position": "WR",
+   "school": "Notre Dame",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://fightingirish.com/sports/football/roster",
+   "class_source_url": "https://fightingirish.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Jordan Faison",
+     "listed_position": "WR",
+     "listed_school": "Notre Dame"
+    }
+   ]
+  },
+  {
+   "id": "2027-jordan-napier-san-diego-state",
+   "name": "Jordan Napier",
+   "position": "WR",
+   "school": "San Diego State",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "WR",
+   "roster_url": "https://goaztecs.com/sports/football/roster",
+   "class_source_url": "https://goaztecs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jordan Napier",
+     "listed_position": "WR",
+     "listed_school": "San Diego State"
+    }
+   ]
+  },
+  {
+   "id": "2027-jordan-shipp-north-carolina",
+   "name": "Jordan Shipp",
+   "position": "WR",
+   "school": "North Carolina",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "Wide Receiver",
+   "roster_url": "https://goheels.com/sports/football/roster",
+   "class_source_url": "https://goheels.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Jordan Shipp",
+     "listed_position": "WR",
+     "listed_school": "North Carolina"
+    }
+   ]
+  },
+  {
+   "id": "2027-junior-sherrill-vanderbilt",
+   "name": "Junior Sherrill",
+   "position": "WR",
+   "school": "Vanderbilt",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://vucommodores.com/sports/football/roster",
+   "class_source_url": "https://vucommodores.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Junior Sherrill",
+     "listed_position": "WR",
+     "listed_school": "Vanderbilt"
+    }
+   ]
+  },
+  {
+   "id": "2027-justin-bowick-oklahoma-state",
+   "name": "Justin Bowick",
+   "position": "WR",
+   "school": "Oklahoma State",
+   "draft_year": 2027,
+   "roster_class": "R-Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://okstate.com/sports/football/roster",
+   "class_source_url": "https://okstate.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Justin Bowick",
+     "listed_position": "WR",
+     "listed_school": "Oklahoma State"
+    }
+   ]
+  },
+  {
+   "id": "2027-kenny-johnson-texas-tech",
+   "name": "Kenny Johnson",
+   "position": "WR",
+   "school": "Texas Tech",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://texastech.com/sports/football/roster",
+   "class_source_url": "https://texastech.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Kenny Johnson",
+     "listed_position": "WR",
+     "listed_school": "Texas Tech"
+    }
+   ]
+  },
+  {
+   "id": "2027-keshaun-singleton-auburn",
+   "name": "Keshaun Singleton",
+   "position": "WR",
+   "school": "Auburn",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://auburntigers.com/sports/football/roster",
+   "class_source_url": "https://auburntigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Keshaun Singleton",
+     "listed_position": "WR",
+     "listed_school": "Auburn"
+    }
+   ]
+  },
+  {
+   "id": "2027-kj-duff-rutgers",
+   "name": "KJ Duff",
+   "position": "WR",
+   "school": "Rutgers",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://scarletknights.com/sports/football/roster",
+   "class_source_url": "https://scarletknights.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "K.J. Duff",
+     "listed_position": "WR",
+     "listed_school": "Rutgers"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "KJ Duff",
+     "listed_position": "WR",
+     "listed_school": "Rutgers"
+    }
+   ]
+  },
+  {
+   "id": "2027-lawayne-mccoy-louisville",
+   "name": "Lawayne McCoy",
+   "position": "WR",
+   "school": "Louisville",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://gocards.com/sports/football/roster",
+   "class_source_url": "https://gocards.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Lawayne McCoy",
+     "listed_position": "WR",
+     "listed_school": "Louisville"
+    }
+   ]
+  },
+  {
+   "id": "2027-london-humphreys-georgia",
+   "name": "London Humphreys",
+   "position": "WR",
+   "school": "Georgia",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://georgiadogs.com/sports/football/roster",
+   "class_source_url": "https://georgiadogs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "London Humphreys",
+     "listed_position": "WR",
+     "listed_school": "Georgia"
+    }
+   ]
+  },
+  {
+   "id": "2027-mario-craver-texas-a-and-m",
+   "name": "Mario Craver",
+   "position": "WR",
+   "school": "Texas A&M",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://12thman.com/sports/football/roster",
+   "class_source_url": "https://12thman.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Mario Craver",
+     "listed_position": "WR",
+     "listed_school": "Texas A&M"
+    }
+   ]
+  },
+  {
+   "id": "2027-mike-matthews-tennessee",
+   "name": "Mike Matthews",
+   "position": "WR",
+   "school": "Tennessee",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://utsports.com/sports/football/roster",
+   "class_source_url": "https://utsports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Mike Matthews",
+     "listed_position": "WR",
+     "listed_school": "Tennessee"
+    }
+   ]
+  },
+  {
+   "id": "2027-nic-anderson-kentucky",
+   "name": "Nic Anderson",
+   "position": "WR",
+   "school": "Kentucky",
+   "draft_year": 2027,
+   "roster_class": "Junior",
+   "roster_position": "Wide Receiver -",
+   "roster_url": "https://ukathletics.com/sports/football/roster/",
+   "class_source_url": "https://ukathletics.com/sports/football/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Nic Anderson",
+     "listed_position": "WR",
+     "listed_school": "Kentucky"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Nic Anderson",
+     "listed_position": "WR",
+     "listed_school": "Kentucky"
+    }
+   ]
+  },
+  {
+   "id": "2027-nick-marsh-indiana",
+   "name": "Nick Marsh",
+   "position": "WR",
+   "school": "Indiana",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "WR",
+   "roster_url": "https://iuhoosiers.com/sports/football/roster",
+   "class_source_url": "https://iuhoosiers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Nick Marsh",
+     "listed_position": "WR",
+     "listed_school": "Indiana"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Nick Marsh",
+     "listed_position": "WR",
+     "listed_school": "Indiana"
+    }
+   ]
+  },
+  {
+   "id": "2027-nyck-harbor-south-carolina",
+   "name": "Nyck Harbor",
+   "position": "WR",
+   "school": "South Carolina",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://gamecocksonline.com/sports/football/roster/",
+   "class_source_url": "https://gamecocksonline.com/sports/football/roster/",
+   "roster_season": 2026,
+   "roster_parse": "text",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Nyck Harbor",
+     "listed_position": "WR",
+     "listed_school": "South Carolina"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Nyck Harbor",
+     "listed_position": "WR",
+     "listed_school": "South Carolina"
+    }
+   ]
+  },
+  {
+   "id": "2027-nyziah-hunter-nebraska",
+   "name": "Nyziah Hunter",
+   "position": "WR",
+   "school": "Nebraska",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://huskers.com/sports/football/roster",
+   "class_source_url": "https://huskers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Nyziah Hunter",
+     "listed_position": "WR",
+     "listed_school": "Nebraska"
+    }
+   ]
+  },
+  {
+   "id": "2027-omarion-miller-arizona-state",
+   "name": "Omarion Miller",
+   "position": "WR",
+   "school": "Arizona State",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://thesundevils.com/sports/football/roster",
+   "class_source_url": "https://thesundevils.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Omarion Miller",
+     "listed_position": "WR",
+     "listed_school": "Arizona State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Omarion Miller",
+     "listed_position": "WR",
+     "listed_school": "Arizona State"
+    }
+   ]
+  },
+  {
+   "id": "2027-reed-harris-arizona-state",
+   "name": "Reed Harris",
+   "position": "WR",
+   "school": "Arizona State",
+   "draft_year": 2027,
+   "roster_class": "Senior",
+   "roster_position": "WR",
+   "roster_url": "https://thesundevils.com/sports/football/roster",
+   "class_source_url": "https://thesundevils.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Reed Harris",
+     "listed_position": "WR",
+     "listed_school": "Arizona State"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Reed Harris",
+     "listed_position": "WR",
+     "listed_school": "Arizona State"
+    }
+   ]
+  },
+  {
+   "id": "2027-ryan-coleman-williams-alabama",
+   "name": "Ryan Coleman-Williams",
+   "position": "WR",
+   "school": "Alabama",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://rolltide.com/sports/football/roster",
+   "class_source_url": "https://rolltide.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Ryan Coleman-Williams",
+     "listed_position": "WR",
+     "listed_school": "Alabama"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Ryan Coleman-Williams",
+     "listed_position": "WR",
+     "listed_school": "Alabama"
+    }
+   ]
+  },
+  {
+   "id": "2027-ryan-wingo-texas",
+   "name": "Ryan Wingo",
+   "position": "WR",
+   "school": "Texas",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://texaslonghorns.com/sports/football/roster",
+   "class_source_url": "https://texaslonghorns.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Ryan Wingo",
+     "listed_position": "WR",
+     "listed_school": "Texas"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Ryan Wingo",
+     "listed_position": "WR",
+     "listed_school": "Texas"
+    }
+   ]
+  },
+  {
+   "id": "2027-terrell-anderson-usc",
+   "name": "Terrell Anderson",
+   "position": "WR",
+   "school": "USC",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://usctrojans.com/sports/football/roster",
+   "class_source_url": "https://usctrojans.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Terrell Anderson",
+     "listed_position": "WR",
+     "listed_school": "USC"
+    }
+   ]
+  },
+  {
+   "id": "2027-terry-bussey-texas-a-and-m",
+   "name": "Terry Bussey",
+   "position": "WR",
+   "school": "Texas A&M",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://12thman.com/sports/football/roster",
+   "class_source_url": "https://12thman.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Terry Bussey",
+     "listed_position": "WR",
+     "listed_school": "Texas A&M"
+    }
+   ]
+  },
+  {
+   "id": "2027-tj-moore-clemson",
+   "name": "T.J. Moore",
+   "position": "WR",
+   "school": "Clemson",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://clemsontigers.com/sports/football/roster",
+   "class_source_url": "https://clemsontigers.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "T.J. Moore",
+     "listed_position": "WR",
+     "listed_school": "Clemson"
+    },
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "TJ Moore",
+     "listed_position": "WR",
+     "listed_school": "Clemson"
+    }
+   ]
+  },
+  {
+   "id": "2027-tony-diaz-iowa",
+   "name": "Tony Diaz",
+   "position": "WR",
+   "school": "Iowa",
+   "draft_year": 2027,
+   "roster_class": "3rd",
+   "roster_position": "WR",
+   "roster_url": "https://hawkeyesports.com/sports/football/roster",
+   "class_source_url": "https://hawkeyesports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Tony Diaz",
+     "listed_position": "WR",
+     "listed_school": "Iowa"
+    }
+   ]
+  },
+  {
+   "id": "2027-trell-harris-oklahoma",
+   "name": "Trell Harris",
+   "position": "WR",
+   "school": "Oklahoma",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "WR",
+   "roster_url": "https://soonersports.com/sports/football/roster",
+   "class_source_url": "https://soonersports.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Trell Harris",
+     "listed_position": "WR",
+     "listed_school": "Oklahoma"
+    }
+   ]
+  },
+  {
+   "id": "2027-trent-walker-houston",
+   "name": "Trent Walker",
+   "position": "WR",
+   "school": "Houston",
+   "draft_year": 2027,
+   "roster_class": "5th",
+   "roster_position": "WR",
+   "roster_url": "https://uhcougars.com/sports/football/roster",
+   "class_source_url": "https://uhcougars.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Trent Walker",
+     "listed_position": "WR",
+     "listed_school": "Houston"
+    }
+   ]
+  },
+  {
+   "id": "2027-tre-richardson-louisville",
+   "name": "Tre Richardson",
+   "position": "WR",
+   "school": "Louisville",
+   "draft_year": 2027,
+   "roster_class": "Sr.",
+   "roster_position": "WR",
+   "roster_url": "https://gocards.com/sports/football/roster",
+   "class_source_url": "https://gocards.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "walterfootball_wr",
+     "url": "https://walterfootball.com/WRRankings2027.php",
+     "listed_name": "Trevontae Richardson",
+     "listed_position": "WR",
+     "listed_school": "Louisville"
+    }
+   ]
+  },
+  {
+   "id": "2027-umari-hatcher-syracuse",
+   "name": "Umari Hatcher",
+   "position": "WR",
+   "school": "Syracuse",
+   "draft_year": 2027,
+   "roster_class": "6th",
+   "roster_position": "WR",
+   "roster_url": "https://cuse.com/sports/football/roster",
+   "class_source_url": "https://cuse.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Umari Hatcher",
+     "listed_position": "WR",
+     "listed_school": "Syracuse"
+    }
+   ]
+  },
+  {
+   "id": "2027-wyatt-young-oklahoma-state",
+   "name": "Wyatt Young",
+   "position": "WR",
+   "school": "Oklahoma State",
+   "draft_year": 2027,
+   "roster_class": "Jr.",
+   "roster_position": "WR",
+   "roster_url": "https://okstate.com/sports/football/roster",
+   "class_source_url": "https://okstate.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Wyatt Young",
+     "listed_position": "WR",
+     "listed_school": "Oklahoma State"
+    }
+   ]
+  },
+  {
+   "id": "2027-yannick-smith-smu",
+   "name": "Yannick Smith",
+   "position": "WR",
+   "school": "SMU",
+   "draft_year": 2027,
+   "roster_class": "JR",
+   "roster_position": "WR",
+   "roster_url": "https://smumustangs.com/sports/football/roster",
+   "class_source_url": "https://smumustangs.com/sports/football/roster",
+   "roster_season": 2026,
+   "roster_parse": "nuxt",
+   "verified_on": "2026-10-21",
+   "boards": [
+    {
+     "source": "sticktothemodel",
+     "url": "https://sticktothemodel.com/draft/prospect-overview/big-board",
+     "listed_name": "Yannick Smith",
+     "listed_position": "WR",
+     "listed_school": "SMU"
+    }
+   ]
+  }
+ ],
+ "rejected_last_refresh": [
+  {
+   "name": "Brendan Sorsby",
+   "listed_schools": [
+    "Texas Tech"
+   ],
+   "boards": [
+    "walterfootball_qb",
+    "sticktothemodel"
+   ],
+   "reason": "not_on_official_roster"
+  },
+  {
+   "name": "Cam Vaughn",
+   "listed_schools": [
+    "Miami (FL)"
+   ],
+   "boards": [
+    "sticktothemodel"
+   ],
+   "reason": "not_on_official_roster"
+  },
+  {
+   "name": "DJ Black",
+   "listed_schools": [
+    "South Carolina"
+   ],
+   "boards": [
+    "sticktothemodel"
+   ],
+   "reason": "not_on_official_roster"
+  },
+  {
+   "name": "Duke Scott",
+   "listed_schools": [
+    "NC State"
+   ],
+   "boards": [
+    "sticktothemodel"
+   ],
+   "reason": "roster_position_not_fantasy:CB"
+  },
+  {
+   "name": "Jalen Buckley",
+   "listed_schools": [
+    "Western Michigan"
+   ],
+   "boards": [
+    "sticktothemodel"
+   ],
+   "reason": "roster_position_not_fantasy:Safety"
+  },
+  {
+   "name": "Ryan Williams",
+   "listed_schools": [
+    "Alabama"
+   ],
+   "boards": [
+    "sticktothemodel"
+   ],
+   "reason": "not_on_official_roster"
+  },
+  {
+   "name": "Tre Wilson III",
+   "listed_schools": [
+    "LSU"
+   ],
+   "boards": [
+    "walterfootball_wr"
+   ],
+   "reason": "not_on_official_roster"
+  },
+  {
+   "name": "Walker Eget",
+   "listed_schools": [
+    "NA"
+   ],
+   "boards": [
+    "sticktothemodel"
+   ],
+   "reason": "no_official_roster_configured"
+  }
+ ]
+}
