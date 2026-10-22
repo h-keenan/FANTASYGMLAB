@@ -20,6 +20,9 @@ interface Props {
   leagueName: string;
   partnerTeamName?: string;
   partnerTeamAvatarUrl?: string | null;
+  /** Engine per-side value totals (Trade Hub send_score/receive_score); optional. */
+  sendTotal?: number;
+  receiveTotal?: number;
   verdict: TradeVerdict;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
@@ -40,6 +43,8 @@ export default function TradeSharePreviewModal({
   leagueName,
   partnerTeamName,
   partnerTeamAvatarUrl,
+  sendTotal,
+  receiveTotal,
   verdict,
   sendPlayers,
   receivePlayers,
@@ -168,6 +173,8 @@ export default function TradeSharePreviewModal({
                 receivePlayers={receivePlayers}
                 partnerTeamName={partnerTeamName}
                 partnerTeamAvatarUrl={partnerTeamAvatarUrl}
+                sendTotal={sendTotal}
+                receiveTotal={receiveTotal}
                 onReadyChange={(ready) => {
                   imagesReadyRef.current = ready;
                 }}

@@ -1,17 +1,14 @@
 import React, { forwardRef, useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
-import QRCode from 'react-native-qrcode-svg';
 
 import type { PortfolioLeague, PortfolioTopAsset } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerNameText from './PlayerNameText';
+import ShareCardChrome, { CARD_WIDTH } from './ShareCardChrome';
 
-const CARD_WIDTH = 360;
 const CARD_HEIGHT = 640;
-const SHARE_QR_URL = 'https://fantasygmlab.com';
-const QR_SIZE = 60;
 // Cap matches RecapShareCard's own MAX_STORIES idea — a compact per-league
 // strip stays scannable at a glance instead of turning into a scroll-free
 // list that has to shrink type to fit everything.
@@ -137,19 +134,12 @@ const PortfolioShareCard = forwardRef<View, {
   }, [ready]);
 
   return (
-    <View ref={ref} collapsable={false} style={styles.card}>
-      <View style={styles.headerRow}>
-        <View style={styles.brandRow}>
-          <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
-          <AppText style={styles.brandWord}>
-            FANTASY<AppText style={styles.brandWordAccent}>GM</AppText> LAB
-          </AppText>
-        </View>
-        <AppText style={styles.kickerRight}>YOUR PORTFOLIO</AppText>
-      </View>
-
-      <View style={styles.hairline} />
-
+    <ShareCardChrome
+      ref={ref}
+      kind="Portfolio"
+      height={CARD_HEIGHT}
+      headerRight={<AppText style={styles.kickerRight}>YOUR PORTFOLIO</AppText>}
+    >
       <AppText style={styles.headline}>{headline}</AppText>
       <AppText style={styles.headlineSub}>Across every saved league</AppText>
 
@@ -180,57 +170,15 @@ const PortfolioShareCard = forwardRef<View, {
         </>
       ) : null}
 
-      <View style={styles.qrRow}>
-        <View style={styles.qrTextGroup}>
-          <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
-          <AppText style={styles.qrTitle}>FantasyDesk</AppText>
-          <AppText style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</AppText>
-        </View>
-        <View style={styles.qrWrap}>
-          <QRCode
-            value={SHARE_QR_URL}
-            size={QR_SIZE}
-            color={colors.background}
-            backgroundColor="#fff"
-            logo={require('../../assets/icon.png')}
-            logoSize={QR_SIZE * 0.28}
-            logoBorderRadius={4}
-            logoBackgroundColor="#fff"
-            ecl="H"
-          />
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <AppText style={styles.footerText}>
-          <AppText style={{ color: colors.accent }}>PLAN. </AppText>
-          <AppText style={{ color: colors.premium }}>PROJECT. </AppText>
-          <AppText style={{ color: colors.danger }}>WIN.</AppText>
-        </AppText>
-      </View>
-    </View>
+    </ShareCardChrome>
   );
 });
 PortfolioShareCard.displayName = 'PortfolioShareCard';
-
 export default PortfolioShareCard;
 export { CARD_WIDTH, CARD_HEIGHT };
 
 const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  brandMark: { width: 28, height: 28, borderRadius: 8 },
-  brandWord: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0.5 },
-  brandWordAccent: { color: colors.accent },
+
   kickerRight: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6 },
   hairline: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.sm },
   headline: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
@@ -265,27 +213,4 @@ const styles = StyleSheet.create({
   standoutTextGroup: { flex: 1 },
   standoutLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
   standoutName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 1 },
-  qrRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // 'auto' (not a fixed value) — same trick TradeShareCard/RecapShareCard
-    // use so flexbox fills whatever room is left in the fixed-height card
-    // regardless of how many leagues/rows this particular portfolio shows.
-    marginTop: 'auto',
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    gap: spacing.md,
-  },
-  qrTextGroup: { flex: 1 },
-  qrKicker: { fontSize: 9, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
-  qrTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
-  qrSubtitle: { fontSize: 10, color: colors.textSecondary, lineHeight: 13, marginTop: 2 },
-  qrWrap: {
-    padding: 6,
-    backgroundColor: '#fff',
-    borderRadius: radii.sm,
-  },
-  footer: { marginTop: 'auto', alignItems: 'center', paddingTop: spacing.sm },
-  footerText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
 });

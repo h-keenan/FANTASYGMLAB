@@ -1027,6 +1027,8 @@ function TradeIdeaCard({
         leagueName={leagueName}
         partnerTeamName={idea.partner_team_name}
         partnerTeamAvatarUrl={idea.partner_team_avatar_url}
+        sendTotal={idea.send_score}
+        receiveTotal={idea.receive_score}
         verdict={ideaToShareVerdict(idea)}
         sendPlayers={shareAssetsToPlayers(idea.package.send)}
         receivePlayers={shareAssetsToPlayers(idea.package.receive)}

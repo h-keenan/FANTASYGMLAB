@@ -2010,6 +2010,9 @@ export interface TradePackage {
 export interface TradeIdea {
   partner_team_name: string;
   partner_team_avatar_url: string | null;
+  /** Real untruncated per-side value totals (same fields web reads). */
+  send_score?: number;
+  receive_score?: number;
   // Real archetype label (e.g. "Rebuilding", "Aging Contender") from the
   // same computation /v1/leagues/{id}/team-rankings uses — empty when it
   // couldn't be matched to a roster.
