@@ -35,6 +35,13 @@ RECORD_SIGNAL_WEIGHT_FLOOR = 0.30
 # scheduling-luck outlier, etc).
 RECORD_SIGNAL_WEIGHT_CEILING = 0.85
 RECORD_SIGNAL_WEIGHT_SEASON_SLOPE = 0.55
+# Sample-size ramp: the season-progress weight above assumes a real sample.
+# With a 0.30 floor, ONE result (1-0 or 0-1) used to carry 30%+ of the blend,
+# which flipped a 90th-percentile roster from Contender to Retool after a
+# single loss (and a median roster to Rebuild). The record only earns its full
+# weight once this many games are banked; before that it scales linearly
+# (1 game = 25% of the weight, 2 = 50%, 3 = 75%).
+RECORD_SIGNAL_FULL_WEIGHT_GAMES = 4
 
 
 def clamp_float(value: Any, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -83,6 +90,18 @@ def season_progress_fraction(league: Mapping[str, Any] | None) -> float:
     return clamp_float(current_leg / regular_season_end, 0.0, 1.0)
 
 
+def record_games_played(roster_record: Mapping[str, Any] | None) -> int:
+    """Decided games (wins + losses + ties) on a Sleeper roster settings dict."""
+
+    if not isinstance(roster_record, Mapping):
+        return 0
+    return (
+        max(0, safe_int(roster_record.get("wins"), 0))
+        + max(0, safe_int(roster_record.get("losses"), 0))
+        + max(0, safe_int(roster_record.get("ties"), 0))
+    )
+
+
 def real_record_win_pct(roster_record: Mapping[str, Any] | None) -> float | None:
     """Win percentage from a Sleeper roster's own `settings` dict
     (`{"wins", "losses", "ties"}`), or None when no games have been played /
@@ -125,7 +144,10 @@ def blend_percentile_with_record(
     win_pct = real_record_win_pct(roster_record)
     if win_pct is not None:
         record_signal = win_pct if record_strength_is_high else clamp_float(1.0 - win_pct, 0.0, 1.0)
-        weight = record_signal_weight(season_progress)
+        sample_ramp = clamp_float(
+            record_games_played(roster_record) / float(RECORD_SIGNAL_FULL_WEIGHT_GAMES), 0.0, 1.0
+        )
+        weight = record_signal_weight(season_progress) * sample_ramp
         blended = clamp_float(
             ((1.0 - weight) * blended) + (weight * record_signal),
             0.0,
