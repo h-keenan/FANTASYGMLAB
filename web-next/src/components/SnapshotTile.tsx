@@ -65,9 +65,12 @@ export function SnapshotTile({
       className={`glass-surface flex flex-col gap-1 ${compact ? "p-2 min-w-0" : `p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}`}
       style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
     >
-      <span className={`flex items-center gap-1 ${compact ? "text-[0.6875rem] leading-tight" : "text-xs"}`} style={{ color: "var(--color-text-muted)" }}>
+      <span
+        className={compact ? "flex items-start gap-1 text-[0.6875rem] leading-tight min-h-[2.125rem]" : "flex items-center gap-1 text-xs"}
+        style={{ color: "var(--color-text-muted)" }}
+      >
         {glyph ? (
-          <span style={{ color: tone === "neutral" ? GLYPH_ACCENT[glyph] : toneColor }}>
+          <span className={compact ? "shrink-0 mt-px" : undefined} style={{ color: tone === "neutral" ? GLYPH_ACCENT[glyph] : toneColor }}>
             <SnapshotTileGlyph name={glyph} />
           </span>
         ) : null}
