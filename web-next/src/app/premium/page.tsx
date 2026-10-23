@@ -56,5 +56,5 @@ export default function PremiumPage() {
     );
   }
 
-  return <PremiumContent entitlement={me.user.entitlement} plans={plans.plans} publishableKey={plans.stripe_publishable_key} />;
+  return <PremiumContent entitlement={me.user.entitlement} plans={plans.plans} publishableKey={plans.stripe_publishable_key} trial={plans.trial} trialEndsAt={me.user.trial_ends_at} />;
 }

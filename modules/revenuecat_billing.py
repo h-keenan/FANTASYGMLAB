@@ -17,6 +17,7 @@ from __future__ import annotations
 import hmac
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote
 
@@ -150,6 +151,46 @@ def fetch_active_entitlement_lookup_keys(
     return keys
 
 
+def _trial_fields(event: dict, entitlement: str) -> dict[str, str]:
+    """Trial context from the event itself (display + analytics only).
+
+    Entitlement is never derived from these fields -- it always comes from the
+    fresh active-entitlements read, which RevenueCat reports as active for the
+    whole trial and drops at trial end / cancellation-at-expiry. This only
+    records the trial end date (`expiration_at_ms`) and tags the lifecycle
+    step: started (INITIAL_PURCHASE as TRIAL), converted (RENEWAL flagged
+    `is_trial_conversion`, or the first PAID period after a TRIAL),
+    canceled (CANCELLATION / EXPIRATION of a TRIAL period).
+    """
+
+    event_type = _safe_text(event.get("type"))
+    period_type = _safe_text(event.get("period_type")).upper()
+    out: dict[str, str] = {}
+    if not period_type:
+        return out
+    out["period_type"] = period_type
+    trial_end = ""
+    if period_type == "TRIAL" and entitlement in {"premium", "front_office"}:
+        try:
+            trial_end = datetime.fromtimestamp(int(event["expiration_at_ms"]) / 1000, tz=timezone.utc).isoformat()
+        except (KeyError, TypeError, ValueError, OverflowError):
+            trial_end = ""
+    out["trial_ends_at"] = trial_end
+    transition = ""
+    if period_type == "TRIAL" and event_type == "INITIAL_PURCHASE":
+        transition = "started"
+    elif event_type in {"RENEWAL", "INITIAL_PURCHASE"} and (
+        event.get("is_trial_conversion") is True or _safe_text(event.get("is_trial_conversion")).lower() == "true"
+    ):
+        transition = "converted"
+    elif period_type == "TRIAL" and event_type in {"CANCELLATION", "EXPIRATION"}:
+        transition = "canceled"
+    out["trial_transition"] = transition
+    store = _safe_text(event.get("store")).upper()
+    out["platform"] = {"APP_STORE": "ios", "MAC_APP_STORE": "ios", "PLAY_STORE": "android"}.get(store, "")
+    return out
+
+
 def map_revenuecat_event(
     event: dict,
     *,
@@ -193,6 +234,7 @@ def map_revenuecat_event(
         result["entitlement"] = "premium"
     else:
         result["entitlement"] = "free"
+    result.update(_trial_fields(event, result["entitlement"]))
     return result
 
 

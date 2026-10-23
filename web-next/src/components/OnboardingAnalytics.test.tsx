@@ -44,7 +44,7 @@ describe("onboarding funnel analytics", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
     for (let i = 0; i < 9; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
-    fireEvent.click(screen.getByRole("button", { name: /start my 7-day free trial/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
     const all = calls();
     expect(all.find((c) => c.action === "experience_selected")).toMatchObject({ experience: "expert" });
     expect(all.find((c) => c.action === "completed")).toMatchObject({ experience: "expert", step: "level" });

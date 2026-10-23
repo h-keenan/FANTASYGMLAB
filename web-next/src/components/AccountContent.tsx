@@ -7,6 +7,7 @@ import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api
 import { ReferralCard } from "@/components/ReferralCard";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
+import { trialEndLabel } from "@/lib/trialCopy";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same four categories, same copy — so a user who's seen this in the app
@@ -53,9 +54,11 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
 
 function BillingSection({
   entitlement,
+  trialEndsAt,
   onOpenBillingPortal,
 }: {
   entitlement: MeResponse["user"]["entitlement"];
+  trialEndsAt?: string;
   onOpenBillingPortal: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -66,6 +69,9 @@ function BillingSection({
       <SectionHeading id="account-billing-heading">Billing</SectionHeading>
       {entitlement === "premium" ? (
         <>
+          {trialEndLabel(trialEndsAt) ? (
+            <p className="text-sm font-semibold">{trialEndLabel(trialEndsAt)}</p>
+          ) : null}
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Manage your plan, payment method, or cancel anytime.
           </p>
@@ -436,7 +442,7 @@ export function AccountContent({
       </header>
 
       <IdentitySection user={user} />
-      <BillingSection entitlement={user.entitlement} onOpenBillingPortal={onOpenBillingPortal} />
+      <BillingSection entitlement={user.entitlement} trialEndsAt={user.trial_ends_at} onOpenBillingPortal={onOpenBillingPortal} />
       <ReferralCard referral={referral} error={referralError} onRetry={onRetryReferral} />
       <PreferencesSection
         communityOptedOut={communityOptedOut}

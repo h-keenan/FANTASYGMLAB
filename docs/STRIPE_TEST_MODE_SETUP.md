@@ -178,7 +178,7 @@ Store only the minimum Stripe identifiers needed for portal access and reconcili
 
 ## Free Trial
 
-Trial support is optional. If enabled later, the trial length and renewal behavior must be explicit in the Premium page copy before live billing is enabled.
+Pro checkout includes a 3-day free trial (`STRIPE_TRIAL_DAYS`, default 3, `0` disables), one per account, card required up front. Setup and store configuration: `docs/free-trial-setup.md`.
 
 ## Live Billing Checklist
 

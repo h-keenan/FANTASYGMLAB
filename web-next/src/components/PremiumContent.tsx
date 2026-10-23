@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 
 import { trackFeatureUse } from "@/lib/analytics";
 
-import { api, type BillingPlan } from "@/lib/api";
+import { api, type BillingPlan, type BillingTrial } from "@/lib/api";
+import { activeTrialDays, thenPriceLine, trialCtaLabel, trialEndLabel } from "@/lib/trialCopy";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
 import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
 
@@ -18,10 +19,12 @@ export function PlanCard({
   plan,
   returnTo,
   publishableKey,
+  trialDays = 0,
 }: {
   plan: BillingPlan;
   returnTo?: string;
   publishableKey: string;
+  trialDays?: number;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,8 +99,13 @@ export function PlanCard({
           opacity: busy ? "var(--opacity-disabled)" : 1,
         }}
       >
-        {busy ? "Starting checkout…" : "Subscribe"}
+        {busy ? "Starting checkout…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
       </button>
+      {trialDays > 0 ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {thenPriceLine(plan)}
+        </p>
+      ) : null}
       {clientSecret ? (
         <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />
       ) : null}
@@ -105,7 +113,7 @@ export function PlanCard({
   );
 }
 
-function ManageBilling() {
+function ManageBilling({ trialEndsAt }: { trialEndsAt?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,6 +135,11 @@ function ManageBilling() {
       style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
     >
       <p className="text-sm font-bold">You&apos;re on Premium.</p>
+      {trialEndLabel(trialEndsAt) ? (
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          {trialEndLabel(trialEndsAt)}
+        </p>
+      ) : null}
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Manage your plan, payment method, or cancel anytime.
       </p>
@@ -156,11 +169,16 @@ export function PremiumContent({
   entitlement,
   plans,
   publishableKey,
+  trial,
+  trialEndsAt,
 }: {
   entitlement: "free" | "premium";
   plans: BillingPlan[];
   publishableKey: string;
+  trial?: BillingTrial;
+  trialEndsAt?: string;
 }) {
+  const trialDays = activeTrialDays(trial);
   useEffect(() => {
     trackFeatureUse("premium_viewed", { props: { tier: entitlement === "premium" ? "pro" : "free" } });
   }, [entitlement]);
@@ -173,7 +191,7 @@ export function PremiumContent({
         <h1 style={{ font: "var(--font-page-title)" }}>Unlock the full GM toolkit</h1>
       </header>
 
-      {entitlement === "premium" ? <ManageBilling /> : null}
+      {entitlement === "premium" ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="plans-heading">
         <SectionHeading id="plans-heading">
@@ -181,7 +199,7 @@ export function PremiumContent({
         </SectionHeading>
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => (
-            <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} publishableKey={publishableKey} />
+            <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} publishableKey={publishableKey} trialDays={plan.tier === "pro" ? trialDays : 0} />
           ))}
         </div>
       </section>

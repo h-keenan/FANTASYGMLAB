@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Purchases, {
+  INTRO_ELIGIBILITY_STATUS,
   PURCHASES_ERROR_CODE,
   type PurchasesError,
   type PurchasesOffering,
@@ -7,6 +8,7 @@ import Purchases, {
 } from 'react-native-purchases';
 
 import { env } from './env';
+import type { IntroEligibility } from './freeTrial';
 import {
   FREE,
   FRONT_OFFICE,
@@ -83,6 +85,45 @@ export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
   if (!configured) return null;
   const offerings = await Purchases.getOfferings();
   return offerings.current;
+}
+
+/**
+ * Per-product introductory-offer (free trial) eligibility from RevenueCat, keyed
+ * by store product identifier. Empty when not configured or on any failure, so
+ * callers treat a missing key as 'unknown' (which shows no trial on iOS).
+ */
+export async function getIntroEligibility(productIds: string[]): Promise<Record<string, IntroEligibility>> {
+  if (!configured || productIds.length === 0) return {};
+  try {
+    const result = await Purchases.checkTrialOrIntroductoryPriceEligibility(productIds);
+    const out: Record<string, IntroEligibility> = {};
+    for (const id of productIds) {
+      const status = result[id]?.status;
+      out[id] =
+        status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+          ? 'eligible'
+          : status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_INELIGIBLE ||
+              status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_NO_INTRO_OFFER_EXISTS
+            ? 'ineligible'
+            : 'unknown';
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** ISO end of an in-progress store trial (active entitlement in a TRIAL period), else null. */
+export async function activeTrialEnd(): Promise<string | null> {
+  if (!configured) return null;
+  try {
+    const info = await Purchases.getCustomerInfo();
+    const entitlement = info.entitlements.active[PRO_ENTITLEMENT_ID];
+    if (!entitlement || entitlement.periodType !== 'TRIAL') return null;
+    return entitlement.expirationDate;
+  } catch {
+    return null;
+  }
 }
 
 export interface PurchaseOutcome {

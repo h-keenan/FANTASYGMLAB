@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -21,12 +22,13 @@ import { trackUse } from '../lib/analytics';
 import { useOrbClearance } from '../lib/orbLayout';
 import {
   getCurrentOffering,
+  getIntroEligibility,
   purchasePackage,
   restorePurchases,
 } from '../lib/revenuecat';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { freeTrialFor } from '../lib/freeTrial';
+import { freeTrialForUser, thenPriceLine, trialCtaLabel, type IntroEligibility } from '../lib/freeTrial';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -148,6 +150,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [introEligibility, setIntroEligibility] = useState<Record<string, IntroEligibility>>({});
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -169,6 +172,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
       const current = await getCurrentOffering();
       if (!mountedRef.current) return;
       setOffering(current);
+      void getIntroEligibility((current?.availablePackages ?? []).map((pkg) => pkg.product.identifier)).then(
+        (result) => {
+          if (mountedRef.current) setIntroEligibility(result);
+        },
+      );
       // Keyed off packageType (RevenueCat's own predefined-package enum), not
       // the offering's custom `identifier` string — the identifier is just
       // whatever this one offering happens to be named in the RevenueCat
@@ -238,7 +246,13 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const selected = packages.find((p) => p.identifier === selectedId) ?? null;
   // Only promise a trial the store will actually grant for the selected
   // package (RevenueCat introPrice / Play free phase), never a hardcoded one.
-  const trial = freeTrialFor(selected?.product);
+  // On iOS the intro price exists whether or not this Apple ID already used it,
+  // so the trial is only advertised once RevenueCat says the user is eligible.
+  const trial = freeTrialForUser(
+    selected?.product,
+    selected ? introEligibility[selected.product.identifier] : undefined,
+    Platform.OS,
+  );
 
   useEffect(() => {
     trackUse('paywall', 'viewed', { tier: 'free' });
@@ -317,11 +331,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
           store trial exists, otherwise the Premium page's "Unlock the full
           GM toolkit". */}
       <AppText style={styles.title}>
-        {trial ? `Start your ${trial.lengthLabel} free trial` : 'Unlock the full GM toolkit'}
+        {trial ? `Try Pro free for ${trial.lengthLabel.replace('-day', ' days')}` : 'Unlock the full GM toolkit'}
       </AppText>
       <AppText style={styles.subtitle}>
         {trial
-          ? 'Full access to the GM toolkit. Cancel anytime before it ends and you’re never charged.'
+          ? 'Full access to the GM toolkit.'
           : 'Your price is locked in for as long as you stay subscribed.'}
       </AppText>
 
@@ -461,14 +475,12 @@ export default function PaywallScreen({ navigation, route }: Props) {
         {purchasing ? (
           <ActivityIndicator color={colors.onAccent} />
         ) : (
-          <AppText style={styles.primaryButtonText}>{trial ? 'Get Started For Free' : 'Continue'}</AppText>
+          <AppText style={styles.primaryButtonText}>{trial ? trialCtaLabel(trial) : 'Continue'}</AppText>
         )}
       </TouchableOpacity>
       {trial && selected ? (
         <AppText style={styles.trialTerms}>
-          Then {selected.product.priceString}
-          {packagePriceSuffix(selected.packageType)} — cancel anytime before your trial ends and you’re never
-          charged.
+          {thenPriceLine(selected.product.priceString, packagePriceSuffix(selected.packageType))}
         </AppText>
       ) : null}
 

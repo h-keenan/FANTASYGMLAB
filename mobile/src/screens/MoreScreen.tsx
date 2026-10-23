@@ -22,6 +22,8 @@ import AnimatedCard from '../components/AnimatedCard';
 import IconCircle from '../components/IconCircle';
 import { api, type PushCategory } from '../lib/api';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
+import { activeTrialEnd } from '../lib/revenuecat';
+import { trialEndLabel } from '../lib/freeTrial';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
@@ -85,6 +87,16 @@ export default function MoreScreen({ navigation }: Props) {
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
   const { deleteAccount, session, isGuest, convertGuestToAccount } = useAuth();
+  const [trialEnd, setTrialEnd] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void activeTrialEnd().then((end) => {
+      if (!cancelled) setTrialEnd(end);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [deleting, setDeleting] = useState(false);
   const [guestUpgradeOpen, setGuestUpgradeOpen] = useState(false);
   const [guestUpgradeEmail, setGuestUpgradeEmail] = useState('');
@@ -461,6 +473,7 @@ export default function MoreScreen({ navigation }: Props) {
             icon="card-outline"
             iconColor={colors.textSecondary}
             label="Manage Subscription"
+            description={trialEndLabel(trialEnd) || undefined}
             onPress={onManageSubscription}
             showDivider
           />

@@ -924,6 +924,9 @@ def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict
     return fields
 
 
+_TRIAL_COLUMN_MISSING = False
+
+
 def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str) -> dict[str, str]:
     """Read select `profiles` columns using the caller's own token (RLS-scoped).
 
@@ -937,17 +940,27 @@ def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str
     """
 
     defaults = {"entitlement": "free", "sleeper_username": "", "status": "error"}
-    url = auth_supabase.rest_api_url(
-        config,
-        "profiles",
-        f"select=entitlement,sleeper_username&user_id=eq.{user_id}",
-    )
-    try:
-        response = requests.get(
-            url,
-            headers=auth_supabase.auth_headers(config, access_token),
+    global _TRIAL_COLUMN_MISSING
+    headers = auth_supabase.auth_headers(config, access_token)
+
+    def _get(select: str):
+        return requests.get(
+            auth_supabase.rest_api_url(config, "profiles", f"select={select}&user_id=eq.{user_id}"),
+            headers=headers,
             timeout=15,
         )
+
+    try:
+        # trial_ends_at is display-only (docs/supabase_free_trial.sql); if that
+        # migration is not applied yet, fall back to the original select and
+        # remember it so we do not pay a failed request on every profile read.
+        if _TRIAL_COLUMN_MISSING:
+            response = _get("entitlement,sleeper_username")
+        else:
+            response = _get("entitlement,sleeper_username,trial_ends_at")
+            if response.status_code >= 400:
+                _TRIAL_COLUMN_MISSING = True
+                response = _get("entitlement,sleeper_username")
     except Exception:
         return defaults
     if response.status_code >= 400:
@@ -976,6 +989,7 @@ def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str
         return {
             "entitlement": "premium" if normalized_tier != premium.FREE else "free",
             "sleeper_username": str(row.get("sleeper_username") or "").strip(),
+            "trial_ends_at": str(row.get("trial_ends_at") or "").strip(),
             "status": "ok",
         }
     # No row found (e.g. profile bootstrap hasn't run yet) is a real, known
@@ -1175,6 +1189,22 @@ def record_analytics_event(
         return {"ok": False}
 
 
+def _active_trial_end(row: dict[str, Any]) -> str:
+    """The trial end to show: only for a still-future end on a trialing/unknown
+    status. A past date is never shown as an active trial."""
+
+    raw = str(row.get("trial_ends_at") or "").strip()
+    if not raw:
+        return ""
+    try:
+        end = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    return end.isoformat() if end > datetime.now(timezone.utc) else ""
+
+
 @app.get("/v1/me")
 def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     config = auth_supabase.get_supabase_config()
@@ -1182,6 +1212,7 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     profile = {"entitlement": "free", "sleeper_username": "", "status": "ok"}
     if user_id:
         profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
+    trial_ends_at = _active_trial_end({"trial_ends_at": profile.get("trial_ends_at")}) if profile.get("entitlement") != "free" else ""
     return {
         "ok": True,
         "user": {
@@ -1198,6 +1229,8 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
             # types a username and gets refused, without hardcoding the
             # number in two places.
             "league_cap": saved_leagues.max_leagues_for_entitlement(profile["entitlement"]),
+            # ISO end of an in-progress free trial, "" otherwise. Display only.
+            "trial_ends_at": trial_ends_at,
         },
         # Canonical Premium benefit copy — single source of truth is
         # modules.premium_page (PREMIUM_INCLUDED_NOW / MOBILE_PREMIUM_BENEFIT_LINES),
@@ -1409,8 +1442,41 @@ _BILLING_PLAN_KEYS: tuple[tuple[str, str, str], ...] = (
 )
 
 
+_TRIAL_PROFILE_SELECTS = (
+    "select=stripe_customer_id,stripe_subscription_id,stripe_subscription_status,revenuecat_app_user_id,trial_ends_at&limit=1",
+    # Older schemas (docs/supabase_free_trial.sql / revenuecat migration not applied).
+    "select=stripe_customer_id,stripe_subscription_id,stripe_subscription_status&limit=1",
+    "select=stripe_customer_id,stripe_subscription_id&limit=1",
+)
+
+
+def _fetch_trial_profile(user: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Billing-history columns used for trial eligibility / trial end display.
+
+    Tries progressively narrower selects so a not-yet-applied migration never
+    breaks the page. Returns (row, ok); ok=False means the profile could not
+    be read at all, which callers treat as "not eligible" (fail closed).
+    """
+
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return {}, False
+    supabase_config = auth_supabase.get_supabase_config()
+    for query in _TRIAL_PROFILE_SELECTS:
+        rows, error = account_store.fetch_rows(
+            supabase_config,
+            str(user.get("_access_token") or ""),
+            "profiles",
+            user_id=user_id,
+            extra_query=query,
+        )
+        if not error:
+            return (dict(rows[0]) if rows and isinstance(rows[0], dict) else {}), True
+    return {}, False
+
+
 @app.get("/v1/billing/plans")
-def get_billing_plans(_user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_billing_plans(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Live Stripe pricing for the Premium page — never hardcoded here.
 
     stripe_billing.plan_display_details() always prefers real Stripe Price
@@ -1444,7 +1510,19 @@ def get_billing_plans(_user: dict[str, Any] = Depends(require_user)) -> dict[str
     # the Premium page already fetches plan data from before a user can
     # even click Subscribe. Intentionally public/safe to ship to the
     # client (unlike the secret key, which never leaves this service).
-    return {"ok": True, "plans": plans, "stripe_publishable_key": config.publishable_key}
+    # Trial copy is shown only when this account can actually get the trial
+    # (enabled + no prior billing history). Cheap profile check only here; the
+    # checkout endpoint additionally checks Stripe by email.
+    profile, profile_ok = _fetch_trial_profile(user)
+    trial_eligible = profile_ok and stripe_billing.trial_eligible(
+        config, tier=stripe_billing.TIER_PRO, profile=profile, check_stripe=False
+    )
+    return {
+        "ok": True,
+        "plans": plans,
+        "stripe_publishable_key": config.publishable_key,
+        "trial": {"days": config.trial_days if trial_eligible else 0, "eligible": bool(trial_eligible)},
+    }
 
 
 class CheckoutRequest(BaseModel):
@@ -1489,6 +1567,10 @@ def create_billing_checkout(
     if not user_id:
         raise HTTPException(status_code=401, detail="Checkout requires a signed-in account.")
     config = stripe_billing.load_stripe_config()
+    profile, profile_ok = _fetch_trial_profile(user)
+    trial_ok = profile_ok and stripe_billing.trial_eligible(
+        config, tier=body.tier, email=email, profile=profile
+    )
     return_path = _safe_return_path(body.return_to)
     embedded = str(body.ui_mode or "").strip().casefold() == "embedded"
     try:
@@ -1498,6 +1580,7 @@ def create_billing_checkout(
             email=email,
             interval=body.interval,
             tier=body.tier,
+            trial_eligible=trial_ok,
             ui_mode="embedded" if embedded else "hosted",
             return_url=app_config.stripe_return_url(f"{return_path}?billing=complete", base_url=config.app_base_url)
             if embedded

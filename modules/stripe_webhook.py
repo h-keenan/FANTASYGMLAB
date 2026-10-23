@@ -131,6 +131,11 @@ def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
         clean_value = _safe_text(value)
         if clean_value:
             payload[key] = clean_value
+    # Trial end date for the account screen. Only subscription lifecycle
+    # events are authoritative about it (checkout/invoice events carry no
+    # trial_end), and any non-trialing subscription state clears it.
+    if _safe_text(action.get("reason")).startswith("customer.subscription."):
+        payload["trial_ends_at"] = _safe_text(action.get("stripe_trial_end")) or None  # type: ignore[assignment]
     event_created = _safe_text(action.get("event_created"))
     if event_created:
         try:
@@ -211,18 +216,30 @@ def update_profile_entitlement(
         ordering_params = _durable_event_ordering_params(payload)
         if ordering_params:
             request_kwargs["params"] = ordering_params
-        response = request_session.patch(
-            _profile_update_url(config, user_id),
-            headers={
-                "apikey": config.service_role_key,
-                "Authorization": f"Bearer {config.service_role_key}",
-                "Content-Type": "application/json",
-                "Prefer": "return=minimal",
-            },
-            json=payload,
-            timeout=15,
-            **request_kwargs,
-        )
+        def _patch(body: dict) -> Any:
+            return request_session.patch(
+                _profile_update_url(config, user_id),
+                headers={
+                    "apikey": config.service_role_key,
+                    "Authorization": f"Bearer {config.service_role_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json=body,
+                timeout=15,
+                **request_kwargs,
+            )
+
+        response = _patch(payload)
+        if (
+            response.status_code >= 400
+            and "trial_ends_at" in payload
+            and "trial_ends_at" in _supabase_error_message(response).casefold()
+        ):
+            # docs/supabase_free_trial.sql not applied yet: entitlement must
+            # still flow, so retry without the display-only trial column.
+            payload = {key: value for key, value in payload.items() if key != "trial_ends_at"}
+            response = _patch(payload)
     except Exception:
         return False, "Could not reach Supabase profiles table."
     if response.status_code >= 400:
@@ -315,6 +332,20 @@ def _track_subscription_lifecycle(
                     extra={"tier": tier, "interval": interval},
                 ),
                 once_key=event_id,
+                state=state,
+            )
+        transition = _safe_text(action.get("trial_transition"))
+        if transition in {"converted", "canceled"}:
+            # Privacy-safe: no ids or emails beyond the hashed account key
+            # track_event derives from `state`.
+            launch_analytics.track_event(
+                "feature_use",
+                props=launch_analytics.build_context_props(
+                    state,
+                    source_surface="stripe_webhook",
+                    extra={"feature": "trial", "action": transition, "platform": "web"},
+                ),
+                once_key=f"trial_{transition}:{_safe_text(action.get('stripe_subscription_id')) or event_id}",
                 state=state,
             )
         if (
