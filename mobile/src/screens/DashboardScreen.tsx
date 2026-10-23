@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import PickPlate from '../components/PickPlate';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -21,7 +21,6 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
-import NewBadge from '../components/NewBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
@@ -47,6 +46,7 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import ThisWeekSection from '../components/ThisWeekSection';
+import { thisWeekTradeIdeaHeadline } from '../lib/thisWeek';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
@@ -453,6 +453,11 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // `items` whenever this is true.
   const showEmptyState = quiet || !items || items.length === 0;
   const grouped = groupDashboardItems(showEmptyState ? [] : items!);
+  // The trade idea the This week strip already shows is not repeated in the Top Priority hero.
+  const duplicateTradeHeadline = thisWeekTradeIdeaHeadline(dashboardData?.this_week);
+  if (duplicateTradeHeadline) {
+    grouped.topPriority = grouped.topPriority.filter((item) => (item.headline ?? '').trim() !== duplicateTradeHeadline);
+  }
 
   return (
     <View style={styles.root}>
@@ -736,10 +741,12 @@ export function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.asset_type === 'pick') {
     return (
-      <View style={styles.assetRow}>
-        <PickPlate round={asset.round ? Number(asset.round) : null} pickNo={asset.pick_no ? Number(asset.pick_no) : null} />
-        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
-      </View>
+      <DraftPickAssetRow
+        round={asset.round ? Number(asset.round) : null}
+        pickNo={asset.pick_no ? Number(asset.pick_no) : null}
+        label={asset.label}
+        projectedRange={asset.projected_range}
+      />
     );
   }
   return (
@@ -917,7 +924,7 @@ function TopPriorityTradeCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</AppText>
-        {isNew ? <NewBadge /> : null}
+        {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
         <View style={styles.tradeBadge}>
           <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
           <AppText style={styles.tradeBadgeText}>TRADE</AppText>
@@ -1025,7 +1032,7 @@ function BriefingCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>
-        {isNew ? <NewBadge /> : null}
+        {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
         {/* Real signal for why this tile leads the priority ladder (roster
             need > injury pressure > future risk > upgrade opportunity) —
             not a fabricated confidence score, since that ladder is a strict
@@ -1329,8 +1336,6 @@ function createStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  assetName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

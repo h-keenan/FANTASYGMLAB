@@ -501,7 +501,7 @@ function TradeHubGateCard({
 // (_SELL_HIGH_OPPORTUNITY_LABELS — established trade value from a starter
 // reputation, but the opportunity signal underneath is already softening).
 // Reuses impactTagConfig's exact labels/colors so the legend, the filter
-// chips below, and each card's ImpactBadge never drift from one another.
+// chips below, and each card's impact pill never drift from one another.
 function impactLegend(colors: ThemeColors): ScreenInfoLegendItem[] {
   const config = impactTagConfig(colors);
   return [

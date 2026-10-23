@@ -189,6 +189,7 @@ export function ExchangeAssetList({
               <DraftPickAssetRow
                 pickId={asset.pick_id}
                 round={asset.round ? Number(asset.round) : null}
+                pickNo={asset.pick_no ? Number(asset.pick_no) : null}
                 label={asset.label}
                 projectedRange={asset.projected_range}
                 pickTier={asset.pick_tier}
@@ -250,12 +251,6 @@ function categoryColor(category: string, colors: ThemeColors): string {
   return categoryColors(colors)[category] ?? colors.textSecondary;
 }
 
-function CategoryBadge({ category }: { category: string }) {
-  const { colors } = useThemeMode();
-  if (!category) return null;
-  return <ToneBadge label={category} color={categoryColor(category, colors)} />;
-}
-
 // Semantic-color fix (recommendation-clarity audit, this pass): `sell_high`
 // previously rendered in `colors.danger` (red). Per UI_MAGNA_CARTA.md §3,
 // red is reserved app-wide for "injury, urgent risk, negative value, serious
@@ -283,13 +278,6 @@ export function impactTagConfig(
   };
 }
 
-
-function ImpactBadge({ impactTag }: { impactTag: string }) {
-  const { colors } = useThemeMode();
-  const config = impactTagConfig(colors)[impactTag];
-  if (!config) return null;
-  return <ToneBadge label={config.label} color={config.color} />;
-}
 
 
 /**
@@ -366,6 +354,7 @@ export default function TradeIdeaCard({
   const bandColor = valueEdgeBandColor(colors)[idea.value_edge_band] ?? colors.textSecondary;
 
   const categoryAccent = categoryColor(idea.category, colors);
+  const impactConfig = impactTagConfig(colors)[idea.impact_tag];
 
   const landedTargetNames = (idea.landed_gm_target_player_ids ?? [])
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
@@ -375,8 +364,8 @@ export default function TradeIdeaCard({
     <AccentCard accent={categoryAccent} compact style={styles.card}>
       {idea.category || idea.impact_tag ? (
         <View style={[styles.categoryRow, styles.categoryRowSpread]}>
-          <CategoryBadge category={idea.category} />
-          <ImpactBadge impactTag={idea.impact_tag} />
+          {idea.category ? <ToneBadge label={idea.category} color={categoryAccent} /> : null}
+          {impactConfig ? <ToneBadge label={impactConfig.label} color={impactConfig.color} /> : null}
         </View>
       ) : null}
       <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} style={styles.beginnerHelp} />

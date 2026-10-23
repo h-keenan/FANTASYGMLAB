@@ -97,10 +97,10 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.cardBorder,
       paddingHorizontal: spacing.sm,
-      paddingVertical: 7,
+      minHeight: 44,
     },
     buttonActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent, borderWidth: 1.5 },
-    buttonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, flexShrink: 1 },
+    buttonText: { fontSize: 12, fontWeight: '600', letterSpacing: -0.2, color: colors.textSecondary, flexShrink: 1 },
     buttonTextActive: { color: colors.accentOnTint, fontWeight: '700' },
     backdrop: {
       flex: 1,

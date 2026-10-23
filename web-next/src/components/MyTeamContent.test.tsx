@@ -159,7 +159,7 @@ describe("MyTeamContent", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "IR" }));
-    expect(container.querySelector(".ovr-gauge-placeholder")).toBeInTheDocument();
+    expect(container.querySelector(".value-ring-placeholder")).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-18, screenshot: "the bench should be in order so.

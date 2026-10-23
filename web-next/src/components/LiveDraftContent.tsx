@@ -17,6 +17,7 @@ import type {
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PickPlate } from "@/components/PickRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LiveDraftTradeEvaluator } from "@/components/LiveDraftTradeEvaluator";
 import {
@@ -254,9 +255,7 @@ function PickRowView({ row }: { row: LiveDraftPickRow }) {
         identity={{ player_id: row.player_id, name: row.player_name, position: row.position, team: row.team, sourceLabel: "Live Draft" }}
         className="flex items-center gap-2 min-w-0"
       >
-        <span className="text-xs font-bold w-10 shrink-0" style={{ color: "var(--color-text-muted)" }}>
-          #{row.pick_no}
-        </span>
+        <PickPlate round={row.round} pickNo={row.pick_no} />
         <PositionBadge position={row.position} />
         <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
           {row.player_name}

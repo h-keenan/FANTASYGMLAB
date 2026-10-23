@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -50,24 +50,44 @@ export default function ThisWeekSection({
           <Button label={next.cta_label} onPress={() => go(next.route)} style={styles.cta} />
         </AccentCard>
       ) : (
-        data.rows.map((row) => {
-          const color = colors[thisWeekToneKey(row.tone)];
-          return (
-            <AccentCard key={row.key} accent={color} compact>
-              <View style={styles.titleRow}>
+        <AccentCard accent={colors.accent} compact>
+          {data.rows.map((row, index) => {
+            const color = colors[thisWeekToneKey(row.tone)];
+            const actionable = Boolean(row.cta_label && row.route);
+            const content = (
+              <>
                 <ToneBadge label={row.status} color={color} />
-                <AppText style={[styles.headline, styles.flex]}>{row.headline}</AppText>
+                <View style={styles.rowText}>
+                  <AppText style={styles.headline} numberOfLines={1}>
+                    {row.headline}
+                  </AppText>
+                  <AppText style={styles.why} numberOfLines={2}>
+                    {row.why}
+                  </AppText>
+                </View>
+                {actionable ? <AppText style={styles.arrow}>→</AppText> : null}
+              </>
+            );
+            return actionable ? (
+              <Pressable
+                key={row.key}
+                accessibilityRole="button"
+                accessibilityLabel={row.cta_label ?? undefined}
+                onPress={() => go(row.route!)}
+                style={[styles.row, index > 0 ? styles.rowDivider : null]}
+              >
+                {content}
+              </Pressable>
+            ) : (
+              <View key={row.key} style={[styles.row, index > 0 ? styles.rowDivider : null]}>
+                {content}
               </View>
-              <AppText style={styles.why}>{row.why}</AppText>
-              {row.cta_label && row.route ? (
-                <Button label={row.cta_label} onPress={() => go(row.route!)} style={styles.cta} />
-              ) : null}
-            </AccentCard>
-          );
-        })
+            );
+          })}
+        </AccentCard>
       )}
       {tradePending && !next && !data.rows.some((row) => row.key === 'trade') ? (
-        <SkeletonBlock height={84} radius={12} />
+        <SkeletonBlock height={64} radius={12} />
       ) : null}
     </View>
   );
@@ -81,5 +101,9 @@ function createStyles(colors: ThemeColors) {
     headline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     why: { fontSize: 13, color: colors.textSecondary },
     cta: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
+    rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+    rowText: { flex: 1, minWidth: 0 },
+    arrow: { fontSize: 16, color: colors.accent },
   });
 }

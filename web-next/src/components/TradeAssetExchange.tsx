@@ -1,5 +1,6 @@
 import type { TradeAsset } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PickRow } from "@/components/PickRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { isIdpPositionFilter } from "@/lib/idpPresentation";
@@ -16,33 +17,6 @@ import { isIdpPositionFilter } from "@/lib/idpPresentation";
 function formatValue(raw: number | null | undefined): string {
   if (raw === null || raw === undefined) return "";
   return Math.round(raw).toLocaleString();
-}
-
-/**
- * The square draft-pick plate ("R1" over "#3"). One look for every pick row:
- * TradeAssetRow's pick branch and PickRow both render it.
- */
-export function PickPlate({ round, pickNo }: { round?: number | string | null; pickNo?: number | string | null }) {
-  const top = round ? `R${round}` : pickNo ? `#${pickNo}` : "PICK";
-  const bottom = round && pickNo ? `#${pickNo}` : null;
-  return (
-    <div
-      className="flex flex-col items-center justify-center font-extrabold uppercase leading-none"
-      style={{
-        width: "2.25rem",
-        height: "2.25rem",
-        flex: "0 0 2.25rem",
-        fontSize: "0.6875rem",
-        gap: 2,
-        background: "var(--color-surface-muted)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        color: "var(--color-accent)",
-      }}
-    >
-      <span>{top}</span>
-      {bottom ? <span>{bottom}</span> : null}
-    </div>
-  );
 }
 
 export function TradeAssetRow({
@@ -63,19 +37,13 @@ export function TradeAssetRow({
 }) {
   if (asset.asset_type === "pick") {
     return (
-      <div className="flex items-center gap-3 py-1.5">
-        <PickPlate round={asset.round} pickNo={asset.pick_no} />
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-            {asset.label || "Draft pick"}
-          </span>
-          {asset.owner_team_name || asset.projected_range ? (
-            <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-              {[asset.projected_range, asset.owner_team_name].filter(Boolean).join(" · ")}
-            </span>
-          ) : null}
-        </div>
-      </div>
+      <PickRow
+        dense
+        round={asset.round}
+        pickNo={asset.pick_no}
+        label={asset.label || "Draft pick"}
+        context={[asset.projected_range, asset.owner_team_name].filter(Boolean).join(" · ") || null}
+      />
     );
   }
 

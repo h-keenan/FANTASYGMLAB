@@ -15,7 +15,7 @@ import {
   playersPositionOptions,
 } from "@/lib/idpPresentation";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PickRow } from "@/components/PickRow";
+import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
@@ -505,7 +505,7 @@ export function PlayersContent({
                 className="glass-surface"
               >
                 {seasonPicks.map((pick, index) => (
-                  <PickRow key={pick.pick_id} pick={pick} showOwner showDivider={index < seasonPicks.length - 1} />
+                  <PickRow key={pick.pick_id} {...draftPickRowProps(pick, true)} showDivider={index < seasonPicks.length - 1} />
                 ))}
               </div>
             </div>

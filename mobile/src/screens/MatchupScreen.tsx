@@ -22,7 +22,7 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import StatStrip from '../components/StatStrip';
+import DashboardStatRow from '../components/DashboardStatRow';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import ValuesCredit from '../components/ValuesCredit';
@@ -385,8 +385,8 @@ function Scoreboard({
         <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText>
       )}
 
-      <StatStrip
-        fullWidth
+      <DashboardStatRow
+        style={{ marginBottom: 0 }}
         items={[
           { label: 'Your value', value: formatSeasonValue(comparison.my_season_value) },
           {

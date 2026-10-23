@@ -18,14 +18,14 @@ import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
-import { ValueRing } from "@/components/ValueRing";
+import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import {
   confidenceLevel,
-  confidenceRingPercent,
   formatTradeGain,
-  levelToRingTone,
+  LEVEL_SEGMENTS,
+  levelColor,
   tradeShareRecord,
 } from "@/lib/tradeHubPresentation";
 import { tradePositionOptions } from "@/lib/idpPresentation";
@@ -313,7 +313,6 @@ function VerdictCard({
   const toneColor = TONE_COLOR[verdict.tone];
   const deltaText = formatTradeGain(verdict.value_delta);
   const confidenceLvl = confidenceLevel(verdict.confidence);
-  const confidencePercent = confidenceRingPercent(verdict.confidence);
   const sendTotal = sendAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const receiveTotal = receiveAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const alternatePackages = verdict.alternate_packages ?? [];
@@ -438,23 +437,12 @@ function VerdictCard({
         </div>
       ) : null}
 
-      {/* Confidence then Risk — the same order (and the same ring primitive
-          Trade Hub's confidence/realism rows use) as
-          build_offer_result_card_html's own documented hierarchy. */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex flex-col items-center gap-1">
-          <ValueRing
-            percent={confidencePercent}
-            tone={levelToRingTone(confidenceLvl)}
-            display={`${confidencePercent}%`}
-            ariaLabel={`Confidence: ${verdict.confidence}`}
-            size="sm"
-          />
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-            Confidence · {verdict.confidence}
-          </span>
-        </div>
-      </div>
+      <ConfidenceMeter
+        label="Confidence"
+        value={verdict.confidence}
+        level={LEVEL_SEGMENTS[confidenceLvl]}
+        color={levelColor(confidenceLvl)}
+      />
       <BeginnerHelp term="analyzerConfidence" />
 
       {verdict.risk_summary ? (

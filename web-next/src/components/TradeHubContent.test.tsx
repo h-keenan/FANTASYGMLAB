@@ -76,13 +76,13 @@ describe("TradeHubContent", () => {
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
   });
 
-  it("reveals the full rationale and confidence/realism rings only after View details is clicked", () => {
+  it("reveals the full rationale and confidence/realism meters only after View details is clicked", () => {
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 
-    expect(screen.queryByText(/Confidence · High/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Confidence: High" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /View details/ }));
-    expect(screen.getByText(/Confidence · High/)).toBeInTheDocument();
-    expect(screen.getByText(/Realism · Realistic/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Confidence: High" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Realism: Realistic" })).toBeInTheDocument();
   });
 
   it("shows the Premium upsell banner when ideas are hidden", () => {
@@ -191,7 +191,7 @@ describe("TradeHubContent", () => {
     it("leaves every idea collapsed and unmarked without a highlightPlayerId (current/before behavior)", () => {
       const { container } = render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={twoIdeas} />);
       expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
-      expect(screen.queryByText(/Confidence ·/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("img", { name: /^Confidence:/ })).not.toBeInTheDocument();
     });
 
     it("highlights and auto-expands only the idea naming the given player id", () => {
@@ -204,7 +204,7 @@ describe("TradeHubContent", () => {
       expect(highlighted[0].textContent).toContain("Other GM");
       // Auto-expanded: its detail block shows without clicking "View details";
       // the non-matching idea stays collapsed.
-      expect(screen.getAllByText(/Confidence ·/)).toHaveLength(1);
+      expect(screen.getAllByRole("img", { name: /^Confidence:/ })).toHaveLength(1);
     });
 
     it("matches a send-side (give-away) player id too, not just the receive side", () => {
