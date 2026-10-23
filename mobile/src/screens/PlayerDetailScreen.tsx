@@ -139,7 +139,7 @@ function NewsImpactModal({
         <SwipeDismissCard style={styles.modalCard} onDismiss={onClose}>
           <View style={styles.modalHeaderRow}>
             <AppText style={styles.modalTitle}>In The News</AppText>
-            <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>

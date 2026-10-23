@@ -422,12 +422,12 @@ export default function HomeScreen({ navigation, route }: Props) {
                     </AppText>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => void signOut()} hitSlop={8}>
                   <AppText style={styles.signOut}>Sign out</AppText>
                 </TouchableOpacity>
               </View>
               {me ? (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   disabled={me.entitlement === 'premium'}
                   onPress={() => (me.profile_status === 'error' ? void load() : navigation.navigate('Paywall'))}
                   style={[
@@ -486,7 +486,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             <View style={styles.sectionHeader}>
               <AppText style={styles.sectionTitle}>Your leagues</AppText>
               {atLeagueCap ? null : (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.addLeagueButton}
                   onPress={() => {
                     setAddQuery(me?.sleeper_username ?? '');
@@ -558,7 +558,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           const isFirst = index === 0;
           const isLast = index === (leagues?.length ?? 0) - 1;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               activeOpacity={0.7}
               style={[
                 styles.leagueRow,
@@ -585,7 +585,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   stand-in, and rename prefills from it — saving would write
                   the fake name back into saved_leagues for real. */}
               {showcaseMode ? null : (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   hitSlop={8}
                   style={styles.renameButton}
                   onPress={() => {
@@ -670,7 +670,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 all — not only shown reactively after a failed search (see
                 findLeagues' auto-expand above), since someone might never
                 attempt a search in the first place without this nudge. */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               onPress={() => setShowNoLeagueHelp((value) => !value)}
               hitSlop={8}
               style={styles.noLeagueToggle}
@@ -689,7 +689,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   doesn't create or host leagues itself. Create a free league in the Sleeper app
                   (or at sleeper.com), then come back here and search your Sleeper username.
                 </AppText>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.noLeagueButton}
                   onPress={() => void Linking.openURL('https://sleeper.com')}
                 >
@@ -726,7 +726,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     <AppText style={styles.addOptionsSeasonHeader}>{section.title} season</AppText>
                   )}
                   renderItem={({ item }) => (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.addOptionRow}
                       disabled={addBusy}
                       onPress={() =>

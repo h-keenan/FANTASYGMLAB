@@ -92,7 +92,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
-    minHeight: 40,
+    minHeight: 44,
     justifyContent: 'center',
     maxWidth: 150,
   },

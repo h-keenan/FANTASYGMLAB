@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -151,7 +152,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load the draft center" message={error} />
       </View>
     );
   }

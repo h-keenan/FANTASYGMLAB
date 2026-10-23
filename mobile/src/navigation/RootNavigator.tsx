@@ -259,10 +259,10 @@ export default function RootNavigator() {
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8}>
+                  <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8} accessibilityRole="button" accessibilityLabel="News">
                     <Ionicons name="globe-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8}>
+                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8} accessibilityRole="button" accessibilityLabel="More">
                     <Ionicons name="ellipsis-horizontal-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>

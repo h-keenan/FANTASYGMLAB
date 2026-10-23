@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import Button from '../components/Button';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -446,7 +447,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load the trade analyzer" message={error} />
       </View>
     );
   }
@@ -509,13 +510,13 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
       {!quickMode ? (
         <View style={styles.assetTypeRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, assetType === 'players' && styles.pillActive]}
             onPress={() => setAssetType('players')}
           >
             <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, assetType === 'picks' && styles.pillActive]}
             onPress={() => setAssetType('picks')}
           >
@@ -537,7 +538,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
       {activeSide === 'receive' && otherTeams.length > 0 ? (
         <View style={styles.teamRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, selectedTeamId === ALL_TEAMS_ID && styles.pillActive]}
             onPress={() => setSelectedTeamId(ALL_TEAMS_ID)}
           >
@@ -546,7 +547,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             </AppText>
           </TouchableOpacity>
           {otherTeams.map((team) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={team.rosterId}
               style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
               onPress={() => setSelectedTeamId(team.rosterId)}
@@ -670,6 +671,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             <TouchableOpacity
               style={styles.pickInfoButton}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Pick details"
               onPress={() =>
                 navigation.navigate('PickDetail', { pick: item.pick, leagueId, leagueName })
               }
@@ -799,7 +802,7 @@ function VerdictCard({
         <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
           {verdict.band}
         </AppText>
-        <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+        <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <AppText style={styles.shareButtonText}>Share</AppText>
         </TouchableOpacity>
@@ -852,7 +855,7 @@ function VerdictCard({
         </>
       ) : null}
       {verdict.counter_action ? (
-        <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
+        <TouchableOpacity accessibilityRole="button" style={styles.counterButton} onPress={onBuildCounter}>
           <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
           <AppText style={styles.counterButtonText}>Build the counter</AppText>
         </TouchableOpacity>
@@ -911,7 +914,7 @@ function TradeSide({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.side, active && styles.sideActive]}
       onPress={onPressHeader}
       activeOpacity={0.85}

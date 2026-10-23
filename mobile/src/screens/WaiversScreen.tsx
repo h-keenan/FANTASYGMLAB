@@ -632,7 +632,7 @@ function FreeAgentRow({
           trendingAddLabel={waiverTrendingAddLabel(player)}
           onPress={onPress}
         />
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.gridTrailingFooter}>
+        <TouchableOpacity accessibilityRole="button" onPress={onPress} activeOpacity={0.7} style={styles.gridTrailingFooter}>
           <AppText style={styles.freeAgentValue}>{scoreText}</AppText>
           <View style={styles.freeAgentTrailingChips}>
             {player.position_rank ? (
@@ -678,7 +678,7 @@ function FreeAgentRow({
           showDivider={false}
         />
       </View>
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.freeAgentTrailing}>
+      <TouchableOpacity accessibilityRole="button" onPress={onPress} activeOpacity={0.7} style={styles.freeAgentTrailing}>
         <AppText style={styles.freeAgentValue}>{scoreText}</AppText>
         <View style={styles.freeAgentTrailingChips}>
           {player.position_rank ? (

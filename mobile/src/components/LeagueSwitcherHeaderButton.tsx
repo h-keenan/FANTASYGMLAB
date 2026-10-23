@@ -69,7 +69,7 @@ export default function LeagueSwitcherHeaderButton({
 
   return (
     <>
-      <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
+      <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Switch league">
         <Ionicons name="swap-vertical" size={18} color={colors.textPrimary} />
       </TouchableOpacity>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>

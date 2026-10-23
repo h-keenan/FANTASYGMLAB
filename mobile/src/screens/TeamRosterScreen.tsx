@@ -370,7 +370,7 @@ function RosterPlayerRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const injury = waiverInjuryDisplay(player.injury_status);
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.compactRow, showDivider && styles.compactDivider]}
       onPress={onPress}
       activeOpacity={0.7}

@@ -35,7 +35,7 @@ export default function TrialLapsedScreen({ navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <View style={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
-        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>
+        <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>
           <AppText style={styles.closeButtonText}>Not now</AppText>
         </TouchableOpacity>
 
@@ -48,7 +48,7 @@ export default function TrialLapsedScreen({ navigation }: Props) {
         </View>
 
         <PremiumGlow radius={radii.md} style={styles.glowWrap}>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.replace('Paywall')}>
+          <TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={() => navigation.replace('Paywall')}>
             <AppText style={styles.primaryButtonText}>See the new plans</AppText>
           </TouchableOpacity>
         </PremiumGlow>
