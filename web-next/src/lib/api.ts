@@ -2156,6 +2156,16 @@ export interface FounderAnalyticsStorage {
   scope_label: string;
 }
 
+export interface FounderOnboardingFunnel {
+  started_users: number;
+  completed_users: number;
+  completion_rate_pct: number | null;
+  skipped_users: number;
+  skip_rate_pct: number | null;
+  steps: { step: string; step_index: number; users: number; drop_off_pct: number | null; skipped_users: number }[];
+  experience: Record<string, { users: number; pct: number }>;
+}
+
 export interface FounderAnalyticsReport {
   window_key: string;
   window_label: string;
@@ -2172,6 +2182,8 @@ export interface FounderAnalyticsReport {
   platforms?: Record<string, number>;
   /** feature_use events by (feature, action) with platform and Free/Pro split. */
   feature_use?: FounderAnalyticsFeatureUse[];
+  /** Onboarding funnel from stored events; null/absent when none stored. */
+  onboarding_funnel?: FounderOnboardingFunnel | null;
   errors: Record<string, number>;
   error_sessions: number;
   performance: Record<string, FounderAnalyticsLatencyStat>;

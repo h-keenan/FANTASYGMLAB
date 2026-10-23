@@ -217,6 +217,44 @@ export function FounderAnalyticsContent({
         </section>
       ) : null}
 
+      {data.onboarding_funnel && data.onboarding_funnel.steps.length > 0 ? (
+        <section className="flex flex-col gap-2" data-testid="onboarding-funnel">
+          {sectionLabel("Onboarding funnel")}
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {data.onboarding_funnel.started_users.toLocaleString()} users started
+            {data.onboarding_funnel.completion_rate_pct !== null
+              ? ` · completion ${data.onboarding_funnel.completion_rate_pct}%`
+              : ""}
+            {data.onboarding_funnel.skip_rate_pct !== null ? ` · skip rate ${data.onboarding_funnel.skip_rate_pct}%` : ""}
+            {Object.keys(data.onboarding_funnel.experience).length > 0
+              ? ` · experience ${Object.entries(data.onboarding_funnel.experience)
+                  .map(([key, v]) => `${key} ${v.pct}%`)
+                  .join(" / ")}`
+              : ""}
+          </p>
+          <div className="glass-surface flex flex-col">
+            {data.onboarding_funnel.steps.map((row, index) => (
+              <div
+                key={row.step}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+                style={
+                  index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined
+                }
+              >
+                <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+                  {row.step.replace(/_/g, " ")}
+                </span>
+                <span className="text-xs text-right" style={{ color: "var(--color-text-muted)" }}>
+                  {row.users.toLocaleString()} users
+                  {row.drop_off_pct !== null ? ` · drop-off ${row.drop_off_pct}%` : ""}
+                  {row.skipped_users > 0 ? ` · skipped ${row.skipped_users}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-2">
         {sectionLabel("Decision engagement")}
         <NamedCountList items={data.decision_engagement} />

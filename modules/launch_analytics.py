@@ -225,6 +225,11 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         "team_count",
         "te_premium",
         "session_reason",
+        # Onboarding funnel (feature_use feature=onboarding): fixed snake_case
+        # step ids / indices and the new|expert experience pick. No free text.
+        "step",
+        "step_index",
+        "experience",
     }
 )
 

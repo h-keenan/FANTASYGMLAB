@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
+import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 
 /**
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
@@ -51,8 +52,18 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   const levelStep = featureCount + 1;
   const totalSteps = featureCount + 2;
 
+  const stepName = (i: number) => (i < featureCount ? ONBOARDING_FEATURES[i].key : i === connectStep ? "connect" : "level");
+
+  // One step_viewed per step per session (deduped in the helper), so a
+  // re-render or a Back/Next revisit never double counts.
+  useEffect(() => {
+    trackOnboardingStepViewed(stepName(step), step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const finish = async () => {
     if (!level) return;
+    trackOnboarding("completed", { step: "level", step_index: levelStep, experience: experienceBucket(level) });
     setSaving(true);
     try {
       // Saved through ExperienceLevelContext so the answer takes effect
@@ -75,7 +86,18 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
     }
     setStep((s) => s + 1);
   };
-  const back = () => setStep((s) => Math.max(0, s - 1));
+  const back = () => {
+    if (step > 0) trackOnboarding("back", { step: stepName(step), step_index: step });
+    setStep((s) => Math.max(0, s - 1));
+  };
+  const skip = () => {
+    trackOnboarding("skipped", { step: stepName(step), step_index: step });
+    onDone();
+  };
+  const pickLevel = (value: ExperienceLevel) => {
+    setLevel(value);
+    trackOnboarding("experience_selected", { experience: experienceBucket(value) });
+  };
 
   const onTouchEnd = (clientX: number) => {
     const start = touchStartX.current;
@@ -107,7 +129,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
               <span key={i} className={`onboarding-dot${i === step ? " onboarding-dot--active" : ""}`} />
             ))}
           </div>
-          <button type="button" onClick={onDone} className="onboarding-skip">
+          <button type="button" onClick={skip} className="onboarding-skip">
             Skip
           </button>
         </div>
@@ -148,7 +170,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
             <div className="onboarding-cards" style={{ marginTop: "var(--space-md)" }}>
               <button
                 type="button"
-                onClick={() => setLevel("beginner")}
+                onClick={() => pickLevel("beginner")}
                 className={`onboarding-glass onboarding-pick${level === "beginner" ? " onboarding-pick--selected" : ""}`}
               >
                 <div className="onboarding-row">
@@ -163,7 +185,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
               </button>
               <button
                 type="button"
-                onClick={() => setLevel("advanced")}
+                onClick={() => pickLevel("advanced")}
                 className={`onboarding-glass onboarding-pick${level === "advanced" ? " onboarding-pick--selected" : ""}`}
               >
                 <div className="onboarding-row">
