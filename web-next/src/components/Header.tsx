@@ -3,13 +3,15 @@
 import Image from "next/image";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import Link from "next/link";
-import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
+import { useSearchParams } from "@/lib/useSearchParams";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { AlertsBell } from "@/components/AlertsDropdown";
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
+import { maskSavedLeagueRows } from "@/lib/privacy";
 import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
@@ -234,7 +236,7 @@ function HeaderLeagueControls() {
       .from("saved_leagues")
       .select("league_id, league_name")
       .then(({ data }) => {
-        if (!cancelled) setSavedLeagues(data ?? []);
+        if (!cancelled) setSavedLeagues(maskSavedLeagueRows(data ?? []));
       });
     return () => {
       cancelled = true;

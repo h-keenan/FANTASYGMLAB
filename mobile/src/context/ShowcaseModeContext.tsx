@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
+import { Text, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { api } from '../lib/api';
+import { queryClient } from '../lib/queryClient';
 
 const KEY = 'fgl:showcase-mode';
 
@@ -46,7 +50,11 @@ export function ShowcaseModeProvider({ children }: { children: React.ReactNode }
   }, [showcaseMode]);
 
   const setShowcaseMode = (next: boolean) => {
+    // Arm the flag synchronously, then drop cached screens so every query
+    // refetches through (or around) the masking layer.
+    api.setShowcaseModeEnabled(next);
     setShowcaseModeState(next);
+    void queryClient.resetQueries();
     AsyncStorage.setItem(KEY, next ? '1' : '0').catch(() => {});
   };
 
@@ -55,7 +63,12 @@ export function ShowcaseModeProvider({ children }: { children: React.ReactNode }
     [showcaseMode],
   );
 
-  return <ShowcaseModeContext.Provider value={value}>{children}</ShowcaseModeContext.Provider>;
+  return (
+    <ShowcaseModeContext.Provider value={value}>
+      {children}
+      {showcaseMode ? <PrivacyModePill onPress={() => setShowcaseMode(false)} /> : null}
+    </ShowcaseModeContext.Provider>
+  );
 }
 
 export function useShowcaseMode(): ShowcaseModeContextValue {
@@ -64,4 +77,31 @@ export function useShowcaseMode(): ShowcaseModeContextValue {
     throw new Error('useShowcaseMode must be used within a ShowcaseModeProvider');
   }
   return context;
+}
+
+/** Small pill shown on every screen while privacy mode is on; tap to turn off. */
+function PrivacyModePill({ onPress }: { onPress: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Privacy mode on. Tap to turn off"
+      style={{
+        position: 'absolute',
+        alignSelf: 'center',
+        top: insets.top + 2,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 999,
+        backgroundColor: 'rgba(20,20,20,0.8)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.35)',
+        zIndex: 9999,
+        elevation: 9999,
+      }}
+    >
+      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Privacy mode on</Text>
+    </TouchableOpacity>
+  );
 }

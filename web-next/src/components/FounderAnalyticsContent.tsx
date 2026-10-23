@@ -4,6 +4,7 @@ import {
   type FounderAnalyticsReport,
 } from "@/lib/api";
 import { SnapshotTile } from "@/components/SnapshotTile";
+import { PrivacyModeToggle } from "@/components/PrivacyMode";
 
 /**
  * Founder-only internal product analytics (coridian_, 2026-10-19: "just put
@@ -85,6 +86,8 @@ export function FounderAnalyticsContent({
           Internal product usage for {data.window_label.toLowerCase()} — visible only to founder accounts.
         </p>
       </header>
+
+      <PrivacyModeToggle />
 
       <div className="flex gap-2 flex-wrap" role="group" aria-label="Time window">
         {FOUNDER_ANALYTICS_WINDOWS.map((option) => {

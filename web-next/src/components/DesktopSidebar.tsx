@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useParams, useSearchParams } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
+import { useSearchParams } from "@/lib/useSearchParams";
 
 import { useAuth } from "@/context/AuthContext";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";

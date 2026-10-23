@@ -108,3 +108,16 @@ describe("OnboardingCarousel", () => {
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 });
+
+describe("OnboardingCarousel replay", () => {
+  it("shows only the feature slides, ends with Done, and never saves a preference", () => {
+    const onDone = vi.fn();
+    render(<OnboardingCarousel replay onDone={onDone} />);
+    clickNext(FEATURE_COUNT - 1);
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByText("Connect Sleeper or ESPN")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(api.setExperienceLevel).not.toHaveBeenCalled();
+  });
+});

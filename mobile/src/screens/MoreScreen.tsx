@@ -28,6 +28,7 @@ import { trialEndLabel } from '../lib/freeTrial';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
+import { trackOnboarding } from '../lib/onboardingAnalytics';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { currentLeagueContext } from '../navigation/navigationRef';
@@ -110,7 +111,7 @@ export default function MoreScreen({ navigation }: Props) {
   // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
   // doesn't exist for anyone else, so there's nothing for a normal user to
   // stumble into.
-  const showcaseAvailable = isShowcaseModeAvailable(session?.user?.email);
+  const showcaseAvailable = isShowcaseModeAvailable(session?.user?.email, session?.user?.app_metadata);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,9 +416,11 @@ export default function MoreScreen({ navigation }: Props) {
           <SettingsRow
             icon="play-circle-outline"
             iconColor={colors.accent}
-            label="Replay intro tutorial"
-            description="The 5-slide walkthrough shown the first time you signed in"
-            onPress={() => navigation.navigate('Onboarding')}
+            label="Replay the tour"
+            onPress={() => {
+              trackOnboarding('replayed');
+              navigation.navigate('Onboarding', { replay: true });
+            }}
             showDivider={false}
           />
         </AnimatedCard>
@@ -429,8 +432,8 @@ export default function MoreScreen({ navigation }: Props) {
               <SettingsRow
                 icon="videocam-outline"
                 iconColor={colors.premium}
-                label="Showcase mode"
-                description="Replaces every team name, league name, owner name and username with stand-ins so screen recordings stay anonymous. Player and football data are untouched."
+                label="Privacy mode"
+                description="Hides manager, team and league names, avatars and email for screenshots. Display only; player and football data are untouched."
                 showDivider={false}
                 right={
                   <Switch

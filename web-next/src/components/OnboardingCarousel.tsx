@@ -34,7 +34,7 @@ export { ONBOARDING_FEATURES };
 
 const SWIPE_THRESHOLD_PX = 50;
 
-export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
+export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => void; replay?: boolean }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
   const [saving, setSaving] = useState(false);
@@ -70,15 +70,20 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
 
   const featureCount = ONBOARDING_FEATURES.length;
-  const connectStep = featureCount;
-  const levelStep = featureCount + 1;
-  const totalSteps = featureCount + 2;
+  // Replay (Account > "Replay the tour"): feature slides only. No connect or
+  // experience step, so nothing is saved, no step_viewed/completed events
+  // (the signup funnel stays clean) and onboarding-completed is untouched.
+  const connectStep = replay ? -1 : featureCount;
+  const levelStep = replay ? -1 : featureCount + 1;
+  const lastStep = replay ? featureCount - 1 : levelStep;
+  const totalSteps = replay ? featureCount : featureCount + 2;
 
   const stepName = (i: number) => (i < featureCount ? ONBOARDING_FEATURES[i].key : i === connectStep ? "connect" : "level");
 
   // One step_viewed per step per session (deduped in the helper), so a
   // re-render or a Back/Next revisit never double counts.
   useEffect(() => {
+    if (replay) return;
     trackOnboardingStepViewed(stepName(step), step);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
@@ -102,6 +107,10 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   };
 
   const next = () => {
+    if (replay && step === lastStep) {
+      onDone();
+      return;
+    }
     if (step === levelStep) {
       void finish();
       return;
@@ -110,11 +119,15 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
     setStep((s) => s + 1);
   };
   const back = () => {
-    if (step > 0) trackOnboarding("back", { step: stepName(step), step_index: step });
+    if (step > 0 && !replay) trackOnboarding("back", { step: stepName(step), step_index: step });
     setDirection("back");
     setStep((s) => Math.max(0, s - 1));
   };
   const skip = () => {
+    if (replay) {
+      onDone();
+      return;
+    }
     trackOnboarding("skipped", { step: stepName(step), step_index: step });
     onDone();
   };
@@ -133,7 +146,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
     // Mostly-vertical gestures are scrolls, never slide changes.
     if (startY !== null && Math.abs(clientY - startY) > Math.abs(dx)) return;
     // The last step ends in an explicit choice, so a swipe never skips it.
-    if (dx <= -SWIPE_THRESHOLD_PX && step < levelStep) {
+    if (dx <= -SWIPE_THRESHOLD_PX && step < lastStep) {
       setDirection("next");
       setStep(step + 1);
     }
@@ -262,11 +275,13 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
             className="flex-1"
             style={{ alignSelf: "auto" }}
           >
-            {step === levelStep
-              ? saving
-                ? `Setting up ${BRAND_NAME}…`
-                : "Continue"
-              : "Next"}
+            {replay && step === lastStep
+              ? "Done"
+              : step === levelStep
+                ? saving
+                  ? `Setting up ${BRAND_NAME}…`
+                  : "Continue"
+                : "Next"}
           </Button>
         </div>
       </div>
