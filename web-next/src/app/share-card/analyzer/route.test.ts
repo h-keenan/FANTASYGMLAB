@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearRateLimitForTests, parseAnalyzerPayload } from "@/lib/shareCard/analyzerShare";
+import { buildPartnerPitch, clearRateLimitForTests, parseAnalyzerPayload } from "@/lib/shareCard/analyzerShare";
 import { clearShareCachesForTests } from "@/lib/shareCard/server";
 import { fixturePlayer, pngSize } from "@/lib/shareCard/testFixtures";
 
@@ -25,7 +25,8 @@ const verdict = {
   value_delta: -274,
   tone: "counter",
 };
-const sent = { ...fixturePlayer, player_id: "1", name: "Sent Player", position: "QB", team: "ARI", score: 3760 };
+const sent = { ...fixturePlayer, player_id: "1", name: "Sent Player", position: "QB", team: "ARI", score: 4400 };
+const pick2028 = { pick_id: "2028:1:4", label: "2028 Round 1", score: 900, season: 2028, round: 1, original_roster_id: "4", owner_roster_id: "4", original_team_name: null, owner_team_name: null, pick_tier: null, projected_pick_range: null };
 const pick = { pick_id: "2027:3:4", label: "2027 Round 3", score: 834, season: 2027, round: 3, original_roster_id: "4", owner_roster_id: "4", original_team_name: null, owner_team_name: null, pick_tier: null, projected_pick_range: null };
 
 function stub(opts: { analyzer?: unknown; players?: unknown[] } = {}) {
@@ -37,7 +38,7 @@ function stub(opts: { analyzer?: unknown; players?: unknown[] } = {}) {
       const url = String(args[0]);
       if (url.includes("/trade-analyzer")) return Response.json(opts.analyzer ?? { ok: true, verdict, reason: "" });
       if (url.includes("/rankings")) return Response.json({ ok: true, players: opts.players ?? [sent, fixturePlayer] });
-      if (url.includes("/draft-picks")) return Response.json({ ok: true, picks: [pick], reason: "" });
+      if (url.includes("/draft-picks")) return Response.json({ ok: true, picks: [pick, pick2028], reason: "" });
       if (url.includes("/team-profiles")) {
         return Response.json({ ok: true, profiles: { "4": { team_name: "Rival GM", owner_name: "r", username: "r", avatar_id: "", avatar_url: "", roster_id: 4, owner_id: "o" } } });
       }
@@ -49,7 +50,7 @@ function stub(opts: { analyzer?: unknown; players?: unknown[] } = {}) {
   return calls;
 }
 
-const base = { leagueId: "L1", sendPlayerIds: ["1"], receivePlayerIds: ["2"], sendPickIds: [], receivePickIds: ["2027:3:4"], partnerRosterId: "4" };
+const base = { leagueId: "L1", sendPlayerIds: ["1"], receivePlayerIds: ["2"], sendPickIds: ["2028:1:4"], receivePickIds: ["2027:3:4"], partnerRosterId: "4" };
 
 function post(body: unknown, auth = "Bearer tok-1") {
   return POST(
@@ -65,8 +66,12 @@ describe("POST /share-card/analyzer", () => {
   beforeEach(() => {
     clearShareCachesForTests();
     clearRateLimitForTests();
+    vi.stubEnv("SHARE_CARD_INTERNAL_SECRET", "sekret");
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it("requires a bearer token", async () => {
     stub();
@@ -104,11 +109,13 @@ describe("POST /share-card/analyzer", () => {
     const sentBody = JSON.parse(String(analyzer?.[1]?.body));
     expect(sentBody).toMatchObject({ send_player_ids: ["1"], receive_pick_ids: ["2027:3:4"], partner_roster_id: "4" });
     expect(JSON.stringify(sentBody)).not.toContain("9999");
+    // Quota-exempt token is sent server-to-server only when the secret is configured.
+    expect(new Headers(analyzer?.[1]?.headers).get("x-share-card-token")).toBe("sekret");
 
     const out = process.env.SHARE_CARD_SAMPLE_DIR;
     if (out) {
       mkdirSync(out, { recursive: true });
-      writeFileSync(join(out, "analyzer-card.png"), Buffer.from(png));
+      writeFileSync(join(out, "analyzer-card-v2.png"), Buffer.from(png));
     }
   }, 60_000);
 
@@ -129,5 +136,27 @@ describe("parseAnalyzerPayload", () => {
   it("dedupes ids and defaults strategy/lens", () => {
     const parsed = parseAnalyzerPayload({ ...base, sendPlayerIds: ["1", "1"] });
     expect(parsed.ok && parsed.payload).toMatchObject({ sendPlayerIds: ["1"], strategy: "retool", lens: "Dynasty" });
+  });
+});
+
+describe("buildPartnerPitch", () => {
+  const player = (name: string, position: string, score: number) => ({ asset_type: "player" as const, name, position, score });
+  const pk = { asset_type: "pick" as const, season: "2027", round: "3", score: 100 };
+
+  it("pitches value gain, position upgrade and incoming picks when supported", () => {
+    const pitch = buildPartnerPitch([player("Star WR", "WR", 5000), pk], [player("Meh WR", "WR", 3000)], "Rival GM");
+    expect(pitch.headline).toBe("A trade that works for Rival GM");
+    expect(pitch.lines).toEqual(["You gain 2,100 in value", "Upgrade at WR: Star WR", "Adds a 2027 Round 3 pick"]);
+  });
+
+  it("says fair value when within 5% and never claims a partner edge it doesn't have", () => {
+    expect(buildPartnerPitch([player("A", "QB", 1000)], [player("B", "RB", 1030)], "X").lines).toEqual(["Fair value both ways"]);
+    const sender = buildPartnerPitch([player("A", "QB", 1000)], [player("B", "RB", 3000)], "X");
+    expect(sender.headline).toBe("Trade proposal for X");
+    expect(sender.lines.join(" ")).not.toMatch(/gain|works for/i);
+  });
+
+  it("is a neutral proposal with no partner picked", () => {
+    expect(buildPartnerPitch([player("A", "QB", 1)], [player("B", "RB", 1)], "").headline).toBe("Trade proposal");
   });
 });

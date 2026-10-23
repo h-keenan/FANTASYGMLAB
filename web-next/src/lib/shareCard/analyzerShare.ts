@@ -9,6 +9,7 @@
  */
 
 import type { DraftPickAsset, RankedPlayer, TradeAsset, TradeIdea, TradeVerdict } from "@/lib/api";
+import type { TradePitch } from "@/lib/shareCard/tradeCard";
 import { pickToTradeAsset, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { isValuationLens } from "@/lib/valuationLens";
 
@@ -140,4 +141,58 @@ export function buildAnalyzerIdea(payload: AnalyzerSharePayload, resolved: Analy
     receive_score: sum(receive),
     package: { send, receive, value_edge: verdict.band, confidence: verdict.confidence },
   };
+}
+
+/** Partner-addressed pitch built only from the resolved assets (the same
+ * rankings/draft-picks values the Analyzer shows). `send` is what the sender
+ * gives, i.e. what the PARTNER receives. Each line is a fact computed from
+ * those values; a line that isn't supported is omitted, and when the raw
+ * values favor the sender the card never claims otherwise (neutral headline,
+ * no value line). */
+export function buildPartnerPitch(send: TradeAsset[], receive: TradeAsset[], partnerName: string): TradePitch {
+  const gets = sum(send);
+  const gives = sum(receive);
+  const net = gets - gives;
+  const larger = Math.max(gets, gives);
+  const fair = larger > 0 && Math.abs(net) <= larger * 0.05;
+  const lines: string[] = [];
+
+  if (net > 0 && !fair) lines.push(`You gain ${Math.round(net).toLocaleString("en-US")} in value`);
+  else if (fair) lines.push("Fair value both ways");
+
+  // Upgrade at a position: the best incoming player beats the best outgoing
+  // player at the same position.
+  const best = (assets: TradeAsset[]) => {
+    const map = new Map<string, TradeAsset>();
+    for (const a of assets) {
+      if (a.asset_type === "pick" || !a.position) continue;
+      const cur = map.get(a.position);
+      if (!cur || (Number(a.score) || 0) > (Number(cur.score) || 0)) map.set(a.position, a);
+    }
+    return map;
+  };
+  const incoming = best(send);
+  const outgoing = best(receive);
+  let upgrade: { pos: string; gain: number; inName: string } | null = null;
+  for (const [pos, inAsset] of incoming) {
+    const out = outgoing.get(pos);
+    if (!out) continue;
+    const gain = (Number(inAsset.score) || 0) - (Number(out.score) || 0);
+    if (gain > 0 && (!upgrade || gain > upgrade.gain)) upgrade = { pos, gain, inName: inAsset.name || "" };
+  }
+  if (upgrade && upgrade.inName) lines.push(`Upgrade at ${upgrade.pos}: ${upgrade.inName}`);
+
+  const picksIn = send.filter((a) => a.asset_type === "pick");
+  if (picksIn.length) {
+    lines.push(picksIn.length === 1 ? `Adds a ${picksIn[0].season ?? ""} Round ${picksIn[0].round ?? ""} pick`.replace(/\s+/g, " ") : `Adds ${picksIn.length} draft picks`);
+  }
+
+  const name = partnerName.trim();
+  const favorsPartner = net >= 0 || fair;
+  const headline = name
+    ? favorsPartner
+      ? `A trade that works for ${name}`
+      : `Trade proposal for ${name}`
+    : "Trade proposal";
+  return { headline, lines: lines.slice(0, 3) };
 }

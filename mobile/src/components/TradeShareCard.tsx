@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 
-import type { RankedPlayer, TradeVerdict } from '../lib/api';
+import type { DraftPickAsset, RankedPlayer, TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import { confidenceLevelFor } from './ConfidenceMeter';
 import PlayerAvatar from './PlayerAvatar';
@@ -11,7 +11,7 @@ import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
 import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './ShareCardChrome';
 import TeamAvatar from './TeamAvatar';
-import { analyzerHeadline, partnerForLine } from '../lib/tradeShareLabels';
+import { buildPartnerPitch, type PitchAsset } from '../lib/tradePitch';
 
 const CARD_HEIGHT = 620;
 // Safety net only — NOT the fix. If some avatar never fires onLoad/onError
@@ -70,12 +70,18 @@ function AssetRow({
   );
 }
 
+const playerPitchAsset = (p: RankedPlayer): PitchAsset => ({ kind: 'player', name: p.name, position: p.position, score: p.score });
+const pickPitchAsset = (p: DraftPickAsset): PitchAsset => ({ kind: 'pick', score: p.score, season: p.season, round: p.round });
+const sumScores = (players: RankedPlayer[], picks: DraftPickAsset[]) =>
+  [...players.map((p) => p.score), ...picks.map((p) => p.score)].reduce<number>((s, v) => s + (Number(v) || 0), 0);
+
 function ReceivesPanel({
   teamName,
   avatarId,
   accent,
   total,
   players,
+  picks = [],
   keyPrefix,
   onAvatarSettle,
 }: {
@@ -84,11 +90,13 @@ function ReceivesPanel({
   accent: string;
   total?: number;
   players: RankedPlayer[];
+  picks?: DraftPickAsset[];
   keyPrefix: string;
   onAvatarSettle: (key: string) => void;
 }) {
   const shown = players.slice(0, MAX_ROWS);
-  const hidden = players.length - shown.length;
+  const shownPicks = picks.slice(0, Math.max(0, MAX_ROWS - shown.length));
+  const hidden = players.length + picks.length - shown.length - shownPicks.length;
   return (
     <ShareGlass style={[styles.panel, { borderColor: `${accent}8C` }]}>
       <View style={styles.panelHead}>
@@ -108,6 +116,19 @@ function ReceivesPanel({
           trackKey={`${keyPrefix}-${player.player_id ?? i}`}
           onAvatarSettle={onAvatarSettle}
         />
+      ))}
+      {shownPicks.map((pick) => (
+        <View key={pick.pick_id} style={styles.pickRow}>
+          <View style={styles.pickBadge}>
+            <AppText style={styles.pickBadgeText}>{pick.round ? `R${pick.round}` : 'PK'}</AppText>
+          </View>
+          <View style={styles.assetTextGroup}>
+            <AppText style={styles.assetName} numberOfLines={1}>
+              {[pick.season, pick.round ? `Round ${pick.round}` : ''].filter(Boolean).join(' ') || pick.label || 'Draft pick'}
+            </AppText>
+            {pick.score != null ? <AppText style={styles.assetMeta}>{`${Math.round(pick.score).toLocaleString('en-US')} value`}</AppText> : null}
+          </View>
+        </View>
       ))}
       {hidden > 0 ? <AppText style={styles.more}>{`+${hidden} more`}</AppText> : null}
     </ShareGlass>
@@ -144,16 +165,27 @@ const TradeShareCard = forwardRef<View, {
   myTeamName?: string;
   sendTotal?: number;
   receiveTotal?: number;
-  /** Trade Analyzer card: grade word as the headline + "For <partner>" line. */
-  analyzer?: boolean;
+  /** Draft picks on each side (Trade Analyzer). Listed after the players. */
+  sendPicks?: DraftPickAsset[];
+  receivePicks?: DraftPickAsset[];
+  /** Trade Analyzer card: a pitch to the partner instead of verdict/edge/why. */
+  pitchMode?: boolean;
   onReadyChange?: (ready: boolean) => void;
-}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, myTeamName, sendTotal, receiveTotal, analyzer, onReadyChange }, ref) => {
+}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, myTeamName, sendTotal, receiveTotal, sendPicks = [], receivePicks = [], pitchMode, onReadyChange }, ref) => {
   const me = myTeamName?.trim() || 'You';
   const partner = partnerTeamName?.trim() || 'Partner';
   const gain = verdict.value_delta;
   const band = verdict.band?.trim() || '';
-  const headline = (analyzer ? analyzerHeadline(verdict.ui_verdict) : null) || band;
-  const forLine = analyzer ? partnerForLine(partnerTeamName) : null;
+  const pitch = pitchMode
+    ? buildPartnerPitch(
+        [...sendPlayers.map(playerPitchAsset), ...sendPicks.map(pickPitchAsset)],
+        [...receivePlayers.map(playerPitchAsset), ...receivePicks.map(pickPitchAsset)],
+        partnerTeamName,
+      )
+    : null;
+  // Analyzer totals come from the assets themselves (players + picks).
+  const sendSum = sendTotal ?? (pitchMode ? sumScores(sendPlayers, sendPicks) : undefined);
+  const receiveSum = receiveTotal ?? (pitchMode ? sumScores(receivePlayers, receivePicks) : undefined);
   const verdictColor = bandColor(band, HEADLINE_COLOR[verdict.tone]);
   const edge =
     gain === 0
@@ -208,11 +240,6 @@ const TradeShareCard = forwardRef<View, {
         </AppText>
       }
     >
-      {forLine ? (
-        <AppText style={styles.forLine} numberOfLines={1}>
-          {forLine.toUpperCase()}
-        </AppText>
-      ) : null}
       <View style={styles.matchup}>
         <AppText style={styles.matchupName} numberOfLines={1}>
           {me}
@@ -227,8 +254,9 @@ const TradeShareCard = forwardRef<View, {
         <ReceivesPanel
           teamName={me}
           accent={colors.accent}
-          total={receiveTotal}
+          total={receiveSum}
           players={receivePlayers}
+          picks={receivePicks}
           keyPrefix="receive"
           onAvatarSettle={handleAvatarSettle}
         />
@@ -236,8 +264,9 @@ const TradeShareCard = forwardRef<View, {
           teamName={partner}
           avatarId={partnerTeamAvatarUrl}
           accent={colors.premium}
-          total={sendTotal}
+          total={sendSum}
           players={sendPlayers}
+          picks={sendPicks}
           keyPrefix="send"
           onAvatarSettle={handleAvatarSettle}
         />
@@ -246,9 +275,20 @@ const TradeShareCard = forwardRef<View, {
         </View>
       </View>
 
+      {pitch ? (
+        <ShareGlass style={styles.verdictBlock}>
+          <AppText style={styles.pitchHeadline} numberOfLines={2} adjustsFontSizeToFit>
+            {pitch.headline}
+          </AppText>
+          {pitch.lines.length ? <AppText style={styles.whyLabel}>WHY IT WORKS FOR YOU</AppText> : null}
+          {pitch.lines.map((line) => (
+            <AppText key={line} style={styles.pitchLine} numberOfLines={1}>{`\u2022 ${line}`}</AppText>
+          ))}
+        </ShareGlass>
+      ) : (
       <ShareGlass style={styles.verdictBlock}>
         <AppText style={[styles.verdictWord, { color: verdictColor }]} numberOfLines={1} adjustsFontSizeToFit>
-          {headline || 'Trade idea'}
+          {band || 'Trade idea'}
         </AppText>
         <AppText style={[styles.edge, { color: edge.color }]} numberOfLines={1}>
           {edge.text}
@@ -262,8 +302,9 @@ const TradeShareCard = forwardRef<View, {
           </View>
         ) : null}
       </ShareGlass>
+      )}
 
-      {why ? (
+      {why && !pitch ? (
         <ShareGlass style={styles.whyBlock}>
           <AppText style={styles.whyLabel}>WHY</AppText>
           <AppText style={styles.whyText} numberOfLines={5}>
@@ -281,7 +322,11 @@ export { CARD_WIDTH, CARD_HEIGHT };
 
 const styles = StyleSheet.create({
   leagueName: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6, maxWidth: 120 },
-  forLine: { fontSize: 10, fontWeight: '800', color: colors.accent, letterSpacing: 1.6, marginTop: 2 },
+  pitchHeadline: { fontSize: 22, fontWeight: '900', letterSpacing: -0.3, color: colors.textPrimary },
+  pitchLine: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 4, borderRadius: radii.sm, backgroundColor: 'rgba(255,255,255,0.045)' },
+  pickBadge: { width: 30, height: 30, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.accent}22`, borderWidth: 1, borderColor: `${colors.accent}80` },
+  pickBadgeText: { fontSize: 11, fontWeight: '800', color: colors.accent },
   matchup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
   matchupName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   panelsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },

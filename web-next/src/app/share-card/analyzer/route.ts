@@ -6,7 +6,7 @@ import type {
   RankedPlayer,
   TradeAnalyzerResponse,
 } from "@/lib/api";
-import { MAX_BODY_BYTES, buildAnalyzerIdea, parseAnalyzerPayload, rateLimited } from "@/lib/shareCard/analyzerShare";
+import { MAX_BODY_BYTES, buildAnalyzerIdea, buildPartnerPitch, parseAnalyzerPayload, rateLimited } from "@/lib/shareCard/analyzerShare";
 import {
   UpstreamError,
   cacheKey,
@@ -69,6 +69,7 @@ export async function POST(request: Request): Promise<Response> {
     const [analysis, rankings, picks, profiles, mine] = await Promise.all([
       fetchUpstreamJson<TradeAnalyzerResponse>(`${league}/trade-analyzer`, authorization, {
         method: "POST",
+        shareCardToken: true,
         jsonBody: {
           send_player_ids: payload.sendPlayerIds,
           receive_player_ids: payload.receivePlayerIds,
@@ -124,8 +125,7 @@ export async function POST(request: Request): Promise<Response> {
       format,
       myTeamName: mine?.league?.team_name,
       myAvatarUrl: mine?.league?.team_avatar_url,
-      headline: analysis.verdict.ui_verdict,
-      forPartner: Boolean(profile?.team_name),
+      pitch: buildPartnerPitch(idea.package.send, idea.package.receive, profile?.team_name || ""),
     });
     putCachedPng(key, png);
     return pngResponse(png, "miss");

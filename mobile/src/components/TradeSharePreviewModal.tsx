@@ -5,7 +5,7 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
-import { api, type RankedPlayer, type TradeVerdict } from '../lib/api';
+import { api, type DraftPickAsset, type RankedPlayer, type TradeVerdict } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
@@ -25,8 +25,10 @@ interface Props {
   sendTotal?: number;
   receiveTotal?: number;
   verdict: TradeVerdict;
-  /** Trade Analyzer share: grade headline + "For <partner>" on the card. */
+  /** Trade Analyzer share: partner-addressed pitch card, with the picks. */
   analyzer?: boolean;
+  sendPicks?: DraftPickAsset[];
+  receivePicks?: DraftPickAsset[];
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
   /** Evaluation lens active when this trade was evaluated (e.g. "Dynasty")
@@ -50,6 +52,8 @@ export default function TradeSharePreviewModal({
   receiveTotal,
   verdict,
   analyzer,
+  sendPicks,
+  receivePicks,
   sendPlayers,
   receivePlayers,
   valuationLens,
@@ -174,7 +178,9 @@ export default function TradeSharePreviewModal({
                 ref={cardRef}
                 leagueName={leagueName}
                 verdict={verdict}
-                analyzer={analyzer}
+                pitchMode={analyzer}
+                sendPicks={sendPicks}
+                receivePicks={receivePicks}
                 sendPlayers={sendPlayers}
                 receivePlayers={receivePlayers}
                 partnerTeamName={partnerTeamName}
