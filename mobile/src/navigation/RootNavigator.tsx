@@ -49,6 +49,8 @@ import LoadingScreen from '../screens/LoadingScreen';
 import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
 import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
+import LiveDraftScreen from '../screens/LiveDraftScreen';
+import GuessThePlayerLeaderboardScreen from '../screens/GuessThePlayerLeaderboardScreen';
 import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { trackScreen } from '../lib/analytics';
@@ -116,6 +118,9 @@ export type RootStackParamList = {
   // Not league-scoped — the whole point is standing/needs across every
   // saved league at once, not one league's context.
   Portfolio: undefined;
+  // Sleeper-only (gated like the other league screens) — read-only draft room.
+  LiveDraft: { leagueId: string; leagueName: string };
+  GuessThePlayerLeaderboard: { leagueId: string; leagueName: string };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -152,6 +157,8 @@ const EspnAlertsScreen = withEspnGate(AlertsScreen);
 const EspnGmTargetsScreen = withEspnGate(GmTargetsScreen);
 const EspnTeamStanceScreen = withEspnGate(TeamStanceScreen);
 const EspnGmPlanScreen = withEspnGate(GmPlanScreen);
+const EspnLiveDraftScreen = withEspnGate(LiveDraftScreen);
+const EspnGuessLeaderboardScreen = withEspnGate(GuessThePlayerLeaderboardScreen);
 const AuthStack = createNativeStackNavigator();
 
 export default function RootNavigator() {
@@ -301,6 +308,8 @@ export default function RootNavigator() {
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
+          <AppStack.Screen name="LiveDraft" component={EspnLiveDraftScreen} />
+          <AppStack.Screen name="GuessThePlayerLeaderboard" component={EspnGuessLeaderboardScreen} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}

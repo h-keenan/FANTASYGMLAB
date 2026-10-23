@@ -38,6 +38,7 @@ import type { ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import Input from '../components/Input';
+import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
@@ -220,6 +221,17 @@ export default function MoreScreen({ navigation }: Props) {
     navigation.navigate('TeamStance', league);
   };
 
+  // League-scoped entry points (Live Draft, Guess the Player leaderboard)
+  // resolve the league the user last opened, same as Team Situation above.
+  const onOpenLeagueScreen = (screen: 'LiveDraft' | 'GuessThePlayerLeaderboard', purpose: string) => {
+    const league = currentLeagueContext();
+    if (!league) {
+      Alert.alert('Select a league first', `Open a league from Home, then come back ${purpose}.`);
+      return;
+    }
+    navigation.navigate(screen, league);
+  };
+
   const closeGuestUpgrade = () => {
     setGuestUpgradeOpen(false);
     setGuestUpgradeEmail('');
@@ -330,6 +342,22 @@ export default function MoreScreen({ navigation }: Props) {
             label="Trade History"
             description="Trades you've shared and confirmed, plus how they've worked out so far"
             onPress={() => navigation.navigate('TradeHistory')}
+            showDivider
+          />
+          <SettingsRow
+            icon="timer-outline"
+            iconColor={colors.premium}
+            label="Live Draft"
+            description="Real-time pick recommendations while your Sleeper draft is running (Premium)"
+            onPress={() => onOpenLeagueScreen('LiveDraft', 'to use Live Draft')}
+            showDivider
+          />
+          <SettingsRow
+            icon="trophy-outline"
+            iconColor={colors.accent}
+            label="Guess the Player Leaderboard"
+            description="Daily-game streaks among leaguemates on FantasyDesk"
+            onPress={() => onOpenLeagueScreen('GuessThePlayerLeaderboard', 'to see the leaderboard')}
             showDivider={false}
           />
         </AnimatedCard>
@@ -459,6 +487,12 @@ export default function MoreScreen({ navigation }: Props) {
             />
           ))}
         </AnimatedCard>
+
+        {isGuest ? null : (
+          <View style={styles.referralWrap}>
+            <ReferralCard />
+          </View>
+        )}
 
         <SectionHeading title="Account" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
@@ -672,6 +706,7 @@ function createStyles(colors: ThemeColors) {
     // instead of a separately bordered/backgrounded row per item — Magna
     // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
     groupCard: { padding: spacing.md, paddingVertical: 0 },
+    referralWrap: { marginTop: 16 },
     dangerCard: {
       padding: spacing.md,
       paddingVertical: 0,
