@@ -20,7 +20,7 @@ import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { BRAND_NAME } from "@/lib/brand";
-import { shareImageOrText } from "@/lib/shareImage";
+import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
 import { trackUse } from "@/lib/analytics";
 
 /**
@@ -104,7 +104,7 @@ function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; l
       onPreparingImage: setPreparing,
     });
     trackUse("share_card", "shared", { leagueId, props: { item_kind: "player", result: String(outcome ?? "") } });
-    if (outcome === "copied") {
+    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

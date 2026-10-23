@@ -155,11 +155,11 @@ describe("ShareTradeButton", () => {
     await waitFor(() => expect(screen.getByRole("button")).not.toBeDisabled());
   });
 
-  it("falls back to the text-only share when navigator.share/canShare aren't present", async () => {
+  it("falls back to the text copy when there's no recommendation to render a card for", async () => {
     removeShareApis();
     const writeText = stubClipboard();
 
-    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    render(<ShareTradeButton idea={idea({ recommendation_id: undefined })} leagueId="league-1" />);
     fireEvent.click(screen.getByRole("button"));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
@@ -167,7 +167,7 @@ describe("ShareTradeButton", () => {
     await screen.findByText("Copied!");
   });
 
-  it("falls back to the text-only navigator.share when canShare rejects the file", async () => {
+  it("saves the PNG instead of sharing text when canShare rejects the file", async () => {
     const share = stubShare();
     stubCanShare(() => false);
     vi.mocked(api.getTradeHubIdeaShareCardBlob).mockResolvedValue(
@@ -177,10 +177,8 @@ describe("ShareTradeButton", () => {
     render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
     fireEvent.click(screen.getByRole("button"));
 
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
-    const shareArgs = share.mock.calls[0][0] as ShareData;
-    expect(shareArgs.files).toBeUndefined();
-    expect(shareArgs.text).toBeTruthy();
+    await screen.findByText("Copied!");
+    expect(share).not.toHaveBeenCalled();
   });
 
   it("falls back to the text-only share when the PNG fetch fails (e.g. a stale/changed idea)", async () => {
