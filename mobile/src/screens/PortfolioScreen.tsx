@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useNavigation } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQueries, useQuery } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
+import FadeInView from '../components/FadeInView';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
@@ -18,6 +19,13 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock from '../components/SkeletonBlock';
 import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSavedLeague } from '../lib/api';
 import { composePortfolio, type PortfolioLeagueState } from '../lib/portfolioProgress';
+import {
+  enabledLeagueIds,
+  PORTFOLIO_ROW_MIN_HEIGHT,
+  PORTFOLIO_SHELL_SKELETON_COUNT,
+  PORTFOLIO_SPLASH_DELAY_MS,
+} from '../lib/portfolioLoader';
+import { useDelayedFlag } from '../lib/useDelayedFlag';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
 import { ESPN_NOT_SUPPORTED, glanceEspnNote } from '../lib/leaguesGlance';
@@ -93,18 +101,48 @@ export default function PortfolioScreen() {
   // processes instead of sharing one).
   const indexQuery = useQuery({
     queryKey: queryKeys.portfolioIndex(),
-    queryFn: () => api.getPortfolioIndex(),
+    queryFn: ({ signal }) => api.getPortfolioIndex(signal),
     enabled: !isRestoring,
   });
   const index = indexQuery.data ?? null;
   const savedLeagues = index?.is_premium ? index.saved_leagues ?? [] : [];
+  // At most PORTFOLIO_LEAGUE_CONCURRENCY row queries run at once, in saved
+  // order: a row frees its slot once it has fetched this mount (success or
+  // error), or if it already holds fresh cached data. Passing React Query's
+  // `signal` cancels in-flight rows when the user leaves the screen.
+  const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
+  const allowed = enabledLeagueIds(
+    savedLeagues.map((league) => league.league_id),
+    doneIds,
+  );
   const leagueQueries = useQueries({
     queries: savedLeagues.map((league) => ({
       queryKey: queryKeys.portfolioLeague(league.league_id),
-      queryFn: () => api.getPortfolioLeague(league.league_id),
-      enabled: !isRestoring,
+      queryFn: ({ signal }: { signal: AbortSignal }) => api.getPortfolioLeague(league.league_id, signal),
+      enabled: !isRestoring && allowed.has(league.league_id),
     })),
   });
+  const finishedKey = savedLeagues
+    .map((league, position) => {
+      const query = leagueQueries[position];
+      return query && (query.isFetchedAfterMount || (query.data !== undefined && !query.isStale)) ? league.league_id : '';
+    })
+    .join('|');
+  useEffect(() => {
+    const finished = finishedKey.split('|').filter(Boolean);
+    setDoneIds((prev) => {
+      if (finished.every((id) => prev[id])) return prev;
+      return { ...prev, ...Object.fromEntries(finished.map((id) => [id, true])) };
+    });
+  }, [finishedKey]);
+  const retryLeague = useCallback(
+    (leagueId: string) => {
+      const position = savedLeagues.findIndex((league) => league.league_id === leagueId);
+      if (position >= 0) void leagueQueries[position]?.refetch();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [leagueQueries],
+  );
   const leagueStates: Record<string, PortfolioLeagueState> = {};
   savedLeagues.forEach((league, position) => {
     const query = leagueQueries[position];
@@ -131,8 +169,27 @@ export default function PortfolioScreen() {
     [navigation],
   );
 
+  // Instant shell (skeleton rows of the final row height); the branded
+  // spinner only if the first paint is still empty after the delay, and it
+  // goes away the moment the index arrives.
+  const showSplash = useDelayedFlag(loading, PORTFOLIO_SPLASH_DELAY_MS);
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    if (showSplash) return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return (
+      <View style={[styles.root, { paddingTop: headerHeight }]} testID="portfolio-shell">
+        <GridBackground />
+        <View style={styles.listContent}>
+          {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, position) => (
+            <PortfolioLeagueSkeleton
+              key={position}
+              isFirst={position === 0}
+              isLast={position === PORTFOLIO_SHELL_SKELETON_COUNT - 1}
+              styles={styles}
+            />
+          ))}
+        </View>
+      </View>
+    );
   }
 
   if (error) {
@@ -238,7 +295,7 @@ export default function PortfolioScreen() {
               </View>
             ) : null}
             {realFailedLeagues.length > 0 ? (
-              <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} />
+              <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} onRetry={retryLeague} />
             ) : null}
               </>
             ) : null}
@@ -298,10 +355,12 @@ function FailedLeaguesNote({
   leagues,
   colors,
   styles,
+  onRetry,
 }: {
   leagues: PortfolioFailedLeague[];
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
+  onRetry?: (leagueId: string) => void;
 }) {
   const names = leagues.map((league) => league.league_name).join(', ');
   const plural = leagues.length === 1 ? 'league' : 'leagues';
@@ -311,6 +370,21 @@ function FailedLeaguesNote({
       <AppText style={styles.failedNoteText}>
         {`Couldn't load ${leagues.length} ${plural} right now: ${names}. Everything else below is up to date.`}
       </AppText>
+      {onRetry
+        ? leagues
+            .filter((league) => league.reason === 'unavailable')
+            .map((league) => (
+              <TouchableOpacity
+                key={league.league_id}
+                onPress={() => onRetry(league.league_id)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Retry ${league.league_name}`}
+              >
+                <AppText style={[styles.failedNoteText, { color: colors.accent, fontWeight: '700' }]}>Retry</AppText>
+              </TouchableOpacity>
+            ))
+        : null}
     </View>
   );
 }
@@ -328,22 +402,26 @@ function PortfolioLeagueSkeleton({
   isLast,
   styles,
 }: {
-  league: PortfolioSavedLeague;
+  league?: PortfolioSavedLeague;
   isFirst: boolean;
   isLast: boolean;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View
-      accessibilityLabel={`Loading ${league.league_name}`}
+      accessibilityLabel={`Loading ${league ? league.league_name : 'your leagues'}`}
       style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, !isLast && styles.rowDivider]}
     >
       <View style={styles.headerRow}>
         <View style={styles.identityGroup}>
           <SkeletonBlock width="55%" height={18} />
-          <AppText style={styles.leagueName} numberOfLines={1}>
-            {league.league_name}
-          </AppText>
+          {league ? (
+            <AppText style={styles.leagueName} numberOfLines={1}>
+              {league.league_name}
+            </AppText>
+          ) : (
+            <SkeletonBlock width="40%" height={14} style={styles.skeletonGap} />
+          )}
           <SkeletonBlock width="25%" height={12} style={styles.skeletonGap} />
         </View>
         <SkeletonBlock width={52} height={38} />
@@ -385,6 +463,7 @@ function PortfolioLeagueCard({
   const meta = categoryMeta(colors);
 
   return (
+    <FadeInView>
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
@@ -442,6 +521,7 @@ function PortfolioLeagueCard({
         );
       })}
     </TouchableOpacity>
+    </FadeInView>
   );
 }
 
@@ -488,6 +568,8 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surface,
       paddingHorizontal: spacing.md,
       paddingTop: spacing.md,
+      // Same reserved height for the real row and its skeleton: no jump on fill-in.
+      minHeight: PORTFOLIO_ROW_MIN_HEIGHT,
       borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
       borderRightWidth: StyleSheet.hairlineWidth * 1.5,
       borderColor: colors.cardBorder,
