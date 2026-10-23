@@ -726,6 +726,22 @@ report: `depth_chart`, `roster_move_notice`, `coach_press_conference`,
 `game_status_designation`. Proposal only: the server emits none of these
 today (every `document_type` is `headline_only_feed_item`).
 
+**Evidence step (code present, OFF by default, not wired into this endpoint).**
+`modules/news_evidence.py` implements a fetch-and-hash step behind
+`DYNASTYGM_NEWS_EVIDENCE_FETCH` (default `0`), and `modules/gsis_crosswalk.py`
+a Sleeper-dump GSIS crosswalk that the endpoint uses only when the same flag
+is on. The shipped source registry has no `permitted` source (NFL.com terms
+forbid it; the rest need human review), so the guarantees above remain true in
+production. When a source is permitted and a pipeline stores the overlay:
+`claims[].status` may be `supported` (fetched text contains that claim's
+player + designation/event/team) or `retracted`; `content_sha256` is the hash
+of the exact bytes checked; a changed hash or retraction notice yields a new
+`revision_id` (with `previous_revision_id`) and the prior revision reads
+`superseded`/`retracted`; `confirmed` needs an official-primary document or
+independent corroboration of distinct origins. GSIS reason codes added when the
+crosswalk is on: `gsis_shared_by_multiple_sleeper_ids`,
+`player_not_in_sleeper_dump`. See `docs/news-evidence-scope-2026-10.md`.
+
 **Retraction behaviour.** Only the supersession detector above exists. Publisher
 retractions/corrections are not detected, so `retracted` is always `false` and
 absence of a retraction flag is not evidence that none occurred.

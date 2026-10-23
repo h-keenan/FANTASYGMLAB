@@ -7304,7 +7304,11 @@ def get_external_player_news(
         )
     superseded = news_intelligence.detect_supersession(groups)
     checked_at = datetime.now(timezone.utc).isoformat()
-    identity = external_news_contract.resolve_player_identity(players_df, str(player_id), player_name)
+    from modules import gsis_crosswalk as _gsis_crosswalk  # None unless DYNASTYGM_NEWS_EVIDENCE_FETCH=1
+
+    identity = external_news_contract.resolve_player_identity(
+        players_df, str(player_id), player_name, gsis_crosswalk=_gsis_crosswalk.load_gsis_crosswalk()
+    )
     now_ts = int(time.time())
 
     items = [
