@@ -81,11 +81,13 @@ export default function BrandHeaderBar({
             style={styles.iconButton}
             hitSlop={8}
             onPress={() => navigation.navigate('GmTargets', { leagueId, leagueName })}
+            accessibilityRole="button"
+            accessibilityLabel="GM Targets"
           >
             <Ionicons name="star-outline" size={17} color={colors.accent} />
           </TouchableOpacity>
         ) : null}
-        <TouchableOpacity style={styles.iconButton} hitSlop={8} onPress={() => navigation.navigate('More')}>
+        <TouchableOpacity style={styles.iconButton} hitSlop={8} onPress={() => navigation.navigate('More')} accessibilityRole="button" accessibilityLabel="More">
           <Ionicons name="ellipsis-horizontal" size={17} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>

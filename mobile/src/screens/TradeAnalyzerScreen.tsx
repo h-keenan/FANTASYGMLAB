@@ -670,6 +670,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             <TouchableOpacity
               style={styles.pickInfoButton}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Pick details"
               onPress={() =>
                 navigation.navigate('PickDetail', { pick: item.pick, leagueId, leagueName })
               }
