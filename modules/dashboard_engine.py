@@ -32,6 +32,7 @@ aren't replicated here.
 
 from __future__ import annotations
 
+import os
 from functools import partial
 from typing import Any, Mapping
 
@@ -544,7 +545,7 @@ def _shared_trade_independent_tiles(
     injury_display_context: Mapping[str, Any],
 ) -> dict[str, Any]:
     frame_key = league_value_settings.valued_players_frame_cache_key(players_df)
-    if not frame_key:
+    if not frame_key or os.environ.get("DASHBOARD_SHARED_TILES", "1") == "0":  # kill switch / A-B harness
         return compute()
     try:
         digest_parts = (

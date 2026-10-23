@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 import requests
 
-from modules import performance, redis_cache, sleeper_budget
+from modules import performance, sleeper_budget
 from modules.file_lock import ExclusiveFileLock
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
@@ -1326,61 +1326,13 @@ def _live_league_cache_bucket() -> int:
     return int(time.time() // LIVE_LEAGUE_ENDPOINT_TTL_SECONDS)
 
 
-_SHARED_LIVE_NAMESPACE = "sleeper_live"
-_SHARED_LIVE_LOCK_TIMEOUT_SECONDS = 10.0
-
-
-def _shared_live_json(label: str, url: str, bucket: int, *, timeout: int = 5):
-    """`_request_json` for a live league endpoint, shared by every worker.
-
-    The per-process `lru_cache` getters below mean N uvicorn workers each
-    fetch the same league N times per 30s bucket. This puts one Redis
-    single-flight in front of the HTTP call (same bucket TTL), so the first
-    worker fetches and the rest read its payload. Only a genuine live 200
-    payload is shared: a failed fetch (None) or a last-known/stale fallback
-    (see modules.sleeper_budget) stays private to the calling request, so
-    one worker's 429 never becomes another worker's data. Redis being down
-    degrades to exactly the old per-process fetch (fail-open).
-    """
-
-    stale_before = [0]
-
-    def _compute():
-        stale_before[0] = sleeper_budget.stale_served_total()
-        return _request_json(label, url, timeout=timeout)
-
-    def _shareable(payload) -> bool:
-        return payload is not None and sleeper_budget.stale_served_total() == stale_before[0]
-
-    return redis_cache.redis_single_flight_cache(
-        cache_key=redis_cache.build_cache_key(_SHARED_LIVE_NAMESPACE, url, bucket),
-        ttl_seconds=LIVE_LEAGUE_ENDPOINT_TTL_SECONDS,
-        compute=_compute,
-        lock_timeout_seconds=_SHARED_LIVE_LOCK_TIMEOUT_SECONDS,
-        should_cache=_shareable,
-    )
-
-
-def _clear_shared_live_json() -> None:
-    """Drop the cross-worker copies too (manual refresh / tests)."""
-
-    try:
-        client = redis_cache.get_redis_client()
-        pattern = f"{_SHARED_LIVE_NAMESPACE}:*"
-        keys = list(client.scan_iter(match=pattern, count=500))
-        if keys:
-            client.delete(*keys)
-    except Exception:
-        pass
-
-
 @lru_cache(maxsize=128)
 def _get_users_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/users"
     try:
-        users = _shared_live_json("sleeper_league_users", url, _bucket, timeout=5)
+        users = _request_json("sleeper_league_users", url, timeout=5)
         return users if isinstance(users, list) else []
     except Exception:
         return []
@@ -1420,7 +1372,7 @@ def _get_rosters_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/rosters"
     try:
-        rosters = _shared_live_json("sleeper_league_rosters", url, _bucket, timeout=5)
+        rosters = _request_json("sleeper_league_rosters", url, timeout=5)
         return rosters if isinstance(rosters, list) else []
     except Exception:
         return []
@@ -1441,7 +1393,7 @@ def _get_league_cached(league_id: str, _bucket: int) -> Dict[str, Any]:
         return {}
     url = f"{SLEEPER_BASE}/league/{league_id}"
     try:
-        league = _shared_live_json("sleeper_league", url, _bucket, timeout=5)
+        league = _request_json("sleeper_league", url, timeout=5)
         return league if isinstance(league, dict) else {}
     except Exception:
         return {}
@@ -1507,7 +1459,7 @@ def _get_traded_picks_cached(league_id: str, _bucket: int) -> List[Dict[str, Any
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/traded_picks"
     try:
-        picks = _shared_live_json("sleeper_traded_picks", url, _bucket, timeout=5)
+        picks = _request_json("sleeper_traded_picks", url, timeout=5)
         return picks if isinstance(picks, list) else []
     except Exception:
         return []
@@ -1538,7 +1490,7 @@ def _get_transactions_cached(league_id: str, round_num: int, _bucket: int) -> Li
 
     url = f"{SLEEPER_BASE}/league/{league_id}/transactions/{round_num}"
     try:
-        transactions = _shared_live_json("sleeper_transactions", url, _bucket, timeout=5)
+        transactions = _request_json("sleeper_transactions", url, timeout=5)
         return transactions if isinstance(transactions, list) else []
     except Exception:
         return []
@@ -1562,7 +1514,6 @@ def clear_live_league_endpoint_caches() -> None:
     anonymous presentation-only reruns.
     """
 
-    _clear_shared_live_json()
     _get_users_cached.cache_clear()
     _get_rosters_cached.cache_clear()
     _get_league_cached.cache_clear()
@@ -1587,7 +1538,7 @@ def _get_matchups_cached(league_id: str, round_num: int, _bucket: int) -> List[D
 
     url = f"{SLEEPER_BASE}/league/{league_id}/matchups/{round_num}"
     try:
-        matchups = _shared_live_json("sleeper_matchups", url, _bucket, timeout=5)
+        matchups = _request_json("sleeper_matchups", url, timeout=5)
         return matchups if isinstance(matchups, list) else []
     except Exception:
         return []

@@ -220,18 +220,22 @@ def pct(vals, p):
 
 sizes: dict = defaultdict(list)
 PROGRESSIVE = False
+TIMEOUT = 180.0
 
 
 async def user_session(client, n, results, errors, delay=0.0):
     await asyncio.sleep(delay)
     hdr = {"Authorization": f"Bearer user-{n}.x.y"}
+    t_session = time.perf_counter()
     for name, path in FLOWS:
         if name == "dashboard" and PROGRESSIVE:
             # What web/mobile now do: first paint without trade ideas, then the full call.
             t0 = time.perf_counter()
             try:
-                r = await client.get(path.replace("{L}", f"L{n}") + "?defer_trade_ideas=true", headers=hdr, timeout=60)
+                r = await client.get(path.replace("{L}", f"L{n}") + "?defer_trade_ideas=true", headers=hdr, timeout=TIMEOUT)
                 results["dashboard_first_paint"].append((time.perf_counter() - t0) * 1000)
+                if r.status_code < 400:
+                    results["ux_first_paint"].append((time.perf_counter() - t_session) * 1000)
                 if r.status_code >= 400:
                     errors[f"dashboard_first_paint {r.status_code}"] += 1
             except Exception as exc:
@@ -239,10 +243,15 @@ async def user_session(client, n, results, errors, delay=0.0):
             t0 = time.perf_counter()
         t0 = time.perf_counter()
         try:
-            r = await client.get(path.replace("{L}", f"L{n}"), headers=hdr, timeout=60)
+            r = await client.get(path.replace("{L}", f"L{n}"), headers=hdr, timeout=TIMEOUT)
             ms = (time.perf_counter() - t0) * 1000
             results[name].append(ms)
             sizes[name].append(len(r.content))
+            if name == "dashboard" and r.status_code < 400:
+                # Time from the user opening the app to a fully rendered dashboard.
+                results["ux_full"].append((time.perf_counter() - t_session) * 1000)
+                if not PROGRESSIVE:
+                    results["ux_first_paint"].append(results["ux_full"][-1])
             if r.status_code >= 400:
                 errors[f"{name} {r.status_code}"] += 1
         except Exception as exc:
@@ -270,10 +279,13 @@ def main():
     ap.add_argument("--profile-dir", default="", help="write per-request cProfile dumps of the dashboard handler here")
     ap.add_argument("--data-dir", default="", help="source of the throwaway data/ copy (default: <repo>/data); "
                     "use when a worktree's tracked data/ holds stubs instead of the real players dump")
+    ap.add_argument("--timeout", type=float, default=180.0, help="per-request client timeout (s)")
     ap.add_argument("--progressive", action="store_true", help="dashboard flow = deferred first paint then full call")
     a = ap.parse_args()
     global PROGRESSIVE
     PROGRESSIVE = a.progressive
+    global TIMEOUT
+    TIMEOUT = a.timeout
     work = Path(tempfile.mkdtemp(prefix="loadtest_"))
     shutil.copytree(Path(a.data_dir) if a.data_dir else ROOT / "data", work / "data")  # throwaway copy; app cwd is here
     os.environ["LT_PLAYERS_JSON"] = str(work / "data/sleeper_players.json")  # the stub reads it in this process
@@ -314,6 +326,7 @@ def main():
         out = {"users": a.users, "ramp_s": a.ramp, "workers": a.workers, "wall_s": round(wall, 1), "errors": dict(errors),
                "sleeper_calls": dict(Stub.sleeper_hits), "unhandled_sleeper_paths": dict(Stub.unhandled),
                "endpoints": {k: {"n": len(v), "p50_ms": round(statistics.median(v)), "p95_ms": round(pct(v, 0.95)), "max_ms": round(max(v)), "median_bytes": int(statistics.median(sizes[k])) if sizes[k] else 0} for k, v in results.items()}}
+        out["dashboard_completion_rate"] = round(len(results["ux_full"]) / a.users, 3)
         out["cpu_s_total"] = round(cpu_s, 1)
         out["cpu_s_per_user"] = round(cpu_s / a.users, 2)
         out["sleeper_calls_per_session"] = round(Stub.sleeper_hits["__total__"] / a.users, 1)

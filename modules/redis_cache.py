@@ -182,7 +182,6 @@ def redis_single_flight_cache(
     ttl_seconds: int,
     compute: Callable[[], T],
     lock_timeout_seconds: float = 15.0,
-    should_cache: Callable[[T], bool] | None = None,
 ) -> T:
     """At most one caller, cluster-wide, actually runs `compute` for a given
     `cache_key` within its TTL window; every other concurrent caller for the
@@ -210,12 +209,6 @@ def redis_single_flight_cache(
     PX TTL) and how long a waiter blocks before giving up and computing its
     own answer -- so one wedged/crashed computation can only ever cost
     other callers this much extra latency once, not forever.
-
-    `should_cache`, when given, is asked about each freshly computed result
-    before it is stored: returning False hands the result to this caller
-    only (the lock is still released, so the next caller simply computes
-    again). Used for results that must not be shared, e.g. an upstream
-    failure or a stale fallback payload.
     """
 
     client = get_redis_client()
@@ -266,8 +259,7 @@ def redis_single_flight_cache(
                 # exactly the double-run this whole mechanism exists to
                 # prevent.
                 try:
-                    if should_cache is None or should_cache(result):
-                        client.set(cache_key, pickle.dumps(result), ex=ttl_seconds)
+                    client.set(cache_key, pickle.dumps(result), ex=ttl_seconds)
                 except redis_exceptions.RedisError:
                     logger.warning(
                         "Redis unreachable caching result for %s; result still "
