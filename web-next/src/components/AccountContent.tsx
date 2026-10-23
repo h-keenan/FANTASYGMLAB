@@ -8,6 +8,8 @@ import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
 import { trialEndLabel } from "@/lib/trialCopy";
 import { ButtonLink } from "@/components/Button";
+import { OnboardingCarousel } from "@/components/OnboardingCarousel";
+import { trackOnboarding } from "@/lib/onboardingAnalytics";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same four categories, same copy — so a user who's seen this in the app
@@ -298,10 +300,23 @@ function AccountActionsSection({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replaying, setReplaying] = useState(false);
 
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-actions-heading">
       <SectionHeading id="account-actions-heading">Account actions</SectionHeading>
+      <button
+        type="button"
+        onClick={() => {
+          trackOnboarding("replayed");
+          setReplaying(true);
+        }}
+        className="px-4 py-2 text-sm font-bold self-start"
+        style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
+      >
+        Replay the tour
+      </button>
+      {replaying ? <OnboardingCarousel replay onDone={() => setReplaying(false)} /> : null}
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}

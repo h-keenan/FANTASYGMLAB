@@ -2,6 +2,7 @@ import { env } from "./env";
 import { supabase } from "./supabase";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
+import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 
 /**
  * Client for services/mobile_api_service.py. Mirrors mobile/src/lib/api.ts's
@@ -48,7 +49,8 @@ async function performRequest<T>(
         Authorization: `Bearer ${accessToken}`,
         ...(init?.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
       },
-      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
+      // Privacy mode is display-only: masked labels never go back to the server.
+      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskOutgoing(init.jsonBody)) } : {}),
       signal: controller.signal,
     });
   } catch (error) {
@@ -77,7 +79,7 @@ async function performRequest<T>(
     throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
   }
 
-  return body as T;
+  return maskIfPrivate(body) as T;
 }
 
 async function authorizedRequest<T>(
@@ -119,8 +121,11 @@ async function authorizedBinaryRequest(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         ...(jsonBody === undefined ? {} : { "Content-Type": "application/json" }),
+        // Share cards are drawn server-side from upstream data; tell that
+        // route to mask names/avatars the same way the app does.
+        ...(baseUrl === "" && isPrivacyMode() ? { "X-Privacy-Mode": "1" } : {}),
       },
-      body: jsonBody === undefined ? undefined : JSON.stringify(jsonBody),
+      body: jsonBody === undefined ? undefined : JSON.stringify(unmaskOutgoing(jsonBody)),
       signal: controller.signal,
     });
   } catch (error) {

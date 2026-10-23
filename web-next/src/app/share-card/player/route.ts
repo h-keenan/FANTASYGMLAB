@@ -3,6 +3,7 @@ import {
   UpstreamError,
   cacheKey,
   fetchUpstreamJson,
+  privacyMaskerFor,
   getCachedPng,
   isSafeId,
   jsonError,
@@ -26,6 +27,11 @@ const RANKINGS_LIMIT = 300;
  */
 export async function GET(request: Request): Promise<Response> {
   const authorization = request.headers.get("authorization") || "";
+  // Privacy mode (X-Privacy-Mode header): mask names/avatars in upstream data
+  // before the card is drawn; part of the cache key so cards never mix.
+  const masker = privacyMaskerFor(request);
+  const fetchJson = <T,>(path: string, auth: string, init: Parameters<typeof fetchUpstreamJson>[2] = {}) =>
+    fetchUpstreamJson<T>(path, auth, { ...init, masker });
   if (!/^Bearer \S+$/.test(authorization)) return jsonError(401, "Not signed in.");
 
   const params = new URL(request.url).searchParams;
@@ -36,13 +42,13 @@ export async function GET(request: Request): Promise<Response> {
   if (!isSafeId(leagueId) || !isSafeId(playerId)) return jsonError(422, "leagueId and playerId are required.");
   if (!isValuationLens(lens)) return jsonError(422, "Unknown lens.");
 
-  const key = cacheKey(["player", authorization, leagueId, playerId, lens, format]);
+  const key = cacheKey(["player", masker ? "private" : "", authorization, leagueId, playerId, lens, format]);
   const cached = getCachedPng(key);
   if (cached) return pngResponse(cached, "hit");
 
   let rankings: LeagueRankingsResponse;
   try {
-    rankings = await fetchUpstreamJson<LeagueRankingsResponse>(
+    rankings = await fetchJson<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?lens=${encodeURIComponent(lens)}&limit=${RANKINGS_LIMIT}`,
       authorization,
     );

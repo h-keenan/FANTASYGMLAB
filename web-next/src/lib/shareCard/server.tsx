@@ -8,6 +8,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { createMasker, type Masker } from "@/lib/privacy";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -273,7 +274,7 @@ function apiBaseUrl(): string {
 export async function fetchUpstreamJson<T>(
   path: string,
   authorization: string,
-  init: { method?: "GET" | "POST"; jsonBody?: unknown; shareCardToken?: boolean } = {},
+  init: { method?: "GET" | "POST"; jsonBody?: unknown; shareCardToken?: boolean; masker?: Masker | null } = {},
 ): Promise<T> {
   let response: Response;
   try {
@@ -305,7 +306,14 @@ export async function fetchUpstreamJson<T>(
     }
     throw new UpstreamError(response.status, detail || `Upstream request failed (${response.status}).`);
   }
-  return (await response.json()) as T;
+  const json = (await response.json()) as T;
+  return init.masker ? init.masker.mask(json) : json;
+}
+
+/** Privacy mode for a share-card request (X-Privacy-Mode header sent by the
+ * API client): a per-request masker, or null when off. */
+export function privacyMaskerFor(request: Request): Masker | null {
+  return request.headers.get("x-privacy-mode") === "1" ? createMasker() : null;
 }
 
 const SAFE_ID = /^[A-Za-z0-9_.:-]{1,128}$/;

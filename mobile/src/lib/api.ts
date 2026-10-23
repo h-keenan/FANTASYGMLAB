@@ -2,7 +2,7 @@ import { AppState } from 'react-native';
 
 import { supabase } from './supabase';
 import { env } from './env';
-import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
+import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
 import type { PercentileExplorerResponse } from './percentileExplorer';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
@@ -81,7 +81,8 @@ async function performRequest<T>(
         Authorization: `Bearer ${accessToken}`,
         ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
-      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
+      // Privacy mode is display-only: masked labels never go back to the server.
+      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskShowcaseFields(init.jsonBody)) } : {}),
       signal: controller.signal,
     });
   } finally {

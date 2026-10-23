@@ -153,3 +153,14 @@ describe("AccountContent", () => {
     expect(onDeleteAccount).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("AccountContent replay tour", () => {
+  it("opens the feature tour from Account without a preference write", () => {
+    renderContent();
+    fireEvent.click(screen.getByRole("button", { name: "Replay the tour" }));
+    expect(document.querySelector("[data-onboarding-root]")).not.toBeNull();
+    expect(screen.queryByText("How much dynasty experience do you have?")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(document.querySelector("[data-onboarding-root]")).toBeNull();
+  });
+});

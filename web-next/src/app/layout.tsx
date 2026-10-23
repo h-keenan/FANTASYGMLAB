@@ -9,6 +9,7 @@ import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { AppContentShell } from "@/components/AppContentShell";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { GmOrb } from "@/components/GmOrb";
+import { PrivacyPill } from "@/components/PrivacyMode";
 import { Header } from "@/components/Header";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { TradeOutcomePrompt } from "@/components/TradeOutcomePrompt";
@@ -84,6 +85,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     like mobile's RootNavigator does. Decides for itself
                     whether to show; see that component's doc comment. */}
                 <TradeOutcomePrompt />
+                <PrivacyPill />
               </PlayerQuickViewProvider>
             </ValuationLensProvider>
           </ExperienceLevelProvider>

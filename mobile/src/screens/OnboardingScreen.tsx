@@ -81,7 +81,7 @@ const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: Color
  * the Paywall finishes onboarding when it is dismissed. A replay just
  * returns to wherever it was opened from.
  */
-export default function OnboardingScreen({ navigation }: Props) {
+export default function OnboardingScreen({ navigation, route }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
@@ -95,24 +95,34 @@ export default function OnboardingScreen({ navigation }: Props) {
   const [index, setIndex] = useState(0);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
   const [saving, setSaving] = useState(false);
-  const isLast = index === STEP_KEYS.length - 1;
+  // Replay (More > "Replay the tour"): feature slides only. No connect or
+  // experience step, so no preference is written, no funnel events fire and
+  // the onboarding-completed flag is never touched.
+  const isReplay = route?.params?.replay === true;
+  const stepKeys: readonly StepKey[] = isReplay ? STEP_KEYS.filter((k) => k !== 'connect' && k !== 'level') : STEP_KEYS;
+  const isLast = index === stepKeys.length - 1;
   // A replay from More starts with the flag already true; only a real
   // first run gets the trial-offer step.
   const isFirstRun = onboardingComplete === false;
 
   // One step_viewed per step per session (deduped in the helper).
   useEffect(() => {
+    if (isReplay) return;
     trackOnboardingStepViewed(STEP_KEYS[index], index);
-  }, [index]);
+  }, [index, isReplay]);
 
   const goTo = (next: number) => {
-    const clamped = Math.max(0, Math.min(STEP_KEYS.length - 1, next));
-    if (clamped < index) trackOnboarding('back', { step: STEP_KEYS[index], step_index: index });
+    const clamped = Math.max(0, Math.min(stepKeys.length - 1, next));
+    if (clamped < index && !isReplay) trackOnboarding('back', { step: STEP_KEYS[index], step_index: index });
     setIndex(clamped);
     scrollRef.current?.scrollTo({ x: clamped * width, animated: true });
   };
 
   const onSkip = () => {
+    if (isReplay) {
+      if (navigation.canGoBack()) navigation.goBack();
+      return;
+    }
     trackOnboarding('skipped', { step: STEP_KEYS[index], step_index: index });
     if (isFirstRun) {
       navigation.navigate('Paywall', { fromOnboarding: 'skip' });
@@ -123,6 +133,10 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   const onFinish = async () => {
+    if (isReplay) {
+      if (navigation.canGoBack()) navigation.goBack();
+      return;
+    }
     if (!level) return;
     trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(level) });
     setSaving(true);
@@ -141,7 +155,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = width > 0 ? Math.round(e.nativeEvent.contentOffset.x / width) : 0;
-    setIndex(Math.max(0, Math.min(STEP_KEYS.length - 1, next)));
+    setIndex(Math.max(0, Math.min(stepKeys.length - 1, next)));
   };
 
   const renderStep = (key: StepKey) => {
@@ -212,7 +226,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   const primaryLabel = !isLast ? 'Next' : isFirstRun ? 'Continue' : 'Done';
-  const primaryDisabled = isLast && (!level || saving);
+  const primaryDisabled = isLast && !isReplay && (!level || saving);
 
   return (
     <View style={styles.root}>
@@ -220,7 +234,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
       <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.dotsRow}>
-          {STEP_KEYS.map((key, i) => (
+          {stepKeys.map((key, i) => (
             <View key={key} style={[styles.dot, i === index && styles.dotActive]} />
           ))}
         </View>
@@ -237,7 +251,7 @@ export default function OnboardingScreen({ navigation }: Props) {
         onMomentumScrollEnd={onMomentumScrollEnd}
         style={styles.scroll}
       >
-        {STEP_KEYS.map((key) => (
+        {stepKeys.map((key) => (
           <ScrollView
             key={key}
             style={{ width }}

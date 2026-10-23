@@ -3,6 +3,7 @@ import {
   UpstreamError,
   cacheKey,
   fetchUpstreamJson,
+  privacyMaskerFor,
   getCachedPng,
   isSafeId,
   jsonError,
@@ -27,6 +28,11 @@ import { isValuationLens } from "@/lib/valuationLens";
  */
 export async function GET(request: Request): Promise<Response> {
   const authorization = request.headers.get("authorization") || "";
+  // Privacy mode (X-Privacy-Mode header): mask names/avatars in upstream data
+  // before the card is drawn; part of the cache key so cards never mix.
+  const masker = privacyMaskerFor(request);
+  const fetchJson = <T,>(path: string, auth: string, init: Parameters<typeof fetchUpstreamJson>[2] = {}) =>
+    fetchUpstreamJson<T>(path, auth, { ...init, masker });
   if (!/^Bearer \S+$/.test(authorization)) return jsonError(401, "Not signed in.");
 
   const params = new URL(request.url).searchParams;
@@ -41,7 +47,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!isValuationLens(lens)) return jsonError(422, "Unknown lens.");
 
   // Keyed on the caller's token too: two users never share a cached card.
-  const key = cacheKey(["trade", authorization, leagueId, recommendationId, strategy, lens, format]);
+  const key = cacheKey(["trade", masker ? "private" : "", authorization, leagueId, recommendationId, strategy, lens, format]);
   const cached = getCachedPng(key);
   if (cached) return pngResponse(cached, "hit");
 
@@ -52,11 +58,11 @@ export async function GET(request: Request): Promise<Response> {
     // Fail-open: it's Premium-gated and decorative, so any failure just
     // labels their side "Your team" rather than failing the card.
     const [boardResult, mine] = await Promise.all([
-      fetchUpstreamJson<TradeHubResponse>(
+      fetchJson<TradeHubResponse>(
         `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
         authorization,
       ),
-      fetchUpstreamJson<PortfolioLeagueResponse>(
+      fetchJson<PortfolioLeagueResponse>(
         `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}`,
         authorization,
       ).catch(() => null),

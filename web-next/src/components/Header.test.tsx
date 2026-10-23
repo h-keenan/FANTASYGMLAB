@@ -146,3 +146,26 @@ describe("EvaluationLensButton dropdown anchor", () => {
     expect(menu.className).not.toContain("right-0");
   });
 });
+
+describe("Header league switcher in privacy mode", () => {
+  it("shows masked league names for the current league and the saved list", async () => {
+    const { setPrivacyMode, resetPrivacyForTests } = await import("@/lib/privacy");
+    resetPrivacyForTests();
+    setPrivacyMode(true);
+    try {
+      mockSearchParams.get.mockImplementation((key: string) => (key === "name" ? "Dynasty Overlords" : null));
+      mockSavedLeagues([
+        { league_id: "league-7", league_name: "Dynasty Overlords" },
+        { league_id: "league-8", league_name: "Secret Work League" },
+      ]);
+      render(<Header />);
+      const button = await screen.findByRole("button", { name: /Sample League/ });
+      fireEvent.click(button);
+      expect(await screen.findByRole("menuitem", { name: "Sample Dynasty League" })).toBeInTheDocument();
+      expect(screen.queryByText(/Dynasty Overlords|Secret Work/)).toBeNull();
+    } finally {
+      setPrivacyMode(false);
+      resetPrivacyForTests();
+    }
+  });
+});

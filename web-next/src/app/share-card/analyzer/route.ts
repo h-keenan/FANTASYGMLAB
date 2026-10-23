@@ -11,6 +11,7 @@ import {
   UpstreamError,
   cacheKey,
   fetchUpstreamJson,
+  privacyMaskerFor,
   getCachedPng,
   jsonError,
   parseShareFormat,
@@ -33,6 +34,11 @@ const RANKINGS_LIMIT = 300;
  */
 export async function POST(request: Request): Promise<Response> {
   const authorization = request.headers.get("authorization") || "";
+  // Privacy mode (X-Privacy-Mode header): mask names/avatars in upstream data
+  // before the card is drawn; part of the cache key so cards never mix.
+  const masker = privacyMaskerFor(request);
+  const fetchJson = <T,>(path: string, auth: string, init: Parameters<typeof fetchUpstreamJson>[2] = {}) =>
+    fetchUpstreamJson<T>(path, auth, { ...init, masker });
   if (!/^Bearer \S+$/.test(authorization)) return jsonError(401, "Not signed in.");
 
   if (Number(request.headers.get("content-length") || 0) > MAX_BODY_BYTES) return jsonError(413, "Request too large.");
@@ -56,7 +62,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (rateLimited(cacheKey([authorization]))) return jsonError(429, "Too many share cards. Try again in a minute.");
 
-  const key = cacheKey(["analyzer", authorization, payload, format]);
+  const key = cacheKey(["analyzer", masker ? "private" : "", authorization, payload, format]);
   const cached = getCachedPng(key);
   if (cached) return pngResponse(cached, "hit");
 
@@ -67,7 +73,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const [analysis, rankings, picks, profiles, mine] = await Promise.all([
-      fetchUpstreamJson<TradeAnalyzerResponse>(`${league}/trade-analyzer`, authorization, {
+      fetchJson<TradeAnalyzerResponse>(`${league}/trade-analyzer`, authorization, {
         method: "POST",
         shareCardToken: true,
         jsonBody: {
@@ -81,14 +87,14 @@ export async function POST(request: Request): Promise<Response> {
         },
       }),
       playerIds.length
-        ? fetchUpstreamJson<LeagueRankingsResponse>(`${league}/rankings?${lensQ}&limit=${RANKINGS_LIMIT}`, authorization)
+        ? fetchJson<LeagueRankingsResponse>(`${league}/rankings?${lensQ}&limit=${RANKINGS_LIMIT}`, authorization)
         : Promise.resolve<LeagueRankingsResponse>({ ok: true, players: [] }),
-      pickIds.length ? fetchUpstreamJson<DraftPicksResponse>(`${league}/draft-picks?${lensQ}`, authorization) : Promise.resolve(null),
+      pickIds.length ? fetchJson<DraftPicksResponse>(`${league}/draft-picks?${lensQ}`, authorization) : Promise.resolve(null),
       payload.partnerRosterId
-        ? fetchUpstreamJson<LeagueTeamProfilesResponse>(`${league}/team-profiles`, authorization).catch(() => null)
+        ? fetchJson<LeagueTeamProfilesResponse>(`${league}/team-profiles`, authorization).catch(() => null)
         : Promise.resolve(null),
       // Decorative and Premium-gated: fail open to "Your team".
-      fetchUpstreamJson<PortfolioLeagueResponse>(
+      fetchJson<PortfolioLeagueResponse>(
         `/v1/portfolio/leagues/${encodeURIComponent(payload.leagueId)}?${lensQ}`,
         authorization,
       ).catch(() => null),
@@ -102,7 +108,7 @@ export async function POST(request: Request): Promise<Response> {
       playerIds
         .filter((id) => !rankedById.has(id))
         .map(async (id) => {
-          const one = await fetchUpstreamJson<{ player: RankedPlayer | null }>(
+          const one = await fetchJson<{ player: RankedPlayer | null }>(
             `${league}/players/${encodeURIComponent(id)}/rank?${lensQ}`,
             authorization,
           ).catch(() => null);

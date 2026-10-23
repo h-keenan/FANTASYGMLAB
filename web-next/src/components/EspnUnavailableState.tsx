@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "@/lib/useSearchParams";
 
 import { importedPlatformLabel, notAvailableMessage } from "@/lib/leaguePlatform";
 import { ButtonLink } from "@/components/Button";

@@ -56,7 +56,7 @@ export type RootStackParamList = {
   /** `openAddLeague`: opens Home's Add League sheet on arrival (the header
    * league switcher's "Add a league" row). */
   Home: { openAddLeague?: boolean } | undefined;
-  Onboarding: undefined;
+  Onboarding: { replay?: boolean } | undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
   /** `fromOnboarding`: shown as the first-run trial offer right after the
