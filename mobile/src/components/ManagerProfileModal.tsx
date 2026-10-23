@@ -8,11 +8,13 @@ import { useQuery } from '@tanstack/react-query';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import DashboardStatRow from './DashboardStatRow';
+import PickPlate from './PickPlate';
+import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';
 import { api } from '../lib/api';
-import { sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone } from '../lib/managerTendencies';
+import { gradeToneSlug, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel, type ManagerRecentTradeAsset } from '../lib/managerTendencies';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
@@ -122,6 +124,49 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, roster
                     </AccentCard>
                   );
                 })}
+                {data.recent_trades && data.recent_trades.length > 0 ? (
+                  <>
+                    <SectionHeading title="Recent trades" />
+                    {data.recent_trades.map((trade) => (
+                      <AccentCard key={trade.transaction_id} accent={colors.border} compact style={styles.signal}>
+                        <View style={styles.signalHead}>
+                          <AppText style={[styles.muted, styles.tradeMeta]} numberOfLines={2}>
+                            {tradeDateLabel(trade.date, trade.week)}
+                            {trade.partners.length ? ` · with ${trade.partners.join(', ')}` : ''}
+                          </AppText>
+                          {trade.grade ? (
+                            <ToneBadge
+                              label={trade.grade.letter}
+                              color={{ success: colors.success, accent: colors.accent, danger: colors.danger, muted: colors.textSecondary }[gradeToneSlug(trade.grade.tone)]}
+                            />
+                          ) : null}
+                        </View>
+                        {([['Got', trade.received], ['Sent', trade.sent]] as Array<[string, ManagerRecentTradeAsset[]]>).map(([label, assets]) =>
+                          assets.length ? (
+                            <View key={label} style={styles.tradeSide}>
+                              <AppText style={styles.signalTitle}>{label}</AppText>
+                              {assets.map((asset, i) => (
+                                <View key={`${asset.player_id ?? asset.label}-${i}`} style={styles.assetLine}>
+                                  {asset.kind === 'pick' ? (
+                                    <PickPlate round={asset.round} />
+                                  ) : (
+                                    <View style={styles.badgeGap}>
+                                      <PositionBadge position={asset.position} />
+                                    </View>
+                                  )}
+                                  <AppText style={styles.assetName} numberOfLines={2}>
+                                    {asset.kind === 'pick' ? asset.label || 'Draft pick' : asset.name}
+                                    {asset.kind === 'player' && asset.team ? `  ${asset.team}` : ''}
+                                  </AppText>
+                                </View>
+                              ))}
+                            </View>
+                          ) : null,
+                        )}
+                      </AccentCard>
+                    ))}
+                  </>
+                ) : null}
               </>
             )}
           </ScrollView>
@@ -163,6 +208,11 @@ function createStyles(colors: ThemeColors) {
     meterFill: { height: 4, borderRadius: radii.pill },
     signalTitle: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: colors.textSecondary },
     signalSummary: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+    tradeMeta: { flex: 1 },
+    tradeSide: { gap: 4 },
+    assetLine: { flexDirection: 'row', alignItems: 'center' },
+    badgeGap: { marginRight: 8 },
+    assetName: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     muted: { fontSize: 12, color: colors.textSecondary },
     upsellTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     upsellCta: { fontSize: 13, fontWeight: '700', color: colors.premium, marginTop: spacing.xs },

@@ -24,6 +24,48 @@ export interface ManagerTendenciesSummaryResponse {
   managers: ManagerTendencySummaryRow[];
 }
 
+export interface ManagerRecentTradeAsset {
+  kind: 'player' | 'pick';
+  player_id?: string;
+  name?: string;
+  position?: string;
+  team?: string;
+  season?: string;
+  round?: number | null;
+  label?: string;
+  original_team?: string;
+}
+
+export interface ManagerRecentTrade {
+  transaction_id: string;
+  season: string;
+  week: number;
+  date: string;
+  partners: string[];
+  received: ManagerRecentTradeAsset[];
+  sent: ManagerRecentTradeAsset[];
+  /** Our retrospective letter for the manager's side; null when not computable. */
+  grade: { letter: string; tone: string; confidence: string; timing_label: string; ratio: number | null } | null;
+}
+
+/** Grade tone slug (server) -> shared semantic color slug. */
+export function gradeToneSlug(tone: string | null | undefined): 'success' | 'accent' | 'muted' | 'danger' {
+  if (tone === 'success') return 'success';
+  if (tone === 'positive') return 'accent';
+  if (tone === 'risk') return 'danger';
+  return 'muted';
+}
+
+/** "2026-10-04" -> "Oct 4, 2026 · Wk 5" (week-only fallback; '' if neither). */
+export function tradeDateLabel(date: string | null | undefined, week?: number | null): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? '');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const base = match ? `${months[Number(match[2]) - 1] ?? ''} ${Number(match[3])}, ${match[1]}` : '';
+  if (base && week) return `${base} · Wk ${week}`;
+  if (base) return base;
+  return week ? `Week ${week}` : '';
+}
+
 export interface ManagerTendenciesDetailResponse {
   ok: boolean;
   is_premium: boolean;
@@ -34,6 +76,8 @@ export interface ManagerTendenciesDetailResponse {
     sample?: { trades: number; wire_moves: number; seasons: number } | null;
     signals: Record<string, ManagerTendencySignal>;
   } | null;
+  /** Pro payload only; newest first, max 5. */
+  recent_trades?: ManagerRecentTrade[];
 }
 
 /** Signal order + short titles (mirrors modules.manager_tendencies.SIGNAL_ORDER). */

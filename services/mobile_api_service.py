@@ -4935,6 +4935,21 @@ def get_manager_tendencies(
     detail = manager_tendencies.manager_detail(profile, int(roster_id))
     if detail is None:
         raise HTTPException(status_code=404, detail="Roster not found in this league.")
+    player_lookup: dict[str, dict[str, Any]] = {}
+    current_week = 0
+    if (detail["manager"] or {}).get("recent_trade_refs"):
+        # Same cached valuation frame + last_scored_week the History tab
+        # grades with; a failure just leaves the grades null.
+        try:
+            valued = league_value_settings.build_valued_players_frame_cached(
+                league_id=league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH
+            )
+            if not valued.empty:
+                cols = [c for c in ("player_id", "name", "position", "team", "value_score") if c in valued.columns]
+                player_lookup = league_history.player_lookup_from_rows(valued[cols].to_dict("records"))
+            current_week = league_recaps.last_scored_week(sleeper.get_league(league_id))
+        except Exception:
+            player_lookup, current_week = {}, 0
     return {
         "ok": True,
         "reason": "",
@@ -4946,6 +4961,9 @@ def get_manager_tendencies(
         "thresholds": profile.get("thresholds") or {},
         "manager": detail["manager"],
         "transactions": detail["transactions"],
+        "recent_trades": manager_tendencies.recent_trades(
+            profile, int(roster_id), player_lookup=player_lookup, current_week=current_week
+        ),
     }
 
 
