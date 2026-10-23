@@ -75,11 +75,11 @@ export default function LandingPage() {
               ))}
             </ul>
             {/* Keep in step with ESPN_SUPPORTED_SEGMENTS in lib/leaguePlatform.ts
-                and docs/platform-import-status.md: imported leagues get My
-                Team, Trade Analyzer, Players and League Rankings only. */}
+                and docs/platform-import-status.md: imported leagues get Dashboard,
+                Matchup, My Team, Trade Analyzer, Players and League Rankings. */}
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Works with Sleeper leagues, plus public ESPN, Fleaflicker and MFL leagues (My Team, Trade Analyzer,
-              Players and League Rankings).
+              Works with Sleeper leagues, plus public ESPN, Fleaflicker and MFL leagues (Dashboard, Matchup, My Team,
+              Trade Analyzer, Players and League Rankings).
             </p>
             {/* Store slots stay quiet: Google Play is live, App Store is
                 "Coming soon" until lib/appStoreLinks.ts has a URL. */}

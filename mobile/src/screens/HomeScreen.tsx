@@ -28,7 +28,6 @@ import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
 import EspnLeagueImport from '../components/EspnLeagueImport';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { useAuth } from '../context/AuthContext';
@@ -220,14 +219,10 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Honest, plan-accurate copy (lib/leagueCap.ts).
   const capMessageFor = (_cap: number) => leagueCapMessage();
 
-  // Dashboard for Sleeper leagues, My Team for ESPN leagues (which have no
-  // Dashboard yet — lib/leaguePlatform.ts).
+  // Every league opens on its Dashboard; imported leagues show what their
+  // platform data supports (lib/leaguePlatform.ts).
   const openLeague = (leagueId: string, leagueName: string) => {
-    if (isEspnLeagueId(leagueId)) {
-      navigation.navigate('MyTeam', { leagueId, leagueName });
-    } else {
-      navigation.navigate('Dashboard', { leagueId, leagueName });
-    }
+    navigation.navigate('Dashboard', { leagueId, leagueName });
   };
 
   const finishSave = async (leagueId: string, leagueName: string | undefined, routeToTeamStance: boolean) => {
@@ -649,8 +644,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     autoNavigated.current = true;
                     closeAddLeague();
                     void load();
-                    // ESPN leagues have no Dashboard yet (lib/leaguePlatform.ts).
-                    navigation.navigate('MyTeam', { leagueId, leagueName });
+                    navigation.navigate('Dashboard', { leagueId, leagueName });
                   }}
                 />
               )

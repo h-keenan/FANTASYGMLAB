@@ -17,19 +17,19 @@ test('Fleaflicker and MFL leagues are imported leagues with their own label', ()
   assert.equal(importedPlatformLabel('mfl:10015:2025'), 'MFL');
   assert.equal(notAvailableMessage('fleaflicker:206154:2025'), 'Not available for Fleaflicker leagues yet.');
   assert.equal(notAvailableMessage('espn:1:2026'), 'Not available for ESPN leagues yet.');
-  assert.equal(leagueHomeRoute('mfl:10015:2025'), 'MyTeam');
+  assert.equal(leagueHomeRoute('mfl:10015:2025'), 'Dashboard');
 });
 
-test('ESPN leagues open My Team, Sleeper leagues open Dashboard', () => {
-  assert.equal(leagueHomeRoute('espn:42654852:2026'), 'MyTeam');
+test('every league opens on its Dashboard', () => {
+  assert.equal(leagueHomeRoute('espn:42654852:2026'), 'Dashboard');
   assert.equal(leagueHomeRoute('1180112345678901234'), 'Dashboard');
 });
 
 test('only the screens ESPN can feed are supported', () => {
-  for (const route of ['MyTeam', 'Trades', 'Players', 'PlayerDetail', 'Teams']) {
+  for (const route of ['Dashboard', 'Matchup', 'MyTeam', 'Trades', 'Players', 'PlayerDetail', 'Teams']) {
     assert.equal(espnRouteSupported(route), true, route);
   }
-  for (const route of ['Dashboard', 'Waivers', 'Matchup', 'Alerts', 'GmPlan', 'DraftCenter', 'LeagueDetail']) {
+  for (const route of ['Waivers', 'Alerts', 'GmPlan', 'DraftCenter', 'LeagueDetail']) {
     assert.equal(espnRouteSupported(route), false, route);
   }
 });

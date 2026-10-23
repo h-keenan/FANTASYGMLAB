@@ -781,6 +781,9 @@ export interface MatchupResponse {
   /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
   best_ball?: boolean;
   lineup_advice_message?: string;
+  /** Imported leagues only: starters on either side we could not match to a FantasyDesk player. */
+  platform?: string;
+  unmapped_players?: { name: string; position: string; team: string; slot?: string; fantasy_team: string }[];
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
@@ -2030,6 +2033,8 @@ export interface DashboardResponse {
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
   trade_ideas_deferred?: boolean;
+  /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
+  platform_notice?: string;
 }
 
 /**

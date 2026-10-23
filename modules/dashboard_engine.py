@@ -591,6 +591,7 @@ def compose_next_move_briefing(
     season_progress: float | None = None,
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
+    include_trade_and_waiver: bool = True,
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -640,6 +641,11 @@ def compose_next_move_briefing(
     every other surface showing the identical recommendation already
     respected that flag. Both default to empty, matching every existing
     caller/test that predates this parameter.
+
+    `include_trade_and_waiver=False` is for imported (ESPN / Fleaflicker / MFL)
+    leagues: their snapshots can't tell a free agent from a player we failed to
+    map, and Trade Hub needs Sleeper-only pick ownership, so no waiver or trade
+    tile (and no waiver-driven news tile) is built rather than a guessed one.
     """
 
     if roster_df is None:
@@ -658,9 +664,13 @@ def compose_next_move_briefing(
         )
 
         free_agents_df = players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)]
-        top_waiver = select_top_waiver_opportunity(
-            free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions
-        )
+        if include_trade_and_waiver:
+            top_waiver = select_top_waiver_opportunity(
+                free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions
+            )
+        else:
+            top_waiver = None
+            free_agents_df = players_df.iloc[0:0]
 
         need_tile = select_need_headline(team_needs_assessment)
         need_tile["route_key"] = "my_team"
@@ -668,8 +678,10 @@ def compose_next_move_briefing(
         roster_pressure_tile = build_roster_pressure_tile(
             league_id=league_id, roster_id=roster_id, roster_df=roster_df, league_settings=league_settings
         )
-        waiver_tile = build_waiver_tile(
-            top_waiver, league_id=league_id, roster_id=roster_id, score_field=score_field
+        waiver_tile = (
+            build_waiver_tile(top_waiver, league_id=league_id, roster_id=roster_id, score_field=score_field)
+            if include_trade_and_waiver
+            else None
         )
 
         value_trend_tile = build_value_trend_tile(roster_df, score_field)
@@ -715,7 +727,7 @@ def compose_next_move_briefing(
         my_roster_id = int(roster_id)
     except (TypeError, ValueError):
         my_roster_id = None
-    if my_roster_id is not None and rosters:
+    if include_trade_and_waiver and my_roster_id is not None and rosters:
         records = (
             trade_idea_records
             if trade_idea_records is not None

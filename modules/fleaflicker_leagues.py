@@ -330,6 +330,102 @@ def load_league_snapshot(league_key: str) -> dict[str, Any]:
     return snapshot
 
 
+# ---------------------------------------------------------------------------
+# Weekly matchup + lineup (Dashboard / Matchup)
+# ---------------------------------------------------------------------------
+#
+# Two more public endpoints, read lazily (never at import time) and cached for
+# 30 seconds by modules.external_matchups:
+#   FetchLeagueScoreboard  1 call: this week's pairings and scores. Without a
+#                          scoring_period it answers the current one, and its
+#                          ``schedulePeriod.ordinal`` is that week.
+#   FetchRoster            1 call per team that is displayed (you + opponent):
+#                          START slots with the player in each, the bench, and
+#                          each player's actual / projected points in the
+#                          league's own scoring.
+# A page load is therefore at most 3 calls, spaced by the 0.5s throttle.
+
+
+def _score(container: Any) -> float | None:
+    score = container.get("score") if isinstance(container, dict) else None
+    return _value(score) if isinstance(score, dict) and "value" in score else None
+
+
+def fetch_scoreboard(league_key: str) -> dict[str, Any]:
+    parsed = parse_league_key(league_key)
+    if not parsed:
+        raise ExternalLeagueError("invalid_input", ERROR_MESSAGES["invalid_input"])
+    league_id, season = parsed
+    payload = fetch_provider("FetchLeagueScoreboard", {"sport": "NFL", "league_id": league_id, "season": season})
+    period = _get(payload, "schedulePeriod")
+    week = safe_int(period.get("value") if isinstance(period, dict) else 0, 0)
+    if not week and isinstance(period, dict):
+        week = safe_int((period.get("low") or {}).get("ordinal"), 0)
+    games: list[dict[str, Any]] = []
+    for game in as_list(_get(payload, "games")):
+        if not isinstance(game, dict):
+            continue
+        home, away = game.get("home") or {}, game.get("away") or {}
+        if not home.get("id") or not away.get("id"):
+            continue  # a bye / unpaired team: no opponent this week
+        games.append(
+            {
+                "a_id": safe_text(home.get("id")),
+                "b_id": safe_text(away.get("id")),
+                "a_points": _score(game.get("homeScore")),
+                "b_points": _score(game.get("awayScore")),
+                "final": bool(game.get("isFinalScore")),
+            }
+        )
+    return {"week": week, "games": games}
+
+
+def fetch_lineup(league_key: str, team_id: str, week: int) -> dict[str, Any]:
+    """One team's lineup for ``week`` as platform-neutral dicts."""
+
+    parsed = parse_league_key(league_key)
+    if not parsed:
+        raise ExternalLeagueError("invalid_input", ERROR_MESSAGES["invalid_input"])
+    league_id, season = parsed
+    params: dict[str, Any] = {"sport": "NFL", "league_id": league_id, "team_id": team_id, "season": season}
+    if week:
+        params["scoring_period"] = week
+    payload = fetch_provider("FetchRoster", params)
+    starters: list[dict[str, Any]] = []
+    bench: list[dict[str, Any]] = []
+    empty_slots: list[str] = []
+    for group in as_list(_get(payload, "groups")):
+        if not isinstance(group, dict):
+            continue
+        name = safe_text(group.get("group")).upper()
+        if name not in ("START", ""):
+            continue  # injured reserve / taxi are not played this week
+        for slot in as_list(group.get("slots")):
+            if not isinstance(slot, dict):
+                continue
+            label = safe_text((slot.get("position") or {}).get("label"))
+            league_player = slot.get("leaguePlayer")
+            pro = league_player.get("proPlayer") if isinstance(league_player, dict) else None
+            if not isinstance(pro, dict) or not pro:
+                if name == "START":
+                    empty_slots.append(_SLOT.get(label, label))
+                continue
+            raw_team = safe_text(_get(pro, "proTeamAbbreviation")).upper()
+            actual = league_player.get("viewingActualPoints")
+            projected = league_player.get("viewingProjectedPoints")
+            entry = {
+                "platform_id": safe_text(pro.get("id")),
+                "name": safe_text(_get(pro, "nameFull")),
+                "position": _POSITION.get(safe_text(pro.get("position")).upper(), ""),
+                "team": "" if raw_team in ("", "FA") else normalize_espn_team(raw_team),
+                "slot": _SLOT.get(label, label) if name == "START" else "BN",
+                "points": _value(actual) if isinstance(actual, dict) and "value" in actual else None,
+                "projected_points": _value(projected) if isinstance(projected, dict) and "value" in projected else None,
+            }
+            (starters if name == "START" else bench).append(entry)
+    return {"starters": starters, "bench": bench, "empty_slots": empty_slots}
+
+
 def get_league_snapshot(league_key: str, *, refresh: bool = False) -> dict[str, Any] | None:
     if not parse_league_key(league_key):
         return None

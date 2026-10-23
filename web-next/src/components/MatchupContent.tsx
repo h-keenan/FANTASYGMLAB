@@ -740,6 +740,12 @@ export function MatchupContent({
         <BeginnerHelp term="matchupWinProbability" />
       </div>
       <Scoreboard matchup={shown} />
+      {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">
+          Not matched to a FantasyDesk player, so left out of the lineups and win odds:{" "}
+          {matchup.unmapped_players.map((p) => `${p.name} (${p.fantasy_team})`).join(", ")}.
+        </p>
+      ) : null}
       <MatchupInsights matchup={shown} />
       <LineupComparison
         matchup={matchup}

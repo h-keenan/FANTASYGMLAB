@@ -86,7 +86,7 @@ def test_preview_save_my_roster_and_gating_for_mfl(api):
     roster = api.client.get(f"/v1/leagues/{enc}/my-roster").json()["roster"]
     assert roster["roster_id"] == 2 and roster["players"]
 
-    for route in ("dashboard", "waivers", "matchup"):
+    for route in ("waivers", "trade-hub", "alerts"):
         response = api.client.get(f"/v1/leagues/{enc}/{route}")
         assert response.status_code == 409
         assert response.json()["detail"] == "Not available for MFL leagues yet."
@@ -98,5 +98,5 @@ def test_preview_and_gating_for_fleaflicker(api):
     # The two unmappable fixture players are listed, not guessed.
     assert {p["name"] for p in body["diagnostics"]["unmapped_players"]} == {"Zzyzx Unmappable"}
     assert body["ok"] is True
-    response = api.client.get(f"/v1/leagues/{quote(FF_KEY, safe='')}/dashboard")
+    response = api.client.get(f"/v1/leagues/{quote(FF_KEY, safe='')}/waivers")
     assert response.status_code == 409 and response.json()["detail"] == "Not available for Fleaflicker leagues yet."

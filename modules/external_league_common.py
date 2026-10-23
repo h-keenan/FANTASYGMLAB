@@ -135,6 +135,7 @@ def build_snapshot(
     users: list[dict[str, Any]] = []
     summaries: list[dict[str, Any]] = []
     unmapped: list[dict[str, str]] = []
+    id_map: dict[str, str] = {}
     total = matched = ambiguous = 0
 
     for team in league.teams:
@@ -165,6 +166,8 @@ def build_snapshot(
                     )
                 continue
             matched += 1
+            if player.platform_id:
+                id_map[str(player.platform_id)] = canonical
             if canonical in players:
                 continue
             players.append(canonical)
@@ -236,6 +239,9 @@ def build_snapshot(
         "rosters": rosters,
         "users": users,
         "teams": summaries,
+        # platform player id -> FantasyDesk (Sleeper) id for every mapped player,
+        # so a weekly lineup read later maps through the same, honest crosswalk.
+        "id_map": id_map,
         "diagnostics": {
             "teams_found": num_teams,
             "total_players_seen": total,

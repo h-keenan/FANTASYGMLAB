@@ -480,6 +480,10 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
 
+      {dashboardData?.platform_notice ? (
+        <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
+      ) : null}
+
       <ThisWeekSection
         data={dashboardData?.this_week}
         leagueId={leagueId}

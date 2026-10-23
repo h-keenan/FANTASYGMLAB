@@ -67,6 +67,11 @@ ESPN_SUPPORTED_LEAGUE_ROUTES: tuple[str, ...] = (
     "/my-team-needs",
     "/rankings",
     "/trade-analyzer",
+    # Dashboard and Matchup run on the platform's current-week data
+    # (modules.external_matchups) and omit what it can't support.
+    "/dashboard",
+    "/matchup",
+    "/matchup/what-if",
     # Answers with an empty list and reason espn_not_supported (ESPN exposes
     # no future-pick ownership), so Trade Analyzer runs players-only.
     "/draft-picks",
@@ -367,6 +372,9 @@ def build_snapshot(
     rosters: list[dict[str, Any]] = []
     users: list[dict[str, Any]] = []
     team_summaries: list[dict[str, Any]] = []
+    lineups: dict[str, dict[str, Any]] = {}
+    pairings: dict[str, dict[str, Any]] = {}
+    current_week = _safe_int(getattr(raw_league, "current_week", 0), 0)
     for team in teams:
         roster_id = _safe_int(getattr(team, "team_id", 0), 0)
         owner_id = f"espn-team-{roster_id}"
@@ -376,16 +384,44 @@ def build_snapshot(
         players: list[str] = []
         starters: list[str] = []
         reserve: list[str] = []
+        starter_slots: list[str] = []
+        unmapped_starters: list[dict[str, str]] = []
         for player in roster_players:
             canonical, _method = adapter._canonicalize_player(player)
-            if not canonical or canonical in players:
+            slot = _safe_text(getattr(player, "lineupSlot", "")).upper()
+            if not canonical:
+                if slot and slot not in _BENCH_LINEUP_SLOTS:
+                    unmapped_starters.append(
+                        {
+                            "name": _safe_text(getattr(player, "name", "")),
+                            "position": _safe_text(getattr(player, "position", "")),
+                            "team": _safe_text(getattr(player, "proTeam", "")),
+                            "slot": _SLOT_TO_SLEEPER_POSITION.get(slot, slot),
+                        }
+                    )
+                continue
+            if canonical in players:
                 continue
             players.append(canonical)
-            slot = _safe_text(getattr(player, "lineupSlot", "")).upper()
             if slot == "IR":
                 reserve.append(canonical)
             elif slot and slot not in _BENCH_LINEUP_SLOTS:
                 starters.append(canonical)
+                starter_slots.append(_SLOT_TO_SLEEPER_POSITION.get(slot, slot))
+        lineups[str(roster_id)] = {"starters": list(starters), "slots": starter_slots, "unmapped": unmapped_starters}
+        # Current-week pairing: espn_api keeps each team's opponents and scores per
+        # week (a bye week lists the team itself as the opponent).
+        week_index = current_week - 1
+        schedule = list(getattr(team, "schedule", None) or [])
+        scores = list(getattr(team, "scores", None) or [])
+        if 0 <= week_index < len(schedule):
+            opponent = schedule[week_index]
+            opponent_id = _safe_int(getattr(opponent, "team_id", opponent), 0)
+            score = scores[week_index] if week_index < len(scores) else None
+            pairings[str(roster_id)] = {
+                "opponent": str(opponent_id) if opponent_id and opponent_id != roster_id else "",
+                "points": _safe_float(score) if isinstance(score, (int, float)) and score > 0 else None,
+            }
         rosters.append(
             {
                 "platform": ESPN_PLATFORM,
@@ -465,6 +501,10 @@ def build_snapshot(
         "rosters": rosters,
         "users": users,
         "teams": team_summaries,
+        # This week's lineups (starters in slot order, unmapped starters named)
+        # and pairings, read from the same single load: ESPN needs no extra call.
+        "lineups": lineups,
+        "week_state": {"week": current_week, "pairings": pairings},
         "diagnostics": {
             "teams_found": len(teams),
             "total_espn_players_seen": total,

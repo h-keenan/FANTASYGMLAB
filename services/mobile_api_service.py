@@ -158,6 +158,7 @@ from modules import (
     draft_center_cards,
     espn_leagues,
     external_leagues,
+    external_matchups,
     faab,
     founder_analytics,
     gm_plan,
@@ -8974,6 +8975,12 @@ def get_league_dashboard(
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    # Imported (ESPN / Fleaflicker / MFL) leagues: the platform's current week and
+    # this team's real lineup, fail-soft; no waiver or trade engine (see
+    # _external_dashboard_context).
+    is_external = external_leagues.is_external_league_key(league_id)
+    if is_external:
+        league, my_roster = _external_dashboard_context(league_id, league, my_roster)
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.
@@ -9011,7 +9018,10 @@ def get_league_dashboard(
     # moments earlier by opening Trade Hub.
     trade_idea_records = None
     trade_ideas_deferred = False
-    if league_calendar.trade_deadline_passed(league):
+    if is_external:
+        # Trade Hub needs Sleeper-only pick ownership: no idea search, no trade row.
+        trade_idea_records = []
+    elif league_calendar.trade_deadline_passed(league):
         # Past the trade deadline: no Top Trade Opportunity tile — an empty
         # (not None) list keeps compose_next_move_briefing from regenerating.
         trade_idea_records = []
@@ -9109,6 +9119,7 @@ def get_league_dashboard(
         auto_strategy=auto_strategy,
         auto_strategy_label=auto_strategy_label,
         season_progress=record_signal.season_progress_fraction(league),
+        include_trade_and_waiver=not is_external,
     )
 
     # Team Snapshot: record comes straight off the roster we already
@@ -9199,13 +9210,59 @@ def get_league_dashboard(
             items=projected_items,
             # Deferred pass: the search has not run, so there is no "Hold"
             # verdict to give. None = omit the trade row; the full pass fills it.
-            trade_idea_records=None if trade_ideas_deferred else trade_idea_records,
+            trade_idea_records=None if (trade_ideas_deferred or is_external) else trade_idea_records,
             stance=declared_team_stance,
         ),
     }
     if trade_ideas_deferred:
         response["trade_ideas_deferred"] = True
+    if is_external:
+        response["platform_notice"] = (
+            f"Waiver and trade suggestions aren't available for {external_leagues.label_for(league_id)} "
+            "leagues yet, so this page only shows what your imported roster can support."
+        )
     return response
+
+
+def _external_week_state(league_id: str, league: dict[str, Any]) -> dict[str, Any] | None:
+    """The platform's current-week state for an imported league, or None.
+
+    None when the platform can't be read or the league's season is not the NFL
+    season we have schedules, stats and projections for (an older imported
+    season has no "this week" to speak of)."""
+
+    try:
+        season = int(league.get("season") or 0)
+        if not season or season != sleeper.default_player_stats_season():
+            return None
+        state = external_matchups.week_state(league_id)
+        return state if state and int(state.get("week") or 0) > 0 else None
+    except Exception:
+        return None
+
+
+def _external_dashboard_context(
+    league_id: str, league: dict[str, Any], my_roster: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """League + roster for the Dashboard of an imported league.
+
+    Adds the platform's current week (`settings.leg`) and, when every starter
+    maps to a FantasyDesk player, this team's real starters, which is what the
+    "lineup check" row reads. A lineup with an unmapped starter is left out
+    entirely: the row would otherwise claim a lineup is set that we only half
+    know. Never raises."""
+
+    state = _external_week_state(league_id, league)
+    if state is None:
+        return league, my_roster
+    league = {**league, "settings": {**(league.get("settings") or {}), "leg": int(state["week"])}}
+    try:
+        lineup = external_matchups.lineup_for(league_id, int(my_roster.get("roster_id")), state)
+    except Exception:
+        lineup = None
+    if lineup and lineup["starters"] and not lineup["unmapped"]:
+        my_roster = {**my_roster, "starters": list(lineup["starters"]) + ["0"] * len(lineup["empty_slots"])}
+    return league, my_roster
 
 
 def _dashboard_this_week(
@@ -12438,40 +12495,53 @@ def _build_matchup(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
-    try:
-        current_week = int((league_settings or {}).get("leg") or 0)
-    except (TypeError, ValueError):
-        current_week = 0
-    if current_week <= 0:
-        return _empty_matchup("no_current_week")
-
-    matchups = sleeper.get_matchups(league_id, current_week)
-    if not matchups:
-        return _empty_matchup("no_matchup_data", week=current_week)
-
+    is_external = external_leagues.is_external_league_key(league_id)
     my_roster_id = str(my_roster.get("roster_id") or "")
-    my_entry = next((m for m in matchups if str(m.get("roster_id") or "") == my_roster_id), None)
-    if my_entry is None:
-        return _empty_matchup("roster_not_in_matchups", week=current_week)
+    if is_external:
+        # Imported league: the platform's own week and pairing, in Sleeper's shape
+        # (modules.external_matchups). An older imported season has no "this week".
+        external_state = _external_week_state(league_id, league)
+        if external_state is None:
+            return _empty_matchup("no_current_week")
+        current_week = int(external_state["week"])
+        pair = external_matchups.matchup_entries(league_id, int(my_roster_id), external_state)
+        if pair is None:
+            return _empty_matchup("bye_week", week=current_week)
+        my_entry, opponent_entry = pair
+    else:
+        league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+        try:
+            current_week = int((league_settings or {}).get("leg") or 0)
+        except (TypeError, ValueError):
+            current_week = 0
+        if current_week <= 0:
+            return _empty_matchup("no_current_week")
 
-    # A null matchup_id is Sleeper's own "this roster isn't paired this
-    # week" (bye / odd team count), not a missing-data error.
-    matchup_id = my_entry.get("matchup_id")
-    opponent_entry = (
-        next(
-            (
-                m
-                for m in matchups
-                if m.get("matchup_id") == matchup_id and str(m.get("roster_id") or "") != my_roster_id
-            ),
-            None,
+        matchups = sleeper.get_matchups(league_id, current_week)
+        if not matchups:
+            return _empty_matchup("no_matchup_data", week=current_week)
+
+        my_entry = next((m for m in matchups if str(m.get("roster_id") or "") == my_roster_id), None)
+        if my_entry is None:
+            return _empty_matchup("roster_not_in_matchups", week=current_week)
+
+        # A null matchup_id is Sleeper's own "this roster isn't paired this
+        # week" (bye / odd team count), not a missing-data error.
+        matchup_id = my_entry.get("matchup_id")
+        opponent_entry = (
+            next(
+                (
+                    m
+                    for m in matchups
+                    if m.get("matchup_id") == matchup_id and str(m.get("roster_id") or "") != my_roster_id
+                ),
+                None,
+            )
+            if matchup_id is not None
+            else None
         )
-        if matchup_id is not None
-        else None
-    )
-    if opponent_entry is None:
-        return _empty_matchup("bye_week", week=current_week)
+        if opponent_entry is None:
+            return _empty_matchup("bye_week", week=current_week)
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.
@@ -12554,7 +12624,9 @@ def _build_matchup(
             score_field,
             projection_context=projection_context,
             settings=settings,
-            roster_positions=roster_positions,
+            # Imported leagues label each starter with the platform's own slot
+            # (MFL sends none: no label, never a guessed one).
+            roster_positions=my_entry["slot_labels"] if is_external else roster_positions,
             idp_result=idp_result,
         )
     )
@@ -12565,10 +12637,15 @@ def _build_matchup(
             score_field,
             projection_context=projection_context,
             settings=settings,
-            roster_positions=roster_positions,
+            roster_positions=opponent_entry["slot_labels"] if is_external else roster_positions,
             idp_result=idp_result,
         )
     )
+    unmapped_players: list[dict[str, Any]] = []
+    if is_external:
+        for side, entry in ((my_side, my_entry), (opponent_side, opponent_entry)):
+            side["real_empty_slots"] = list(entry.get("empty_slots") or [])
+            unmapped_players.extend(entry.get("unmapped") or [])
 
     # Live, single-week win probability — built from each side's REAL
     # current-week starters (real points once a game's started, this
@@ -12581,10 +12658,14 @@ def _build_matchup(
     win_probability = matchup_win_probability.compute_live_win_probability(
         my_side.get("real_starters") or [], opponent_side.get("real_starters") or []
     )
+    if unmapped_players:
+        # A starter we could not match to a FantasyDesk player has no projection, so
+        # any odds would silently leave a real scorer out. Say so instead.
+        win_probability = {"available": False, "reason": "unmapped_starters"}
     if state is not None:
         state.update(my_side=my_side, opponent_side=opponent_side, my_bench=my_bench, league=league)
 
-    return {
+    response = {
         "ok": True,
         "week": current_week,
         "my_team": my_side,
@@ -12616,6 +12697,10 @@ def _build_matchup(
             league_calendar.BEST_BALL_LINEUP_MESSAGE if league_calendar.is_best_ball(league) else ""
         ),
     }
+    if is_external:
+        response["platform"] = external_leagues.league_platform(league_id)
+        response["unmapped_players"] = unmapped_players
+    return response
 
 
 class MatchupWhatIfLineupSlot(BaseModel):
