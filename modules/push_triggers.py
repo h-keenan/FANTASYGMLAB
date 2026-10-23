@@ -373,6 +373,26 @@ def already_notified_batch(config: PushTriggerConfig, *, user_id: str, recommend
     return {str(row.get("recommendation_id")) for row in rows if isinstance(row, dict) and row.get("recommendation_id")}
 
 
+def delete_invalid_push_tokens(config: PushTriggerConfig, tokens: list[str]) -> None:
+    """Remove tokens Expo reported as DeviceNotRegistered (service-role)."""
+
+    clean = [t for t in (_safe_text(tok) for tok in tokens) if push_tokens.is_expo_push_token(t)]
+    if not config.configured or not clean:
+        return
+    # Token format is ExponentPushToken[...]; delete one at a time with an
+    # exact eq filter so no value ever needs in.(...) escaping.
+    for token in clean:
+        try:
+            requests.delete(
+                f"{config.url}/rest/v1/{PUSH_TOKENS_TABLE}",
+                headers=_headers(config, prefer="return=minimal"),
+                params={"expo_push_token": f"eq.{token}"},
+                timeout=15,
+            )
+        except Exception:
+            pass
+
+
 def record_notification(config: PushTriggerConfig, *, user_id: str, recommendation_id: str, league_id: str) -> None:
     if not config.configured or not user_id or not recommendation_id:
         return
@@ -698,11 +718,18 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     body=push_item["headline"],
                     data=notification_data,
                 )
-                record_notification(config, user_id=user_id, recommendation_id=recommendation_id, league_id=league_id)
+                if result.get("invalid_tokens"):
+                    delete_invalid_push_tokens(config, list(result["invalid_tokens"]))
+                    tokens = [t for t in tokens if t not in set(result["invalid_tokens"])]
                 if result.get("ok"):
+                    # Only dedup-log a delivered push: a transient Expo
+                    # outage must not permanently swallow this notification.
+                    record_notification(config, user_id=user_id, recommendation_id=recommendation_id, league_id=league_id)
                     stats["pushes_sent"] += 1
                 else:
                     stats["errors"].append(f"{user_id}/{league_id}: {result.get('error')}")
+                    if not tokens:
+                        break
 
     return stats
 
