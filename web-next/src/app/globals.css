@@ -2587,6 +2587,91 @@ a {
   line-height: 1.3;
   color: var(--color-text-secondary);
 }
+/* Autoplay motion: transform/opacity only, gated on data-playing so SSR,
+   reduced-motion and paused states are static. */
+.landing-shot-img {
+  transform-origin: 50% 18%;
+}
+.landing-showcase[data-playing="true"] .landing-shot-img {
+  transition: transform 0.8s ease-in-out;
+}
+.landing-showcase[data-playing="true"] .landing-shot[data-active="true"] .landing-shot-img {
+  transform: scale(1.1);
+  transition: transform 2.5s ease-out;
+  will-change: transform;
+}
+.landing-shot-caption {
+  transition: opacity 0.6s ease;
+}
+.landing-showcase[data-playing="true"] .landing-shot[data-active="false"] .landing-shot-caption {
+  opacity: 0.45;
+}
+.landing-showcase-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.landing-showcase-pause {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.5625rem;
+  cursor: pointer;
+}
+.landing-showcase-dots {
+  display: flex;
+  align-items: center;
+}
+.landing-showcase-dot {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.landing-showcase-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+  opacity: 0.4;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+.landing-showcase-dot[aria-current="true"]::after {
+  opacity: 1;
+  background: var(--color-accent);
+  transform: scale(1.4);
+}
+.landing-showcase-pause:focus-visible,
+.landing-showcase-dot:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-shot-img,
+  .landing-shot-caption {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
 @media (min-width: 768px) {
   .landing-grid {
     max-width: 62rem;
