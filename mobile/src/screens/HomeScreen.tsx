@@ -437,13 +437,13 @@ export default function HomeScreen({ navigation, route }: Props) {
                   onPress={() => (me.profile_status === 'error' ? void load() : navigation.navigate('Paywall'))}
                   style={[
                     styles.entitlementPill,
-                    me.entitlement === 'premium' && styles.entitlementPillPremium,
+                    me.profile_status !== 'error' && styles.entitlementPillPremium,
                   ]}
                 >
                   <AppText
                     style={[
                       styles.entitlementText,
-                      me.entitlement === 'premium' && styles.entitlementTextPremium,
+                      me.profile_status !== 'error' && styles.entitlementTextPremium,
                     ]}
                   >
                     {me.profile_status === 'error'

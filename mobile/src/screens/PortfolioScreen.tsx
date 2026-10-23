@@ -157,6 +157,7 @@ export default function PortfolioScreen() {
             'Upgrade to Premium to see your standing across every saved league in one place.'
           }
           actionLabel="Upgrade to Premium"
+          actionVariant="premium"
           onPressAction={() => navigation.navigate('Paywall')}
         />
       </View>

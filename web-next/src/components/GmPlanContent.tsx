@@ -536,8 +536,8 @@ export function GmPlanContent({
         fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
         bare
       />
-      <section className="glass-surface flex flex-col gap-1 p-4" data-testid="gm-plan-pro-preview">
-        <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+      <section className="glass-surface flex flex-col gap-1 p-4 premium-glow-card" data-testid="gm-plan-pro-preview">
+        <p className="text-sm font-bold" style={{ color: "var(--color-premium)" }}>
           {PLAIN_COPY.gmPlanProTitle}
         </p>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
+import PremiumGlow from '../components/PremiumGlow';
 import SectionHeading from '../components/SectionHeading';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -404,13 +405,14 @@ export default function PaywallScreen({ navigation, route }: Props) {
                 <AnimatedCard
                   key={pack.identifier}
                   glow={isAnnual}
+                  glowColor={colors.premium}
                   onPress={() => setSelectedId(pack.identifier)}
                 >
                   <View style={styles.packageRow}>
                     <Ionicons
                       name={isSelected ? 'radio-button-on' : 'radio-button-off'}
                       size={20}
-                      color={isSelected ? colors.accent : colors.textTertiary}
+                      color={isSelected ? colors.premium : colors.textTertiary}
                       style={styles.packageRadio}
                     />
                     <View style={styles.packageLabelGroup}>
@@ -467,17 +469,21 @@ export default function PaywallScreen({ navigation, route }: Props) {
 
       {purchaseError ? <AppText style={styles.error}>{purchaseError}</AppText> : null}
 
-      <TouchableOpacity
-        style={[styles.primaryButton, (!selected || purchasing) && styles.primaryButtonDisabled]}
-        onPress={() => selected && onPurchase(selected)}
-        disabled={!selected || purchasing}
-      >
-        {purchasing ? (
-          <ActivityIndicator color={colors.onAccent} />
-        ) : (
-          <AppText style={styles.primaryButtonText}>{trial ? trialCtaLabel(trial) : 'Continue'}</AppText>
-        )}
-      </TouchableOpacity>
+      <PremiumGlow radius={radii.md} active={Boolean(selected) && !purchasing} style={styles.glowWrap}>
+        <TouchableOpacity
+          style={[styles.primaryButton, styles.premiumButton, (!selected || purchasing) && styles.primaryButtonDisabled]}
+          onPress={() => selected && onPurchase(selected)}
+          disabled={!selected || purchasing}
+        >
+          {purchasing ? (
+            <ActivityIndicator color={colors.onPremium} />
+          ) : (
+            <AppText style={[styles.primaryButtonText, { color: colors.onPremium }]}>
+              {trial ? trialCtaLabel(trial) : 'Continue'}
+            </AppText>
+          )}
+        </TouchableOpacity>
+      </PremiumGlow>
       {trial && selected ? (
         <AppText style={styles.trialTerms}>
           {thenPriceLine(selected.product.priceString, packagePriceSuffix(selected.packageType))}
@@ -497,7 +503,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         style={[styles.restoreButton, restoring && styles.primaryButtonDisabled]}
       >
         {restoring ? (
-          <ActivityIndicator color={colors.textPrimary} />
+          <ActivityIndicator color={colors.premium} />
         ) : (
           <AppText style={styles.restoreButtonText}>Restore purchases</AppText>
         )}
@@ -613,6 +619,8 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     marginTop: spacing.sm,
   },
+  premiumButton: { backgroundColor: colors.premiumFill, marginTop: 0 },
+  glowWrap: { marginTop: spacing.sm },
   primaryButtonDisabled: { opacity: disabledOpacity },
   primaryButtonText: { color: colors.onAccent, fontSize: 16, fontWeight: '600' },
   trialTerms: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm, lineHeight: 17 },
@@ -626,10 +634,10 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.md,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSolid,
+    borderColor: colors.premium,
+    backgroundColor: 'transparent',
   },
-  restoreButtonText: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+  restoreButtonText: { color: colors.premium, fontSize: 15, fontWeight: '600' },
   disclosure: {
     fontSize: 11,
     color: colors.textTertiary,

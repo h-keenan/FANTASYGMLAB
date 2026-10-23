@@ -81,6 +81,11 @@
      rather than two names that must be kept in sync by hand. */
   --color-information: var(--color-accent);
   --color-premium: var(--color-action);
+  /* Premium gold set (owner 2026-10-23: anything premium is ALWAYS gold with a glow). Fill + ink are AA (>= 9:1); the glow reuses the prestige-ring recipe. */
+  --color-premium-fill: #facc15;
+  --color-on-premium: #1a1300;
+  --color-premium-glow: rgba(250, 204, 21, 0.55);
+  --color-premium-glow-soft: rgba(250, 204, 21, 0.28);
   --color-experimental: var(--color-diagnostic);
 
   /* Player prestige */
@@ -276,6 +281,10 @@
     --color-muted: rgba(16, 24, 32, 0.45);
     --color-information: var(--color-accent);
     --color-premium: var(--color-action);
+    --color-premium-fill: #e8b100;
+    --color-on-premium: #140e00;
+    --color-premium-glow: rgba(176, 125, 0, 0.5);
+    --color-premium-glow-soft: rgba(176, 125, 0, 0.24);
     --color-experimental: var(--color-diagnostic);
 
     --color-prestige-elite: #7d5b07;
@@ -1716,6 +1725,42 @@ a {
   }
 }
 
+/* Premium glow (owner 2026-10-23): the prestige-ring glow recipe in gold.
+   box-shadow only (no layout shift). `.premium-glow` pulses gently like the
+   prestige rings; reduced-motion gets the static glow. `.premium-glow-card`
+   is the same glow, static, for a large locked card. */
+@keyframes premium-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--color-premium-glow-soft), 0 0 10px var(--color-premium-glow-soft);
+  }
+  50% {
+    box-shadow: 0 0 6px var(--color-premium-glow), 0 0 16px var(--color-premium-glow-soft);
+  }
+}
+.premium-glow {
+  box-shadow: 0 0 6px var(--color-premium-glow), 0 0 14px var(--color-premium-glow-soft);
+  animation: premium-glow-pulse 2.5s ease-in-out infinite;
+}
+.premium-glow-card {
+  border-color: var(--color-premium);
+  box-shadow: 0 0 8px var(--color-premium-glow-soft), 0 0 22px var(--color-premium-glow-soft);
+}
+.premium-glow:active:not(:disabled) {
+  animation: none;
+  filter: brightness(0.94);
+  box-shadow: 0 0 3px var(--color-premium-glow-soft);
+}
+.premium-glow:disabled,
+.premium-glow[aria-disabled="true"] {
+  animation: none;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .premium-glow {
+    animation: none;
+  }
+}
+
 /* Landing page forced-dark scope (src/app/page.tsx) — coridian_, 2026-10-18:
    screenshotted the real site in light mode (a real, common system
    preference, not a hypothetical) and it's completely flat — plain white
@@ -1759,6 +1804,10 @@ a {
   --color-muted: rgba(229, 231, 235, 0.52);
   --color-information: var(--color-accent);
   --color-premium: var(--color-action);
+  --color-premium-fill: #facc15;
+  --color-on-premium: #1a1300;
+  --color-premium-glow: rgba(250, 204, 21, 0.55);
+  --color-premium-glow-soft: rgba(250, 204, 21, 0.28);
   --color-experimental: var(--color-diagnostic);
   --color-prestige-elite: #d8b85a;
   --color-prestige-starter: #d7dbe2;

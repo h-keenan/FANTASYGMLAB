@@ -48,9 +48,9 @@ export function PremiumUpsellCard({
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{title}</h1>
       </header>
-      <AccentCard accent="var(--color-premium)" as="div">
+      <AccentCard accent="var(--color-premium)" as="div" className="premium-glow-card">
         <p className="text-sm">{body}</p>
-        <ButtonLink href="/premium" onClick={() => trackUse(gateFeature, "upsell_tapped", { tier: "free" })}>
+        <ButtonLink href="/premium" variant="premium" onClick={() => trackUse(gateFeature, "upsell_tapped", { tier: "free" })}>
           Upgrade →
         </ButtonLink>
       </AccentCard>

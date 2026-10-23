@@ -1,6 +1,7 @@
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
@@ -547,15 +548,15 @@ export function WaiversContent({
           {!data.entitlement.is_premium ? (
             <div
               className="p-4 flex flex-col gap-2"
-              style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
+              style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
             >
               <p className="text-sm font-bold">Full waiver board and FAAB shortlist</p>
               <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 Priority Adds stay free. Premium adds stashes, depth and FAAB.
               </p>
-              <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+              <ButtonLink href="/premium" variant="premium" size="sm">
                 Upgrade →
-              </Link>
+              </ButtonLink>
             </div>
           ) : (
             <>

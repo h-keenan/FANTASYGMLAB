@@ -94,6 +94,11 @@ const darkColors = {
   successMuted: 'rgba(34,197,94,0.14)',
   premium: '#FFC43D',
   premiumMuted: 'rgba(255,196,61,0.14)',
+  // Premium gold button set (owner 2026-10-23: anything premium is ALWAYS gold with a glow).
+  // onPremium on premiumFill is ~12:1; premiumGlow is the halo color (see PremiumGlow).
+  premiumFill: '#FFC43D',
+  onPremium: '#1A1300',
+  premiumGlow: '#FFC43D',
   badgeBackground: 'rgba(103,232,249,0.14)',
   badgeText: '#9FF3FC',
   violet: '#8B93FF',
@@ -175,6 +180,10 @@ const lightColors = {
   // as plain text (4.81:1 / 4.42:1) without drifting the hue toward brown.
   premium: '#8A6508',
   premiumMuted: 'rgba(184,134,11,0.12)',
+  // onPremium on premiumFill is ~9.8:1 (AA). The glow is a deeper amber so it reads on white.
+  premiumFill: '#E8B100',
+  onPremium: '#140E00',
+  premiumGlow: '#C98F00',
   badgeBackground: 'rgba(5,110,124,0.12)',
   badgeText: '#056e7c',
   violet: '#6B5FCC',

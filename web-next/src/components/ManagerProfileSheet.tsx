@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import { useEffect, useState } from "react";
 
 import { api, type ManagerRecentTradeAsset, type ManagerTendenciesDetailResponse } from "@/lib/api";
@@ -170,9 +171,9 @@ export function ManagerProfileSheet({
           ) : !data.is_premium ? (
             <div className="flex flex-col gap-2">
               <p className="text-sm font-bold">{data.upsell?.title ?? "Manager Tendencies"}</p>
-              <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+              <ButtonLink href="/premium" variant="premium" size="sm">
                 Upgrade →
-              </Link>
+              </ButtonLink>
             </div>
           ) : rows.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

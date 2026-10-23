@@ -8,9 +8,12 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties } from "
  * `danger` / `dangerOutline` are the destructive fill and outline. `loading`
  * marks an in-flight action (disabled, aria-busy, spinner before the label).
  * A disabled primary falls back to the muted surface so it never reads as
- * live. Never put white text on the cyan accent.
+ * live. Never put white text on the cyan accent. `premium` is the gold fill
+ * with dark ink and a soft pulsing gold glow (the prestige-ring recipe) for
+ * EVERY premium-related control (Upgrade, trial CTAs, Manage Billing);
+ * `premiumOutline` is its quiet gold-outline sibling (Restore purchases).
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dangerOutline";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dangerOutline" | "premium" | "premiumOutline";
 
 type ButtonLook = { variant?: ButtonVariant; size?: "sm" | "md"; fullWidth?: boolean };
 
@@ -21,6 +24,17 @@ function palette(variant: ButtonVariant, disabled: boolean): CSSProperties {
       return {
         background: disabled ? "var(--color-surface-muted)" : "var(--color-accent-strong)",
         color: disabled ? muted : "var(--color-on-accent)",
+      };
+    case "premium":
+      return {
+        background: disabled ? "var(--color-surface-muted)" : "var(--color-premium-fill)",
+        color: disabled ? muted : "var(--color-on-premium)",
+      };
+    case "premiumOutline":
+      return {
+        background: "transparent",
+        color: disabled ? muted : "var(--color-premium)",
+        border: `var(--border-width-default) solid ${disabled ? "var(--color-border-strong)" : "var(--color-premium)"}`,
       };
     case "danger":
       return {
@@ -51,7 +65,7 @@ function buttonLook(
   style?: CSSProperties,
 ) {
   return {
-    className: `${size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} min-h-[var(--touch-target-min)] inline-flex items-center justify-center font-bold ${fullWidth ? "w-full" : "self-start"} ${className}`.trim(),
+    className: `${size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} min-h-[var(--touch-target-min)] inline-flex items-center justify-center font-bold ${fullWidth ? "w-full" : "self-start"} ${variant === "premium" ? "premium-glow" : ""} ${className}`.trim(),
     style: {
       ...palette(variant, disabled),
       fontWeight: "var(--font-weight-button)",
