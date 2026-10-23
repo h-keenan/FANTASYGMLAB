@@ -200,6 +200,9 @@ export interface TradeCardOptions {
   /** The signed-in manager's own team (name + Sleeper avatar URL), when known. */
   myTeamName?: string | null;
   myAvatarUrl?: string | null;
+  /** Trade Analyzer card: big verdict text + "For <partner>" line. */
+  headline?: string;
+  forPartner?: boolean;
 }
 
 export async function renderTradeCardPng(idea: TradeIdea, lens: string, options: TradeCardOptions = {}): Promise<ArrayBuffer> {
@@ -221,6 +224,8 @@ export async function renderTradeCardPng(idea: TradeIdea, lens: string, options:
       images={{ headshots, partnerAvatar, myAvatar }}
       lens={valuationLensLabel(lens)}
       myTeamName={options.myTeamName}
+      headline={options.headline}
+      forPartner={options.forPartner}
       {...shareSize(format)}
     />,
     format,
@@ -267,11 +272,20 @@ function apiBaseUrl(): string {
 /** GET an API path as the signed-in caller (their own bearer token, passed
  * through unchanged), so the card can only ever show data that user's own
  * session can already see. */
-export async function fetchUpstreamJson<T>(path: string, authorization: string): Promise<T> {
+export async function fetchUpstreamJson<T>(
+  path: string,
+  authorization: string,
+  init: { method?: "GET" | "POST"; jsonBody?: unknown } = {},
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl()}${path}`, {
-      headers: { Authorization: authorization },
+      method: init.method ?? "GET",
+      headers: {
+        Authorization: authorization,
+        ...(init.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: init.jsonBody !== undefined ? JSON.stringify(init.jsonBody) : undefined,
       signal: AbortSignal.timeout(30_000),
       cache: "no-store",
     });

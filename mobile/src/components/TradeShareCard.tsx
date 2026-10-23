@@ -11,6 +11,7 @@ import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
 import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './ShareCardChrome';
 import TeamAvatar from './TeamAvatar';
+import { analyzerHeadline, partnerForLine } from '../lib/tradeShareLabels';
 
 const CARD_HEIGHT = 620;
 // Safety net only — NOT the fix. If some avatar never fires onLoad/onError
@@ -143,12 +144,16 @@ const TradeShareCard = forwardRef<View, {
   myTeamName?: string;
   sendTotal?: number;
   receiveTotal?: number;
+  /** Trade Analyzer card: grade word as the headline + "For <partner>" line. */
+  analyzer?: boolean;
   onReadyChange?: (ready: boolean) => void;
-}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, myTeamName, sendTotal, receiveTotal, onReadyChange }, ref) => {
+}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, myTeamName, sendTotal, receiveTotal, analyzer, onReadyChange }, ref) => {
   const me = myTeamName?.trim() || 'You';
   const partner = partnerTeamName?.trim() || 'Partner';
   const gain = verdict.value_delta;
   const band = verdict.band?.trim() || '';
+  const headline = (analyzer ? analyzerHeadline(verdict.ui_verdict) : null) || band;
+  const forLine = analyzer ? partnerForLine(partnerTeamName) : null;
   const verdictColor = bandColor(band, HEADLINE_COLOR[verdict.tone]);
   const edge =
     gain === 0
@@ -203,6 +208,11 @@ const TradeShareCard = forwardRef<View, {
         </AppText>
       }
     >
+      {forLine ? (
+        <AppText style={styles.forLine} numberOfLines={1}>
+          {forLine.toUpperCase()}
+        </AppText>
+      ) : null}
       <View style={styles.matchup}>
         <AppText style={styles.matchupName} numberOfLines={1}>
           {me}
@@ -238,7 +248,7 @@ const TradeShareCard = forwardRef<View, {
 
       <ShareGlass style={styles.verdictBlock}>
         <AppText style={[styles.verdictWord, { color: verdictColor }]} numberOfLines={1} adjustsFontSizeToFit>
-          {band || 'Trade idea'}
+          {headline || 'Trade idea'}
         </AppText>
         <AppText style={[styles.edge, { color: edge.color }]} numberOfLines={1}>
           {edge.text}
@@ -271,6 +281,7 @@ export { CARD_WIDTH, CARD_HEIGHT };
 
 const styles = StyleSheet.create({
   leagueName: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6, maxWidth: 120 },
+  forLine: { fontSize: 10, fontWeight: '800', color: colors.accent, letterSpacing: 1.6, marginTop: 2 },
   matchup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
   matchupName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   panelsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },

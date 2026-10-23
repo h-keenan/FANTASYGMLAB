@@ -263,12 +263,16 @@ function VerdictBlock({
   compact,
   includeWhy,
   why,
+  headline,
 }: {
   idea: TradeIdea;
   myTeam: string;
   compact: boolean;
   includeWhy: boolean;
   why: string;
+  /** Overrides the big verdict text (Analyzer: ACCEPT/DECLINE/...); the
+   * color still follows the value-edge band. */
+  headline?: string;
 }) {
   const band = (idea.value_edge_band || "").trim();
   const bandColor = band ? resolveTokenColor(fairnessBandColor(band)) : T["--color-text-primary"];
@@ -276,7 +280,7 @@ function VerdictBlock({
   return (
     <div style={{ ...glassStyle(), flexGrow: compact ? 1 : 0, flexShrink: 1, flexBasis: compact ? 0 : "auto", minWidth: 0, alignItems: "stretch", padding: compact ? "14px 22px" : "28px 32px", gap: compact ? 22 : 30, border: `2px solid ${withAlpha(T["--color-accent"], 0.4)}` }}>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 14, flexShrink: 0, width: includeWhy && why ? (compact ? 370 : 400) : "100%" }}>
-        <div style={{ display: "flex", fontSize: compact ? 48 : 70, fontWeight: 900, lineHeight: 1.02, color: bandColor, letterSpacing: "-0.02em" }}>{band || "Trade idea"}</div>
+        <div style={{ display: "flex", fontSize: compact ? 48 : 70, fontWeight: 900, lineHeight: 1.02, color: bandColor, letterSpacing: "-0.02em" }}>{headline || band || "Trade idea"}</div>
         <div style={{ display: "block", fontSize: compact ? 22 : 26, fontWeight: 800, color: edge.color, lineClamp: 2 }}>
           {edge.text}
         </div>
@@ -302,10 +306,16 @@ export function TradeShareCard({
   brand,
   images,
   myTeamName,
+  headline,
+  forPartner,
   width,
   height,
 }: {
   idea: TradeIdea;
+  /** Big verdict text override (Trade Analyzer card). */
+  headline?: string;
+  /** Shows a "For <partner>" line: the user picked who they're trading with. */
+  forPartner?: boolean;
   brand: ShareBrandAssets;
   images: TradeCardImages;
   lens?: string;
@@ -343,7 +353,12 @@ export function TradeShareCard({
       footer={!compact}
       headerRight={compact ? matchup : undefined}
     >
-      {compact ? null : <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 38, fontWeight: 700 }}>{matchup}</div>}
+      {compact ? null : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {forPartner ? <div style={{ ...eyebrowStyle(T["--color-accent"], 24), letterSpacing: "0.18em" }}>{`For ${partnerTeam}`}</div> : null}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 38, fontWeight: 700 }}>{matchup}</div>
+        </div>
+      )}
       <div style={{ display: "flex", flexGrow: 1, position: "relative", gap: compact ? 44 : 56 }}>
         <ReceivesPanel
           teamName={myTeam}
@@ -374,7 +389,7 @@ export function TradeShareCard({
 
       {compact ? (
         <div style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
-          <VerdictBlock idea={idea} myTeam={myTeam} compact includeWhy why={why} />
+          <VerdictBlock idea={idea} myTeam={myTeam} compact includeWhy why={why} headline={headline} />
           <div style={{ ...glassStyle(), flexShrink: 0, alignItems: "center", gap: 16, padding: "14px 20px" }}>
             <ShareQr brand={brand} size={92} />
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -384,7 +399,7 @@ export function TradeShareCard({
           </div>
         </div>
       ) : (
-        <VerdictBlock idea={idea} myTeam={myTeam} compact={false} includeWhy why={why} />
+        <VerdictBlock idea={idea} myTeam={myTeam} compact={false} includeWhy why={why} headline={headline} />
       )}
     </ShareFrame>
   );

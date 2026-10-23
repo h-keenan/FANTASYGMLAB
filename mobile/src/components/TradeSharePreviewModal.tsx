@@ -25,6 +25,8 @@ interface Props {
   sendTotal?: number;
   receiveTotal?: number;
   verdict: TradeVerdict;
+  /** Trade Analyzer share: grade headline + "For <partner>" on the card. */
+  analyzer?: boolean;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
   /** Evaluation lens active when this trade was evaluated (e.g. "Dynasty")
@@ -47,6 +49,7 @@ export default function TradeSharePreviewModal({
   sendTotal,
   receiveTotal,
   verdict,
+  analyzer,
   sendPlayers,
   receivePlayers,
   valuationLens,
@@ -171,6 +174,7 @@ export default function TradeSharePreviewModal({
                 ref={cardRef}
                 leagueName={leagueName}
                 verdict={verdict}
+                analyzer={analyzer}
                 sendPlayers={sendPlayers}
                 receivePlayers={receivePlayers}
                 partnerTeamName={partnerTeamName}
