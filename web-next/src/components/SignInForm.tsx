@@ -279,8 +279,11 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         ← {email}
       </button>
 
+      <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+        Create your account or sign in
+      </h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        Enter your password to continue — we&apos;ll sign you in, or set up your account if this is your first time.
+        New here? Choose a password (6+ characters) to create your account. Already have one? Enter it to sign in.
       </p>
 
       {needsAgeGate && !ageConfirmed ? (
