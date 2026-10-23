@@ -56,12 +56,11 @@ export function PlanCard({
 
   return (
     <div
-      className="glass-surface p-4 flex flex-col gap-2"
-      style={plan.tier === "front_office" ? { borderColor: "var(--color-premium)" } : undefined}
+      className="glass-surface p-4 flex flex-col gap-2 premium-glow-card"
     >
       <span
         className="flex items-center gap-1.5 text-xs font-bold uppercase"
-        style={{ color: plan.tier === "front_office" ? "var(--color-premium)" : "var(--color-text-muted)" }}
+        style={{ color: "var(--color-premium)" }}
       >
         <PlanTierGlyph name={plan.tier} />
         {TIER_LABELS[plan.tier]} — {plan.label}
@@ -89,6 +88,7 @@ export function PlanCard({
         </p>
       ) : null}
       <Button
+        variant="premium"
         type="button"
         onClick={subscribe}
         loading={busy}
@@ -125,12 +125,15 @@ function ManageBilling({ trialEndsAt }: { trialEndsAt?: string }) {
 
   return (
     <div
-      className="p-4 flex flex-col gap-2"
-      style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
+      className="p-4 flex flex-col gap-2 premium-glow-card"
+      style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
     >
       <p className="text-sm font-bold">You&apos;re on Premium.</p>
       {trialEndLabel(trialEndsAt) ? (
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        <p
+          className="text-xs font-extrabold self-start px-2 py-1"
+          style={{ color: "var(--color-premium)", background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)" }}
+        >
           {trialEndLabel(trialEndsAt)}
         </p>
       ) : null}
@@ -142,19 +145,9 @@ function ManageBilling({ trialEndsAt }: { trialEndsAt?: string }) {
           {error}
         </p>
       ) : null}
-      <button
-        type="button"
-        onClick={openPortal}
-        disabled={busy}
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{
-          background: "var(--color-premium)",
-          color: "var(--color-bg)",
-          opacity: busy ? "var(--opacity-disabled)" : 1,
-        }}
-      >
+      <Button variant="premium" type="button" onClick={openPortal} loading={busy}>
         {busy ? "Opening…" : "Manage Billing"}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -22,6 +22,7 @@ export default function EmptyState({
   subtitle,
   actionLabel,
   onPressAction,
+  actionVariant,
   secondaryLabel,
   onPressSecondary,
 }: {
@@ -30,6 +31,8 @@ export default function EmptyState({
   subtitle?: string;
   actionLabel?: string;
   onPressAction?: () => void;
+  /** Use 'premium' when the CTA is an upgrade (gold, glowing). */
+  actionVariant?: 'primary' | 'premium';
   /** Optional lightweight text link under the primary action — for a
    * secondary path (e.g. "Don't have a league yet?") that shouldn't compete
    * visually with the main CTA button above it. */
@@ -44,7 +47,7 @@ export default function EmptyState({
       <AppText style={styles.title}>{title}</AppText>
       {subtitle ? <AppText style={styles.subtitle}>{subtitle}</AppText> : null}
       {actionLabel && onPressAction ? (
-        <Button label={actionLabel} onPress={onPressAction} style={styles.button} />
+        <Button label={actionLabel} onPress={onPressAction} variant={actionVariant} style={styles.button} />
       ) : null}
       {secondaryLabel && onPressSecondary ? (
         <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>

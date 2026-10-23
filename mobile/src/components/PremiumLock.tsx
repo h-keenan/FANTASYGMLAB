@@ -6,10 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { trackUse } from '../lib/analytics';
 import AccentCard from './AccentCard';
+import PremiumGlow from './PremiumGlow';
 import AppText from './AppText';
 import Button from './Button';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 interface Props {
@@ -37,7 +38,8 @@ export default function PremiumLock({ title, description, feature }: Props) {
   }, [gateFeature]);
 
   return (
-    <AccentCard accent={colors.premium}>
+    <PremiumGlow radius={radii.md} pulse={false} strength={0.6}>
+    <AccentCard accent={colors.premium} style={styles.card}>
       <View style={styles.titleRow}>
         <Ionicons name="lock-closed" size={16} color={colors.premium} />
         <AppText style={styles.title}>{title}</AppText>
@@ -45,6 +47,7 @@ export default function PremiumLock({ title, description, feature }: Props) {
       <AppText style={styles.description}>{description}</AppText>
       <Button
         label="Upgrade"
+        variant="premium"
         onPress={() => {
           trackUse(gateFeature, 'upsell_tapped', { tier: 'free' });
           navigation.navigate('Paywall');
@@ -52,11 +55,13 @@ export default function PremiumLock({ title, description, feature }: Props) {
         style={styles.button}
       />
     </AccentCard>
+    </PremiumGlow>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    card: { borderWidth: 1, borderColor: colors.premium },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     title: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     description: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },

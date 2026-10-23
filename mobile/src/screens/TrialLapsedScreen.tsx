@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import PremiumGlow from '../components/PremiumGlow';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -46,12 +47,11 @@ export default function TrialLapsedScreen({ navigation }: Props) {
           </AppText>
         </View>
 
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.replace('Paywall')}
-        >
-          <AppText style={styles.primaryButtonText}>See the new plans</AppText>
-        </TouchableOpacity>
+        <PremiumGlow radius={radii.md} style={styles.glowWrap}>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.replace('Paywall')}>
+            <AppText style={styles.primaryButtonText}>See the new plans</AppText>
+          </TouchableOpacity>
+        </PremiumGlow>
       </View>
     </View>
   );
@@ -74,12 +74,12 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
     },
     primaryButton: {
-      backgroundColor: colors.accent,
+      backgroundColor: colors.premiumFill,
       borderRadius: radii.md,
       paddingVertical: spacing.md + 2,
       alignItems: 'center',
-      marginBottom: spacing.lg,
     },
-    primaryButtonText: { fontSize: 16, fontWeight: '600', color: colors.onAccent },
+    glowWrap: { marginBottom: spacing.lg },
+    primaryButtonText: { fontSize: 16, fontWeight: '600', color: colors.onPremium },
   });
 }

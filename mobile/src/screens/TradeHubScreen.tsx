@@ -435,7 +435,7 @@ function AllTradesFooter({
         <AppText style={styles.gateBody}>
           Free shows {entitlement?.free_limit} ideas across All Trades. Go Pro to browse every team.
         </AppText>
-        <Button label="Upgrade to Pro" onPress={onUpgrade} style={styles.gatePrimaryButton} />
+        <Button label="Upgrade to Pro" variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </AnimatedCard>
     );
   }
@@ -485,7 +485,7 @@ function TradeHubGateCard({
             )}
           </TouchableOpacity>
         ) : null}
-        <Button label="Upgrade to Pro" onPress={onUpgrade} style={styles.gatePrimaryButton} />
+        <Button label="Upgrade to Pro" variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </View>
     </AnimatedCard>
   );

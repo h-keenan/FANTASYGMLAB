@@ -73,7 +73,12 @@ function BillingSection({
       {entitlement === "premium" ? (
         <>
           {trialEndLabel(trialEndsAt) ? (
-            <p className="text-sm font-semibold">{trialEndLabel(trialEndsAt)}</p>
+            <p
+              className="text-xs font-extrabold self-start px-2 py-1"
+              style={{ color: "var(--color-premium)", background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)" }}
+            >
+              {trialEndLabel(trialEndsAt)}
+            </p>
           ) : null}
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Manage your plan, payment method, or cancel anytime.
@@ -83,9 +88,10 @@ function BillingSection({
               {error}
             </p>
           ) : null}
-          <button
+          <Button
+            variant="premium"
             type="button"
-            disabled={busy}
+            loading={busy}
             onClick={() => {
               setBusy(true);
               setError(null);
@@ -93,11 +99,9 @@ function BillingSection({
                 .catch((err) => setError(err instanceof Error ? err.message : "Could not open the billing portal."))
                 .finally(() => setBusy(false));
             }}
-            className="px-4 py-2 text-sm font-bold self-start"
-            style={{ background: "var(--color-premium)", color: "var(--color-bg)", opacity: busy ? "var(--opacity-disabled)" : 1 }}
           >
             {busy ? "Opening…" : "Manage Billing"}
-          </button>
+          </Button>
         </>
       ) : (
         <>
@@ -106,6 +110,7 @@ function BillingSection({
           </p>
           <ButtonLink
             href="/premium"
+            variant="premium"
           >
             Upgrade to Premium
           </ButtonLink>

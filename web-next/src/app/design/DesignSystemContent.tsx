@@ -521,6 +521,51 @@ export function DesignSystemContent() {
         </Spec>
       </Family>
 
+      {/* PREMIUM */}
+      <Family id="premium" title="Premium" note="Everything premium is gold with a soft glow (owner, 2026-10-23). Primary cyan stays for non-premium actions.">
+        <Spec name="Button premium" path="web-next/src/components/Button.tsx" note="variant premium | premiumOutline. Dark ink on gold; glow pulses like the prestige rings (static under reduced motion).">
+          <div className="grid grid-cols-2 gap-3">
+            <Variant label="Premium">
+              <Button variant="premium">Manage Billing</Button>
+            </Variant>
+            <Variant label="Disabled">
+              <Button variant="premium" disabled>
+                Manage Billing
+              </Button>
+            </Variant>
+            <Variant label="Loading">
+              <Button variant="premium" loading>
+                Opening…
+              </Button>
+            </Variant>
+            <Variant label="Outline (Restore)">
+              <Button variant="premiumOutline">Restore purchases</Button>
+            </Variant>
+            <Variant label="Link">
+              <ButtonLink href="/design#premium" variant="premium" size="sm">
+                Upgrade →
+              </ButtonLink>
+            </Variant>
+            <Variant label="Tier badge">
+              <ToneBadge label="Pro" color="var(--color-premium)" />
+            </Variant>
+          </div>
+        </Spec>
+        <Spec
+          name="PremiumUpsellCard (locked card)"
+          path="components/PremiumUpsellCard.tsx (AccentCard, premium edge)"
+          note="Gold edge and glow; mobile PremiumLock is the same card."
+        >
+          <PremiumUpsellCard
+            bare
+            kicker="Premium"
+            upsell={null}
+            fallbackTitle="Unlock Trade Finder"
+            fallbackBody="Static sample copy for the lock card. Premium members get every trade partner ranked."
+          />
+        </Spec>
+      </Family>
+
       {/* 3. BADGES & CHIPS */}
       <Family id="badges" title="Badges & chips" note="Rounded pills. Position badges are the only fixed per-category tint set.">
         <Spec name="PositionBadge" path="web-next/src/components/PositionBadge.tsx" note="Every position incl. IDP and neutral lanes; sm and md; with rank.">
@@ -701,19 +746,6 @@ export function DesignSystemContent() {
         </Spec>
         <Spec name=".glass-surface" path="web-next/src/app/globals.css (.glass-surface)" note="The one card surface (radius-panel, glass fill).">
           <div className="glass-surface p-4 text-sm">Plain glass surface</div>
-        </Spec>
-        <Spec
-          name="PremiumUpsellCard (locked card)"
-          path="components/PremiumUpsellCard.tsx (AccentCard, premium edge)"
-          note="Mobile PremiumLock is the same card."
-        >
-          <PremiumUpsellCard
-            bare
-            kicker="Premium"
-            upsell={null}
-            fallbackTitle="Unlock Trade Finder"
-            fallbackBody="Static sample copy for the lock card. Premium members get every trade partner ranked."
-          />
         </Spec>
         <Spec
           name="EmptyState and ErrorState"

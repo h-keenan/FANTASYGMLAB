@@ -1,5 +1,6 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -143,15 +144,15 @@ export function DashboardContent({
 
         {data.entitlement.hidden_count > 0 ? (
           <div
-            className="p-4 flex flex-col gap-2"
-            style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
+            className="p-4 flex flex-col gap-2 premium-glow-card"
+            style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
           >
             <p className="text-sm font-bold">
               {data.entitlement.hidden_count} more move{data.entitlement.hidden_count === 1 ? "" : "s"} available on Premium.
             </p>
-            <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+            <ButtonLink href="/premium" variant="premium" size="sm">
               Upgrade →
-            </Link>
+            </ButtonLink>
           </div>
         ) : null}
       </section>

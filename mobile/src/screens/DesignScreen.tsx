@@ -174,6 +174,9 @@ export default function DesignScreen() {
             <Button label="Danger outline" variant="dangerOutline" onPress={noop} />
             <Button label="Disabled" disabled onPress={noop} />
             <Button label="Loading" loading onPress={noop} />
+            <Button label="Premium (Manage / Upgrade)" variant="premium" onPress={noop} />
+            <Button label="Premium disabled" variant="premium" disabled onPress={noop} />
+            <Button label="Restore purchases" variant="premiumOutline" onPress={noop} />
           </Spec>
         </Family>
 
@@ -284,7 +287,7 @@ export default function DesignScreen() {
           <Spec
             styles={styles}
             name="PremiumLock (locked card)"
-            path="components/PremiumLock.tsx (AccentCard, premium edge)"
+            path="components/PremiumLock.tsx (gold edge + glow, premium Upgrade button)"
           >
             <PremiumLock title="Unlock Trade Finder" description="Static sample copy for the lock card." feature="design_sample" />
           </Spec>

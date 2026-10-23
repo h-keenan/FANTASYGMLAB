@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import { useEffect, useState } from "react";
 
 import { trackUse } from "@/lib/analytics";
@@ -47,14 +47,14 @@ export function ManagerTendenciesCard({
   if (!data) return null;
   if (!data.is_premium) {
     return (
-      <Link
+      <ButtonLink
         href="/premium"
+        variant="premium"
+        size="sm"
         onClick={() => trackUse("manager_tendencies", "upsell_tapped", { leagueId, tier: "free" })}
-        className="text-xs font-bold self-start"
-        style={{ color: "var(--color-premium)" }}
       >
         How this manager trades · Premium →
-      </Link>
+      </ButtonLink>
     );
   }
   if (chips.length === 0) return null;

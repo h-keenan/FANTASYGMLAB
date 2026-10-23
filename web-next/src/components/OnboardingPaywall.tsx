@@ -45,6 +45,7 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
         </p>
       ) : null}
       <Button
+        variant="premium"
         type="button"
         onClick={subscribe}
         loading={busy}
