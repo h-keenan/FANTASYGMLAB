@@ -47,6 +47,7 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import ThisWeekSection from '../components/ThisWeekSection';
+import { thisWeekTradeIdeaHeadline } from '../lib/thisWeek';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
@@ -453,6 +454,11 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // `items` whenever this is true.
   const showEmptyState = quiet || !items || items.length === 0;
   const grouped = groupDashboardItems(showEmptyState ? [] : items!);
+  // The trade idea the This week strip already shows is not repeated in the Top Priority hero.
+  const duplicateTradeHeadline = thisWeekTradeIdeaHeadline(dashboardData?.this_week);
+  if (duplicateTradeHeadline) {
+    grouped.topPriority = grouped.topPriority.filter((item) => (item.headline ?? '').trim() !== duplicateTradeHeadline);
+  }
 
   return (
     <View style={styles.root}>
