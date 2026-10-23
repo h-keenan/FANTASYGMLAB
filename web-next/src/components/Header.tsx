@@ -47,7 +47,7 @@ function LeagueSwitcherButton({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-2.5 text-xs font-bold max-w-[9rem] truncate"
+        className="px-2.5 py-2.5 text-xs font-bold max-w-[9rem] truncate min-h-[var(--touch-target-min)]"
         style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
         {/* coridian_, 2026-10-18: "where it says dashboard and revivalary...
@@ -160,7 +160,7 @@ export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
         onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-2.5 text-xs font-bold"
+        className="px-2.5 py-2.5 text-xs font-bold min-h-[var(--touch-target-min)]"
         style={{ color: "var(--color-premium)", border: "var(--border-width-default) solid var(--color-premium)" }}
       >
         {current?.label ?? "Dynasty"} ▾
@@ -368,7 +368,7 @@ export function Header() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            className="px-3 py-2.5 text-xs font-bold uppercase"
+            className="px-3 py-2.5 text-xs font-bold uppercase min-h-[var(--touch-target-min)]"
             style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", letterSpacing: "0.03em" }}
           >
             Menu

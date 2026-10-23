@@ -37,7 +37,7 @@ export function EspnUnavailableState({ leagueId }: { leagueId: string }) {
               className="px-3 py-2 text-sm font-bold"
               style={{
                 background: "var(--color-accent-strong)",
-                color: "var(--color-brand-mark-ink)",
+                color: "var(--color-on-accent)",
                 fontWeight: "var(--font-weight-button)",
               }}
             >

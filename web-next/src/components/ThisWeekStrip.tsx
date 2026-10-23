@@ -70,7 +70,7 @@ function ThisWeekCta({ label, href }: { label: string; href: string }) {
       className="self-start px-3 py-1.5 text-xs mt-1"
       style={{
         background: "var(--color-accent-strong)",
-        color: "var(--color-brand-mark-ink)",
+        color: "var(--color-on-accent)",
         fontWeight: "var(--font-weight-button)",
         borderRadius: "var(--radius-control)",
       }}

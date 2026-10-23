@@ -212,7 +212,7 @@ function ProspectCard({
               className="px-3 py-1.5 text-xs font-bold"
               style={{
                 background: "var(--color-accent)",
-                color: "var(--color-brand-mark-ink)",
+                color: "var(--color-on-accent)",
                 opacity: busy || draft.grade == null ? 0.6 : 1,
               }}
             >
