@@ -51,3 +51,10 @@ export function thisWeekTitle(data: ThisWeek): string {
 export function hasThisWeekContent(data: ThisWeek | null | undefined): data is ThisWeek {
   return Boolean(data && (data.next_action || data.rows.length > 0));
 }
+
+/** Headline of the trade idea the "This week" trade row already shows (an
+ * 'Idea' row, not a hold), so the Top Priority hero can skip the same idea. */
+export function thisWeekTradeIdeaHeadline(data: ThisWeek | null | undefined): string {
+  const row = data?.rows?.find((candidate) => candidate.key === 'trade' && candidate.status === 'Idea');
+  return row?.headline?.trim() ?? '';
+}
