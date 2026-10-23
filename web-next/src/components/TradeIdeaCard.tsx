@@ -10,7 +10,7 @@ import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { shareImageOrText } from "@/lib/shareImage";
+import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
 import { trackUse } from "@/lib/analytics";
 import { ideaTags, shortReason } from "@/lib/tradeHubFilters";
 import {
@@ -72,8 +72,8 @@ export function ShareTradeButton({
       title: `Trade idea vs. ${idea.partner_team_name}`,
       onPreparingImage: setPreparingImage,
     });
-    if (outcome === "shared-image" || outcome === "shared-text" || outcome === "copied") recordShare();
-    if (outcome === "copied") {
+    if (isCompletedShare(outcome)) recordShare();
+    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
