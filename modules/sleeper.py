@@ -1348,13 +1348,15 @@ def _is_espn_league(league_id: Any) -> bool:
     return empty for an ESPN key instead of sending it to Sleeper's API;
     the API refuses the features that depend on them for ESPN leagues."""
 
-    return isinstance(league_id, str) and league_id.startswith("espn:")
+    return isinstance(league_id, str) and league_id.startswith(("espn:", "fleaflicker:", "mfl:"))
 
 
 def _espn_leagues():
-    from modules import espn_leagues
+    # Despite the name: the dispatcher for every imported platform (ESPN,
+    # Fleaflicker, MFL), see modules.external_leagues.
+    from modules import external_leagues
 
-    return espn_leagues
+    return external_leagues
 
 
 def get_users(league_id: str) -> List[Dict[str, Any]]:

@@ -22,6 +22,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       previewEspnLeague: vi.fn(),
+      previewImportedLeague: vi.fn(),
       saveLeague: vi.fn(),
     },
   };
@@ -110,6 +111,35 @@ describe("ESPN import in the Connect League flow", () => {
       rosterId: "2",
       makeDefault: true,
     });
+  });
+
+  it("imports an MFL league through the shared form, listing players left unmatched", async () => {
+    vi.mocked(api.previewImportedLeague).mockResolvedValue({
+      ...PREVIEW,
+      platform: "mfl",
+      league: { league_key: "mfl:10015:2025", external_league_id: "10015", season: "2025", name: "Dynasty Pioneer", team_count: 2 },
+      diagnostics: {
+        teams_found: 2,
+        total_players_seen: 10,
+        canonical_matched_count: 9,
+        unmatched_count: 1,
+        matched_rate: 0.9,
+        unmapped_players: [{ name: "Zzyzx Unmappable", position: "WR", team: "", fantasy_team: "Austin Astronauts", reason: "no_unique_match" }],
+      },
+    });
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 1 });
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    fireEvent.click(screen.getByRole("button", { name: "MFL" }));
+    fireEvent.change(screen.getByLabelText(/mfl league id/i), { target: { value: "10015" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my mfl league/i }));
+
+    await waitFor(() => expect(screen.getByText("Dynasty Pioneer")).toBeInTheDocument());
+    expect(api.previewImportedLeague).toHaveBeenCalledWith("mfl", "10015", expect.any(Number));
+    expect(screen.getByText(/9 of 10 rostered players matched/i)).toBeInTheDocument();
+    expect(screen.getByText(/zzyzx unmappable \(WR\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add this league/i }));
+    await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("mfl:10015:2025", "Dynasty Pioneer"));
   });
 
   it("shows the private-league explanation the API returns", async () => {

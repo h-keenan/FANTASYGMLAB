@@ -124,3 +124,24 @@ def load_espn_crosswalk(sleeper_players: Mapping[str, Any] | None = None) -> dic
     """ESPN id -> Sleeper id from every available source. Never raises."""
 
     return build_crosswalk(sleeper_dump_pairs(sleeper_players), load_dynastyprocess_pairs())
+
+
+def _read_pairs_for_column(path: str, column: str) -> list[tuple[str, str]]:
+    frame = pd.read_csv(path, usecols=[column, "sleeper_id"], dtype=str, keep_default_na=False)
+    return [(_clean_id(raw), _clean_id(sleeper)) for raw, sleeper in zip(frame[column], frame["sleeper_id"])]
+
+
+def load_platform_crosswalk(column: str) -> dict[str, str]:
+    """{platform id -> Sleeper id} for another platform in the same table.
+
+    ``column`` is a DynastyProcess id column such as ``mfl_id`` or
+    ``fleaflicker_id``. Same cache file, same refresh policy and the same
+    rule as the ESPN crosswalk: an id that maps to several Sleeper ids is
+    dropped so the caller falls back to name matching. Never raises."""
+
+    load_dynastyprocess_pairs()  # makes sure the cached CSV exists / is fresh
+    path = DYNASTYPROCESS_PLAYER_IDS_CACHE_PATH
+    try:
+        return build_crosswalk(_read_pairs_for_column(path, column))
+    except Exception:
+        return {}

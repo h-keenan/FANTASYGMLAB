@@ -1,0 +1,182 @@
+{
+ "rosterPositions": [
+  {
+   "label": "QB",
+   "group": "START",
+   "eligibility": [
+    "QB"
+   ],
+   "start": 1
+  },
+  {
+   "label": "RB",
+   "group": "START",
+   "eligibility": [
+    "RB"
+   ],
+   "start": 2
+  },
+  {
+   "label": "WR",
+   "group": "START",
+   "eligibility": [
+    "WR"
+   ],
+   "start": 2
+  },
+  {
+   "label": "TE",
+   "group": "START",
+   "eligibility": [
+    "TE"
+   ],
+   "start": 1
+  },
+  {
+   "label": "RB/WR/TE",
+   "group": "START",
+   "eligibility": [
+    "RB",
+    "WR",
+    "TE"
+   ],
+   "start": 1
+  },
+  {
+   "label": "K",
+   "group": "START",
+   "eligibility": [
+    "K"
+   ],
+   "start": 1
+  },
+  {
+   "label": "CB",
+   "group": "START",
+   "eligibility": [
+    "CB"
+   ]
+  },
+  {
+   "label": "S",
+   "group": "START",
+   "eligibility": [
+    "S"
+   ]
+  },
+  {
+   "label": "DB",
+   "group": "START",
+   "eligibility": [
+    "CB",
+    "S"
+   ],
+   "start": 2
+  },
+  {
+   "label": "EDR",
+   "group": "START",
+   "eligibility": [
+    "EDR"
+   ]
+  },
+  {
+   "label": "IL",
+   "group": "START",
+   "eligibility": [
+    "IL"
+   ]
+  },
+  {
+   "label": "EDR/IL",
+   "group": "START",
+   "eligibility": [
+    "EDR",
+    "IL"
+   ],
+   "start": 2
+  },
+  {
+   "label": "LB",
+   "group": "START",
+   "eligibility": [
+    "LB"
+   ],
+   "start": 2
+  },
+  {
+   "label": "DB/EDR/IL/LB",
+   "group": "START",
+   "eligibility": [
+    "CB",
+    "S",
+    "EDR",
+    "IL",
+    "LB"
+   ],
+   "start": 2
+  },
+  {
+   "label": "IR",
+   "group": "INJURED",
+   "eligibility": [
+    "QB",
+    "RB",
+    "WR",
+    "TE",
+    "K",
+    "P",
+    "D/ST",
+    "CB",
+    "S",
+    "EDR",
+    "DE",
+    "IL",
+    "DT",
+    "LB",
+    "LB"
+   ],
+   "start": 25
+  },
+  {
+   "label": "TAXI",
+   "group": "TAXI",
+   "eligibility": [
+    "QB",
+    "RB",
+    "WR",
+    "TE",
+    "K",
+    "P",
+    "D/ST",
+    "CB",
+    "S",
+    "EDR",
+    "DE",
+    "IL",
+    "DT",
+    "LB",
+    "LB"
+   ],
+   "start": 3
+  },
+  {
+   "label": "BN"
+  },
+  {
+   "label": "P",
+   "group": "START",
+   "eligibility": [
+    "P"
+   ]
+  },
+  {
+   "label": "D/ST",
+   "group": "START",
+   "eligibility": [
+    "D/ST"
+   ]
+  }
+ ],
+ "numBench": 24
+}

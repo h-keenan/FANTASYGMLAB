@@ -1,0 +1,181 @@
+{
+ "version": "1.0",
+ "rosters": {
+  "franchise": [
+   {
+    "id": "0001",
+    "player": [
+     {
+      "id": "11244",
+      "status": "ROSTER"
+     },
+     {
+      "id": "10775",
+      "status": "ROSTER"
+     },
+     {
+      "id": "12626",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15757",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16414",
+      "status": "ROSTER"
+     },
+     {
+      "id": "13164",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15253",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16650",
+      "status": "ROSTER"
+     },
+     {
+      "id": "9431",
+      "status": "ROSTER"
+     },
+     {
+      "id": "13813",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15861",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16672",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15904",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16689",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16700",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15875",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14871",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16282",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16680",
+      "status": "ROSTER"
+     },
+     {
+      "id": "17040",
+      "status": "INJURED_RESERVE"
+     },
+     {
+      "id": "0001",
+      "status": "ROSTER"
+     }
+    ]
+   },
+   {
+    "id": "0002",
+    "player": [
+     {
+      "id": "12741",
+      "status": "ROSTER"
+     },
+     {
+      "id": "12739",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14833",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14892",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14071",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15751",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15721",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16244",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15794",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16722",
+      "status": "ROSTER"
+     },
+     {
+      "id": "13325",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16241",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14219",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14779",
+      "status": "ROSTER"
+     },
+     {
+      "id": "13690",
+      "status": "ROSTER"
+     },
+     {
+      "id": "14148",
+      "status": "ROSTER"
+     },
+     {
+      "id": "16846",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15241",
+      "status": "ROSTER"
+     },
+     {
+      "id": "15344",
+      "status": "TAXI_SQUAD"
+     },
+     {
+      "id": "99999",
+      "status": "ROSTER"
+     }
+    ]
+   }
+  ]
+ }
+}
