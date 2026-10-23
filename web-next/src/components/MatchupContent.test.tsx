@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
 
 import { MatchupContent } from "./MatchupContent";
 import type {
@@ -359,6 +363,8 @@ describe("MatchupContent", () => {
     };
     render(<MatchupContent leagueName="My League" matchup={offseason} />);
     expect(screen.getByText("This league hasn't started a week yet.")).toBeInTheDocument();
+    expect(screen.getByText("Check back when the season starts.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Dashboard" })).toBeInTheDocument();
   });
 
   it("uses Matchup's own copy for not_a_member_of_league instead of the shared link-account copy", () => {
@@ -372,6 +378,7 @@ describe("MatchupContent", () => {
     render(<MatchupContent leagueName="My League" matchup={notMember} />);
 
     expect(screen.getByText("You don't appear to own a team in this league.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect a league" })).toBeInTheDocument();
   });
 
   it("empty rosters on both sides: suggested tab says so", () => {

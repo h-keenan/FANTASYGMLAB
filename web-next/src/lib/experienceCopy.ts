@@ -103,6 +103,24 @@ export const BEGINNER_HELP = {
     "Overall (1-99) shows where this player's value ranks among players at the same position. Higher means closer to the top of the position.",
   playerTier:
     "Tier groups players mostly by how their value ranks across the whole player pool: Generational is roughly the top 1%, Elite the top 2.5%, Impact Starter the top 6%, Starter the top 16% and Contributor the top third. A player with no current role is capped at Committee / Role.",
+
+  // Matchup, My Team, Playoff Odds and GM Plan (services/mobile_api_service.py
+  // get_league_matchup / get_league_playoff_odds, modules/team_stance.py).
+  matchupIntro:
+    "This is your head-to-head for the week. Check your win probability and Suggested Moves, then make any lineup change in your league app before kickoff.",
+  matchupWinProbability:
+    "Win probability is your chance to win this week, based on both lineups' projected points. It isn't a guarantee.",
+  myTeamIntro:
+    "My Team shows your roster and how it stacks up. This week: make sure your best players are starting, and look at the bench for players worth trading or dropping.",
+  myTeamValueTiers:
+    "Value is a player's worth in this league (higher is better). A tier groups players of similar value, from Generational down to Contributor.",
+  playoffOddsIntro:
+    "Playoff Odds estimates each team's chance to make the playoffs. Low odds mean consider building for later; high odds mean add help now.",
+  playoffOddsTerms:
+    "Win probability is a team's chance to win a single game. Clinched means a playoff spot is locked in. Eliminated means it can no longer happen.",
+  stanceRebuilding: "Rebuilding: you're trading for youth and draft picks, not this season's title.",
+  stanceCompeting: "Competing: you're going for a title now, even if it costs future picks.",
+  stanceBalanced: "Balanced: you want to stay competitive while keeping future flexibility.",
 } as const;
 
 export type BeginnerHelpKey = keyof typeof BEGINNER_HELP;
@@ -117,6 +135,20 @@ export const BEGINNER_LABELS = {
 } as const;
 
 export type BeginnerLabelKey = keyof typeof BEGINNER_LABELS;
+
+/** Plain (not beginner-gated) next-step and orientation copy that must read
+ * the same on web and mobile. A web test keeps the two maps byte-identical. */
+export const PLAIN_COPY = {
+  matchupRetryAction: "Try again",
+  matchupSeasonSubtitle: "Check back when the season starts.",
+  matchupDashboardAction: "Open Dashboard",
+  matchupConnectAction: "Connect a league",
+  gmPlanProTitle: "What Pro unlocks",
+  gmPlanProBody:
+    "A season headline for your team, your best trade paths, and roster-construction focus areas, all built from your Team Snapshot above.",
+  onboardingDynastyNote:
+    "Dynasty is the long-term fantasy format where you keep your players year to year. If you're new to fantasy football overall, choose New to dynasty.",
+} as const;
 
 const VERDICT_HELP_KEY: Record<string, BeginnerHelpKey> = {
   ACCEPT: "verdictAccept",

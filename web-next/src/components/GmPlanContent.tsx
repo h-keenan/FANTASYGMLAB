@@ -34,6 +34,7 @@ import { PillRow } from "@/components/PillRow";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PLAIN_COPY } from "@/lib/experienceCopy";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
@@ -534,13 +535,23 @@ export function GmPlanContent({
       {notice}
     </p>
   ) : !data.is_premium ? (
-    <PremiumUpsellCard
-      kicker="GM Plan"
-      upsell={data.upsell}
-      fallbackTitle="Your season-arc roadmap"
-      fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
-      bare
-    />
+    <>
+      <PremiumUpsellCard
+        kicker="GM Plan"
+        upsell={data.upsell}
+        fallbackTitle="Your season-arc roadmap"
+        fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
+        bare
+      />
+      <section className="glass-surface flex flex-col gap-1 p-4" data-testid="gm-plan-pro-preview">
+        <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+          {PLAIN_COPY.gmPlanProTitle}
+        </p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {PLAIN_COPY.gmPlanProBody}
+        </p>
+      </section>
+    </>
   ) : quiet ? (
     <EmptyState title="Not enough to build a GM Plan yet." subtitle="We need more of this league's data first." />
   ) : null;

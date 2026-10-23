@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { api, type LeagueTeamRankingsResponse, type PlayoffOddsResponse, type PlayoffOddsTeam, type TeamRanking } from "@/lib/api";
 import {
   boardSecondaryParts,
@@ -251,6 +252,8 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
       >
         Playoff Odds
       </SectionHeading>
+      <BeginnerHelp term="playoffOddsIntro" />
+      <BeginnerHelp term="playoffOddsTerms" />
       {state === "idle" ? (
         <button
           type="button"

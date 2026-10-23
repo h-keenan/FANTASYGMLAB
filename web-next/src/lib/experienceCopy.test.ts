@@ -66,5 +66,6 @@ describe("experienceCopy", () => {
     const mobile = readFileSync(path.resolve(__dirname, "../../../mobile/src/lib/experienceCopy.ts"), "utf8");
     expect(extract(mobile, "BEGINNER_HELP")).toBe(extract(web, "BEGINNER_HELP"));
     expect(extract(mobile, "BEGINNER_LABELS")).toBe(extract(web, "BEGINNER_LABELS"));
+    expect(extract(mobile, "PLAIN_COPY")).toBe(extract(web, "PLAIN_COPY"));
   });
 });

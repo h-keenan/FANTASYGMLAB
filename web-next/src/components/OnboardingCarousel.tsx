@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
-import type { ExperienceLevel } from "@/lib/experienceCopy";
+import { PLAIN_COPY, type ExperienceLevel } from "@/lib/experienceCopy";
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 
 /**
@@ -167,6 +167,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
             <p className="onboarding-body onboarding-body--center">
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
             </p>
+            <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingDynastyNote}</p>
             <div className="onboarding-cards" style={{ marginTop: "var(--space-md)" }}>
               <button
                 type="button"

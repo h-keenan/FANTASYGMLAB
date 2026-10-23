@@ -7,6 +7,7 @@ import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnaly
 import type { ReactNode } from "react";
 import { PillRow } from "@/components/PillRow";
 import type { KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SectionHeading } from "@/components/SectionHeading";
 import { formatRank } from "@/components/SnapshotTile";
 import { ValueRing } from "@/components/ValueRing";
@@ -217,6 +218,8 @@ export function MyTeamContent({
           My Team
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <BeginnerHelp term="myTeamIntro" />
+        <BeginnerHelp term="myTeamValueTiers" />
       </header>
 
       <section className="flex flex-col gap-3" aria-labelledby="team-snapshot-heading">

@@ -19,6 +19,7 @@ import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
 import type { ExperienceLevelValue } from '../lib/api';
+import { PLAIN_COPY } from '../lib/experienceCopy';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -179,6 +180,7 @@ export default function OnboardingScreen({ navigation }: Props) {
             <AppText style={styles.body}>
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
             </AppText>
+            <AppText style={styles.body}>{PLAIN_COPY.onboardingDynastyNote}</AppText>
             <View style={styles.cards}>
               {LEVEL_OPTIONS.map((option) => {
                 const selected = level === option.value;

@@ -16,6 +16,8 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import BeginnerHelp from '../components/BeginnerHelp';
+import { PLAIN_COPY } from '../lib/experienceCopy';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -234,10 +236,16 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const openTradeHub = () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'block' });
 
   const gateNotice = locked ? (
-    <PremiumLock
-      title={plan?.upsell?.title || 'Your season-arc roadmap'}
-      description={plan?.upsell?.body || 'GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction.'}
-    />
+    <>
+      <PremiumLock
+        title={plan?.upsell?.title || 'Your season-arc roadmap'}
+        description={plan?.upsell?.body || 'GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction.'}
+      />
+      <AnimatedCard style={styles.situation}>
+        <AppText style={styles.stanceLabel}>{PLAIN_COPY.gmPlanProTitle}</AppText>
+        <AppText style={styles.caption}>{PLAIN_COPY.gmPlanProBody}</AppText>
+      </AnimatedCard>
+    </>
   ) : gated ? (
     <AnimatedCard style={styles.hero}>
       <AppText style={styles.quietText}>
@@ -364,6 +372,9 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   );
                 })}
               </View>
+              <BeginnerHelp term="stanceRebuilding" />
+              <BeginnerHelp term="stanceCompeting" />
+              <BeginnerHelp term="stanceBalanced" />
               {TEAM_STANCE_OPTIONS.find((o) => o.value === stance) ? (
                 <AppText style={styles.caption}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
               ) : null}

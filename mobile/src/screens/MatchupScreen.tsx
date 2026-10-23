@@ -7,6 +7,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import BeginnerHelp from '../components/BeginnerHelp';
+import EmptyState from '../components/EmptyState';
 import AnimatedCard from '../components/AnimatedCard';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -38,6 +40,8 @@ import {
   hasKickedOff,
   lineupComparisonRows,
   lineupPlayerPoints,
+  matchupActionLabel,
+  matchupNextAction,
   matchupVerdict,
   moveOverLine,
   moveSlotLabel,
@@ -200,11 +204,21 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
   if (!matchup || !matchup.my_team || !matchup.opponent || !matchup.comparison) {
     const reason = matchup?.reason ?? '';
+    const next = matchupNextAction(reason);
+    const onNext = () => {
+      if (next.action === 'retry') void matchupQuery.refetch();
+      else if (next.action === 'connect') navigation.navigate('Home', { openAddLeague: true });
+      else navigation.navigate('Dashboard', { leagueId, leagueName });
+    };
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.notice}>
-          {NOT_READY_MESSAGES[reason] ?? "Couldn't build this week's matchup for this league."}
-        </AppText>
+        <EmptyState
+          icon="calendar-outline"
+          title={NOT_READY_MESSAGES[reason] ?? "Couldn't build this week's matchup for this league yet."}
+          subtitle={next.subtitle}
+          actionLabel={matchupActionLabel(next.action)}
+          onPressAction={onNext}
+        />
       </View>
     );
   }
@@ -244,6 +258,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
           ) : null}
         </View>
 
+        <BeginnerHelp term="matchupIntro" />
+        <BeginnerHelp term="matchupWinProbability" />
         <Scoreboard matchup={shown} mine={mine} opponent={opponent} />
         <Insights matchup={shown} />
         <LineupComparison
