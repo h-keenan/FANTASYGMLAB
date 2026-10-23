@@ -650,6 +650,159 @@ versa).
   `superseded_by` as "not flagged by this detector," not as "confirmed
   still accurate."
 
+### Source-backed news contract (additive fields)
+
+Every item above additionally carries the fields below, built by
+`modules/external_news_contract.py`. They are purely additive: no legacy
+field changed, and old clients that ignore unknown keys are unaffected.
+
+**Read this first: what the server can and cannot prove today.** The news
+pool is built from publisher RSS feeds (headline, feed summary, article
+URL, publisher timestamp). The server never fetches or stores publisher
+article bodies, so it has no "checked document". Consequently, for every
+item today: `provenance[].content_sha256` is `null`, `provenance[].checked_at`
+is `null`, `provenance[].excerpt` is `null`, `evidence.status` is
+`"unavailable"`, and `review_only` is `true`. A headline is never hashed and
+presented as a checked article. Items are headline-only and labelled so
+(`content.kind = "headline_only"`). A consumer that requires a hashed,
+checked document must treat every item as review-only.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `league` | string | Always `"NFL"`. |
+| `id` | string | Stable claim-group id; identical to `event_identity`. |
+| `revision_id` | string | 16-hex digest of the item's substantive state (status, `superseded_by`, provenance ids, claim field/value/status). Changes whenever any of those change; unchanged otherwise. |
+| `previous_revision_id` | string \| null | Always `null`: the server is stateless and keeps no revision history. A client that wants history must store the `revision_id`s it has seen. |
+| `player_ids` | object | `sleeper` (always), `gsis` (string `00-NNNNNNN` or `null`), `gsis_unavailable_reason` (`null` when `gsis` is set; else `no_gsis_crosswalk_available`, `gsis_not_mapped_for_player`, `gsis_malformed`, `ambiguous_name_team_mapping`, `player_not_in_table`). GSIS is emitted only when the player table carries a well-formed id for that exact row and the (name, team) pair is unique in the table. **Today the player table has no GSIS column, so `gsis` is `null` with `no_gsis_crosswalk_available`.** IDs are never guessed. |
+| `player` | object | `name`, `team` (Sleeper's current team abbreviation, `null` if unknown). |
+| `status` | enum | `confirmed` (only when a provenance entry is an official primary-source domain, `is_official_primary`), `reported` (non-speculative, not official), `speculative` (classifier flagged speculation), `superseded` (a later opposite-direction claim exists), `retracted` (reserved; never emitted — see below). A confidence score is never promoted to `confirmed`. Because RSS carries no official-domain links, `confirmed` does not occur today. |
+| `speculative`, `retracted` | bool | Honest flags. `retracted` is always `false` (the server cannot detect publisher-side retractions); `superseded_by` (legacy field) is the supersession signal. |
+| `published_ts` | int \| null | Unix seconds of the earliest known article; `null` when no publisher timestamp. |
+| `content` | object | `kind: "headline_only"`, `headline` (publisher headline or `null`), `body` always `null` with `body_unavailable_reason`. |
+| `provenance[]` | array | One entry per independent source (syndicated/aggregator copies collapse to one; they count once). Fields: `id` (`prov_` + hash of the URL, stable), `publisher_domain`, `original_url` (publisher URL; `null` with `original_url_unavailable_reason: "aggregator_syndication_origin_unknown"` for aggregator-only items), `retrieved_url`, `published_at` (Unix s \| null), `checked_at` (always `null`), `content_sha256` (always `null`, with `content_sha256_unavailable_reason`), `excerpt` (always `null`), `document_type`, `is_official_primary`, `allowlist_status` (`allowlisted` / `not_allowlisted`), `retracted` (bool; mirrors item-level retraction, `false` today). |
+| `claims[]` | array | Structured assertions; see below. |
+| `corroboration` | object | `independent_publisher_domains`, `independent_publisher_count`, `independence_verified` (always `false`: two different hosts may still share an origin and the server has no fetched documents to prove otherwise). |
+| `evidence` | object | `status: "unavailable"` and machine-readable `reason_codes` (`document_not_fetched`, `no_licensed_excerpt`). |
+| `freshness` | object | `class` (`general` or `urgent_availability`), the limits (`max_published_age_seconds`, `max_checked_age_seconds`), actual ages, and `published_within_limit` / `checked_within_limit` (`null` when the underlying timestamp does not exist, which is always the case for `checked_within_limit` today). |
+| `domain_review` | array of string | Publisher domains not on the allowlist, for deliberate human review. The allowlist is not broadened automatically. |
+| `review_only`, `review_only_reasons` | bool, array | `true` with codes such as `document_not_fetched_headline_only`, `no_official_primary_source`, `status_speculative`, `status_superseded`, `gsis_unavailable`, `published_ts_unavailable`, `non_allowlisted_domain`. Always `true` today. |
+
+**Allowlist (documented, not auto-extended):** `rotowire.com`, `espn.com`,
+`cbssports.com`, `sports.yahoo.com`, `nbcsports.com`, `profootballrumors.com`
+(exactly the hosts of `modules.news.NEWS_FEEDS`), plus official primary
+domains `nfl.com`, `nflpa.com`.
+
+**Freshness classes.** `urgent_availability` = event types `INJURY`,
+`INJURY_SEVERITY_UPDATE`, `IR_PUP_NFI`, `RETURN_TO_PRACTICE`,
+`RETURN_TO_PLAY`, `INACTIVE`, `ACTIVE`: published within 6 h, checked within
+15 min. Everything else is `general`: published within 24 h, checked within
+1 h. The server reports ages and booleans; it does not hide stale items.
+
+**Claims.** `claims[]` entries: `id`, `field`, `value`, `source_ids`
+(provenance ids that support it; here all of the item's provenance),
+`unit` (always `null`; no numeric claims exist), `team` (team context: the
+player's current team abbreviation, `null` when unknown), `status`
+(`active` / `superseded`), `superseded_by` (event id or `null`), `corrects`
+(always `null`; reserved).
+
+| `field` | `value` enum | Source |
+|---|---|---|
+| `event_type` | `INJURY`, `INJURY_SEVERITY_UPDATE`, `IR_PUP_NFI`, `RETURN_TO_PRACTICE`, `RETURN_TO_PLAY`, `INACTIVE`, `ACTIVE`, `STARTER_CHANGE`, `DEPTH_CHART_CHANGE`, `ROLE_INCREASE`, `ROLE_DECREASE`, `POSITION_BATTLE`, `TRADE`, `SIGNING`, `RELEASE`, `SUSPENSION`, `RETIREMENT`, `OTHER` | deterministic classifier |
+| `availability_designation` | `out`, `doubtful`, `questionable`, `inactive`, `cleared_to_play`, `active` | emitted only when the exact phrase (`ruled out`/`out`, `doubtful`, `questionable`, `inactive`, `cleared to play`, `activated`) was matched in the article text |
+| `team_affiliation` | NFL team abbreviation | Sleeper player table, not the article |
+
+Null/unknown semantics: a claim that cannot be supported is **omitted**, not
+emitted with a `null` value. Body part, diagnosis, timeline and cause are
+deliberately not claim fields. Corrections: when a later opposite-direction
+claim supersedes this one, every claim on the earlier item flips to
+`status: "superseded"` with `superseded_by` set, the item's `status` becomes
+`superseded`, and its `revision_id` changes. The newer item is a separate
+`id`. A superseded item is review-only and must not be posted as current.
+
+**Typed primary document equivalents.** The bot's current primary types are
+`injury_report`, `inactive_list`, `transaction`, `team_announcement`. Proposed
+non-medical equivalents for availability/role news that has no medical
+report: `depth_chart`, `roster_move_notice`, `coach_press_conference`,
+`game_status_designation`. Proposal only: the server emits none of these
+today (every `document_type` is `headline_only_feed_item`).
+
+**Retraction behaviour.** Only the supersession detector above exists. Publisher
+retractions/corrections are not detected, so `retracted` is always `false` and
+absence of a retraction flag is not evidence that none occurred.
+
+**What may be reproduced.** Verbatim: the player name, team, structured
+claim values, and the publisher attribution/URL. The publisher headline is
+supplied as `content.headline` for attribution and identification only; its
+licence for republication is not established here, so prefer a paraphrase
+plus a link. Paraphrase: anything derived from `claims`. Never reproduce or
+invent: article body text, quotes, diagnoses, timelines or causes (none are
+supplied). Attribution: name the `publisher_domain` and link `original_url`
+when non-null; when `original_url` is `null` (aggregator), do not claim an
+origin. No excerpt is licensed or supplied.
+
+**Completeness and licensing limits.** The feed covers only the six allowlisted
+RSS publishers' recent items and only items classified as actionable; absence
+of an item is not evidence that nothing happened. Feeds are not scraped
+beyond their public RSS; no prohibited source is accessed. This section does
+not authorize publishing; the consumer's trust policy still decides.
+
+#### Example (generated by the real code on a synthetic feed row)
+
+The input row is synthetic (a fabricated ESPN-style item for player 9001,
+`HOU`), run through the real route in a test harness; fields shared with the
+legacy shape are omitted for brevity. Timestamps are fixed at generation time.
+
+```json
+{
+  "league": "NFL",
+  "id": "f7cadf53f52014924d2b8feb22ee941c07a3fcea",
+  "revision_id": "2a6178cced13a2c9",
+  "previous_revision_id": null,
+  "player_ids": {"sleeper": "9001", "gsis": null, "gsis_unavailable_reason": "no_gsis_crosswalk_available"},
+  "player": {"name": "Nico Collins", "team": "HOU"},
+  "status": "reported",
+  "speculative": false,
+  "retracted": false,
+  "published_ts": 1792696400,
+  "content": {"kind": "headline_only", "headline": "Nico Collins (hamstring) questionable for Sunday", "body": null, "body_unavailable_reason": "article_body_not_fetched_or_licensed"},
+  "provenance": [
+    {
+      "id": "prov_d52dbeaa32bd54f2",
+      "publisher_domain": "espn.com",
+      "original_url": "https://www.espn.com/nfl/story/collins",
+      "original_url_unavailable_reason": null,
+      "retrieved_url": "https://www.espn.com/nfl/story/collins",
+      "published_at": 1792696400,
+      "checked_at": null,
+      "content_sha256": null,
+      "content_sha256_unavailable_reason": "document_not_fetched_feed_headline_only",
+      "excerpt": null,
+      "excerpt_unavailable_reason": "no_licensed_excerpt_supplied",
+      "document_type": "headline_only_feed_item",
+      "is_official_primary": false,
+      "allowlist_status": "allowlisted",
+      "retracted": false
+    }
+  ],
+  "claims": [
+    {"id": "claim_176d1a6281137d25", "field": "event_type", "value": "INJURY", "source_ids": ["prov_d52dbeaa32bd54f2"], "unit": null, "team": "HOU", "status": "active", "superseded_by": null, "corrects": null},
+    {"id": "claim_95ae9766a8d04767", "field": "availability_designation", "value": "questionable", "source_ids": ["prov_d52dbeaa32bd54f2"], "unit": null, "team": "HOU", "status": "active", "superseded_by": null, "corrects": null},
+    {"id": "claim_f150cf6d97062314", "field": "team_affiliation", "value": "HOU", "source_ids": ["prov_d52dbeaa32bd54f2"], "unit": null, "team": "HOU", "status": "active", "superseded_by": null, "corrects": null}
+  ],
+  "corroboration": {"independent_publisher_domains": ["espn.com"], "independent_publisher_count": 1, "independence_verified": false, "note": "Distinct publisher hosts only; shared-origin syndication across different hosts cannot be ruled out without fetched documents."},
+  "evidence": {"status": "unavailable", "reason_codes": ["document_not_fetched", "no_licensed_excerpt"]},
+  "freshness": {"class": "urgent_availability", "max_published_age_seconds": 21600, "max_checked_age_seconds": 900, "published_age_seconds": 3600, "checked_age_seconds": null, "published_within_limit": true, "checked_within_limit": null},
+  "domain_review": [],
+  "review_only": true,
+  "review_only_reasons": ["document_not_fetched_headline_only", "no_official_primary_source", "gsis_unavailable"]
+}
+```
+
+Remaining gap: to ever return `content_sha256`, `checked_at` and a licensed
+excerpt, the server would need a permitted fetch-and-hash step for
+allowlisted publishers (not implemented), and a GSIS crosswalk column in the
+player table (not present).
+
 ## `GET /v1/external/players/{player_id}/rating-history`
 
 Phase 3, last and biggest piece of coridian_'s external content-posting bot
@@ -1580,3 +1733,4 @@ nflverse data on 2026-10-22:
   `standard_and_box_score.unavailable_reason` text now points to these
   routes; its shape is unchanged. Purely additive: no existing field,
   status value, or route changed.
+- `v1` (2026-10-22): `GET /v1/external/players/{player_id}/news` gained the additive source-backed fields (`league`, `id`, `revision_id`, `player_ids`, `status`, `published_ts`, `provenance[]`, `claims[]`, `freshness`, `review_only`, ...). All headline-only and review-only until a permitted fetch-and-hash step exists. No existing field changed.

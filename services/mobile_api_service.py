@@ -231,6 +231,7 @@ from modules import (
     waivers_ui,
     weekly_box_scores,
 )
+from modules import external_news_contract
 from modules import idp_scoring
 from modules import guillotine as guillotine_module
 from modules import keepers as keepers_module
@@ -7194,6 +7195,8 @@ def _external_news_payload(
     *,
     superseded_by: str,
     checked_at: str,
+    identity: Mapping[str, Any] | None = None,
+    now_ts: int | None = None,
 ) -> dict[str, Any]:
     """Shape one modules.news_intelligence.group_player_events_by_identity
     group into the external contract (docs/external-api-contract.md):
@@ -7211,7 +7214,19 @@ def _external_news_payload(
         if event.article_time and event.article_time > 0
         else None
     )
+    # Additive source-backed contract fields (modules/external_news_contract.py).
+    contract = (
+        external_news_contract.build_contract_fields(
+            group=group,
+            identity=identity,
+            superseded_by=superseded_by,
+            now_ts=now_ts if now_ts is not None else int(time.time()),
+        )
+        if identity is not None
+        else {}
+    )
     return {
+        **contract,
         "player_id": str(player_id),
         "event_identity": event.event_identity,
         "event_type": event.event_type,
@@ -7289,6 +7304,8 @@ def get_external_player_news(
         )
     superseded = news_intelligence.detect_supersession(groups)
     checked_at = datetime.now(timezone.utc).isoformat()
+    identity = external_news_contract.resolve_player_identity(players_df, str(player_id), player_name)
+    now_ts = int(time.time())
 
     items = [
         _external_news_payload(
@@ -7296,6 +7313,8 @@ def get_external_player_news(
             group,
             superseded_by=superseded.get(group["event"].event_identity, ""),
             checked_at=checked_at,
+            identity=identity,
+            now_ts=now_ts,
         )
         for group in groups[:limit]
     ]
