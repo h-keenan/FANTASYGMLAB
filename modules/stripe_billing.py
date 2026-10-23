@@ -8,9 +8,10 @@ Streamlit. Tier names are therefore plain string literals here, kept in
 sync with modules.premium by convention and by the shared test suite, not
 by a shared import):
 
-  - "pro": GM Pro. Monthly or annual, 7-day Stripe trial on both (trial
-    mechanics live entirely in the Stripe subscription object via
-    `trial_period_days` — see create_checkout_session).
+  - "pro": GM Pro. Monthly or annual, with a Stripe-native free trial on both
+    (3 days by default, STRIPE_TRIAL_DAYS overrides, 0 disables; mechanics
+    live in the Stripe subscription object via `trial_period_days` — see
+    create_checkout_session). One trial per account: see trial_eligible.
   - "front_office": Front Office. Annual only.
 
 Price-ID configuration: STRIPE_PRICE_PRO_MONTHLY / STRIPE_PRICE_PRO_ANNUAL
@@ -51,6 +52,7 @@ CONFIG_KEYS = (
     "STRIPE_PRICE_PRO_ANNUAL",
     "STRIPE_PRICE_PRO_ANNUAL_LAUNCH_WEEK",
     "STRIPE_PRICE_FRONT_OFFICE_ANNUAL",
+    "STRIPE_TRIAL_DAYS",
     "STRIPE_CUSTOMER_PORTAL_RETURN_URL",
     "STRIPE_CHECKOUT_SUCCESS_URL",
     "STRIPE_CHECKOUT_CANCEL_URL",
@@ -78,8 +80,24 @@ RAW_FREE = "free"
 RAW_PRO = "premium"
 RAW_FRONT_OFFICE = "front_office"
 
-# GM Pro's Stripe-native trial, both intervals.
-PRO_TRIAL_DAYS = 7
+# GM Pro's Stripe-native trial, both intervals. Default length only: the
+# effective value is StripeBillingConfig.trial_days (env STRIPE_TRIAL_DAYS,
+# 0 disables the trial entirely).
+DEFAULT_TRIAL_DAYS = 3
+PRO_TRIAL_DAYS = DEFAULT_TRIAL_DAYS
+
+
+def parse_trial_days(raw: Any) -> int:
+    """STRIPE_TRIAL_DAYS -> int. Unset/blank -> default; junk/negative -> 0 (fail closed: no trial)."""
+
+    text = _safe_text(raw)
+    if not text:
+        return DEFAULT_TRIAL_DAYS
+    try:
+        days = int(text)
+    except ValueError:
+        return 0
+    return max(0, min(days, 90))
 
 # Launch Week promo: $29.99 GM Pro annual, Oct 12 00:00 CT through
 # Oct 18 23:59 CT. A pure function of wall-clock time + config — no
@@ -162,6 +180,8 @@ class StripeBillingConfig:
     checkout_success_url: str = ""
     checkout_cancel_url: str = ""
     app_base_url: str = app_config.LOCAL_BASE_URL
+    # Free-trial length for GM Pro checkout (0 = no trial). See parse_trial_days.
+    trial_days: int = DEFAULT_TRIAL_DAYS
 
     @property
     def secret_mode_configured(self) -> bool:
@@ -195,6 +215,7 @@ class StripeBillingConfig:
             "has_annual_price": bool(self.price_annual),
             "has_front_office_annual_price": bool(self.price_front_office_annual),
             "has_launch_week_price": bool(self.price_pro_annual_launch_week),
+            "trial_days": self.trial_days,
             "has_customer_portal_return_url": bool(self.customer_portal_return_url),
             "has_checkout_success_url": bool(self.checkout_success_url),
             "has_checkout_cancel_url": bool(self.checkout_cancel_url),
@@ -230,6 +251,7 @@ def load_stripe_config(*, environ: dict | None = None, secrets: Any = None) -> S
         checkout_success_url=values["STRIPE_CHECKOUT_SUCCESS_URL"],
         checkout_cancel_url=values["STRIPE_CHECKOUT_CANCEL_URL"],
         app_base_url=app_config.app_base_url(environ=environ, secrets=secrets),
+        trial_days=parse_trial_days(values["STRIPE_TRIAL_DAYS"]),
     )
 
 
@@ -433,6 +455,79 @@ def reset_price_display_cache_for_tests() -> None:
         _price_display_cache.clear()
 
 
+def profile_has_billing_history(profile: dict | None) -> bool:
+    """True when the profile row shows this account ever started a paid or
+    trial subscription on Stripe or through a store (RevenueCat)."""
+
+    if not isinstance(profile, dict):
+        return False
+    return any(
+        _safe_text(profile.get(key))
+        for key in (
+            "stripe_customer_id",
+            "stripe_subscription_id",
+            "stripe_subscription_status",
+            "revenuecat_app_user_id",
+            "trial_ends_at",
+        )
+    )
+
+
+def stripe_customer_had_trial(config: StripeBillingConfig, email: str) -> bool:
+    """True when any Stripe customer with this email ever held a subscription.
+
+    Checkout creates a fresh Stripe customer per session (customer_email), so
+    the profile row alone can miss a previous trial that never reached our
+    webhook. Any prior subscription (trial or not) forfeits the trial: a
+    returning customer is not a new trial. Raises on API failure; callers
+    treat that as ineligible.
+    """
+
+    clean_email = _safe_text(email)
+    if not clean_email:
+        return False
+    stripe = _stripe_module()
+    stripe.api_key = config.secret_key
+    customers = stripe.Customer.list(email=clean_email, limit=10)
+    for customer in _price_field(customers, "data") or []:
+        customer_id = _stripe_id(customer)
+        if not customer_id:
+            continue
+        subs = stripe.Subscription.list(customer=customer_id, status="all", limit=1)
+        if _price_field(subs, "data"):
+            return True
+    return False
+
+
+def trial_eligible(
+    config: StripeBillingConfig,
+    *,
+    tier: str = TIER_PRO,
+    email: str = "",
+    profile: dict | None = None,
+    check_stripe: bool = True,
+) -> bool:
+    """One free trial per account, Pro only, and only when enabled.
+
+    Fails closed: any doubt (profile shows billing history, Stripe shows a
+    prior subscription for the email, the lookup itself errors) -> no trial.
+    """
+
+    if config.trial_days <= 0:
+        return False
+    if (_safe_text(tier).casefold() or TIER_PRO) != TIER_PRO:
+        return False
+    if profile_has_billing_history(profile):
+        return False
+    if check_stripe and config.secret_mode_configured and _safe_text(email):
+        try:
+            if stripe_customer_had_trial(config, email):
+                return False
+        except Exception:
+            return False
+    return True
+
+
 def create_checkout_session(
     *,
     config: StripeBillingConfig,
@@ -443,6 +538,7 @@ def create_checkout_session(
     success_url: str = "",
     cancel_url: str = "",
     trial_days: int | None = None,
+    trial_eligible: bool = True,
     now: datetime | None = None,
     ui_mode: str = "hosted",
     return_url: str = "",
@@ -454,9 +550,14 @@ def create_checkout_session(
     tier="front_office" explicitly (and interval is ignored/annual-only —
     see price_id_for_plan).
 
-    `trial_days` defaults to PRO_TRIAL_DAYS for GM Pro (both intervals,
-    per the pricing spec) and to no trial for any other tier; pass 0
-    explicitly to force no trial on a Pro checkout. Trial mechanics are
+    `trial_days` defaults to config.trial_days (STRIPE_TRIAL_DAYS, 3 unless
+    overridden) for GM Pro (both intervals) and to no trial for any other
+    tier; pass 0 explicitly to force no trial on a Pro checkout.
+    `trial_eligible=False` (the caller found prior billing history; see
+    `trial_eligible()` -- the function of the same name) suppresses the
+    trial: one trial per account. A trial always collects a payment method
+    up front and cancels (never converts to free access) if none exists at
+    trial end. Trial mechanics are
     entirely Stripe-native (`subscription_data.trial_period_days`) — this
     function does not track trial state locally.
 
@@ -483,10 +584,13 @@ def create_checkout_session(
     stripe.api_key = config.secret_key
     subscription_data: dict[str, Any] = {"metadata": {"supabase_user_id": clean_user_id}}
     resolved_trial_days = (
-        trial_days if trial_days is not None else (PRO_TRIAL_DAYS if tier_key == TIER_PRO else 0)
+        trial_days if trial_days is not None else (config.trial_days if tier_key == TIER_PRO else 0)
     )
+    if not trial_eligible:
+        resolved_trial_days = 0
     if resolved_trial_days and resolved_trial_days > 0:
         subscription_data["trial_period_days"] = int(resolved_trial_days)
+        subscription_data["trial_settings"] = {"end_behavior": {"missing_payment_method": "cancel"}}
 
     embedded = _safe_text(ui_mode).casefold() == "embedded"
     url_kwargs: dict[str, Any] = (
@@ -511,7 +615,11 @@ def create_checkout_session(
         allow_promotion_codes=True,
         client_reference_id=clean_user_id,
         # Reduce duplicate checkouts for the same user+interval+price.
-        idempotency_key=f"fgl-checkout-{clean_user_id}-{_safe_text(interval).casefold()}-{price_id}-{ui_mode}"[:255],
+        idempotency_key=(
+            f"fgl-checkout-{clean_user_id}-{_safe_text(interval).casefold()}-{price_id}-{ui_mode}"
+            f"-t{int(resolved_trial_days or 0)}"
+        )[:255],
+        payment_method_collection="always",
         metadata={
             "supabase_user_id": clean_user_id,
             "billing_interval": _safe_text(interval).casefold(),
@@ -621,10 +729,46 @@ def _invoice_subscription_status(obj: dict) -> str:
     return status
 
 
+def _epoch(value: Any) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def _iso_from_epoch(value: int | None) -> str:
+    if value is None:
+        return ""
+    return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
+
+
+def _trial_transition(event_type: str, obj: dict, event: dict, status: str, trial_end: int | None) -> str:
+    """started | converted | canceled | "" -- analytics only, never entitlement."""
+
+    previous = event.get("data", {}).get("previous_attributes") if isinstance(event.get("data"), dict) else None
+    previous_status = _safe_text(previous.get("status")).casefold() if isinstance(previous, dict) else ""
+    if event_type == "customer.subscription.created" and status == "trialing":
+        return "started"
+    if event_type == "checkout.session.completed" and _safe_text(obj.get("payment_status")) == "no_payment_required":
+        return "started"
+    if event_type == "customer.subscription.updated" and previous_status == "trialing":
+        if status == "active":
+            return "converted"
+        if status in {"canceled", "unpaid", "incomplete_expired", "past_due"}:
+            return "canceled"
+    if event_type == "customer.subscription.deleted" and trial_end is not None:
+        ended = _epoch(obj.get("ended_at")) or _epoch(obj.get("canceled_at"))
+        if previous_status == "trialing" or (ended is not None and ended <= trial_end + 300):
+            return "canceled"
+    return ""
+
+
 def map_stripe_event_to_entitlement(
     event: dict,
     *,
     config: StripeBillingConfig | None = None,
+    now: datetime | None = None,
 ) -> dict[str, str]:
     """Resolve one Stripe event to a Supabase `profiles.entitlement` write.
 
@@ -646,7 +790,12 @@ def map_stripe_event_to_entitlement(
     A `trialing` subscription status is included in the same active set
     as `active` — Stripe's own trial state already resolves the paid tier
     here, matching the "trial resolves as the target tier before first
-    payment" requirement; no separate trial-tracking state is kept.
+    payment" requirement. The one guard: a `trialing` event whose
+    `trial_end` is already in the past never grants (a stale/replayed
+    event cannot extend access past the trial); it resolves "free".
+    The trial end date is surfaced as `stripe_trial_end` (ISO, trialing
+    only) so the profile can show it, and `trial_transition` tags
+    started/converted/canceled for analytics.
     """
 
     event_type = _safe_text(event.get("type"))
@@ -662,6 +811,15 @@ def map_stripe_event_to_entitlement(
     entitlement = ""
     reason = event_type
     cancel_at_period_end = bool(obj.get("cancel_at_period_end"))
+    trial_end = _epoch(obj.get("trial_end"))
+    current_time = now if now is not None else datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    trial_expired = (
+        subscription_status == "trialing"
+        and trial_end is not None
+        and trial_end <= int(current_time.timestamp())
+    )
     if event_type in ACTIVE_ENTITLEMENT_EVENTS:
         if not subscription_status or subscription_status in {"active", "trialing", "paid", "complete"}:
             entitlement = "premium"
@@ -674,11 +832,23 @@ def map_stripe_event_to_entitlement(
                 entitlement = "front_office"
             if cancel_at_period_end and subscription_status in {"active", "trialing"}:
                 reason = f"{event_type}:cancel_at_period_end"
+    if trial_expired:
+        # A trial that has run out is never access, whatever the status field
+        # on a late/replayed event still says.
+        entitlement = "free"
+        reason = f"{event_type}:trial_expired"
     if event_type == "invoice.payment_failed":
         # Fail closed: unpaid invoices revoke paid access until a later success event.
         entitlement = "free"
     if event_type in INACTIVE_ENTITLEMENT_EVENTS or subscription_status in {"canceled", "unpaid", "incomplete_expired"}:
         entitlement = "free"
+
+    transition = _trial_transition(event_type, obj, event, subscription_status, trial_end)
+    if transition == "canceled" and event_type == "customer.subscription.updated":
+        # trialing -> past_due/unpaid/canceled: the trial ended without a
+        # successful first payment. No paid access.
+        entitlement = "free"
+        reason = f"{event_type}:trial_ended_unpaid"
 
     return {
         "event_id": _safe_text(event.get("id")),
@@ -691,6 +861,8 @@ def map_stripe_event_to_entitlement(
         "stripe_subscription_status": subscription_status,
         "stripe_price_id": event_price_id,
         "cancel_at_period_end": "true" if cancel_at_period_end else "false",
+        "stripe_trial_end": _iso_from_epoch(trial_end) if subscription_status == "trialing" and not trial_expired else "",
+        "trial_transition": transition,
     }
 
 

@@ -158,6 +158,8 @@ export interface MeResponse {
     sleeper_username: string;
     profile_status: string;
     league_cap: number;
+    /** ISO end of an in-progress free trial, "" when not trialing. */
+    trial_ends_at?: string;
   };
   premium_benefits: string[];
 }
@@ -171,9 +173,17 @@ export interface BillingPlan {
   features: string[];
 }
 
+/** Free-trial offer for the signed-in account. `eligible` is false when the
+ * trial is disabled or the account already had one (one trial per account). */
+export interface BillingTrial {
+  days: number;
+  eligible: boolean;
+}
+
 export interface BillingPlansResponse {
   ok: boolean;
   plans: BillingPlan[];
+  trial?: BillingTrial;
   /** Zach, 2026-10-19 ("we dont need renders publuishable" / "find a work
    * around" — web-next isn't deployed on Render, so there's no
    * NEXT_PUBLIC_ build-time pipeline to bake this into): served at

@@ -216,7 +216,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
             {step === levelStep
               ? saving
                 ? `Setting up ${BRAND_NAME}…`
-                : "Start my 7-day free trial"
+                : "Continue"
               : "Next"}
           </button>
         </div>

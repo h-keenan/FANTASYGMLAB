@@ -4,6 +4,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState } from "react";
 
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
+import { activeTrialDays, thenPriceLine, trialCtaLabel } from "@/lib/trialCopy";
 import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
 
@@ -16,7 +17,7 @@ import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
 // saying what it costs after), just no card chrome or feature list. The
 // monthly-vs-annual choice still exists on /premium for anyone who wants
 // it later.
-function FreeTrialButton({ plan, publishableKey }: { plan: BillingPlan; publishableKey: string }) {
+function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPlan; publishableKey: string; trialDays: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -54,10 +55,10 @@ function FreeTrialButton({ plan, publishableKey }: { plan: BillingPlan; publisha
           opacity: busy ? "var(--opacity-disabled)" : 1,
         }}
       >
-        {busy ? "Starting…" : "Get Started For Free"}
+        {busy ? "Starting…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
       </button>
       <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
-        Then {plan.price} {plan.cadence} — cancel anytime before your trial ends and you&apos;re never charged.
+        {trialDays > 0 ? thenPriceLine(plan) : `${plan.price} ${plan.cadence}. Cancel anytime.`}
       </p>
       {clientSecret ? (
         <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />
@@ -101,14 +102,15 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
     };
   }, []);
 
+  const trialDays = activeTrialDays(plans?.trial);
   const annualPlan = plans?.plans.find((plan) => plan.interval === "annual") ?? plans?.plans[0] ?? null;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-center">
-        <SectionHeading>Start your 7-day free trial</SectionHeading>
+        <SectionHeading>{trialDays > 0 ? `Try Pro free for ${trialDays} days` : "Unlock the full GM toolkit"}</SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Full access to the GM toolkit. Cancel anytime before it ends and you&apos;re never charged.
+          Full access to the GM toolkit.
         </p>
       </div>
 
@@ -121,7 +123,7 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
           Loading plans…
         </p>
       ) : (
-        <FreeTrialButton plan={annualPlan} publishableKey={plans?.stripe_publishable_key ?? ""} />
+        <FreeTrialButton plan={annualPlan} publishableKey={plans?.stripe_publishable_key ?? ""} trialDays={trialDays} />
       )}
 
       <button

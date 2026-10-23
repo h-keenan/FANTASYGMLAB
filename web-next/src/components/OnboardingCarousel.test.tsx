@@ -41,12 +41,12 @@ describe("OnboardingCarousel", () => {
     expect(screen.getByText(/how much dynasty experience/i)).toBeInTheDocument();
 
     // Can't finish without picking a level.
-    expect(screen.getByRole("button", { name: /start my 7-day free trial/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^continue$/i })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
-    expect(screen.getByRole("button", { name: /start my 7-day free trial/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /^continue$/i })).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /start my 7-day free trial/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
@@ -87,7 +87,7 @@ describe("OnboardingCarousel", () => {
 
     clickNext(FEATURE_COUNT + 1);
     fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
-    fireEvent.click(screen.getByRole("button", { name: /start my 7-day free trial/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });

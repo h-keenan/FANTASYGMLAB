@@ -15,7 +15,7 @@ export interface TrialSourceProduct {
 }
 
 export interface FreeTrial {
-  /** e.g. "7-day" — ready for "Start your 7-day free trial". */
+  /** e.g. "3-day" — ready for "Start 3-day free trial". */
   lengthLabel: string;
 }
 
@@ -45,4 +45,46 @@ export function freeTrialFor(product: TrialSourceProduct | null | undefined): Fr
     if (l) return { lengthLabel: l };
   }
   return null;
+}
+
+/** Mirrors RevenueCat's INTRO_ELIGIBILITY_STATUS without importing it (this file stays node-testable). */
+export type IntroEligibility = 'eligible' | 'ineligible' | 'unknown';
+
+/**
+ * The trial to advertise to THIS user, or null. A store product can carry a free
+ * intro offer the user already used, so product data alone is not enough:
+ * - iOS: `introPrice` is present whether or not the Apple ID is still eligible,
+ *   so require RevenueCat to report 'eligible' (unknown/ineligible show no trial).
+ * - Android: Play already resolves `defaultOption` to the best offer this account
+ *   is eligible for, and the SDK reports eligibility as unknown, so trust the
+ *   free phase unless eligibility is explicitly 'ineligible'.
+ */
+export function freeTrialForUser(
+  product: TrialSourceProduct | null | undefined,
+  eligibility: IntroEligibility | undefined,
+  platform: string,
+): FreeTrial | null {
+  const trial = freeTrialFor(product);
+  if (!trial) return null;
+  if (eligibility === 'ineligible') return null;
+  if (platform === 'ios') return eligibility === 'eligible' ? trial : null;
+  return trial;
+}
+
+/** "Start 3-day free trial" */
+export function trialCtaLabel(trial: FreeTrial): string {
+  return `Start ${trial.lengthLabel} free trial`;
+}
+
+/** "Then $19.99/yr. Cancel anytime." using the store's own price string. */
+export function thenPriceLine(priceString: string, suffix: string): string {
+  return `Then ${priceString}${suffix}. Cancel anytime.`;
+}
+
+/** "Trial ends Oct 25" for a still-future ISO date, else "". */
+export function trialEndLabel(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!iso) return '';
+  const end = new Date(iso);
+  if (Number.isNaN(end.getTime()) || end.getTime() <= now.getTime()) return '';
+  return `Trial ends ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 }

@@ -37,14 +37,33 @@ describe("OnboardingPaywall", () => {
   // few bullets", then immediately after seeing it live: "have an annual
   // button instead of showing the plan" — one button for the annual plan,
   // price disclosed as fine print below it, no card or feature list.
-  it("renders a single Get Started For Free button for the annual plan, no card or bullets", async () => {
-    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
+  it("renders a single trial button for the annual plan, no card or bullets", async () => {
+    vi.mocked(api.getBillingPlans).mockResolvedValue({
+      ok: true,
+      plans: PLANS,
+      stripe_publishable_key: "pk_test_123",
+      trial: { days: 3, eligible: true },
+    });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
-    expect(await screen.findByRole("button", { name: "Get Started For Free" })).toBeInTheDocument();
-    expect(screen.getByText(/Then \$59\.99 per year/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Start 3-day free trial" })).toBeInTheDocument();
+    expect(screen.getByText("Then $59.99/year. Cancel anytime.")).toBeInTheDocument();
     expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
     expect(screen.queryByText("Full League Pulse")).not.toBeInTheDocument();
+  });
+
+  it("shows no trial copy when the account is not eligible", async () => {
+    vi.mocked(api.getBillingPlans).mockResolvedValue({
+      ok: true,
+      plans: PLANS,
+      stripe_publishable_key: "pk_test_123",
+      trial: { days: 0, eligible: false },
+    });
+    render(<OnboardingPaywall onSkip={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeInTheDocument();
+    expect(screen.queryByText(/free trial/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/free for/i)).not.toBeInTheDocument();
   });
 
   it("calls onSkip when 'Skip for now' is clicked", async () => {
@@ -52,7 +71,7 @@ describe("OnboardingPaywall", () => {
     const onSkip = vi.fn();
     render(<OnboardingPaywall onSkip={onSkip} />);
 
-    await screen.findByRole("button", { name: "Get Started For Free" });
+    await screen.findByRole("button", { name: "Subscribe" });
     fireEvent.click(screen.getByText("Skip for now — continue free"));
 
     expect(onSkip).toHaveBeenCalledTimes(1);
@@ -66,7 +85,7 @@ describe("OnboardingPaywall", () => {
     });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Get Started For Free" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Subscribe" }));
 
     expect(await screen.findByLabelText("Close checkout")).toBeInTheDocument();
     expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "annual", "/", "embedded");

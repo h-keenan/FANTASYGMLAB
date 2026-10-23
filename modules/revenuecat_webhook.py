@@ -142,6 +142,9 @@ def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
         clean_value = _safe_text(value)
         if clean_value:
             payload[key] = clean_value
+    if _safe_text(action.get("period_type")):
+        # Display-only trial end date; cleared (null) once the period is not a trial.
+        payload["trial_ends_at"] = _safe_text(action.get("trial_ends_at")) or None  # type: ignore[assignment]
     event_created_ms = _safe_text(action.get("event_created_ms"))
     if event_created_ms:
         try:
@@ -219,18 +222,30 @@ def update_profile_entitlement(
         ordering_params = _durable_event_ordering_params(payload)
         if ordering_params:
             request_kwargs["params"] = ordering_params
-        response = request_session.patch(
-            _profile_update_url(config, user_id),
-            headers={
-                "apikey": config.service_role_key,
-                "Authorization": f"Bearer {config.service_role_key}",
-                "Content-Type": "application/json",
-                "Prefer": "return=minimal",
-            },
-            json=payload,
-            timeout=15,
-            **request_kwargs,
-        )
+        def _patch(body: dict) -> Any:
+            return request_session.patch(
+                _profile_update_url(config, user_id),
+                headers={
+                    "apikey": config.service_role_key,
+                    "Authorization": f"Bearer {config.service_role_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json=body,
+                timeout=15,
+                **request_kwargs,
+            )
+
+        response = _patch(payload)
+        if (
+            response.status_code >= 400
+            and "trial_ends_at" in payload
+            and "trial_ends_at" in _supabase_error_message(response).casefold()
+        ):
+            # docs/supabase_free_trial.sql not applied yet: entitlement must
+            # still flow, so retry without the display-only trial column.
+            payload = {key: value for key, value in payload.items() if key != "trial_ends_at"}
+            response = _patch(payload)
     except Exception:
         return False, "Could not reach Supabase profiles table."
     if response.status_code >= 400:
@@ -254,6 +269,32 @@ def update_profile_entitlement(
             )
         return False, "Supabase entitlement update failed."
     return True, ""
+
+
+def _track_trial_lifecycle(action: dict[str, str]) -> None:
+    """Trial started / converted / canceled via the existing feature_use
+    pipeline. Fail-soft; carries only the hashed account key (derived by
+    track_event from `state`), a platform and the lifecycle step."""
+
+    try:
+        from modules import launch_analytics
+
+        transition = _safe_text(action.get("trial_transition"))
+        if transition not in {"started", "converted", "canceled"}:
+            return
+        user_id = _safe_text(action.get("user_id"))
+        state: dict[str, Any] | None = {"auth_session": {"user_id": user_id}} if user_id else None
+        extra: dict[str, Any] = {"feature": "trial", "action": transition}
+        if action.get("platform"):
+            extra["platform"] = action["platform"]
+        launch_analytics.track_event(
+            "feature_use",
+            props=launch_analytics.build_context_props(state, source_surface="revenuecat_webhook", extra=extra),
+            once_key=f"trial_{transition}:{_safe_text(action.get('event_id'))}",
+            state=state,
+        )
+    except Exception:
+        pass
 
 
 def process_verified_revenuecat_webhook(
@@ -298,6 +339,8 @@ def process_verified_revenuecat_webhook(
     )
     if ok and event_id:
         _remember_event_id(event_id)
+    if ok:
+        _track_trial_lifecycle(action)
     return {
         "ok": ok,
         "skipped": False,

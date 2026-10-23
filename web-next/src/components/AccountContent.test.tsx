@@ -63,6 +63,18 @@ describe("AccountContent", () => {
     expect(screen.queryByText("Manage Billing")).not.toBeInTheDocument();
   });
 
+  it("shows the trial end date for a trialing account and hides a past one", () => {
+    const future = new Date(Date.now() + 2 * 86400000).toISOString();
+    renderContent({ user: user({ entitlement: "premium", trial_ends_at: future }) });
+    expect(screen.getByText(/^Trial ends /)).toBeInTheDocument();
+  });
+
+  it("does not show a trial line when the end date has passed", () => {
+    const past = new Date(Date.now() - 86400000).toISOString();
+    renderContent({ user: user({ entitlement: "premium", trial_ends_at: past }) });
+    expect(screen.queryByText(/^Trial ends /)).not.toBeInTheDocument();
+  });
+
   it("shows Manage Billing (not an upgrade link) for a premium account and opens the portal", () => {
     const onOpenBillingPortal = vi.fn().mockResolvedValue(undefined);
     renderContent({ user: user({ entitlement: "premium" }), onOpenBillingPortal });

@@ -107,4 +107,27 @@ describe("PremiumContent", () => {
 
     await waitFor(() => expect(location.href).toBe("https://billing.stripe.com/p/session_abc"));
   });
+
+  it("shows trial CTA and one price line only when the trial is offered", () => {
+    render(
+      <PremiumContent entitlement="free" plans={PLANS} publishableKey="pk" trial={{ days: 3, eligible: true }} />,
+    );
+    expect(screen.getAllByRole("button", { name: "Start 3-day free trial" })).toHaveLength(2);
+    expect(screen.getAllByText("Then $9.99/month. Cancel anytime.")).toHaveLength(1);
+    // Front Office gets no trial.
+    expect(screen.getAllByRole("button", { name: "Subscribe" })).toHaveLength(1);
+  });
+
+  it("shows no trial copy for an ineligible account", () => {
+    render(
+      <PremiumContent entitlement="free" plans={PLANS} publishableKey="pk" trial={{ days: 0, eligible: false }} />,
+    );
+    expect(screen.queryByText(/free trial/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the trial end date while trialing", () => {
+    const end = new Date(Date.now() + 2 * 86400000).toISOString();
+    render(<PremiumContent entitlement="premium" plans={PLANS} publishableKey="pk" trialEndsAt={end} />);
+    expect(screen.getByText(/^Trial ends /)).toBeInTheDocument();
+  });
 });
