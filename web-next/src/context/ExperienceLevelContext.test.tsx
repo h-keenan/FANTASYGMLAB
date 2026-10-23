@@ -155,7 +155,7 @@ describe("experience level copy on Trade Hub idea cards", () => {
     expect(await screen.findByText(BEGINNER_HELP.impactSellHigh)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /view details/i }));
     expect(screen.getByText(BEGINNER_HELP.ideaBalance)).toBeInTheDocument();
-    expect(screen.getByText(/Partner Acceptance · Plausible/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Partner Acceptance: Plausible" })).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.ideaRealism)).toBeInTheDocument();
   });
 
@@ -165,7 +165,7 @@ describe("experience level copy on Trade Hub idea cards", () => {
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: /view details/i }));
-    expect(screen.getByText(/Realism · Plausible/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Realism: Plausible" })).toBeInTheDocument();
     expect(container.querySelector("[data-beginner-help]")).toBeNull();
   });
 });

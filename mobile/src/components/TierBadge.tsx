@@ -1,11 +1,10 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import AppText from './AppText';
 
+import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { resolvePlayerTier } from '../lib/playerTier';
-import { radii, spacing } from '../theme';
 
+/** Tier -> ToneBadge adapter: picks the tier's color and label, the shared pill draws it. */
 export default function TierBadge({
   storedTier,
   size = 'sm',
@@ -16,31 +15,11 @@ export default function TierBadge({
   const { isDark } = useThemeMode();
   if (!storedTier) return null;
   const tier = resolvePlayerTier(storedTier, isDark);
-  const label = size === 'md' ? tier.shortLabel : tier.abbrLabel;
   return (
-    <View
-      style={[
-        styles.badge,
-        size === 'md' && styles.badgeMd,
-        { backgroundColor: `${tier.color}26`, borderColor: `${tier.color}80` },
-      ]}
-    >
-      <AppText style={[styles.text, size === 'md' && styles.textMd, { color: tier.color }]} numberOfLines={1}>
-        {label}
-      </AppText>
-    </View>
+    <ToneBadge
+      label={size === 'md' ? tier.shortLabel : tier.abbrLabel}
+      color={tier.color}
+      size={size === 'md' ? 'sm' : 'xs'}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    alignSelf: 'flex-start',
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 1,
-  },
-  badgeMd: { paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  text: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  textMd: { fontSize: 11 },
-});

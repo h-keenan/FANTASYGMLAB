@@ -21,14 +21,6 @@ export function confidenceLevel(label: string | null | undefined): "high" | "med
   return "medium";
 }
 
-/** Port of confidence_ring_percent — same mapping realismRingPercent below uses. */
-export function confidenceRingPercent(label: string | null | undefined): number {
-  const level = confidenceLevel(label);
-  if (level === "high") return 90;
-  if (level === "low") return 35;
-  return 60;
-}
-
 /** Byte-for-byte port of modules/trade_visual_language.py's realism_level. */
 export function realismLevel(label: string | null | undefined): "high" | "medium" | "low" {
   const text = (label || "").trim().toLowerCase();
@@ -37,20 +29,14 @@ export function realismLevel(label: string | null | undefined): "high" | "medium
   return "medium";
 }
 
-/** Port of realism_ring_percent — same 90/60/35 scale as confidence. */
-export function realismRingPercent(label: string | null | undefined): number {
-  const level = realismLevel(label);
-  if (level === "high") return 90;
-  if (level === "low") return 35;
-  return 60;
-}
+/** Segments filled in a ConfidenceMeter for a confidence/realism level. */
+export const LEVEL_SEGMENTS = { high: 3, medium: 2, low: 1 } as const;
 
-/** Ring level -> the existing .value-ring--{low|mid|high} tone classes
- * (My Team's Team Value ring already defines these three). */
-export function levelToRingTone(level: "high" | "medium" | "low"): "low" | "mid" | "high" {
-  if (level === "high") return "high";
-  if (level === "low") return "low";
-  return "mid";
+/** Semantic meter color for a confidence/realism level. */
+export function levelColor(level: "high" | "medium" | "low"): string {
+  if (level === "high") return "var(--color-success)";
+  if (level === "low") return "var(--color-danger)";
+  return "var(--color-warning)";
 }
 
 /** value_edge_band (already computed server-side by

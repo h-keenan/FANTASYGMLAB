@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import StatStrip from './StatStrip';
+import DashboardStatRow from './DashboardStatRow';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { GuillotineResponse } from '../lib/api';
@@ -23,7 +23,7 @@ export default function GuillotineCard({ data }: { data: GuillotineResponse | nu
         </AppText>
         <ToneBadge label={view.badge.label} color={color} />
       </View>
-      <StatStrip items={view.items} fullWidth />
+      <DashboardStatRow items={view.items} style={{ marginBottom: 0 }} />
     </AccentCard>
   );
 }

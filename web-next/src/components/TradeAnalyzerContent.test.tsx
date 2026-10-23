@@ -197,7 +197,7 @@ describe("TradeAnalyzerContent", () => {
     // Single value bar — never a second meter duplicating the same number.
     expect(document.querySelectorAll(".lean-bar-track").length).toBe(1);
 
-    expect(screen.getByText(/Confidence · High confidence/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Confidence: High confidence" })).toBeInTheDocument();
     expect(screen.getByText("Minimal injury risk on either side.")).toBeInTheDocument();
     expect(screen.getByText("Ask for a sweetener too")).toBeInTheDocument();
   });

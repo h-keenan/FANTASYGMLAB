@@ -8,7 +8,8 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
-import { ValueRing } from "@/components/ValueRing";
+import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { LEVEL_SEGMENTS, levelColor } from "@/lib/tradeHubPresentation";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
 import { trackUse } from "@/lib/analytics";
@@ -17,12 +18,9 @@ import {
   LOW_CONFIDENCE_USER_NOTE,
   categoryColor,
   confidenceLevel,
-  confidenceRingPercent,
   fairnessBandColor,
   formatTradeGain,
-  levelToRingTone,
   realismLevel,
-  realismRingPercent,
   tradeIdeaShareRecord,
   tradeIdeaShareText,
 } from "@/lib/tradeHubPresentation";
@@ -306,30 +304,18 @@ export function TradeIdeaCardView({
           <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
           <BeginnerHelp term="ideaBalance" />
           <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex flex-col items-center gap-1">
-              <ValueRing
-                percent={confidenceRingPercent(idea.confidence_label)}
-                tone={levelToRingTone(confidenceLvl)}
-                display={`${confidenceRingPercent(idea.confidence_label)}%`}
-                ariaLabel={`Confidence: ${idea.confidence_label}`}
-                size="sm"
-              />
-              <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                Confidence · {idea.confidence_label}
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <ValueRing
-                percent={realismRingPercent(idea.market_realism_label)}
-                tone={levelToRingTone(realismLvl)}
-                display={`${realismRingPercent(idea.market_realism_label)}%`}
-                ariaLabel={`Market realism: ${idea.market_realism_label}`}
-                size="sm"
-              />
-              <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                {copy.label("ideaRealism", "Realism")} · {idea.market_realism_label}
-              </span>
-            </div>
+            <ConfidenceMeter
+              label="Confidence"
+              value={idea.confidence_label}
+              level={LEVEL_SEGMENTS[confidenceLvl]}
+              color={levelColor(confidenceLvl)}
+            />
+            <ConfidenceMeter
+              label={copy.label("ideaRealism", "Realism")}
+              value={idea.market_realism_label}
+              level={LEVEL_SEGMENTS[realismLvl]}
+              color={levelColor(realismLvl)}
+            />
           </div>
           <BeginnerHelp term="ideaConfidence" />
           <BeginnerHelp term="ideaRealism" />

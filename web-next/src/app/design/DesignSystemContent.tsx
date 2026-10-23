@@ -535,9 +535,9 @@ export function DesignSystemContent() {
           </div>
         </Spec>
         <Spec
-          name="ToneBadge vs PlayerInjuryBadge vs PositionBadge"
+          name="ToneBadge / PlayerInjuryBadge / PositionBadge"
           path="components/ToneBadge.tsx | components/PlayerInjuryBadge.tsx | components/PositionBadge.tsx"
-          duplicate="Three pill dialects: ToneBadge (text-xs, 15% tint, 0.085em tracking), PlayerInjuryBadge (0.625rem, own tint tokens, abbreviated code), PositionBadge (.position-badge CSS, min-width). Same family, three implementations."
+          note="One pill: ToneBadge. PlayerInjuryBadge is ToneBadge at size xs; PositionBadge is the same rounded pill with a fixed per-position tint."
         >
           <div className="flex flex-wrap items-center gap-2">
             <Variant label="ToneBadge">
@@ -738,9 +738,9 @@ export function DesignSystemContent() {
       {/* 6. STAT TILES & METERS */}
       <Family id="tiles" title="Stat tiles & meters" note="Tiles show a number; meters show a magnitude. Colors are semantic, not decorative.">
         <Spec
-          name="StatStrip / SnapshotTile vs ValueStat"
+          name="StatStrip / SnapshotTile / ValueStat"
           path="components/StatStrip.tsx, components/SnapshotTile.tsx | components/ValueStat.tsx"
-          duplicate="Two stat-tile dialects: SnapshotTile (glyph + label + value, tone) and ValueStat (caption-over-number, no container). Mobile adds MetricCard, StatStrip and DashboardStatRow."
+          note="Tiles are StatStrip/SnapshotTile (mobile: DashboardStatRow/MetricCard). ValueStat is the in-row Value caption, not a tile."
         >
           <Variant label="StatStrip columns=4">
             <StatStrip
@@ -774,9 +774,9 @@ export function DesignSystemContent() {
           </Variant>
         </Spec>
         <Spec
-          name="ConfidenceMeter vs ValueRing vs OvrGauge"
+          name="ConfidenceMeter / ValueRing / OvrGauge"
           path="components/ConfidenceMeter.tsx | components/ValueRing.tsx | components/OvrGauge.tsx"
-          duplicate="Confidence is drawn two ways: 3-segment bar (Waivers) and circular ring (Trade Hub). OvrGauge is a third circular gauge with its own tint ramp."
+          note="Confidence is always the 3-segment bar. ValueRing is the one ring; OvrGauge is a ValueRing tinted by rating."
         >
           <Variant label="ConfidenceMeter">
             <div className="flex flex-col gap-1">
@@ -785,7 +785,7 @@ export function DesignSystemContent() {
               <ConfidenceMeter label="Confidence" value="Low" color="var(--color-danger)" />
             </div>
           </Variant>
-          <Variant label="ValueRing (md low/mid/high, sm)">
+          <Variant label="ValueRing (lg low/mid/high, sm)">
             <div className="flex items-center gap-3">
               <ValueRing percent={22} tone="low" display="22" ariaLabel="low" />
               <ValueRing percent={55} tone="mid" display="55" ariaLabel="mid" />
@@ -794,7 +794,7 @@ export function DesignSystemContent() {
               <ValueRing percent={null} tone="mid" display="—" ariaLabel="none" />
             </div>
           </Variant>
-          <Variant label="OvrGauge (sm / md / lg / empty)">
+          <Variant label="OvrGauge (sm / md / lg / empty), a tinted ValueRing">
             <div className="flex items-center gap-3">
               <OvrGauge rating={91} size="sm" />
               <OvrGauge rating={64} size="md" />

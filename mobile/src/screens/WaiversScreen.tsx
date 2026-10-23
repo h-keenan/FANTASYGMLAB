@@ -28,7 +28,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import StatStrip from '../components/StatStrip';
+import DashboardStatRow from '../components/DashboardStatRow';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -269,14 +269,15 @@ export default function WaiversScreen({ route, navigation }: Props) {
       />
       <View style={styles.headerRow}>
         <AppText style={styles.headerSubtitle}>Ranked by fit for your team.</AppText>
-        <StatStrip
-          items={[
-            { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
-            { label: stats.faabLabel, value: stats.faab },
-            { label: 'Team need', value: neededPositions.length > 0 ? neededPositions.join('/') : 'None' },
-          ]}
-        />
       </View>
+      <DashboardStatRow
+        style={styles.statRow}
+        items={[
+          { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
+          { label: stats.faabLabel, value: stats.faab },
+          { label: 'Team need', value: neededPositions.length > 0 ? neededPositions.join('/') : 'None' },
+        ]}
+      />
       <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
@@ -828,6 +829,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
+  statRow: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
   headerSubtitle: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
   tabWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   filterPills: { marginBottom: spacing.sm },
