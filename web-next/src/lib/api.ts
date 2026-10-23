@@ -35,11 +35,16 @@ function reportApiFailure(status: number): void {
 
 async function performRequest<T>(
   path: string,
-  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown } | undefined,
+  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // A caller-supplied signal (e.g. the user left the page) cancels this request too.
+  if (init?.signal) {
+    if (init.signal.aborted) controller.abort();
+    else init.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
 
   let response: Response;
   try {
@@ -84,7 +89,7 @@ async function performRequest<T>(
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown },
+  init?: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal },
 ): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -3413,15 +3418,16 @@ export const api = {
   // Progressive Portfolio: the cheap index first, then one request per saved
   // league (fired concurrently) so each card paints as soon as its own
   // summary is ready instead of after the slowest league's.
-  getPortfolioIndex: (lens: string = "Dynasty") =>
-    authorizedRequest<PortfolioIndexResponse>(`/v1/portfolio/leagues?lens=${encodeURIComponent(lens)}`),
+  getPortfolioIndex: (lens: string = "Dynasty", signal?: AbortSignal) =>
+    authorizedRequest<PortfolioIndexResponse>(`/v1/portfolio/leagues?lens=${encodeURIComponent(lens)}`, { signal }),
 
   getPortfolioExposure: (lens: string = "Dynasty") =>
     authorizedRequest<PortfolioExposureResponse>(`/v1/portfolio/exposure?lens=${encodeURIComponent(lens)}`),
 
-  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty") =>
+  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty", signal?: AbortSignal) =>
     authorizedRequest<PortfolioLeagueResponse>(
       `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}`,
+      { signal },
     ),
 
   getGmPlan: (leagueId: string, lens: string = "Dynasty") =>

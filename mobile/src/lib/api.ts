@@ -67,11 +67,16 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 async function performRequest<T>(
   path: string,
-  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown } | undefined,
+  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // A caller-supplied signal (e.g. React Query cancelling on unmount) cancels this request too.
+  if (init?.signal) {
+    if (init.signal.aborted) controller.abort();
+    else init.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
 
   let response: Response;
   try {
@@ -109,7 +114,7 @@ async function performRequest<T>(
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown },
+  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal },
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
@@ -130,8 +135,8 @@ async function authorizedRequest<T>(
   return maskShowcaseFields(body as T);
 }
 
-function authorizedFetch<T>(path: string): Promise<T> {
-  return authorizedRequest<T>(path);
+function authorizedFetch<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return authorizedRequest<T>(path, signal ? { signal } : undefined);
 }
 
 function authorizedPost<T>(path: string, jsonBody: unknown): Promise<T> {
@@ -2649,11 +2654,12 @@ export const api = {
   /** Progressive Portfolio: the cheap index first, then one request per
    * saved league (fired concurrently) so each row paints as soon as its own
    * summary is ready instead of after the slowest league's. */
-  getPortfolioIndex: () => authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues'),
+  getPortfolioIndex: (signal?: AbortSignal) =>
+    authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues', signal),
   /** Player exposure across saved leagues (Pro). */
   getPortfolioExposure: () => authorizedFetch<PortfolioExposureResponse>('/v1/portfolio/exposure'),
-  getPortfolioLeague: (leagueId: string) =>
-    authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`),
+  getPortfolioLeague: (leagueId: string, signal?: AbortSignal) =>
+    authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`, signal),
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).
    * Server-cached per league for a few minutes (cache_ttl_seconds). */
   getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),

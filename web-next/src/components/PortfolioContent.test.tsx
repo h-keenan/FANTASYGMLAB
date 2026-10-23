@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PortfolioContent } from "./PortfolioContent";
+import { PortfolioContent, PortfolioShell } from "./PortfolioContent";
+import { PORTFOLIO_CARD_MIN_HEIGHT, PORTFOLIO_SHELL_SKELETON_COUNT } from "@/lib/portfolioLoader";
 import { api, type BriefingItem, type PortfolioLeague, type PortfolioResponse } from "@/lib/api";
 
 vi.mock("@/lib/api", async () => {
@@ -425,5 +426,54 @@ describe("PortfolioContent", () => {
   it("shows free accounts the upsell (their upgrade path), not the add link", () => {
     render(<PortfolioContent data={{ ...BASE_RESPONSE, is_premium: false }} />);
     expect(screen.queryByRole("link", { name: "+ Add a league" })).not.toBeInTheDocument();
+  });
+  it("reserves the same height for skeleton rows and loaded cards so nothing jumps", () => {
+    const { container } = render(
+      <PortfolioContent
+        data={BASE_RESPONSE}
+        order={["999", "s1"]}
+        pending={[{ league_id: "s1", league_name: "Slow League" }]}
+      />,
+    );
+    const min = `${PORTFOLIO_CARD_MIN_HEIGHT}px`;
+    const card = container.querySelector("[data-portfolio-card]") as HTMLElement;
+    const skeleton = container.querySelector("[data-portfolio-skeleton]") as HTMLElement;
+    expect(card.style.minHeight).toBe(min);
+    expect(skeleton.style.minHeight).toBe(min);
+  });
+
+  it("keeps saved-league order when a later league arrives first", () => {
+    const { container } = render(
+      <PortfolioContent
+        data={BASE_RESPONSE}
+        order={["slow", BASE_RESPONSE.leagues[0].league_id]}
+        pending={[{ league_id: "slow", league_name: "Slow League" }]}
+      />,
+    );
+    const rows = Array.from(container.querySelectorAll("[data-portfolio-skeleton], [data-portfolio-card]"));
+    expect(rows.map((el) => el.hasAttribute("data-portfolio-skeleton"))).toEqual([true, false]);
+  });
+
+  it("offers an inline Retry for a league whose row failed, and calls back with its id", () => {
+    const onRetry = vi.fn();
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          failed_leagues: [{ league_id: "bad", league_name: "Bad League", reason: "unavailable" }],
+        }}
+        onRetryLeague={onRetry}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledWith("bad");
+  });
+
+  it("paints a header plus final-height skeleton cards for the instant shell", () => {
+    const { container } = render(<PortfolioShell />);
+    expect(screen.getByRole("heading", { name: "Your leagues" })).toBeInTheDocument();
+    const skeletons = container.querySelectorAll("[data-portfolio-skeleton]");
+    expect(skeletons).toHaveLength(PORTFOLIO_SHELL_SKELETON_COUNT);
+    skeletons.forEach((el) => expect((el as HTMLElement).style.minHeight).toBe(`${PORTFOLIO_CARD_MIN_HEIGHT}px`));
   });
 });

@@ -2715,3 +2715,18 @@ a {
     width: 10rem;
   }
 }
+
+/* Portfolio rows fade in when their data arrives (opacity/transform only, so
+   the reserved row height never changes). */
+@keyframes portfolio-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.portfolio-row-in {
+  animation: portfolio-row-in 150ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-row-in {
+    animation: none;
+  }
+}
