@@ -12,6 +12,7 @@ vi.mock("@/context/AuthContext", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
+  trackUse: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -237,5 +238,72 @@ describe("SleeperImportForm", () => {
         props: { reason: "exception" },
       }),
     );
+  });
+
+  it("shows the Pro upsell and does NOT open the league when a single-league save is refused at_cap", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [{ league_id: "league-solo", name: "Solo League", season: "2026", total_rosters: 12 }],
+      message: "",
+    });
+    vi.mocked(api.linkSleeperUsername).mockResolvedValue({ ok: true } as never);
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "at_cap", cap: 1 });
+    const onLeagueChosen = vi.fn();
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Pro supports up to 5.")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /upgrade/i })).toHaveAttribute("href", "/premium");
+    expect(onLeagueChosen).not.toHaveBeenCalled();
+    expect(trackFeatureUse).not.toHaveBeenCalledWith("league_import_completed", expect.anything());
+  });
+
+  it("shows the Pro upsell and does NOT open the league when a picked league is refused at_cap", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [
+        { league_id: "league-a", name: "League A", season: "2026", total_rosters: 12 },
+        { league_id: "league-b", name: "League B", season: "2026", total_rosters: 10 },
+      ],
+      message: "",
+    });
+    vi.mocked(api.linkSleeperUsername).mockResolvedValue({ ok: true } as never);
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "at_cap", cap: 1 });
+    const onLeagueChosen = vi.fn();
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    await waitFor(() => expect(screen.getByText("League B")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("League B"));
+
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Pro supports up to 5.")).toBeInTheDocument());
+    expect(onLeagueChosen).not.toHaveBeenCalled();
+  });
+
+  it("shows a message and does NOT open the league on league_not_found", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [{ league_id: "league-solo", name: "Solo League", season: "2026", total_rosters: 12 }],
+      message: "",
+    });
+    vi.mocked(api.linkSleeperUsername).mockResolvedValue({ ok: true } as never);
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "league_not_found", cap: 0 });
+    const onLeagueChosen = vi.fn();
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/didn't load just now/i));
+    expect(onLeagueChosen).not.toHaveBeenCalled();
   });
 });

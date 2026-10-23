@@ -185,4 +185,35 @@ describe("ESPN import in the Connect League flow", () => {
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
     await waitFor(() => expect(trackUse).toHaveBeenLastCalledWith("league_import", "failed", { props: { result: "espn_error" } }));
   });
+
+  it("shows the Pro upsell and does NOT open the league when the save is refused at_cap", async () => {
+    vi.mocked(api.previewEspnLeague).mockResolvedValue(PREVIEW);
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "at_cap", cap: 1 });
+    openEspn();
+
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => expect(screen.getByText("FFLR Test League")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add this league/i }));
+
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Pro supports up to 5.")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /upgrade/i })).toHaveAttribute("href", "/premium");
+    expect(onLeagueChosen).not.toHaveBeenCalled();
+  });
+
+  it("shows the mapped message and does NOT open the league on mapping_too_low", async () => {
+    vi.mocked(api.previewEspnLeague).mockResolvedValue(PREVIEW);
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "mapping_too_low", cap: 0 });
+    openEspn();
+
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => expect(screen.getByText("FFLR Test League")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add this league/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/too few of this league/i));
+    expect(onLeagueChosen).not.toHaveBeenCalled();
+  });
 });
