@@ -6,6 +6,7 @@ import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { EmptyState } from "@/components/EmptyState";
 import { TradeHubFilters } from "@/components/TradeHubFilters";
 import { filterTradeIdeas } from "@/lib/tradeHubFilters";
+import { TradeHubHoldCard } from "@/components/TradeHubHoldCard";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -32,59 +33,17 @@ import { ValuesCredit } from "@/components/ValuesCredit";
  * PNG-export feature, not core page parity).
  */
 
-/** Backend strategy values are snake_case engine tokens (e.g.
- * "fringe_contender") — title-case for display, same approach
- * formatGamePlanCategory already uses for a different snake_case field. */
-function formatStrategyLabel(strategy: string): string {
-  return strategy
-    .split("_")
-    .filter(Boolean)
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
-// coridian_, screenshot: "it says values reflect a retool strategy, yet
-// there's nowhere to change that strategy, and there's no explanation of
-// what retool means or dynasty or whatever else young contender... people's
-// natural inclination when they don't know what something is on a phone is
-// probably to tap it." Plain-language versions of the same five age-curve
-// buckets modules/trade_hub_engine.py's apply_strategy_age_curve actually
-// applies — not invented copy, just that function's real behavior in
-// words. Changing the strategy itself stays out of scope here (it's driven
-// by Team Situation on this page, a deliberate separate control surface,
-// not a Trade-Hub-local setting) — this fix is the missing explanation.
-const STRATEGY_EXPLANATIONS: Record<string, string> = {
-  contender: "Values lean toward players in their prime (25-30) who help you win now, and slightly discount very young players and aging running backs.",
-  fringe_contender: "A lighter version of Contender — still leans toward players who help you win soon, without discounting youth as much.",
-  retool: "A middle ground: values tilt toward younger players (25 and under) while still crediting players through their late 20s.",
-  rebuild: "Values lean heavily toward young players and discount aging ones, since the plan is to build around players who'll be good years from now.",
-  tank: "The most aggressive lean toward youth — older players are discounted the most, prioritizing future assets over today's roster.",
-};
-
-function StrategyExplainer({ strategy }: { strategy: string }) {
-  const [open, setOpen] = useState(false);
-  const explanation = STRATEGY_EXPLANATIONS[strategy];
-
+/** Plain-English posture line (server: trade_hub_engine.posture_sentence).
+ * Beginners get the term explained under it via the shared BeginnerHelp;
+ * advanced users see just the sentence. */
+function PostureLine({ sentence }: { sentence: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        className="text-xs text-left underline self-start"
-        style={{ color: "var(--color-text-muted)" }}
-      >
-        Values here reflect a <strong>{formatStrategyLabel(strategy)}</strong> strategy — they may differ
-        slightly from Waivers, Dashboard, or Player Quick View. What does this mean?
-      </button>
-      {open ? (
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-          {explanation ||
-            "This strategy nudges trade values based on player age, favoring whichever players fit your current team-building plan."}{" "}
-          Set under Team Situation, not here.
-        </p>
-      ) : null}
-    </div>
+    <>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        {sentence}
+      </p>
+      <BeginnerHelp term="tradeHubPosture" />
+    </>
   );
 }
 
@@ -118,9 +77,15 @@ export function TradeHubContent({
     return (
       <main className="flex-1 flex flex-col gap-4 items-center justify-center px-4">
         <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
-        <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
-          {notice}
-        </p>
+        {data.hold ? (
+          <div className="w-full max-w-3xl">
+            <TradeHubHoldCard hold={data.hold} />
+          </div>
+        ) : (
+          <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
+            {notice}
+          </p>
+        )}
       </main>
     );
   }
@@ -136,18 +101,18 @@ export function TradeHubContent({
           Ideas built around your roster.
         </p>
         <BeginnerHelp term="tradeHubIntro" />
-        {/* Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
-            strategy age-curve adjustment to player value that Waivers/
-            Dashboard/PQV's plain valuation pipeline doesn't — the same
-            player can show a different number there than here, with
-            nothing explaining why. This names the strategy these values
-            were generated under instead of leaving that silent. */}
-        {data.team_strategy ? <StrategyExplainer strategy={data.team_strategy} /> : null}
+        {data.posture_sentence ? <PostureLine sentence={data.posture_sentence} /> : null}
       </header>
+
+      {data.hold ? <TradeHubHoldCard hold={data.hold} /> : null}
 
       {data.ideas.length > 0 ? <TradeHubFilters ideas={data.ideas} filter={filter} onChange={setFilter} /> : null}
 
-      {data.ideas.length === 0 ? (
+      {data.ideas.length === 0 && data.hold ? (
+        <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="text-sm font-bold" style={{ color: "var(--color-accent)" }}>
+          Build your own in Trade Finder →
+        </Link>
+      ) : data.ideas.length === 0 ? (
         <EmptyState
           title="No trade ideas right now"
           subtitle="Ideas appear when rosters move. Build your own in Trade Finder."

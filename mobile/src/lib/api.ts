@@ -2382,6 +2382,15 @@ export interface TradeHubEntitlement {
   ad_unlocks_applied: number;
 }
 
+export interface TradeHubHold {
+  verdict: 'hold';
+  reason: string;
+  headline: string;
+  why: { factor: string; text: string }[];
+  /** True when ideas below are still worth a look, but optional. */
+  ideas_optional: boolean;
+}
+
 export interface TradeHubResponse {
   ok: true;
   ideas: TradeIdea[];
@@ -2390,6 +2399,8 @@ export interface TradeHubResponse {
   /** reason === 'trade_deadline_passed' carries this user-facing copy. */
   message?: string;
   trade_window?: TradeWindow;
+  hold?: TradeHubHold | null;
+  posture_sentence?: string;
 }
 
 export interface AllTradesEntitlement {

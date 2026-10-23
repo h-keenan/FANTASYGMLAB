@@ -15073,6 +15073,7 @@ def test_trade_hub_stops_pushing_trades_after_the_deadline(monkeypatch):
     assert body["message"] == _DEADLINE_MESSAGE
     assert body["trade_window"]["trade_deadline_week"] == 11
     assert body["trade_window"]["trade_deadline_passed"] is True
+    assert body["hold"]["reason"] == "trade_deadline_passed"
     generate.assert_not_called()
 
 

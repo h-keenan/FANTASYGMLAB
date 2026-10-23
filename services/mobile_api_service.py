@@ -12975,6 +12975,7 @@ def get_trade_hub_ideas(
             "reason": league_calendar.TRADE_DEADLINE_PASSED_REASON,
             "message": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
             "trade_window": trade_window,
+            "hold": trade_hub_engine.build_hold_verdict([], trade_window=trade_window),
         }
 
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
@@ -13012,10 +13013,35 @@ def get_trade_hub_ideas(
             user_id, [str(card.get("recommendation_id") or "") for card in ranked], pool_cap
         )
         visible = [card for card in ranked if str(card.get("recommendation_id") or "") in allowed_ids][:pool_cap]
+    # Hold verdict: judged on the full approved board (not the free-tier slice)
+    # using one already-cached rankings row; no extra idea search.
+    power_rank = team_count = None
+    try:
+        frame = league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        if not frame.empty:
+            team_count = int(len(frame))
+            mine = frame[frame["roster_id"].astype(str) == str(roster_id)]
+            if not mine.empty:
+                power_rank = int(mine.iloc[0].get("power_rank"))
+    except Exception:
+        power_rank = team_count = None
+    hold = trade_hub_engine.build_hold_verdict(
+        ranked,
+        strategy=strategy,
+        power_rank=power_rank,
+        team_count=team_count,
+        season_progress=record_signal.season_progress_fraction(league),
+        in_season=league_calendar.is_in_season(league),
+        trade_window=trade_window,
+    )
     return {
         "ok": True,
         "ideas": visible,
         "reason": "",
+        "hold": hold,
+        "posture_sentence": trade_hub_engine.posture_sentence(strategy),
         # Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
         # strategy age-curve adjustment (modules.trade_hub_engine.
         # apply_strategy_age_curve, inside generate_trade_idea_records_cached
