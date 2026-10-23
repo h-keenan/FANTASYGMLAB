@@ -54,6 +54,8 @@
   --color-brand-bg: #000000;
   --color-brand-surface: #1f2226;
   --color-brand-mark-ink: #0b1220;
+  /* Ink on an accent-strong fill: dark on the cyan (dark theme), white on the deep teal (light theme). Mirrors mobile colors.onAccent. */
+  --color-on-accent: #0b1220;
 
   /* One modal backdrop darkness for every sheet and dialog (web GmOrb, checkout; mobile theme.colors.scrim). */
   --color-scrim: rgba(0, 0, 0, 0.6);
@@ -259,6 +261,7 @@
 
     --color-accent: #056e7c;
     --color-accent-strong: #08616e;
+    --color-on-accent: #ffffff;
     --color-accent-soft: rgba(6, 110, 124, 0.16);
     --color-success: #147337;
     --color-opportunity: #0c7065;
@@ -1726,6 +1729,7 @@ a {
   --color-border-strong: #64748b;
   --color-accent: #67e8f9;
   --color-accent-strong: #22d3ee;
+  --color-on-accent: #0b1220;
   --color-accent-soft: rgba(103, 232, 249, 0.14);
   --color-success: #22c55e;
   --color-opportunity: #14b8a6;
@@ -2002,7 +2006,7 @@ a {
   padding: var(--space-md);
   border-radius: var(--radius-control);
   background: var(--color-accent-strong);
-  color: #061014;
+  color: var(--color-on-accent);
   border: 0;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-button);

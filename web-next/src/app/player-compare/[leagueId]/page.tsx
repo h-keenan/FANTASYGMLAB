@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayerCompareContent } from "@/components/PlayerCompareContent";
+import { EmptyState } from "@/components/EmptyState";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -58,7 +59,14 @@ export default function PlayerComparePage() {
 
   if (!playerAId) {
     return (
-      <ErrorState message="No player selected to compare." />
+      <main className="flex-1 flex flex-col px-4 py-6 max-w-3xl w-full mx-auto">
+        <EmptyState
+          title="No player selected to compare"
+          subtitle="Pick a player from the list, then tap Compare."
+          actionLabel="Browse players"
+          onAction={() => router.push(`/players/${encodeURIComponent(leagueId)}`)}
+        />
+      </main>
     );
   }
 

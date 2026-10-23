@@ -242,7 +242,7 @@ export function EspnImportForm({
               className="px-4 py-2 text-sm font-bold"
               style={{
                 background: "var(--color-accent-strong)",
-                color: "var(--color-brand-mark-ink)",
+                color: "var(--color-on-accent)",
                 fontWeight: "var(--font-weight-button)",
                 opacity: !rosterId || status === "saving" ? "var(--opacity-disabled)" : 1,
               }}
@@ -328,7 +328,7 @@ export function EspnImportForm({
         className="px-4 py-2 text-sm font-bold self-start"
         style={{
           background: "var(--color-accent-strong)",
-          color: "var(--color-brand-mark-ink)",
+          color: "var(--color-on-accent)",
           fontWeight: "var(--font-weight-button)",
           opacity: status === "loading" ? "var(--opacity-disabled)" : 1,
         }}

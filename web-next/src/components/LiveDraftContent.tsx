@@ -396,13 +396,16 @@ export function LiveDraftContent({
       </div>
 
       {liveOrPaused.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {discovery.drafts.length === 0
-            ? "No Sleeper drafts were found for this league yet."
-            : hasCompleted
-              ? "The latest Sleeper draft has ended. Live Draft activates again when a draft is in progress or paused."
-              : "No live Sleeper draft is active. This workspace appears only while a draft is in progress or paused."}
-        </p>
+        <EmptyState
+          title="No live draft right now"
+          subtitle={
+            discovery.drafts.length === 0
+              ? "No Sleeper drafts were found for this league yet."
+              : hasCompleted
+                ? "The latest Sleeper draft has ended. Live Draft activates again when a draft is in progress or paused."
+                : "No live Sleeper draft is active. This workspace appears only while a draft is in progress or paused."
+          }
+        />
       ) : (
         <>
           {liveOrPaused.length > 1 ? (

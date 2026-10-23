@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -230,9 +231,12 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
 
   if (data.reason === "no_completed_week" || !data.recap) {
     return (
-      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        No completed week is ready for a recap yet. Open History for the recorded transaction timeline.
-      </p>
+      <EmptyState
+        title="No recap yet"
+        subtitle="No completed week is ready for a recap yet. Open History for the recorded transaction timeline."
+        actionLabel="Open History"
+        onAction={() => onOpenHistory("")}
+      />
     );
   }
 

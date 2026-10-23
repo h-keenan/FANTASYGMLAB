@@ -166,7 +166,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           className="px-4 py-2.5 text-sm font-bold"
           style={{
             background: "var(--color-accent-strong)",
-            color: "var(--color-brand-mark-ink)",
+            color: "var(--color-on-accent)",
             fontWeight: "var(--font-weight-button)",
             borderRadius: "var(--radius-control)",
           }}
@@ -211,7 +211,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             className="px-4 py-2.5 text-sm font-bold"
             style={{
               background: "var(--color-accent-strong)",
-              color: "var(--color-brand-mark-ink)",
+              color: "var(--color-on-accent)",
               fontWeight: "var(--font-weight-button)",
               borderRadius: "var(--radius-control)",
             }}
@@ -311,7 +311,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             className="px-4 py-2.5 text-sm font-bold self-start"
             style={{
               background: "var(--color-accent-strong)",
-              color: "var(--color-brand-mark-ink)",
+              color: "var(--color-on-accent)",
               fontWeight: "var(--font-weight-button)",
               opacity: busy ? "var(--opacity-disabled)" : 1,
               borderRadius: "var(--radius-control)",

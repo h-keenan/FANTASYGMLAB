@@ -13,8 +13,13 @@ describe("shared UI modules", () => {
   it("Button primary uses dark ink on the accent, never white", () => {
     render(<Button>Analyze</Button>);
     const style = screen.getByRole("button", { name: "Analyze" }).style;
-    expect(style.color).toBe("var(--color-brand-mark-ink)");
+    expect(style.color).toBe("var(--color-on-accent)");
     expect(style.background).toBe("var(--color-accent-strong)");
+  });
+
+  it("Button keeps a 44px touch target", () => {
+    render(<Button size="sm">Tap</Button>);
+    expect(screen.getByRole("button", { name: "Tap" }).className).toContain("min-h-[var(--touch-target-min)]");
   });
 
   it("EmptyState renders a next-step button that fires", () => {

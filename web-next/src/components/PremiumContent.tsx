@@ -94,7 +94,7 @@ export function PlanCard({
         className="px-4 py-2 text-sm font-bold self-start"
         style={{
           background: "var(--color-accent-strong)",
-          color: "var(--color-brand-mark-ink)",
+          color: "var(--color-on-accent)",
           fontWeight: "var(--font-weight-button)",
           opacity: busy ? "var(--opacity-disabled)" : 1,
         }}

@@ -128,7 +128,7 @@ function RosterRow({
             type="button"
             aria-label={`Open ${player.name || "player"}`}
             onClick={() => openPlayer(identity)}
-            className="p-1"
+            className="inline-flex items-center justify-center -my-3 min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
             <Chevron />

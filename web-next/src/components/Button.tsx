@@ -27,7 +27,7 @@ export function Button({
     variant === "primary"
       ? {
           background: disabled ? "var(--color-surface-muted)" : "var(--color-accent-strong)",
-          color: disabled ? "var(--color-text-muted)" : "var(--color-brand-mark-ink)",
+          color: disabled ? "var(--color-text-muted)" : "var(--color-on-accent)",
         }
       : variant === "secondary"
         ? {
@@ -39,7 +39,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`${size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} font-bold ${fullWidth ? "w-full" : "self-start"} ${className}`.trim()}
+      className={`${size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} min-h-[var(--touch-target-min)] font-bold ${fullWidth ? "w-full" : "self-start"} ${className}`.trim()}
       style={{
         ...palette,
         fontWeight: "var(--font-weight-button)",
