@@ -888,12 +888,27 @@ export interface IdpValueRow {
   idp_rank: number;
 }
 
+/** A defender projected below this league's replacement level: listed so he
+ * can be picked as a trade asset, with no value (shown as a dash). */
+export interface IdpBelowReplacementRow {
+  player_id: string;
+  name: string;
+  position: string;
+  family: 'DL' | 'LB' | 'DB';
+  team: string | null;
+  age: number | null;
+  injury_status: string | null;
+  value: null;
+}
+
 /** `idp: false` (and no rows) for any league that does not start defenders. */
 export interface LeagueIdpValuesResponse {
   ok: boolean;
   idp: boolean;
   players: IdpValueRow[];
   below_replacement_ids?: string[];
+  /** Only with `includeBelow`. */
+  below_replacement_players?: IdpBelowReplacementRow[];
   unscored_keys?: string[];
   reason?: string;
   method?: string;
@@ -2564,8 +2579,10 @@ export const api = {
     leagueId: string,
     body: { lineup: MatchupWhatIfSlot[]; edit_index?: number | null },
   ) => authorizedPost<MatchupWhatIfResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/matchup/what-if`, body),
-  getLeagueIdpValues: (leagueId: string) =>
-    authorizedFetch<LeagueIdpValuesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/idp/values`),
+  getLeagueIdpValues: (leagueId: string, options: { includeBelow?: boolean } = {}) =>
+    authorizedFetch<LeagueIdpValuesResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/idp/values${options.includeBelow ? '?include_below=true' : ''}`,
+    ),
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

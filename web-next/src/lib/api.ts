@@ -1763,6 +1763,19 @@ export interface IdpValueRow {
   idp_rank: number;
 }
 
+/** A defender projected below this league's replacement level: listed so he
+ * can be picked as a trade asset, with no value (shown as a dash). */
+export interface IdpBelowReplacementRow {
+  player_id: string;
+  name: string;
+  position: string;
+  family: "DL" | "LB" | "DB";
+  team: string | null;
+  age: number | null;
+  injury_status: string | null;
+  value: null;
+}
+
 /** GET .../leagues/{id}/idp/values - `idp: false` (and no rows) for any
  * league that does not start defenders. */
 export interface LeagueIdpValuesResponse {
@@ -1771,6 +1784,8 @@ export interface LeagueIdpValuesResponse {
   players: IdpValueRow[];
   /** Defenders projected but not above this league's replacement level. */
   below_replacement_ids?: string[];
+  /** Only with `includeBelow`. */
+  below_replacement_players?: IdpBelowReplacementRow[];
   unscored_keys?: string[];
   reason?: string;
   method?: string;
@@ -3432,8 +3447,10 @@ export const api = {
   // League-adjusted player rankings — GM Targets (Revision 11) joins this
   // against getGmTargets' bare preference rows for name/position/team/rank/
   // injury, the same client-side join mobile's GmTargetsScreen.tsx does.
-  getLeagueIdpValues: (leagueId: string) =>
-    authorizedRequest<LeagueIdpValuesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/idp/values`),
+  getLeagueIdpValues: (leagueId: string, options: { includeBelow?: boolean } = {}) =>
+    authorizedRequest<LeagueIdpValuesResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/idp/values${options.includeBelow ? "?include_below=true" : ""}`,
+    ),
   getLeagueRankings: (leagueId: string, lens: string = "Dynasty", limit: number = 300) =>
     authorizedRequest<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?lens=${encodeURIComponent(lens)}&limit=${limit}`,

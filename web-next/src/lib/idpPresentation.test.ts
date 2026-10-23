@@ -76,3 +76,28 @@ describe("withIdpPositionOptions", () => {
     expect(withIdpPositionOptions(BASE, [{}])).toEqual([...BASE, "DL", "LB", "DB"]);
   });
 });
+
+import { idpTradePoolPlayers, tradePositionOptions } from "./idpPresentation";
+
+describe("trade pool", () => {
+  const idp = {
+    ok: true,
+    idp: true,
+    players: [row()],
+    below_replacement_players: [
+      { player_id: "x1", name: "Low Corner", position: "CB", family: "DB", team: "NYJ", age: 23, injury_status: null, value: null },
+    ],
+  } as unknown as LeagueIdpValuesResponse;
+
+  it("lists valued defenders at their model value and below-replacement ones with a null score", () => {
+    const pool = idpTradePoolPlayers(idp);
+    expect(pool.map((p) => [p.player_id, p.score])).toEqual([["d1", 2706], ["x1", null]]);
+  });
+
+  it("is empty for non-IDP leagues and adds defense chips only when defenders exist", () => {
+    expect(idpTradePoolPlayers({ ok: true, idp: false, players: [] })).toEqual([]);
+    expect(idpTradePoolPlayers(null)).toEqual([]);
+    expect(tradePositionOptions(BASE, [{ position: "QB" }])).toEqual(BASE);
+    expect(tradePositionOptions(BASE, idpTradePoolPlayers(idp))).toEqual([...BASE, "DL", "LB", "DB"]);
+  });
+});

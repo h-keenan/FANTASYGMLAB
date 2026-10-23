@@ -70,3 +70,20 @@ test('withIdpPositionOptions adds DL/LB/DB only when defenders are present', () 
   assert.deepEqual(withIdpPositionOptions(BASE, undefined), BASE);
   assert.deepEqual(withIdpPositionOptions(BASE, [{}]), [...BASE, 'DL', 'LB', 'DB']);
 });
+
+import { idpTradePoolPlayers, tradePositionOptions } from './idpPresentation.ts';
+
+test('trade pool: below-replacement defenders carry a null score, non-IDP is empty', () => {
+  const idp = {
+    ...IDP,
+    below_replacement_players: [
+      { player_id: 'x1', name: 'Low Corner', position: 'CB', family: 'DB', team: 'NYJ', age: 23, injury_status: null, value: null },
+    ],
+  } as never;
+  const pool = idpTradePoolPlayers(idp);
+  assert.equal(pool[pool.length - 1].player_id, 'x1');
+  assert.equal(pool[pool.length - 1].score, null);
+  assert.deepEqual(idpTradePoolPlayers({ ok: true, idp: false, players: [] } as never), []);
+  assert.deepEqual(tradePositionOptions(BASE, [{ position: 'QB' }]), BASE);
+  assert.deepEqual(tradePositionOptions(BASE, pool), [...BASE, 'DL', 'LB', 'DB']);
+});

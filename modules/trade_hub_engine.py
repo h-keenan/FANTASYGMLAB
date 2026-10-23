@@ -444,6 +444,20 @@ def _keeper_context_for_league(league: Mapping[str, Any], league_id: str, round_
         return None
 
 
+_IDP_FAMILIES = frozenset({"DL", "LB", "DB", "DE", "DT", "NT", "OLB", "ILB", "MLB", "CB", "S", "SS", "FS"})
+
+
+def exclude_idp_rows(players_df: pd.DataFrame) -> pd.DataFrame:
+    """Trade Hub never builds ideas around defenders: their IDP-model values
+    are not part of this engine's trusted pricing. Offense-only frames (every
+    frame today) pass through untouched; silently, with no message."""
+
+    if players_df is None or players_df.empty or "position" not in players_df.columns:
+        return players_df
+    is_idp = players_df["position"].astype(str).str.upper().isin(_IDP_FAMILIES)
+    return players_df[~is_idp] if bool(is_idp.any()) else players_df
+
+
 def generate_trade_idea_records(
     *,
     league_id: str,
@@ -514,6 +528,8 @@ def generate_trade_idea_records(
     load" — this exact recomputation, not a missing cache, was the real
     cost behind Dashboard's ~11s cold load). Omitting it (every existing
     test/caller) falls back to the original fresh computation, unchanged."""
+
+    players_df = exclude_idp_rows(players_df)
 
     # OVR for every asset's PlayerIdentityRow badge (coridian_, Trade Hub
     # card screenshot: the colored tier ring alone doesn't say how good two

@@ -99,6 +99,7 @@ def build_league_idp_values(
     )
     rows: List[Dict[str, Any]] = []
     below: List[str] = []
+    below_rows: List[Dict[str, Any]] = []
     for entry in valued:
         if entry.get("value") is None:
             continue
@@ -110,6 +111,19 @@ def build_league_idp_values(
             # Projected, but not above this league's replacement level: reported
             # by id so clients can say "below replacement" instead of "no value".
             below.append(entry["player_id"])
+            below_rows.append(
+                {
+                    "player_id": entry["player_id"],
+                    "name": info.get("full_name") or " ".join(str(info.get(k) or "") for k in ("first_name", "last_name")).strip(),
+                    "position": info.get("position"),
+                    "family": entry["family"],
+                    "team": info.get("team"),
+                    "age": round(entry["age"], 1) if entry.get("age") is not None else info.get("age"),
+                    "injury_status": info.get("injury_status"),
+                    "value": None,
+                    "confidence": entry.get("confidence"),
+                }
+            )
             continue
         rows.append(
             {
@@ -130,7 +144,8 @@ def build_league_idp_values(
     rows.sort(key=lambda r: (-r["value"], r["name"]))
     for rank, row in enumerate(rows, start=1):
         row["idp_rank"] = rank
-    return {**base, "players": rows, "below_replacement_ids": sorted(below)}
+    below_rows.sort(key=lambda r: (r["name"], r["player_id"]))
+    return {**base, "players": rows, "below_replacement_ids": sorted(below), "below_replacement_players": below_rows}
 
 
 def cached_league_idp_values(league_id: str, league: Mapping[str, Any]) -> Dict[str, Any]:

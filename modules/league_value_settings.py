@@ -262,6 +262,15 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
             if pos not in offense_slots and pos not in regular_flex_positions
         )
         settings["_sources"]["non_offense_starter_count"] = "Sleeper"
+        # Defensive starter slots, only when the league has them (absent
+        # otherwise, so non-IDP settings are byte-identical to before).
+        idp_slots = {
+            name: sum(1 for pos in starter_positions if pos == name)
+            for name in ("DL", "LB", "DB", "IDP_FLEX")
+        }
+        idp_slots = {name: count for name, count in idp_slots.items() if count}
+        if idp_slots:
+            settings["idp_slots"] = idp_slots
         counted_core = (
             int(settings["qb_count"])
             + int(settings["rb_count"])

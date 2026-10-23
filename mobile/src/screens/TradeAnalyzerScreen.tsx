@@ -44,6 +44,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
+import { idpTradePoolPlayers, tradePositionOptions } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
@@ -142,6 +143,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [otherTeams, setOtherTeams] = useState<OtherTeam[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(ALL_TEAMS_ID);
   const [rankings, setRankings] = useState<RankedPlayer[]>([]);
+  const positionOptions = useMemo(() => tradePositionOptions(ALL_POSITION_OPTIONS, rankings), [rankings]);
   const [allPicks, setAllPicks] = useState<DraftPickAsset[]>([]);
   const [sendIds, setSendIds] = useState<RankedPlayer[]>([]);
   const [receiveIds, setReceiveIds] = useState<RankedPlayer[]>([]);
@@ -190,7 +192,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, teamProfilesResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, teamProfilesResult, idpResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens, limit: 300 }),
           api.getLeagueUsers(leagueId),
@@ -202,6 +204,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           // (modules.sleeper.get_league_roster_profiles), unlike reading a
           // raw Sleeper user's `avatar` field directly.
           api.getLeagueTeamProfiles(leagueId).catch(() => ({ ok: true as const, profiles: {} })),
+          // IDP leagues only (`idp: false` otherwise); a failure leaves offense untouched.
+          api.getLeagueIdpValues(leagueId, { includeBelow: true }).catch(() => null),
         ]);
         if (cancelled) return;
 
@@ -237,7 +241,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           .filter((team) => team.rosterId && team.rosterId !== myId);
         setOtherTeams(teams);
 
-        setRankings(rankingsResult.players);
+        setRankings([...rankingsResult.players, ...idpTradePoolPlayers(idpResult)]);
       } catch (err) {
         if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load trade data.'));
       } finally {
@@ -524,7 +528,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         <View style={styles.teamRow}>
           <FilterDropdownButton
             label="Position"
-            options={ALL_POSITION_OPTIONS}
+            options={positionOptions}
             value={positionFilter ?? 'ALL'}
             onChange={(next) => setPositionFilter(next === 'ALL' ? null : next)}
           />
@@ -641,7 +645,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
               tier={item.player.tier}
               overallRating={item.player.overall_rating}
               positionRank={item.player.position_rank}
-              trailingValue={String(Math.round(playerScore(item.player)))}
+              trailingValue={typeof item.player.score === 'number' ? String(Math.round(item.player.score)) : '—'}
               onPress={() => addPlayerToSide(item.player)}
               showDivider={showDivider}
             />
