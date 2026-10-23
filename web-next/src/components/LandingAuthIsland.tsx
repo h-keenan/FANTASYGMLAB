@@ -23,7 +23,10 @@ import { maskSavedLeagueRows } from "@/lib/privacy";
  * marketing copy, not a loading state.
  */
 export function LandingAuthSlotPlaceholder() {
-  return <div aria-busy="true" className="w-full" style={{ minHeight: "15rem" }} />;
+  // 8.25rem = the measured height of the signed-out sign-in card at phone
+  // width (131px). The old 15rem slot collapsed by ~110px when the real form
+  // arrived and shoved the content below it up (landing CLS 0.11, 2026-10 audit).
+  return <div aria-busy="true" className="w-full" style={{ minHeight: "8.25rem" }} />;
 }
 
 /**

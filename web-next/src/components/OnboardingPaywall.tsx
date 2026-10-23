@@ -6,7 +6,12 @@ import { useEffect, useState } from "react";
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel } from "@/lib/trialCopy";
 import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
-import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
+import dynamic from "next/dynamic";
+
+// Stripe.js + react-stripe-js load only when a checkout is actually opened.
+const EmbeddedCheckoutModal = dynamic(() => import("@/components/EmbeddedCheckoutModal").then((m) => m.EmbeddedCheckoutModal), {
+  ssr: false,
+});
 import { Button } from "@/components/Button";
 
 // Zach: "have one product here and call it Get Started For Free with a few
