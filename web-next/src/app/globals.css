@@ -1763,7 +1763,8 @@ a {
    SleeperImportForm, OnboardingPaywall — unmodified) resolves the same
    dark var(--color-*) values those components already reference, with no
    per-component changes needed. */
-.fd-landing-dark {
+.fd-landing-dark,
+[data-onboarding-root] {
   --color-bg: #000000;
   --color-shell: #000000;
   /* Glass surfaces, matching body's own override above — this block
@@ -1921,6 +1922,10 @@ a {
 .onboarding-shell {
   position: fixed;
   inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  isolation: isolate;
+  transform: translateZ(0);
   /* Zach, 2026-10-18 (screenshot): the GM orb's floating trigger button
      (fixed, z-index:40, always rendered app-wide whenever a user is
      signed in — see GmOrb.tsx's `if (!session) return null`) was tying/
@@ -2001,7 +2006,10 @@ a {
   max-width: 28rem;
   margin: 0 auto;
   box-sizing: border-box;
-  padding: var(--space-lg) var(--space-lg) 0;
+  min-height: 0;
+  touch-action: pan-y;
+  padding: max(var(--space-lg), env(safe-area-inset-top)) max(var(--space-lg), env(safe-area-inset-right)) 0
+    max(var(--space-lg), env(safe-area-inset-left));
 }
 /* coridian_, 2026-10-18: "the onboarding like slideshow after you make an
    account needs some scaling work, specifically on mobile, but I'm sure
@@ -2042,9 +2050,47 @@ a {
    rules themselves, which were already correct. */
 .onboarding-footer {
   margin-top: auto;
-  padding: var(--space-lg) 0 var(--space-xl);
+  padding: var(--space-md) 0 max(var(--space-lg), env(safe-area-inset-bottom));
   display: flex;
   gap: var(--space-sm);
+  flex: 0 0 auto;
+}
+.onboarding-footer > * {
+  min-height: 3rem;
+}
+.onboarding-skip {
+  min-height: 2.75rem;
+  padding: 0 var(--space-sm);
+}
+.onboarding-preload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+/* Slide-in: opacity + transform only (no layout), and only on slides with no
+   backdrop-filter children so iOS Safari never flickers the blur. */
+@keyframes onboarding-slide-next {
+  from { opacity: 0; transform: translate3d(24px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes onboarding-slide-back {
+  from { opacity: 0; transform: translate3d(-24px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+.onboarding-slide--next {
+  animation: onboarding-slide-next 0.28s ease-out both;
+}
+.onboarding-slide--back {
+  animation: onboarding-slide-back 0.28s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-slide--next,
+  .onboarding-slide--back {
+    animation: none;
+  }
 }
 .onboarding-back {
   padding: var(--space-md) var(--space-lg);
@@ -2123,7 +2169,9 @@ a {
   text-align: center;
 }
 .onboarding-section {
-  padding-top: var(--space-xl);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -2159,7 +2207,8 @@ a {
   gap: var(--space-sm);
 }
 .onboarding-phone {
-  height: clamp(17rem, 64vh, 36rem);
+  height: clamp(12rem, calc(100vh - 19rem), 36rem);
+  height: clamp(12rem, calc(100dvh - 19rem), 36rem);
   aspect-ratio: 600 / 1298;
   max-width: 100%;
   margin-top: var(--space-sm);
@@ -2480,5 +2529,88 @@ a {
   select,
   textarea {
     font-size: 16px;
+  }
+}
+
+/* Signed-out landing (app/page.tsx): phone-first single column; at >=768px
+   the product strip moves to a right-hand column beside hero + form. */
+.landing-grid {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.landing-hero {
+  text-align: center;
+}
+.landing-showcase {
+  margin: 0 calc(-1 * var(--space-md));
+}
+.landing-showcase-track {
+  display: flex;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0 var(--space-md);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--space-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.landing-showcase-track::-webkit-scrollbar {
+  display: none;
+}
+.landing-shot {
+  flex: 0 0 auto;
+  width: 6.75rem;
+  scroll-snap-align: start;
+  text-align: center;
+}
+.landing-phone {
+  height: auto;
+  width: 100%;
+  margin-top: 0;
+}
+.landing-shot-title {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.landing-shot-benefit {
+  margin: 2px 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: var(--color-text-secondary);
+}
+@media (min-width: 768px) {
+  .landing-grid {
+    max-width: 62rem;
+    display: grid;
+    grid-template-columns: 26rem 1fr;
+    column-gap: 2.5rem;
+    align-content: center;
+  }
+  .landing-hero {
+    text-align: left;
+    grid-column: 1;
+  }
+  .landing-form,
+  .landing-extra {
+    grid-column: 1;
+  }
+  .landing-showcase {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    margin: 0;
+    align-self: center;
+    min-width: 0;
+  }
+  .landing-shot {
+    width: 10rem;
   }
 }

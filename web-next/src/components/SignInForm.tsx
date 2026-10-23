@@ -193,13 +193,13 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (step === "email") {
     return (
-      <div className="glass-surface flex flex-col gap-4 p-6">
-        <form onSubmit={handleEmailContinue} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
+      <div id="get-started" className="glass-surface flex flex-col gap-3 p-4">
+        <form onSubmit={handleEmailContinue} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5">
             <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
               Get started
             </h2>
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            <p className="hidden sm:block text-sm" style={{ color: "var(--color-text-secondary)" }}>
               Enter your email to sign in or create an account.
             </p>
           </div>
@@ -208,7 +208,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             <input
               type="email"
               required
-              autoFocus
+              autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="glass-input px-3 py-2.5"
@@ -231,12 +231,14 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         <div className="flex items-center gap-3">
           <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            or
+            or continue with
           </span>
           <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
         </div>
+        <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
+          aria-label={oauthBusy === "google" ? undefined : "Continue with Google"}
           onClick={() => handleOAuth("google")}
           disabled={oauthBusy !== null}
           className="glass-input px-4 py-2.5 text-sm font-bold"
@@ -246,10 +248,11 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
-          {oauthBusy === "google" ? "Redirecting to Google…" : "Continue with Google"}
+          {oauthBusy === "google" ? "Redirecting to Google…" : "Google"}
         </button>
         <button
           type="button"
+          aria-label={oauthBusy === "apple" ? undefined : "Continue with Apple"}
           onClick={() => handleOAuth("apple")}
           disabled={oauthBusy !== null}
           className="glass-input px-4 py-2.5 text-sm font-bold"
@@ -259,8 +262,9 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
-          {oauthBusy === "apple" ? "Redirecting to Apple…" : "Continue with Apple"}
+          {oauthBusy === "apple" ? "Redirecting to Apple…" : "Apple"}
         </button>
+        </div>
       </div>
     );
   }

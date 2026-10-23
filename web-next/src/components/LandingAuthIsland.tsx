@@ -21,7 +21,7 @@ import { supabase } from "@/lib/supabase";
  * marketing copy, not a loading state.
  */
 export function LandingAuthSlotPlaceholder() {
-  return <div aria-busy="true" className="w-full" style={{ minHeight: "22rem" }} />;
+  return <div aria-busy="true" className="w-full" style={{ minHeight: "15rem" }} />;
 }
 
 /**

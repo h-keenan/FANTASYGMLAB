@@ -25,15 +25,15 @@ import { APP_STORE_LINKS, type AppStoreLinks } from "@/lib/appStoreLinks";
  */
 export function AppStoreModules({ links = APP_STORE_LINKS }: { links?: AppStoreLinks }) {
   return (
-    <section aria-labelledby="app-store-modules-heading" className="w-full max-w-sm flex flex-col gap-3">
+    <section aria-labelledby="app-store-modules-heading" className="w-full flex flex-col gap-2">
       <h2
         id="app-store-modules-heading"
-        className="text-xs font-bold uppercase text-center"
+        className="text-xs font-bold uppercase"
         style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
       >
         Mobile apps
       </h2>
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-2 gap-2">
         <li>
           <StoreSlot
             storeName="App Store"
@@ -104,7 +104,7 @@ function StoreSlot({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={liveCallToAction}
-        className="onboarding-glass flex items-center gap-3 px-4 py-3 h-full"
+        className="onboarding-glass flex items-center gap-2 px-3 py-2 h-full"
       >
         {body}
       </a>
@@ -113,7 +113,7 @@ function StoreSlot({
 
   return (
     <div
-      className="onboarding-glass flex items-center gap-3 px-4 py-3 h-full"
+      className="onboarding-glass flex items-center gap-2 px-3 py-2 h-full"
       aria-label={`${storeName} app for ${platform}: coming soon`}
       role="group"
     >
