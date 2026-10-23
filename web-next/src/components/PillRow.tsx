@@ -1,73 +1,67 @@
+import Link from "next/link";
+
 /**
- * Small pill-style segmented control for a scope/filter toggle (e.g.
- * League Recaps/History's filter pills, Draft Center's My Picks/League
- * toggle). Extracted from LeagueRecapsContent's local `PillRow` (Revision
- * 13) so Revision 14's Draft Center doesn't redefine the same four style
- * rules a second time — visual output is unchanged from the original.
- *
- * `fullWidth` is the stretched, equal-width tab-bar form (same colors and
- * active underline) that LeagueRecapsContent used to define as its own
- * local `TabBar` for Recaps/History/Storylines; it keeps that bar's exact
- * spacing. Its wider badge letter-spacing vs. the compact form's 0.03em is
- * a known drift — see docs/ui-module-inventory.md B15.
+ * The one segmented control / tab bar. Compact (wrapping) by default;
+ * `fullWidth` stretches equal-width tabs. Options with an `href` render as
+ * links (role="tab") so route tabs (Trades) use the same control. Tight
+ * tracking, 44px targets.
  */
 export function PillRow({
   options,
   active,
   onSelect,
   fullWidth = false,
+  ariaLabel,
 }: {
-  options: { label: string; value: string }[];
+  options: { label: string; value: string; href?: string }[];
   active: string;
-  onSelect: (value: string) => void;
+  onSelect?: (value: string) => void;
   fullWidth?: boolean;
+  ariaLabel?: string;
 }) {
-  if (fullWidth) {
-    return (
-      <div className="flex w-full" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
-        {options.map((option, index) => {
-          const isActive = option.value === active;
+  const routed = options.some((option) => option.href);
+  return (
+    <div
+      role={routed ? "tablist" : undefined}
+      aria-label={routed ? ariaLabel : undefined}
+      className={fullWidth ? "flex w-full" : "flex flex-wrap gap-0"}
+      style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+    >
+      {options.map((option, index) => {
+        const isActive = option.value === active;
+        const className = fullWidth
+          ? "flex-1 min-w-0 px-1 min-h-[var(--touch-target-min)] py-3 text-center text-[0.6875rem] sm:text-xs font-bold uppercase"
+          : "px-3 min-h-[var(--touch-target-min)] py-3 text-xs font-bold uppercase";
+        const style = {
+          letterSpacing: "var(--letter-spacing-tight)",
+          background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
+          color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+          boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
+          border: "var(--border-width-default) solid var(--color-border)",
+          marginLeft: fullWidth && index === 0 ? 0 : "-1px",
+        } as const;
+        if (option.href) {
           return (
-            <button
+            <Link
               key={option.value}
-              type="button"
-              onClick={() => onSelect(option.value)}
-              aria-pressed={isActive}
-              className="flex-1 min-w-0 px-1 min-h-[var(--touch-target-min)] py-3 text-[0.6875rem] sm:text-xs font-bold uppercase"
-              style={{
-                letterSpacing: "0.03em",
-                background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
-                color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
-                borderLeft: index === 0 ? "none" : "var(--border-width-default) solid var(--color-border)",
-              }}
+              href={option.href}
+              role="tab"
+              aria-selected={isActive}
+              className={`${className} flex items-center justify-center`}
+              style={style}
             >
               {option.label}
-            </button>
+            </Link>
           );
-        })}
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-wrap gap-0" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
-      {options.map((option) => {
-        const isActive = option.value === active;
+        }
         return (
           <button
             key={option.value}
             type="button"
-            onClick={() => onSelect(option.value)}
+            onClick={() => onSelect?.(option.value)}
             aria-pressed={isActive}
-            className="px-3 min-h-[var(--touch-target-min)] py-3 text-xs font-bold uppercase"
-            style={{
-              letterSpacing: "0.03em",
-              background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
-              color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
-              border: "var(--border-width-default) solid var(--color-border)",
-              marginLeft: "-1px",
-            }}
+            className={className}
+            style={style}
           >
             {option.label}
           </button>

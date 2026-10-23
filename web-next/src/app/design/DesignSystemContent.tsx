@@ -12,7 +12,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PickRow } from "@/components/PickRow";
+import { PickPlate, PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PqvBodySkeleton, StatGroup, SubRatingRow } from "@/components/PlayerQuickView";
@@ -25,7 +25,7 @@ import { SnapshotTile } from "@/components/SnapshotTile";
 import { StatStrip } from "@/components/StatStrip";
 import { ToneBadge } from "@/components/ToneBadge";
 import { AccentCard } from "@/components/AccentCard";
-import { ExchangeSide, PickPlate, TradeAssetRow } from "@/components/TradeAssetExchange";
+import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { TradeHubSkeleton } from "@/components/TradeHubFilters";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ValueRing } from "@/components/ValueRing";
@@ -148,7 +148,7 @@ const RADII: [string, string][] = [
   ["--radius-control 14", "var(--radius-control)"],
   ["--radius-panel 20", "var(--radius-panel)"],
   ["--radius-pill", "var(--radius-pill)"],
-  ["--radius-none 0 (PillRow, TradesTabBar, PickPlate)", "var(--radius-none)"],
+  ["--radius-none 0 (PillRow, PickPlate)", "var(--radius-none)"],
 ];
 const SPACING: [string, string][] = [
   ["2xs", "var(--space-2xs)"],
@@ -573,18 +573,14 @@ export function DesignSystemContent() {
             <ToneBadge label="Waiver" color="var(--color-action)" />
           </div>
         </Spec>
-        <Spec
-          name="PillRow / TradesTabBar"
-          path="components/PillRow.tsx | components/TradesTabBar.tsx"
-          duplicate="Three square-cornered segmented tab bars with the same colors/underline: PillRow compact, PillRow fullWidth, TradesTabBar (own copy of the styles). Mobile equivalent is SegmentedTabBar (pill track, different look)."
-        >
+        <Spec name="PillRow (tab bar / segmented control)" path="components/PillRow.tsx" note="The only tab bar. Compact or fullWidth; options with href render as route tabs (TradesTabBar wraps it).">
           <Variant label="PillRow (compact)">
             <PillRow options={pillOptions} active={pill} onSelect={setPill} />
           </Variant>
           <Variant label="PillRow (fullWidth)">
             <PillRow options={pillOptions} active={pillFull} onSelect={setPillFull} fullWidth />
           </Variant>
-          <Variant label="TradesTabBar">
+          <Variant label="TradesTabBar (route tabs)">
             <TradesTabBar leagueId="sample" leagueName="Sample League" active="trade_hub" />
           </Variant>
         </Spec>
@@ -637,14 +633,10 @@ export function DesignSystemContent() {
             </PlayerIdentity>
           </Variant>
         </Spec>
-        <Spec
-          name="PickRow vs TradeAssetRow (pick)"
-          path="components/PickRow.tsx | components/TradeAssetExchange.tsx (PickPlate, TradeAssetRow)"
-          duplicate="Both render a pick: PickRow (padded, ValueStat + confidence) and TradeAssetRow's pick branch (no value). Mobile has a third (DraftPickAssetRow) plus LiveDraft PickRowView on web."
-        >
+        <Spec name="PickRow" path="components/PickRow.tsx" note="The one pick row (square PickPlate). Value column only where the data has one; TradeAssetRow renders picks through it.">
           <Variant label="PickRow">
             <div className="glass-surface">
-              <PickRow pick={DRAFT_PICK} showOwner showDivider={false} />
+              <PickRow {...draftPickRowProps(DRAFT_PICK, true)} />
             </div>
           </Variant>
           <Variant label="TradeAssetRow (pick asset)">
@@ -900,7 +892,7 @@ export function DesignSystemContent() {
             <option value="b">Option B</option>
           </select>
         </Spec>
-        <Spec name="Segmented control" path="web-next/src/components/PillRow.tsx" note="The only segmented control; see Badges & chips for the duplicate tab bars.">
+        <Spec name="Segmented control" path="web-next/src/components/PillRow.tsx" note="PillRow is the only segmented control.">
           <PillRow options={pillOptions} active={segment} onSelect={setSegment} />
         </Spec>
         <Spec
