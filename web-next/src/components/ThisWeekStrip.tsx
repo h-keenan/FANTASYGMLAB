@@ -1,4 +1,6 @@
 
+import Link from "next/link";
+
 import type { ThisWeek } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -39,23 +41,60 @@ export function ThisWeekStrip({
           <ThisWeekCta label={nextAction.cta_label} href={thisWeekHref(nextAction.route, leagueId, leagueName)} />
         </AccentCard>
       ) : (
-        data.rows.map((row) => (
-          <AccentCard key={row.key} accent={thisWeekToneColor(row.tone)} compact>
-            <div className="flex items-center gap-2">
-              <ToneBadge label={row.status} color={thisWeekToneColor(row.tone)} />
-              <h3 className="text-sm font-bold">{row.headline}</h3>
-            </div>
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {row.why}
-            </p>
-            {row.cta_label && row.route ? (
-              <ThisWeekCta label={row.cta_label} href={thisWeekHref(row.route, leagueId, leagueName, row.player_id)} />
-            ) : null}
-          </AccentCard>
-        ))
+        <AccentCard accent="var(--color-accent)" compact>
+          <ul className="flex flex-col" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {data.rows.map((row, index) => {
+              const color = thisWeekToneColor(row.tone);
+              const body = (
+                <>
+                  <ToneBadge label={row.status} color={color} />
+                  <span className="min-w-0 flex-1 flex flex-col">
+                    <span className="text-sm font-bold truncate">{row.headline}</span>
+                    <span
+                      className="text-xs"
+                      style={{
+                        color: "var(--color-text-secondary)",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {row.why}
+                    </span>
+                  </span>
+                  {row.cta_label && row.route ? (
+                    <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+                      →
+                    </span>
+                  ) : null}
+                </>
+              );
+              const rowStyle = index > 0 ? { borderTop: "1px solid var(--color-border)" } : undefined;
+              return (
+                <li key={row.key} style={rowStyle}>
+                  {row.cta_label && row.route ? (
+                    <Link
+                      href={thisWeekHref(row.route, leagueId, leagueName, row.player_id)}
+                      aria-label={row.cta_label}
+                      className="flex items-center gap-2 py-2.5"
+                      style={{ minHeight: 44, color: "inherit", textDecoration: "none" }}
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-2 py-2.5" style={{ minHeight: 44 }}>
+                      {body}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </AccentCard>
       )}
       {tradePending && !nextAction && !data.rows.some((row) => row.key === "trade") ? (
-        <div className="pqv-skeleton-chart w-full" style={{ height: 84 }} aria-hidden="true" data-fgl-this-week-trade-pending="true" />
+        <div className="pqv-skeleton-chart w-full" style={{ height: 64 }} aria-hidden="true" data-fgl-this-week-trade-pending="true" />
       ) : null}
     </section>
   );
