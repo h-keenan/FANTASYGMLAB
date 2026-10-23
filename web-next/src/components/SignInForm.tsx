@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
@@ -90,6 +90,25 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     // On success the browser navigates away to the provider; nothing left
     // to do here.
   };
+
+  // Cancelling at Apple/Google (or pressing Back) returns here from the
+  // browser's back/forward cache with oauthBusy still set, which left both
+  // buttons disabled and grayed out. Clear it whenever the page comes back.
+  useEffect(() => {
+    const reset = () => setOauthBusy(null);
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reset();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reset();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   const handleEmailContinue = (event: React.FormEvent) => {
     event.preventDefault();

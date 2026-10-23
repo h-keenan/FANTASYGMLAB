@@ -83,6 +83,22 @@ describe("SignInForm", () => {
     await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("apple"));
   });
 
+  it("re-enables the buttons when the user comes back from Apple without finishing", async () => {
+    signInWithOAuth.mockResolvedValue({ error: null });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Redirecting to Apple/ })).toBeDisabled());
+
+    // Browser back/forward cache restore after cancelling at Apple.
+    const event = new Event("pageshow") as PageTransitionEvent;
+    Object.defineProperty(event, "persisted", { value: true });
+    window.dispatchEvent(event);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue with Apple" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
+  });
+
   it("shows the OAuth error inline instead of silently failing", async () => {
     signInWithOAuth.mockResolvedValue({ error: "Provider not configured" });
     render(<SignInForm onSignedIn={vi.fn()} />);
