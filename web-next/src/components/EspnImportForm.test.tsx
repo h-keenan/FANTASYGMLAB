@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SleeperImportForm } from "./SleeperImportForm";
 import { useAuth } from "@/context/AuthContext";
+import { trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
 
 vi.mock("@/context/AuthContext", () => ({
@@ -11,6 +12,7 @@ vi.mock("@/context/AuthContext", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
+  trackUse: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -122,5 +124,35 @@ describe("ESPN import in the Connect League flow", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/private/i));
     expect(api.saveLeague).not.toHaveBeenCalled();
+  });
+
+  it("shows the friendly ESPN setting hint, a Retry button and emits espn_private", async () => {
+    vi.mocked(trackUse).mockClear();
+    vi.mocked(api.previewEspnLeague).mockResolvedValue({ ok: false, reason: "private_league", message: "x" });
+    openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "99887766" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Make League Viewable to Public/));
+    expect(trackUse).toHaveBeenCalledWith("league_import", "failed", { props: { result: "espn_private" } });
+    expect(JSON.stringify(vi.mocked(trackUse).mock.calls)).not.toContain("99887766");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.previewEspnLeague).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not show the private hint or Retry for a wrong id or an outage", async () => {
+    vi.mocked(trackUse).mockClear();
+    vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "league_not_found", message: "Not found." });
+    openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Not found."));
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(trackUse).toHaveBeenLastCalledWith("league_import", "failed", { props: { result: "espn_not_found" } });
+
+    vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "espn_unavailable", message: "Down." });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => expect(trackUse).toHaveBeenLastCalledWith("league_import", "failed", { props: { result: "espn_error" } }));
   });
 });

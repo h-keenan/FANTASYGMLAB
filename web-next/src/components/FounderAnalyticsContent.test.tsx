@@ -118,4 +118,19 @@ describe("FounderAnalyticsContent", () => {
 
     expect(screen.getByText("No analytics file on this host yet.")).toBeInTheDocument();
   });
+
+  it("shows ESPN import outcomes only when failures were recorded", () => {
+    const { rerender } = render(<FounderAnalyticsContent data={report()} windowKey="7d" onWindowChange={vi.fn()} />);
+    expect(screen.queryByTestId("espn-import-outcomes")).toBeNull();
+    rerender(
+      <FounderAnalyticsContent
+        data={report({
+          espn_import_outcomes: { espn_private: 3, espn_not_found: 1, espn_error: 0, total_failed: 4, private_pct: 75 },
+        })}
+        windowKey="7d"
+        onWindowChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("espn-import-outcomes")).toHaveTextContent("private 3 (75%)");
+  });
 });

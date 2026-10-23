@@ -69,3 +69,14 @@ export function espnSeasonOptions(now: Date = new Date()): number[] {
   const year = now.getFullYear();
   return [year, year - 1, year - 2];
 }
+
+/** ESPN setting a league manager changes to make a private league readable. */
+export const ESPN_PRIVATE_LEAGUE_HINT =
+  "This league is private. Ask your league manager to turn on League Settings > Make League Viewable to Public in ESPN, then retry.";
+
+/** Privacy-safe analytics `result` for a failed ESPN import preview. */
+export function espnImportFailureResult(reason: string | null | undefined): "espn_private" | "espn_not_found" | "espn_error" {
+  if (reason === "private_league") return "espn_private";
+  if (reason === "league_not_found") return "espn_not_found";
+  return "espn_error";
+}

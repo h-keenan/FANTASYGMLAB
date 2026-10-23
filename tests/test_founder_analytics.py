@@ -153,3 +153,19 @@ def test_onboarding_funnel_aggregation():
 def test_onboarding_props_pass_allowlist():
     clean = la._safe_props({"step": "gameplan", "step_index": 0, "experience": "new", "email": "x@y.z"})
     assert clean == {"step": "gameplan", "step_index": 0, "experience": "new"}
+
+
+def _espn_row(result, feature="league_import", action="failed"):
+    return {"event": "feature_use", "props": {"feature": feature, "action": action, "result": result}}
+
+
+def test_espn_import_outcomes_none_without_data():
+    assert founder_analytics._espn_import_outcomes([]) is None
+    assert founder_analytics._espn_import_outcomes([_espn_row("espn_private", action="completed")]) is None
+    assert founder_analytics._espn_import_outcomes([_espn_row("bogus")]) is None
+
+
+def test_espn_import_outcomes_counts():
+    rows = [_espn_row("espn_private"), _espn_row("espn_private"), _espn_row("espn_not_found"), _espn_row("espn_error")]
+    out = founder_analytics._espn_import_outcomes(rows)
+    assert out == {"espn_private": 2, "espn_not_found": 1, "espn_error": 1, "total_failed": 4, "private_pct": 50.0}

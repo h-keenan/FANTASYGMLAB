@@ -2175,6 +2175,14 @@ export interface FounderOnboardingFunnel {
   experience: Record<string, { users: number; pct: number }>;
 }
 
+export interface FounderEspnImportOutcomes {
+  espn_private: number;
+  espn_not_found: number;
+  espn_error: number;
+  total_failed: number;
+  private_pct: number;
+}
+
 export interface FounderAnalyticsReport {
   window_key: string;
   window_label: string;
@@ -2193,6 +2201,8 @@ export interface FounderAnalyticsReport {
   feature_use?: FounderAnalyticsFeatureUse[];
   /** Onboarding funnel from stored events; null/absent when none stored. */
   onboarding_funnel?: FounderOnboardingFunnel | null;
+  /** Failed ESPN import attempts by result; null/absent when none stored. */
+  espn_import_outcomes?: FounderEspnImportOutcomes | null;
   errors: Record<string, number>;
   error_sessions: number;
   performance: Record<string, FounderAnalyticsLatencyStat>;
