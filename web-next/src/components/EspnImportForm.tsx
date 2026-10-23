@@ -3,9 +3,9 @@
 import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { trackFeatureUse } from "@/lib/analytics";
+import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
-import { espnSeasonOptions } from "@/lib/leaguePlatform";
+import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
 
 const SAVE_FAILURE_COPY: Record<string, string> = {
   at_cap: "Your plan's saved-league limit is reached. Upgrade to Premium to add another league.",
@@ -34,9 +34,10 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<EspnLeaguePreviewResponse | null>(null);
   const [rosterId, setRosterId] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     const clean = leagueId.trim();
     if (!/^\d{1,12}$/.test(clean)) {
       setMessage("Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.");
@@ -44,6 +45,7 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
     }
     setStatus("loading");
     setMessage(null);
+    setIsPrivate(false);
     setPreview(null);
     setRosterId("");
     trackFeatureUse("league_import_started", { props: { platform: "espn" } });
@@ -59,7 +61,9 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       const result = await api.previewEspnLeague(clean, season);
       setStatus("idle");
       if (!result.league) {
-        setMessage(result.message || "That ESPN league couldn't be loaded.");
+        setIsPrivate(result.reason === "private_league");
+        setMessage(result.reason === "private_league" ? ESPN_PRIVATE_LEAGUE_HINT : result.message || "That ESPN league couldn't be loaded.");
+        trackUse("league_import", "failed", { props: { result: espnImportFailureResult(result.reason) } });
         trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: result.reason || "unavailable" } });
         return;
       }
@@ -71,6 +75,7 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
     } catch (error) {
       setStatus("idle");
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      trackUse("league_import", "failed", { props: { result: "espn_error" } });
       trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: "exception" } });
     }
   };
@@ -245,6 +250,17 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
         <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>
           {message}
         </p>
+      ) : null}
+      {isPrivate ? (
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={status === "loading"}
+          className="text-xs font-bold self-start"
+          style={{ color: "var(--color-accent)" }}
+        >
+          Retry
+        </button>
       ) : null}
       <button
         type="submit"
