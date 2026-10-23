@@ -229,7 +229,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
         <div className="flex items-center gap-3">
           <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             or continue with
           </span>
           <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
@@ -240,7 +240,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           aria-label={oauthBusy === "google" ? undefined : "Continue with Google"}
           onClick={() => handleOAuth("google")}
           disabled={oauthBusy !== null}
-          className="glass-input px-4 py-2.5 text-sm font-bold"
+          className="glass-input px-4 py-2.5 text-sm font-bold min-h-[var(--touch-target-min)]"
           style={{
             color: "var(--color-text-primary)",
             borderRadius: "var(--radius-control)",
@@ -254,7 +254,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           aria-label={oauthBusy === "apple" ? undefined : "Continue with Apple"}
           onClick={() => handleOAuth("apple")}
           disabled={oauthBusy !== null}
-          className="glass-input px-4 py-2.5 text-sm font-bold"
+          className="glass-input px-4 py-2.5 text-sm font-bold min-h-[var(--touch-target-min)]"
           style={{
             color: "var(--color-text-primary)",
             borderRadius: "var(--radius-control)",
@@ -276,8 +276,8 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           setStep("email");
           setError(null);
         }}
-        className="self-start text-xs"
-        style={{ color: "var(--color-text-muted)" }}
+        className="self-start text-xs inline-flex items-center min-h-[var(--touch-target-min)] max-w-full truncate"
+        style={{ color: "var(--color-text-secondary)" }}
       >
         ← {email}
       </button>

@@ -284,8 +284,8 @@ const ICON_BUTTON_STYLE = {
   color: "var(--color-text-secondary)",
   border: "var(--border-width-default) solid var(--color-border)",
   borderRadius: "var(--radius-control)",
-  width: "2.5rem",
-  height: "2.5rem",
+  width: "var(--touch-target-min)",
+  height: "var(--touch-target-min)",
 } as const;
 
 /**
