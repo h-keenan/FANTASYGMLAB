@@ -1,10 +1,10 @@
-import Link from "next/link";
 
 import type { ThisWeek } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { thisWeekHref, thisWeekToneColor } from "@/lib/thisWeek";
+import { ButtonLink } from "@/components/Button";
 
 /**
  * The Dashboard's "This week" strip: up to three moves (lineup, waivers,
@@ -65,17 +65,12 @@ export function ThisWeekStrip({
  * <button>, and a button inside a link is invalid), same tokens and sizing. */
 function ThisWeekCta({ label, href }: { label: string; href: string }) {
   return (
-    <Link
+    <ButtonLink
       href={href}
-      className="self-start px-3 py-1.5 text-xs mt-1"
-      style={{
-        background: "var(--color-accent-strong)",
-        color: "var(--color-on-accent)",
-        fontWeight: "var(--font-weight-button)",
-        borderRadius: "var(--radius-control)",
-      }}
+      size="sm"
+      className="mt-1"
     >
       {label}
-    </Link>
+    </ButtonLink>
   );
 }

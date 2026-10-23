@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
@@ -8,6 +7,7 @@ import { ReferralCard } from "@/components/ReferralCard";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
 import { trialEndLabel } from "@/lib/trialCopy";
+import { ButtonLink } from "@/components/Button";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same four categories, same copy — so a user who's seen this in the app
@@ -101,13 +101,11 @@ function BillingSection({
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             You&apos;re on the Free plan.
           </p>
-          <Link
+          <ButtonLink
             href="/premium"
-            className="px-4 py-2 text-sm font-bold self-start"
-            style={{ background: "var(--color-accent-strong)", color: "var(--color-on-accent)", fontWeight: "var(--font-weight-button)" }}
           >
             Upgrade to Premium
-          </Link>
+          </ButtonLink>
         </>
       )}
     </section>

@@ -5,6 +5,8 @@ import { AlertsContent } from "./AlertsContent";
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -128,5 +130,7 @@ describe("AlertsContent", () => {
     );
 
     expect(screen.getByText(/Alerts needs to know which players are yours/)).toBeInTheDocument();
+    expect(screen.getByTestId("empty-state")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect a league" })).toBeInTheDocument();
   });
 });

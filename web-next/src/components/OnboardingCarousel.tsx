@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/Button";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { PLAIN_COPY, type ExperienceLevel } from "@/lib/experienceCopy";
@@ -208,18 +209,18 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
               Back
             </button>
           ) : null}
-          <button
-            type="button"
+          <Button
             onClick={next}
             disabled={(step === levelStep && !level) || saving}
-            className="onboarding-next"
+            className="flex-1"
+            style={{ alignSelf: "auto" }}
           >
             {step === levelStep
               ? saving
                 ? `Setting up ${BRAND_NAME}…`
                 : "Continue"
               : "Next"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

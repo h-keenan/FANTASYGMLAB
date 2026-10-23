@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { importedPlatformLabel, notAvailableMessage } from "@/lib/leaguePlatform";
+import { ButtonLink } from "@/components/Button";
 
 /**
  * Shown in place of a league page an ESPN league can't feed yet (see
@@ -31,18 +31,13 @@ export function EspnUnavailableState({ leagueId }: { leagueId: string }) {
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {links.map((link) => (
-            <Link
+            <ButtonLink
               key={link.label}
               href={link.href}
-              className="px-3 py-2 text-sm font-bold"
-              style={{
-                background: "var(--color-accent-strong)",
-                color: "var(--color-on-accent)",
-                fontWeight: "var(--font-weight-button)",
-              }}
-            >
+        style={{ alignSelf: "auto" }}
+      >
               {link.label}
-            </Link>
+            </ButtonLink>
           ))}
         </div>
       </div>

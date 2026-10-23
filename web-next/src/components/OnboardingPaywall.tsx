@@ -7,6 +7,7 @@ import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel } from "@/lib/trialCopy";
 import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
+import { Button } from "@/components/Button";
 
 // Zach: "have one product here and call it Get Started For Free with a few
 // bullets" (first pass: one CTA, the annual plan, with a handful of its
@@ -43,20 +44,14 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
           {error}
         </p>
       ) : null}
-      <button
+      <Button
         type="button"
         onClick={subscribe}
         disabled={busy}
-        className="px-4 py-2.5 text-sm font-bold"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-          opacity: busy ? "var(--opacity-disabled)" : 1,
-        }}
+        style={{ alignSelf: "auto" }}
       >
         {busy ? "Starting…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
-      </button>
+      </Button>
       <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
         {trialDays > 0 ? thenPriceLine(plan) : `${plan.price} ${plan.cadence}. Cancel anytime.`}
       </p>

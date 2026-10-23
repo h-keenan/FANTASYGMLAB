@@ -9,6 +9,7 @@ import { api, type BillingPlan, type BillingTrial } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel, trialEndLabel } from "@/lib/trialCopy";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
 import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
+import { Button } from "@/components/Button";
 
 const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   pro: "Pro",
@@ -87,20 +88,13 @@ export function PlanCard({
           {error}
         </p>
       ) : null}
-      <button
+      <Button
         type="button"
         onClick={subscribe}
         disabled={busy}
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-          opacity: busy ? "var(--opacity-disabled)" : 1,
-        }}
       >
         {busy ? "Starting checkout…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
-      </button>
+      </Button>
       {trialDays > 0 ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {thenPriceLine(plan)}
