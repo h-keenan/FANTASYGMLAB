@@ -699,7 +699,7 @@ function FreeAgentRow({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+  container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
   notice: {
     fontSize: 13,
     color: colors.textSecondary,

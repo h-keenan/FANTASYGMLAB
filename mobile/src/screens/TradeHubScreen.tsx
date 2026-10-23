@@ -692,7 +692,7 @@ function createStyles(colors: ThemeColors) {
   },
   gateSecondaryButtonText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   gatePrimaryButton: { flex: 1 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },

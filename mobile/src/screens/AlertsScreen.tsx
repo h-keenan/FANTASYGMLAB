@@ -413,7 +413,7 @@ function createRowStyles(colors: ThemeColors) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
     center: {
       flex: 1,
       alignItems: 'center',

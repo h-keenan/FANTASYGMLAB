@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
+import AppBackground from '../components/AppBackground';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -188,8 +189,9 @@ export default function RootNavigator() {
     colors: {
       ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
       primary: colors.accent,
-      background: colors.background,
-      card: colors.background,
+      // Transparent so the root AppBackground shows through every screen.
+      background: 'transparent',
+      card: 'transparent',
       text: colors.textPrimary,
       border: colors.hairline,
       notification: colors.danger,
@@ -215,6 +217,9 @@ export default function RootNavigator() {
   const hideFloatingChrome = currentRouteName === 'Onboarding' || showOnboardingFirst;
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    {/* The single shared animated page background, behind every screen. */}
+    <AppBackground />
     <NavigationContainer
       ref={navigationRef}
       theme={navigationTheme}
@@ -249,7 +254,11 @@ export default function RootNavigator() {
             headerTintColor: colors.textPrimary,
             headerShadowVisible: false,
             headerTitleAlign: 'center',
-            contentStyle: { backgroundColor: colors.background },
+            // Transparent: the shared animated AppBackground sits behind the
+            // whole navigator. 'fade' because a sliding transparent screen
+            // would show the previous screen through itself mid-transition.
+            contentStyle: { backgroundColor: 'transparent' },
+            animation: 'fade',
           }}
         >
           <AppStack.Screen
@@ -313,12 +322,12 @@ export default function RootNavigator() {
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}
-            options={{ presentation: 'modal', title: 'Premium' }}
+            options={{ presentation: 'modal', title: 'Premium', animation: 'default', contentStyle: { backgroundColor: colors.background } }}
           />
           <AppStack.Screen
             name="TrialLapsed"
             component={TrialLapsedScreen}
-            options={{ presentation: 'modal', headerShown: false }}
+            options={{ presentation: 'modal', headerShown: false, animation: 'default', contentStyle: { backgroundColor: colors.background } }}
           />
         </AppStack.Navigator>
         {hideFloatingChrome ? null : <GmOrb />}
@@ -327,10 +336,11 @@ export default function RootNavigator() {
         {hideFloatingChrome ? null : <GuessThePlayerNameMatchPrompt />}
         </View>
       ) : (
-        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+        <AuthStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
           <AuthStack.Screen name="Login" component={LoginScreen} />
         </AuthStack.Navigator>
       )}
     </NavigationContainer>
+    </View>
   );
 }

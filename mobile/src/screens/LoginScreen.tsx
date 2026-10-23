@@ -292,7 +292,7 @@ export default function LoginScreen() {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,

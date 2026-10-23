@@ -59,7 +59,7 @@ export default function TrialLapsedScreen({ navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     content: { flex: 1, paddingHorizontal: spacing.lg, justifyContent: 'space-between' },
     closeButton: { alignSelf: 'flex-end', paddingVertical: spacing.sm },
     closeButtonText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },

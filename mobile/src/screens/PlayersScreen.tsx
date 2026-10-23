@@ -437,7 +437,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+  container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
   discoveryCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
