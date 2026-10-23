@@ -67,7 +67,7 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: spacing.sm - 2,
+      minHeight: 44,
       borderRadius: radii.pill,
     },
     segmentActive: {
@@ -75,7 +75,7 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.accent,
     },
-    label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+    label: { fontSize: 12, fontWeight: '600', letterSpacing: -0.2, color: colors.textSecondary },
     // accentOnTint, not accent: this label sits directly on `segmentActive`'s
     // accentMuted fill, where light mode's plain accent falls under AA
     // contrast (color-system audit, 2026-09-25 — see theme.ts).

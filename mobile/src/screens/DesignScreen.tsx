@@ -214,7 +214,6 @@ export default function DesignScreen() {
             styles={styles}
             name="SegmentedTabBar"
             path="mobile/src/components/SegmentedTabBar.tsx"
-            duplicate="Web has three tab-bar implementations (PillRow x2, TradesTabBar); mobile has SegmentedTabBar plus ViewModeToggle, FilterDropdownButton and LeagueTypeControl."
           >
             <SegmentedTabBar<'a' | 'b' | 'c'>
               options={[
@@ -261,7 +260,6 @@ export default function DesignScreen() {
             styles={styles}
             name="DraftPickAssetRow / PickPlate"
             path="components/DraftPickAssetRow.tsx | components/PickPlate.tsx"
-            duplicate="Dashboard TradeAssetRow and Trade Finder/Hub ExchangeAssetList render picks themselves instead of DraftPickAssetRow."
           >
             <DraftPickAssetRow round={1} pickNo={3} label="2027 1st" projectedRange="Early 1st" trailingValue="5,200" trailingCaption="Value" showDivider />
             <View style={styles.row}>

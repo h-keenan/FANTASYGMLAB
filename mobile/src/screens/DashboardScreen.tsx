@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import PickPlate from '../components/PickPlate';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -736,10 +736,12 @@ export function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.asset_type === 'pick') {
     return (
-      <View style={styles.assetRow}>
-        <PickPlate round={asset.round ? Number(asset.round) : null} pickNo={asset.pick_no ? Number(asset.pick_no) : null} />
-        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
-      </View>
+      <DraftPickAssetRow
+        round={asset.round ? Number(asset.round) : null}
+        pickNo={asset.pick_no ? Number(asset.pick_no) : null}
+        label={asset.label}
+        projectedRange={asset.projected_range}
+      />
     );
   }
   return (
@@ -1329,8 +1331,6 @@ function createStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  assetName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

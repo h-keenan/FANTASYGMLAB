@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValueStat } from "@/components/ValueStat";
-import { PickPlate } from "@/components/TradeAssetExchange";
+import { PickPlate, PickRow } from "@/components/PickRow";
 
 describe("shared UI modules", () => {
   it("Button primary uses dark ink on the accent, never white", () => {
@@ -55,5 +55,15 @@ describe("shared UI modules", () => {
     render(<PickPlate round={1} pickNo={3} />);
     expect(screen.getByText("R1")).toBeInTheDocument();
     expect(screen.getByText("#3")).toBeInTheDocument();
+  });
+
+  it("PickRow shows the round alone when no pick number, and a value only when given", () => {
+    const { rerender } = render(<PickRow round={2} label="2027 Round 2" />);
+    expect(screen.getByText("R2")).toBeInTheDocument();
+    expect(screen.queryByText("#2")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    rerender(<PickRow round={1} pickNo={3} label="2027 1st" value={5200} />);
+    expect(screen.getByText("#3")).toBeInTheDocument();
+    expect(screen.getByText("5,200")).toBeInTheDocument();
   });
 });
