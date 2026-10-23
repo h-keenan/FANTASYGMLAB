@@ -38,6 +38,8 @@ export function notAvailableMessage(leagueId: string | null | undefined): string
 /** League-scoped stack routes an ESPN league can open. Trades opens on its
  * "Make a Trade" (Trade Analyzer) tab only. */
 export const ESPN_SUPPORTED_ROUTES = new Set([
+  'Dashboard',
+  'Matchup',
   'MyTeam',
   'Trades',
   'Players',
@@ -51,10 +53,10 @@ export function espnRouteSupported(routeName: string): boolean {
   return ESPN_SUPPORTED_ROUTES.has(routeName);
 }
 
-/** Where opening a league lands: Dashboard for Sleeper, My Team for ESPN
- * (ESPN leagues have no Dashboard yet). */
-export function leagueHomeRoute(leagueId: string): 'Dashboard' | 'MyTeam' {
-  return isEspnLeagueId(leagueId) ? 'MyTeam' : 'Dashboard';
+/** Where opening a league lands: the Dashboard, for every platform (imported
+ * leagues show what their data supports; see docs/platform-import-status.md). */
+export function leagueHomeRoute(_leagueId: string): 'Dashboard' {
+  return 'Dashboard';
 }
 
 /** Seasons offered in the ESPN import, newest first. */

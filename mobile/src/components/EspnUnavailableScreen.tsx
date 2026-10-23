@@ -32,9 +32,9 @@ export default function EspnUnavailableScreen({
       <EmptyState
         icon="construct-outline"
         title={notAvailableMessage(leagueId)}
-        subtitle={`${leagueName} is {importedPlatformLabel(leagueId) === 'ESPN' ? 'an' : 'a'} ${importedPlatformLabel(leagueId) || 'ESPN'} league. This screen needs league data FantasyDesk can only read from Sleeper so far. My Team, Trade Analyzer, Players and League Rankings work for it now.`}
-        actionLabel="Open My Team"
-        onPressAction={() => navigationRef.dispatch(StackActions.replace('MyTeam', params))}
+        subtitle={`${leagueName} is ${importedPlatformLabel(leagueId) === 'ESPN' ? 'an' : 'a'} ${importedPlatformLabel(leagueId) || 'ESPN'} league. This screen needs league data FantasyDesk can only read from Sleeper so far. Dashboard, Matchup, My Team, Trade Analyzer, Players and League Rankings work for it now.`}
+        actionLabel="Open Dashboard"
+        onPressAction={() => navigationRef.dispatch(StackActions.replace('Dashboard', params))}
         secondaryLabel="Open Trade Analyzer"
         onPressSecondary={() =>
           navigationRef.dispatch(StackActions.replace('Trades', { ...params, initialTab: 'make' }))

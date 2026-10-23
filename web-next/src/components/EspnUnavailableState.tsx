@@ -16,6 +16,8 @@ export function EspnUnavailableState({ leagueId }: { leagueId: string }) {
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const encodedId = encodeURIComponent(leagueId);
   const links = [
+    { label: "Dashboard", href: `/dashboard/${encodedId}${query}` },
+    { label: "Matchup", href: `/matchup/${encodedId}${query}` },
     { label: "My Team", href: `/my-team/${encodedId}${query}` },
     { label: "Trade Analyzer", href: `/trade-analyzer/${encodedId}${query}` },
     { label: "Players", href: `/players/${encodedId}${query}` },

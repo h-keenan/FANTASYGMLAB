@@ -1,0 +1,140 @@
+{
+ "schedulePeriod": {
+  "ordinal": 7,
+  "low": {
+   "ordinal": 7,
+   "season": 2026,
+   "startEpochMilli": "1792490400000"
+  },
+  "value": 7
+ },
+ "eligibleSchedulePeriods": [
+  {
+   "ordinal": 1,
+   "low": {
+    "ordinal": 1,
+    "season": 2021,
+    "startEpochMilli": "1631008800000"
+   },
+   "value": 1
+  }
+ ],
+ "games": [
+  {
+   "id": "47213800",
+   "away": {
+    "id": 1371776,
+    "name": "Winter Hill Black Shamrocks",
+    "recordOverall": {
+     "wins": 5,
+     "losses": 8,
+     "winPercentage": {
+      "value": 0.3846154,
+      "formatted": ".385"
+     },
+     "rank": 11,
+     "formatted": "5-8"
+    },
+    "recordDivision": {
+     "wins": 4,
+     "losses": 2,
+     "winPercentage": {
+      "value": 0.6666667,
+      "formatted": ".667"
+     },
+     "rank": 2,
+     "formatted": "4-2"
+    },
+    "recordPostseason": {
+     "losses": 1,
+     "winPercentage": {
+      "formatted": ".000"
+     },
+     "rank": 11,
+     "formatted": "0-1"
+    },
+    "pointsFor": {
+     "value": 1379.9,
+     "formatted": "1,379.9"
+    },
+    "pointsAgainst": {
+     "value": 1503.94,
+     "formatted": "1,503.94"
+    },
+    "streak": {
+     "value": -1.0,
+     "formatted": "L1"
+    },
+    "waiverAcquisitionBudget": {
+     "value": 100.0,
+     "formatted": "$100"
+    },
+    "initials": "WH"
+   },
+   "home": {
+    "id": 1373393,
+    "name": "Philadelphia Fire",
+    "recordOverall": {
+     "wins": 4,
+     "losses": 9,
+     "winPercentage": {
+      "value": 0.30769232,
+      "formatted": ".308"
+     },
+     "rank": 12,
+     "formatted": "4-9"
+    },
+    "recordDivision": {
+     "wins": 2,
+     "losses": 4,
+     "winPercentage": {
+      "value": 0.33333334,
+      "formatted": ".333"
+     },
+     "rank": 3,
+     "formatted": "2-4"
+    },
+    "recordPostseason": {
+     "wins": 2,
+     "losses": 1,
+     "winPercentage": {
+      "value": 0.6666667,
+      "formatted": ".667"
+     },
+     "rank": 12,
+     "formatted": "2-1"
+    },
+    "pointsFor": {
+     "value": 1842.9,
+     "formatted": "1,842.9"
+    },
+    "pointsAgainst": {
+     "value": 1842.04,
+     "formatted": "1,842.04"
+    },
+    "streak": {
+     "value": 1.0,
+     "formatted": "W1"
+    },
+    "waiverAcquisitionBudget": {
+     "value": 100.0,
+     "formatted": "$100"
+    },
+    "initials": "MM"
+   },
+   "awayScore": {
+    "score": {
+     "value": 48.0,
+     "formatted": "48"
+    }
+   },
+   "homeScore": {
+    "score": {
+     "value": 61.4,
+     "formatted": "61.4"
+    }
+   },
+   "isFinalScore": false
+  }
+ ]
+}

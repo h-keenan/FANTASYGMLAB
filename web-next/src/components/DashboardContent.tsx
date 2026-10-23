@@ -116,6 +116,12 @@ export function DashboardContent({
         </section>
       ) : null}
 
+      {data.platform_notice ? (
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-notice">
+          {data.platform_notice}
+        </p>
+      ) : null}
+
       {data.this_week ? <ThisWeekStrip data={data.this_week} leagueId={leagueId} leagueName={leagueName} tradePending={Boolean(data.trade_ideas_deferred)} /> : null}
 
       {droppedDuplicate && topItems.length === 0 && watchItems.length === 0 && data.entitlement.hidden_count <= 0 ? null : (

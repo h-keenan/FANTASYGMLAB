@@ -1,0 +1,307 @@
+{
+ "groups": [
+  {
+   "group": "START",
+   "slots": [
+    {
+     "position": {
+      "label": "QB",
+      "group": "START",
+      "start": 1
+     },
+     "leaguePlayer": {
+      "proPlayer": {
+       "id": 8598,
+       "nameFull": "Russell Wilson",
+       "proTeamAbbreviation": "FA",
+       "position": "QB",
+       "nflByeWeek": 9,
+       "positionEligibility": [
+        "QB"
+       ]
+      },
+      "viewingProjectedPoints": {
+       "value": 17.5,
+       "formatted": "17.5"
+      },
+      "transactionStatus": {
+       "locked": {},
+       "isLineupStatusLocked": true
+      },
+      "requestedGamesPeriod": {
+       "ordinal": 7,
+       "startEpochMilli": "1792490400000",
+       "isNow": true
+      },
+      "viewingFormat": "TOTAL",
+      "viewingRange": {
+       "low": 7
+      },
+      "owner": {
+       "id": 1373883,
+       "name": "Manitoba Marmots",
+       "initials": "MM"
+      },
+      "displayGroup": "PASSER",
+      "isKeeper": true,
+      "isOnTradingBlock": true,
+      "viewingActualPoints": {
+       "value": 18.0,
+       "formatted": "18.0"
+      }
+     }
+    },
+    {
+     "position": {
+      "label": "RB",
+      "group": "START",
+      "start": 1
+     },
+     "leaguePlayer": {
+      "proPlayer": {
+       "id": 12929,
+       "nameFull": "Dalvin Cook",
+       "proTeamAbbreviation": "FA",
+       "position": "RB",
+       "nflByeWeek": 9,
+       "positionEligibility": [
+        "RB"
+       ]
+      },
+      "viewingProjectedPoints": {
+       "value": 12.0,
+       "formatted": "12.0"
+      },
+      "transactionStatus": {
+       "locked": {},
+       "isLineupStatusLocked": true
+      },
+      "requestedGamesPeriod": {
+       "ordinal": 7,
+       "startEpochMilli": "1792490400000",
+       "isNow": true
+      },
+      "viewingFormat": "TOTAL",
+      "viewingRange": {
+       "low": 7
+      },
+      "owner": {
+       "id": 1373883,
+       "name": "Manitoba Marmots",
+       "initials": "MM"
+      },
+      "displayGroup": "PASSER",
+      "isKeeper": true,
+      "isOnTradingBlock": true,
+      "viewingActualPoints": {
+       "value": 11.0,
+       "formatted": "11.0"
+      }
+     }
+    },
+    {
+     "position": {
+      "label": "WR",
+      "group": "START",
+      "start": 1
+     },
+     "leaguePlayer": {
+      "proPlayer": {
+       "id": 12197,
+       "nameFull": "Tyreek Hill",
+       "proTeamAbbreviation": "FA",
+       "position": "WR",
+       "nflByeWeek": 9,
+       "positionEligibility": [
+        "WR"
+       ]
+      },
+      "viewingProjectedPoints": {
+       "value": 15.0,
+       "formatted": "15.0"
+      },
+      "transactionStatus": {
+       "locked": {},
+       "isLineupStatusLocked": true
+      },
+      "requestedGamesPeriod": {
+       "ordinal": 7,
+       "startEpochMilli": "1792490400000",
+       "isNow": true
+      },
+      "viewingFormat": "TOTAL",
+      "viewingRange": {
+       "low": 7
+      },
+      "owner": {
+       "id": 1373883,
+       "name": "Manitoba Marmots",
+       "initials": "MM"
+      },
+      "displayGroup": "PASSER",
+      "isKeeper": true,
+      "isOnTradingBlock": true,
+      "viewingActualPoints": {
+       "value": 20.4,
+       "formatted": "20.4"
+      }
+     }
+    },
+    {
+     "position": {
+      "label": "TE",
+      "group": "START",
+      "start": 1
+     },
+     "leaguePlayer": {
+      "proPlayer": {
+       "id": 6611,
+       "nameFull": "Rob Gronkowski",
+       "proTeamAbbreviation": "FA",
+       "position": "TE",
+       "nflByeWeek": 9,
+       "positionEligibility": [
+        "TE"
+       ]
+      },
+      "viewingProjectedPoints": {
+       "value": 9.0,
+       "formatted": "9.0"
+      },
+      "transactionStatus": {
+       "locked": {},
+       "isLineupStatusLocked": true
+      },
+      "requestedGamesPeriod": {
+       "ordinal": 7,
+       "startEpochMilli": "1792490400000",
+       "isNow": true
+      },
+      "viewingFormat": "TOTAL",
+      "viewingRange": {
+       "low": 7
+      },
+      "owner": {
+       "id": 1373883,
+       "name": "Manitoba Marmots",
+       "initials": "MM"
+      },
+      "displayGroup": "PASSER",
+      "isKeeper": true,
+      "isOnTradingBlock": true,
+      "viewingActualPoints": {
+       "value": 12.0,
+       "formatted": "12.0"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "slots": [
+    {
+     "position": {
+      "label": "BN",
+      "max": 24
+     },
+     "leaguePlayer": {
+      "proPlayer": {
+       "id": 11373,
+       "nameFull": "Mike Davis",
+       "proTeamAbbreviation": "FA",
+       "position": "RB",
+       "nflByeWeek": 9,
+       "positionEligibility": [
+        "RB"
+       ]
+      },
+      "viewingProjectedPoints": {
+       "formatted": "\u2014"
+      },
+      "transactionStatus": {
+       "locked": {},
+       "isLineupStatusLocked": true
+      },
+      "requestedGamesPeriod": {
+       "ordinal": 7,
+       "startEpochMilli": "1792490400000",
+       "isNow": true
+      },
+      "viewingFormat": "TOTAL",
+      "viewingRange": {
+       "low": 7
+      },
+      "owner": {
+       "id": 1373883,
+       "name": "Manitoba Marmots",
+       "initials": "MM"
+      },
+      "displayGroup": "PASSER",
+      "isKeeper": true,
+      "viewingActualPoints": {
+       "formatted": "\u2014"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "group": "INJURED",
+   "slots": [
+    {
+     "position": {
+      "label": "BN",
+      "max": 24
+     },
+     "leaguePlayer": {
+      "proPlayer": {
+       "id": 3356,
+       "nameFull": "Alex Smith",
+       "proTeamAbbreviation": "FA",
+       "position": "QB",
+       "nflByeWeek": 9,
+       "positionEligibility": [
+        "QB"
+       ]
+      },
+      "viewingProjectedPoints": {
+       "formatted": "\u2014"
+      },
+      "transactionStatus": {
+       "locked": {},
+       "isLineupStatusLocked": true
+      },
+      "requestedGamesPeriod": {
+       "ordinal": 7,
+       "startEpochMilli": "1792490400000",
+       "isNow": true
+      },
+      "viewingFormat": "TOTAL",
+      "viewingRange": {
+       "low": 7
+      },
+      "owner": {
+       "id": 1373883,
+       "name": "Manitoba Marmots",
+       "initials": "MM"
+      },
+      "displayGroup": "PASSER",
+      "isKeeper": true,
+      "isOnTradingBlock": true,
+      "viewingActualPoints": {
+       "formatted": "\u2014"
+      }
+     }
+    }
+   ]
+  }
+ ],
+ "lineupPeriod": {
+  "ordinal": 7,
+  "low": {
+   "ordinal": 7
+  },
+  "containsNow": true,
+  "value": 7
+ }
+}

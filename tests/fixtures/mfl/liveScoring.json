@@ -1,0 +1,92 @@
+{
+ "version": "1.0",
+ "liveScoring": {
+  "week": "7",
+  "matchup": [
+   {
+    "franchise": [
+     {
+      "playersCurrentlyPlaying": "0",
+      "gameSecondsRemaining": "0",
+      "id": "0001",
+      "playersYetToPlay": "2",
+      "players": {
+       "player": [
+        {
+         "updatedStats": "",
+         "score": "18.20",
+         "gameSecondsRemaining": "0",
+         "id": "11244",
+         "status": "starter"
+        },
+        {
+         "updatedStats": "",
+         "score": "12.50",
+         "gameSecondsRemaining": "0",
+         "id": "12626",
+         "status": "starter"
+        },
+        {
+         "updatedStats": "",
+         "score": "6.00",
+         "gameSecondsRemaining": "0",
+         "id": "15757",
+         "status": "starter"
+        },
+        {
+         "updatedStats": "",
+         "score": "4.00",
+         "gameSecondsRemaining": "0",
+         "id": "99999",
+         "status": "starter"
+        },
+        {
+         "updatedStats": "",
+         "score": "0.00",
+         "gameSecondsRemaining": "0",
+         "id": "0001",
+         "status": "starter"
+        }
+       ]
+      },
+      "score": "40.70",
+      "isHome": "0"
+     },
+     {
+      "playersCurrentlyPlaying": "1",
+      "gameSecondsRemaining": "3600",
+      "id": "0002",
+      "playersYetToPlay": "1",
+      "players": {
+       "player": [
+        {
+         "updatedStats": "",
+         "score": "9.00",
+         "gameSecondsRemaining": "0",
+         "id": "14833",
+         "status": "starter"
+        },
+        {
+         "updatedStats": "",
+         "score": "7.50",
+         "gameSecondsRemaining": "0",
+         "id": "14071",
+         "status": "starter"
+        },
+        {
+         "updatedStats": "",
+         "score": "22.00",
+         "gameSecondsRemaining": "0",
+         "id": "14779",
+         "status": "starter"
+        }
+       ]
+      },
+      "score": "38.50",
+      "isHome": "1"
+     }
+    ]
+   }
+  ]
+ }
+}

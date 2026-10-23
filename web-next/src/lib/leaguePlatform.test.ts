@@ -18,17 +18,19 @@ describe("leaguePlatform", () => {
     expect(isEspnLeagueId("yahoo:1:2025")).toBe(false);
     expect(importedPlatformLabel("mfl:10015:2025")).toBe("MFL");
     expect(notAvailableMessage("fleaflicker:206154:2025")).toBe("Not available for Fleaflicker leagues yet.");
-    expect(espnUnavailableLeagueId(`/dashboard/${encodeURIComponent("mfl:10015:2025")}`)).toBe("mfl:10015:2025");
-    expect(leagueHomePath("mfl:10015:2025", "X")).toBe(`/my-team/${encodeURIComponent("mfl:10015:2025")}?name=X`);
+    expect(espnUnavailableLeagueId(`/waivers/${encodeURIComponent("mfl:10015:2025")}`)).toBe("mfl:10015:2025");
+    expect(leagueHomePath("mfl:10015:2025", "X")).toBe(`/dashboard/${encodeURIComponent("mfl:10015:2025")}?name=X`);
   });
 
   it("keeps ESPN leagues off pages they can't feed, for encoded and raw ids", () => {
-    expect(espnUnavailableLeagueId(`/dashboard/${ENCODED}`)).toBe(ESPN_ID);
+    expect(espnUnavailableLeagueId(`/alerts/${ENCODED}`)).toBe(ESPN_ID);
     expect(espnUnavailableLeagueId(`/waivers/${ESPN_ID}`)).toBe(ESPN_ID);
     expect(espnUnavailableLeagueId(`/trade-hub/${ENCODED}`)).toBe(ESPN_ID);
   });
 
   it("lets ESPN leagues open the supported pages, and never gates Sleeper leagues", () => {
+    expect(espnUnavailableLeagueId(`/dashboard/${ENCODED}`)).toBeNull();
+    expect(espnUnavailableLeagueId(`/matchup/${ENCODED}`)).toBeNull();
     expect(espnUnavailableLeagueId(`/my-team/${ENCODED}`)).toBeNull();
     expect(espnUnavailableLeagueId(`/trade-analyzer/${ENCODED}`)).toBeNull();
     expect(espnUnavailableLeagueId(`/players/${ENCODED}/9221`)).toBeNull();
@@ -38,9 +40,9 @@ describe("leaguePlatform", () => {
     expect(espnUnavailableLeagueId("/")).toBeNull();
   });
 
-  it("opens Sleeper leagues on Dashboard and ESPN leagues on My Team", () => {
+  it("opens every league on its Dashboard", () => {
     expect(leagueHomePath("123", "Dynasty")).toBe("/dashboard/123?name=Dynasty");
-    expect(leagueHomePath(ESPN_ID, "FFLR Test League")).toBe(`/my-team/${ENCODED}?name=FFLR%20Test%20League`);
+    expect(leagueHomePath(ESPN_ID, "FFLR Test League")).toBe(`/dashboard/${ENCODED}?name=FFLR%20Test%20League`);
   });
 });
 

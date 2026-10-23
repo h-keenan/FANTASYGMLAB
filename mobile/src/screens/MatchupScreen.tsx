@@ -260,6 +260,13 @@ export default function MatchupScreen({ route, navigation }: Props) {
         <BeginnerHelp term="matchupIntro" />
         <BeginnerHelp term="matchupWinProbability" />
         <Scoreboard matchup={shown} mine={mine} opponent={opponent} />
+        {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
+          <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>
+            {`Not matched to a FantasyDesk player, so left out of the lineups and win odds: ${matchup.unmapped_players
+              .map((p) => `${p.name} (${p.fantasy_team})`)
+              .join(', ')}.`}
+          </AppText>
+        ) : null}
         <Insights matchup={shown} />
         <LineupComparison
           matchup={matchup}
