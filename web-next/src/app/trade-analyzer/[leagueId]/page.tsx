@@ -13,6 +13,7 @@ import {
   type RankedPlayer,
   type TeamProfile,
 } from "@/lib/api";
+import { idpTradePoolPlayers } from "@/lib/idpPresentation";
 import { TradeAnalyzerContent } from "@/components/TradeAnalyzerContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -72,12 +73,14 @@ export default function TradeAnalyzerPage() {
       api.getLeagueDraftPicks(leagueId, lens).catch(() => ({ ok: true as const, picks: [], reason: "unavailable" })),
       api.getLeagueRosters(leagueId).catch(() => ({ ok: true as const, rosters: [] })),
       api.getLeagueTeamProfiles(leagueId).catch(() => ({ ok: true as const, profiles: {} })),
+      // IDP leagues only (`idp: false` otherwise); a failure leaves offense untouched.
+      api.getLeagueIdpValues(leagueId, { includeBelow: true }).catch(() => null),
     ])
-      .then(([myRoster, rankingsResult, picksResult, rostersResult, teamProfilesResult]) => {
+      .then(([myRoster, rankingsResult, picksResult, rostersResult, teamProfilesResult, idpResult]) => {
         if (cancelled) return;
         setData({
           myRoster,
-          rankings: rankingsResult.players,
+          rankings: [...rankingsResult.players, ...idpTradePoolPlayers(idpResult)],
           picks: picksResult.picks,
           rosters: rostersResult.rosters,
           teamProfiles: teamProfilesResult.profiles,

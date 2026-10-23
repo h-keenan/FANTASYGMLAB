@@ -2,6 +2,7 @@ import type { TradeAsset } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
+import { isIdpPositionFilter } from "@/lib/idpPresentation";
 
 /**
  * Shared give/get asset row + labeled exchange-side column — extracted
@@ -95,6 +96,11 @@ export function TradeAssetRow({
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
           <ValueStat value={formatValue(asset.score)} />
+        </div>
+      ) : isIdpPositionFilter((asset.position ?? "").toUpperCase()) ? (
+        // A defender below this league's replacement level has no value: a dash, never a made-up number.
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <ValueStat value="—" />
         </div>
       ) : null}
     </div>

@@ -28,6 +28,7 @@ import {
   levelToRingTone,
   tradeShareRecord,
 } from "@/lib/tradeHubPresentation";
+import { tradePositionOptions } from "@/lib/idpPresentation";
 import {
   ALL_POSITION_OPTIONS,
   ALL_TEAMS_ID,
@@ -575,6 +576,8 @@ export function TradeAnalyzerContent({
   );
   const hasAnyAssets = sendPlayers.length > 0 || receivePlayers.length > 0 || sendPicks.length > 0 || receivePicks.length > 0;
 
+  const positionOptions = useMemo(() => tradePositionOptions(ALL_POSITION_OPTIONS, rankings), [rankings]);
+
   const searchPool = useMemo(() => {
     if (activeSide === "send") return rankings.filter((p) => myRosterIds.has(p.player_id));
     if (selectedTeamId === ALL_TEAMS_ID) return rankings.filter((p) => !myRosterIds.has(p.player_id));
@@ -810,7 +813,7 @@ export function TradeAnalyzerContent({
           />
           {assetType === "players" ? (
             <PillRow
-              options={ALL_POSITION_OPTIONS.map((position) => ({ label: position, value: position }))}
+              options={positionOptions.map((position) => ({ label: position, value: position }))}
               active={positionFilter}
               onSelect={setPositionFilter}
             />

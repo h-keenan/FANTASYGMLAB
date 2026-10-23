@@ -35,6 +35,45 @@ def _lineup_row(pid: Any, name: Any, family: Any, team: Any, age: Any, injury: A
     }
 
 
+# The IDP engine's own evidence grade (modules.idp_values): "high" is 20+
+# defensive games of history. Anything thinner is a model guess that Trade Hub
+# and counter-offer suggestions must not build ideas around.
+TRUSTED_CONFIDENCE = "high"
+
+
+def trusted_idp_ids(result: Mapping[str, Any]) -> set[str]:
+    """Defenders whose model value is backed by enough games to act on."""
+
+    if not result.get("idp"):
+        return set()
+    return {
+        str(entry["player_id"])
+        for entry in result.get("players") or []
+        if entry.get("confidence") == TRUSTED_CONFIDENCE and entry.get("value")
+    }
+
+
+def all_idp_ids(result: Mapping[str, Any]) -> set[str]:
+    if not result.get("idp"):
+        return set()
+    return {str(e["player_id"]) for e in result.get("players") or []} | {
+        str(e["player_id"]) for e in result.get("below_replacement_players") or []
+    }
+
+
+def trade_pool_rows(result: Mapping[str, Any], wanted_below_ids: Any = ()) -> List[Dict[str, Any]]:
+    """Defenders as trade-asset rows. Valued defenders keep their model value;
+    a below-replacement defender is included only when asked for (a roster
+    member or a chosen asset) and carries ``value: None`` (shown as a dash)."""
+
+    if not result.get("idp"):
+        return []
+    wanted = {str(pid) for pid in (wanted_below_ids or ())}
+    rows = [dict(entry) for entry in result.get("players") or []]
+    rows += [dict(e) for e in result.get("below_replacement_players") or [] if str(e["player_id"]) in wanted]
+    return rows
+
+
 def roster_idp_rows(
     result: Mapping[str, Any],
     roster_player_ids: Any,

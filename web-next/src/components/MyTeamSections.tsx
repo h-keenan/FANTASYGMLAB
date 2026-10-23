@@ -91,6 +91,7 @@ function surplusText(info: KeeperPlayerInfo | undefined): string | null {
 
 function badgeLabel(player: LineupPlayer, showSlot: boolean): string | null | undefined {
   if (!showSlot || !player.slot || player.slot === "BENCH") return player.position;
+  if (player.slot === "IDP_FLEX") return "IDP";
   return player.slot === "SUPER_FLEX" ? "SF" : player.slot.replace("_", " ");
 }
 

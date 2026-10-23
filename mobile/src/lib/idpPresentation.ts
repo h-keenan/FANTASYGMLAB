@@ -70,3 +70,34 @@ export function idpMethodNote(idp: LeagueIdpValuesResponse | null | undefined): 
 export function withIdpPositionOptions(base: readonly string[], idpRows: readonly unknown[] | null | undefined): string[] {
   return idpRows && idpRows.length > 0 ? [...base, ...IDP_POSITION_FILTERS] : [...base];
 }
+
+/** Defenders as Trade Analyzer pool rows: valued ones at their model value,
+ * below-replacement ones with `score: null` (shown as a dash, never a made-up
+ * number). Empty for non-IDP leagues. Needs the response fetched with
+ * `includeBelow` for the below-replacement rows. */
+export function idpTradePoolPlayers(idp: LeagueIdpValuesResponse | null | undefined): RankedPlayer[] {
+  if (!idp || !idp.idp) return [];
+  const below: RankedPlayer[] = (idp.below_replacement_players ?? []).map((row) => ({
+    player_id: row.player_id,
+    name: row.name,
+    position: row.family,
+    team: row.team,
+    age: row.age,
+    status: 'Active',
+    injury_status: row.injury_status,
+    tier: null,
+    score: null,
+    overall_rank: null,
+    position_rank: null,
+    rank_unavailable_reason: null,
+    opportunity_label: null,
+    overall_rating: null,
+  }));
+  return [...idpRowsAsRankedPlayers(idp), ...below];
+}
+
+/** Trade Analyzer position chips: defense appears only when the pool has defenders. */
+export function tradePositionOptions(base: readonly string[], pool: readonly { position?: string | null }[]): string[] {
+  const hasIdp = pool.some((p) => isIdpPositionFilter((p.position ?? '').toUpperCase()));
+  return hasIdp ? [...base, ...IDP_POSITION_FILTERS] : [...base];
+}

@@ -4090,6 +4090,7 @@ def get_league_rankings(
 def get_league_idp_values(
     league_id: str = Depends(resolve_league_path_id),
     limit: int = 300,
+    include_below: bool = False,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Individual-defensive-player values for leagues that start defenders.
@@ -4108,7 +4109,12 @@ def get_league_idp_values(
     from modules import idp_league_values
 
     result = idp_league_values.cached_league_idp_values(league_id, league)
-    return {"ok": True, **result, "players": result["players"][:limit]}
+    body = {"ok": True, **result, "players": result["players"][:limit]}
+    # Defenders projected below this league's replacement level (no value
+    # above replacement) are opt-in: Trade Analyzer lists them with a dash.
+    if not include_below:
+        body.pop("below_replacement_players", None)
+    return body
 
 
 @app.get("/v1/leagues/{league_id}/players/{player_id}/rank")
@@ -4308,6 +4314,60 @@ def get_player_news(
     return {"ok": True, "items": [_project_news_item(item) for item in matches[:limit]]}
 
 
+def _with_idp_trade_rows(
+    valued: pd.DataFrame,
+    idp_result: dict[str, Any] | None,
+    score_field: str,
+    wanted_ids: set[str],
+) -> pd.DataFrame:
+    """`valued` plus this league's defenders at their IDP-model value, so IDP
+    players resolve as trade assets in an IDP league. A below-replacement
+    defender is added (only when roster/asset-relevant) with value 0: it adds
+    nothing to a package and clients show a dash. Non-IDP leagues, or any
+    failure, return `valued` unchanged."""
+
+    if not idp_result or not idp_result.get("idp"):
+        return valued
+    from modules import idp_roster_rows
+    from modules.valuation_authority import (
+        AUTHORITATIVE_COLUMN,
+        SOURCE_COLUMN,
+        STATUS_COLUMN,
+        TRADE_ELIGIBLE_COLUMN,
+    )
+
+    have = set(valued["player_id"].astype(str)) if "player_id" in valued.columns else set()
+    rows: list[dict[str, Any]] = []
+    for entry in idp_roster_rows.trade_pool_rows(idp_result, wanted_ids):
+        if str(entry["player_id"]) in have:
+            continue
+        value = entry.get("value")
+        score = int(value) if isinstance(value, (int, float)) else 0
+        rows.append(
+            {
+                "player_id": str(entry["player_id"]),
+                "name": entry.get("name"),
+                "position": entry.get("family"),
+                "team": entry.get("team"),
+                "age": entry.get("age"),
+                "status": "Active",
+                "injury_status": entry.get("injury_status"),
+                "score": score,
+                "value_score": score,
+                "dynasty_score": score,
+                "rebuild_score": score,
+                score_field: score,
+                STATUS_COLUMN: "model_derived",
+                SOURCE_COLUMN: "idp_model",
+                AUTHORITATIVE_COLUMN: True,
+                TRADE_ELIGIBLE_COLUMN: True,
+            }
+        )
+    if not rows:
+        return valued
+    return pd.concat([valued, pd.DataFrame(rows)], ignore_index=True, sort=False)
+
+
 class TradeAnalyzerRequest(BaseModel):
     send_player_ids: list[str] = Field(default_factory=list)
     receive_player_ids: list[str] = Field(default_factory=list)
@@ -4434,6 +4494,24 @@ def post_trade_analyzer(
             keeper_adjusted = False
 
     my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    # IDP leagues: defenders resolve as assets at their model value. Trust
+    # gating below keeps untrusted ones out of any counter-offer suggestion.
+    idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
+    idp_ids: set[str] = set()
+    trusted_idp: set[str] = set()
+    untrusted_idp: set[str] = set()
+    if idp_result and idp_result.get("idp"):
+        from modules import idp_roster_rows
+
+        valued = _with_idp_trade_rows(
+            valued,
+            idp_result,
+            score_field,
+            my_roster_ids | {str(p) for p in body.send_player_ids + body.receive_player_ids},
+        )
+        idp_ids = idp_roster_rows.all_idp_ids(idp_result)
+        trusted_idp = idp_roster_rows.trusted_idp_ids(idp_result)
+        untrusted_idp = idp_ids - trusted_idp
     my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
     if my_team_df.empty:
         return {"ok": True, "verdict": None, "reason": "empty_roster"}
@@ -4507,6 +4585,9 @@ def post_trade_analyzer(
                     owner_info={"owner_roster_id": body.partner_roster_id},
                 )
                 for _, row in partner_rows.iterrows()
+                # Counter suggestions never lean on a defender the IDP model
+                # is not confident about.
+                if str(row.get("player_id")) not in untrusted_idp
             ]
 
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
@@ -4539,6 +4620,7 @@ def post_trade_analyzer(
             my_asset_pool: list[dict[str, Any]] = [
                 player_asset_from_mapping(row, score_field=score_field)
                 for _, row in my_team_df.iterrows()
+                if str(row.get("player_id")) not in untrusted_idp
             ]
             partner_asset_pool: list[dict[str, Any]] = list(partner_assets)
             # Same cached front door as the send/receive-picks branch above
@@ -10246,7 +10328,7 @@ def get_gm_plan(
 # Display order for My Team's starters section — matches
 # modules.team_eval.suggest_optimal_lineup's own slot-assignment order.
 # Bench keeps the frame's existing sort_score-descending order untouched.
-_LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K"]
+_LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "DL", "LB", "DB", "IDP_FLEX"]
 
 
 def _matchup_player_identity_fields(row: pd.Series, score_field: str) -> dict[str, Any]:
@@ -10526,6 +10608,38 @@ def _score_reinstated_inactive_rows(
     return rows
 
 
+def _idp_lineup_frame_rows(
+    idp_result: dict[str, Any],
+    roster_player_ids: set[str],
+    players_lookup: dict[str, Any] | None,
+    score_field: str,
+) -> list[dict[str, Any]]:
+    """A roster's defenders as lineup-frame rows. ``score_field`` carries the
+    IDP model value (None when below replacement: shown as no value, ranked
+    last, never invented)."""
+
+    from modules import idp_roster_rows
+
+    rows: list[dict[str, Any]] = []
+    for row in idp_roster_rows.roster_idp_rows(idp_result, roster_player_ids, players_lookup):
+        rows.append(
+            {
+                "player_id": row["player_id"],
+                "name": row["name"],
+                "position": row["position"],
+                "team": row["team"],
+                "age": row["age"],
+                "status": "Active",
+                "injury_status": row["injury_status"],
+                "player_tier": None,
+                "opportunity_label": None,
+                "_overall_rating_col": None,
+                score_field: row["score"],
+            }
+        )
+    return rows
+
+
 def _suggested_lineup_split(
     valued: pd.DataFrame,
     roster: dict[str, Any],
@@ -10535,8 +10649,13 @@ def _suggested_lineup_split(
     players_lookup: dict[str, Any] | None = None,
     projection_context: "_ProjectionContext | None" = None,
     meta: dict[str, Any] | None = None,
+    idp_result: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """One roster's suggested starters (slot-ordered) and bench.
+
+    In an IDP league (``settings["idp_slots"]``) the roster's defenders join
+    the frame at their IDP-model value (``idp_result``) so DL/LB/DB/IDP_FLEX
+    slots are filled; non-IDP leagues are untouched.
 
     With a `projection_context` (a current NFL week exists) this is THIS
     WEEK's lineup: players on bye or ruled out never start (their slot
@@ -10590,6 +10709,13 @@ def _suggested_lineup_split(
         )
         if reinstated_rows:
             roster_df = pd.concat([roster_df, pd.DataFrame(reinstated_rows)], ignore_index=True, sort=False)
+
+    if settings.get("idp_slots") and idp_result and idp_result.get("idp"):
+        defenders = _idp_lineup_frame_rows(idp_result, roster_player_ids, players_lookup, score_field)
+        have = set(roster_df["player_id"].astype(str)) if not roster_df.empty else set()
+        defenders = [d for d in defenders if d["player_id"] not in have]
+        if defenders:
+            roster_df = pd.concat([roster_df, pd.DataFrame(defenders)], ignore_index=True, sort=False)
 
     projections_by_id: dict[str, dict[str, Any]] = {}
     if projection_context is not None:
@@ -10825,6 +10951,7 @@ def get_league_my_team(
     # players never start, weekly projections rank the rest (see
     # _suggested_lineup_split). Offseason / no week: season-value lineup.
     lineup_meta: dict[str, Any] = {}
+    idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
     starters, bench = _suggested_lineup_split(
         valued,
         my_roster,
@@ -10833,6 +10960,7 @@ def get_league_my_team(
         players_lookup=my_team_players_lookup,
         projection_context=_build_projection_context(_league_current_lineup_week(league)),
         meta=lineup_meta,
+        idp_result=idp_result,
     )
     lineup_basis = lineup_meta.get("lineup_basis", SEASON_VALUE_BASIS)
 
@@ -10842,7 +10970,15 @@ def get_league_my_team(
         "starters": starters,
         "bench": bench,
         # Additive: rostered defenders, IDP leagues only ([] otherwise).
-        "idp_players": _my_team_idp_rows(league_id, league, roster_player_ids, my_team_players_lookup),
+        # Defenders already placed in the lineup (starters/bench) are not repeated.
+        "idp_players": _my_team_idp_rows(
+            league_id,
+            league,
+            roster_player_ids
+            - {str(p.get("player_id")) for p in starters}
+            - {str(p.get("player_id")) for p in bench},
+            my_team_players_lookup,
+        ),
         "reason": "",
         "roster_id": str(my_roster.get("roster_id") or ""),
         # Additive (older clients ignore these).
@@ -11369,6 +11505,7 @@ def _matchup_side(
     projection_context: "_ProjectionContext | None" = None,
     matchup_entry: dict[str, Any] | None = None,
     bench_out: list[dict[str, Any]] | None = None,
+    idp_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One team's side of the matchup: identity, suggested starters, season-value total.
 
@@ -11410,6 +11547,7 @@ def _matchup_side(
         players_lookup=players_lookup,
         projection_context=projection_context,
         meta=lineup_meta,
+        idp_result=idp_result,
     )
     if bench_out is not None:
         # The lineup planner (get_league_matchup_what_if) needs the bench too,
@@ -11649,6 +11787,7 @@ def _real_current_lineup(
     projection_context: "_ProjectionContext | None" = None,
     settings: dict[str, Any] | None = None,
     roster_positions: list[Any] | None = None,
+    idp_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """This roster's ACTUAL current-week lineup and points, straight from Sleeper.
 
@@ -11719,6 +11858,12 @@ def _real_current_lineup(
             str(rec["player_id"]): pd.Series(rec) for rec in reinstated_rows
         }
 
+    # IDP leagues: a real defender starter resolves from the IDP model so he
+    # carries his position (slot eligibility) and value, not an unknown row.
+    idp_by_id: dict[str, dict[str, Any]] = {}
+    if idp_result and idp_result.get("idp"):
+        idp_by_id = {str(e["player_id"]): e for e in idp_result.get("players") or []}
+
     rows: list[dict[str, Any]] = []
     empty_slots: list[str] = []
     # Indexes run over Sleeper's RAW starters array (empty "0" slots
@@ -11740,6 +11885,32 @@ def _real_current_lineup(
                 _project_real_starter_row(
                     row, score_field, actual_points, projection_context=projection_context, slot=slot
                 )
+            )
+        elif player_id in idp_by_id:
+            entry = idp_by_id[player_id]
+            injury = str(entry.get("injury_status") or "")
+            rows.append(
+                {
+                    "player_id": player_id,
+                    "name": entry.get("name"),
+                    "position": entry.get("family"),
+                    "team": entry.get("team"),
+                    "age": entry.get("age"),
+                    "status": "Active",
+                    "injury_status": injury or None,
+                    "injury_label": injury.title(),
+                    "tier": None,
+                    "score": entry.get("value"),
+                    "opportunity_label": None,
+                    "overall_rating": None,
+                    "actual_points": round(float(actual_points), 2) if isinstance(actual_points, (int, float)) else None,
+                    "projection": None,
+                    "game_started": None,
+                    "game_final": None,
+                    "game_kickoff_at": None,
+                    "game_status": None,
+                    "slot": slot,
+                }
             )
         else:
             # A real Sleeper starter who isn't in our valued pool and
@@ -12327,6 +12498,7 @@ def _build_matchup(
     # either side's real starters. Best-effort, same "fails soft" contract
     # as everywhere else in this file.
     projection_context = _build_projection_context(current_week)
+    idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
 
     my_bench: list[dict[str, Any]] = []
     my_side = _matchup_side(
@@ -12340,6 +12512,7 @@ def _build_matchup(
         projection_context=projection_context,
         matchup_entry=my_entry,
         bench_out=my_bench if state is not None else None,
+        idp_result=idp_result,
     )
     opponent_side = _matchup_side(
         opponent_roster_id,
@@ -12351,6 +12524,7 @@ def _build_matchup(
         players_lookup=matchup_players_lookup,
         projection_context=projection_context,
         matchup_entry=opponent_entry,
+        idp_result=idp_result,
     )
     if not my_side["starters"] and not opponent_side["starters"]:
         return _empty_matchup("empty_roster", week=current_week)
@@ -12373,6 +12547,7 @@ def _build_matchup(
             projection_context=projection_context,
             settings=settings,
             roster_positions=roster_positions,
+            idp_result=idp_result,
         )
     )
     opponent_side.update(
@@ -12383,6 +12558,7 @@ def _build_matchup(
             projection_context=projection_context,
             settings=settings,
             roster_positions=roster_positions,
+            idp_result=idp_result,
         )
     )
 
