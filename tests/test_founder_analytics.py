@@ -107,3 +107,49 @@ def test_build_report_does_not_append_events(tmp_path, monkeypatch):
     before = path.read_text(encoding="utf-8")
     founder_analytics.build_report(window_key="all", path=path, writes_enabled=True)
     assert path.read_text(encoding="utf-8") == before
+
+
+def _onb(anon, action, step=None, idx=None, experience=None):
+    props = {"feature": "onboarding", "action": action}
+    if step:
+        props["step"] = step
+    if idx is not None:
+        props["step_index"] = idx
+    if experience:
+        props["experience"] = experience
+    return {"event": "feature_use", "anon_id": anon, "props": props}
+
+
+def test_onboarding_funnel_none_without_data():
+    assert founder_analytics._onboarding_funnel([]) is None
+    other = [{"event": "feature_use", "anon_id": "a", "props": {"feature": "paywall", "action": "viewed"}}]
+    assert founder_analytics._onboarding_funnel(other) is None
+
+
+def test_onboarding_funnel_aggregation():
+    rows = []
+    for u in ("a", "b", "c", "d"):
+        rows.append(_onb(u, "step_viewed", "gameplan", 0))
+    for u in ("a", "b", "c"):
+        rows.append(_onb(u, "step_viewed", "level", 9))
+    rows.append(_onb("a", "step_viewed", "level", 9))
+    rows.append(_onb("d", "skipped", "gameplan", 0))
+    rows.append(_onb("a", "experience_selected", experience="new"))
+    rows.append(_onb("b", "experience_selected", experience="expert"))
+    rows.append(_onb("c", "experience_selected", experience="expert"))
+    rows.append(_onb("a", "completed", "level", 9, "new"))
+    rows.append(_onb("b", "completed", "level", 9, "expert"))
+    funnel = founder_analytics._onboarding_funnel(rows)
+    assert funnel["started_users"] == 4
+    assert [s["step"] for s in funnel["steps"]] == ["gameplan", "level"]
+    assert funnel["steps"][0]["drop_off_pct"] is None
+    assert funnel["steps"][1]["users"] == 3 and funnel["steps"][1]["drop_off_pct"] == 25.0
+    assert funnel["steps"][0]["skipped_users"] == 1
+    assert funnel["skip_rate_pct"] == 25.0
+    assert funnel["completion_rate_pct"] == 50.0
+    assert funnel["experience"]["expert"] == {"users": 2, "pct": 66.7}
+
+
+def test_onboarding_props_pass_allowlist():
+    clean = la._safe_props({"step": "gameplan", "step_index": 0, "experience": "new", "email": "x@y.z"})
+    assert clean == {"step": "gameplan", "step_index": 0, "experience": "new"}
