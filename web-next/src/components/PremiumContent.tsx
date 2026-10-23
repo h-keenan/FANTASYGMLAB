@@ -7,7 +7,12 @@ import { trackFeatureUse } from "@/lib/analytics";
 
 import { api, type BillingPlan, type BillingTrial } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel, trialEndLabel } from "@/lib/trialCopy";
-import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
+import dynamic from "next/dynamic";
+
+// Stripe.js + react-stripe-js load only when a checkout is actually opened.
+const EmbeddedCheckoutModal = dynamic(() => import("@/components/EmbeddedCheckoutModal").then((m) => m.EmbeddedCheckoutModal), {
+  ssr: false,
+});
 import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
 import { Button } from "@/components/Button";
 

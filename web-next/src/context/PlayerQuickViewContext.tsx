@@ -2,7 +2,14 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
-import { PlayerQuickView } from "@/components/PlayerQuickView";
+import dynamic from "next/dynamic";
+
+// Perf audit 2026-10: this provider wraps every page from the root layout, so a
+// static import dragged recharts (~114 KB gz) onto the landing page and every
+// other route. The modal only mounts after a tap, so load it on demand.
+const PlayerQuickView = dynamic(() => import("@/components/PlayerQuickView").then((m) => m.PlayerQuickView), {
+  ssr: false,
+});
 import { trackFeatureUse } from "@/lib/analytics";
 
 /**
