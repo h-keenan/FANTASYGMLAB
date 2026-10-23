@@ -12,6 +12,7 @@ import {
   type TradeVerdict,
 } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
+import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
@@ -205,7 +206,16 @@ function TradeSidePanel({
   );
 }
 
-/** Shares the reviewed package as text (native share sheet, else clipboard)
+/** What the share card route needs to re-derive this trade server-side. */
+export interface AnalyzerShareIds {
+  sendPlayerIds: string[];
+  receivePlayerIds: string[];
+  sendPickIds: string[];
+  receivePickIds: string[];
+  partnerRosterId: string;
+}
+
+/** Shares the reviewed package as a branded PNG (falling back to text)
  * and records it for the "Did this trade happen?" prompt, same payload as
  * mobile's Analyzer share (TradeSharePreviewModal.recordShare). */
 function ShareVerdictButton({
@@ -215,6 +225,7 @@ function ShareVerdictButton({
   verdict,
   sendAssets,
   receiveAssets,
+  shareIds,
 }: {
   leagueId: string;
   partnerTeamName: string;
@@ -222,7 +233,9 @@ function ShareVerdictButton({
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
   receiveAssets: TradeAsset[];
+  shareIds: AnalyzerShareIds;
 }) {
+  const [preparing, setPreparing] = useState(false);
   const [copied, setCopied] = useState(false);
   const label = (assets: TradeAsset[]) => assets.map((a) => a.name).join(", ") || "nothing";
 
@@ -248,22 +261,19 @@ function ShareVerdictButton({
       `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
       `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
       `Balance: ${formatTradeGain(verdict.value_delta)}`;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ text, title });
-        recordShare();
-        return;
-      } catch {
-        // Cancelled or rejected: fall through to the clipboard.
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      recordShare();
+    // Branded PNG (QR + "For <partner>") through the OS share sheet, so the
+    // user can pick the partner's messaging app; text/clipboard fallbacks.
+    const outcome = await shareImageOrText({
+      fetchImage: () => api.getTradeAnalyzerShareCardBlob(leagueId, shareIds),
+      filename: "fantasydesk-trade.png",
+      text,
+      title,
+      onPreparingImage: setPreparing,
+    });
+    if (isCompletedShare(outcome)) recordShare();
+    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // No Share API and no clipboard permission.
     }
   };
 
@@ -271,10 +281,11 @@ function ShareVerdictButton({
     <button
       type="button"
       onClick={onShare}
+      disabled={preparing}
       className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
       style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
     >
-      {copied ? "Copied!" : "Share"}
+      {copied ? "Copied!" : preparing ? "Preparing..." : "Share"}
     </button>
   );
 }
@@ -287,6 +298,7 @@ function VerdictCard({
   leagueId,
   partnerTeamName,
   lens,
+  shareIds,
 }: {
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
@@ -295,6 +307,7 @@ function VerdictCard({
   leagueId: string;
   partnerTeamName: string;
   lens: string;
+  shareIds: AnalyzerShareIds;
 }) {
   const toneColor = TONE_COLOR[verdict.tone];
   const deltaText = formatTradeGain(verdict.value_delta);
@@ -325,6 +338,7 @@ function VerdictCard({
             verdict={verdict}
             sendAssets={sendAssets}
             receiveAssets={receiveAssets}
+            shareIds={shareIds}
           />
         </span>
       </div>
@@ -896,6 +910,13 @@ export function TradeAnalyzerContent({
           leagueId={leagueId}
           partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
           lens={lens}
+          shareIds={{
+            sendPlayerIds: sendPlayers.map((p) => p.player_id),
+            receivePlayerIds: receivePlayers.map((p) => p.player_id),
+            sendPickIds: sendPicks.map((p) => p.pick_id),
+            receivePickIds: receivePicks.map((p) => p.pick_id),
+            partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
+          }}
         />
       ) : hasAnyAssets ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

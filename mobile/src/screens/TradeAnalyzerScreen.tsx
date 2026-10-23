@@ -871,6 +871,9 @@ function VerdictCard({
         leagueName={leagueName}
         partnerTeamName={partnerTeamName}
         verdict={verdict}
+        analyzer
+        sendPicks={sendPicks}
+        receivePicks={receivePicks}
         sendPlayers={sendIds}
         receivePlayers={receiveIds}
         valuationLens={lens}

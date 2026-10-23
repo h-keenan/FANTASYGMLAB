@@ -4220,8 +4220,16 @@ def post_trade_analyzer(
     body: TradeAnalyzerRequest,
     league_id: str = Depends(resolve_league_path_id),
     user: dict[str, Any] = Depends(require_user),
+    x_share_card_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
     """Real accept/decline/counter verdict for a proposed trade package.
+
+    The web share-card route re-runs this call server-to-server to re-derive
+    the grade for an analysis the user already ran. It authenticates with the
+    shared secret SHARE_CARD_INTERNAL_SECRET (header X-Share-Card-Token) and
+    is then exempt from the free-tier weekly gate/counter. With the secret
+    unset or the header wrong/absent, the normal gate applies: a client can't
+    bypass the quota with this header.
 
     Shares the exact same fit engine as the web app's Trade Analyzer
     (modules.trade_analyzer_fit, extracted from app.py) and the same
@@ -4266,7 +4274,9 @@ def post_trade_analyzer(
     # (modules.trade_eval_usage); web enforced it, this API did not. The
     # counter is server-side (Redis), not the user-writable user_settings.
     analyzer_user_id = str(user.get("id") or "")
-    if not _manager_tendencies_gate(user):
+    secret = os.environ.get("SHARE_CARD_INTERNAL_SECRET", "")
+    share_card_call = bool(secret) and secrets.compare_digest(str(x_share_card_token or ""), secret)
+    if not share_card_call and not _manager_tendencies_gate(user):
         if not free_tier_ledger.consume_weekly_trade_eval(
             analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
         ):
