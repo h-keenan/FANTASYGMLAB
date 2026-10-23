@@ -3,14 +3,83 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { api, type ManagerTendenciesDetailResponse } from "@/lib/api";
+import { api, type ManagerRecentTradeAsset, type ManagerTendenciesDetailResponse } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip } from "@/components/StatStrip";
 import { ToneBadge } from "@/components/ToneBadge";
-import { sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone } from "@/lib/managerTendencies";
+import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
 import { SheetHandle } from "@/components/SheetHandle";
+import { PositionBadge } from "@/components/PositionBadge";
+import { PickPlate } from "@/components/TradeAssetExchange";
+
+function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
+  if (asset.kind === "pick") {
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <PickPlate round={asset.round} />
+        <span className="text-sm font-bold break-words">{asset.label || "Draft pick"}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <PositionBadge position={asset.position} />
+      <span className="text-sm font-bold break-words">{asset.name}</span>
+      {asset.team ? (
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {asset.team}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function RecentTrades({ trades }: { trades: NonNullable<ManagerTendenciesDetailResponse["recent_trades"]> }) {
+  return (
+    <>
+      <SectionHeading>Recent trades</SectionHeading>
+      <ul className="flex flex-col gap-2">
+        {trades.map((trade) => (
+          <li key={trade.transaction_id}>
+            <AccentCard accent="var(--color-border)" compact as="div">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {tradeDateLabel(trade.date, trade.week)}
+                  {trade.partners.length ? ` · with ${trade.partners.join(", ")}` : ""}
+                </span>
+                {trade.grade ? (
+                  <ToneBadge label={trade.grade.letter} color={gradeToneColor(trade.grade.tone)} />
+                ) : null}
+              </div>
+              {(
+                [
+                  ["Got", trade.received],
+                  ["Sent", trade.sent],
+                ] as Array<[string, ManagerRecentTradeAsset[]]>
+              ).map(([label, assets]) =>
+                assets.length ? (
+                  <div key={label} className="flex flex-col gap-1">
+                    <span
+                      className="text-xs uppercase font-extrabold"
+                      style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+                    >
+                      {label}
+                    </span>
+                    {assets.map((asset, i) => (
+                      <TradeAssetLine key={`${asset.player_id ?? asset.label}-${i}`} asset={asset} />
+                    ))}
+                  </div>
+                ) : null,
+              )}
+            </AccentCard>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 /** Manager profile sheet (League Rankings): every readable signal with its
  * evidence line. Loaded only when opened. Reuses the quick-view sheet shell. */
@@ -164,6 +233,9 @@ export function ManagerProfileSheet({
                   );
                 })}
               </ul>
+              {data.recent_trades && data.recent_trades.length > 0 ? (
+                <RecentTrades trades={data.recent_trades} />
+              ) : null}
             </div>
           )}
         </div>

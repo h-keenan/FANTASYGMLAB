@@ -85,3 +85,21 @@ export function sampleFill(sampleSize: number, minSample: number): number {
   const target = Math.max(1, minSample) * 2;
   return Math.max(0, Math.min(1, sampleSize / target));
 }
+
+/** Grade tone slug (server) -> shared semantic color token. */
+export function gradeToneColor(tone: string | null | undefined): string {
+  if (tone === "success") return "var(--color-success)";
+  if (tone === "positive") return "var(--color-accent)";
+  if (tone === "risk") return "var(--color-danger)";
+  return "var(--color-text-muted)";
+}
+
+/** "2026-10-04" -> "Oct 4, 2026 · Wk 5" (week-only fallback; "" if neither). */
+export function tradeDateLabel(date: string | null | undefined, week?: number | null): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? "");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const base = match ? `${months[Number(match[2]) - 1] ?? ""} ${Number(match[3])}, ${match[1]}` : "";
+  if (base && week) return `${base} · Wk ${week}`;
+  if (base) return base;
+  return week ? `Week ${week}` : "";
+}

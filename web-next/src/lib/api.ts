@@ -2671,6 +2671,30 @@ export interface ManagerTendenciesSummaryResponse {
   managers: ManagerTendencySummaryRow[];
 }
 
+export interface ManagerRecentTradeAsset {
+  kind: "player" | "pick";
+  player_id?: string;
+  name?: string;
+  position?: string;
+  team?: string;
+  season?: string;
+  round?: number | null;
+  label?: string;
+  original_team?: string;
+}
+
+export interface ManagerRecentTrade {
+  transaction_id: string;
+  season: string;
+  week: number;
+  date: string;
+  partners: string[];
+  received: ManagerRecentTradeAsset[];
+  sent: ManagerRecentTradeAsset[];
+  /** Our retrospective letter for the manager's side; null when not computable. */
+  grade: { letter: string; tone: string; confidence: string; timing_label: string; ratio: number | null } | null;
+}
+
 export interface ManagerTendenciesDetailResponse {
   ok: boolean;
   is_premium: boolean;
@@ -2682,6 +2706,8 @@ export interface ManagerTendenciesDetailResponse {
     sample: { trades: number; wire_moves: number; seasons: number } | null;
     signals: Record<string, ManagerTendencySignal>;
   } | null;
+  /** Pro payload only; newest first, max 5. */
+  recent_trades?: ManagerRecentTrade[];
 }
 
 export interface RecordTradeShareBody {

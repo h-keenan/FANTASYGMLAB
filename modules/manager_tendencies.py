@@ -72,6 +72,8 @@ from modules import league_history, redis_cache, sleeper
 # per season) and how far back an owner's old habits are allowed to speak
 # for them now.
 MAX_TENDENCY_SEASONS = 5
+# Trades shown in the manager sheet's "Recent trades" section.
+RECENT_TRADES_LIMIT = 5
 
 # The current (head-of-chain) season changes whenever a real move happens.
 # 30 minutes matches the sibling transaction-derived caches
@@ -696,6 +698,8 @@ def build_league_tendencies(
                             "league_id": _text(season.get("league_id")),
                             "season": _text(season.get("season")),
                             "recent": _text(season.get("league_id")) in recent_league_ids,
+                            "roster_id": roster_id,
+                            "timestamp": timestamp,
                             "received": side["received"],
                             "sent": side["sent"],
                             "partners": [p for p in partners if p],
@@ -840,6 +844,7 @@ def build_league_tendencies(
                 "seasons": len(included),
             },
             "signals": signals,
+            "recent_trade_refs": _recent_trade_refs(data["trades"]),
             "headline": _headline(signals, len(data["trades"])),
             "status": OK if any(s["status"] == OK for s in signals.values()) else INSUFFICIENT,
         }
@@ -852,6 +857,19 @@ def build_league_tendencies(
         "transactions": transactions,
         "thresholds": dict(THRESHOLDS),
     }
+
+
+def _recent_trade_refs(trades: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Newest-first (transaction_id, roster_id) refs for a manager's latest
+    trades. Ids only: the trade bodies already live in ``transactions``."""
+
+    # Ties on timestamp fall back to scan order (later in the season = newer).
+    indexed = sorted(enumerate(trades), key=lambda it: (_int(it[1].get("timestamp")), it[0]), reverse=True)
+    return [
+        {"transaction_id": _text(t.get("transaction_id")), "roster_id": _int(t.get("roster_id"))}
+        for _, t in indexed[:RECENT_TRADES_LIMIT]
+        if _text(t.get("transaction_id")) and _int(t.get("roster_id"))
+    ]
 
 
 def _manager_signals(
@@ -1461,6 +1479,119 @@ def league_summary(profile: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "labels": {
                     key: signal.get("label") for key, signal in (manager.get("signals") or {}).items()
                 },
+            }
+        )
+    return rows
+
+
+def _recent_asset(asset: Mapping[str, Any], lookup: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    if asset.get("kind") == "pick":
+        return {
+            "kind": "pick",
+            "season": _text(asset.get("season")),
+            "round": asset.get("round"),
+            "label": _text(asset.get("label")),
+            "original_team": _text(asset.get("original_team")),
+        }
+    player_id = _text(asset.get("player_id"))
+    row = lookup.get(player_id) if player_id else None
+    row = row if isinstance(row, Mapping) else {}
+    return {
+        "kind": "player",
+        "player_id": player_id,
+        "name": _text(row.get("name")) or _text(asset.get("name")),
+        "position": _text(row.get("position")) or _text(asset.get("position")),
+        "team": _text(row.get("team")),
+    }
+
+
+def _grade_for_side(
+    tx: Mapping[str, Any],
+    roster_id: int,
+    lookup: Mapping[str, Mapping[str, Any]],
+    current_week: int,
+) -> dict[str, Any] | None:
+    """The History tab's retrospective letter for this manager's side, or
+    None when it cannot be computed honestly (multi-team trade, startup-draft
+    picks, still too recent, or missing current values)."""
+
+    from modules import transaction_grades
+
+    sides = [s for s in tx.get("sides") or [] if isinstance(s, Mapping)]
+    if len(sides) != 2 or roster_id not in {_int(s.get("roster_id")) for s in sides}:
+        return None
+    graded_sides = []
+    for side in sides:
+        received = list(side.get("received") or [])
+        if any(a.get("kind") == "pick" and a.get("startup") for a in received + list(side.get("sent") or [])):
+            return None
+        graded_sides.append(
+            {
+                "team_name": side.get("team_name"),
+                "roster_id": side.get("roster_id"),
+                "receives": received,
+            }
+        )
+    try:
+        graded = transaction_grades.grade_trade(
+            {"type": "trade", "week": tx.get("week"), "sides": graded_sides, "timestamp": 0},
+            player_lookup=lookup,
+            current_week=current_week,
+            later_events=(),
+        )
+    except Exception:
+        return None
+    for source, result in zip(graded_sides, graded.get("sides") or []):
+        if _int(source.get("roster_id")) != roster_id:
+            continue
+        letter = _text(result.get("letter"))
+        if not letter or letter == transaction_grades.PENDING:
+            return None
+        return {
+            "letter": letter,
+            "tone": _text(result.get("tone")),
+            "confidence": _text(result.get("confidence")),
+            "timing_label": _text(result.get("timing_label")),
+            "ratio": result.get("ratio"),
+        }
+    return None
+
+
+def recent_trades(
+    profile: Mapping[str, Any],
+    roster_id: int,
+    *,
+    player_lookup: Mapping[str, Mapping[str, Any]] | None = None,
+    current_week: int = 0,
+    limit: int = RECENT_TRADES_LIMIT,
+) -> list[dict[str, Any]]:
+    """The manager's latest trades (newest first) from the already-loaded
+    league transactions: date/week, what each side received, and our grade
+    for the manager's side (null when it can't be computed -- never invented)."""
+
+    manager = (profile.get("managers") or {}).get(roster_id) or {}
+    all_tx = profile.get("transactions") or {}
+    lookup = player_lookup or {}
+    rows: list[dict[str, Any]] = []
+    for ref in (manager.get("recent_trade_refs") or [])[:limit]:
+        tx = all_tx.get(ref.get("transaction_id"))
+        if not tx:
+            continue
+        rid = _int(ref.get("roster_id"))
+        mine = next((s for s in tx.get("sides") or [] if _int(s.get("roster_id")) == rid), None)
+        if mine is None:
+            continue
+        others = [s for s in tx.get("sides") or [] if _int(s.get("roster_id")) != rid]
+        rows.append(
+            {
+                "transaction_id": tx.get("transaction_id"),
+                "season": tx.get("season"),
+                "week": tx.get("week"),
+                "date": tx.get("date"),
+                "partners": [_text(s.get("team_name")) for s in others],
+                "received": [_recent_asset(a, lookup) for a in mine.get("received") or []],
+                "sent": [_recent_asset(a, lookup) for a in mine.get("sent") or []],
+                "grade": _grade_for_side(tx, rid, lookup, current_week),
             }
         )
     return rows

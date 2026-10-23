@@ -435,6 +435,13 @@ def profile_stub(monkeypatch):
     stub = Mock(return_value=profile)
     monkeypatch.setattr(mt, "league_tendencies_cached", stub)
     monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
+    # Never build the real valuation frame (players.db) from a test.
+    import pandas as pd
+
+    monkeypatch.setattr(
+        "modules.league_value_settings.build_valued_players_frame_cached",
+        lambda **kw: pd.DataFrame(),
+    )
     return stub
 
 
@@ -472,7 +479,43 @@ def test_premium_summary_and_detail(monkeypatch, profile_stub):
     assert body["manager"]["signals"]["posture"]["label"] == "rebuilding"
     assert "t2" in body["transactions"]
     assert body["thresholds"]["min_trades"] == mt.MIN_TRADES
+    assert [t["transaction_id"] for t in body["recent_trades"]] == ["t5", "t4", "t3", "t2", "t1"]
+    assert all(t["grade"] is None for t in body["recent_trades"])  # no values loaded -> never invented
 
     with patch("requests.get", side_effect=_auth("premium")):
         missing = client.get("/v1/leagues/abc/managers/99/tendencies", headers={"Authorization": "Bearer good-token"})
     assert missing.status_code == 404
+
+
+# --- Recent trades -----------------------------------------------------------
+
+
+def test_recent_trades_newest_first_capped_with_assets_and_real_grade():
+    trades = _rebuilder_trades()
+    trades.append(_trade("t0", TS_2024, {"v_wr1": 2}, {"v_wr1": 1}, creator="u2"))
+    profile = _profile(trades)
+    lookup = {
+        pid: {"name": row["full_name"], "position": row["position"], "team": "BUF", "value_score": 50 + i * 5}
+        for i, (pid, row) in enumerate(PLAYERS.items())
+    }
+    rows = mt.recent_trades(profile, 1, player_lookup=lookup, current_week=10)
+    assert len(rows) == mt.RECENT_TRADES_LIMIT == 5
+    assert "t0" not in [r["transaction_id"] for r in rows]  # oldest dropped by the cap
+    t2 = next(r for r in rows if r["transaction_id"] == "t2")
+    # roster 1 sent v_wr1 and received the 2026 R1 pick from roster 3
+    assert [a["label"] for a in t2["received"] if a["kind"] == "pick"] == ["2026 1st"]
+    assert t2["sent"][0] == {
+        "kind": "player", "player_id": "v_wr1", "name": "Vet WR One", "position": "WR", "team": "BUF",
+    }
+    assert t2["date"] and t2["partners"]
+    t1 = next(r for r in rows if r["transaction_id"] == "t1")
+    assert t1["grade"] and t1["grade"]["letter"] and t1["grade"]["tone"]
+    # Picks the roster-1 manager received are rounds, season preserved.
+    assert next(a for a in t2["received"] if a["kind"] == "pick")["season"] == "2026"
+
+
+def test_recent_trades_grade_is_null_without_values_and_empty_without_trades():
+    profile = _profile(_rebuilder_trades())
+    assert all(r["grade"] is None for r in mt.recent_trades(profile, 1, player_lookup={}, current_week=10))
+    assert mt.recent_trades(profile, 99) == []
+    assert mt.recent_trades(_profile([]), 1) == []
