@@ -12,7 +12,7 @@ import {
   gamePlanTileHref,
   resolveGamePlanTargetPlayerId,
 } from "@/lib/gamePlanPresentation";
-import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
+import { destinationCtaLabel } from "@/lib/destinationLabels";
 
 /**
  * Ports modules/daily_gm_briefing_ui.py's Today's Game Plan card: kicker
@@ -43,7 +43,7 @@ export function GamePlanCard({
   leagueId: string;
   leagueName: string;
 }) {
-  const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
+  const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination] ?? "dashboard";
   const copy = useExperienceCopy();
   return (
     <AccentCard accent="var(--color-accent)">
@@ -70,23 +70,13 @@ export function GamePlanCard({
         {item.reason}
       </p>
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
-      {internalRoute ? (
-        <Link
-          href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
-          className="self-start text-sm font-bold mt-1"
-          style={{ color: "var(--color-accent)" }}
-        >
-          {destinationCtaLabel(item.destination)} →
-        </Link>
-      ) : (
-        <a
-          href={streamlitPageUrl(item.destination)}
-          className="self-start text-sm font-bold mt-1"
-          style={{ color: "var(--color-accent)" }}
-        >
-          {destinationCtaLabel(item.destination)} →
-        </a>
-      )}
+      <Link
+        href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
+        className="self-start text-sm font-bold mt-1"
+        style={{ color: "var(--color-accent)" }}
+      >
+        {destinationCtaLabel(item.destination)} →
+      </Link>
     </AccentCard>
   );
 }

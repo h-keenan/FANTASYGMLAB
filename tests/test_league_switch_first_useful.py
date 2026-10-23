@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from modules import league_switch_first_useful
 from modules import prepared_player_frame
 from modules import session_integrity
 from modules import trade_hub_first_useful
@@ -116,61 +115,6 @@ def test_trade_hub_memo_isolated_across_leagues():
     assert board["eligible_ideas"][0]["tag"] == "B1"
 
 
-def test_rapid_a_b_c_final_league_wins_and_no_stale_narrative():
-    state: dict = {"selected_league_id": "A"}
-    for previous, nxt in (("A", "B"), ("B", "C")):
-        league_switch_first_useful.begin_switch_guard(
-            state,
-            previous_league_id=previous,
-            next_league_id=nxt,
-        )
-        state["canonical_recommendation_narrative"] = {"league_id": previous}
-        state.pop("canonical_recommendation_narrative", None)
-        prepared_player_frame.clear_league_scoped_prepared_memos(
-            state, previous_league_id=previous
-        )
-        state["selected_league_id"] = nxt
-        league_switch_first_useful.mark_cleanup_complete(state)
-        league_switch_first_useful.consume_switch_guard(state)
-    assert state["selected_league_id"] == "C"
-    assert "canonical_recommendation_narrative" not in state
-
-
-def test_stale_flash_helper_detects_mismatch():
-    league_switch_first_useful.assert_no_stale_league_payload(
-        active_league_id="B",
-        payload_league_id="B",
-        surface="inbox",
-    )
-    try:
-        league_switch_first_useful.assert_no_stale_league_payload(
-            active_league_id="B",
-            payload_league_id="A",
-            surface="inbox",
-        )
-    except AssertionError as exc:
-        assert "stale league payload" in str(exc)
-    else:
-        raise AssertionError("expected stale payload detection")
-
-
-def test_app_uses_league_scoped_clear_on_switch():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    clearer = source[
-        source.index("def _clear_league_switch_transient_state(") : source.index(
-            "def _open_notification_destination("
-        )
-    ]
-    assert "clear_league_scoped_prepared_memos" in clearer
-    assert "clear_prepared_player_frame" not in clearer
-    assert "league_switch_first_useful.begin_switch_guard" in source
-    assert "Loading" in source[
-        source.index("league_switch_ack = st.session_state.pop") : source.index(
-            "def _query_param_page("
-        )
-    ]
-
-
 def test_no_football_modules_touched():
     """League-switch presentation PRs must not touch Trust engines.
 
@@ -193,8 +137,3 @@ def test_no_football_modules_touched():
         "modules/trust_enforcement.py",
     }
     assert not diff_names.intersection(forbidden)
-
-
-def test_viewport_matrix_documented():
-    validate = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-    assert "WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)" in validate

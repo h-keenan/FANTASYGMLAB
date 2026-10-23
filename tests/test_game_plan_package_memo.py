@@ -13,7 +13,6 @@ from modules import startup_coordinator
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 PACKAGE = (ROOT / "modules" / "game_plan_package.py").read_text(encoding="utf-8")
 
 
@@ -58,24 +57,6 @@ def _sample_briefing(*, entitlement: str = "free") -> daily_gm_briefing.DailyGmB
         entitlement=entitlement,
         context_fingerprint="fp-1",
     )
-
-
-def test_game_plan_context_flags_disable_full_intelligence():
-    flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
-    assert flags[0] is False
-    assert flags[1] is True
-    assert flags[2] is True
-    assert flags[3] is True
-    assert "GAME_PLAN_CONTEXT_FLAGS" in APP
-    assert "include_intelligence=flags[0]" in APP
-
-
-def test_dashboard_defers_league_context_until_package_miss():
-    assert "league_context_loader=" in APP
-    assert "_load_game_plan_league_context" in APP
-    assert "game_plan_package_cache_lookup" in APP
-    assert "lookup_package(" in APP
-    assert "store_package(" in APP
 
 
 def test_package_miss_equals_hit_recommendation_ids_and_order():
@@ -254,29 +235,3 @@ def test_startup_milestones_include_package_cache_events():
     assert "game_plan_package_ready" in labels
     assert "game_plan_trade_inventory_ready" in labels
     assert "game_plan_first_useful" in labels
-
-
-def test_game_plan_first_useful_survives_startup_complete_origin():
-    state: dict = {}
-    from modules import auth_restore_lifecycle
-
-    auth_restore_lifecycle.ensure_startup_session(state)
-    origin = startup_coordinator.startup_session_origin(state)
-    coordinator = startup_coordinator.StartupCoordinator(session_state=state, active=True)
-    coordinator.complete()
-    assert startup_coordinator.startup_session_origin(state) == origin
-    # Contract: Dashboard useful marker still ties to preserved origin.
-    useful = APP.index('data-fgl-dashboard-useful="1"')
-    block = APP[useful : useful + 1400]
-    assert "startup_session_origin" in block
-
-
-def test_post_ready_package_hit_skips_trade_inventory_path():
-    # Hit restores package; trade inventory only runs in the miss (else) branch.
-    hit_marker = APP.index("game_plan_package_hit")
-    else_branch = APP.index("else:", hit_marker)
-    trade_call = APP.index("cached_dashboard_trade_headline(", else_branch)
-    store_call = APP.index("game_plan_package.store_package(", else_branch)
-    assert trade_call > else_branch
-    assert store_call > trade_call
-    assert "game_plan_package_ready" in APP[hit_marker:else_branch]

@@ -3,8 +3,6 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from modules import football_assets
-from modules.app_styles import APP_CSS
-from modules.football_asset_styles import FOOTBALL_ASSET_CSS
 
 
 def asset(**overrides):
@@ -110,44 +108,7 @@ def test_prestige_indicator_has_fixed_semantic_rail_and_accessible_text():
     assert "Premium status: Elite" in html
 
 
-def test_styles_are_token_backed_loaded_once_and_responsive():
-    assert APP_CSS.count(FOOTBALL_ASSET_CSS) == 1
-    assert "var(--color-prestige-elite)" in FOOTBALL_ASSET_CSS
-    assert "var(--space-md)" in FOOTBALL_ASSET_CSS
-    assert "var(--touch-target-min)" in FOOTBALL_ASSET_CSS
-    assert "@media (max-width: 700px)" in FOOTBALL_ASSET_CSS
-    assert "@media (prefers-reduced-motion: reduce)" in FOOTBALL_ASSET_CSS
-    assert "#" not in FOOTBALL_ASSET_CSS
-
-
-def test_roster_core_portrait_is_ring_ready_and_larger_than_list_avatar():
-    html = football_assets.player_card_html(
-        asset(),
-        avatar_html="<div class='compact-player-avatar dg-player-headshot'><span class='dg-player-headshot-fallback'>AP</span><img class='dg-player-headshot-image' src='photo.png' alt=''></div>",
-    )
-    assert "dg-player-portrait" in html
-    assert "dg-football-asset__avatar dg-player-portrait" in html
-    assert "var(--size-asset-standard, 2.75rem)" in FOOTBALL_ASSET_CSS
-    assert "var(--size-roster-core-portrait)" in FOOTBALL_ASSET_CSS
-    assert ".dg-player-portrait>.dg-player-headshot" in FOOTBALL_ASSET_CSS.replace(" ", "")
-    assert "--avatar-size:100%!important" in FOOTBALL_ASSET_CSS.replace(" ", "")
-    assert "object-fit:cover!important" in FOOTBALL_ASSET_CSS.replace(" ", "")
-    assert "transparent" in FOOTBALL_ASSET_CSS
-    assert ".dg-player-portrait--gold" not in FOOTBALL_ASSET_CSS
-    assert "#d8b85a" not in FOOTBALL_ASSET_CSS
-
-
 def test_football_asset_module_does_not_import_page_or_business_modules():
     source = __import__("inspect").getsource(football_assets)
     for forbidden in ("app", "trade_hub", "waivers", "rankings", "valuation", "streamlit"):
         assert f"import {forbidden}" not in source
-
-
-def test_position_badge_uses_shared_position_identity_class():
-    html = football_assets.position_badge_html("WR")
-    assert "dg-football-position--wr" in html
-    assert "WR" in html
-    card = football_assets.player_card_html(asset(position="QB"))
-    assert "dg-football-position--qb" in card
-    assert "dg-football-position--qb" in FOOTBALL_ASSET_CSS
-    assert "--color-position-qb" in FOOTBALL_ASSET_CSS

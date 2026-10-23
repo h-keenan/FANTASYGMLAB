@@ -24,7 +24,6 @@ from modules import tail_latency_diagnostics
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -35,23 +34,6 @@ def _reset(monkeypatch):
     yield
     game_plan_process_cache.clear_process_game_plan_caches()
     tail_latency_diagnostics.reset_process_boot_for_tests()
-
-
-def test_app_resolves_truth_canon_before_render_home_dashboard():
-    entry = APP.index('"dashboard_game_plan_entry"')
-    canon = APP.index("pre_package_canonical_resolver", entry)
-    render = APP.index("render_home_dashboard(", canon)
-    assert entry < canon < render
-    assert "game_plan_truth_canon_ready" in APP
-
-
-def test_valued_enrichment_defers_display_but_cannot_overwrite_canon_contract():
-    block = APP[
-        APP.index("def _enrich_valued_shell_chrome()") :
-        APP.index("defer_valued_shell_for_game_plan")
-    ]
-    assert "presentation_strategy_view" in block
-    assert "note_presentation_strategy_write" not in block
 
 
 def test_presentation_view_prefers_explicit_canon_without_mutation(monkeypatch, capsys):

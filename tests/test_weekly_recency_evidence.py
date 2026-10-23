@@ -425,25 +425,6 @@ def test_display_reads_a_real_player_row_end_to_end():
     assert abs(read["trend"]) <= rankings.RECENCY_TREND_CLIP
 
 
-def test_display_is_the_only_gate_both_surfaces_use():
-    """Neither app may re-threshold the read with numbers of its own."""
-
-    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-    # The PQV dossier and the full player-detail page, and nowhere else.
-    assert app_source.count("rankings_module.recency_trend_display(row)") == 2
-    mobile_source = (ROOT / "services" / "mobile_api_service.py").read_text(encoding="utf-8")
-    assert "rankings.recency_trend_display(row)" in mobile_source
-    for surface in (app_source, mobile_source):
-        assert "RECENCY_DISPLAY_MIN_CONFIDENCE" not in surface
-        assert "RECENCY_DISPLAY_MIN_TREND" not in surface
-    # The mobile client renders whatever it is handed; it owns no threshold.
-    for screen in ("PlayerDetailScreen.tsx", "PlayersScreen.tsx"):
-        client = (ROOT / "mobile" / "src" / "screens" / screen).read_text(encoding="utf-8")
-        assert "usage_trend" in client
-        assert "sample_n" not in client
-        assert "confidence >" not in client
-
-
 def _cooling_trend(usages: list[float]) -> str:
     weekly = _weeks_from_usage("RB", usages)
     row = _score(

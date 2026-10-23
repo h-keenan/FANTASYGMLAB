@@ -7,79 +7,10 @@ from pathlib import Path
 import pandas as pd
 
 from modules import player_eligibility
-from modules import waivers_ui
-from modules.trade_hub_ui import TRADE_SUMMARY_COMPONENT_CSS
+from modules import waivers_logic
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_trade_summary_uses_shared_headshot_helper():
-    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    helper = source[
-        source.index("def _trade_summary_assets_html") : source.index(
-            "def trade_hub_display_section"
-        )
-    ]
-    assert "compact_asset_stack_html" in helper
-    assert "get_player_image_url" in source
-    assert "show_value=False" in helper
-    assert "<img src=" not in helper
-
-
-def test_waiver_sections_dedupe_across_stash_and_watchlist():
-    featured = pd.DataFrame([{"player_id": "a", "name": "A"}])
-    stash = pd.DataFrame(
-        [
-            {"player_id": "a", "name": "A"},
-            {"player_id": "b", "name": "B"},
-        ]
-    )
-    watch = pd.DataFrame([{"player_id": "b", "name": "B"}, {"player_id": "c", "name": "C"}])
-    faab = pd.DataFrame([{"player_id": "d", "name": "D"}])
-
-    _, stash_out, watch_out, faab_out = waivers_ui._dedupe_waiver_sections(
-        featured, stash, watch, faab
-    )
-
-    assert stash_out["player_id"].tolist() == ["b"]
-    assert watch_out["player_id"].tolist() == ["c"]
-    assert faab_out["player_id"].tolist() == ["d"]
-
-
-def test_executive_unify_normalizes_legacy_card_and_portrait_surfaces():
-    css = (ROOT / "modules" / "desktop_executive_layout_styles.py").read_text(encoding="utf-8")
-    for selector in (
-        ".summary-tile",
-        ".free-agent-card",
-        ".home-command-card",
-    ):
-        assert selector in css
-    assert ".team-rank-card" not in css
-
-
-def test_trade_summary_iframe_headshots_use_contain_and_muted_background():
-    css = TRADE_SUMMARY_COMPONENT_CSS
-    assert "object-fit: cover" in css
-    assert "color-surface-muted" in css
-
-
-def test_scan_renderer_defaults_to_design_system():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    scan = source.split("def render_player_scan_cards(", 1)[1].split("\ndef ", 1)[0]
-    compact = source.split("def _compact_player_row_html(", 1)[1].split("\ndef ", 1)[0]
-    assert "design_system: bool = True" in scan
-    assert "design_system: bool = True" in compact
-
-
-def test_waiver_featured_fallback_does_not_restore_all_stale_players():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    block = source.split("featured_free_agents = free_agents_ranked[", 1)[1].split(
-        "else:\n                featured_free_agents = free_agents_ranked.copy()",
-        1,
-    )[0]
-    assert "is_current_fantasy_eligible" in block
-    assert "free_agents_ranked.copy()" not in block.split("if featured_free_agents.empty")[1][:600]
 
 
 def test_audit_document_exists():

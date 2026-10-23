@@ -255,16 +255,6 @@ def test_malformed_scalar_exception_behavior_is_unchanged():
         trust_engine.validate_player(record, now=NOW)
 
 
-def test_no_new_persistent_trust_state_or_app_wiring():
-    source = Path("modules/trust_engine.py").read_text(encoding="utf-8")
-
-    assert "st.session_state" not in source
-    assert "cache_data" not in source
-    assert "cache_resource" not in source
-    assert "_canonical_object_key_from_payload(kind, payload)" in source
-    assert Path("app.py").read_text(encoding="utf-8")
-
-
 def test_profiler_locations_do_not_expose_host_path_segments():
     external = _safe_profile_location(
         r"C:\Users\controlled-user\venv\Lib\site-packages\pandas\core.py",

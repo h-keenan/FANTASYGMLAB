@@ -8,12 +8,12 @@ league:
   1. record     -- W-L-T, standings rank, playoff status
                    (modules.league_standings.build_league_standings_bundle)
   2. waiver     -- the single top-priority add + a one-line reason
-                   (modules.waivers_ui.select_top_waiver_opportunity, projected
+                   (modules.waivers_logic.select_top_waiver_opportunity, projected
                    through modules.dashboard_engine.build_waiver_tile so the
                    reason text matches the Dashboard's own waiver tile)
   3. trade      -- the headline of the single top trade idea
                    (modules.trade_hub_engine.generate_trade_idea_records_cached,
-                   ordered by modules.trade_hub_ui.order_trade_hub_visible_ideas
+                   ordered by modules.trade_hub_presentation.order_trade_hub_visible_ideas
                    and projected through dashboard_engine.build_trade_tile)
   4. news       -- a roster news/injury count: the roster-relevant news items
                    the league's Alerts screen shows (modules.my_news, the same
@@ -56,13 +56,13 @@ from modules import (
     sleeper_leagues,
     team_stance,
     trade_hub_engine,
-    trade_hub_ui,
+    trade_hub_presentation,
 )
 from modules.rankings import injury_level
 from modules.roster_needs import select_need_headline
 from modules.team_eval import suggest_optimal_lineup
 from modules.trade_analyzer_fit import build_team_needs_assessment, get_needed_positions
-from modules.waivers_ui import select_top_waiver_opportunity
+from modules.waivers_logic import select_top_waiver_opportunity
 
 # Same cap GET /v1/leagues/{id}/alerts defaults to, so the badge never
 # promises more items than the Alerts screen it opens will list.
@@ -302,7 +302,7 @@ def build_league_glance(
     except (TypeError, ValueError):
         records = None
     if records:
-        ranked = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+        ranked = trade_hub_presentation.order_trade_hub_visible_ideas(list(records))
         if ranked:
             trade = project_trade_tile(
                 dashboard_engine.build_trade_tile(

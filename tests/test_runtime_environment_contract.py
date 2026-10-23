@@ -131,10 +131,6 @@ class TestRuntimeEnvironmentContract(unittest.TestCase):
     def test_stripe_billing_mode_is_inventoried_for_web(self):
         self.assertIn("STRIPE_BILLING_MODE", app_config.WEB_APP_CONFIG_KEYS)
 
-    def test_app_py_enforces_managed_web_config(self):
-        source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn("enforce_managed_web_config", source)
-
 
 if __name__ == "__main__":
     unittest.main()

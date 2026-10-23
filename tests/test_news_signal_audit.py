@@ -439,16 +439,3 @@ def test_injury_alert_path_uses_status_not_article_sentiment():
     assert 'df["news_factor"] = 0.0' in (ROOT / "modules" / "rankings.py").read_text(
         encoding="utf-8"
     )
-
-
-def test_reason_labels_cover_unified_taxonomy():
-    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-    for key in (
-        "injury/status",
-        "transaction",
-        "transaction/drama",
-        "off-field/drama",
-        "role/depth chart",
-        "player headline",
-    ):
-        assert f'"{key}"' in app_source

@@ -465,41 +465,5 @@ class TestEffectiveEntitlementReferralComp(unittest.TestCase):
         self.assertEqual(tier, premium.PRO)
 
 
-class TestInviteCtaRenders(unittest.TestCase):
-    """Smoke test: the League Rankings CTA actually renders and its button
-    click fires without raising (modules.referral_ui is otherwise untested
-    by the pure-logic cases above, which only exercise modules.referrals)."""
-
-    @pytest.mark.known_flaky
-    def test_renders_referral_link_and_copy_button_for_a_signed_in_user(self):
-        from streamlit.testing.v1 import AppTest
-
-        at = AppTest.from_string(
-            "import streamlit as st\n"
-            "from modules import referral_ui\n"
-            "st.session_state.setdefault('auth_session', {'user_id': "
-            f"'{USER_A}', 'access_token': 'tok'}})\n"
-            "referral_ui.render_invite_cta(session_state=st.session_state)\n"
-        )
-        at.run()
-        self.assertFalse(at.exception)
-        self.assertEqual(len(at.button), 1)
-
-        at.button[0].click().run()
-        self.assertFalse(at.exception)
-
-    def test_renders_nothing_for_a_signed_out_session(self):
-        from streamlit.testing.v1 import AppTest
-
-        at = AppTest.from_string(
-            "import streamlit as st\n"
-            "from modules import referral_ui\n"
-            "referral_ui.render_invite_cta(session_state=st.session_state)\n"
-        )
-        at.run()
-        self.assertFalse(at.exception)
-        self.assertEqual(len(at.button), 0)
-
-
 if __name__ == "__main__":
     unittest.main()

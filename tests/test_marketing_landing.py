@@ -4,119 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from modules import brand_identity, launch_analytics, marketing_landing, premium_page
+from modules import brand_identity, launch_analytics, premium_benefits
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_landing_copy_answers_core_questions_without_hype():
-    cold = marketing_landing.landing_hero_html() + marketing_landing.landing_body_html(
-        billing_configured=False
-    )
-    html = marketing_landing.landing_hero_html() + marketing_landing.landing_body_html(
-        billing_configured=False, detail=True, include_pricing=True
-    )
-    proof = marketing_landing.landing_proof_html()
-    assert brand_identity.PRODUCT_NAME in cold
-    assert marketing_landing.APP_HERO_STATEMENT in cold
-    assert marketing_landing.TRUST_LINE
-    assert "fgl-landing__trust" in Path(ROOT / "modules" / "marketing_landing.py").read_text(
-        encoding="utf-8"
-    )
-    assert "What it does" not in cold
-    assert "How it works" in proof
-    assert "Roster decisions" in proof
-    assert "Next step" not in cold
-    assert "Game Plan" in html
-    assert "Trade Hub" in html
-    assert "Waivers" in html
-    assert "Decision Memory" in html
-    assert "GM Targets" in html
-    assert "Founder Beta" not in html
-    assert "Free includes" not in cold
-    assert "Free includes" in html
-    assert "Included now with Premium" in html
-    assert "best in class" not in html.casefold()
-    assert "testimonial" not in html.casefold()
-    assert "Live billing is not enabled" in html
-
-
-def test_landing_hero_notes_mobile_apps_coming_soon_without_fabrication():
-    # The badge renders after the primary/secondary CTAs and trust line (see
-    # render_marketing_landing), not inside landing_hero_html — a "coming
-    # soon" note between the value prop and the CTA read as "not ready yet"
-    # right at the decision moment, which is the opposite of what a
-    # paid-ad landing page wants. landing_hero_html itself must stay clean.
-    hero = marketing_landing.landing_hero_html()
-    assert "fgl-landing__mobile-badge" not in hero
-
-    badge = marketing_landing.landing_mobile_soon_badge_html()
-    assert "fgl-landing__mobile-badge" in badge
-    assert marketing_landing.MOBILE_SOON_LABEL in badge
-    from html import escape as _escape
-
-    assert _escape(marketing_landing.MOBILE_SOON_TEXT) in badge
-    assert "iOS" in badge
-    assert "Android" in badge
-    assert "coming soon" in badge.casefold()
-    # Honest, minimal copy only — no fabricated dates, links, or download claim.
-    lowered = badge.casefold()
-    for needle in (
-        "apps.apple.com",
-        "play.google.com",
-        "download now",
-        "available now",
-        "waitlist",
-        "sign up",
-        "2026",
-        "2027",
-    ):
-        assert needle not in lowered
-    css = (ROOT / "modules" / "marketing_landing_styles.py").read_text(encoding="utf-8")
-    assert "fgl-landing__mobile-badge" in css
-    # Compact hero (mid-flow) never renders the badge at all.
-    compact = marketing_landing.landing_hero_html(compact=True)
-    assert "fgl-landing__mobile-badge" not in compact
-
-
-def test_product_preview_is_generic_workspace_not_fake_league_data():
-    html = marketing_landing.landing_product_preview_html()
-    assert "data-fgl-product-preview='1'" in html
-    assert "Your league changes the answer" in html
-    assert "Contending team" in html
-    assert "Move surplus WR" in html
-    assert "Your player pool" in html
-    assert "Same players. Different league context. Different next move." in html
-    lowered = html.casefold()
-    for needle in (
-        "mccaffrey",
-        "jefferson",
-        "jeanty",
-        "mahomes",
-        "94.2",
-        "league #1",
-        "your team 'the",
-        "@",
-    ):
-        assert needle not in lowered
-    css = (ROOT / "modules" / "marketing_landing_styles.py").read_text(encoding="utf-8")
-    assert ".fgl-preview" in css
-    assert "APP_PRIMARY_CTA_HINT" in (
-        ROOT / "modules" / "marketing_landing.py"
-    ).read_text(encoding="utf-8")
-
-
-def test_landing_reuses_premium_page_positioning():
-    html = marketing_landing.landing_body_html(
-        billing_configured=True, detail=True, include_pricing=True
-    )
-    for title, _body in premium_page.FREE_INCLUDES:
-        assert title in html
-    for title, _body in premium_page.PREMIUM_INCLUDED_NOW[:3]:
-        assert title in html
-    assert "Stripe test mode" in html
-    assert "No live charge will be made" in html
 
 
 def test_landing_analytics_events_are_allowlisted():
@@ -128,13 +19,6 @@ def test_landing_analytics_events_are_allowlisted():
         "signup_started",
     ):
         assert event in launch_analytics.TRACKED_EVENTS
-
-
-def test_launch_screen_wires_marketing_landing():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    launch = source.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
-    assert "marketing_landing.render_marketing_landing()" in launch
-    assert "launch-step-grid" not in launch
 
 
 def test_marketing_assets_exist():
@@ -151,49 +35,3 @@ def test_marketing_assets_exist():
         path = ROOT / "assets" / "marketing" / name
         assert path.exists(), name
         assert path.stat().st_size > 40, name
-
-
-def test_screenshot_gallery_was_removed_not_just_renamed():
-    """Regression test for the "fake renderings" complaint: the landing used
-
-    to claim its gallery was "Captured from the product UI — not marketing
-    mockups" while two of the three images were synthetic share-card
-    renders (literal "Synthetic Young WR" placeholder data, generic
-    silhouette avatars) built by modules/share_card_renderer.py, not real
-    captured screens. Rather than patch the caption, the gallery and its
-    image-rendering machinery were removed from the in-app landing
-    entirely — the abstract, honest preview rail (landing_product_preview_html)
-    is the one "what it does" moment now.
-    """
-
-    source = (ROOT / "modules" / "marketing_landing.py").read_text(encoding="utf-8")
-    assert "render_screenshot_gallery" not in source
-    assert "WHAT_IT_DOES" not in source
-    assert "not marketing mockups" not in source
-    assert not hasattr(marketing_landing, "render_screenshot_gallery")
-    assert not hasattr(marketing_landing, "WHAT_IT_DOES")
-    assert not hasattr(marketing_landing, "screenshot_path")
-
-
-def test_why_different_section_is_merged_not_split():
-    """"Why it's different" and the old standalone "Trust" section made the
-
-    same overlapping claims twice. They're one list now.
-    """
-
-    html = marketing_landing.landing_body_html(
-        billing_configured=False, detail=True, include_pricing=False
-    )
-    assert "Why it's different" in html
-    assert "<div class='fgl-landing__kicker'>Trust</div>" not in html
-    assert "What's experimental" not in html
-    assert "What's included" not in html
-    assert "Founder Beta" not in html
-    assert "ESPN import" in html
-
-
-def test_landing_css_is_not_global_app_css():
-    app_styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "MARKETING_LANDING_CSS" not in app_styles
-    landing = (ROOT / "modules" / "marketing_landing.py").read_text(encoding="utf-8")
-    assert "MARKETING_LANDING_CSS" in landing

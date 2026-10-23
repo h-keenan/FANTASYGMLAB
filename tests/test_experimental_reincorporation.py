@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules import decision_memory, experimental_graduation, gm_targets, share_recommendation_cards
-from modules import premium_page
+from modules import premium_benefits
 from modules.ui_architecture import (
     ARCHIVED_DESTINATION_KEYS,
     PLATFORM_DESTINATIONS,
@@ -139,56 +139,6 @@ def test_decision_memory_premium_history_free_session():
     assert decision_memory.should_sync_durable(free) is False
     assert decision_memory.can_access_history(premium) is True
     assert decision_memory.should_sync_durable(premium) is True
-
-
-def test_share_is_free_and_surfaces_wired():
-    assert share_recommendation_cards.EXPERIMENTAL_LABEL == ""
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "share_recommendation_ui.render_share_controls" in app
-    trade = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    assert "share_recommendation_ui.render_share_controls" in trade
-    assert 'expander("Player actions"' not in trade
-    assert 'expander("Inspect players"' not in trade
-    assert "Tap a player in the package to inspect" in trade
-    assert "Share Trade Idea" in trade or "TRADE_HUB_SHARE_LABEL" in trade
-    waivers = (ROOT / "modules" / "waivers_ui.py").read_text(encoding="utf-8")
-    assert "share_recommendation_ui.render_share_controls" in waivers
-
-
-def test_premium_marketing_includes_graduated_premium_depth():
-    included = {title for title, _ in premium_page.PREMIUM_INCLUDED_NOW}
-    free = {title for title, _ in premium_page.FREE_INCLUDES}
-    assert "Decision Memory" in included
-    assert "GM Targets (full board)" in included
-    assert "Share Recommendation" in free
-    assert "GM Targets (limited)" in free
-    assert premium_page.PREMIUM_EXPERIMENTAL_WHEN_ENABLED == ()
-
-
-def test_cross_workflow_entry_points():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "gm_targets_ui.render_pqv_target_control" in app
-    ui = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
-    assert "Open Trade Hub" in ui
-    assert "Open Waivers" in ui
-    assert "_workflow_handoff_destination" in ui
-    assert 'enabled_experimental_keys.append("gm_targets")' in app
-    assert '("Experimental", "warning")' not in app[
-        app.index('if current_page == "gm_targets"') : app.index(
-            'if current_page == "players"'
-        )
-    ]
-
-
-def test_player_explorer_css_lazy_not_in_cold_app_css():
-    from modules.app_styles import APP_CSS
-    from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
-
-    assert PLAYER_ASSET_EXPLORER_CSS not in APP_CSS
-    explorer = (ROOT / "modules" / "player_asset_explorer_ui.py").read_text(
-        encoding="utf-8"
-    )
-    assert "inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)" in explorer
 
 
 def test_no_game_plan_fingerprint_pollution():

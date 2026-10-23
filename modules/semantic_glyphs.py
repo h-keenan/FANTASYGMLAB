@@ -102,7 +102,7 @@ KIND_CONCEPT = {
     "storylines": "history",
     "more": "more",
     "settings": "more",
-    # Trade Hub display-section categories (trade_hub_ui.trade_hub_display_section)
+    # Trade Hub display-section categories (trade_hub_presentation.trade_hub_display_section)
     # that don't already resolve through an existing stem above.
     "contender": "insights",
     "rebuild": "roster",

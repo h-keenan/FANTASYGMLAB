@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import pandas as pd
 
-import app
 from conftest import (
     frozen_valuation_authority_persisted_frame,
     frozen_valuation_authority_sleeper_records,
@@ -17,7 +16,6 @@ from modules import league_history
 from modules import player_state_authority
 from modules import rankings
 from modules import structured_player_refresh
-from modules.player_asset_explorer_ui import filter_player_results, ranked_player_frame
 from modules.player_eligibility import player_eligibility
 
 
@@ -49,7 +47,7 @@ def _reconciled_frame() -> pd.DataFrame:
 
 def test_injury_level_matches_player_state_authority_for_inactive_and_practice_squad():
     """Injury-awareness audit finding: rankings.injury_level() — the app's
-    other injury-severity vocabulary, used by trade_ideas.py, trade_hub_ui.py,
+    other injury-severity vocabulary, used by trade_ideas.py, trade_hub_presentation.py,
     faab.py, chat.py and the player_cards "Injury Risk" tag — independently
     missed two literal Sleeper `status` values that
     player_state_authority.waiver_actionability() already treats as fully
@@ -163,31 +161,6 @@ def test_actual_keenan_survives_current_player_universe_reconciliation():
     assert bool(row.iloc[0]["is_current_fantasy_eligible"]) is True
 
 
-def test_query_keenan_returns_actual_player_with_default_explorer_filters():
-    frame = player_state_authority.current_player_pool(
-        _reconciled_frame(),
-        surface="player_asset_explorer",
-    )
-    searched = app.search_trade_assets(
-        frame,
-        [],
-        "Keenan",
-        asset_filter="All",
-        limit=60,
-    )
-    players = searched.loc[searched["asset_type"].eq("player")].copy()
-    visible = filter_player_results(
-        players,
-        age_filter="All ages",
-        status_filter="All statuses",
-        availability_filter="All availability",
-        rostered_player_ids=set(),
-        is_injury_status=rankings.is_injury_status,
-    )
-
-    assert "Keenan Allen" in visible["name"].tolist()
-
-
 def test_active_unsigned_cached_market_value_remains_globally_searchable(cached_2025_stats_season):
     # Uses a frozen tests/fixtures/valuation_authority/ snapshot rather than
     # the live, cron-refreshed data/players.db / data/sleeper_players.json
@@ -234,36 +207,6 @@ def test_historical_identity_lookup_still_resolves_retired_player():
     lookup = league_history.player_lookup_from_rows([ben])
 
     assert lookup[str(ben["player_id"])]["name"] == "Ben Roethlisberger"
-
-
-def test_roster_browser_uses_membership_without_deleting_global_identity():
-    keenan = _actual_record("Keenan Allen")
-    frame = player_state_authority.current_player_pool(
-        _reconciled_frame(),
-        surface="trade_search_pool",
-    )
-    global_result = app.player_search_results(frame, "Keenan", limit=8)
-    roster_result = app.player_search_results(
-        frame,
-        "Keenan",
-        owned_player_ids={"not-keenan"},
-        only_owned=True,
-        limit=8,
-    )
-
-    assert str(keenan["player_id"]) in global_result["player_id"].astype(str).tolist()
-    assert roster_result.empty
-
-
-def test_ranked_explorer_source_retains_reconciled_current_identity():
-    keenan = _actual_record("Keenan Allen")
-    current = player_state_authority.current_player_pool(
-        _reconciled_frame(),
-        surface="prepared_player_frame",
-    )
-    ranked = ranked_player_frame(current, "value_score")
-
-    assert str(keenan["player_id"]) in ranked["player_id"].astype(str).tolist()
 
 
 def test_public_cache_fingerprint_depends_on_eligibility_contract(monkeypatch):

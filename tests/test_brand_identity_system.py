@@ -87,20 +87,6 @@ def test_brand_api_paths_and_helpers():
     assert "valuation" not in Path(brand_identity.__file__).read_text(encoding="utf-8").casefold()
 
 
-def test_shell_and_startup_use_mark_assets():
-    shell = (ROOT / "modules" / "application_shell.py").read_text(encoding="utf-8")
-    startup = (ROOT / "modules" / "startup_coordinator.py").read_text(encoding="utf-8")
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    brand = (ROOT / "modules" / "brand_identity.py").read_text(encoding="utf-8")
-    assert "mark_img_html" in shell
-    assert "mark_img_html" in startup
-    assert "page_icon_path()" in app
-    assert "DynastyGM" not in shell
-    assert "Candidate A" not in brand
-    assert "MARK_CANDIDATES" not in brand
-    assert "fgl-arc-monogram" in brand
-
-
 def test_share_cards_consume_brand_mark_bytes():
     from modules import share_card_renderer
     from modules import share_recommendation_cards as share

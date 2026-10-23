@@ -6,21 +6,12 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-from modules import app_styles
-from modules import component_family_styles
 from modules import game_plan_package
 from modules import game_plan_process_cache
 from modules import sleeper
-from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
-GUEST = (ROOT / "modules" / "guest_conversion.py").read_text(encoding="utf-8")
-ACCOUNT = (ROOT / "modules" / "account_ui.py").read_text(encoding="utf-8")
-CONTINUITY = (ROOT / "modules" / "workflow_continuity.py").read_text(encoding="utf-8")
-VISUAL = (ROOT / "modules" / "visual_identity_styles.py").read_text(encoding="utf-8")
-FAMILY = component_family_styles.COMPONENT_FAMILY_CSS
 
 
 def test_waiver_pool_digest_changes_package_signature():
@@ -170,58 +161,6 @@ def test_clear_live_league_caches_preserve_username_and_players():
     sleeper.clear_live_league_endpoint_caches()
 
 
-def test_dashboard_hides_raw_traceback():
-    assert "st.exception(dashboard_exc)" not in APP
-    assert "dashboard_render_failed" in APP
-    assert "This roster has no players yet." in APP
-    assert "render_roster_mismatch_notice" in APP
-    assert "No roster matched this Sleeper username" in (
-        ROOT / "modules" / "product_copy.py"
-    ).read_text(encoding="utf-8")
-    assert "Sleeper returned none" not in APP
-    assert "waiver_pool_digest=waiver_pool_digest" in APP
-    assert "waiver_context.get(\"team_direction_summary\")" in APP
-
-
-def test_guest_prompt_primary_create_account():
-    assert 'st.columns([1, 1, 1])' not in GUEST
-    assert 'type="primary"' in GUEST
-    assert 'key=f"guest_signup_{surface}"' in GUEST
-    assert "link_cols = st.columns(2)" in GUEST
-
-
-def test_logout_and_continuity_copy():
-    assert "Signed out on this device." in ACCOUNT
-    assert 'st.warning(error)' not in ACCOUNT.split("account_logout", 1)[-1][:800]
-    assert "Review Game Plan, then open Trade Hub or Waivers to act." in CONTINUITY
-    assert "Review Your Next Move" not in CONTINUITY
-
-
-def test_trade_analyzer_partner_label_and_tokens():
-    start = APP.index('if current_page == "trade_analyzer":')
-    end = APP.index('if current_page == "premium":')
-    block = APP[start:end]
-    assert "toa-partner-block" in block
-    assert "Build the trade" in block
-    assert "Team that sent this offer" not in block
-    assert "Partner first, then build the package you received." not in block
-    assert 'help="Manager who sent you the offer."' not in block
-    assert "var(--color-accent-strong" in TRADE_ANALYZER_CSS
-    assert "var(--color-danger" in TRADE_ANALYZER_CSS
-    assert ".toa-tone-accept .toa-verdict { color: #d1ff72; }" not in TRADE_ANALYZER_CSS
-
-
-def test_hover_only_on_tappable_rows():
-    assert ".scan-card.scan-card-tappable:hover" in VISUAL
-    assert ".compact-player-row.scan-card-tappable:hover" in VISUAL
-    assert ".scan-card:hover,\n.compact-player-row:hover" not in VISUAL
-
-
-def test_canonical_select_family_still_owns_menus():
-    assert 'ul[role="listbox"]' in FAMILY
-    assert "max-height:min(42vh,18rem)" in FAMILY.replace(" ", "")
-
-
 def test_package_signature_still_account_scoped():
     a = game_plan_package.build_package_signature(
         account_user_id="user-a", league_id="L1", roster_id="7"
@@ -230,9 +169,3 @@ def test_package_signature_still_account_scoped():
         account_user_id="user-b", league_id="L1", roster_id="7"
     )
     assert a != b
-
-
-def test_app_css_budget_unchanged_architecture():
-    assert len(app_styles.APP_CSS) < 400_000
-    assert "toa-share-card" not in app_styles.APP_CSS
-    assert "fgl-landing__hero" not in app_styles.APP_CSS

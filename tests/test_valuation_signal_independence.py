@@ -422,7 +422,7 @@ def test_backup_with_upside_workload_trend_requires_an_actual_rising_signal():
     unconditionally — inconsistent with the "Strong Opportunity"/
     "Committee Back" branch right above it, which correctly only says
     "Rising" when there's a substantiating trend signal. That silently
-    defeated modules.waivers_ui.rank_priority_add_candidates' own
+    defeated modules.waivers_logic.rank_priority_add_candidates' own
     ``workload_trend == "Blocked"`` gate for a young, near-zero-usage
     player: Dike (7% snap share, 2 targets in 3 games) got told his role
     was "Rising" instead of reflecting that he has no live current role.

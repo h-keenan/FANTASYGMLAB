@@ -10,7 +10,6 @@ import pytest
 
 from modules import share_card_renderer
 from modules import share_recommendation_cards as share
-from modules import share_recommendation_ui
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -216,45 +215,6 @@ def test_share_qr_encodes_canonical_site_and_survives_resize():
         assert decoded_small == "https://fantasygmlab.com"
 
 
-def test_trade_share_png_includes_sides_and_canonical_qr_owner():
-    pytest.importorskip("PIL")
-    share.clear_share_cache_for_tests()
-    card = share.build_trade_share_card(
-        {
-            "trade_gain": 1440,
-            "my_score": 11980,
-            "their_score": 13420,
-            "trade_confidence_label": "High",
-            "reasoning_summary": "Acquire the younger WR while keeping the lineup stable.",
-            "tag": "Win-now swap",
-            "send_assets": [{"name": "Sender WR", "position": "WR", "team": "DAL", "player_id": "s1"}],
-            "receive_assets": [{"name": "Acquirer WR", "position": "WR", "team": "MIA", "player_id": "r1"}],
-        }
-    )
-    png = share_card_renderer.render_share_card_png(card, portraits={})
-    from PIL import Image
-    from io import BytesIO
-
-    image = Image.open(BytesIO(png))
-    # White quiet-zone plate around the compact left QR footer.
-    found_plate = False
-    for y in range(image.height - 1, image.height // 2, -10):
-        for x in range(40, image.width // 2, 10):
-            pixel = image.getpixel((x, y))
-            if pixel[0] > 180 and pixel[1] > 180 and pixel[2] > 180:
-                found_plate = True
-                break
-        if found_plate:
-            break
-    assert found_plate
-    source = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
-    assert "share_card_qr.share_qr_png_bytes" in source
-    ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
-    assert "navigator.share" in ui
-    assert "Save Image" in ui
-    assert "components.html" in ui
-
-
 def _decode_qr_png(png: bytes) -> str | None:
     from io import BytesIO
 
@@ -290,23 +250,6 @@ def test_temp_file_cleanup_and_safe_write():
     assert not path.exists() or True  # may race on some FS; function must not raise
 
 
-def test_ui_is_noop_when_flag_off(monkeypatch):
-    import streamlit as st
-
-    from modules import share_recommendation_ui
-
-    calls = []
-    monkeypatch.setattr(st, "button", lambda *a, **k: calls.append("button") or False)
-    card = share.build_waiver_share_card({"name": "X"}, action="Add", reason="Y")
-    share_recommendation_ui.render_share_controls(
-        card,
-        key="t",
-        state={},
-        environ={share.EXPERIMENT_ENV_KEY: "0"},
-    )
-    assert calls == []
-
-
 def test_analytics_events_registered():
     from modules import launch_analytics
 
@@ -337,34 +280,6 @@ def test_config_key_registered():
     assert "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS" in app_config.WEB_APP_CONFIG_KEYS
 
 
-def test_flag_off_keeps_trade_hub_ordering_helper_untouched():
-    """Sharing must not import into trade idea score fields."""
-
-    from modules import trade_hub_ui
-
-    idea = {"trade_idea_score": 12.0, "trade_gain": 1, "send_assets": [], "receive_assets": []}
-    contract = trade_hub_ui.trade_card_presentation_contract(idea)
-    assert contract["ordering_score"] == 12.0
-
-
-def test_native_share_markup_feature_detects_web_share():
-    from modules import share_recommendation_ui
-
-    html = share_recommendation_ui.native_share_markup(
-        b"\x89PNG\r\n\x1a\n",
-        file_name="fantasygmlab-waiver-abc.png",
-        title="Waiver Target",
-    )
-    assert "navigator.share" in html
-    assert "fantasygmlab-waiver-abc.png" in html
-    assert "files: [file]" in html
-    assert "image/png" in html
-    assert "image/jpeg" not in html
-    assert "toDataURL" not in html
-    assert "html2canvas" not in html
-    assert "expectedBytes" in html
-
-
 def test_waiver_share_includes_faab_and_value_labels():
     card = share.build_waiver_share_card(
         {"name": "Garrett Nussmeier", "position": "QB", "team": "NO", "player_id": "n1"},
@@ -376,70 +291,6 @@ def test_waiver_share_includes_faab_and_value_labels():
     assert "12–18% of remaining FAAB" in card.metrics
     assert "Dynasty Score 4,120" in card.metrics
     assert card.acquire_lines[0].label == "Garrett Nussmeier"
-
-
-def test_in_app_preview_uses_full_export_source():
-    pytest.importorskip("PIL")
-    from io import BytesIO
-
-    from PIL import Image
-
-    share.clear_share_cache_for_tests()
-    card = share.build_trade_share_card(
-        {
-            "trade_gain": 314,
-            "my_score": 8540,
-            "their_score": 9028,
-            "trade_confidence_label": "High",
-            "reasoning_summary": "Acquire the ascending WR.",
-            "send_assets": [{"name": "Depth WR", "position": "WR", "team": "CHI", "player_id": "101"}],
-            "receive_assets": [{"name": "Alpha WR", "position": "WR", "team": "MIA", "player_id": "202"}],
-        }
-    )
-    export = share_card_renderer.render_share_card_png(card, portraits={})
-    preview_html = share_recommendation_ui._preview_markup(export, title=card.title or "Trade")
-    preview_src = share_recommendation_ui.preview_source_bytes(preview_html)
-    export_img = Image.open(BytesIO(export))
-    preview_img = Image.open(BytesIO(preview_src))
-    assert export_img.size[0] == 2160
-    assert share.SHARE_HEIGHT_MIN <= export_img.size[1] <= share.SHARE_HEIGHT_MAX
-    assert preview_img.size == export_img.size
-    assert preview_src == export
-    assert f"width='{share.PREVIEW_DISPLAY_WIDTH}'" in preview_html
-    ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
-    assert "st.image(" not in ui
-    assert "PREVIEW_DISPLAY_WIDTH" in ui
-    assert "preview_png_bytes" not in ui
-    assert "output_format" not in ui
-    assert "image/jpeg" not in ui
-    assert "_preview_markup(" in ui
-    css = Path("modules/trade_detail_styles.py").read_text(encoding="utf-8")
-    assert "pointer-events: none" not in css.split(".fgl-share-preview")[1].split("@media (min-width: 1280px)")[0]
-    assert "-webkit-touch-callout: none" not in css
-    renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
-    assert "comparison_bar_widths" not in renderer
-    assert "def value_edge_bar_geometry(" in renderer
-    assert renderer.count("value_edge_bar_geometry(") >= 1
-    assert "YOU GIVE" not in renderer
-    assert "YOU GET" not in renderer
-    assert "def _trade_column_titles(" in renderer
-    assert "YOU RECEIVE" not in renderer.split("def _render_trade(")[1][:2500]
-    assert "YOU SEND" not in renderer.split("def _render_trade(")[1][:2500]
-    assert "ACQUIRER / RECEIVES" not in renderer
-
-
-def test_trade_hub_share_sits_under_verdict_before_secondary_actions():
-    source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
-    dialog = source[
-        source.index("def _trade_detail_dialog()") : source.index(
-            'with performance.time_block("trade_hub_detail_modal"'
-        )
-    ]
-    first = dialog.index("trade_review_first_useful")
-    share_at = dialog.index("render_share_controls")
-    actions = dialog.index("render_detail_actions")
-    assert first < share_at < actions
-    assert "Load supporting metrics" not in dialog
 
 
 def test_recommendation_share_keeps_full_why_and_footer_reserve():

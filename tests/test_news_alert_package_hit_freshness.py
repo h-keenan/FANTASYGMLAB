@@ -352,20 +352,6 @@ def test_clear_game_plan_package_also_clears_news_presentation():
     assert ni.PRESENTATION_DIGEST_KEY not in session
 
 
-def test_hit_path_calls_refresh_without_store_package():
-    import pathlib
-
-    app = pathlib.Path("app.py").read_text(encoding="utf-8")
-    hit_region = app.split("if game_plan_package_hit and cached_package:", 1)[1].split(
-        "else:", 1
-    )[0]
-    assert "refresh_news_alerts_for_presentation" in hit_region
-    assert "load_cached_news_pool()" in hit_region
-    assert "store_package" not in hit_region
-    assert "fetch_news" not in hit_region.casefold()
-    assert "requests." not in hit_region
-
-
 def test_valuation_firewall_still_blocks_article_score_writes():
     row = {
         "player_id": "p-starter",

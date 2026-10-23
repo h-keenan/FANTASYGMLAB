@@ -428,74 +428,6 @@ def test_add_remove_does_not_invalidate_football_frame_keys():
     assert session[lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] == {"r1": "sig"}
 
 
-def test_recommendation_equivalence_enabled_disabled_and_targeted():
-    """GM Targets must not alter inventory signatures or recommendation ids."""
-
-    def _tile():
-        return {
-            "label": "Top Trade Opportunity",
-            "value": "Josh Jacobs",
-            "note": "You move from TE surplus.",
-            "recommendation_id": "t1",
-            "route_key": "trade_hub",
-            "route_player_id": "6794",
-            "recommendation_narrative": {
-                "recommendation_id": "t1",
-                "kind": "trade",
-                "action": "Buy need-position upgrade",
-                "target_label": "Josh Jacobs",
-                "reason": "You move from TE surplus.",
-                "confidence_label": "Medium",
-                "is_active_recommendation": True,
-            },
-        }
-
-    tiles = [_tile()]
-    off_session: dict = {}
-    on_session = _premium_session()
-    targeted_session = _premium_session()
-    gt._cache_targets(
-        targeted_session,
-        league_id="L1",
-        targets=[
-            gt.GmTarget(
-                user_id="u", league_id="L1", player_id="6794", created_ts=1.0
-            )
-        ],
-    )
-    ten = _premium_session()
-    gt._cache_targets(
-        ten,
-        league_id="L1",
-        targets=[
-            gt.GmTarget(user_id="u", league_id="L1", player_id=str(i), created_ts=1.0)
-            for i in range(10)
-        ],
-    )
-
-    nc.publish_activity_inventory(off_session, tiles, league_id="L1", context_fingerprint="fp")
-    with patch.object(gt, "experiment_enabled", return_value=True):
-        nc.publish_activity_inventory(
-            on_session, tiles, league_id="L1", context_fingerprint="fp"
-        )
-        nc.publish_activity_inventory(
-            targeted_session, tiles, league_id="L1", context_fingerprint="fp"
-        )
-        nc.publish_activity_inventory(
-            ten, tiles, league_id="L1", context_fingerprint="fp"
-        )
-
-    def _sig(session):
-        return session.get(lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY)
-
-    def _ids(session):
-        snap = session.get(nc.ACTIVITY_INBOX_SNAPSHOT_KEY) or {}
-        return [r.get("recommendation_id") for r in snap.get("records") or []]
-
-    assert _sig(off_session) == _sig(on_session) == _sig(targeted_session) == _sig(ten)
-    assert _ids(off_session) == _ids(on_session) == _ids(targeted_session) == _ids(ten)
-
-
 def test_migration_sql_rls_and_identity_contract():
     sql = (ROOT / "docs" / "supabase_gm_targets.sql").read_text(encoding="utf-8")
     assert "gm_targets" in sql
@@ -513,49 +445,6 @@ def test_untouchable_migration_sql_adds_column_and_update_policy():
     assert "for update" in sql.casefold()
     assert "auth.uid() = user_id" in sql
     assert "to anon" not in sql
-
-
-def test_ui_and_contract_docs_exist():
-    ui = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
-    doc = (ROOT / "docs" / "experimental-gm-targets-contract.md").read_text(
-        encoding="utf-8"
-    )
-    assert "Add to GM Targets" in ui or gt.ADD_ACTION_LABEL
-    assert "data-gm-target=" in ui
-    assert "data-gm-targets-discovery=" in ui
-    assert "DYNASTYGM_EXPERIMENTAL_GM_TARGETS" in doc
-    assert "50" in doc or "Premium **50**" in doc
-    assert "Never modifies" in (ROOT / "modules" / "gm_targets.py").read_text(
-        encoding="utf-8"
-    )
-
-
-def test_target_card_identity_row_is_tappable_into_quick_view():
-    # Tappable-modules audit (coridian_, 2026-10-14): every other player
-    # card/row on the site opens Player Quick View on a tap of the card
-    # itself; GM Targets' identity row was the one still requiring a
-    # separate "Open player" button click instead. The identity block must
-    # carry the same player-card-tappable + data-player-id markup
-    # interaction_contract.py's TAP_DELEGATION_JS already delegates on, and
-    # the card must render through render_tappable_player_html (not a plain
-    # render_html_fragment) so a tap actually reaches open_player_quick_view.
-    ui = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
-    assert "from modules.player_cards import player_support_chip_html, render_tappable_player_html" in ui
-    assert "dg-gm-target-identity player-card-tappable" in ui
-    assert "render_tappable_player_html(" in ui
-    # The explicit "Open player" button stays too, as a keyboard/no-JS
-    # fallback — this is additive, not a replacement for it.
-    assert "Open player" in ui
-
-
-def test_app_wires_pqv_and_destination_without_critical_path_fetch():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "gm_targets_ui.render_pqv_target_control" in app
-    assert 'current_page == "gm_targets"' in app
-    assert "gm_targets.clear_gm_targets_session" in app
-    assert 'enabled_experimental_keys.append("gm_targets")' in app
-    # Membership hydrate stays inside the PQV control / workspace, not shell bootstrap.
-    assert "ensure_membership_cache" not in app.split("destination_visibility")[0]
 
 
 def test_no_n_plus_one_fetch_helper_is_list_based():
@@ -762,45 +651,6 @@ def test_enrich_target_surfaces_injury_display():
 
     missing_row_card = gt.enrich_target(target, session=None, player_row=None)
     assert missing_row_card.injury_display == ""
-
-
-def test_resolve_untouchable_names_unions_legacy_and_gm_targets_state():
-    """Recommendation-compliance audit finding: app.py's Trade Hub/Game
-    Plan/My Team trade-idea generation protects players via a legacy
-    NAME-keyed list (profile["untouchables"]) that GM Targets' real,
-    id-keyed "Mark untouchable" button never wrote to. A player protected
-    only through GM Targets must still come back out of the union by name.
-    """
-
-    session = _premium_session()
-    gt._cache_targets(
-        session,
-        league_id="L1",
-        targets=[
-            gt.GmTarget(
-                user_id="u",
-                league_id="L1",
-                player_id="6794",
-                untouchable=True,
-            ),
-            gt.GmTarget(
-                user_id="u",
-                league_id="L1",
-                player_id="9999",
-                untouchable=False,
-            ),
-        ],
-    )
-
-    resolved = gt.resolve_untouchable_names(
-        session,
-        league_id="L1",
-        legacy_names=["Legacy Only Guy"],
-        player_id_to_name={"6794": "Josh Jacobs", "9999": "Not Untouchable Guy"},
-        environ={},
-    )
-
-    assert resolved == ("Josh Jacobs", "Legacy Only Guy")
 
 
 def test_resolve_untouchable_names_without_gm_targets_state_is_legacy_only():

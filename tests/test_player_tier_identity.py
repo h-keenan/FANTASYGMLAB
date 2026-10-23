@@ -5,10 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules import football_assets, player_quick_view, player_tier_identity
-from modules.app_styles import APP_CSS
 from modules.design_tokens import DESIGN_TOKEN_HEX
-from modules.football_asset_styles import FOOTBALL_ASSET_CSS
-from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.player_tier_identity import (
     PLAYER_TIER_LADDER,
     DEFAULT_PLAYER_TIER,
@@ -107,34 +104,6 @@ def test_portrait_size_rule_full_ring_none():
     assert portrait_frame_mode(size_rem=1.5) == "none"
 
 
-def test_pqv_hero_owns_one_semantic_label_and_full_frame():
-    identity = resolve_player_tier_identity(stored_tier="Star")
-    html = player_quick_view.pqv_hero_html(
-        avatar_html=(
-            "<div class='player-quick-view-avatar dg-player-headshot'>"
-            "<span class='dg-player-headshot-fallback'>BR</span>"
-            "<img class='dg-player-headshot-image' src='photo.png' alt=''>"
-            "</div>"
-        ),
-        name="Bijan Robinson",
-        position="RB",
-        team="ATL",
-        age_text="24",
-        role_label="Elite Opportunity",
-        identity=identity,
-        include_tier_legend=True,
-    )
-    assert "pqv-hero-portrait dg-tier-frame dg-tier-frame--elite dg-tier-frame--full" in html
-    assert html.count("class='pqv-hero-tier") == 1
-    assert ">ELITE<" in html
-    assert "Player tier: Elite" in html
-    assert "Amethyst" not in html
-    assert "Ruby Player" not in html
-    assert html.count("Elite Opportunity") == 1
-    assert "What player tiers mean" in html
-    assert html.count("dg-tier-frame--elite") >= 1
-
-
 def test_missing_photo_keeps_the_same_tier_frame():
     identity = resolve_player_tier_identity(stored_tier="Developmental")
     html = football_assets.player_card_html(
@@ -181,17 +150,6 @@ def test_my_team_roster_portrait_uses_canonical_frame_classes():
     assert "Diamond" not in html
 
 
-def test_small_avatar_mode_is_none_and_css_has_chip_suppression():
-    identity = resolve_player_tier_identity(stored_tier="Starter")
-    classes = player_tier_identity.portrait_frame_classes(
-        identity,
-        base="dg-compact-asset-avatar",
-        frame_mode=portrait_frame_mode(size_px=24),
-    )
-    assert "dg-tier-frame--none" in classes
-    assert ".dg-tier-frame--none" in FOOTBALL_ASSET_CSS
-
-
 def test_accessibility_label_exists_for_every_tier():
     for tier in PLAYER_TIER_LADDER:
         assert tier.accessibility_label == f"Player tier: {tier.semantic_label}"
@@ -227,98 +185,3 @@ def test_identity_module_does_not_call_valuation_or_ai():
     assert "assign_player_tiers(" not in source
     assert "st.rerun" not in source
     assert "openai" not in source.lower()
-
-
-def test_frame_css_is_token_backed_and_not_player_specific():
-    assert ".dg-tier-frame--generational" in FOOTBALL_ASSET_CSS
-    assert ".dg-tier-frame--elite" in FOOTBALL_ASSET_CSS
-    assert "Bijan" not in FOOTBALL_ASSET_CSS
-    assert "Jeanty" not in FOOTBALL_ASSET_CSS
-    assert "Hurts" not in FOOTBALL_ASSET_CSS
-    assert "#" not in FOOTBALL_ASSET_CSS
-    assert FOOTBALL_ASSET_CSS in APP_CSS
-    assert "animation:" not in FOOTBALL_ASSET_CSS
-    from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
-
-    assert "pqv-hero-tier" in PLAYER_QUICK_VIEW_CSS
-    assert "pqv-hero-tier" not in APP_CSS
-
-
-def test_hero_tier_pill_fills_with_the_tier_token_and_contrasting_ink():
-    # Every tier gets a fill, and it is the same token the portrait frame uses.
-    for tier in PLAYER_TIER_LADDER:
-        token = tier_fill_token(tier)
-        assert token in DESIGN_TOKEN_HEX, token
-        frame_rule = (
-            # depth_developmental rides the .dg-tier-frame base declaration.
-            f".dg-tier-frame{{--dg-tier-a:var({token})"
-            if tier is DEFAULT_PLAYER_TIER
-            else f".dg-tier-frame--{tier.tier_id}{{--dg-tier-a:var({token})}}"
-        )
-        assert frame_rule in FOOTBALL_ASSET_CSS, tier.tier_id
-
-    # Light fills take the near-black ink, dark fills the light ink.
-    light_fill_tiers = {
-        "generational",
-        "elite",
-        "starter",
-        "contributor",
-        "committee_role",
-    }
-    for tier in PLAYER_TIER_LADDER:
-        expected = (
-            TIER_INK_DARK_TOKEN
-            if tier.tier_id in light_fill_tiers
-            else TIER_INK_LIGHT_TOKEN
-        )
-        assert tier_ink_token(tier) == expected, tier.tier_id
-        style = tier_solid_pill_style(tier)
-        assert f"--dg-tier-fill:var({tier_fill_token(tier)})" in style
-        assert f"--dg-tier-ink:var({expected})" in style
-
-    # The ink choice tracks the fill's real brightness, not a hardcoded list.
-    for tier in PLAYER_TIER_LADDER:
-        brightness = _perceived_brightness(DESIGN_TOKEN_HEX[tier_fill_token(tier)])
-        dark_ink = tier_ink_token(tier) == TIER_INK_DARK_TOKEN
-        assert dark_ink == (brightness > 0.55), tier.tier_id
-
-    # No tier falls back to an undifferentiated neutral.
-    fills = {tier_fill_token(tier) for tier in PLAYER_TIER_LADDER}
-    assert len(fills) == len(PLAYER_TIER_LADDER)
-    assert tier_solid_pill_style(None) == tier_solid_pill_style(DEFAULT_PLAYER_TIER)
-
-
-def test_pqv_hero_renders_the_solid_tier_pill_not_the_list_chip():
-    identity = resolve_player_tier_identity(stored_tier="Elite")  # → Generational
-    html = player_quick_view.pqv_hero_html(
-        avatar_html="<div class='player-quick-view-avatar'></div>",
-        name="Ja'Marr Chase",
-        position="WR",
-        team="CIN",
-        age_text="25",
-        identity=identity,
-    )
-    assert "pqv-hero-tier pqv-hero-tier--solid" in html
-    assert "--dg-tier-fill:var(--color-accent)" in html
-    assert "--dg-tier-ink:var(--color-bg)" in html
-    assert "data-player-tier='generational'" in html
-    # The dense-list translucent chip stays out of the hero.
-    assert "dg-tier-elite" not in html
-    assert "dg-tier-chip" not in html
-
-    depth_html = player_quick_view.pqv_hero_html(
-        avatar_html="<div class='player-quick-view-avatar'></div>",
-        name="Deep Stash",
-        position="RB",
-        team="FA",
-        age_text="22",
-        identity=resolve_player_tier_identity(stored_tier="Developmental"),
-    )
-    assert "--dg-tier-fill:var(--color-prestige-depth)" in depth_html
-    assert "--dg-tier-ink:var(--color-text-primary)" in depth_html
-
-    css = PLAYER_QUICK_VIEW_CSS
-    assert ".pqv-hero-tier.pqv-hero-tier--solid{" in css
-    assert "background:var(--dg-tier-fill" in css
-    assert "color:var(--dg-tier-ink" in css
-    assert "#" not in css.split(".pqv-hero-tier.pqv-hero-tier--solid{")[1].split("}")[0]

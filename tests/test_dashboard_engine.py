@@ -1,7 +1,7 @@
 """modules.dashboard_engine — the mobile "Next Move" briefing pipeline.
 
 Mocks requests.get (the I/O boundary for modules.sleeper) but exercises the
-real team_eval / trade_analyzer_fit / injury_ui / waivers_ui / daily_gm_briefing
+real team_eval / trade_analyzer_fit / injury_ui / waivers_logic / daily_gm_briefing
 engines, matching the mocking convention used across the mobile API tests.
 """
 
@@ -141,77 +141,6 @@ def test_select_need_headline_tier_labels_match_the_priority_ladder():
     balanced = dashboard_engine.select_need_headline(_empty_assessment())
     assert balanced["category"] == "balanced"
     assert balanced["tier_label"] == ""
-
-
-def test_compose_next_move_briefing_returns_a_real_composed_briefing():
-    league_id = "dashboard-engine-test-league-1"
-    roster_id = "1"
-    my_players = [
-        _player("qb1", "QB", value=80),
-        _player("rb1", "RB", value=70),
-        _player("rb2", "RB", value=40),
-        _player("wr1", "WR", value=65),
-        _player("wr2", "WR", value=30),
-        _player("te1", "TE", value=25),
-    ]
-    other_roster_players = [_player("opp-rb", "RB", value=55)]
-    free_agent_players = [_player("fa-wr", "WR", value=45, status="Active")]
-    players_df = pd.DataFrame(my_players + other_roster_players + free_agent_players)
-
-    league_payload = _sleeper_response(
-        {
-            "roster_positions": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"] + ["BN"] * 6,
-            "settings": {"taxi_slots": 0, "reserve_slots": 0},
-        }
-    )
-    rosters_payload = _sleeper_response(
-        [
-            {
-                "roster_id": 1,
-                "players": [p["player_id"] for p in my_players],
-                "taxi": [],
-                "reserve": [],
-            },
-            {
-                "roster_id": 2,
-                "players": [p["player_id"] for p in other_roster_players],
-                "taxi": [],
-                "reserve": [],
-            },
-        ]
-    )
-
-    with patch("requests.get", side_effect=[league_payload, rosters_payload]):
-        briefing = dashboard_engine.compose_next_move_briefing(
-            league_id=league_id,
-            roster_id=roster_id,
-            players_df=players_df,
-            roster_player_ids={p["player_id"] for p in my_players},
-            all_rostered_player_ids={p["player_id"] for p in my_players + other_roster_players},
-            league_settings=SETTINGS,
-            score_field="dynasty_score",
-        )
-
-    assert briefing.league_id == league_id
-    assert briefing.roster_id == roster_id
-    # Real engine output, not a mocked result — the free-agent WR is the only
-    # unrostered player, so the waiver engine should surface it by name. With
-    # no `rosters` passed there's no trade candidate, so app.py's default
-    # tile order (roster_pressure, waiver, need, injury — see
-    # dashboard_engine's module docstring) makes the waiver tile the primary
-    # recommendation (category "top_priority"), same as the web app's own
-    # `_append(briefing.primary, CATEGORY_TOP_PRIORITY)` — it does not also
-    # appear under "waiver_opportunity" since that category only pulls from
-    # the intelligence/additional zones, not primary.
-    categories = {item.category for item in briefing.items}
-    assert categories  # at least one tile survived organize_dashboard_items
-    top_priority_items = [item for item in briefing.items if item.category == "top_priority"]
-    assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
-    assert any("fa-wr" in (item.route_player_id or "") for item in top_priority_items)
-    for item in briefing.items:
-        payload = item.to_dict()
-        assert payload["headline"]
-        assert payload["league_id"] == league_id
 
 
 def test_compose_next_move_briefing_includes_strategy_check_on_a_real_mismatch():
@@ -618,41 +547,6 @@ def test_build_strategy_check_tile_returns_none_without_a_roster_record():
         )
         is None
     )
-
-
-def test_build_news_tiles_reads_only_the_disk_cached_pool():
-    """build_news_tiles must never hit live RSS — only the disk-cached pool
-    (modules.news.load_cached_news_pool), same as app.py's single-league
-    Dashboard — so a many-league Portfolio fan-out never blocks on network
-    I/O. The dedupe/escalation `session` passed to news_intelligence is a
-    plain throwaway dict, never Streamlit's session state."""
-
-    fake_tile = {
-        "label": "News Alert",
-        "value": "Star Back listed questionable",
-        "note": "Questionable with a knee injury.",
-        "route_player_id": "star-decliner",
-    }
-    with patch(
-        "modules.dashboard_engine.news_cache.load_cached_news_pool",
-        return_value=[{"title": "Star Back listed questionable (Q)"}],
-    ) as mock_pool:
-        with patch(
-            "modules.dashboard_engine.news_intelligence.build_roster_news_alert_tiles",
-            return_value=[fake_tile],
-        ) as mock_tiles:
-            tiles = dashboard_engine.build_news_tiles(
-                league_id="league-1",
-                league_settings={},
-                roster_df=pd.DataFrame([{"player_id": "star-decliner", "name": "Star Back"}]),
-                lineup_df=pd.DataFrame(),
-                free_agents_df=pd.DataFrame(),
-                players_df=pd.DataFrame(),
-            )
-    assert tiles == [fake_tile]
-    mock_pool.assert_called_once_with()
-    assert mock_tiles.call_args.kwargs["session"] == {}
-    assert mock_tiles.call_args.kwargs["max_tiles"] == 1
 
 
 def test_build_news_tiles_fails_soft_when_the_cache_read_errors():

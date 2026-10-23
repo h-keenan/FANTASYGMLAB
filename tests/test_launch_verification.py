@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock
 
-from modules import auth_supabase, feedback, launch_analytics, premium, stripe_billing, stripe_webhook
+from modules import auth_supabase, launch_analytics, premium, stripe_billing, stripe_webhook
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,74 +35,6 @@ def test_feedback_sql_is_rls_protected_and_founder_reviewable():
     assert "auth.uid() = user_id" in lowered
     assert "user_id is null" in lowered
     assert "table editor" in lowered
-
-
-def test_feedback_categories_cover_launch_taxonomy():
-    categories = feedback.GLOBAL_FEEDBACK_CATEGORIES
-    assert "Bug or broken page" in categories
-    assert "Confusing page" in categories
-    assert "Bad recommendation" in categories
-    assert "Feature request" in categories
-    assert "Billing or Premium" in categories
-    assert "Other feedback" in categories
-
-
-def test_feedback_context_omits_email_and_tokens():
-    payload = feedback.feedback_context_payload(
-        current_page="trade_hub",
-        platform="Sleeper",
-        league_id="league-1",
-        league_name="Secret League",
-        user_id="user-1",
-        email="user@example.com",
-        entitlement="premium",
-        viewport_width=390,
-    )
-    assert payload["auth_state"] == "signed_in"
-    assert payload["viewport_category"] == "mobile"
-    assert payload["entitlement"] == "premium"
-    assert "email" not in payload
-    assert "league_name" not in payload
-    report = feedback.build_global_feedback_report(
-        category="Bug or broken page",
-        message="Broken",
-        context={**payload, "access_token": "secret", "email": "user@example.com"},
-        email="user@example.com",
-        can_contact=False,
-    )
-    assert "access_token" not in report["context"]
-    assert report["email"] == ""
-
-
-def test_feedback_supabase_insert_uses_authenticated_row(monkeypatch):
-    calls = {}
-
-    def fake_post(url, headers=None, json=None, timeout=None):
-        calls["url"] = url
-        calls["headers"] = headers
-        calls["json"] = json
-        response = Mock()
-        response.status_code = 201
-        return response
-
-    monkeypatch.setattr(feedback.requests, "post", fake_post)
-    report = feedback.build_global_feedback_report(
-        category="Feature request",
-        message="Add export",
-        context={"page": "dashboard", "user_id": "user-1"},
-        can_contact=False,
-    )
-    report["user_id"] = "user-1"
-    saved, error = feedback.append_feedback_report_supabase(
-        report,
-        config={"url": "https://example.supabase.co", "anon_key": "anon", "enabled": True},
-        access_token="user-jwt",
-    )
-    assert saved is True
-    assert error == ""
-    assert calls["json"]["user_id"] == "user-1"
-    assert calls["json"]["category"] == "Feature request"
-    assert "feedback_reports" in calls["url"]
 
 
 def test_past_due_webhook_is_successful_noop(monkeypatch):
@@ -238,15 +170,6 @@ def test_launch_analytics_records_safe_events(tmp_path, monkeypatch):
     row = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
     assert row["event"] == "checkout_started"
     assert "email" not in row["props"]
-
-
-def test_render_yaml_keeps_service_role_off_streamlit():
-    text = (ROOT / "render.yaml").read_text(encoding="utf-8")
-    streamlit_block, webhook_block = text.split("fantasygm-lab-stripe-webhook", 1)
-    assert "SUPABASE_SERVICE_ROLE_KEY" not in streamlit_block
-    assert "SUPABASE_SERVICE_ROLE_KEY" in webhook_block
-    assert "STRIPE_WEBHOOK_SECRET" not in streamlit_block.split("fantasygm-lab-stripe-webhook")[0]
-    assert "DYNASTYGM_SHOW_EXPERIMENTAL" in streamlit_block
 
 
 def test_launch_verification_doc_exists():

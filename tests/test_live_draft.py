@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 
-from modules import live_draft, live_draft_ui
+from modules import live_draft
 from modules.ui_architecture import current_platform_destinations
 
 
@@ -43,15 +43,6 @@ class TestLiveDraft(unittest.TestCase):
         # Trade Analyzer graduated as incoming-offer CORE surface.
         self.assertIn("trade_analyzer", visible)
 
-    def test_multiple_draft_selection_labels_are_distinct(self):
-        labels = [
-            live_draft_ui._draft_label({"draft_id": "a", "status": "drafting", "season": "2026", "metadata": {"name": "Rookie Draft"}}),
-            live_draft_ui._draft_label({"draft_id": "b", "status": "complete", "season": "2025", "metadata": {"name": "Startup"}}),
-        ]
-
-        self.assertIn("Rookie Draft", labels[0])
-        self.assertIn("Drafting", labels[0])
-        self.assertNotEqual(labels[0], labels[1])
 
     def test_drafted_players_are_excluded_from_available_pool(self):
         players = pd.DataFrame(
@@ -223,16 +214,6 @@ class TestLiveDraft(unittest.TestCase):
         self.assertFalse(any(rec["label"] == "Position Need" for rec in recs))
         self.assertFalse(any("thinnest current roster room" in rec["reason"] for rec in recs))
 
-    def test_mobile_markup_classes_exist(self):
-        css = Path("modules/live_draft_styles.py").read_text(encoding="utf-8")
-        ui = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
-
-        for marker in ("live-draft-hero", "live-draft-command", "live-draft-rec-grid", "live-draft-route-marker"):
-            self.assertIn(marker, css)
-        self.assertIn("inject_global_styles(LIVE_DRAFT_CSS)", ui)
-        # Pick rows now reuse dense-list anatomy; class remains on the HTML producer.
-        self.assertIn("live-draft-pick-row", ui)
-        self.assertIn("dense_list_primitives", ui)
 
     def test_experimental_visibility_rules_hide_live_draft_by_default(self):
         hidden = [page.key for page in current_platform_destinations(False, show_experimental=False)]
@@ -240,120 +221,6 @@ class TestLiveDraft(unittest.TestCase):
 
         self.assertNotIn("live_draft", hidden)
         self.assertIn("live_draft", visible)
-
-    def test_app_route_is_conditional_launch_and_read_only(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        registry_source = Path("modules/ui_architecture.py").read_text(encoding="utf-8")
-
-        self.assertIn('if current_page == "live_draft"', app_source)
-        self.assertIn("live_draft_ui.render_live_draft_page", app_source)
-        self.assertIn('"live_draft": "Read-only Sleeper live draft assistant', app_source)
-        self.assertIn('"live_draft"', registry_source)
-        self.assertIn("Live Draft", registry_source)
-        self.assertIn('category="CONDITIONAL"', registry_source)
-        self.assertIn('("Active draft", "strategy")', app_source)
-        self.assertNotIn('("[EXPERIMENTAL]", "warning")', app_source)
-
-    def test_ui_renders_read_only_label_and_fetches_picks(self):
-        fetch_picks = Mock(return_value=([{"player_id": "p1", "pick_no": 1, "roster_id": 1}], ""))
-        context = Mock(__enter__=lambda s: s, __exit__=lambda *a: None)
-        fragment = lambda run_every: (lambda func: func)
-        selectbox = lambda label, options, **kwargs: options[0]
-        with (
-            patch.object(live_draft_ui.st, "markdown") as markdown,
-            patch.object(live_draft_ui.st, "selectbox", side_effect=selectbox),
-            patch.object(live_draft_ui.st, "button", return_value=False),
-            patch.object(live_draft_ui.st, "caption"),
-            patch.object(live_draft_ui.st, "dataframe"),
-            patch.object(live_draft_ui.st, "columns", return_value=[context, context]),
-            patch.object(live_draft_ui.st, "text_input", return_value=""),
-            patch.object(live_draft_ui.st, "expander", return_value=context),
-            patch.object(live_draft_ui.st, "form", return_value=context),
-            patch.object(live_draft_ui.st, "multiselect", return_value=[]),
-            patch.object(live_draft_ui.st, "form_submit_button", return_value=False),
-        ):
-            with patch.object(live_draft_ui.st, "fragment", create=True, new=fragment):
-                live_draft_ui.render_live_draft_page(
-                    selected_league_id="league-1",
-                    selected_league_name="League",
-                    username="user",
-                    my_roster_id=1,
-                    df_players=pd.DataFrame([{"player_id": "p2", "name": "Available", "position": "RB", "team": "LV", "age": 22, "active": True, "status": "Active", "fantasycalc_value": 80, "value_score": 80}]),
-                    roster_df=pd.DataFrame(),
-                    rosters=[{"owner_id": "owner", "roster_id": 1}],
-                    roster_profiles={"1": {"team_name": "Mine"}},
-                    league_settings={"qb_format": "1QB", "scoring_format": "PPR", "league_format": "Dynasty"},
-                    score_field="value_score",
-                    score_label="Dynasty Score",
-                    fetch_league_drafts=lambda league_id: [{"draft_id": "draft", "status": "drafting", "season": "2026"}],
-                    fetch_draft=lambda draft_id: {"draft_id": draft_id, "status": "drafting", "settings": {"rounds": 4, "teams": 12}},
-                    fetch_draft_picks=fetch_picks,
-                )
-
-        fetch_picks.assert_called_once_with("draft")
-        rendered = "\n".join(str(call.args[0]) for call in markdown.call_args_list if call.args)
-        self.assertIn(live_draft.LIVE_DRAFT_READ_ONLY_LABEL, rendered)
-
-    def test_expired_draft_renders_inactive_state_without_loading_pick_details(self):
-        fetch_picks = Mock(return_value=([], ""))
-        with (
-            patch.object(live_draft_ui.st, "markdown"),
-            patch.object(live_draft_ui.st, "info") as info,
-        ):
-            live_draft_ui.render_live_draft_page(
-                selected_league_id="league-1",
-                selected_league_name="League",
-                username="user",
-                my_roster_id=1,
-                df_players=pd.DataFrame(),
-                roster_df=pd.DataFrame(),
-                rosters=[],
-                roster_profiles={},
-                league_settings={},
-                score_field="value_score",
-                score_label="Dynasty Score",
-                fetch_league_drafts=lambda league_id: [{"draft_id": "old", "status": "complete"}],
-                fetch_draft=lambda draft_id: {"draft_id": draft_id, "status": "complete"},
-                fetch_draft_picks=fetch_picks,
-            )
-
-        fetch_picks.assert_not_called()
-        self.assertIn("has ended", info.call_args.args[0])
-
-    def test_recommendation_player_opens_canonical_quick_view(self):
-        recommendation = {
-            "player_id": "p1",
-            "name": "Draft Target",
-            "position": "WR",
-            "team": "SEA",
-            "recommendation_role": "Recommended pick",
-            "recommendation_reason": "Best available fit for the current roster.",
-            "confidence": "High",
-            "position_need_impact": "Addresses a WR need",
-            "immediate_roster_impact": "Competes for a starting role",
-            "league_adjusted_draft_score": 9100,
-        }
-        render_tappable = Mock(return_value="p1")
-        open_quick_view = Mock()
-        with patch.object(live_draft_ui.st, "markdown"):
-            live_draft_ui._render_recommendations(
-                {"recommendations": [recommendation]},
-                render_tappable_player_html=render_tappable,
-                open_player_quick_view=open_quick_view,
-                draft_id="draft-1",
-            )
-
-        render_tappable.assert_called_once()
-        self.assertEqual(
-            render_tappable.call_args.kwargs["key_prefix"],
-            "live_draft_recommendations_draft-1",
-        )
-        open_quick_view.assert_called_once_with(
-            "p1",
-            source_label="Live Draft Assistant",
-            source_note="Best available fit for the current roster.",
-            status_label="Recommended pick",
-        )
 
 
 if __name__ == "__main__":

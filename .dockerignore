@@ -1,7 +1,7 @@
 # Keep the Docker build context small and avoid baking dev-only or
-# irrelevant content into the self-hosted image. None of the four Python
-# web services (Streamlit app, mobile API, Stripe webhook, RevenueCat
-# webhook) need any of this at runtime.
+# irrelevant content into the self-hosted image. None of the Python
+# web services (mobile API, Stripe webhook, RevenueCat webhook) need any
+# of this at runtime.
 
 .git/
 .github/

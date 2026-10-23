@@ -28,13 +28,6 @@ def test_marketing_readiness_gap_doc_exists():
     assert "Gap" in text
 
 
-def test_public_ops_probe_script_is_network_safe_contract():
-    source = (ROOT / "scripts" / "founder_beta_ops_public_probe.py").read_text(encoding="utf-8")
-    assert "fantasygmlab.com" in source
-    assert "_stcore/health" in source
-    assert "Does not create accounts" in source or "does not create accounts" in source.casefold()
-
-
 def test_managed_host_blocks_customer_unsafe_debug_without_allow():
     locked = {
         "RENDER": "true",
@@ -87,10 +80,3 @@ def test_self_hosted_box_is_recognized_as_managed_without_render_markers():
     allowed = dict(self_hosted, DYNASTYGM_ALLOW_PROD_DEBUG="1")
     assert app_config.customer_unsafe_debug_allowed(environ=allowed, secrets={})
     assert performance.debug_enabled(environ=allowed, secrets={})
-
-
-def test_destination_visibility_helper_locks_experimental_on_managed_hosts():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "customer_unsafe_debug_allowed" in source
-    assert 'flags["show_experimental"] = False' in source
-    assert 'flags["show_dev"] = False' in source

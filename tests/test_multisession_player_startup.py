@@ -116,7 +116,6 @@ def test_background_refresh_does_not_block_valid_foreground_cache(monkeypatch):
     assert players_refresh_flight.provider_refresh_call_count() == 1
 
 
-def test_render_build_prepares_cache_before_web_process():
-    render = open("render.yaml", encoding="utf-8").read()
-    web_service = render.split("- type: web", 1)[1].split("- type: web", 1)[0]
-    assert "python scripts/prepare_public_player_cache.py" in web_service
+def test_image_build_prepares_cache_before_services_start():
+    dockerfile = open("Dockerfile", encoding="utf-8").read()
+    assert "RUN python scripts/prepare_public_player_cache.py" in dockerfile

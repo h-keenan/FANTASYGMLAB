@@ -144,31 +144,3 @@ def test_reset_lazily_fetches_existing_preferences_before_merging():
     assert state["account_user_settings"]["settings"] == {"theme": "dark"}
     fetch.assert_called_once()
     save.assert_called_once()
-
-
-def test_app_loads_preferences_at_authenticated_dashboard_boundary_and_wires_dismissal():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    startup = source.split("def main():", 1)[1].split("# SIDEBAR", 1)[0]
-
-    assert "user_preferences.refresh_authenticated_preferences(" in source
-    assert "user_preferences.refresh_authenticated_preferences(" not in startup
-    assert "user_preferences.onboarding_is_dismissed(" in source
-    assert "on_dont_show_again=_persist_onboarding_dismissal" in source
-    assert "account_user_settings" in source
-    account_ui = (ROOT / "modules" / "account_ui.py").read_text(encoding="utf-8")
-    assert '"Profile preferences"' in account_ui
-    assert '"Reset onboarding"' in account_ui
-
-
-def test_founder_beta_geometry_uses_canonical_tokens():
-    polish = (ROOT / "modules" / "ux_polish_styles.py").read_text(encoding="utf-8")
-    consistency = (
-        ROOT / "modules" / "founder_beta_consistency_styles.py"
-    ).read_text(encoding="utf-8")
-
-    assert "--dg-ux-radius: var(--radius-panel)" in polish
-    assert "--dg-ux-card-pad: var(--space-md)" in polish
-    assert "border-radius: 14px" not in polish
-    assert "border-radius: 999px" not in polish
-    assert ".st-key-dashboard_orientation_panel" in consistency
-    assert "padding: var(--space-md)" in consistency

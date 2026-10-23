@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 
-from modules import theme_mode
 from modules.design_tokens import (
     DESIGN_TOKEN_HEX,
     DESIGN_TOKEN_HEX_LIGHT,
@@ -151,55 +150,3 @@ def test_light_subtle_border_stays_a_hairline_not_a_loud_boundary():
 
 
 # --- theme_mode resolution -------------------------------------------------
-
-
-def test_stored_mode_defaults_to_dark_and_validates_the_value_set():
-    assert theme_mode.stored_mode(None) == "dark"
-    assert theme_mode.stored_mode({"settings": {"theme_mode": "light"}}) == "light"
-    assert theme_mode.stored_mode({"settings": {"theme_mode": "bogus"}}) == "dark"
-
-
-def test_current_mode_prefers_the_live_widget_value_over_everything_else():
-    session = {
-        theme_mode.RADIO_WIDGET_KEY: "light",
-        theme_mode.LOCAL_OVERRIDE_KEY: "dark",
-        "account_user_settings": {"settings": {"theme_mode": "auto"}},
-    }
-    assert theme_mode.current_mode(session) == "light"
-
-
-def test_current_mode_falls_back_to_local_override_then_stored():
-    assert theme_mode.current_mode({theme_mode.LOCAL_OVERRIDE_KEY: "light"}) == "light"
-    assert theme_mode.current_mode(
-        {"account_user_settings": {"settings": {"theme_mode": "auto"}}}
-    ) == "auto"
-    assert theme_mode.current_mode({}) == "dark"
-
-
-def test_resolve_is_dark_for_explicit_modes():
-    assert theme_mode.resolve_is_dark({theme_mode.RADIO_WIDGET_KEY: "dark"}) is True
-    assert theme_mode.resolve_is_dark({theme_mode.RADIO_WIDGET_KEY: "light"}) is False
-
-
-def test_resolve_is_dark_for_system_mode_uses_probe_then_defaults_dark():
-    auto_session = {theme_mode.RADIO_WIDGET_KEY: "auto"}
-    assert theme_mode.resolve_is_dark(auto_session) is True  # no probe reading yet
-    auto_session[theme_mode.SYSTEM_PREFERS_DARK_KEY] = False
-    assert theme_mode.resolve_is_dark(auto_session) is False
-
-
-def test_with_theme_mode_merges_without_dropping_other_settings():
-    updated = theme_mode.with_theme_mode({"settings": {"other_pref": 1}}, mode="light")
-    assert updated == {"settings": {"other_pref": 1, "theme_mode": "light"}}
-
-
-def test_persist_authenticated_theme_mode_requires_auth():
-    error = theme_mode.persist_authenticated_theme_mode(config={}, session_state={}, mode="light")
-    assert error == "Authentication is required."
-
-
-def test_set_mode_applies_locally_even_when_signed_out():
-    session: dict = {}
-    error = theme_mode.set_mode(config={}, session_state=session, mode="light")
-    assert error == ""
-    assert session[theme_mode.LOCAL_OVERRIDE_KEY] == "light"

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from modules import player_state_authority, waivers_ui
+from modules import player_state_authority, waivers_logic
 
 
 def _player(player_id: str, **overrides) -> dict:
@@ -65,7 +65,7 @@ def test_bryce_class_record_is_not_actionable_and_cannot_keep_starter_label():
     decision = player_state_authority.waiver_actionability(bryce)
     assert decision == {"actionable": False, "reason": "no_current_nfl_team"}
 
-    ranked = waivers_ui.rank_priority_add_candidates(
+    ranked = waivers_logic.rank_priority_add_candidates(
         pd.DataFrame([bryce, _player("next", dynasty_score=1700)]),
         score_field="dynasty_score",
         needed_positions=["WR"],
@@ -87,7 +87,7 @@ def test_top_waiver_uses_next_valid_candidate_and_pool_is_cache_stable():
     first = player_state_authority.waiver_actionable_player_pool(frame, {})
     second = player_state_authority.waiver_actionable_player_pool(frame.copy(), {})
     pd.testing.assert_frame_equal(first.reset_index(drop=True), second.reset_index(drop=True))
-    selected = waivers_ui.select_top_waiver_opportunity(
+    selected = waivers_logic.select_top_waiver_opportunity(
         first,
         pd.DataFrame(),
         {"qb_format": "1QB"},
@@ -124,7 +124,7 @@ def test_status_literally_injured_reserve_is_never_actionable_even_when_active_f
     decision = player_state_authority.waiver_actionability(row)
     assert decision == {"actionable": False, "reason": "non_actionable_nfl_status"}
 
-    ranked = waivers_ui.rank_priority_add_candidates(
+    ranked = waivers_logic.rank_priority_add_candidates(
         pd.DataFrame([row, _player("healthy", dynasty_score=1700)]),
         score_field="dynasty_score",
         needed_positions=["WR"],
@@ -181,7 +181,7 @@ def test_zero_snap_role_blocked_player_is_not_ranked_despite_high_value_score():
         snap_share=0.45,
     )
 
-    ranked = waivers_ui.rank_priority_add_candidates(
+    ranked = waivers_logic.rank_priority_add_candidates(
         pd.DataFrame([blocked, healthy]),
         score_field="value_score",
         needed_positions=["RB"],
@@ -194,7 +194,7 @@ def test_zero_snap_role_blocked_player_is_not_ranked_despite_high_value_score():
 
     # Even with no roster-need competition at all, a role-blocked zero-usage
     # player must not clear the ranker on value score alone.
-    solo = waivers_ui.rank_priority_add_candidates(
+    solo = waivers_logic.rank_priority_add_candidates(
         pd.DataFrame([blocked]),
         score_field="value_score",
         needed_positions=[],
@@ -230,7 +230,7 @@ def test_suspended_free_agent_is_never_actionable_despite_active_status():
     )
     assert pool["player_id"].tolist() == ["healthy"]
 
-    ranked = waivers_ui.rank_priority_add_candidates(
+    ranked = waivers_logic.rank_priority_add_candidates(
         pd.DataFrame([suspended, _player("healthy", dynasty_score=1700)]),
         score_field="dynasty_score",
         needed_positions=["WR"],

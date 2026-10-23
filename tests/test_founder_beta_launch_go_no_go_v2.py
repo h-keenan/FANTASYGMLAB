@@ -45,15 +45,6 @@ def test_go_no_go_v2_doc_exists_with_required_gates_and_binary_verdict():
     assert "remaining p0 blockers" in text.casefold()
 
 
-def test_public_probe_baseline_matches_post_168_main():
-    source = (ROOT / "scripts" / "founder_beta_ops_public_probe.py").read_text(
-        encoding="utf-8"
-    )
-    # Probe baseline tracks latest paid-launch gate main (updated by subsequent ops PRs).
-    assert "6d379dcd38f1a87f501dafa119dc58d0f0d6134a" in source
-    assert "Does not create accounts" in source or "does not create accounts" in source.casefold()
-
-
 def test_ops_activation_points_at_go_no_go_v2_doc():
     ops = (ROOT / "docs" / "founder-beta-ops-activation.md").read_text(encoding="utf-8")
     assert "founder-beta-launch-go-no-go-v2.md" in ops

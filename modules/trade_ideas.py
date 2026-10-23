@@ -44,7 +44,7 @@ from modules.player_state_authority import (
     NFL_NON_ACTIONABLE_STATUSES,
     waiver_actionable_player_pool,
 )
-from modules.waivers_ui import select_top_waiver_opportunity
+from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
 from modules import trade_grade
@@ -2487,7 +2487,7 @@ def _waiver_alternative_for_need(
     waiver_context: Dict[str, Any] | None,
 ) -> Dict[str, Any] | None:
     """The best actionable, need-fit waiver option at `position` for this
-    team, via the exact same ranked pool modules.waivers_ui already builds
+    team, via the exact same ranked pool modules.waivers_logic already builds
     for the Waivers tab (select_top_waiver_opportunity ->
     rank_priority_add_candidates) -- never a second, bespoke scoring pass.
     Returns None when no waiver context was built for this run (e.g. the

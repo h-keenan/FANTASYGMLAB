@@ -6,8 +6,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules import auth_supabase
-from modules import account_ui
-from modules import session_isolation
 
 
 def test_top_level_signup_user_requires_confirmation():
@@ -91,29 +89,6 @@ def test_signup_path_enters_pending_for_top_level_user():
     assert not auth_supabase.current_user_id(state)
 
 
-def test_mobile_auth_entry_replaces_form_when_pending():
-    config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-    state: dict = {}
-    # No payload → ambiguous evidence → enumeration-safe copy (no false “we sent”).
-    auth_supabase.enter_pending_email_confirmation(state, "user@example.com")
-    with patch.object(account_ui.st, "session_state", state), patch.object(
-        account_ui.st, "markdown"
-    ) as markdown, patch.object(account_ui.st, "button", return_value=False), patch.object(
-        account_ui.st, "caption"
-    ), patch.object(account_ui.st, "success"), patch.object(account_ui.st, "warning"), patch.object(
-        account_ui.st, "info"
-    ):
-        actions = account_ui.render_mobile_auth_entry(config=config)
-    html = " ".join(str(c.args[0]) for c in markdown.call_args_list if c.args)
-    assert "Check your email" in html
-    assert "data-fgl-pending-email-confirmation" in html
-    assert "not signed in" in html.casefold()
-    assert "If an account can be created" in html
-    assert "We sent a confirmation" not in html
-    assert actions["logged_in"] is False
-    assert actions["continue_guest"] is False
-
-
 def test_use_different_email_clears_pending():
     state: dict = {}
     auth_supabase.enter_pending_email_confirmation(state, "a@b.c")
@@ -137,49 +112,3 @@ def test_confirmed_callback_clears_pending():
     auth_supabase.apply_auth_payload(state, payload)
     assert auth_supabase.current_user_id(state) == "u1"
     assert auth_supabase.is_pending_email_confirmation(state) is False
-
-
-def test_guest_dialog_pending_signup_keeps_dialog_open():
-    """In-league soft-prompt signup must keep the dialog so the check-email card can mount."""
-
-    source = Path(__file__).resolve().parents[1].joinpath(
-        "modules", "guest_conversion.py"
-    ).read_text(encoding="utf-8")
-    dialog_fn = source.split("def render_guest_auth_dialog", 1)[1].split(
-        "\ndef ", 1
-    )[0]
-    assert "is_pending_email_confirmation" in dialog_fn
-    assert "render_confirmation_required_card" in dialog_fn
-    import re
-
-    pending_blocks = re.findall(
-        r"enter_pending_email_confirmation\([\s\S]*?st\.rerun\(\)",
-        dialog_fn,
-    )
-    assert pending_blocks
-    for block in pending_blocks:
-        assert "close_auth_dialog()" not in block
-
-
-def test_email_confirm_callback_consumes_guest_resume():
-    source = Path(__file__).resolve().parents[1].joinpath(
-        "modules", "account_ui.py"
-    ).read_text(encoding="utf-8")
-    # Match the Python success branch, not the component's JavaScript payload.
-    region = source.split('st.session_state["auth_restore_last_result"] = "email_confirm_callback"', 1)[1].split(
-        '\n    if ', 1
-    )[0]
-    assert "peek_guest_resume" in region
-    assert "finish_auth_from_guest" in region
-    assert 'surface="email_confirm"' in region
-
-
-def test_anonymous_isolation_while_pending():
-    state = {
-        "selected_league_id": "league-a",
-        "selected_league_name": "League A",
-    }
-    auth_supabase.enter_pending_email_confirmation(state, "a@b.c")
-    result = session_isolation.enforce_anonymous_account_league_boundary(state)
-    assert result["stripped"] is True
-    assert not auth_supabase.current_user_id(state)

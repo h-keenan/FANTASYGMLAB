@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from modules.player_asset_explorer_ui import ranked_player_frame
 from modules.player_eligibility import (
     annotate_player_eligibility,
     filter_current_fantasy_players,
@@ -122,22 +121,6 @@ def test_actual_keenan_survives_normalization_and_prepared_universe_filter():
     )
 
     assert prepared["player_id"].astype(str).tolist() == [str(record["player_id"])]
-
-
-def test_unsigned_active_player_remains_discoverable_in_explorer_and_trade_pool():
-    eligible = _record(team=None, team_abbr=None, fantasycalc_value=None)
-    other = _record(player_id="other", full_name="Other", name="Other", value_score=800)
-    annotated = annotate_player_eligibility(pd.DataFrame([eligible, other]), now=NOW)
-
-    explorer = ranked_player_frame(annotated, "value_score")
-    trade_pool = filter_current_fantasy_players(
-        annotated,
-        surface="trade_search_pool",
-        now=NOW,
-    )
-
-    assert "current-veteran" in explorer["player_id"].tolist()
-    assert "current-veteran" in trade_pool["player_id"].tolist()
 
 
 def test_eligibility_contract_version_invalidates_stored_annotation():

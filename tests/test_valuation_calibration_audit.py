@@ -319,13 +319,6 @@ def test_lineup_uses_active_score_field_not_hardcoded_current():
     assert current_rb == "old"
 
 
-def test_my_team_boards_consume_score_field_parameter():
-    source = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
-    workspace = source.split("def render_my_team_workspace", 1)[1]
-    assert workspace.count("score_field=score_field") >= 7
-    assert 'score_field="value_score"' not in workspace
-
-
 def test_production_vs_upside_controlled_profiles():
     """Market is the production proxy; youth alone must not dominate elite producers."""
 
@@ -473,26 +466,6 @@ def test_dead_age_adjustment_not_used_in_composite():
     assert "age_adjustment" not in model
 
 
-def test_strategy_age_curve_is_overlay_not_rankings_owner():
-    """Strategy may reweight recommendation boards; rankings.py owns universal talent.
-
-    apply_strategy_age_curve used to be defined twice — once in app.py, once
-    as a "faithful port" in modules/trade_hub_engine.py — a real drift risk
-    if either copy's age-curve tables were tuned without the other. Both
-    call sites now share the one definition in trade_hub_engine.py; app.py
-    just imports it.
-    """
-
-    rankings_src = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
-    app_src = (ROOT / "app.py").read_text(encoding="utf-8")
-    engine_src = (ROOT / "modules" / "trade_hub_engine.py").read_text(encoding="utf-8")
-    assert "def apply_strategy_age_curve" not in rankings_src
-    assert "def apply_strategy_age_curve" not in app_src
-    assert "from modules.trade_hub_engine import" in app_src and "apply_strategy_age_curve" in app_src
-    assert "def apply_strategy_age_curve" in engine_src
-    assert "def apply_valuation_model" in rankings_src
-
-
 def test_rookie_years_exp_does_not_bypass_market_in_composite_formula():
     """NFL evidence proxy is market_score; years_exp only shapes opportunity labels."""
 
@@ -502,16 +475,6 @@ def test_rookie_years_exp_does_not_bypass_market_in_composite_formula():
     assert "years_exp" in role  # opportunity_profile / production input
     assert "COMPOSITE_WEIGHT_MARKET" in compose
     assert "years_exp" not in compose.split("composite = (", 1)[1].split(")", 1)[0]
-
-
-def test_role_adjusted_lineup_does_not_clobber_canonical_value_score():
-    """Role weights are a lineup overlay — canonical value_score must remain intact."""
-
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert 'my_team_df["role_adjusted_score"] = adjusted_scores' in source
-    assert 'score_field="role_adjusted_score"' in source
-    # Legacy clobber path must not remain on Game Plan / My Team role loops.
-    assert 'my_team_df["value_score"] = adjusted_scores' not in source
 
 
 def test_market_weight_dominates_but_football_components_can_move_order():

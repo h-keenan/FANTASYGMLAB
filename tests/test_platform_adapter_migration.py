@@ -3,7 +3,6 @@ from unittest.mock import patch
 
 import pandas as pd
 
-import app
 from modules import team_eval
 from modules import trade_ideas
 
@@ -129,26 +128,6 @@ class TestPlatformAdapterMigration(unittest.TestCase):
             and pick.get("original_roster_id") == 1
         ]
         self.assertEqual(traded_second[0]["owner_roster_id"], 2)
-
-    def test_dashboard_waiver_preview_excludes_adapter_canonical_roster_ids(self):
-        adapter = FakeAdapter()
-        df_players = pd.DataFrame(
-            [
-                {"player_id": "p1", "name": "Rostered", "position": "WR", "team": "DAL", "active": True, "status": "Active", "fantasycalc_value": 90, "value_score": 90, "dynasty_score": 90},
-                {"player_id": "p3", "name": "Free Agent", "position": "RB", "team": "NYG", "active": True, "status": "Active", "fantasycalc_value": 80, "value_score": 80, "dynasty_score": 80},
-            ]
-        )
-
-        with patch("app.get_sleeper_adapter", return_value=adapter):
-            free_agents, _, _ = app.build_home_dashboard_free_agent_preview(
-                df_players,
-                "league",
-                my_roster_id=None,
-                score_field="value_score",
-                league_settings={},
-            )
-
-        self.assertEqual(free_agents["player_id"].tolist(), ["p3"])
 
 
 if __name__ == "__main__":

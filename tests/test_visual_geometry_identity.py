@@ -5,8 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules import compact_fantasy_assets as compact
-from modules import trade_hub_ui
-from modules.trade_detail_styles import TRADE_DETAIL_CSS
+from modules import trade_hub_presentation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -101,41 +100,3 @@ def test_game_plan_trade_visual_is_give_for_get_package():
     assert "grid-template-columns:minmax(0,1fr)autominmax(0,1fr)" in css
     assert "max-width:40rem" in css
     assert "justify-content:space-between" not in css
-
-
-def test_trade_summary_package_reuses_compact_identity_without_space_between():
-    html = trade_hub_ui._trade_summary_assets_html(
-        [_player(), _pick(name="2027 3rd", label="2027 3rd")]
-    )
-    assert "dg-compact-asset--player" in html
-    assert "dg-compact-asset--pick" in html
-    assert "trade-avatar" not in html
-    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    assert "justify-content: space-between;" not in css.split(".trade-summary-impact-row")[1][:400]
-    assert "justify-content: flex-start;" in css
-    assert "max-width: 100%;" in css
-    assert ".trade-summary-side { align-items: start;" in css
-    assert "grid-template-columns: minmax(0, 1fr);" in css
-
-
-def test_review_package_compact_identity_geometry_is_unchanged():
-    css = TRADE_DETAIL_CSS
-    assert "grid-template-columns: 3.5rem minmax(0, 1fr);" in css
-    assert "height: 3.5rem !important;" in css or "height: 3.5rem;" in css
-    assert ".trade-asset-row-compact .trade-asset-name" in css
-    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    dialog = source[source.index("def _trade_detail_dialog") : source.index("render_trade_idea_player_actions")]
-    assert "trade-matchup trade-matchup-compact" in dialog
-    assert "send_label" in dialog
-    assert "receive_label" in dialog
-    assert "compact_assets_html or assets_html" in dialog
-
-
-def test_dashboard_secondary_cards_share_game_plan_padding_owner():
-    css = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert ".dg-game-plan-card{" in css.replace("\n", "") or ".dg-game-plan-card{" in css
-    assert "gap:var(--space-sm)" in css.replace(" ", "")
-    assert "compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS" in css
-    assert "watch_attention_html" in css
-    assert "size=\"standard\"" in css or "size='standard'" in css
-    assert "dg-gp-identity-row" in css

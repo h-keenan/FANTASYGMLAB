@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from modules import account_ui
 from modules import auth_supabase
-from modules import session_isolation
 
 
 def _new_unconfirmed_payload(*, with_identities: bool = True) -> dict:
@@ -135,78 +133,6 @@ def test_enter_pending_new_user_sets_confirmation_sent():
     assert pending["confirmation_evidence"] == "definite_new_unconfirmed"
 
 
-def test_ui_obfuscated_signup_uses_safe_copy_and_sign_in_cta():
-    config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-    state: dict = {}
-    auth_supabase.enter_pending_email_confirmation(
-        state,
-        "existing@example.com",
-        payload=_obfuscated_existing_confirmed_payload(),
-    )
-    button_labels: list[str] = []
-
-    def _button(label, **_kwargs):
-        button_labels.append(str(label))
-        return False
-
-    with patch.object(account_ui.st, "session_state", state), patch.object(
-        account_ui.st, "markdown"
-    ) as markdown, patch.object(account_ui.st, "button", side_effect=_button), patch.object(
-        account_ui.st, "caption"
-    ), patch.object(account_ui.st, "success"), patch.object(account_ui.st, "warning"), patch.object(
-        account_ui.st, "info"
-    ):
-        actions = account_ui.render_mobile_auth_entry(config=config)
-    html = " ".join(str(c.args[0]) for c in markdown.call_args_list if c.args)
-    assert "Check your email" in html
-    assert "If an account can be created" in html
-    assert "We sent a confirmation" not in html
-    assert "Already have an account? Sign in" in button_labels
-    assert "Use a different email" in button_labels
-    assert "Continue without an account" in button_labels
-    assert actions["logged_in"] is False
-
-
-def test_ui_new_signup_may_claim_sent():
-    config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-    state: dict = {}
-    auth_supabase.enter_pending_email_confirmation(
-        state,
-        "fresh@example.com",
-        payload=_new_unconfirmed_payload(),
-    )
-    with patch.object(account_ui.st, "session_state", state), patch.object(
-        account_ui.st, "markdown"
-    ) as markdown, patch.object(account_ui.st, "button", return_value=False), patch.object(
-        account_ui.st, "caption"
-    ), patch.object(account_ui.st, "info"):
-        account_ui.render_mobile_auth_entry(config=config)
-    html = " ".join(str(c.args[0]) for c in markdown.call_args_list if c.args)
-    assert "We sent a confirmation link" in html
-
-
-def test_resend_success_uses_safe_language():
-    config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-    state: dict = {}
-    auth_supabase.enter_pending_email_confirmation(
-        state,
-        "existing@example.com",
-        payload=_obfuscated_existing_confirmed_payload(),
-    )
-    state["_confirm_resend_success"] = True
-    with patch.object(account_ui.st, "session_state", state), patch.object(
-        account_ui.st, "markdown"
-    ) as markdown, patch.object(account_ui.st, "button", return_value=False), patch.object(
-        account_ui.st, "caption"
-    ), patch.object(account_ui.st, "info"):
-        account_ui.render_confirmation_required_card(
-            config=config, email="existing@example.com", key_prefix="enum"
-        )
-    html = " ".join(str(c.args[0]) for c in markdown.call_args_list if c.args)
-    assert "Confirmation email sent" not in html
-    assert "If a confirmation can be sent" in html
-
-
 def test_malformed_email_and_weak_password_do_not_enter_pending():
     config = {"enabled": True, "url": "https://proj.supabase.co", "anon_key": "sb_publishable_x"}
 
@@ -280,21 +206,6 @@ def test_diagnostics_do_not_encode_user_existence():
     assert codes == ["pending_confirmation", "pending_confirmation"]
     created = [c.kwargs.get("auth_user_created") for c in diag.call_args_list]
     assert created == [False, False]
-
-
-def test_anonymous_isolation_preserved_for_ambiguous_pending():
-    state = {
-        "selected_league_id": "league-a",
-        "selected_league_name": "League A",
-    }
-    auth_supabase.enter_pending_email_confirmation(
-        state,
-        "existing@example.com",
-        payload=_obfuscated_existing_confirmed_payload(),
-    )
-    result = session_isolation.enforce_anonymous_account_league_boundary(state)
-    assert result["stripped"] is True
-    assert not auth_supabase.current_user_id(state)
 
 
 def test_signup_http_obfuscated_existing_enters_ambiguous_pending():

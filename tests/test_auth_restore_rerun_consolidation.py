@@ -3,15 +3,12 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import app
 from modules import auth_restore_lifecycle
 from modules import auth_supabase
 from modules import startup_coordinator
-from scripts import report_startup_waterfall
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 def _auth_payload(user_id: str = "user-a", token: str = "access-a") -> dict:
@@ -24,52 +21,6 @@ def _auth_payload(user_id: str = "user-a", token: str = "access-a") -> dict:
         "expires_at": 9999999999,
         "token_type": "bearer",
     }
-
-
-def test_auth_restore_does_not_force_immediate_rerun_before_profile():
-    main = APP.index("def main():")
-    auth_restore = APP.index('if auth_restore.get("restored"):', main)
-    profile = APP.index('runtime_trace.mark("profile_lookup_complete")', auth_restore)
-    auth_block = APP[auth_restore:profile]
-    assert "st.rerun()" not in auth_block
-    assert "clear_auth_pending_wait" in auth_block
-
-
-def test_league_resume_no_longer_forces_explicit_rerun():
-    call_site = APP.index("_maybe_auto_resume_supabase_league()", APP.index("def main():"))
-    snippet = APP[call_site : call_site + 160]
-    assert "st.rerun()" not in snippet
-
-
-def test_post_usable_durable_save_is_flushed_without_rerun_after_football():
-    # Canonical dismiss is after PAGE_READY; early guest launch may dismiss sooner.
-    page_ready = APP.index("StartupPhase.PAGE_READY")
-    dismiss = APP.index('runtime_trace.mark("first_usable_paint")', page_ready)
-    complete = APP.index("startup.complete()", dismiss)
-    post = APP[complete : complete + 1200]
-    assert "POST_USABLE_SAVE_AFTER_FOOTBALL_KEY" in post
-    assert "st.rerun()" not in post
-    flush = APP.index("post_usable_auth_save_flushed")
-    football = APP.index('"football_context_ready"')
-    assert football < flush
-    assert "flush_durable_auth_persistence" in APP[flush - 400 : flush + 200]
-    assert "st.rerun()" not in APP[flush - 200 : flush + 400]
-    assert complete < football
-
-
-def test_auth_pending_stop_remains_required():
-    pending = APP.index('if auth_restore.get("pending") and startup.active:')
-    stop = APP.index("st.stop()", pending)
-    assert stop > pending
-    assert stop < APP.index(
-        "startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)",
-        pending,
-    )
-
-
-def test_session_restored_milestone_is_once_gated():
-    idx = APP.index('"session_restored"')
-    assert "once=True" in APP[idx : idx + 120]
 
 
 def test_identical_auth_payload_skips_workspace_wipe_and_reapply():
@@ -153,47 +104,3 @@ def test_milestone_once_suppresses_duplicate_session_restored():
     )
     assert first is not None
     assert second is None
-
-
-def test_waterfall_groups_by_startup_session_and_run():
-    text = "\n".join(
-        [
-            'DYNASTYGM_STARTUP {"kind":"startup_run","startup_session_id":"abc","startup_run_number":1,"restore_phase":"UNINITIALIZED"}',
-            'DYNASTYGM_STARTUP {"kind":"startup_milestone","milestone":"auth_storage_requested","label":"Auth storage requested","elapsed_ms":20,"startup_session_id":"abc","startup_run_number":1}',
-            'DYNASTYGM_STARTUP {"kind":"startup_run","startup_session_id":"abc","startup_run_number":2,"restore_phase":"STORAGE_PENDING"}',
-            'DYNASTYGM_STARTUP {"kind":"startup_milestone","milestone":"session_restored","label":"Session restored","elapsed_ms":200,"startup_session_id":"abc","startup_run_number":2}',
-            'DYNASTYGM_STARTUP {"kind":"startup_milestone","milestone":"loading_dismissed","label":"Loading dismissed","elapsed_ms":900,"startup_session_id":"abc","startup_run_number":2}',
-        ]
-    )
-    rendered = report_startup_waterfall._render(report_startup_waterfall._parse_lines(text))
-    assert "Startup session abc" in rendered
-    assert "Run 1" in rendered
-    assert "Run 2" in rendered
-    assert "Session restored milestones: 1" in rendered
-    assert "Script runs: 2" in rendered
-
-
-def test_entitlement_refresh_is_memoized_for_same_user():
-    state: dict = {}
-    auth_supabase.apply_auth_payload(state, _auth_payload())
-    state["account_profile"] = {"plan": "free"}
-    with (
-        patch.object(app.st, "session_state", state),
-        patch.object(app.premium, "effective_entitlement", return_value="free") as entitlement,
-        patch.object(app.auth_supabase, "current_user_id", return_value="user-a"),
-    ):
-        first = app.refresh_current_user_entitlement()
-        second = app.refresh_current_user_entitlement()
-    assert first == "free"
-    assert second == "free"
-    assert entitlement.call_count == 1
-
-
-def test_loading_dismiss_prerequisites_remain_after_auth_ready():
-    auth_ready = APP.index('"auth_ready"')
-    shell = APP.index('"shell_chrome_ready"')
-    # Authenticated / league path dismisses after shell; early guest may dismiss sooner.
-    dismiss = APP.index('runtime_trace.mark("first_usable_paint")', shell)
-    assert auth_ready < shell < dismiss
-    assert "early_guest_launch" in APP
-    assert "account_controls_ready" in APP

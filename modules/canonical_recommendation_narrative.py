@@ -31,15 +31,15 @@ CONSUMER_SURFACES: tuple[str, ...] = (
 # Builders that remain as field extractors / shorteners feeding this model.
 RETAINED_BUILDERS: tuple[tuple[str, str], ...] = (
     (
-        "modules.trade_hub_ui.trade_target_reason",
+        "modules.trade_hub_presentation.trade_target_reason",
         "Extracts the existing target/fit reason field chain; feeds Reason.",
     ),
     (
-        "modules.trade_hub_ui.trade_partner_reason",
+        "modules.trade_hub_presentation.trade_partner_reason",
         "Extracts partner/evidence field chain; feeds Evidence.",
     ),
     (
-        "modules.trade_hub_ui.trade_confidence_reason",
+        "modules.trade_hub_presentation.trade_confidence_reason",
         "Extracts confidence summary + health caveat; feeds Risk/confidence wording.",
     ),
     (
@@ -47,11 +47,11 @@ RETAINED_BUILDERS: tuple[tuple[str, str], ...] = (
         "Surface shortening only; must not rewrite meaning.",
     ),
     (
-        "modules.waivers_ui.free_agent_reason_text",
+        "modules.waivers_logic.free_agent_reason_text",
         "Waiver-specific existing reason assembly; feeds waiver narratives.",
     ),
     (
-        "modules.waivers_ui.waiver_recommendation_label",
+        "modules.waivers_logic.waiver_recommendation_label",
         "Existing waiver action label from row signals; feeds Action.",
     ),
 )

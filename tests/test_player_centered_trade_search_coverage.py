@@ -271,28 +271,6 @@ def test_target_search_never_returns_unrelated_board_ideas():
     )
 
 
-def test_valuation_lens_is_score_field_not_a_second_search_engine():
-    app = (__import__("pathlib").Path(__file__).resolve().parents[1] / "app.py").read_text(
-        encoding="utf-8"
-    )
-    ideas = (__import__("pathlib").Path(__file__).resolve().parents[1] / "modules" / "trade_ideas.py").read_text(
-        encoding="utf-8"
-    )
-    ui = (
-        __import__("pathlib").Path(__file__).resolve().parents[1]
-        / "modules"
-        / "valuation_archetype_ui.py"
-    ).read_text(encoding="utf-8")
-    assert "score_field=score_field" in app.split("def cached_trade_ideas", 1)[1][:2500] or "score_field=" in ideas
-    # "Evaluation" moved into modules/trade_hub_ui.py's
-    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
-    hub_src = (
-        __import__("pathlib").Path(__file__).resolve().parents[1] / "modules" / "trade_hub_ui.py"
-    ).read_text(encoding="utf-8")
-    assert "Evaluation" in hub_src
-    assert "not a second" in ui.casefold()
-
-
 def test_skattebo_class_player_plus_pick_survives_neutral_partner_fit():
     frame = pd.DataFrame(
         [
@@ -524,16 +502,3 @@ def test_player_search_fallback_does_not_make_provider_calls():
     assert "get_rosters(" not in fallback
     assert "get_league(" not in fallback
     assert "get_traded_picks(" not in fallback
-
-
-def test_trade_setup_controls_are_compact():
-    # The Trade Hub route body was extracted out of app.py's route
-    # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
-    app = (
-        __import__("pathlib").Path(__file__).resolve().parents[1] / "modules" / "trade_hub_ui.py"
-    ).read_text(encoding="utf-8")
-    hub = app[app.index("def render_trade_hub_workspace(") :]
-    assert "trade_hub_setup" in hub
-    assert "TRADE_SETUP_CAPTION" in hub
-    assert 'label="Evaluation"' in hub
-    assert "compact=True" in hub

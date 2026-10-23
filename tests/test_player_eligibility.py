@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pandas as pd
 
-import app
 from modules import draft_assistant, live_draft
 from modules.player_eligibility import (
     eligibility_diagnostics,
@@ -292,19 +291,6 @@ def test_live_draft_filters_before_ranking_labels():
     assert "138" not in rankings["player_id"].astype(str).tolist()
 
 
-def test_startup_draft_center_excludes_ineligible_player():
-    board = app.build_startup_draft_board(
-        _decision_pool(),
-        score_field="dynasty_score",
-        strategy_label="Balanced",
-        current_round=1,
-        league_settings={"qb_format": "1QB", "te_premium": False},
-        excluded_player_ids=set(),
-    )
-
-    assert board["player_id"].tolist() == ["current-1", "rookie-1"]
-
-
 def test_draft_assistant_filters_every_path_and_recommendation_bucket():
     source = _decision_pool()
     long_draft_pool = draft_assistant.apply_draft_pool_filter(
@@ -324,19 +310,6 @@ def test_draft_assistant_filters_every_path_and_recommendation_bucket():
     assert long_draft_pool["player_id"].tolist() == ["current-1", "rookie-1"]
     assert available["player_id"].tolist() == ["current-1", "rookie-1"]
     assert all(str(item.get("player_id")) != "138" for item in recommendations)
-
-
-def test_waiver_and_dashboard_free_agent_entry_points_use_canonical_filter():
-    app_source = Path("app.py").read_text(encoding="utf-8")
-
-    assert 'surface="waiver_free_agents"' in app_source
-    assert 'surface="dashboard_free_agents"' in app_source
-    filtered = filter_current_fantasy_players(
-        _decision_pool(),
-        surface="waiver_free_agents",
-        now=NOW,
-    )
-    assert "138" not in filtered["player_id"].astype(str).tolist()
 
 
 def test_active_unsigned_veteran_with_current_structured_news_is_eligible():
@@ -409,57 +382,6 @@ def test_no_player_name_is_hardcoded_in_eligibility_implementation():
 
     assert "roethlisberger" not in implementation
     assert "ben " not in implementation
-
-
-def test_surface_wiring_covers_all_active_decision_pools():
-    app_source = Path("app.py").read_text(encoding="utf-8")
-    live_source = Path("modules/live_draft.py").read_text(encoding="utf-8")
-    assistant_source = Path("modules/draft_assistant.py").read_text(encoding="utf-8")
-
-    for surface in (
-        "startup_draft_center",
-        "startup_manual_exclusions",
-        "startup_best_available",
-        "waiver_free_agents",
-        "dashboard_free_agents",
-        "prepared_player_frame",
-        "trade_search_pool",
-    ):
-        assert f'surface="{surface}"' in app_source
-    explorer_source = Path("modules/player_asset_explorer_ui.py").read_text(encoding="utf-8")
-    assert "is_current_fantasy_eligible" in explorer_source
-    assert 'surface="live_draft_available_pool"' in live_source
-    assert 'surface="live_draft_rankings"' in live_source
-    assert 'surface="draft_assistant_available_pool"' in assistant_source
-    assert 'surface="draft_assistant_recommendations"' in assistant_source
-
-
-def test_sleeper_fixture_retired_veteran_is_not_a_current_asset():
-    import json
-
-    from modules.player_eligibility import is_current_fantasy_asset
-    from modules.player_asset_explorer_ui import ranked_player_frame
-
-    sleeper = json.loads(Path("data/sleeper_players.json").read_text(encoding="utf-8"))
-    record = sleeper["138"]
-    assert is_current_fantasy_asset(record, now=NOW) is False
-    frame = filter_current_fantasy_players(
-        pd.DataFrame(
-            [
-                {
-                    **_stale_roethlisberger_record(),
-                    "fantasycalc_value": 8000,
-                    "value_score": 8000,
-                },
-                _player("current-1", "Current Veteran", value_score=5000),
-            ]
-        ),
-        now=NOW,
-        surface="player_asset_explorer",
-    )
-    visible = ranked_player_frame(frame, "value_score")
-    assert "138" not in visible["player_id"].astype(str).tolist()
-    assert visible["player_id"].tolist() == ["current-1"]
 
 
 def test_injured_reserve_and_active_free_agent_stay_eligible():
@@ -576,22 +498,3 @@ def test_trade_search_and_recommendation_pools_drop_retired_assets():
     )
     assert "138" not in pool["player_id"].astype(str).tolist()
     assert all(str(item.get("player_id")) != "138" for item in recommendations)
-
-
-def test_shop_next_move_routes_owned_player_as_send_asset():
-    my_team = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
-    app = Path("app.py").read_text(encoding="utf-8")
-    assert 'route_focus_mode": "my_player"' in my_team
-    assert "next_move_shop_player_id" in my_team
-    assert '"route_focus_mode": "my_player"' in app
-    assert "next_move_shop_player_id=next_move_shop_player_id" in app
-    assert 'st.session_state["waivers_focus_player_id"]' in app
-    assert "route_player_id" in my_team
-
-
-def test_roster_actions_grid_is_content_height():
-    css = Path("modules/visual_hierarchy_styles.py").read_text(encoding="utf-8")
-    assert "st-key-my_team_roster_actions" in css
-    assert "height: auto" in css
-    workspace = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
-    assert 'key="my_team_roster_actions"' in workspace

@@ -4,28 +4,10 @@ from pathlib import Path
 
 from modules import game_plan_package
 from modules import game_plan_truth_canon as truth_canon
-from modules import valuation_archetype_ui
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
-UI = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
 CANON = (ROOT / "modules" / "game_plan_truth_canon.py").read_text(encoding="utf-8")
-
-
-def test_league_type_and_team_strategy_are_separate_canonical_fields():
-    assert 'key="league_type"' in UI or "CANONICAL_LENS_SESSION_KEY" in UI
-    assert "league_type" in APP
-    assert "active_team_strategy" in APP
-    assert "team_strategy_select_" in APP
-    assert "active_team_strategy" not in UI
-    assert "league_type" in CANON
-    assert "is intentionally separate" in CANON
-    my_team = APP.split('if current_page == "my_team"', 1)[1].split(
-        "if current_page ==", 1
-    )[0]
-    assert "override_is_explicit_user_change" in my_team
-    assert "active_team_strategy != prior_strategy" not in my_team
 
 
 def test_auto_inference_is_not_an_explicit_strategy_change():
@@ -201,33 +183,6 @@ def test_league_switch_allows_new_inferred_initial_value():
     assert log[-1]["writer"] == "pre_package_canonical_resolver"
 
 
-def test_identity_cache_cannot_overwrite_locked_strategy():
-    from modules import prepared_player_frame
-
-    state: dict = {}
-    truth_canon.lock_canonical_inputs(
-        state,
-        truth_signature="sig",
-        team_strategy="contender",
-        pick_score_multiplier=1.0,
-        writer="pre_package_canonical_resolver",
-        force=True,
-        league_id="L1",
-        roster_id="R1",
-    )
-    prepared_player_frame.get_or_build_shell_chrome(
-        state,
-        signature="identity|L1",
-        builder=lambda: {"active_team_strategy": "retool"},
-    )
-    view = truth_canon.presentation_strategy_view(
-        state, inferred_strategy="retool", inferred_override="Auto"
-    )
-    assert view[truth_canon.CANON_STRATEGY_FIELD] == "contender"
-    assert "get_canon(st.session_state)" in APP
-    assert "Identity chrome is memoized" in APP
-
-
 def test_production_fringe_to_retool_digests_are_the_phantom_pair():
     """Production run 26 → 30: 468ac786 (fringe_contender) then 03e8f038 (retool)."""
 
@@ -258,9 +213,3 @@ def test_production_fringe_to_retool_digests_are_the_phantom_pair():
     )
     assert locked[truth_canon.CANON_STRATEGY_FIELD] == "fringe_contender"
     assert truth_canon._digest(locked[truth_canon.CANON_STRATEGY_FIELD]) == "468ac786"
-
-
-def test_desktop_lens_widget_does_not_write_team_strategy():
-    assert "active_team_strategy" not in UI
-    assert "lock_canonical_inputs" not in UI
-    assert valuation_archetype_ui.CANONICAL_LENS_SESSION_KEY == "league_type"

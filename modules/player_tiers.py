@@ -42,7 +42,7 @@ TIER_COLUMN_BY_SCORE_FIELD = {
 
 # A player rankings.py's own opportunity/usage signal has already judged to
 # have no live current role (``workload_trend == "Blocked"`` — the same
-# column modules.waivers_ui.rank_priority_add_candidates gates Priority
+# column modules.waivers_logic.rank_priority_add_candidates gates Priority
 # Adds on, for the identical reason) must never show as "Starter" tier or
 # above. value_score/dynasty_score are long-horizon (draft capital, age
 # curve, market) and can stay high for a young former-high-pick player long

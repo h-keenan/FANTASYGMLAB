@@ -18,14 +18,6 @@ WORKFLOW = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-
 LOADING = (ROOT / "modules" / "dashboard_loading_state.py").read_text(encoding="utf-8")
 
 
-def test_dashboard_has_no_timed_post_useful_fragment():
-    assert "@st.fragment" not in WORKFLOW
-    assert "timedelta" not in WORKFLOW
-    assert 'state.pop("_dashboard_defer_secondary_once"' in LOADING
-    assert 'state["_dashboard_defer_secondary_once"] = True' not in LOADING
-    assert dashboard_workflow.POST_USEFUL_MOUNTED_KEY == "_dashboard_secondary_mounted"
-
-
 def _trade_card():
     return share.build_trade_share_card(
         {

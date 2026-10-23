@@ -15,7 +15,6 @@ from modules import startup_coordinator
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 def test_league_process_cache_hit_equals_miss_payload():
@@ -137,22 +136,6 @@ def test_compose_diagnostics_report_hit_miss():
     assert [i.recommendation_id for i in first.items] == [
         i.recommendation_id for i in second.items
     ]
-
-
-def test_app_wires_process_caches_and_cache_events():
-    assert "game_plan_process_cache.get_or_build_league_context" in APP
-    assert "game_plan_process_cache.get_or_build_trade_headline" in APP
-    assert "log_startup_cache_event" in APP
-    assert "game_plan_briefing_assembly" in APP
-    assert "game_plan_compose_cache_lookup" in APP
-    assert "include_intelligence=True" not in APP.split(
-        "def _load_game_plan_league_context()", 1
-    )[1].split("render_home_dashboard(", 1)[0]
-
-
-def test_package_lookup_logs_cache_status_without_slow_gate():
-    assert 'cache_status="hit" if game_plan_package_hit else "miss"' in APP
-    assert "log_startup_cache_event" in APP
 
 
 def test_startup_cache_event_emits_without_elapsed_gate(monkeypatch, capsys):

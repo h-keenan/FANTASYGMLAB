@@ -470,7 +470,7 @@ def test_project_trade_idea_card_includes_category_and_value_edge_band():
     payload = card.to_dict()
     # +800 clears the >=500 threshold in modules.trade_visual_language's band.
     assert payload["value_edge_band"] == "Favorable"
-    # Non-headline: falls back to trade_hub_ui.trade_hub_display_section's
+    # Non-headline: falls back to trade_hub_presentation.trade_hub_display_section's
     # classification. reasoning_tags=["Need-Based"] contains the substring
     # "need" (checked before the trade_confidence_label=="High" fallback
     # this test originally expected), so it's classified Need-Based first.

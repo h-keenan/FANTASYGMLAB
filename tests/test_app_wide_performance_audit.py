@@ -76,24 +76,3 @@ def test_live_draft_discovery_mark_persists_ttl_keys():
     assert session["_cached_live_draft_active"] is True
     assert session[live_draft.LIVE_DRAFT_DISCOVERY_LEAGUE_KEY] == "lg9"
     assert session[live_draft.LIVE_DRAFT_DISCOVERY_AT_KEY] == 42.5
-
-
-def test_app_wires_live_draft_discovery_ttl_and_premium_profile_cache():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "should_refresh_live_draft_discovery" in source
-    assert "mark_live_draft_discovery" in source
-    assert 'force=billing_flag == "success"' in source
-    assert "LIVE_DRAFT_DISCOVERY_AT_KEY" in source
-
-
-def test_app_wide_performance_harness_and_audit_doc_exist():
-    harness = (ROOT / "scripts" / "measure_app_wide_performance.py").read_text(
-        encoding="utf-8"
-    )
-    doc = (ROOT / "docs" / "app-wide-performance-audit.md").read_text(encoding="utf-8")
-    assert "dynastygm-app-wide-performance-v1" in harness
-    assert "DYNASTYGM_RUNTIME_TRACE" in harness
-    assert "Latency map" in doc or "latency map" in doc.casefold()
-    assert "Live Draft discovery" in doc or "live_draft_discovery" in doc
-    assert "protobuf" in doc.casefold()
-    assert "No football" in doc or "no football" in doc.casefold()

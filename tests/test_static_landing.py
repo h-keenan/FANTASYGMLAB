@@ -75,12 +75,6 @@ def test_static_landing_lazy_loads_gallery_images():
     assert "assets/web/" in html
 
 
-def test_build_static_landing_assets_script_exists():
-    assert Path("scripts/build_static_landing_assets.py").exists()
-    assert Path("scripts/measure_production_first_paint.py").exists()
-    assert Path("scripts/measure_import_startup.py").exists()
-
-
 def test_static_landing_search_crawler_contract():
     html = (LANDING / "index.html").read_text(encoding="utf-8")
     robots = (LANDING / "robots.txt").read_text(encoding="utf-8")

@@ -4,7 +4,7 @@ from unittest import mock
 
 import pandas as pd
 
-from modules import live_draft, live_draft_ui
+from modules import live_draft
 
 
 def players():
@@ -113,14 +113,6 @@ class TestLiveDraftRankings(unittest.TestCase):
             self.assertNotIn(token, source)
         self.assertEqual(live_draft.LIVE_DRAFT_WRITE_METHOD_TOKENS, ())
 
-    def test_mobile_rankings_use_compact_rows(self):
-        source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
-        self.assertIn("live-rank-row", source)
-        self.assertIn("dense_list_primitives", source)
-        self.assertIn("Live Team Rankings", source)
-        self.assertIn("Available Player Rankings", source)
-        self.assertNotIn("def _render_available_pool", source)
-        self.assertIn("with st.expander(\"How the live score is built\"", source)
 
     def test_labels_and_tiers_are_not_uniform(self):
         ranked = board()
@@ -143,20 +135,6 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertFalse(ranked.columns.duplicated().any())
         self.assertEqual(len(ranked), len(source))
         self.assertIn("league_adjusted_draft_score", ranked.columns)
-
-
-    def test_multiple_ranking_rows_do_not_become_markdown_code_blocks(self):
-        rows = board().head(3).to_dict("records")
-        rendered_rows = [live_draft_ui._ranking_row_html(row) for row in rows]
-        combined = "".join(rendered_rows)
-
-        self.assertTrue(all(html.startswith("<article") for html in rendered_rows))
-        self.assertTrue(all(html.endswith("</article>") for html in rendered_rows))
-        self.assertNotIn("\n    <article", combined)
-        self.assertNotIn("\n<article", combined)
-        self.assertEqual(sum(1 for html in rendered_rows if "live-rank-row" in html), 3)
-        self.assertEqual(sum(1 for html in rendered_rows if "dg-dense-row" in html), 3)
-        self.assertEqual(combined.count("data-player-id="), 3)
 
 
     def test_live_team_rankings_rerank_rosters_as_picks_arrive(self):
@@ -267,28 +245,6 @@ class TestLiveDraftRankings(unittest.TestCase):
         )[0]
         self.assertNotIn("age", score_formula.casefold())
 
-    def test_main_draft_center_uses_shared_mobile_ranking_cards(self):
-        source = Path("modules/draft_center_ui.py").read_text(encoding="utf-8")
-        self.assertIn("_available_card_board", source)
-        self.assertIn("live_draft_ui._ranking_row_html", source)
-        self.assertNotIn("live_draft.build_live_draft_rankings", source)
-        active_board = source.split('"Available Board"', 1)[1].split("return {", 1)[0]
-        self.assertNotIn("st.dataframe(", active_board)
-
-    def test_available_player_rankings_are_rendered_before_live_team_rankings(self):
-        # UI V2 Architecture Reset: hierarchy follows user decision importance,
-        # not incidental build order. Available Player Rankings directly
-        # supports the current-pick decision; Live Team Rankings is
-        # league-standings context that does not drive this pick, so it now
-        # renders after the decision-relevant board.
-        source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
-        self.assertIn("Live Team Rankings", source)
-        snapshot = source.split("def render_snapshot()", 1)[1]
-        self.assertLess(
-            snapshot.index("_render_live_rankings("),
-            snapshot.index("_render_live_team_rankings(state)"),
-        )
-
 
     def test_live_rankings_do_not_mutate_shared_player_evaluations(self):
         source = players()
@@ -307,60 +263,6 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertNotIn("league_adjusted_draft_score", source.columns)
         self.assertNotIn("base_value", source.columns)
 
-    def test_main_draft_card_adapter_preserves_canonical_order_and_value(self):
-        from modules import draft_center_ui
-
-        source = pd.DataFrame([
-            {"player_id": "older", "name": "Older Elite", "position": "QB", "age": 31, "value_score": 100},
-            {"player_id": "young", "name": "Young Player", "position": "RB", "age": 21, "value_score": 70},
-        ])
-        cards = draft_center_ui._available_card_board(source, "value_score")
-
-        self.assertEqual(cards["player_id"].tolist(), ["older", "young"])
-        self.assertEqual(cards["base_value"].tolist(), [100, 70])
-        self.assertEqual(cards["league_adjusted_draft_score"].tolist(), [100, 70])
-
-    def test_live_scoring_is_not_imported_by_other_evaluators(self):
-        for path in (
-            "modules/rankings.py",
-            "modules/team_eval.py",
-            "modules/trades.py",
-            "modules/waivers_ui.py",
-            "modules/draft_assistant.py",
-        ):
-            source = Path(path).read_text(encoding="utf-8")
-            self.assertNotIn("build_live_draft_rankings", source, path)
-            self.assertNotIn("build_live_team_rankings", source, path)
-
-
-    def test_large_live_pool_is_fully_ranked_while_mobile_render_is_bounded(self):
-        large_pool = pd.DataFrame([
-            {
-                "player_id": f"p-{index}",
-                "name": f"Player {index}",
-                "position": ("QB", "RB", "WR", "TE")[index % 4],
-                "age": 21 + index % 12,
-                "dynasty_score": 1000 - index,
-                "years_exp": index % 8,
-                "active": True,
-                "status": "Active",
-                "fantasycalc_value": 1000 - index,
-            }
-            for index in range(400)
-        ])
-        ranked = live_draft.build_live_draft_rankings(
-            large_pool,
-            roster_df=pd.DataFrame(),
-            league_settings={"league_format": "Dynasty", "qb_format": "1QB"},
-            score_field="dynasty_score",
-            draft={"metadata": {"type": "startup"}},
-            picks_until_mine=8,
-        )
-
-        self.assertEqual(len(ranked), 400)
-        self.assertEqual(ranked["overall_rank"].iloc[-1], 400)
-        ui_source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
-        self.assertIn("visible_board = display.head(120)", ui_source)
 
     def test_position_availability_is_precomputed_once_per_refresh(self):
         source = Path("modules/live_draft.py").read_text(encoding="utf-8")
@@ -377,46 +279,6 @@ class TestLiveDraftRankings(unittest.TestCase):
         )[0]
         self.assertIn("relevant_player_ids", team_source)
         self.assertIn("relevant_players = players[", team_source)
-
-
-    def test_actual_startup_mode_board_uses_shared_tappable_cards(self):
-        # V2 restructure moved the Best-Player/Best-Fit `render_analysis_cards`
-        # reasoning block to sit directly under the recommendation tiles and
-        # button grid (before the Draft Board list), instead of after it —
-        # so the boundary this test checks is now the "Draft Board" section
-        # itself, not "everything after the button grid up to the next
-        # render_analysis_cards(" call.
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        board_section = app_source.split(
-            'render_section_header(\n        "Draft Board"', 1
-        )[1].split('with st.expander("Drafted players and exclusions"', 1)[0]
-
-        self.assertIn("draft_center_ui._available_card_board", board_section)
-        self.assertIn("live_draft_ui._ranking_row_html", board_section)
-        self.assertIn("_render_tappable_player_html", board_section)
-        self.assertIn("open_player_quick_view", board_section)
-        self.assertNotIn("st.dataframe(", board_section)
-        self.assertNotIn("render_player_detail_picker(", board_section)
-
-    def test_startup_card_board_preserves_existing_startup_score(self):
-        from modules import draft_center_ui
-
-        source = pd.DataFrame([
-            {
-                "player_id": "first", "name": "First", "position": "WR",
-                "startup_score": 950, "value_score": 700,
-            },
-            {
-                "player_id": "second", "name": "Second", "position": "QB",
-                "startup_score": 800, "value_score": 990,
-            },
-        ])
-        original = source.copy(deep=True)
-        cards = draft_center_ui._available_card_board(source, "startup_score")
-
-        self.assertEqual(cards["player_id"].tolist(), ["first", "second"])
-        self.assertEqual(cards["league_adjusted_draft_score"].tolist(), [950, 800])
-        pd.testing.assert_frame_equal(source, original)
 
 
 class TestLiveDraftRankingsTierAndMovementAvoidFullIterrows(unittest.TestCase):

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import app
 
-from modules import alerts_activity, alerts_activity_ui, trade_ideas
+from modules import alerts_activity, trade_ideas
 
 
 def _player(name: str, position: str, score: int = 3000) -> dict:
@@ -64,41 +63,6 @@ def _assessed_idea(my_shape, partner_shape, send, receive, *, value_delta=500):
     )
 
 
-def test_production_shape_qb_need_te_surplus_cannot_headline_qb_for_te():
-    my_shape = _shape(needs=("QB",), surplus=("TE",))
-    partner_shape = _shape(needs=("QB",), surplus=("TE",))
-    send = [_player("Ty Simpson", "QB", 2400)]
-    receive = [_player("Colby Parkinson", "TE", 2404), _pick(score=500)]
-
-    idea = _assessed_idea(my_shape, partner_shape, send, receive, value_delta=504)
-
-    assert idea["my_fit_score"] < 0
-    assert "spend from a weak QB room" in idea["my_fit_negatives"]
-    assert idea["partner_fit_score"] > 0
-    assert "Partner gets QB help" in idea["fit_summary"]
-    assert "You get QB help" not in idea["fit_summary"]
-    assert idea["trade_headline_ready"] is False
-    assert app._headline_trade_idea([idea]) is None
-
-
-def test_qb_surplus_te_need_has_correct_user_and_partner_perspective():
-    my_shape = _shape(needs=("TE",), surplus=("QB",))
-    partner_shape = _shape(needs=("QB",), surplus=("TE",))
-    idea = _assessed_idea(
-        my_shape,
-        partner_shape,
-        [_player("Movable QB", "QB")],
-        [_player("Needed TE", "TE")],
-    )
-
-    assert idea["my_fit_score"] > 0
-    assert idea["partner_fit_score"] > 0
-    assert "get TE help" in idea["fit_summary"]
-    assert "Partner gets QB help" in idea["fit_summary"]
-    assert idea["trade_headline_ready"] is True
-    assert app._headline_trade_idea([idea]) is idea
-
-
 def test_value_arbitrage_can_justify_surplus_acquisition_without_hidden_harm():
     my_shape = _shape(surplus=("TE",))
     partner_shape = _shape(needs=("WR",), surplus=("TE",))
@@ -113,18 +77,6 @@ def test_value_arbitrage_can_justify_surplus_acquisition_without_hidden_harm():
     assert idea["my_fit_negatives"] == []
     assert idea["trade_headline_fit_exception"] is True
     assert idea["trade_headline_ready"] is True
-
-
-def test_balanced_roster_raw_delta_alone_does_not_force_top_priority():
-    idea = _assessed_idea(
-        _shape(),
-        _shape(needs=("QB",), surplus=("TE",)),
-        [_player("QB", "QB")],
-        [_player("TE", "TE")],
-        value_delta=600,
-    )
-    assert idea["trade_headline_ready"] is False
-    assert app._headline_trade_idea([idea]) is None
 
 
 def test_contender_rebuilder_and_pick_package_keep_final_package_perspective():
@@ -174,46 +126,3 @@ def test_balanced_package_rationale_is_recomputed_from_mutated_final_assets():
     assert "Partner gets QB help" in original["rationale"]
     assert "Partner gets QB help" not in final["rationale"]
     assert "You get TE help" in final["rationale"]
-
-
-def test_alert_priority_semantics_and_fresh_default_contract():
-    assert alerts_activity.ALERT_FILTERS[0] == "Priority"
-    assert alerts_activity.normalize_filter("Important") == "Priority"
-    assert alerts_activity.normalize_filter(None) == "My Players"
-    rows = (
-        {"id": "urgent", "category": "URGENT", "alert_worthy": True},
-        {"id": "news", "category": "NEWS", "alert_worthy": False},
-        {"id": "decision", "category": "DECISIONS", "alert_worthy": True},
-    )
-    assert [row["id"] for row in alerts_activity.filter_timeline(rows, "Priority")] == [
-        "urgent",
-        "decision",
-    ]
-    source = (Path(__file__).resolve().parents[1] / "modules" / "alerts_activity_ui.py").read_text(
-        encoding="utf-8"
-    )
-    assert "owner_key" in source
-    assert "FILTER_MY_PLAYERS" in source
-
-
-def test_alert_injury_row_has_concise_non_repetitive_hierarchy():
-    html = alerts_activity_ui.timeline_row_html(
-        {
-            "headline": "Ashton Jeanty: Injury",
-            "context": "affects your starter",
-            "freshness": "1h",
-            "category": "URGENT",
-            "roster_relationship": "MY_STARTER",
-            "severity": "CRITICAL",
-            "event_type": "INJURY",
-            "status_unconfirmed": True,
-            "player_id": "12527",
-            "player_name": "Ashton Jeanty",
-        }
-    )
-    assert html.count("INJURY ALERT") == 1
-    assert html.count("MY PLAYER") == 1
-    assert "Starter · Status not yet confirmed" in html
-    assert "affects your starter" not in html
-    assert "STATUS NOT YET CONFIRMED</span>" not in html
-    assert "aria-label='URGENT player alert'" in html

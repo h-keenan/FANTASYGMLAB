@@ -1,5 +1,11 @@
-streamlit>=1.58,<2
 pandas>=3.0,<4
+# pyarrow was previously installed only as a transitive dependency of
+# streamlit (removed 2026-10, docs/streamlit-removal-2026-10.md). pandas 3
+# uses Arrow-backed string storage when pyarrow is importable (exercised by
+# tests/test_frame_records_parity.py and tests/test_benchmark_public_player_cache.py),
+# so it is pinned explicitly to keep production's dtype/memory behavior
+# unchanged now that streamlit no longer pulls it in.
+pyarrow>=16,<27
 requests>=2.32,<3
 feedparser>=6,<7
 espn-api>=0.46,<1

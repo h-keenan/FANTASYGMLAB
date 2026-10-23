@@ -635,7 +635,7 @@ def test_need_filling_trade_flags_a_clearly_better_waiver_alternative(monkeypatc
     `_waiver_alternative_guardrail` (additive, never a hard suppression)
     must flag that gap on the idea itself when the receive side lands on a
     true need position and a free agent at that position clearly outscores
-    the trade target by modules.waivers_ui's own ranked pool
+    the trade target by modules.waivers_logic's own ranked pool
     (select_top_waiver_opportunity), using the exact score field already in
     play elsewhere in this pipeline -- not a reinvented comparison.
     """

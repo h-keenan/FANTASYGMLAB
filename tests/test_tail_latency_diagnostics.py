@@ -14,7 +14,6 @@ from modules import startup_cold_path
 from modules import startup_coordinator
 from modules import tail_latency_diagnostics
 from scripts import diagnose_tail_latency
-from scripts.report_startup_waterfall import _parse_lines
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -220,37 +219,6 @@ def test_percentile_helper_and_synthetic_report():
     assert "PROCESS_COLD" in report
     assert "Owners:" in report
     assert "UNEXPLAINED/gap" in report
-
-
-def test_waterfall_parser_accepts_new_kinds():
-    text = "\n".join(
-        [
-            'DYNASTYGM_STARTUP {"kind":"startup_trace_summary","interactive_stable_ms":100}',
-            'DYNASTYGM_STARTUP {"kind":"duplicate_work","family":"compose"}',
-            'DYNASTYGM_STARTUP {"kind":"startup_stage_duration","stage":"compose","duration_ms":12}',
-            'DYNASTYGM_STARTUP {"kind":"provider_timing","category":"provider_rosters","duration_ms":9}',
-            'DYNASTYGM_STARTUP {"kind":"post_ready_rebuild","family":"league_context"}',
-        ]
-    )
-    assert len(diagnose_tail_latency.parse_log_text(text)) == 5
-    rows = _parse_lines(text)
-    kinds = {row.get("kind") for row in rows}
-    assert "startup_trace_summary" in kinds
-    assert "duplicate_work" in kinds
-    assert "provider_timing" in kinds
-    classic = (
-        'DYNASTYGM_STARTUP {"kind":"startup_run","startup_session_id":"a","startup_run_number":1,'
-        '"restore_phase":"UNINITIALIZED"}'
-    )
-    assert _parse_lines(classic)
-
-
-def test_briefing_substage_accounting_present_in_app_source():
-    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert 'f"briefing_{_name}"' in app_source
-    assert '"briefing_assembly"' in app_source
-    for name in ("injury", "waiver", "tiles", "organization", "snapshot"):
-        assert f'"{name}"' in app_source
 
 
 def test_provider_category_mapping():

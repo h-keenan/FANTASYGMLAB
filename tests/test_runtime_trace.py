@@ -4,8 +4,6 @@ from pathlib import Path
 import subprocess
 import sys
 
-from scripts.summarize_runtime_traces import parse_reports, summarize
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -146,91 +144,6 @@ for sequence in (1, 2):
         report["process"]["initial_http_request_observable"] is False
         for report in reports
     )
-
-
-def test_streamlit_message_observation_records_only_structure_and_size():
-    completed = _run_trace_script(
-        """
-from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
-from modules import runtime_trace
-
-runtime_trace.begin_rerun()
-message = ForwardMsg()
-message.delta.new_element.markdown.body = "private-user@example.com"
-runtime_trace._observe_streamlit_message(message)
-runtime_trace.finish_rerun(route="dashboard")
-""",
-        enabled=True,
-    )
-    report = _runtime_report(completed)
-    assert report["counters"]["streamlit_messages"] == 1
-    assert report["counters"]["streamlit_elements"] == 1
-    assert report["streamlit"]["protobuf_bytes"] > 0
-    assert report["streamlit"]["largest_messages"][0]["type"] == "markdown"
-    assert "private-user@example.com" not in completed.stdout
-
-
-def test_css_message_observation_records_hash_and_sizes_without_contents():
-    completed = _run_trace_script(
-        """
-from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
-from modules import runtime_trace
-
-runtime_trace.begin_rerun()
-message = ForwardMsg()
-message.delta.new_element.markdown.body = "<style>.private-selector{color:red}</style>"
-runtime_trace._observe_streamlit_message(message)
-runtime_trace.finish_rerun(route="dashboard")
-""",
-        enabled=True,
-    )
-    report = _runtime_report(completed)
-    css_message = report["streamlit"]["css_messages"][0]
-    assert css_message["ordinal"] == 1
-    assert len(css_message["sha256"]) == 64
-    assert css_message["utf8_bytes"] == 43
-    assert css_message["protobuf_bytes"] > css_message["utf8_bytes"]
-    assert "private-selector" not in completed.stdout
-    assert "color:red" not in completed.stdout
-
-
-def test_disabled_trace_does_not_observe_or_hash_css_messages():
-    completed = _run_trace_script(
-        """
-from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
-from modules import runtime_trace
-
-runtime_trace.begin_rerun()
-message = ForwardMsg()
-message.delta.new_element.markdown.body = "<style>.private-selector{color:red}</style>"
-runtime_trace._observe_streamlit_message(message)
-assert runtime_trace.finish_rerun(route="dashboard") == {}
-print("disabled")
-""",
-        enabled=False,
-    )
-    assert completed.stdout.strip() == "disabled"
-
-
-def test_explicit_rerun_event_preserves_only_structural_correlation():
-    completed = _run_trace_script(
-        """
-from modules import runtime_trace
-runtime_trace.begin_rerun(sequence=4, cache_state="warm")
-runtime_trace._emit_rerun_request()
-""",
-        enabled=True,
-    )
-    line = next(
-        value
-        for value in completed.stdout.splitlines()
-        if value.startswith("DYNASTYGM_RUNTIME_RERUN ")
-    )
-    event = json.loads(line.split(" ", 1)[1])
-    assert event["schema"] == "dynastygm-runtime-rerun-event-v1"
-    assert event["sequence"] == 4
-    assert len(event["correlation_id"]) == 16
-    assert event["elapsed_ms"] >= 0
 
 
 def test_runtime_trace_aggregates_calls_frames_external_requests_and_duplicates():
@@ -394,42 +307,6 @@ def private_url_not_logged(report: dict) -> bool:
     return "url" not in json.dumps(report).casefold()
 
 
-def test_production_trace_boundaries_cover_requested_computations():
-    expected = {
-        "modules/team_eval.py": (
-            '"suggest_optimal_lineup"',
-            '"build_league_summary"',
-            '"get_team_vs_league"',
-        ),
-        "modules/roster_needs.py": (
-            '"assess_team_needs"',
-            '"true_roster_needs"',
-            '"classify_roster_rooms"',
-        ),
-        "modules/trade_ideas.py": ('"trade_board_generation"',),
-        "modules/rankings.py": (
-            '"player_metadata_construction"',
-            '"injury_level"',
-            'counter="injury_parsing"',
-        ),
-        "modules/my_news.py": (
-            '"curate_player_news"',
-            '"filter_news_for_players"',
-            'counter="news_parsing"',
-        ),
-        "app.py": (
-            '"ownership_map_construction"',
-            '"player_fit_construction"',
-            '"roster_normalization"',
-        ),
-    }
-    for relative_path, labels in expected.items():
-        source = (ROOT / relative_path).read_text(encoding="utf-8")
-        assert "runtime_trace.traced(" in source
-        for label in labels:
-            assert label in source
-
-
 def test_direct_network_paths_use_the_central_observed_boundaries():
     trace_source = (ROOT / "modules/runtime_trace.py").read_text(encoding="utf-8")
     assert "requests.sessions.Session.request = traced_request" in trace_source
@@ -437,97 +314,6 @@ def test_direct_network_paths_use_the_central_observed_boundaries():
     assert 'external_call("rss", label)' in trace_source
     assert 'source = "sleeper"' in trace_source
     assert 'source = "supabase"' in trace_source
-
-
-def test_runtime_log_summarizer_groups_pages_and_ranks_observed_duplicates():
-    report = {
-        "schema": "dynastygm-runtime-trace-v1",
-        "route": "my_team",
-        "cache_state": "cold",
-        "total_page_ms": 100.0,
-        "phases": {"lineup_generation": {"calls": 2, "total_ms": 40.0}},
-        "functions": {
-            "suggest_optimal_lineup": {
-                "calls": 2,
-                "total_ms": 40.0,
-                "max_ms": 25.0,
-            }
-        },
-        "duplicate_computations": {"suggest_optimal_lineup": 2},
-        "counters": {"dataframe_copies": 7, "dataframe_merges": 1},
-        "external": {
-            "by_source": {"sleeper": {"calls": 1, "total_ms": 10.0}}
-        },
-        "dataframes": [
-            {
-                "label": "team",
-                "rows": 30,
-                "columns": 70,
-                "estimated_memory_bytes": 16800,
-            }
-        ],
-    }
-    lines = [
-        "unrelated",
-        f"prefix DYNASTYGM_RUNTIME {json.dumps(report)}",
-    ]
-    output = summarize(parse_reports(lines))
-    page = output["pages"]["my_team"]
-    assert page["samples"] == 1
-    assert page["cache_states"]["cold"]["total_page_ms"]["mean"] == 100.0
-    assert page["cache_states"]["cold"]["total_page_ms"]["p50"] == 100.0
-    assert page["duplicates"]["suggest_optimal_lineup"] == 2
-    assert page["dataframe_operations"]["dataframe_copies"] == 7
-    assert page["external_requests"]["sleeper"]["calls"] == 1
-    assert output["aggregate"]["largest_dataframes"][0]["rows"] == 30
-    assert output["top_optimization_opportunities"][0]["label"] == "suggest_optimal_lineup"
-
-
-def test_runtime_log_summarizer_does_not_conflate_cold_and_warm_samples():
-    reports = [
-        {
-            "schema": "dynastygm-runtime-trace-v1",
-            "route": "dashboard",
-            "cache_state": "cold",
-            "total_page_ms": 1000.0,
-        },
-        {
-            "schema": "dynastygm-runtime-trace-v1",
-            "route": "dashboard",
-            "cache_state": "warm",
-            "total_page_ms": 100.0,
-        },
-    ]
-    page = summarize(reports)["pages"]["dashboard"]
-    assert page["cache_states"]["cold"]["total_page_ms"]["p50"] == 1000.0
-    assert page["cache_states"]["warm"]["total_page_ms"]["p50"] == 100.0
-    assert page["total_page_ms_all_cache_states"]["mean"] == 550.0
-
-
-def test_runtime_log_summarizer_accepts_v2_and_reports_streamlit_payloads():
-    report = {
-        "schema": "dynastygm-runtime-trace-v2",
-        "route": "dashboard",
-        "cache_state": "warm",
-        "total_page_ms": 50.0,
-        "streamlit": {"protobuf_bytes": 4096},
-    }
-    output = summarize([report])
-    page = output["pages"]["dashboard"]
-    assert page["streamlit_protobuf_bytes"]["p50"] == 4096.0
-
-
-def test_runtime_log_summarizer_accepts_v3_session_correlations():
-    report = {
-        "schema": "dynastygm-runtime-trace-v3",
-        "session_correlation_id": "0123456789abcdef",
-        "correlation_id": "fedcba9876543210",
-        "route": "dashboard",
-        "cache_state": "warm",
-        "total_page_ms": 50.0,
-    }
-    output = summarize([report])
-    assert output["pages"]["dashboard"]["samples"] == 1
 
 
 def test_aggregate_stage_counters_are_not_reported_as_duplicate_functions():

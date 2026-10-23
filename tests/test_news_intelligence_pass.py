@@ -570,22 +570,6 @@ def test_fail_soft_build_tiles_on_corrupt_input():
     assert tiles == []
 
 
-def test_clear_alert_state_on_league_switch_contract():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "news_intelligence.clear_alert_state" in app
-    assert "load_cached_news_pool()" in app
-    assert 'label": "News Alert"' in app or "News Alert" in app
-
-
-def test_dashboard_news_alerts_use_cached_pool_not_fetch():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    block_start = app.index("Roster-aware news alerts from disk-cached articles")
-    block = app[block_start : block_start + 1200]
-    assert "load_cached_news_pool()" in block
-    assert "fetch_news(" not in block
-    assert "fetch_roster_news(" not in block
-
-
 def test_structured_role_notes_from_sleeper_only():
     notes = ni.populate_structured_role_notes_from_sleeper(
         {"depth_chart_position": "RB1", "depth_chart_order": 1},

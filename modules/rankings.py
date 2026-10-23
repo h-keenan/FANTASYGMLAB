@@ -1,3 +1,5 @@
+import copy
+import functools
 import hashlib
 import json
 import os
@@ -10,7 +12,6 @@ from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
-import streamlit as st
 
 from modules import performance
 from modules import player_hydrate_stages
@@ -50,8 +51,8 @@ UNRANKED_SEARCH_RANK = 9999999
 PLAYER_CACHE_METADATA_TABLE = "player_cache_metadata"
 PLAYER_UNIVERSE_SIDECAR_SUFFIX = ".universe-meta.json"
 _FILE_CONTENT_DIGEST_MEMO: dict[tuple[str, int, int], str] = {}
-# Process-scoped canonical public frame. New Streamlit sessions on a warm worker
-# reuse this object instead of re-hashing/unpickling ``@st.cache_data``.
+# Process-scoped canonical public frame. Requests on a warm worker reuse this
+# object instead of re-hashing/copying through ``_process_cache_data``.
 _PROCESS_PUBLIC_FRAMES: dict[str, pd.DataFrame] = {}
 _PROCESS_PUBLIC_META: dict[str, dict[str, Any]] = {}
 _PROCESS_PUBLIC_GUARD = threading.Lock()
@@ -2078,7 +2079,7 @@ def opportunity_profile(
         # Committee Back branch directly above, which correctly checks
         # ``workload_rising``), so a young player with a buried, flat, or
         # declining real workload still got told his role was "Rising."
-        # That silently defeated both: waivers_ui.rank_priority_add_
+        # That silently defeated both: waivers_logic.rank_priority_add_
         # candidates' own ``workload_trend == "Blocked"`` gate (added in
         # the "Gate role-blocked, zero-usage players out of waiver Priority
         # Adds" fix), and anything downstream judging current role off this
@@ -2655,7 +2656,7 @@ def _injury_level_cached(status: str, injury_status: str) -> str:
     # waiver_actionability()'s sibling check in player_state_authority.py).
     # It is deliberately NOT folded into major_terms itself, because that set
     # is reused verbatim as free-text injury wording in several callers
-    # (trade_hub_ui.py's trade_asset_injury_context(), player_cards.py's
+    # (trade_hub_presentation.py's trade_asset_injury_context(), player_cards.py's
     # injury_value_impact(), chat.py's trade narrative) — those call
     # is_suspended() directly to say "Suspended" instead of "injury", and
     # injury_display_label() below does the same for its raw tag. Without
@@ -3442,8 +3443,6 @@ def summarize_team_injuries(
         "actionable_injury_summary": actionable_injury_summary,
         "health_flag": health_flag,
     }
-
-
 
 
 def _prepare_fantasycalc_values() -> pd.DataFrame:
@@ -5082,7 +5081,46 @@ def public_player_fingerprint_category(
     return f"pub{present}of{len(fingerprint)}_{digest}"
 
 
-@st.cache_data(show_spinner=False, max_entries=4)
+def _process_cache_data(*, max_entries: int):
+    """Small in-process keyed cache that hands every caller a private copy.
+
+    Replaces the former Streamlit ``cache_data`` decorator with the same
+    contract this module relied on: results are keyed by the (hashable)
+    arguments, bounded to ``max_entries`` (oldest evicted first), each caller
+    gets its own deep copy so mutating a returned frame never poisons the
+    cache, and ``.clear()`` empties it.
+    """
+
+    def decorator(func):
+        store: OrderedDict = OrderedDict()
+        guard = threading.Lock()
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            with guard:
+                if key in store:
+                    store.move_to_end(key)
+                    return copy.deepcopy(store[key])
+            value = func(*args, **kwargs)
+            with guard:
+                store[key] = value
+                store.move_to_end(key)
+                while len(store) > max(1, int(max_entries)):
+                    store.popitem(last=False)
+            return copy.deepcopy(value)
+
+        def clear() -> None:
+            with guard:
+                store.clear()
+
+        wrapper.clear = clear
+        return wrapper
+
+    return decorator
+
+
+@_process_cache_data(max_entries=4)
 def _cached_public_players(
     db_path: str,
     source_fingerprint: tuple[tuple[str, bool, int, int], ...],
@@ -5105,7 +5143,7 @@ def _cached_public_players(
 # trade-idea search, league rankings) already got a Redis layer so all
 # workers share one answer instead of each independently paying for its
 # own (see modules.redis_cache's module docstring). This builder was the
-# one gap: `_cached_public_players` above is a `@st.cache_data` wrapper,
+# one gap: `_cached_public_players` above is a `_process_cache_data` wrapper,
 # which — like `_PROCESS_PUBLIC_FRAMES` below — lives in ONE process's
 # memory, so a request landing on a worker that hasn't built this yet pays
 # the full cost alone: live Sleeper season-stat fetches plus per-player

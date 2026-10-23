@@ -233,19 +233,6 @@ def test_compose_does_not_invent_scoring_or_order_helpers():
     assert "organize_dashboard_items" in source or "DashboardBriefing" in source
 
 
-def test_app_wires_game_plan_without_new_inventory_builders():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    dashboard = app.split("def render_home_dashboard(", 1)[1].split(
-        "STARTUP_DRAFT_STRATEGIES", 1
-    )[0]
-    assert "compose_daily_gm_briefing(" in dashboard
-    assert "render_todays_game_plan=_render_todays_game_plan" in dashboard
-    assert "_open_daily_gm_briefing_item" in app
-    # Still uses existing inventory — no parallel trade/waiver engine.
-    assert "cached_dashboard_trade_headline(" in dashboard
-    assert "select_top_waiver_opportunity(" in dashboard
-
-
 def test_navigation_destinations_preserve_recommendation_id():
     trade = _tile(
         "Top Trade Opportunity",
@@ -347,31 +334,3 @@ def test_stale_recommendation_without_headline_is_omitted():
     plan = dgb.compose_daily_gm_briefing(briefing)
     assert plan.quiet
     assert plan.items == ()
-
-
-def test_open_item_uses_daily_gm_briefing_handoff_source():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    opener = app.split("def _open_daily_gm_briefing_item", 1)[1].split(
-        "\ndef ", 1
-    )[0]
-    assert 'handoff_source="daily_gm_briefing"' in opener
-    assert 'origin_page="dashboard"' in opener
-    assert 'origin_label="Today\'s Game Plan"' in opener
-    assert "recommendation_narrative=narrative" in opener
-
-
-def test_briefing_not_session_cached():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    dashboard = app.split("def render_home_dashboard(", 1)[1].split(
-        "STARTUP_DRAFT_STRATEGIES", 1
-    )[0]
-    assert "compose_daily_gm_briefing(" in dashboard
-    assert "session_state[\"daily_gm_briefing\"]" not in dashboard
-    assert "session_state['daily_gm_briefing']" not in dashboard
-
-
-def test_ui_module_uses_existing_executive_primitives():
-    source = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert 'render_section_header("Today\'s Game Plan"' in source
-    assert "No urgent roster issues right now." in source
-    assert "dg-daily-briefing" in source

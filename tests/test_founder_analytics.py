@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 from modules import founder_analytics
-from modules import founder_labs_ui
 from modules import launch_analytics as la
 
 
@@ -81,19 +80,6 @@ def test_window_filters_and_counts(tmp_path, monkeypatch):
     assert day["errors"]["timeout"] == 1
     assert day["storage"]["kind"] == "host_local_jsonl"
     assert "not all-user" in day["storage"]["scope_label"].casefold() or "this host" in day["storage"]["scope_label"].casefold()
-
-
-def test_analytics_ui_is_labs_gated_and_not_a_customer_route():
-    source = Path(__file__).resolve().parents[1].joinpath("modules", "ui_architecture.py").read_text(
-        encoding="utf-8"
-    )
-    assert "founder_analytics" not in source
-    labs_ui = Path(founder_labs_ui.__file__).read_text(encoding="utf-8")
-    assert "render_founder_analytics" in labs_ui
-    analytics_ui = Path(__file__).resolve().parents[1].joinpath(
-        "modules", "founder_analytics_ui.py"
-    ).read_text(encoding="utf-8")
-    assert "founder_labs.founder_labs_authorized" in analytics_ui
 
 
 def test_build_report_does_not_append_events(tmp_path, monkeypatch):

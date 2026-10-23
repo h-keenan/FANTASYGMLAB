@@ -56,81 +56,6 @@ def test_achievement_order_prioritizes_significance_then_recency():
     assert all(item.achievement_id for item in resume.achievements)
 
 
-def test_missing_history_uses_useful_empty_state_not_achievement_failure():
-    resume = player_history.build_career_resume(
-        [{"stats_season": 2025, "games_played": None, "fantasy_points_ppr": None}],
-        position="WR",
-        current_season=2025,
-        source_note="fixture",
-    )
-    assert len(resume.seasons) == 1
-    assert resume.seasons[0].games is None
-    assert resume.seasons[0].fantasy_points is None
-    assert not resume.achievements
-    html = player_quick_view.career_resume_html(resume, position="WR", years_exp=4)
-    assert "No verified achievement threshold" not in html
-    assert "Prestige" not in html
-    assert "Experience" in html
-    assert ">0<" not in html
-
-
-def test_rookie_empty_state_is_contextual():
-    resume = player_history.build_career_resume(
-        [{"stats_season": 2025, "games_played": 4, "fantasy_points_ppr": 40}],
-        position="RB",
-        current_season=2025,
-        source_note="fixture",
-    )
-    html = player_quick_view.career_resume_html(resume, position="RB", years_exp=0)
-    assert "Rookie" in html
-    assert "No verified achievement threshold" not in html
-
-
-def test_career_summary_exposes_finish_consistency_and_arc():
-    resume = player_history.build_career_resume(
-        [
-            season(2023, finish=12, points=220, yards=1050),
-            season(2024, finish=8, points=280, yards=1300),
-            season(2025, finish=18, points=190, yards=900),
-        ],
-        position="WR",
-        current_season=2025,
-        source_note="fixture",
-    )
-    summary = player_history.summarize_career_resume(
-        resume, position="WR", years_exp=5
-    )
-    assert summary.best_finish_label == "WR8"
-    assert summary.best_finish_season == 2024
-    assert "Top-24" in summary.consistency_label
-    assert "WR12 → WR8 → WR18" == summary.arc_label
-    html = player_quick_view.career_resume_html(resume, position="WR", years_exp=5)
-    assert "Best finish" in html
-    assert "WR8" in html
-    assert "Career Milestones" in html
-
-
-def test_collapsed_resume_and_timeline_progressively_disclose_history():
-    resume = player_history.build_career_resume(
-        [season(2025, finish=2), season(2024, finish=4), season(2023, finish=9)],
-        position="WR",
-        current_season=2025,
-        source_note="fixture",
-    )
-    collapsed_timeline = player_quick_view.career_timeline_html(resume)
-    expanded_timeline = player_quick_view.career_timeline_html(resume, expanded=True)
-    assert "2025" in collapsed_timeline and "2024" in collapsed_timeline
-    assert "2023" not in collapsed_timeline
-    assert "2023" in expanded_timeline
-    collapsed = player_quick_view.career_resume_html(resume, position="WR", years_exp=4)
-    expanded = player_quick_view.career_resume_html(
-        resume, expanded=True, position="WR", years_exp=4
-    )
-    assert "Best finish" in collapsed
-    assert len(expanded) >= len(collapsed)
-    assert "Verified PPR finishes" in expanded
-
-
 def test_cached_loader_uses_existing_files_only_and_orders_position_finish(tmp_path):
     payload = {
         "player-a": season(2024, points=280, finish=None),
@@ -164,22 +89,6 @@ def test_load_cached_career_resume_rejects_positional_player_id(tmp_path):
             position_lookup={"x": "WR"},
             cache_dir=tmp_path,
         )
-
-
-def test_app_pqv_career_loader_call_uses_keyword_only_player_id():
-    from pathlib import Path
-
-    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
-    renderer = source[
-        source.index("def render_player_quick_view_content(") : source.index(
-            "def render_player_quick_view_modal("
-        )
-    ]
-    assert "load_cached_career_resume(" in renderer
-    assert "player_id=player_id" in renderer
-    # Broken production signature used a bare positional first arg.
-    assert "load_cached_career_resume(\n            player_id," not in renderer
-    assert "load_cached_career_resume(\n                player_id," not in renderer
 
 
 def test_te_finish_band_stops_at_top_twelve():

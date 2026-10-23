@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from modules import league_standings
-from modules import league_workspace_ui
+from modules import league_display
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,53 +149,6 @@ def test_odd_and_common_league_sizes_have_unique_ranks():
         ranks = bundle["frame"]["standing_rank"].tolist()
         assert ranks == list(range(1, size + 1))
         assert len(set(bundle["frame"]["roster_id"])) == size
-
-
-def test_standings_board_reuses_ranked_row_and_current_accent():
-    bundle = league_standings.build_league_standings_bundle(
-        rosters=[
-            _roster("mine", wins=6, losses=2, fpts=900),
-            _roster("theirs", wins=7, losses=1, fpts=950),
-        ],
-        roster_profiles={
-            "mine": {"team_name": "Mine", "owner_username": "me"},
-            "theirs": {"team_name": "Theirs", "owner_username": "them"},
-        },
-        league={"settings": {"leg": 8, "playoff_teams": 1}},
-    )
-    captured = {}
-
-    def _capture(*, html: str, key_prefix: str):
-        captured["html"] = html
-        return None
-
-    league_workspace_ui.render_standings_board(
-        bundle,
-        team_tap_markup=lambda row: (
-            " team-card-tappable",
-            f" data-roster-id='{row.get('roster_id')}'",
-        ),
-        render_team_card_tap_grid=_capture,
-        open_league_team_from_tap=lambda _clicked: False,
-        team_logo_html=lambda *_a, **_k: "<div class='dg-ranked-logo'>T</div>",
-        current_roster_id="mine",
-    )
-    html = captured["html"]
-    assert "dg-ranked-board--standings" in html
-    assert "dg-ranked-row--current" in html
-    assert "dg-standings-playoff-line" in html
-    assert "7-1" in html
-    assert "Record" in html
-    assert html.index("Theirs") < html.index("Mine")
-
-
-def test_league_overview_places_standings_before_power_rankings():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    rankings = source[source.index('if league_section == "Rankings":') :]
-    standings_index = rankings.index("render_league_standings_board(")
-    power_index = rankings.index("render_power_rankings_board(")
-    assert standings_index < power_index
-    assert "Standings = actual results" in rankings[:5000]
 
 
 def test_standings_contract_doc_exists():

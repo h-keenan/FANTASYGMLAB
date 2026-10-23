@@ -8,7 +8,7 @@ import pandas as pd
 
 from modules import session_integrity
 from modules import trade_hub_first_useful
-from modules import trade_hub_ui
+from modules import trade_hub_presentation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,7 +62,7 @@ def test_presentation_board_cache_hit_miss_and_mutation_isolation():
 
     def builder():
         builds["n"] += 1
-        ordered = trade_hub_ui.order_trade_hub_visible_ideas(ideas)
+        ordered = trade_hub_presentation.order_trade_hub_visible_ideas(ideas)
         return {
             "eligible_ideas": ordered,
             "presentation": {"is_premium": True, "visible_count": len(ordered)},
@@ -218,7 +218,7 @@ def test_account_clear_drops_trade_hub_computation_caches():
 def test_cache_hit_and_miss_equivalence_fingerprints_match():
     state: dict = {}
     ideas = _sample_ideas()
-    ordered = trade_hub_ui.order_trade_hub_visible_ideas(ideas)
+    ordered = trade_hub_presentation.order_trade_hub_visible_ideas(ideas)
     fingerprint = trade_hub_first_useful.idea_equivalence_fingerprint(ordered)
 
     def builder():
@@ -242,23 +242,6 @@ def test_cache_hit_and_miss_equivalence_fingerprints_match():
     assert trade_hub_first_useful.recommendation_one_identity(
         miss["eligible_ideas"]
     ) == trade_hub_first_useful.recommendation_one_identity(hit["eligible_ideas"])
-
-
-def test_recommendation_one_requires_full_board_contract_documented():
-    """#1 is presentation-first of the complete approved set — no early provisional #1."""
-
-    source = (ROOT / "modules" / "trade_hub_first_useful.py").read_text(encoding="utf-8")
-    assert "complete approved candidate set must be known" in source
-    assert "does not invent provisional early-result semantics" in source
-    # The Trade Hub route body (render_trade_hub_workspace) was extracted
-    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
-    # the last function defined there, so slice to end-of-file.
-    app = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    hub = app[app.index("def render_trade_hub_workspace(") :]
-    assert "get_or_build_presentation_board(" in hub
-    assert "order_trade_hub_visible_ideas(" in hub
-    assert "include_intelligence=False" in hub
-    assert "trade_hub_rec1_ready" in hub
 
 
 def test_no_football_logic_modules_modified_for_this_pr():

@@ -9,49 +9,12 @@ import pytest
 
 from modules import player_profile_ui
 from modules import share_recommendation_cards as share
-from modules import share_recommendation_ui
-from modules.app_styles import APP_CSS
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_html
-from modules.trade_detail_styles import TRADE_DETAIL_CSS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 AVATAR = (ROOT / "modules" / "player_profile_ui.py").read_text(encoding="utf-8")
-SHARE_UI = (ROOT / "modules" / "share_recommendation_ui.py").read_text(encoding="utf-8")
-HUB = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-SEARCH = (ROOT / "modules" / "trade_hub_player_search.py").read_text(encoding="utf-8")
-
-
-def test_canonical_avatar_hides_fallback_only_after_image_loads():
-    html = player_profile_ui.avatar_html(
-        "https://example.com/hurts.png",
-        "JH",
-        "compact-player-avatar",
-    )
-    assert "dg-player-headshot-fallback" in html
-    assert ">JH<" in html
-    assert "onload=" not in html
-    assert "onerror=" not in html
-    assert "dg-player-headshot-image" in html
-    assert html.index("dg-player-headshot-fallback") < html.index("<img")
-    failed = player_profile_ui.avatar_html("", "AJ", "compact-player-avatar")
-    assert ">AJ<" in failed
-    assert "<img" not in failed
-    from modules.player_headshot_runtime import HEADSHOT_RUNTIME_JS
-    assert "is-loaded" in HEADSHOT_RUNTIME_JS
-    assert ":has(.dg-player-headshot-image.is-loaded)" in APP_CSS
-    assert ":has(img.dg-player-headshot-image)" in APP_CSS
-    assert ":has(img.dg-player-headshot-image)" in COMPACT_FANTASY_ASSET_CSS
-    assert "visibility: hidden !important" in APP_CSS
-    assert ".compact-player-avatar span:not(.dg-player-headshot-fallback)" in APP_CSS
-    assert ".player-avatar span:not(.dg-player-headshot-fallback)" in APP_CSS
-    assert "z-index: 0 !important" in APP_CSS[APP_CSS.rindex("/* Shared player headshots.") :]
-    assert "z-index: 1 !important" in APP_CSS[APP_CSS.rindex("/* Shared player headshots.") :]
-    assert ":has(.dg-player-headshot-image.is-loaded)" in COMPACT_FANTASY_ASSET_CSS
-    import app as production_app
-
-    assert "onload=" not in production_app.avatar_html("https://example.com/x.png", "X")
+HUB = (ROOT / "modules" / "trade_hub_presentation.py").read_text(encoding="utf-8")
 
 
 def test_compact_assets_reuse_canonical_avatar():
@@ -68,72 +31,6 @@ def test_compact_assets_reuse_canonical_avatar():
     assert "is-loaded" in html or "dg-player-headshot-image" in html
     assert "onload=" not in html
     assert "onerror=" not in html
-
-
-def test_share_panel_is_centered_cluster_not_full_canvas():
-    assert "fgl-share-panel" in SHARE_UI
-    assert "fgl-share-kicker" in SHARE_UI
-    assert "st.caption(label)" not in SHARE_UI
-    assert "Share directly or save the full-resolution card." in SHARE_UI
-    assert "Close Share Preview" in SHARE_UI
-    assert "st.columns(2, gap=\"small\")" in SHARE_UI
-    assert 360 <= share.PREVIEW_DISPLAY_WIDTH <= 420
-    assert "max-width: 400px" in TRADE_DETAIL_CSS
-    assert "max-width: 300px" in TRADE_DETAIL_CSS
-    assert "max-width: min(100%, 26.25rem)" in TRADE_DETAIL_CSS
-    assert "margin-inline: auto" in TRADE_DETAIL_CSS
-    preview = share_recommendation_ui._preview_markup(
-        b"\x89PNG\r\n\x1a\n",
-        title="Trade",
-        kicker=share.TRADE_HUB_SHARE_LABEL,
-    )
-    assert preview.count("Share Trade Idea") == 1
-    assert "fgl-share-preview-caption" not in preview
-    assert f"width='{share.PREVIEW_DISPLAY_WIDTH}'" in preview
-
-
-def test_share_still_embeds_full_res_bytes_in_preview_and_share():
-    assert "SHARE_WIDTH = 1080 * SHARE_SCALE" in (
-        ROOT / "modules" / "share_recommendation_cards.py"
-    ).read_text(encoding="utf-8")
-    assert "preview_png_bytes" not in SHARE_UI
-    assert "data:image/png;base64" in SHARE_UI
-
-
-def test_modal_skips_nonessential_hub_tree_when_dialog_open():
-    # render_top_trade_opportunities / _trade_hub_visible_feed now live in
-    # modules/trade_hub_ui.py's render_trade_hub_workspace, extracted out of
-    # app.py's route dispatch.
-    board = HUB.split("def render_top_trade_opportunities()", 1)[1].split(
-        "def render_search_around_player()", 1
-    )[0]
-    assert "_dialog_open_after_board" in board
-    assert board.index("_dialog_open_after_board") < board.index(
-        "guest_conversion.render_soft_signup_prompt"
-    )
-    assert "if not _dialog_open_after_board:" in board
-    assert "if not open_trade_key and len(ranked_feed) > local_visible:" in board
-    assert 'if not _dialog_open:' in board
-    feed = HUB.split("def _trade_hub_visible_feed()", 1)[1].split(
-        "_trade_hub_visible_feed()", 1
-    )[0]
-    assert "if card_key != open_trade_key:" in feed
-    assert "@st.fragment" in HUB
-    assert "time.sleep" not in HUB.split("def _trade_detail_dialog()", 1)[1][:2500]
-
-
-def test_search_around_player_decoupling_survives():
-    assert "FIND_BUTTON_LABEL" in SEARCH
-    assert "mark_executed" in SEARCH
-    assert "note_skip" in SEARCH
-    assert 'note_skip("trade_dialog_open")' in APP
-    assert "if not player_search.is_executed" in APP
-
-
-def test_no_new_rerun_or_provider_or_overlay_hack():
-    assert SHARE_UI.count("st.rerun(") == 0
-    assert "opacity: 0.35" not in TRADE_DETAIL_CSS
-    assert "pointer-events: none" not in TRADE_DETAIL_CSS.split(".fgl-share-preview")[1][:800]
 
 
 def test_write_required_screenshots():

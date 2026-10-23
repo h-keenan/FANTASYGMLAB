@@ -2,7 +2,6 @@ import unittest
 
 import pandas as pd
 
-import app
 from modules.rankings import current_availability_multiplier, injury_multiplier
 
 
@@ -86,33 +85,7 @@ def valuation_frame() -> pd.DataFrame:
 
 
 class TestPlayerValuationContext(unittest.TestCase):
-    def test_superflex_increases_qb_value_relative_to_1qb(self):
-        base = valuation_frame()
-        one_qb = app.apply_valuation_lens(base, "Dynasty", {"qb_format": "1QB"})
-        superflex = app.apply_valuation_lens(base, "Dynasty", {"qb_format": "Superflex", "superflex_count": 1})
 
-        one_qb_value = int(one_qb.loc[one_qb["player_id"].eq("qb"), "dynasty_score"].iloc[0])
-        superflex_value = int(superflex.loc[superflex["player_id"].eq("qb"), "dynasty_score"].iloc[0])
-
-        self.assertGreater(superflex_value, one_qb_value)
-
-    def test_te_premium_increases_te_value(self):
-        base = valuation_frame()
-        normal = app.apply_valuation_lens(base, "Dynasty", {"te_premium": False})
-        premium = app.apply_valuation_lens(base, "Dynasty", {"te_premium": True})
-
-        normal_value = int(normal.loc[normal["player_id"].eq("te"), "dynasty_score"].iloc[0])
-        premium_value = int(premium.loc[premium["player_id"].eq("te"), "dynasty_score"].iloc[0])
-
-        self.assertGreater(premium_value, normal_value)
-
-    def test_dynasty_rebuild_lens_penalizes_older_rb_vs_young_asset(self):
-        valued = app.apply_valuation_lens(valuation_frame(), "Rebuild", {"league_format": "Dynasty"})
-
-        old_rb = int(valued.loc[valued["player_id"].eq("old-rb"), "rebuild_score"].iloc[0])
-        young_wr = int(valued.loc[valued["player_id"].eq("young-wr"), "rebuild_score"].iloc[0])
-
-        self.assertLess(old_rb, young_wr)
 
     def test_minor_injury_has_small_current_availability_hit(self):
         healthy = current_availability_multiplier("Active", "DAL", 100, "")

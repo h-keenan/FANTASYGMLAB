@@ -29,7 +29,6 @@ from modules import tail_latency_diagnostics
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -40,21 +39,6 @@ def _reset(monkeypatch):
     yield
     refresh_flight.reset_process_refresh_state_for_tests()
     tail_latency_diagnostics.reset_process_boot_for_tests()
-
-
-def test_app_schedules_background_refresh_after_dashboard_first_useful():
-    football = APP.index('"football_context_ready"')
-    dashboard = APP.index("render_home_dashboard(", football)
-    refresh = APP.index("maybe_refresh_players_after_shell(", dashboard)
-    dump = APP.index("_dash_wf.dump(", refresh)
-    block = APP[refresh : refresh + 400]
-    assert "background=True" in block
-    assert football < dashboard < refresh < dump
-    # Must not start the GIL-heavy refresh owner before Game Plan.
-    pre_dashboard = APP[football:dashboard]
-    assert "maybe_refresh_players_after_shell(" not in pre_dashboard or (
-        'current_page) != "dashboard"' in pre_dashboard
-    )
 
 
 def test_pre238_sync_refresh_topology_would_block_nine_seconds():
@@ -171,28 +155,6 @@ def test_provider_failure_preserves_last_known_good_and_cools_down():
     assert refresh_flight.should_queue_stale_refresh(state2) is False
 
 
-def test_auth_save_deferral_is_one_shot():
-    state: dict = {
-        auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY: {"access_token": "x"},
-    }
-    # First arm.
-    assert not state.get(auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY)
-    state[auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY] = True
-    # Remount path marks done.
-    state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
-    # Re-arming guard in app.py: AFTER_FOOTBALL already set / RERUN done.
-    may_arm = (
-        (
-            auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in state
-            or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in state
-        )
-        and not state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY)
-        and not state.get(auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY)
-    )
-    assert may_arm is False
-    assert auth_storage_handshake.classify_script_run_cause(state) == "post_usable_auth_save"
-
-
 def test_auth_save_queued_clears_after_intended_remount_pop():
     state: dict = {
         auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY: {"access_token": "x"},
@@ -214,17 +176,6 @@ def test_auth_save_queued_clears_after_intended_remount_pop():
     assert state.pop(auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY, False)
     state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
     assert auth_storage_handshake.classify_script_run_cause(state) == "post_usable_auth_save"
-
-
-def test_game_plan_entry_milestones_exist_in_app():
-    for name in (
-        "dashboard_game_plan_entry",
-        "game_plan_fingerprint_start",
-        "game_plan_fingerprint_complete",
-        "game_plan_package_lookup_start",
-        "game_plan_package_lookup_complete",
-    ):
-        assert f'"{name}"' in APP
 
 
 def test_summary_emits_per_trigger_without_erasing_early():
@@ -356,15 +307,3 @@ def test_no_duplicate_refresh_after_session_reschedule_attempt():
     )
     assert refresh_flight.wait_for_refresh(timeout_s=2.0)
     assert builds["n"] == 1
-
-
-def test_package_miss_path_still_instrumented_after_football():
-    football = APP.index('"football_context_ready"')
-    entry = APP.index('"dashboard_game_plan_entry"', football)
-    assert football < entry
-    assert '"game_plan_package_lookup_start"' in APP
-    assert '"game_plan_package_lookup_complete"' in APP
-    # Fingerprint + lookup live inside render_home_dashboard (defined above main).
-    fp = APP.index('"game_plan_fingerprint_start"')
-    lookup = APP.index('"game_plan_package_lookup_start"', fp)
-    assert fp < lookup

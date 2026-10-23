@@ -17,8 +17,7 @@ from modules import signal_freshness
 from modules import sleeper
 from modules import structured_player_refresh as spr
 from modules import trade_ideas
-from modules import trade_hub_ui
-from modules.player_quick_view import pqv_hero_html
+from modules import trade_hub_presentation
 from modules.player_tiers import assign_player_tiers
 from modules.rankings import (
     current_availability_multiplier,
@@ -26,7 +25,6 @@ from modules.rankings import (
     injury_multiplier,
     summarize_team_injuries,
 )
-from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -455,61 +453,6 @@ def test_healthy_backup_coverage_prevents_false_permanent_need():
     assert "RB" not in set(summary.get("injury_need_positions") or set())
 
 
-def test_no_cover_injury_creates_waiver_replacement_fit():
-    from app import build_home_dashboard_free_agent_preview
-
-    uncovered = pd.DataFrame(
-        [
-            _row("rb1", name="Starter RB", position="RB", team="KC", depth=1, market_score=8200),
-            _row("fa-rb", name="Healthy FA RB", position="RB", team="DAL", depth=2, market_score=2400),
-        ]
-    )
-    patched = _refresh(
-        uncovered,
-        {
-            "rb1": _sleeper("rb1", status="Out", injury_status="Out", full_name="Starter RB"),
-            "fa-rb": _sleeper("fa-rb", position="RB", team="DAL", depth_chart_order=2),
-        },
-    )
-    roster = patched[patched["player_id"].astype(str) == "rb1"].copy()
-    roster["suggested_starter"] = True
-    summary = summarize_team_injuries(roster, roster)
-    assert "RB" in set(summary.get("injury_need_positions") or set())
-    fa, positions, _injured = build_home_dashboard_free_agent_preview(
-        patched,
-        "league-a",
-        1,
-        "value_score",
-        {"roster_positions": ["RB", "RB", "WR", "TE", "QB"]},
-        rostered_ids={"rb1"},
-        injury_need_positions=set(summary.get("injury_need_positions") or set()),
-        known_injured_starters=1,
-    )
-    assert "RB" in positions
-    assert bool(fa.set_index("player_id").loc["fa-rb", "injury_replacement_fit"]) is True
-
-
-def test_recovery_clears_waiver_fit():
-    from app import build_home_dashboard_free_agent_preview
-
-    recovered = _refresh(_rb_room(), _sleeper_room())
-    recovered["suggested_starter"] = [True, False, False]
-    summary = summarize_team_injuries(recovered, recovered)
-    fa, positions, _ = build_home_dashboard_free_agent_preview(
-        recovered,
-        "league-a",
-        1,
-        "value_score",
-        {"roster_positions": ["RB", "RB", "WR"]},
-        rostered_ids={"rb1", "rb2"},
-        injury_need_positions=set(summary.get("injury_need_positions") or set()),
-        known_injured_starters=int(summary.get("injured_starters") or 0),
-    )
-    assert "RB" not in positions
-    if not fa.empty and "fa-rb" in set(fa["player_id"].astype(str)):
-        assert bool(fa.set_index("player_id").loc["fa-rb", "injury_replacement_fit"]) is False
-
-
 def test_trade_hub_injury_guardrail_reacts_and_protects_core():
     result = trade_ideas._temporary_injury_trade_guardrail(
         {
@@ -555,20 +498,6 @@ def test_recovery_clears_temporary_trade_guardrail():
     assert result["applied"] is False
 
 
-def test_dashboard_and_my_team_agree_on_injury_state():
-    from app import roster_injury_context
-
-    injured = _refresh(_rb_room(), _sleeper_room(starter_status="Out", starter_injury="Out"))
-    injured["suggested_starter"] = [True, False, False]
-    dashboard = summarize_team_injuries(injured, injured)
-    my_team = roster_injury_context(injured, injured)
-    assert dashboard["injured_starters"] == my_team["injured_starters"]
-    assert dashboard["injury_need_positions"] == my_team["injury_need_positions"]
-    alert = injury_ui.my_team_injury_alert(my_team)
-    assert int(alert["starter_count"]) == int(dashboard["injured_starters"])
-    assert "happened" not in str(alert["note"]).casefold()
-
-
 def test_alerts_q_and_sleeper_q_remain_q():
     patched = _refresh(_rb_room(), _sleeper_room(starter_injury="Questionable"))
     starter = patched.set_index("player_id").loc["rb1"]
@@ -604,47 +533,6 @@ def test_sleeper_out_then_updates_evaluation():
     )
     assert starter["player_tier"]
     assert int(starter["value_score"]) != int(q.set_index("player_id").loc["rb1", "value_score"])
-
-
-def test_stale_status_freshness_is_honest():
-    unknown = signal_freshness.status_sync_freshness(
-        cache_path="/tmp/fantasygm-missing-sleeper-players.json"
-    )
-    assert unknown["freshness_bucket"] == signal_freshness.BUCKET_UNKNOWN
-    assert "unavailable" in unknown["label"].casefold()
-    assert "happened" not in unknown["label"].casefold()
-    stale = signal_freshness.status_sync_freshness(now=2_000_000_000, synced_at=1_000_000_000)
-    assert stale["freshness_bucket"] == signal_freshness.BUCKET_STALE
-    assert "Player status synced" in stale["label"]
-    html = pqv_hero_html(
-        avatar_html="<div></div>",
-        name="Starter RB",
-        position="RB",
-        team="KC",
-        age_text="25",
-        status_freshness_label="STATUS · synced 18m ago",
-    )
-    assert "STATUS · synced 18m ago" in html
-    assert "happened" not in html
-    blocked = pqv_hero_html(
-        avatar_html="<div></div>",
-        name="Starter RB",
-        position="RB",
-        team="KC",
-        age_text="25",
-        status_freshness_label="injury happened 18m ago",
-    )
-    assert "happened" not in blocked
-    note = trade_hub_ui.trade_asset_injury_context(
-        {
-            "asset_type": "player",
-            "status": "Out",
-            "injury_status": "Out",
-            "news_updated": 1_700_000_000_000,
-        },
-        injury_level=injury_level,
-    )
-    assert "happened" not in note["note"].casefold()
 
 
 def test_league_a_to_b_isolation():
@@ -690,14 +578,6 @@ def test_scoring_format_still_invalidates_lens():
     assert prepared_player_frame.build_frame_signature(
         **kwargs, scoring_format="PPR"
     ) != prepared_player_frame.build_frame_signature(**kwargs, scoring_format="Standard")
-
-
-def test_explicit_rerun_count_unchanged():
-    assert count_explicit_reruns() <= 63
-    source = (ROOT / "modules" / "structured_player_refresh.py").read_text(encoding="utf-8")
-    assert "st.rerun" not in source
-    assert "requests.get" not in source
-    assert "get_dynasty_values" not in source
 
 
 def test_unmatched_rows_preserved_and_input_not_mutated():

@@ -832,14 +832,14 @@ def apply_valuation_lens(
 # recently the underlying Sleeper league settings or player data actually
 # changed. That's the same "asker-independent, redone from scratch on every
 # call" shape modules.league_rankings/modules.trade_hub_engine/
-# modules.playoff_simulator/modules.waivers_ui already fixed for their own
+# modules.playoff_simulator/modules.waivers_logic already fixed for their own
 # downstream computations — this is that same fix one layer further
 # upstream, for the shared input every one of them (and these seven
 # endpoints) builds on top of.
 #
 # coridian_, 2026-10-19, performance audit: 30s (this module's original
 # value, matching modules.league_rankings/modules.trade_hub_engine/
-# modules.waivers_ui's own live-time-bucket idiom) is much shorter than a
+# modules.waivers_logic's own live-time-bucket idiom) is much shorter than a
 # real league's roster actually changes — trades/waivers/drops happen a
 # handful of times a week, not every 30 seconds. Widened to 2 minutes
 # across all four of these shared caches together (same reasoning, same

@@ -1,3 +1,5 @@
+> **Historical / partly obsolete (2026-10):** this document describes the retired Streamlit web app (`app.py`, `streamlit run`, `/_stcore/health`, `st.session_state`), which has been removed. The production web app is `web-next/` (Next.js) on the FastAPI services. See [`streamlit-removal-2026-10.md`](streamlit-removal-2026-10.md). Streamlit-specific details below are no longer current.
+
 > HISTORICAL EVIDENCE: this report records past probes of a guessed hostname and past topology assumptions. It is no longer deployment or runbook authority. Do not execute its service-creation instructions. See [current webhook operations](webhook-operational-authority.md).
 
 # Founder Beta Launch Go / No-Go Gate v2

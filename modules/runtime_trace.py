@@ -139,7 +139,6 @@ _active_trace: contextvars.ContextVar[dict[str, Any] | None] = contextvars.Conte
 )
 _patch_lock = threading.Lock()
 _pandas_patched = False
-_streamlit_patched = False
 _process_started = time.perf_counter()
 _process_trace_count = 0
 
@@ -219,7 +218,6 @@ def begin_rerun(
     if not TRACE_ENABLED:
         return
     _install_pandas_hooks()
-    _install_streamlit_hooks()
     _active_trace.set(
         _new_trace(
             sequence,
@@ -386,117 +384,6 @@ def external_call(source: str, label: str) -> Iterator[None]:
                 (time.perf_counter() - float(trace["started"])) * 1000,
                 1,
             )
-
-
-def _observe_streamlit_message(message: Any) -> None:
-    trace = _active_trace.get()
-    if trace is None:
-        return
-    started = time.perf_counter()
-    try:
-        message_type = str(message.WhichOneof("type") or "unknown")
-        label = message_type
-        if message_type == "delta":
-            delta_type = str(message.delta.WhichOneof("type") or "delta")
-            label = delta_type
-            if delta_type == "new_element":
-                label = str(message.delta.new_element.WhichOneof("type") or "element")
-                count("streamlit_elements")
-                if label in {"arrow_data_frame", "data_frame"}:
-                    count("streamlit_dataframes")
-                if label in {"table", "arrow_table"}:
-                    count("streamlit_tables")
-                if "chart" in label:
-                    count("streamlit_charts")
-        size = int(message.ByteSize())
-        count("streamlit_messages")
-        streamlit = trace["streamlit"]
-        streamlit["protobuf_bytes"] += max(0, size)
-        if label == "markdown":
-            body = str(message.delta.new_element.markdown.body or "")
-            if body.lstrip().casefold().startswith("<style"):
-                import hashlib
-
-                encoded = body.encode("utf-8")
-                streamlit["css_messages"].append(
-                    {
-                        "ordinal": len(streamlit["css_messages"]) + 1,
-                        "sha256": hashlib.sha256(encoded).hexdigest(),
-                        "utf8_bytes": len(encoded),
-                        "protobuf_bytes": max(0, size),
-                    }
-                )
-        largest = streamlit["largest_messages"]
-        largest.append({"type": label[:64], "protobuf_bytes": max(0, size)})
-        largest.sort(key=lambda item: int(item["protobuf_bytes"]), reverse=True)
-        del largest[12:]
-    except Exception:
-        return
-    finally:
-        trace = _active_trace.get()
-        if trace is not None:
-            trace["streamlit"]["observation_overhead_ms"] += (
-                time.perf_counter() - started
-            ) * 1000
-
-
-def _emit_rerun_request() -> None:
-    trace = _active_trace.get()
-    if trace is None:
-        return
-    elapsed_ms = round(
-        (time.perf_counter() - float(trace["started"])) * 1000,
-        1,
-    )
-    trace["milestones"]["explicit_rerun_requested"] = elapsed_ms
-    event = {
-        "schema": "dynastygm-runtime-rerun-event-v1",
-        "correlation_id": trace["correlation_id"],
-        "sequence": trace["sequence"],
-        "elapsed_ms": elapsed_ms,
-    }
-    try:
-        print(
-            "DYNASTYGM_RUNTIME_RERUN " + json.dumps(event, sort_keys=True),
-            flush=True,
-        )
-    except Exception:
-        pass
-
-
-def _install_streamlit_hooks() -> None:
-    global _streamlit_patched
-    if _streamlit_patched:
-        return
-    with _patch_lock:
-        if _streamlit_patched:
-            return
-        try:
-            import streamlit as st
-            from streamlit.runtime.scriptrunner_utils.script_run_context import (
-                ScriptRunContext,
-            )
-
-            original_enqueue = ScriptRunContext.enqueue
-            original_rerun = st.rerun
-
-            @functools.wraps(original_enqueue)
-            def traced_enqueue(context, message):
-                result = original_enqueue(context, message)
-                _observe_streamlit_message(message)
-                return result
-
-            ScriptRunContext.enqueue = traced_enqueue
-
-            @functools.wraps(original_rerun)
-            def traced_rerun(*args, **kwargs):
-                _emit_rerun_request()
-                return original_rerun(*args, **kwargs)
-
-            st.rerun = traced_rerun
-            _streamlit_patched = True
-        except Exception:
-            return
 
 
 def _install_pandas_hooks() -> None:

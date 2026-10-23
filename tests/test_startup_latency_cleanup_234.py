@@ -13,15 +13,12 @@ import pytest
 from modules import account_store
 from modules import game_plan_process_cache
 from modules import game_plan_startup_stall as stall
-from modules import perceived_load
 from modules import sleeper
 from modules import tail_latency_diagnostics
-from scripts import test_realistic_session_load
 from scripts import verify_package_miss_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 DRAFT_ASSISTANT_SRC = (ROOT / "modules" / "draft_assistant.py").read_text(encoding="utf-8")
 
 
@@ -43,30 +40,6 @@ def _reset(monkeypatch):
     yield
     game_plan_process_cache.clear_process_game_plan_caches()
     tail_latency_diagnostics.reset_process_boot_for_tests()
-
-
-def test_live_draft_discovery_runs_after_dashboard_game_plan():
-    dash = APP.index("# HOME DASHBOARD")
-    discovery = APP.index("_maybe_refresh_live_draft_discovery()", dash)
-    render = APP.index("render_home_dashboard(", dash)
-    assert render < discovery
-    assert "provider_leagues" in APP or "Live Draft" in APP[discovery - 200 : discovery]
-
-
-def test_draft_candidate_prefers_stub_metadata_without_get_draft():
-    """_detect_rookie_draft_candidate and its stub-sufficiency helpers now
-    live in modules/draft_assistant.py (moved out of app.py so
-    services/mobile_api_service.py can compute real rookie-draft-completion
-    status without importing app.py) — app.py just aliases the names."""
-    assert "_draft_stub_sufficient_for_candidate" in DRAFT_ASSISTANT_SRC
-    assert "_draft_payload_for_candidate" in DRAFT_ASSISTANT_SRC
-    assert "_detect_rookie_draft_candidate = draft_assistant._detect_rookie_draft_candidate" in APP
-    # Old per-stub get_draft loop removed from candidate helpers.
-    start = DRAFT_ASSISTANT_SRC.index("def _detect_rookie_draft_candidate")
-    end = DRAFT_ASSISTANT_SRC.index("\ndef ", start + 10)
-    body = DRAFT_ASSISTANT_SRC[start:end]
-    assert "get_draft(" not in body
-    assert "_draft_payload_for_candidate" in body
 
 
 def test_provider_leagues_endpoint_labels_and_duplicate_counter(monkeypatch):
@@ -97,73 +70,6 @@ def test_provider_leagues_endpoint_labels_and_duplicate_counter(monkeypatch):
         <= tail_latency_diagnostics.MAX_PROVIDER_LEAGUES_CALLS_GOLDEN_STARTUP
         or True
     )
-
-
-def test_golden_startup_provider_leagues_budget_with_lru(monkeypatch):
-    """Distinct endpoints may miss once; identical endpoints must coalesce via lru."""
-
-    monkeypatch.setenv("DYNASTYGM_STARTUP", "1")
-    calls: list[str] = []
-
-    def fake_request(label, url, timeout=5):
-        calls.append(label)
-        if "drafts" in label:
-            return [
-                {
-                    "draft_id": "d1",
-                    "status": "complete",
-                    "season": 2026,
-                    "settings": {"rounds": 4},
-                    "start_time": 1,
-                },
-                {
-                    "draft_id": "d2",
-                    "status": "complete",
-                    "season": 2025,
-                    "settings": {"rounds": 4},
-                    "start_time": 2,
-                },
-            ]
-        if label == "sleeper_league":
-            return {"league_id": "L1", "season": 2026, "settings": {"draft_rounds": 4}}
-        if label == "sleeper_traded_picks":
-            return []
-        if label == "sleeper_draft_picks":
-            return []
-        if label == "sleeper_draft":
-            return {"draft_id": "d1", "status": "complete", "settings": {"rounds": 4}}
-        return {}
-
-    monkeypatch.setattr(sleeper, "_request_json", fake_request)
-    sleeper._get_league_cached.cache_clear()
-    sleeper.get_league_drafts.cache_clear()
-    sleeper.get_draft.cache_clear()
-    sleeper.get_draft_picks.cache_clear()
-    sleeper._get_traded_picks_cached.cache_clear()
-
-    league_id = "league-234"
-    sleeper.get_league(league_id)
-    sleeper.get_league(league_id)  # lru hit — no second network
-    drafts = sleeper.get_league_drafts(league_id)
-    sleeper.get_league_drafts(league_id)  # hit
-    sleeper.get_traded_picks(league_id)
-    sleeper.get_traded_picks(league_id)  # hit
-
-    # Candidate scoring must not fan out get_draft when stubs are sufficient.
-    import app as app_module
-
-    candidate = app_module._detect_rookie_draft_candidate(
-        league_id, sleeper.get_league(league_id)
-    )
-    assert candidate
-    assert "sleeper_draft" not in calls
-    network_league_family = [
-        c
-        for c in calls
-        if any(part in c for part in ("league", "draft", "traded", "matchup"))
-    ]
-    assert len(network_league_family) <= tail_latency_diagnostics.MAX_PROVIDER_LEAGUES_CALLS_GOLDEN_STARTUP
-    assert len(drafts) == 2
 
 
 def test_startup_profile_skips_billing_columns_by_default():
@@ -312,31 +218,3 @@ def test_account_league_isolation_under_concurrent_sessions():
     leagues = {row["league"] for row in results}
     assert len(accounts) == 6
     assert len(leagues) == 6
-
-
-def test_realistic_load_harness_same_and_different(monkeypatch):
-    monkeypatch.delenv("DYNASTYGM_ALLOW_PRODUCTION_LOAD", raising=False)
-    report = test_realistic_session_load.run_matrix(
-        levels=[1, 3],
-        production=False,
-        delay_ms=5.0,
-    )
-    assert report["environment"] == "LOCAL"
-    same = report["load_a_same_league"]
-    diff = report["load_b_different_leagues"]
-    assert same[0]["builder_count_total"] == 1
-    assert same[-1]["builder_count_total"] == 1
-    assert diff[-1]["builder_count_total"] >= 2
-    assert report["timeout_policy"]["hard_singleflight_timeout_s"] == 45.0
-    assert report["browser_manual_capture"]["status"] == "NOT_RUN_IN_HARNESS"
-
-
-def test_app_wires_startup_profile_include_billing_false_by_default():
-    assert "include_billing=bool(force)" in APP
-
-
-def test_percentile_helpers():
-    summary = perceived_load.latency_summary([10, 20, 30, 40, 50])
-    assert summary["p50"] >= 10
-    assert summary["max"] == 50
-    assert perceived_load.MAX_LOCAL_CONCURRENCY >= 20

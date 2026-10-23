@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 from modules import launch_analytics as la
-from modules import founder_ops
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -172,10 +171,3 @@ def test_contract_doc_exists():
     assert "Privacy model" in text
     assert "DYNASTYGM_LAUNCH_ANALYTICS" in text
     assert "120 days" in text
-
-
-def test_founder_ops_snapshot_includes_funnel_fields():
-    snap = founder_ops.collect_ops_snapshot(environ={}, secrets={})
-    assert isinstance(snap.analytics_event_counts, dict)
-    assert isinstance(snap.analytics_funnel, tuple)
-    assert isinstance(snap.analytics_metrics, dict)

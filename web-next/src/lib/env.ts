@@ -18,10 +18,4 @@ export const env = {
   // convention: points at a locally running
   // `uvicorn services.mobile_api_service:app --port 8000`.
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000",
-  // Every other page still lives in Streamlit (Revision 1 scope — see PR
-  // description). Quick-action / "Open X" cards on the Dashboard deep-link
-  // out to it via Streamlit's own `?page=<destination>` query-param router
-  // (app.py's platform_nav_page) until each page gets its own Next.js
-  // migration. Defaults to the local dev Streamlit port.
-  streamlitBaseUrl: process.env.NEXT_PUBLIC_STREAMLIT_BASE_URL || "http://localhost:8501",
 };

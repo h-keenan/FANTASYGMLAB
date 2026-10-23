@@ -76,15 +76,6 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertEqual(visible_by_key["gm_targets"].category, "CONDITIONAL")
         self.assertEqual(visible_by_key["players"].category, "CORE")
 
-    def test_premium_is_support_not_primary_gm_route(self):
-        primary_keys = {destination.key for destination in mobile_primary_destinations(startup_mode=False)}
-        visible_by_key = {destination.key: destination for destination in current_platform_destinations(startup_mode=False)}
-        app_source = Path("app.py").read_text(encoding="utf-8")
-
-        self.assertNotIn("premium", primary_keys)
-        self.assertEqual(visible_by_key["premium"].category, "SUPPORT")
-        self.assertIn('"premium": "Free and Premium plan preview for FantasyDesk."', app_source)
-        self.assertNotIn("primary_labels = {", app_source)
 
     def test_mobile_secondary_normal_users_are_support_only_after_core_routes(self):
         secondary = mobile_secondary_destinations(startup_mode=False)
@@ -103,70 +94,6 @@ class TestDestinationVisibility(unittest.TestCase):
         for stale in ("HQ Dashboard", "TM My Team", "TR Trade Hub", "WV", "DR", "Action Center"):
             self.assertNotIn(stale, all_labels)
 
-    def test_app_wires_destination_visibility_flags(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-
-        self.assertIn("DYNASTYGM_SHOW_EXPERIMENTAL", app_source)
-        self.assertIn("DYNASTYGM_SHOW_DEV_DESTINATIONS", app_source)
-        self.assertIn("current_platform_destinations(startup_mode, **destination_visibility)", app_source)
-        self.assertIn("Core routes first", app_source)
-        self.assertIn("brand_identity.EXPERIMENTAL_LABEL", app_source)
-        self.assertIn("[EXPERIMENTAL]", Path("modules/brand_identity.py").read_text(encoding="utf-8"))
-
-    def test_gm_orb_opens_all_destinations_without_legacy_popup(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        nav_source = app_source.split("def render_mobile_navigation_shell", 1)[1].split("def safe_pick_value", 1)[0]
-
-        self.assertIn("mobile_gm_sheet_trigger_", nav_source)
-        self.assertIn("gm_orb_floating_trigger_html()", nav_source)
-        self.assertIn("mobile_gm_sheet_open_", nav_source)
-        self.assertIn("GM_ORB_HELP", nav_source)
-        self.assertIn("brand_identity.GM_ORB_ARIA_LABEL", nav_source)
-        self.assertIn("mobile-gm-floating-trigger-marker", brand_identity.gm_orb_floating_trigger_html())
-        self.assertNotIn("st.popover(\"GM\"", nav_source)
-        self.assertNotIn("mobile_gm_nav_", nav_source)
-        self.assertNotIn("Open GM command menu", nav_source)
-        self.assertNotIn("GM Command", nav_source)
-
-    def test_navigation_uses_buttons_without_platform_radio_key_conflict(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        shell_source = app_source.split("destination_visibility = _destination_visibility_flags()", 1)[1].split("page_note_map = {", 1)[0]
-
-        self.assertIn('key=f"desktop_nav_{destination.key}"', shell_source)
-        self.assertIn('key=f"mobile_sheet_nav_{page.key}"', app_source)
-        self.assertIn("on_click=_commit_platform_destination", shell_source)
-        self.assertIn('kwargs={"source": "sidebar_destination"}', shell_source)
-        self.assertNotIn('st.session_state["platform_nav_page"] = destination.key', shell_source)
-        self.assertNotIn("st.rerun()", shell_source)
-        self.assertNotIn('key="platform_nav_group"', shell_source)
-        self.assertNotIn('key="platform_nav_page"', shell_source)
-        self.assertNotIn("current_page = st.radio", shell_source)
-
-    def test_header_and_fixed_controls_have_distinct_selectors(self):
-        from modules.app_styles import APP_CSS
-
-        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
-        self.assertIn(".dg-executive-shell", APP_CSS)
-        self.assertNotIn(".app-top-league-header", css)
-        self.assertIn("object-fit: cover", APP_CSS)
-        self.assertIn("object-position: center center", APP_CSS)
-        self.assertIn("mobile_gm_sheet_trigger_", css)
-        self.assertIn("mobile-gm-floating-trigger-marker", css)
-        self.assertNotIn("mobile_gm_command_menu_", css)
-        self.assertIn("_global_feedback_control", css)
-        self.assertIn("left: max(env(safe-area-inset-left", css)
-        self.assertIn("right: max(16px, env(safe-area-inset-right))", css)
-
-    def test_quick_view_avatar_containment_rules_remain(self):
-        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
-        pqv = Path("modules/player_quick_view_styles.py").read_text(encoding="utf-8")
-
-        self.assertIn("div[data-testid=\"stDialog\"] .pqv-hero-portrait", pqv)
-        self.assertIn("--pqv-portrait-size", pqv)
-        self.assertIn("div[data-testid=\"stDialog\"] .player-detail-avatar", css)
-        self.assertIn("--avatar-size: 64px", css)
-        self.assertIn("max-height: var(--avatar-size)", css)
-        self.assertIn("--avatar-size: 58px", css)
 
     def test_hidden_direct_routes_fall_back_without_feature_deletion(self):
         visible_keys = {destination.key for destination in current_platform_destinations(startup_mode=False)}
@@ -223,17 +150,6 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertIn("live_draft", active_only)
         self.assertIn("trade_analyzer", active_only)
 
-    def test_mobile_all_destinations_contains_live_draft(self):
-        keys = {
-            page.key
-            for page in mobile_secondary_destinations(
-                startup_mode=True,
-                show_experimental=self._experimental_flag("1"),
-            )
-        }
-        self.assertIn("live_draft", keys)
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        self.assertIn("all_pages = current_platform_destinations(startup_mode, **visibility)", app_source)
 
     def test_visibility_flag_is_not_cached_across_environment_changes(self):
         self.assertFalse(self._experimental_flag("false"))

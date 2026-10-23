@@ -14,7 +14,7 @@ import {
   gamePlanTileHref,
   resolveGamePlanTargetPlayerId,
 } from "@/lib/gamePlanPresentation";
-import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
+import { destinationCtaLabel } from "@/lib/destinationLabels";
 
 /**
  * Watchlist & Alerts: every Game Plan item except Top Priority, as one
@@ -39,7 +39,7 @@ export function WatchListCard({
   return (
     <article className="glass-surface flex flex-col" style={{ overflow: "hidden" }} data-testid="watchlist-alerts">
       {items.map((item, index) => {
-        const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
+        const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination] ?? "dashboard";
         const tag = watchTag(item);
         const trendPct = usageTrendPct(item);
         const mentioned = item.mentioned_players?.[0];
@@ -96,7 +96,7 @@ export function WatchListCard({
         );
         const className = "flex items-center gap-3 px-3 py-2.5";
         const key = item.recommendation_id || item.headline;
-        return internalRoute ? (
+        return (
           <Link
             key={key}
             href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
@@ -106,10 +106,6 @@ export function WatchListCard({
           >
             {body}
           </Link>
-        ) : (
-          <a key={key} href={streamlitPageUrl(item.destination)} aria-label={label} className={className} style={rowStyle}>
-            {body}
-          </a>
         );
       })}
     </article>

@@ -246,7 +246,7 @@ def test_build_league_glance_composes_all_five_fields(monkeypatch):
 
     monkeypatch.setattr(league_glance.trade_hub_engine, "generate_trade_idea_records_cached", _trade_records)
     monkeypatch.setattr(
-        league_glance.trade_hub_ui,
+        league_glance.trade_hub_presentation,
         "order_trade_hub_visible_ideas",
         lambda records: sorted(records, key=lambda idea: idea["rank"]),
     )

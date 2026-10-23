@@ -3,31 +3,13 @@ from unittest.mock import patch
 
 import pandas as pd
 
-import app
-from modules import draft_center_ui
+from modules import draft_center_cards
 
 
 class TestDraftCenterUI(unittest.TestCase):
-    def test_direct_draft_helpers_are_exposed_through_app(self):
-        self.assertIs(
-            app._draft_rank_cutoffs,
-            draft_center_ui._draft_rank_cutoffs,
-        )
-        self.assertIs(
-            app._draft_posture_profile,
-            draft_center_ui._draft_posture_profile,
-        )
-        self.assertIs(
-            app.build_draft_decision_cards,
-            draft_center_ui.build_draft_decision_cards,
-        )
-        self.assertIs(
-            app.build_draft_partner_cards,
-            draft_center_ui.build_draft_partner_cards,
-        )
 
     def test_pick_rich_rebuilder_posture_is_preserved(self):
-        posture = draft_center_ui._draft_posture_profile(
+        posture = draft_center_cards._draft_posture_profile(
             {
                 "mode": "rebuild",
                 "draft_capital_rank": 1,
@@ -76,7 +58,7 @@ class TestDraftCenterUI(unittest.TestCase):
             ]
         )
 
-        cards = draft_center_ui.build_draft_decision_cards(draft_workspace)
+        cards = draft_center_cards.build_draft_decision_cards(draft_workspace)
 
         self.assertEqual(
             [card["label"] for card in cards],
@@ -89,30 +71,6 @@ class TestDraftCenterUI(unittest.TestCase):
             ],
         )
         self.assertTrue(all(card["items"] for card in cards))
-
-    def test_draft_dashboard_wrapper_forwards_app_owned_callbacks(self):
-        with patch.object(
-            draft_center_ui,
-            "render_draft_capital_dashboard",
-        ) as render_dashboard:
-            app.render_draft_capital_dashboard(pd.DataFrame(), [])
-
-        kwargs = render_dashboard.call_args.kwargs
-        self.assertIs(kwargs["draft_year_columns"], app.draft_year_columns)
-        self.assertIs(
-            kwargs["render_draft_team_cards"],
-            app.render_draft_team_cards,
-        )
-        self.assertIs(kwargs["team_tap_markup"], app._team_tap_markup)
-        self.assertIs(
-            kwargs["render_team_card_tap_grid"],
-            app._render_team_card_tap_grid,
-        )
-        self.assertIs(
-            kwargs["open_league_team_from_tap"],
-            app._open_league_team_from_tap,
-        )
-        self.assertIs(kwargs["team_logo_html"], app.team_logo_html)
 
 
 if __name__ == "__main__":

@@ -2,16 +2,16 @@
 #
 # FantasyDesk — shared application image for self-hosted deployment.
 #
-# Why one image for four services (not four separate Dockerfiles):
-# every real (non-cron) service in render.yaml — fantasygm-lab (Streamlit),
-# fantasygm-lab-mobile-api, fantasygm-lab-stripe-webhook, and
-# fantasygm-lab-revenuecat-webhook — shares the exact same runtime
-# (Python 3.12.10), the exact same dependency set (requirements.txt), and
-# the exact same buildCommand (`pip install -r requirements.txt`; the
-# Streamlit service additionally runs the deterministic, network-free
-# prepare_public_player_cache.py, which is harmless to run for every
-# service, so it's baked into the shared image rather than forked into a
-# separate build). The four services differ only in their startCommand
+# Why one image for three Python services (not three separate Dockerfiles):
+# every Python (non-cron) service in render.yaml — fantasygm-lab-mobile-api,
+# fantasygm-lab-stripe-webhook, and fantasygm-lab-revenuecat-webhook —
+# shares the exact same runtime (Python 3.12.10), the exact same dependency
+# set (requirements.txt), and the exact same buildCommand
+# (`pip install -r requirements.txt`). The deterministic, network-free
+# prepare_public_player_cache.py is harmless to run for every service, so
+# it's baked into the shared image rather than forked into a separate
+# build. (The legacy Streamlit service was removed in 2026-10 -- see
+# docs/streamlit-removal-2026-10.md.) The services differ only in their startCommand
 # (see docker-compose.yml's `command:` override per service), exactly as
 # they do in render.yaml. One image means one build, one set of layers to
 # cache/scan/patch, and a self-hosted box that only has to pull/rebuild one
@@ -85,15 +85,14 @@ WORKDIR /app
 
 # Application source. See .dockerignore for what's intentionally excluded
 # (the mobile/ Expo app, tests/, docs/, local dev-only state, etc.) — none
-# of that is needed to run any of the four web services.
+# of that is needed to run any of the Python web services.
 COPY . .
 
-# Mirrors render.yaml's fantasygm-lab (Streamlit) buildCommand step:
-#   pip install -r requirements.txt && python scripts/prepare_public_player_cache.py
+# Pre-builds the public player cache the mobile API reads on first request.
 # This script only reads checked-in SQLite/JSON/CSV inputs (no network
 # calls — see its own module docstring) and is idempotent, so it's safe to
-# always run here even for the three services that don't strictly need its
-# output; that keeps this Dockerfile identical for all four services.
+# always run here even for the webhook services that don't strictly need its
+# output; that keeps this Dockerfile identical for all three services.
 RUN python scripts/prepare_public_player_cache.py
 
 RUN chown -R appuser:appuser /app

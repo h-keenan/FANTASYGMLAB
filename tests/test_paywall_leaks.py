@@ -147,14 +147,14 @@ def test_dashboard_headline_alone_is_visible_then_trade_hub_stays_within_cap(fre
 
 def test_share_card_refuses_a_hidden_idea(free_env):
     client, _ = free_env
-    from modules import trade_hub_ui
+    from modules import trade_hub_presentation
 
     records = _records_for("retool", "Dynasty")
     shown = _ids(_hub(client, strategy="retool", lens="Dynasty"))
     hidden_id = next(
-        trade_hub_ui.idea_recommendation_id(r)
+        trade_hub_presentation.idea_recommendation_id(r)
         for r in records
-        if trade_hub_ui.idea_recommendation_id(r) not in shown
+        if trade_hub_presentation.idea_recommendation_id(r) not in shown
     )
     from types import SimpleNamespace
 
