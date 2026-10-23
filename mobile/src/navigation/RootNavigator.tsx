@@ -23,6 +23,7 @@ import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import TrialLapsedScreen from '../screens/TrialLapsedScreen';
 import NewsScreen from '../screens/NewsScreen';
+import DesignScreen from '../screens/DesignScreen';
 import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
 import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
@@ -67,6 +68,8 @@ export type RootStackParamList = {
   TrialLapsed: undefined;
   News: undefined;
   More: undefined;
+  /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
+  Design: undefined;
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string };
@@ -270,6 +273,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
+          <AppStack.Screen name="Design" component={DesignScreen} options={{ title: 'Design' }} />
           <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
           <AppStack.Screen
             name="HowWeEvaluate"

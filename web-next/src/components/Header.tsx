@@ -22,12 +22,12 @@ const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "no_affiliation", label: "No-Affiliation Disclaimer" },
 ];
 
-interface SavedLeagueRow {
+export interface SavedLeagueRow {
   league_id: string;
   league_name: string | null;
 }
 
-function LeagueSwitcherButton({
+export function LeagueSwitcherButton({
   leagueId,
   leagueName,
   leagues,

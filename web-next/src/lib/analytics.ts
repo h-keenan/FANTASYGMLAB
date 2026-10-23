@@ -88,6 +88,9 @@ interface AnalyticsEventBody {
  * events).
  */
 function postEvent(input: AnalyticsEventBody): void {
+  // The hidden /design reference page renders real components with static
+  // sample data and must make no API calls (analytics included).
+  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/design")) return;
   // `platform` lets the founder dashboard split web vs mobile; the backend
   // also defaults a missing platform to "web".
   const body: AnalyticsEventBody = { ...input, props: { platform: "web", ...(input.props || {}) } };

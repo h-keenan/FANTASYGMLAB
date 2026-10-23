@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -443,7 +444,10 @@ export default function MoreScreen({ navigation }: Props) {
           </>
         ) : null}
 
-        <SectionHeading title="Legal" topGap={16} />
+        {/* Hidden dev path: long-press (1.5s) opens the design-system reference. */}
+        <Pressable onLongPress={() => navigation.navigate('Design')} delayLongPress={1500}>
+          <SectionHeading title="Legal" topGap={16} />
+        </Pressable>
         <AnimatedCard style={styles.groupCard}>
           {LEGAL_ITEMS.map((item, index) => (
             <SettingsRow
