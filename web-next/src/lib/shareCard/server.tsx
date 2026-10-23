@@ -274,7 +274,7 @@ function apiBaseUrl(): string {
 export async function fetchUpstreamJson<T>(
   path: string,
   authorization: string,
-  init: { method?: "GET" | "POST"; jsonBody?: unknown; shareCardToken?: boolean; masker?: Masker | null } = {},
+  init: { method?: "GET" | "POST"; jsonBody?: unknown; masker?: Masker | null } = {},
 ): Promise<T> {
   let response: Response;
   try {
@@ -283,11 +283,6 @@ export async function fetchUpstreamJson<T>(
       headers: {
         Authorization: authorization,
         ...(init.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
-        // Server-to-server only (never sent to browsers): lets the analyzer
-        // skip the free-tier quota for a share of an already-run analysis.
-        ...(init.shareCardToken && process.env.SHARE_CARD_INTERNAL_SECRET
-          ? { "X-Share-Card-Token": process.env.SHARE_CARD_INTERNAL_SECRET }
-          : {}),
       },
       body: init.jsonBody !== undefined ? JSON.stringify(init.jsonBody) : undefined,
       signal: AbortSignal.timeout(30_000),

@@ -3343,20 +3343,6 @@ export const api = {
       "",
     ),
 
-  // Branded 1080x1350 PNG for an ad-hoc Trade Analyzer trade
-  // (app/share-card/analyzer). Posts only the picked ids; the server
-  // re-runs the analyzer and resolves every asset itself.
-  getTradeAnalyzerShareCardBlob: (
-    leagueId: string,
-    body: {
-      sendPlayerIds: string[];
-      receivePlayerIds: string[];
-      sendPickIds: string[];
-      receivePickIds: string[];
-      partnerRosterId: string;
-    },
-  ) => authorizedBinaryRequest("/share-card/analyzer", "", { leagueId, ...body }),
-
   // Branded 1080x1350 player card PNG (app/share-card/player) for the
   // Player Profile page's Share button, built from the same
   // GET .../rankings row that page renders.

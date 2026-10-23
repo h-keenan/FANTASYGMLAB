@@ -207,13 +207,11 @@ function TradeSidePanel({
   );
 }
 
-/** What the share card route needs to re-derive this trade server-side. */
-export interface AnalyzerShareIds {
-  sendPlayerIds: string[];
-  receivePlayerIds: string[];
-  sendPickIds: string[];
-  receivePickIds: string[];
-  partnerRosterId: string;
+/** Team identity for the share card, all from data already on the page. */
+export interface AnalyzerCardTeams {
+  partnerAvatarUrl?: string | null;
+  myTeamName?: string | null;
+  myAvatarUrl?: string | null;
 }
 
 /** Shares the reviewed package as a branded PNG (falling back to text)
@@ -226,7 +224,7 @@ function ShareVerdictButton({
   verdict,
   sendAssets,
   receiveAssets,
-  shareIds,
+  cardTeams,
 }: {
   leagueId: string;
   partnerTeamName: string;
@@ -234,7 +232,7 @@ function ShareVerdictButton({
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
   receiveAssets: TradeAsset[];
-  shareIds: AnalyzerShareIds;
+  cardTeams: AnalyzerCardTeams;
 }) {
   const [preparing, setPreparing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -262,10 +260,15 @@ function ShareVerdictButton({
       `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
       `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
       `Balance: ${formatTradeGain(verdict.value_delta)}`;
-    // Branded PNG (QR + "For <partner>") through the OS share sheet, so the
-    // user can pick the partner's messaging app; text/clipboard fallbacks.
+    // Branded PNG (QR + "For <partner>") drawn in the browser from the
+    // analysis already on screen (no server call, no quota use), through the
+    // OS share sheet so the user can pick the partner's messaging app;
+    // clipboard-image / download / text fallbacks.
     const outcome = await shareImageOrText({
-      fetchImage: () => api.getTradeAnalyzerShareCardBlob(leagueId, shareIds),
+      fetchImage: async () => {
+        const { renderAnalyzerCardBlob } = await import("@/lib/shareCard/clientRender");
+        return renderAnalyzerCardBlob({ sendAssets, receiveAssets, verdict, lens, partnerName: partnerTeamName, ...cardTeams });
+      },
       filename: "fantasydesk-trade.png",
       text,
       title,
@@ -299,7 +302,7 @@ function VerdictCard({
   leagueId,
   partnerTeamName,
   lens,
-  shareIds,
+  cardTeams,
 }: {
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
@@ -308,7 +311,7 @@ function VerdictCard({
   leagueId: string;
   partnerTeamName: string;
   lens: string;
-  shareIds: AnalyzerShareIds;
+  cardTeams: AnalyzerCardTeams;
 }) {
   const toneColor = TONE_COLOR[verdict.tone];
   const deltaText = formatTradeGain(verdict.value_delta);
@@ -338,7 +341,7 @@ function VerdictCard({
             verdict={verdict}
             sendAssets={sendAssets}
             receiveAssets={receiveAssets}
-            shareIds={shareIds}
+            cardTeams={cardTeams}
           />
         </span>
       </div>
@@ -901,12 +904,10 @@ export function TradeAnalyzerContent({
           leagueId={leagueId}
           partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
           lens={lens}
-          shareIds={{
-            sendPlayerIds: sendPlayers.map((p) => p.player_id),
-            receivePlayerIds: receivePlayers.map((p) => p.player_id),
-            sendPickIds: sendPicks.map((p) => p.pick_id),
-            receivePickIds: receivePicks.map((p) => p.pick_id),
-            partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
+          cardTeams={{
+            partnerAvatarUrl: selectedTeamId === ALL_TEAMS_ID ? null : (teamProfiles[selectedTeamId]?.avatar_url ?? null),
+            myTeamName: teamProfiles[myRosterId]?.team_name ?? null,
+            myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
           }}
         />
       ) : hasAnyAssets ? (
