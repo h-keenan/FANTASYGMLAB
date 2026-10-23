@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
+import BeginnerHelp from '../components/BeginnerHelp';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -123,6 +124,8 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
         keyExtractor={(item) => String(item.roster_id)}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
+            <BeginnerHelp term="playoffOddsIntro" />
+            <BeginnerHelp term="playoffOddsTerms" />
             <ScreenInfoNote label="How Playoff Odds works" text={methodologyNote} />
           </View>
         }

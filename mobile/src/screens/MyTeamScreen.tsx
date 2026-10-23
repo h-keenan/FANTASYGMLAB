@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import BeginnerHelp from '../components/BeginnerHelp';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -261,6 +262,8 @@ export default function MyTeamScreen({ route, navigation }: Props) {
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
 
+        <BeginnerHelp term="myTeamIntro" />
+        <BeginnerHelp term="myTeamValueTiers" />
         <SectionHeading title="Team Snapshot" topGap={12} />
         <TeamSnapshot team={myTeam} leagueSize={leagueSize} teamValue={teamValue} />
         {myTeam && hasRosterAnalysis(myTeam) ? (

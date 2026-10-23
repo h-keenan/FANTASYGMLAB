@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { InfoTip } from "@/components/InfoTip";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -50,6 +51,11 @@ export function TeamSituationCard({
         active={stance}
         onSelect={onPick}
       />
+      <div className="flex flex-col gap-0.5">
+        <BeginnerHelp term="stanceRebuilding" />
+        <BeginnerHelp term="stanceCompeting" />
+        <BeginnerHelp term="stanceBalanced" />
+      </div>
       {selected ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {selected.description}

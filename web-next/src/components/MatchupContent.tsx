@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import type {
@@ -8,6 +9,9 @@ import type {
   MatchupSide,
   MatchupSuggestedMove,
 } from "@/lib/api";
+import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { EmptyState } from "@/components/EmptyState";
+import { reloadPage } from "@/components/ErrorState";
 import { PillRow } from "@/components/PillRow";
 import { PlannerBar, SwapSheet, useLineupPlanner } from "@/components/MatchupPlanner";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -26,6 +30,8 @@ import {
   hasKickedOff,
   lineupComparisonRows,
   lineupPlayerPoints,
+  matchupActionLabel,
+  matchupNextAction,
   matchupReasonMessage,
   matchupVerdict,
   moveOverLine,
@@ -676,6 +682,7 @@ export function MatchupContent({
   leagueId?: string;
   lens?: string;
 }) {
+  const router = useRouter();
   const guillotineData = useGuillotine(leagueId, lens);
   const guillotine = guillotineData?.is_guillotine ? guillotineData : null;
   const ready = matchup.ok && matchup.my_team && matchup.opponent && matchup.comparison;
@@ -711,12 +718,21 @@ export function MatchupContent({
   }
 
   if (!ready) {
+    const next = matchupNextAction(matchup.reason);
+    const onNext = () => {
+      if (next.action === "retry") return reloadPage();
+      if (next.action === "connect" || !leagueId) return router.push("/connect-league");
+      return router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`);
+    };
     return (
       <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
         <MatchupHeader week={matchup.week} live={false} leagueName={leagueName} />
-        <p className="glass-surface text-sm text-center p-6" style={{ color: "var(--color-text-muted)" }}>
-          {matchupReasonMessage(matchup.reason)}
-        </p>
+        <EmptyState
+          title={matchupReasonMessage(matchup.reason)}
+          subtitle={next.subtitle}
+          actionLabel={matchupActionLabel(next.action)}
+          onAction={onNext}
+        />
       </main>
     );
   }
@@ -724,6 +740,10 @@ export function MatchupContent({
   return (
     <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
+      <div className="flex flex-col gap-1">
+        <BeginnerHelp term="matchupIntro" />
+        <BeginnerHelp term="matchupWinProbability" />
+      </div>
       <Scoreboard matchup={shown} />
       <MatchupInsights matchup={shown} />
       <LineupComparison

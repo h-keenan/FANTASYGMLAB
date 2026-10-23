@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  matchupActionLabel,
+  matchupNextAction,
   edgeExplanation,
   formatSigned,
   lineupComparisonRows,
@@ -73,4 +75,12 @@ test('moveOverLine covers empty slot, bye and projection', () => {
     moveOverLine({ slot: 'RB', start, over, over_reason: 'bye_week', gain: 1, locked: false }),
     'Over Y (on bye)',
   );
+});
+
+test("matchupNextAction gives every dead end one next step", () => {
+  assert.equal(matchupNextAction("no_current_week").action, "dashboard");
+  assert.equal(matchupNextAction("no_current_week").subtitle, "Check back when the season starts.");
+  assert.equal(matchupNextAction("not_a_member_of_league").action, "connect");
+  assert.equal(matchupNextAction("something_new").action, "retry");
+  assert.equal(matchupActionLabel("retry"), "Try again");
 });

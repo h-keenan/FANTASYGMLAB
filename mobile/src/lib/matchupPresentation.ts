@@ -11,6 +11,7 @@ import type {
   MatchupStarter,
   MatchupSuggestedMove,
 } from './api.ts';
+import { PLAIN_COPY } from './experienceCopy.ts';
 
 // ---------------------------------------------------------------------------
 // Matchup page layout (owner's concept, 2026-10-21): scoreboard, insights,
@@ -219,4 +220,30 @@ export function recordLabel(side: { wins: number | null; losses: number | null; 
 
 export function formatSeasonValue(value: number): string {
   return Math.round(value).toLocaleString();
+}
+
+
+export type MatchupNextAction = 'retry' | 'dashboard' | 'connect';
+
+/** The one next step for a Matchup dead end (the message itself is
+ * matchupReasonMessage). Mirrored by mobile's matchupPresentation. */
+export function matchupNextAction(reason: string): { action: MatchupNextAction; subtitle?: string } {
+  switch (reason) {
+    case 'no_current_week':
+      return { action: 'dashboard', subtitle: PLAIN_COPY.matchupSeasonSubtitle };
+    case 'bye_week':
+      return { action: 'dashboard' };
+    case 'no_sleeper_username_linked':
+    case 'sleeper_user_not_found':
+    case 'not_a_member_of_league':
+      return { action: 'connect' };
+    default:
+      return { action: 'retry' };
+  }
+}
+
+export function matchupActionLabel(action: MatchupNextAction): string {
+  if (action === 'dashboard') return PLAIN_COPY.matchupDashboardAction;
+  if (action === 'connect') return PLAIN_COPY.matchupConnectAction;
+  return PLAIN_COPY.matchupRetryAction;
 }
