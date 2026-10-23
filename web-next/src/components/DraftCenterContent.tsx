@@ -4,7 +4,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { useMemo, useState } from "react";
 
 import type { DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
-import { PickRow } from "@/components/PickRow";
+import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import {
@@ -142,8 +142,7 @@ export function DraftCenterContent({
                   {seasonPicks.map((pick, index) => (
                     <PickRow
                       key={pick.pick_id}
-                      pick={pick}
-                      showOwner={pickScope === "league"}
+                      {...draftPickRowProps(pick, pickScope === "league")}
                       showDivider={index < seasonPicks.length - 1}
                     />
                   ))}

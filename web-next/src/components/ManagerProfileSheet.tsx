@@ -12,7 +12,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
 import { SheetHandle } from "@/components/SheetHandle";
 import { PositionBadge } from "@/components/PositionBadge";
-import { PickPlate } from "@/components/TradeAssetExchange";
+import { PickPlate } from "@/components/PickRow";
 
 function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
   if (asset.kind === "pick") {

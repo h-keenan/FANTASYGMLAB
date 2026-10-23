@@ -189,6 +189,7 @@ export function ExchangeAssetList({
               <DraftPickAssetRow
                 pickId={asset.pick_id}
                 round={asset.round ? Number(asset.round) : null}
+                pickNo={asset.pick_no ? Number(asset.pick_no) : null}
                 label={asset.label}
                 projectedRange={asset.projected_range}
                 pickTier={asset.pick_tier}
