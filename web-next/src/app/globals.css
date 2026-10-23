@@ -82,10 +82,10 @@
   --color-information: var(--color-accent);
   --color-premium: var(--color-action);
   /* Premium gold set (owner 2026-10-23: anything premium is ALWAYS gold with a glow). Fill + ink are AA (>= 9:1); the glow reuses the prestige-ring recipe. */
-  --color-premium-fill: #facc15;
+  --color-premium-fill: #e0a526;
   --color-on-premium: #1a1300;
-  --color-premium-glow: rgba(250, 204, 21, 0.55);
-  --color-premium-glow-soft: rgba(250, 204, 21, 0.28);
+  --color-premium-glow: rgba(240, 170, 40, 0.85);
+  --color-premium-glow-soft: rgba(240, 170, 40, 0.45);
   --color-experimental: var(--color-diagnostic);
 
   /* Player prestige */
@@ -281,10 +281,10 @@
     --color-muted: rgba(16, 24, 32, 0.45);
     --color-information: var(--color-accent);
     --color-premium: var(--color-action);
-    --color-premium-fill: #e8b100;
+    --color-premium-fill: #d79a14;
     --color-on-premium: #140e00;
-    --color-premium-glow: rgba(176, 125, 0, 0.5);
-    --color-premium-glow-soft: rgba(176, 125, 0, 0.24);
+    --color-premium-glow: rgba(190, 125, 0, 0.8);
+    --color-premium-glow-soft: rgba(190, 125, 0, 0.42);
     --color-experimental: var(--color-diagnostic);
 
     --color-prestige-elite: #7d5b07;
@@ -1731,19 +1731,19 @@ a {
    is the same glow, static, for a large locked card. */
 @keyframes premium-glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 4px var(--color-premium-glow-soft), 0 0 10px var(--color-premium-glow-soft);
+    box-shadow: 0 0 8px var(--color-premium-glow-soft), 0 0 20px var(--color-premium-glow-soft), 0 0 36px var(--color-premium-glow-soft);
   }
   50% {
-    box-shadow: 0 0 6px var(--color-premium-glow), 0 0 16px var(--color-premium-glow-soft);
+    box-shadow: 0 0 10px var(--color-premium-glow), 0 0 26px var(--color-premium-glow), 0 0 52px var(--color-premium-glow-soft);
   }
 }
 .premium-glow {
-  box-shadow: 0 0 6px var(--color-premium-glow), 0 0 14px var(--color-premium-glow-soft);
+  box-shadow: 0 0 10px var(--color-premium-glow), 0 0 22px var(--color-premium-glow), 0 0 44px var(--color-premium-glow-soft);
   animation: premium-glow-pulse 2.5s ease-in-out infinite;
 }
 .premium-glow-card {
   border-color: var(--color-premium);
-  box-shadow: 0 0 8px var(--color-premium-glow-soft), 0 0 22px var(--color-premium-glow-soft);
+  box-shadow: 0 0 12px var(--color-premium-glow-soft), 0 0 30px var(--color-premium-glow-soft), 0 0 56px var(--color-premium-glow-soft);
 }
 .premium-glow:active:not(:disabled) {
   animation: none;
@@ -1803,11 +1803,11 @@ a {
   --color-diagnostic: #8b93ff;
   --color-muted: rgba(229, 231, 235, 0.52);
   --color-information: var(--color-accent);
-  --color-premium: var(--color-action);
-  --color-premium-fill: #facc15;
+  --color-premium: #e5ad32;
+  --color-premium-fill: #e0a526;
   --color-on-premium: #1a1300;
-  --color-premium-glow: rgba(250, 204, 21, 0.55);
-  --color-premium-glow-soft: rgba(250, 204, 21, 0.28);
+  --color-premium-glow: rgba(240, 170, 40, 0.85);
+  --color-premium-glow-soft: rgba(240, 170, 40, 0.45);
   --color-experimental: var(--color-diagnostic);
   --color-prestige-elite: #d8b85a;
   --color-prestige-starter: #d7dbe2;
