@@ -17,6 +17,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { percentileColor } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
+import PremiumLock from '../components/PremiumLock';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -43,6 +44,7 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
   const [weeksRemaining, setWeeksRemaining] = useState<number | null>(null);
   const [slopeFitted, setSlopeFitted] = useState(false);
   const [myRosterId, setMyRosterId] = useState<string>('');
+  const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +61,10 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
             api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
           ]);
           if (cancelled) return;
+          if (oddsResult.is_premium === false) {
+            setLocked(oddsResult.upsell ?? { title: '', body: '' });
+            return;
+          }
           setTeams(oddsResult.teams ?? []);
           setReason(oddsResult.reason ?? '');
           setWeeksRemaining(oddsResult.weeks_remaining ?? null);
@@ -86,6 +92,25 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
+      </View>
+    );
+  }
+
+  if (locked) {
+    return (
+      <View style={[styles.root, { paddingTop: headerHeight }]}>
+        <GridBackground />
+        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        <View style={styles.infoNoteWrap}>
+          <PremiumLock
+            feature="playoff_odds"
+            title={locked.title || 'Your real shot at the playoffs'}
+            description={
+              locked.body ||
+              "Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
+            }
+          />
+        </View>
       </View>
     );
   }

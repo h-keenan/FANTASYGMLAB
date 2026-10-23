@@ -21,6 +21,7 @@ import {
 import { ManagerProfileSheet } from "@/components/ManagerProfileSheet";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
 
@@ -274,7 +275,16 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
           {error}
         </p>
       ) : null}
-      {state === "ready" && result ? (
+      {state === "ready" && result && result.is_premium === false ? (
+        <PremiumUpsellCard
+          bare
+          kicker="Playoff Odds"
+          upsell={result.upsell ?? null}
+          fallbackTitle="Your real shot at the playoffs"
+          fallbackBody="Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
+        />
+      ) : null}
+      {state === "ready" && result && result.is_premium !== false ? (
         result.reason || result.teams.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             {playoffOddsReasonMessage(result.reason)}

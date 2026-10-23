@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type CollegeProspectsResponse } from "@/lib/api";
 import { CollegeScoutingContent } from "@/components/CollegeScoutingContent";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -53,6 +54,17 @@ export default function CollegeScoutingPage() {
   if (error || !data) {
     return (
       <ErrorState message={error || "Could not load College Scouting."} onRetry={reloadPage} />
+    );
+  }
+
+  if (data.is_premium === false) {
+    return (
+      <PremiumUpsellCard
+        kicker="College Scouting"
+        upsell={data.upsell ?? null}
+        fallbackTitle="Scout the next rookie class"
+        fallbackBody="College Scouting is a Pro feature: the shared prospect board, community grades, your own scouting reports and watchlist. Start your free trial to unlock it."
+      />
     );
   }
 
