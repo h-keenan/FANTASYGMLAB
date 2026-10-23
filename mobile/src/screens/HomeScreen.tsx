@@ -82,7 +82,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Which platform the Add League sheet is importing from. Sleeper is the
   // default; ESPN is EspnLeagueImport (public leagues, a subset of
   // features — see lib/leaguePlatform.ts).
-  const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn'>('sleeper');
+  const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>('sleeper');
   // Fix (welcome audit, tester feedback "I don't even know where to start"):
   // a brand-new user with no existing Sleeper account/league has no path
   // forward on this screen otherwise — this toggles the honest "we don't
@@ -623,10 +623,12 @@ export default function HomeScreen({ navigation, route }: Props) {
             <>
             <AppText style={styles.renameTitle}>Add a league</AppText>
             <View style={styles.platformTabs}>
-              <SegmentedTabBar<'sleeper' | 'espn'>
+              <SegmentedTabBar<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>
                 options={[
                   { key: 'sleeper', label: 'Sleeper' },
                   { key: 'espn', label: 'ESPN' },
+                  { key: 'fleaflicker', label: 'Fleaflicker' },
+                  { key: 'mfl', label: 'MFL' },
                 ]}
                 active={addPlatform}
                 onChange={(platform) => {
@@ -636,13 +638,15 @@ export default function HomeScreen({ navigation, route }: Props) {
                 }}
               />
             </View>
-            {addPlatform === 'espn' ? (
+            {addPlatform !== 'sleeper' ? (
               addCapMessage ? (
                 <View style={styles.capLockInModal}>
                   <PremiumLock title="League limit reached" description={addCapMessage} />
                 </View>
               ) : (
                 <EspnLeagueImport
+                  key={addPlatform}
+                  platform={addPlatform}
                   onCancel={closeAddLeague}
                   onCapReached={(cap) => setAddCapMessage(capMessageFor(cap))}
                   onSaved={(leagueId, leagueName) => {

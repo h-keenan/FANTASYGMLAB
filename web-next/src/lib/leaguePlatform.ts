@@ -11,8 +11,29 @@
 
 export const ESPN_NOT_AVAILABLE_MESSAGE = "Not available for ESPN leagues yet.";
 
+/**
+ * Fleaflicker ("fleaflicker:{id}:{season}") and MFL ("mfl:{id}:{season}")
+ * leagues (modules/fleaflicker_leagues.py, modules/mfl_leagues.py) follow the
+ * exact ESPN pattern: same saved-league column, same Sleeper-shaped data, same
+ * supported pages. So `isEspnLeagueId` (kept under its old name for its many
+ * callers) is true for every imported, non-Sleeper league.
+ */
+const IMPORTED_PLATFORM_LABELS: Record<string, string> = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL" };
+
+/** "ESPN" | "Fleaflicker" | "MFL" for an imported league id, "" for Sleeper. */
+export function importedPlatformLabel(leagueId: string | null | undefined): string {
+  if (typeof leagueId !== "string") return "";
+  const prefix = leagueId.split(":", 1)[0];
+  return leagueId.includes(":") ? (IMPORTED_PLATFORM_LABELS[prefix] ?? "") : "";
+}
+
 export function isEspnLeagueId(leagueId: string | null | undefined): boolean {
-  return typeof leagueId === "string" && leagueId.startsWith("espn:");
+  return importedPlatformLabel(leagueId) !== "";
+}
+
+/** "Not available for MFL leagues yet." for the league's own platform. */
+export function notAvailableMessage(leagueId: string | null | undefined): string {
+  return `Not available for ${importedPlatformLabel(leagueId) || "ESPN"} leagues yet.`;
 }
 
 /** First path segment of every league-scoped page an ESPN league can open. */

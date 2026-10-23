@@ -208,14 +208,26 @@ export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
-  league?: { league_key: string; espn_league_id: string; season: string; name: string; team_count: number };
+  platform?: 'fleaflicker' | 'mfl';
+  platform_label?: string;
+  league?: {
+    league_key: string;
+    espn_league_id?: string;
+    external_league_id?: string;
+    season: string;
+    name: string;
+    team_count: number;
+  };
   teams?: EspnLeagueTeam[];
   diagnostics?: {
     teams_found: number;
-    total_espn_players_seen: number;
+    total_espn_players_seen?: number;
+    total_players_seen?: number;
     canonical_matched_count: number;
     unmatched_count: number;
     matched_rate: number;
+    /** Players with no confident match; left off the roster, never guessed. */
+    unmapped_players?: Array<{ name: string; position: string; team: string; fantasy_team: string; reason: string }>;
   };
   features?: Array<{ feature: string; status: 'available' | 'not_available'; note: string }>;
 }
@@ -2675,6 +2687,8 @@ export const api = {
     authorizedFetch<import('./leagueWarmup').WarmupStatus>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/warmup-status`,
     ),
+  previewImportedLeague: (platform: 'fleaflicker' | 'mfl', leagueId: string, season: number) =>
+    authorizedPost<EspnLeaguePreviewResponse>('/v1/import/preview', { platform, league_id: leagueId, season }),
   previewEspnLeague: (leagueId: string, season: number) =>
     authorizedPost<EspnLeaguePreviewResponse>('/v1/espn/leagues/preview', { league_id: leagueId, season }),
   getGmTargets: (leagueId: string) =>

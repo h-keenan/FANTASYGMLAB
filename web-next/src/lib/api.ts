@@ -217,7 +217,7 @@ export interface SaveLeagueResponse {
   /** True when the server started warming this league's first-load data;
    * poll getLeagueWarmupStatus for real progress. */
   warming?: boolean;
-  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" };
+  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" | "fleaflicker" | "mfl" };
 }
 
 /** GET /v1/leagues/{id}/warmup-status: "none" means nothing to wait for. */
@@ -247,15 +247,28 @@ export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
-  league?: { league_key: string; espn_league_id: string; season: string; name: string; team_count: number };
+  /** Fleaflicker / MFL previews (POST /v1/import/preview) only. */
+  platform?: "fleaflicker" | "mfl";
+  platform_label?: string;
+  league?: {
+    league_key: string;
+    espn_league_id?: string;
+    external_league_id?: string;
+    season: string;
+    name: string;
+    team_count: number;
+  };
   teams?: EspnLeagueTeam[];
   diagnostics?: {
     teams_found: number;
-    total_espn_players_seen: number;
+    total_espn_players_seen?: number;
+    total_players_seen?: number;
     canonical_matched_count: number;
     unmatched_count: number;
     matched_rate: number;
-    unmatched_examples: Array<{ name: string; position: string; team: string }>;
+    unmatched_examples?: Array<{ name: string; position: string; team: string }>;
+    /** Players that couldn't be matched to a FantasyDesk player; left off the roster. */
+    unmapped_players?: Array<{ name: string; position: string; team: string; fantasy_team: string; reason: string }>;
   };
   features?: EspnFeatureSupport[];
 }
@@ -3058,6 +3071,12 @@ export const api = {
         make_default: input.makeDefault ?? false,
         roster_id: input.rosterId ?? "",
       },
+    }),
+
+  previewImportedLeague: (platform: "fleaflicker" | "mfl", leagueId: string, season: number) =>
+    authorizedRequest<EspnLeaguePreviewResponse>("/v1/import/preview", {
+      method: "POST",
+      jsonBody: { platform, league_id: leagueId, season },
     }),
 
   previewEspnLeague: (leagueId: string, season: number) =>

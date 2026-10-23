@@ -12,8 +12,27 @@
 
 export const ESPN_NOT_AVAILABLE_MESSAGE = 'Not available for ESPN leagues yet.';
 
+/**
+ * Fleaflicker ("fleaflicker:{id}:{season}") and MFL ("mfl:{id}:{season}")
+ * leagues (modules/fleaflicker_leagues.py, modules/mfl_leagues.py) follow the
+ * exact ESPN pattern, so `isEspnLeagueId` (kept under its old name for its
+ * many callers) is true for every imported, non-Sleeper league.
+ */
+const IMPORTED_PLATFORM_LABELS: Record<string, string> = { espn: 'ESPN', fleaflicker: 'Fleaflicker', mfl: 'MFL' };
+
+/** 'ESPN' | 'Fleaflicker' | 'MFL' for an imported league id, '' for Sleeper. */
+export function importedPlatformLabel(leagueId: string | null | undefined): string {
+  if (typeof leagueId !== 'string' || !leagueId.includes(':')) return '';
+  return IMPORTED_PLATFORM_LABELS[leagueId.split(':', 1)[0]] ?? '';
+}
+
 export function isEspnLeagueId(leagueId: string | null | undefined): boolean {
-  return typeof leagueId === 'string' && leagueId.startsWith('espn:');
+  return importedPlatformLabel(leagueId) !== '';
+}
+
+/** "Not available for MFL leagues yet." for the league's own platform. */
+export function notAvailableMessage(leagueId: string | null | undefined): string {
+  return `Not available for ${importedPlatformLabel(leagueId) || 'ESPN'} leagues yet.`;
 }
 
 /** League-scoped stack routes an ESPN league can open. Trades opens on its
@@ -47,7 +66,7 @@ export function espnSeasonOptions(now: Date = new Date()): number[] {
 /** Customer copy for POST /v1/espn/leagues/preview and /v1/leagues/save
  * failure reasons that the server doesn't already send a message for. */
 export const ESPN_SAVE_FAILURE_COPY: Record<string, string> = {
-  league_not_found: "ESPN didn't return that league just now. Please try again.",
+  league_not_found: "That league didn't load just now. Please try again.",
   espn_team_not_selected: 'Pick which team is yours first.',
   mapping_too_low: "Too few of this league's players matched FantasyDesk's player list to value it accurately.",
 };

@@ -6,7 +6,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import EmptyState from './EmptyState';
 import GridBackground from './GridBackground';
 import { navigationRef } from '../navigation/navigationRef';
-import { ESPN_NOT_AVAILABLE_MESSAGE } from '../lib/leaguePlatform';
+import { importedPlatformLabel, notAvailableMessage } from '../lib/leaguePlatform';
 import { useThemeMode } from '../context/ThemeModeContext';
 
 /**
@@ -31,8 +31,8 @@ export default function EspnUnavailableScreen({
       <GridBackground />
       <EmptyState
         icon="construct-outline"
-        title={ESPN_NOT_AVAILABLE_MESSAGE}
-        subtitle={`${leagueName} is an ESPN league. This screen needs league data FantasyDesk can only read from Sleeper so far. My Team, Trade Analyzer, Players and League Rankings work for it now.`}
+        title={notAvailableMessage(leagueId)}
+        subtitle={`${leagueName} is {importedPlatformLabel(leagueId) === 'ESPN' ? 'an' : 'a'} ${importedPlatformLabel(leagueId) || 'ESPN'} league. This screen needs league data FantasyDesk can only read from Sleeper so far. My Team, Trade Analyzer, Players and League Rankings work for it now.`}
         actionLabel="Open My Team"
         onPressAction={() => navigationRef.dispatch(StackActions.replace('MyTeam', params))}
         secondaryLabel="Open Trade Analyzer"

@@ -7,6 +7,30 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { ApiError, api, type EspnLeaguePreviewResponse } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { ESPN_SAVE_FAILURE_COPY, espnSeasonOptions } from '../lib/leaguePlatform';
+
+export type ImportPlatform = 'espn' | 'fleaflicker' | 'mfl';
+
+/** Per-platform copy; everything else about the flow is shared. */
+const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFound: string; placeholder: string }> = {
+  espn: {
+    label: 'ESPN',
+    hint: "FantasyDesk can read public ESPN leagues. Your league ID is the number after leagueId= in your ESPN league's web address. Private ESPN leagues aren't supported yet; your league manager can make the league viewable to the public in ESPN's league settings.",
+    notFound: "Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.",
+    placeholder: 'e.g. 12345678',
+  },
+  fleaflicker: {
+    label: 'Fleaflicker',
+    hint: "Your league ID is the number after /leagues/ in your Fleaflicker league's web address. Leagues that aren't viewable to the public can't be read.",
+    notFound: "Enter your Fleaflicker league ID. It's the number after /leagues/ in your league's web address.",
+    placeholder: 'e.g. 206154',
+  },
+  mfl: {
+    label: 'MFL',
+    hint: "Your league ID is the number at the end of your MFL league's web address, like /home/12345. MFL leagues that need a login aren't supported yet.",
+    notFound: "Enter your MFL league ID. It's the number at the end of your league's web address.",
+    placeholder: 'e.g. 10015',
+  },
+};
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
 
@@ -20,14 +44,17 @@ import { radii, spacing, typography, type ThemeColors } from '../theme';
  * cookies stored on our server, so this never asks for them.
  */
 export default function EspnLeagueImport({
+  platform = 'espn',
   onSaved,
   onCapReached,
   onCancel,
 }: {
+  platform?: ImportPlatform;
   onSaved: (leagueId: string, leagueName: string) => void;
   onCapReached: (cap: number) => void;
   onCancel: () => void;
 }) {
+  const copy = PLATFORM_COPY[platform];
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const seasons = useMemo(() => espnSeasonOptions(), []);
@@ -41,7 +68,7 @@ export default function EspnLeagueImport({
   const findLeague = async () => {
     const clean = leagueId.trim();
     if (!/^\d{1,12}$/.test(clean)) {
-      setMessage("Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.");
+      setMessage(copy.notFound);
       return;
     }
     setBusy(true);
@@ -49,9 +76,12 @@ export default function EspnLeagueImport({
     setPreview(null);
     setRosterId('');
     try {
-      const result = await api.previewEspnLeague(clean, Number(season));
+      const result =
+        platform === 'espn'
+          ? await api.previewEspnLeague(clean, Number(season))
+          : await api.previewImportedLeague(platform, clean, Number(season));
       if (!result.league) {
-        setMessage(result.message || "That ESPN league couldn't be loaded.");
+        setMessage(result.message || `That ${copy.label} league couldn't be loaded.`);
         return;
       }
       setPreview(result);
@@ -70,7 +100,7 @@ export default function EspnLeagueImport({
     setMessage(null);
     try {
       const result = await api.saveLeague({ leagueId: key, leagueName: name, rosterId, makeDefault: true });
-      trackUse('league_connect', result.ok ? 'completed' : 'failed', { props: { source_surface: 'espn' } });
+      trackUse('league_connect', result.ok ? 'completed' : 'failed', { props: { source_surface: platform } });
       if (result.ok) {
         onSaved(key, name);
         return;
@@ -95,13 +125,23 @@ export default function EspnLeagueImport({
       <View>
         <AppText style={styles.leagueName}>{preview.league.name}</AppText>
         <AppText style={styles.meta}>
-          ESPN · {preview.league.season} season · {preview.league.team_count} teams
+          {copy.label} · {preview.league.season} season · {preview.league.team_count} teams
         </AppText>
         {diagnostics ? (
           <AppText style={styles.hint}>
-            {diagnostics.canonical_matched_count} of {diagnostics.total_espn_players_seen} rostered players matched
+            {diagnostics.canonical_matched_count} of {diagnostics.total_espn_players_seen ?? diagnostics.total_players_seen} rostered players matched
             FantasyDesk's player list ({Math.round(diagnostics.matched_rate * 100)}%). Team defenses (D/ST) and players
             we don't track yet aren't valued.
+          </AppText>
+        ) : null}
+        {diagnostics?.unmapped_players?.length ? (
+          <AppText style={styles.hint}>
+            Left off rosters (no confident match):{' '}
+            {diagnostics.unmapped_players
+              .slice(0, 12)
+              .map((player) => `${player.name}${player.position ? ` (${player.position})` : ''}`)
+              .join(', ')}
+            {diagnostics.unmapped_players.length > 12 ? `, +${diagnostics.unmapped_players.length - 12} more` : ''}.
           </AppText>
         ) : null}
         {preview.ok ? (
@@ -137,11 +177,11 @@ export default function EspnLeagueImport({
         ) : null}
         <View style={styles.featureCard}>
           <AppText style={styles.featureText}>
-            <AppText style={styles.featureStrong}>Works for ESPN leagues: </AppText>
+            <AppText style={styles.featureStrong}>Works for {copy.label} leagues: </AppText>
             {available.map((item) => item.feature).join(', ')}.
           </AppText>
           <AppText style={styles.featureText}>
-            <AppText style={styles.featureStrong}>Not available for ESPN leagues yet: </AppText>
+            <AppText style={styles.featureStrong}>Not available for {copy.label} leagues yet: </AppText>
             {unavailable.map((item) => item.feature).join(', ')}.
           </AppText>
         </View>
@@ -174,16 +214,12 @@ export default function EspnLeagueImport({
 
   return (
     <View>
-      <AppText style={styles.hint}>
-        FantasyDesk can read public ESPN leagues. Your league ID is the number after leagueId= in your ESPN league's web
-        address. Private ESPN leagues aren't supported yet; your league manager can make the league viewable to the
-        public in ESPN's league settings.
-      </AppText>
+      <AppText style={styles.hint}>{copy.hint}</AppText>
       <TextInput
         style={styles.input}
         value={leagueId}
         onChangeText={setLeagueId}
-        placeholder="ESPN league ID"
+        placeholder={`${copy.label} league ID`}
         placeholderTextColor={colors.textTertiary}
         keyboardType="number-pad"
         autoCorrect={false}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { espnUnavailableLeagueId, isEspnLeagueId, leagueHomePath } from "./leaguePlatform";
+import { espnUnavailableLeagueId, importedPlatformLabel, isEspnLeagueId, leagueHomePath, notAvailableMessage } from "./leaguePlatform";
 
 const ESPN_ID = "espn:42654852:2026";
 const ENCODED = encodeURIComponent(ESPN_ID);
@@ -10,6 +10,16 @@ describe("leaguePlatform", () => {
     expect(isEspnLeagueId(ESPN_ID)).toBe(true);
     expect(isEspnLeagueId("1180112345678901234")).toBe(false);
     expect(isEspnLeagueId(null)).toBe(false);
+  });
+
+  it("treats Fleaflicker and MFL leagues like ESPN leagues, with their own label", () => {
+    expect(isEspnLeagueId("fleaflicker:206154:2025")).toBe(true);
+    expect(isEspnLeagueId("mfl:10015:2025")).toBe(true);
+    expect(isEspnLeagueId("yahoo:1:2025")).toBe(false);
+    expect(importedPlatformLabel("mfl:10015:2025")).toBe("MFL");
+    expect(notAvailableMessage("fleaflicker:206154:2025")).toBe("Not available for Fleaflicker leagues yet.");
+    expect(espnUnavailableLeagueId(`/dashboard/${encodeURIComponent("mfl:10015:2025")}`)).toBe("mfl:10015:2025");
+    expect(leagueHomePath("mfl:10015:2025", "X")).toBe(`/my-team/${encodeURIComponent("mfl:10015:2025")}?name=X`);
   });
 
   it("keeps ESPN leagues off pages they can't feed, for encoded and raw ids", () => {

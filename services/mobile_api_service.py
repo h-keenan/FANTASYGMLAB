@@ -157,6 +157,7 @@ from modules import (
     draft_assistant,
     draft_center_ui,
     espn_leagues,
+    external_leagues,
     faab,
     founder_analytics,
     gm_plan,
@@ -566,10 +567,10 @@ class _EspnLeagueRouteGate:
         if (
             scope.get("type") == "http"
             and scope.get("method") != "OPTIONS"
-            and "espn:" in (scope.get("path") or "")
-            and espn_leagues.gated_league_path(scope.get("path") or "")
+            and any(prefix in (scope.get("path") or "") for prefix in external_leagues.PREFIXES)
+            and external_leagues.gated_league_path(scope.get("path") or "")
         ):
-            response = JSONResponse(status_code=409, content=espn_leagues.not_available_payload())
+            response = JSONResponse(status_code=409, content=external_leagues.not_available_payload(scope.get("path") or ""))
             await response(scope, receive, send)
             return
         await self.app(scope, receive, send)
@@ -1670,6 +1671,31 @@ def preview_espn_league(
     return espn_leagues.preview_payload(snapshot)
 
 
+class ImportLeaguePreviewRequest(BaseModel):
+    platform: str
+    league_id: str
+    season: int
+
+
+@app.post("/v1/import/preview")
+def preview_imported_league(
+    body: ImportLeaguePreviewRequest,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Fleaflicker / MFL twin of POST /v1/espn/leagues/preview.
+
+    Public leagues only: no credentials of any kind are accepted. Read-only
+    (saves nothing); `league.league_key` is what POST /v1/leagues/save takes.
+    `diagnostics.unmapped_players` lists, honestly, every rostered player that
+    could not be matched to a FantasyDesk player id (those are left off the
+    roster, never guessed)."""
+
+    platform = str(body.platform or "").strip().lower()
+    if platform not in external_leagues.IMPORT_PLATFORMS:
+        raise HTTPException(status_code=422, detail="Unsupported league platform.")
+    return external_leagues.preview_league(platform, body.league_id, body.season)
+
+
 @app.post("/v1/leagues/save")
 def save_league(
     payload: SaveLeagueRequest,
@@ -1690,14 +1716,14 @@ def save_league(
     if not league_id:
         raise HTTPException(status_code=422, detail="league_id is required.")
 
-    is_espn = espn_leagues.is_espn_league_key(league_id)
+    is_espn = external_leagues.is_external_league_key(league_id)
     espn_roster_id = str(payload.roster_id or "").strip()
     if is_espn:
         # Same "verify before writing" rule as Sleeper below, against ESPN.
-        espn_snapshot = espn_leagues.get_league_snapshot(league_id)
+        espn_snapshot = external_leagues.get_league_snapshot(league_id)
         if not espn_snapshot:
             return {"ok": False, "reason": "league_not_found", "cap": 0}
-        if espn_leagues.mapping_blocks_import(espn_snapshot):
+        if external_leagues.mapping_blocks_import(espn_snapshot):
             return {"ok": False, "reason": "mapping_too_low", "cap": 0}
         if not any(str(roster.get("roster_id")) == espn_roster_id for roster in espn_snapshot["rosters"]):
             return {"ok": False, "reason": "espn_team_not_selected", "cap": 0}
@@ -1777,7 +1803,7 @@ def save_league(
             "league_id": league_id,
             "league_name": league_name,
             "is_default": is_default,
-            "platform": espn_leagues.league_platform(league_id),
+            "platform": external_leagues.league_platform(league_id),
         },
     }
 
@@ -1964,7 +1990,7 @@ def resolve_league_path_id(
     league_id_clean = str(league_id or "").strip()
     if not league_id_clean:
         return league_id
-    if espn_leagues.is_espn_league_key(league_id_clean):
+    if external_leagues.is_external_league_key(league_id_clean):
         # ESPN league ids don't change between seasons, and the season is
         # part of the key, so there is nothing to resolve (and no reason to
         # load the league just to read a Sleeper status).
@@ -2321,7 +2347,7 @@ def get_league_team_rankings(
         )
         # ESPN leagues have no transaction feed here (modules.espn_leagues),
         # so a zero count means "unknown", not a "Quiet Manager".
-        if activity_badge and not espn_leagues.is_espn_league_key(league_id):
+        if activity_badge and not external_leagues.is_external_league_key(league_id):
             team_badges.append(activity_badge)
         pick_flow_badge = pick_flow.classify_pick_flow(firsts_acquired, firsts_sent)
         if pick_flow_badge:
@@ -2643,7 +2669,7 @@ def get_league_draft_picks(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         # ESPN's API doesn't expose who owns which future picks, so listing
         # every team's own picks would be a guess. Trade Analyzer runs
         # players-only for ESPN leagues instead.
@@ -2977,7 +3003,7 @@ def _resolve_my_roster(
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         return _resolve_my_espn_roster(config, access_token, user_id, league_id)
     if profile is None:
         profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
@@ -9065,7 +9091,7 @@ def _build_portfolio_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         # Portfolio's Next Move briefing is the Dashboard engine, which ESPN
         # leagues can't feed yet (see modules.espn_leagues).
         return {
@@ -9429,7 +9455,7 @@ def get_portfolio_exposure(lens: str = "Dynasty", user: dict[str, Any] = Depends
             continue
         seen.add(league_id)
         league_name = str(row.get("league_name") or "").strip() or league_id
-        if espn_leagues.is_espn_league_key(league_id):
+        if external_leagues.is_external_league_key(league_id):
             skipped.append(
                 {"league_id": league_id, "league_name": league_name, "reason": espn_leagues.ESPN_NOT_AVAILABLE_REASON}
             )
@@ -9677,7 +9703,7 @@ def _build_league_glance_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         return {
             "status": "failed",
             "league_id": league_id,
