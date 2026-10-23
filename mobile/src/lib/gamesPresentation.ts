@@ -1,0 +1,99 @@
+/**
+ * Games (Season Simulator + Pick'em) presentation helpers. Pure; mirrors
+ * web-next/src/lib/gamesPresentation.ts. Every string answers a real `reason`
+ * code from modules/games.py or modules/playoff_simulator.py.
+ */
+
+export const GAMES_REASON_MESSAGES: Record<string, string> = {
+  offseason: 'Opens once the regular season starts.',
+  no_playoff_format: 'This league has no playoff format set yet.',
+  no_rankings_data: 'Not enough roster data for this league yet.',
+  unavailable: 'Not available for this league right now.',
+  no_sleeper_username_linked: 'Link your Sleeper username to play.',
+  not_a_member_of_league: 'Only members of this league can play.',
+  espn_team_not_selected: 'Pick your team in this league to play.',
+  no_roster: 'We could not find your team in this league.',
+  locked: 'This week is locked.',
+};
+
+export function gamesReasonMessage(reason: string): string {
+  return GAMES_REASON_MESSAGES[reason] ?? GAMES_REASON_MESSAGES.unavailable;
+}
+
+/** Where the empty state's next-step button should go for a reason. */
+export function gamesReasonAction(reason: string): 'account' | 'home' {
+  return reason === 'no_sleeper_username_linked' || reason === 'espn_team_not_selected' ? 'account' : 'home';
+}
+
+export function formatOdds(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return `${Math.round(value)}%`;
+}
+
+/** "+4.2" / "-1.0" / "0.0" for a points change. */
+export function formatDelta(value: number, digits = 1): string {
+  const fixed = value.toFixed(digits);
+  if (Number(fixed) === 0) return (0).toFixed(digits);
+  return value > 0 ? `+${fixed}` : fixed;
+}
+
+/** Seed moves: negative is better (a lower seed number). */
+export function seedChangeLabel(change: number): string {
+  if (change === 0) return 'Seed unchanged';
+  const places = Math.abs(change);
+  return `${places} seed${places === 1 ? '' : 's'} ${change < 0 ? 'higher' : 'lower'}`;
+}
+
+export type WhatIfTone = 'positive' | 'negative' | 'neutral';
+
+export function whatIfTone(change: { playoff_probability: number; within_noise: boolean }): WhatIfTone {
+  if (change.within_noise) return 'neutral';
+  return change.playoff_probability > 0 ? 'positive' : 'negative';
+}
+
+/** One plain sentence for the result; a move inside simulation noise says so
+ * instead of claiming an effect. */
+export function whatIfSummary(change: { playoff_probability: number; within_noise: boolean }): string {
+  if (change.within_noise) return 'Within simulation noise. This move does not change your odds in a way we can measure.';
+  const points = Math.abs(change.playoff_probability).toFixed(1);
+  return change.playoff_probability > 0
+    ? `Raises your playoff odds by ${points} points.`
+    : `Lowers your playoff odds by ${points} points.`;
+}
+
+export const PICKEM_PHASE_LABEL: Record<string, string> = {
+  open: 'Open',
+  locked: 'Locked',
+  final: 'Final',
+};
+
+/** Replace one matchup's pick locally (optimistic update). */
+export function withPick<T extends { matchup_id: string; my_pick: string | null }>(
+  matchups: T[],
+  matchupId: string,
+  rosterId: string,
+): T[] {
+  return matchups.map((m) => (m.matchup_id === matchupId ? { ...m, my_pick: rosterId } : m));
+}
+
+export function recordLabel(record: { correct: number; graded: number } | undefined): string {
+  if (!record || record.graded === 0) return '0-0';
+  return `${record.correct}-${record.graded - record.correct}`;
+}
+
+/** Case-insensitive name match, best (prefix) hits first; min 2 characters. */
+export function matchPlayersByName<T extends { name: string | null }>(players: readonly T[], query: string, limit = 5): T[] {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const starts: T[] = [];
+  const wordStarts: T[] = [];
+  const contains: T[] = [];
+  for (const player of players) {
+    const name = (player.name ?? '').toLowerCase();
+    if (!name) continue;
+    if (name.startsWith(q)) starts.push(player);
+    else if (name.split(/[\s.'-]+/).some((word) => word.startsWith(q))) wordStarts.push(player);
+    else if (name.includes(q)) contains.push(player);
+  }
+  return [...starts, ...wordStarts, ...contains].slice(0, limit);
+}

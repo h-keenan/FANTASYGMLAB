@@ -158,6 +158,7 @@ from modules import (
     draft_center_cards,
     espn_leagues,
     external_leagues,
+    games,
     external_matchups,
     faab,
     founder_analytics,
@@ -2664,6 +2665,381 @@ def get_league_playoff_odds(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Games: Season Simulator (what-if) and league Pick'em. See modules/games.py.
+# The simulator reuses modules.playoff_simulator; Pick'em storage is optional
+# (docs/supabase_games.sql) and answers `available: false` until applied.
+# ---------------------------------------------------------------------------
+
+_GAMES_WHAT_IF_UPSELL = {
+    "title": "See how a move changes your season",
+    "body": (
+        "What-if is a Premium feature: add or drop players and see the change "
+        "in your playoff odds, seed and wins before you make the move."
+    ),
+}
+
+
+def _games_odds_row(team: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "playoff_probability": team.get("playoff_probability"),
+        "median_final_wins": team.get("median_final_wins"),
+        "median_final_losses": team.get("median_final_losses"),
+        "median_seed": team.get("median_seed"),
+        "clinched": bool(team.get("clinched")),
+        "eliminated": bool(team.get("eliminated")),
+    }
+
+
+def _games_check_lens(lens: str) -> None:
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+
+@app.get("/v1/leagues/{league_id}/games/season-sim")
+@_with_sleeper_as_of
+def get_games_season_sim(
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Season Simulator baseline: the caller's own rest-of-season odds from the
+    shared playoff-odds simulation plus the roster the what-if can drop from.
+    Free for everyone; the what-if (POST) is Premium."""
+
+    _games_check_lens(lens)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    base = {"ok": True, "is_premium": is_premium, "upsell": None if is_premium else _GAMES_WHAT_IF_UPSELL}
+
+    odds = playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if odds.get("reason"):
+        return {**base, "reason": odds["reason"], "teams": [], "my_team": None, "roster": []}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return {**base, "reason": roster_reason or "no_roster", "teams": [], "my_team": None, "roster": []}
+
+    my_rid = str(my_roster.get("roster_id"))
+    teams = [
+        {
+            "roster_id": t["roster_id"],
+            "team_name": t["team_name"],
+            "avatar_url": t.get("avatar_url"),
+            "record_label": t.get("record_label"),
+            "playoff_probability": t["playoff_probability"],
+            "median_seed": t["median_seed"],
+            "mine": t["roster_id"] == my_rid,
+        }
+        for t in odds.get("teams") or []
+    ]
+    my_team = next((t for t in odds.get("teams") or [] if t["roster_id"] == my_rid), None)
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    roster: list[dict[str, Any]] = []
+    my_ids = {str(pid) for pid in (my_roster.get("players") or []) if pid is not None}
+    if my_ids and not players_df.empty and "player_id" in players_df.columns:
+        score_field = league_value_settings.valuation_score_field(lens)
+        mine_df = players_df[players_df["player_id"].astype(str).isin(my_ids)]
+        if score_field in mine_df.columns:
+            mine_df = mine_df.sort_values(score_field, ascending=False)
+        for _, row in mine_df.iterrows():
+            roster.append(
+                {
+                    "player_id": str(row.get("player_id")),
+                    "name": _clean_json_value(row.get("name")),
+                    "position": _clean_json_value(row.get("position")),
+                    "team": _clean_json_value(row.get("team")),
+                    "injury_status": _clean_json_value(row.get("injury_status")),
+                    "tier": _clean_json_value(row.get("tier")),
+                }
+            )
+
+    return {
+        **base,
+        "reason": "",
+        "my_roster_id": my_rid,
+        "my_team": _games_odds_row(my_team) if my_team else None,
+        "teams": teams,
+        "roster": roster,
+        "playoff_teams": odds.get("playoff_teams"),
+        "current_week": odds.get("current_week"),
+        "weeks_remaining": odds.get("weeks_remaining"),
+        "trials": odds.get("trials"),
+        "slope_fitted": odds.get("slope_fitted"),
+        "games_used_for_fit": odds.get("games_used_for_fit"),
+    }
+
+
+class GamesWhatIfRequest(BaseModel):
+    add: list[str] = Field(default_factory=list, max_length=games.WHAT_IF_MAX_PLAYERS)
+    drop: list[str] = Field(default_factory=list, max_length=games.WHAT_IF_MAX_PLAYERS)
+
+
+@app.post("/v1/leagues/{league_id}/games/season-sim/what-if")
+@_with_sleeper_as_of
+def post_games_what_if(
+    body: GamesWhatIfRequest,
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Premium. Re-runs the shared playoff simulation with the caller's Roster
+    Power recomputed for the add/drop, against an equally seeded baseline."""
+
+    import zlib
+
+    import numpy as np
+
+    _games_check_lens(lens)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {"ok": True, "reason": "", "is_premium": False, "upsell": _GAMES_WHAT_IF_UPSELL}
+
+    def not_ready(reason: str) -> dict[str, Any]:
+        return {"ok": True, "reason": reason, "is_premium": True, "upsell": None}
+
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return not_ready(roster_reason or "no_roster")
+    my_rid = str(my_roster.get("roster_id"))
+    current_ids = [str(pid) for pid in (my_roster.get("players") or []) if pid is not None]
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if players_df.empty or "player_id" not in players_df.columns:
+        return not_ready("no_rankings_data")
+    known = {str(pid) for pid in players_df["player_id"]}
+    problem = games.validate_roster_change(current_ids, body.add, body.drop, known)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return not_ready("unavailable")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(lens)
+    before = games.score_roster(players_df, current_ids, score_field, settings)
+    after = games.score_roster(
+        players_df, games.apply_roster_change(current_ids, body.add, body.drop), score_field, settings
+    )
+
+    frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    my_power = None
+    if not frame.empty:
+        match = frame[frame["roster_id"].astype(str) == my_rid]
+        if not match.empty:
+            my_power = float(match.iloc[0].get("power_score") or 0.0)
+    if my_power is None:
+        return not_ready("no_rankings_data")
+    scenario_power = my_power + (after["total_score"] - before["total_score"])
+
+    seed = zlib.crc32(f"{league_id}:{lens}".encode()) & 0xFFFFFFFF
+    base_run = playoff_simulator.build_league_playoff_odds(
+        league_id, lens=lens, players_db_path=PLAYERS_DB_PATH, rng=np.random.default_rng(seed)
+    )
+    if base_run.get("reason"):
+        return not_ready(base_run["reason"])
+    scenario_run = playoff_simulator.build_league_playoff_odds(
+        league_id,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        rng=np.random.default_rng(seed),
+        power_overrides={my_rid: scenario_power},
+    )
+    base_team = next((t for t in base_run["teams"] if t["roster_id"] == my_rid), None)
+    scenario_team = next((t for t in scenario_run["teams"] if t["roster_id"] == my_rid), None)
+    if not base_team or not scenario_team:
+        return not_ready("unavailable")
+
+    touched = set(body.add) | set(body.drop)
+    names = {
+        str(row.get("player_id")): {
+            "player_id": str(row.get("player_id")),
+            "name": _clean_json_value(row.get("name")),
+            "position": _clean_json_value(row.get("position")),
+            "team": _clean_json_value(row.get("team")),
+        }
+        for _, row in players_df[players_df["player_id"].astype(str).isin(touched)].iterrows()
+    }
+    return {
+        "ok": True,
+        "reason": "",
+        "is_premium": True,
+        "upsell": None,
+        "baseline": _games_odds_row(base_team),
+        "scenario": _games_odds_row(scenario_team),
+        "change": games.compare_odds(base_team, scenario_team),
+        "added": [names[pid] for pid in body.add if pid in names],
+        "dropped": [names[pid] for pid in body.drop if pid in names],
+        "factors": games.what_if_factors(
+            before,
+            after,
+            remaining_games=int(base_team.get("remaining_games") or 0),
+            weeks_remaining=int(base_run.get("weeks_remaining") or 0),
+            slope_fitted=bool(base_run.get("slope_fitted")),
+            games_used_for_fit=int(base_run.get("games_used_for_fit") or 0),
+        ),
+    }
+
+
+def _pickem_context(league_id: str) -> tuple[dict[str, Any] | None, str, int, dict[str, Any]]:
+    """(league, season, current_week, roster profiles); league None if unknown."""
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return None, "", 0, {}
+    current_week, _end, _max = league_recaps.league_history_window(league)
+    return league, str(league.get("season") or ""), int(current_week or 0), sleeper.get_league_roster_profiles(league_id)
+
+
+def _pickem_winners(league_id: str, weeks: list[int], profiles: dict[str, Any]) -> dict[int, dict[str, str | None]]:
+    """matchup_id -> winning roster id for finished weeks (from real scores)."""
+
+    import concurrent.futures
+
+    if not weeks:
+        return {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(weeks))) as pool:
+        fetched = list(pool.map(lambda w: sleeper.get_matchups(league_id, w) or [], weeks))
+    out: dict[int, dict[str, str | None]] = {}
+    for week, matchups in zip(weeks, fetched):
+        out[week] = {
+            m["matchup_id"]: games.matchup_winner(m) for m in games.group_week_matchups(matchups, profiles)
+        }
+    return out
+
+
+@app.get("/v1/leagues/{league_id}/games/pickem")
+@_with_sleeper_as_of
+def get_games_pickem(
+    league_id: str = Depends(require_league_access),
+    week: int | None = None,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Weekly pick'em inside the caller's own league: the week's matchups, the
+    caller's picks, results once a week is final, and a season leaderboard
+    among league members who played. available=false until the tables exist."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    token = str(user.get("_access_token") or "")
+    league, season, current_week, profiles = _pickem_context(league_id)
+    if not league:
+        return {"ok": True, "available": False, "reason": "unavailable"}
+    if current_week <= 0 or not season:
+        return {"ok": True, "available": True, "reason": "offseason"}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id)
+    if not my_roster:
+        return {"ok": True, "available": True, "reason": roster_reason or "no_roster"}
+    if not auth_supabase.is_configured(config) or not user_id:
+        return {"ok": True, "available": False, "reason": ""}
+
+    try:
+        my_rows = games.fetch_my_picks(config, token, user_id, league_id, season)
+        try:
+            league_rows = games.fetch_league_picks(league_id, season)
+        except games.Unavailable:
+            league_rows = None
+    except games.Unavailable:
+        return {"ok": True, "available": False, "reason": ""}
+
+    selected = max(1, min(int(week or current_week), current_week))
+    grouped = games.group_week_matchups(sleeper.get_matchups(league_id, selected), profiles)
+    my_week_picks = {
+        str(r.get("matchup_id")): str(r.get("picked_roster_id"))
+        for r in my_rows
+        if str(r.get("week")) == str(selected)
+    }
+    view = games.build_week_view(selected, current_week, grouped, my_week_picks)
+
+    rows = league_rows if league_rows is not None else [{**r, "user_id": user_id} for r in my_rows]
+    final_weeks = sorted(
+        {int(r["week"]) for r in rows if str(r.get("week", "")).isdigit() and int(r["week"]) < current_week}
+    )
+    winners = _pickem_winners(league_id, final_weeks, profiles)
+    board = games.build_leaderboard(rows, winners, profiles, user_id)
+    mine = next((row for row in board if row["mine"]), None)
+    return {
+        "ok": True,
+        "available": True,
+        "reason": "",
+        "season": season,
+        "current_week": current_week,
+        "weeks": list(range(1, current_week + 1)),
+        "my_roster_id": str(my_roster.get("roster_id")),
+        **view,
+        "season_record": {"correct": mine["correct"], "graded": mine["graded"]} if mine else {"correct": 0, "graded": 0},
+        "leaderboard": board,
+        "leaderboard_scope": "league" if league_rows is not None else "you",
+    }
+
+
+class GamesPickRequest(BaseModel):
+    week: int = Field(ge=1, le=30)
+    matchup_id: str = Field(min_length=1, max_length=16)
+    roster_id: str = Field(min_length=1, max_length=16)
+
+
+@app.post("/v1/leagues/{league_id}/games/pickem/pick")
+@_with_sleeper_as_of
+def post_games_pickem_pick(
+    body: GamesPickRequest,
+    league_id: str = Depends(require_league_access),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Save or change a pick. Only league members, only the current week, and
+    only before the week's first score lands (server-checked, not just hidden
+    in the UI)."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    league, season, current_week, profiles = _pickem_context(league_id)
+    if not league or not user_id or not auth_supabase.is_configured(config):
+        return {"ok": False, "available": False, "reason": "not_available"}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id)
+    if not my_roster:
+        return {"ok": False, "available": True, "reason": roster_reason or "no_roster"}
+    if body.week != current_week:
+        return {"ok": False, "available": True, "reason": "locked"}
+    grouped = games.group_week_matchups(sleeper.get_matchups(league_id, body.week), profiles)
+    if games.week_phase(body.week, current_week, grouped) != "open":
+        return {"ok": False, "available": True, "reason": "locked"}
+    problem = games.pick_error(grouped, body.matchup_id, body.roster_id)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    try:
+        games.upsert_pick(
+            config,
+            str(user.get("_access_token") or ""),
+            {
+                "user_id": user_id,
+                "league_id": league_id,
+                "season": season,
+                "week": body.week,
+                "matchup_id": body.matchup_id,
+                "picked_roster_id": body.roster_id,
+                "picker_roster_id": str(my_roster.get("roster_id")),
+            },
+        )
+    except games.Unavailable:
+        return {"ok": False, "available": False, "reason": "not_available"}
+    return {"ok": True, "available": True, "reason": ""}
 
 
 @app.get("/v1/leagues/{league_id}/draft-center")

@@ -834,6 +834,124 @@ export interface PlayoffOddsResponse {
   season?: string;
 }
 
+// Games (Season Simulator + Pick'em) — GET/POST .../games/*, see
+// modules/games.py. Mirrors mobile/src/lib/api.ts.
+export interface GamesOddsRow {
+  playoff_probability: number;
+  median_final_wins: number;
+  median_final_losses: number;
+  median_seed: number;
+  clinched: boolean;
+  eliminated: boolean;
+}
+
+export interface GamesSimTeam {
+  roster_id: string;
+  team_name: string;
+  avatar_url: string | null;
+  record_label: string | null;
+  playoff_probability: number;
+  median_seed: number;
+  mine: boolean;
+}
+
+export interface GamesRosterPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  injury_status: string | null;
+  tier: string | null;
+}
+
+export interface GamesSeasonSimResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  my_roster_id?: string;
+  my_team: GamesOddsRow | null;
+  teams: GamesSimTeam[];
+  roster: GamesRosterPlayer[];
+  playoff_teams?: number;
+  current_week?: number;
+  weeks_remaining?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+}
+
+export interface GamesWhatIfResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  baseline?: GamesOddsRow;
+  scenario?: GamesOddsRow;
+  change?: {
+    playoff_probability: number;
+    median_final_wins: number;
+    median_seed: number;
+    within_noise: boolean;
+  };
+  added?: Pick<GamesRosterPlayer, "player_id" | "name" | "position" | "team">[];
+  dropped?: Pick<GamesRosterPlayer, "player_id" | "name" | "position" | "team">[];
+  factors?: { label: string; detail: string }[];
+}
+
+export interface GamesPickemTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  points: number;
+}
+
+export interface GamesPickemMatchup {
+  matchup_id: string;
+  teams: [GamesPickemTeam, GamesPickemTeam];
+  my_pick: string | null;
+  winner_roster_id: string | null;
+  correct: boolean | null;
+}
+
+export interface GamesLeaderboardRow {
+  rank: number;
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  correct: number;
+  graded: number;
+  accuracy: number;
+  mine: boolean;
+}
+
+export interface GamesPickemResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+  season?: string;
+  current_week?: number;
+  weeks?: number[];
+  week?: number;
+  phase?: "open" | "locked" | "final";
+  matchups?: GamesPickemMatchup[];
+  picked?: number;
+  correct?: number;
+  graded?: number;
+  my_roster_id?: string;
+  season_record?: { correct: number; graded: number };
+  leaderboard?: GamesLeaderboardRow[];
+  leaderboard_scope?: "league" | "you";
+}
+
+export interface GamesPickResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+}
+
 /** One give/get asset inside a trade idea's package — mirrors mobile's
  * PresentationAsset (mobile/src/lib/api.ts), the same
  * modules.compact_fantasy_assets.presentation_asset shape GET .../trade-hub
@@ -3332,6 +3450,25 @@ export const api = {
     authorizedRequest<PlayoffOddsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds?lens=${encodeURIComponent(lens)}`,
     ),
+
+  getGamesSeasonSim: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<GamesSeasonSimResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim?lens=${encodeURIComponent(lens)}`,
+    ),
+  postGamesWhatIf: (leagueId: string, body: { add: string[]; drop: string[] }, lens: string = "Dynasty") =>
+    authorizedRequest<GamesWhatIfResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim/what-if?lens=${encodeURIComponent(lens)}`,
+      { method: "POST", jsonBody: body },
+    ),
+  getGamesPickem: (leagueId: string, week?: number) =>
+    authorizedRequest<GamesPickemResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem${week ? `?week=${week}` : ""}`,
+    ),
+  postGamesPick: (leagueId: string, body: { week: number; matchup_id: string; roster_id: string }) =>
+    authorizedRequest<GamesPickResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem/pick`, {
+      method: "POST",
+      jsonBody: body,
+    }),
 
   // strategy/lens default to the same "retool"/"Dynasty" GET .../trade-hub
   // itself defaults to. `ad_unlocks` is a mobile-only reward mechanic (see
