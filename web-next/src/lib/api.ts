@@ -849,6 +849,15 @@ export interface TradeHubEntitlement {
   free_limit: number;
 }
 
+export interface TradeHubHold {
+  verdict: "hold";
+  reason: string;
+  headline: string;
+  why: { factor: string; text: string }[];
+  /** True when ideas below are still worth a look, but optional. */
+  ideas_optional: boolean;
+}
+
 export interface TradeHubResponse {
   ok: boolean;
   ideas: TradeIdea[];
@@ -862,6 +871,10 @@ export interface TradeHubResponse {
   team_strategy: string;
   /** reason === "trade_deadline_passed" carries this user-facing copy. */
   message?: string;
+  /** Honest "make no trade" answer; null when trading is the better move. */
+  hold?: TradeHubHold | null;
+  /** Plain-English line for the effective strategy. */
+  posture_sentence?: string;
   trade_window?: TradeWindow;
 }
 

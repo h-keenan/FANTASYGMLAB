@@ -725,3 +725,61 @@ def test_cached_ideas_only_pass_keeper_context_for_keeper_leagues():
         ), patch.object(trade_hub_engine, "generate_trade_idea_records", return_value=[]) as gen:
             trade_hub_engine._generate_trade_idea_records_cached("L", 1, "retool", "dynasty", "x.db", (), (), 2, 0)
         assert (gen.call_args.kwargs["keeper_context"] is not None) is keeper_mode
+
+
+# --- Hold verdict / posture sentence -------------------------------------
+
+def _card(gain=500, conf="High", impact=""):
+    return {"trade_gain": gain, "confidence_label": conf, "impact_tag": impact}
+
+
+def test_hold_none_when_a_strong_idea_exists():
+    assert trade_hub_engine.build_hold_verdict(
+        [_card(900, "High", "high_impact")], strategy="contender", power_rank=1, team_count=12
+    ) is None
+
+
+def test_hold_when_no_ideas():
+    hold = trade_hub_engine.build_hold_verdict([], strategy="retool", power_rank=5, team_count=12)
+    assert hold["verdict"] == "hold" and hold["reason"] == "no_ideas"
+    assert hold["ideas_optional"] is False
+    assert {w["factor"] for w in hold["why"]} >= {"ideas", "competition"}
+
+
+def test_hold_when_nothing_clears_quality_threshold():
+    cards = [_card(trade_hub_engine.HOLD_MIN_ACTIONABLE_TRADE_GAIN - 1, "High"), _card(900, "Low")]
+    hold = trade_hub_engine.build_hold_verdict(cards, strategy="retool")
+    assert hold["reason"] == "none_clear_bar" and hold["ideas_optional"] is True
+    assert trade_hub_engine.build_hold_verdict([_card(trade_hub_engine.HOLD_MIN_ACTIONABLE_TRADE_GAIN, "Medium")]) is None
+
+
+def test_hold_for_top_third_contender_without_high_impact_only():
+    kwargs = {"strategy": "contender", "power_rank": 3, "team_count": 12}
+    assert trade_hub_engine.build_hold_verdict([_card(500, "Medium")], **kwargs)["reason"] == "contender_no_need"
+    assert trade_hub_engine.build_hold_verdict([_card(500, "High", "high_impact")], **kwargs) is None
+    # Not a contender, or not near the top: trading stays the answer.
+    assert trade_hub_engine.build_hold_verdict([_card(500, "Medium")], strategy="rebuild", power_rank=3, team_count=12) is None
+    assert trade_hub_engine.build_hold_verdict([_card(500, "Medium")], strategy="contender", power_rank=9, team_count=12) is None
+
+
+def test_hold_small_in_season_sample():
+    kw = {"strategy": "retool", "in_season": True}
+    assert trade_hub_engine.build_hold_verdict([_card()], season_progress=0.07, **kw)["reason"] == "small_sample"
+    assert trade_hub_engine.build_hold_verdict([_card()], season_progress=0.5, **kw) is None
+    assert trade_hub_engine.build_hold_verdict([_card()], season_progress=0.0, **kw) is None
+
+
+def test_hold_trade_deadline_closed_uses_league_calendar():
+    from modules import league_calendar
+
+    league = {"status": "in_season", "settings": {"trade_deadline": 11, "leg": 12}}
+    hold = trade_hub_engine.build_hold_verdict([_card()], trade_window=league_calendar.trade_window(league))
+    assert hold["reason"] == "trade_deadline_passed" and hold["ideas_optional"] is False
+    assert "week 11" in hold["why"][0]["text"]
+
+
+def test_posture_sentence_is_plain_and_covers_every_strategy():
+    for key in ("contender", "fringe_contender", "retool", "rebuild", "tank"):
+        sentence = trade_hub_engine.posture_sentence(key)
+        assert sentence.startswith("You're") and "strategy" not in sentence.lower()
+    assert trade_hub_engine.posture_sentence("nope") == ""

@@ -878,3 +878,116 @@ def generate_trade_ideas(
         team_stance=team_stance,
     )
     return [project_trade_idea_card(idea) for idea in enforced]
+
+
+# ---------------------------------------------------------------------------
+# Hold verdict + plain-English posture (new-user guidance audit, 2026-10)
+#
+# Pure, cheap functions over already-computed inputs (the projected idea
+# cards, the declared stance, one already-cached rankings row, the league
+# payload). Nothing here runs the idea search or any valuation; a "hold"
+# is only ever built from those real inputs.
+
+# An idea "clears the bar" when it is not a low-confidence/close-call idea and
+# the value gain is at least this many points (same scale as card.trade_gain).
+HOLD_MIN_ACTIONABLE_TRADE_GAIN = 200
+# A top-third power rank counts as a team with little pressure to trade.
+HOLD_CONTENDER_TOP_FRACTION = 1 / 3
+# Below this fraction of the regular season the record is too small a sample.
+HOLD_SMALL_SAMPLE_SEASON_FRACTION = 0.15
+
+POSTURE_SENTENCES = {
+    "contender": "You're competing now, so ideas favor current value.",
+    "fringe_contender": "You're in the hunt, so ideas favor players who help soon.",
+    "retool": "You're balancing now and later, so ideas favor younger starters.",
+    "rebuild": "You're building for later, so ideas favor young players and picks.",
+    "tank": "You're building for later, so ideas lean hardest toward youth and picks.",
+}
+
+
+def posture_sentence(strategy: object) -> str:
+    """Plain-English line for the effective strategy ('' if unknown)."""
+
+    return POSTURE_SENTENCES.get(_safe_text(strategy).strip().lower(), "")
+
+
+def _idea_clears_bar(card: Mapping[str, Any]) -> bool:
+    if trade_visual_language.confidence_level(_safe_text(card.get("confidence_label"))) == "low":
+        return False
+    try:
+        return int(card.get("trade_gain") or 0) >= HOLD_MIN_ACTIONABLE_TRADE_GAIN
+    except (TypeError, ValueError):
+        return False
+
+
+def build_hold_verdict(
+    cards: list[Mapping[str, Any]],
+    *,
+    strategy: object = "",
+    power_rank: int | None = None,
+    team_count: int | None = None,
+    season_progress: float = 0.0,
+    in_season: bool = False,
+    trade_window: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Return a hold block, or None when trading is the better answer.
+
+    Reasons, in priority order: deadline passed (trading closed); no ideas;
+    no idea clears the bar; a top-third competing team with no high-impact
+    idea; too small an in-season sample. `why` lists only facts we have.
+    """
+
+    window = trade_window or {}
+    competing = _safe_text(strategy).lower() in {"contender", "fringe_contender"}
+    why: list[dict[str, str]] = []
+
+    def fact(factor: str, text: str) -> None:
+        why.append({"factor": factor, "text": text})
+
+    if window.get("trade_deadline_passed"):
+        week = window.get("trade_deadline_week")
+        fact("context", f"Your league's trade deadline was week {week}." if week else "Your league's trade deadline has passed.")
+        fact("context", "Trades reopen after the season.")
+        return {
+            "verdict": "hold",
+            "reason": "trade_deadline_passed",
+            "headline": "Trading is closed. Hold.",
+            "why": why,
+            "ideas_optional": False,
+        }
+
+    clearing = [card for card in cards if _idea_clears_bar(card)]
+    has_high_impact = any(_safe_text(card.get("impact_tag")) == "high_impact" for card in cards)
+    top_third = bool(power_rank and team_count and power_rank <= max(1, round(team_count * HOLD_CONTENDER_TOP_FRACTION)))
+
+    reason = ""
+    if not cards:
+        reason = "no_ideas"
+    elif not clearing:
+        reason = "none_clear_bar"
+    elif competing and top_third and not has_high_impact:
+        reason = "contender_no_need"
+    elif in_season and 0 < season_progress < HOLD_SMALL_SAMPLE_SEASON_FRACTION and not has_high_impact:
+        reason = "small_sample"
+    if not reason:
+        return None
+
+    if not cards:
+        fact("ideas", "No trade idea fit your roster and your league's rosters today.")
+    elif not clearing:
+        fact("ideas", "None of today's ideas is a clear win for you: each is a small gain or a long shot.")
+    elif reason == "contender_no_need":
+        fact("ideas", "No idea is a high-impact upgrade for your lineup.")
+    elif reason == "small_sample":
+        fact("context", "It's early in the season, so records and trends say little yet.")
+    if power_rank and team_count:
+        fact("competition", f"Your team ranks #{power_rank} of {team_count} for power in this league.")
+    if competing and reason in {"contender_no_need", "none_clear_bar"}:
+        fact("posture", "You're competing now, so a small gain rarely beats keeping your lineup intact.")
+    return {
+        "verdict": "hold",
+        "reason": reason,
+        "headline": "Holding is the best move right now.",
+        "why": why,
+        "ideas_optional": bool(cards),
+    }
