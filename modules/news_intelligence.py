@@ -1430,13 +1430,25 @@ def group_player_events_by_identity(
             continue
         bucket = buckets.setdefault(
             identity,
-            {"events": [], "links": {}},
+            {"events": [], "links": {}, "members": {}},
         )
         bucket["events"].append(event)
         link = str(raw.get("link") or "").strip()
         if link:
             source_key = _source_key_for_article(raw) or "unknown"
             bucket["links"].setdefault(source_key, link)
+            # Additive: per-independent-source article facts (first seen
+            # wins, same as `links`) for the external provenance contract.
+            bucket["members"].setdefault(
+                source_key,
+                {
+                    "source_key": source_key,
+                    "link": link,
+                    "feed": str(raw.get("source") or ""),
+                    "title": str(raw.get("title") or ""),
+                    "published_ts": float(raw.get("published_ts") or 0.0),
+                },
+            )
 
     results: List[Dict[str, Any]] = []
     for identity, bucket in buckets.items():
@@ -1455,6 +1467,7 @@ def group_player_events_by_identity(
                 "event": representative,
                 "source_urls": list(bucket["links"].values()),
                 "supported_claims": claims,
+                "members": list(bucket["members"].values()),
             }
         )
 
