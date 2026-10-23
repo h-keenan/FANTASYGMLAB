@@ -629,78 +629,20 @@ a {
 /* lib/playerPresentation.ts's overallRatingTint, which mirrors           */
 /* player_cards._overall_rating_tint_css's red->gold->green color-mix).   */
 /* ---------------------------------------------------------------------- */
-.ovr-gauge {
-  position: relative;
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: conic-gradient(var(--ovr-tint, var(--color-action)) calc(var(--ovr-pct, 0) * 1%), var(--color-border) 0);
-}
-.ovr-gauge::after {
-  content: "";
-  position: absolute;
-  inset: 0.3rem;
-  border-radius: 50%;
-  background: var(--color-surface-primary);
-}
-.ovr-gauge-value {
-  position: relative;
-  z-index: 1;
-  color: var(--ovr-tint, var(--color-action));
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-/* coridian_, 2026-10-18, screenshot: a row with no OVR rating (e.g. an IR
-   player) had its value/"VALUE" column shift out of alignment with rows
-   that do have a badge, since OvrGauge previously rendered nothing at all
-   instead of reserving the same space. Same width/height classes as
-   .ovr-gauge--sm/md/lg (applied alongside this one), just no visible ring
-   or number — an invisible placeholder, not a fabricated rating. */
-.ovr-gauge-placeholder {
-  display: inline-block;
-  flex: 0 0 auto;
-}
-.ovr-gauge--sm {
-  width: 1.65rem;
-  height: 1.65rem;
-}
-.ovr-gauge--sm::after {
-  inset: 0.22rem;
-}
-.ovr-gauge--sm .ovr-gauge-value {
-  font-size: 0.56rem;
-}
-.ovr-gauge--md {
-  width: 2.5rem;
-  height: 2.5rem;
-}
-.ovr-gauge--md .ovr-gauge-value {
-  font-size: 0.75rem;
-}
-.ovr-gauge--lg {
-  width: 3.25rem;
-  height: 3.25rem;
-}
-.ovr-gauge--lg .ovr-gauge-value {
-  font-size: 1rem;
-}
-
-/* Team Value ring — ports modules/my_team_ui.py's team_snapshot_html
-   (.mt-value-ring): same conic-gradient + punched-out-center ring
-   mechanism as .ovr-gauge above, a team-level percentile metric instead
-   of a per-player rating, banded red/gold/green the same way
-   modules/league_workspace_ui.py._metric_tone_band bands every other
-   ranked-row metric in this app. */
+/* The one ring: conic-gradient + punched-out center. ValueRing renders it  */
+/* for a value percentile (tone low/mid/high) and OvrGauge renders it for   */
+/* a player's overall rating (--value-ring-tone set inline from the rating  */
+/* tint). Sizes by diameter: xs 1.65rem, sm 2.5rem, md 3.25rem, lg 4.5rem.  */
+/* ---------------------------------------------------------------------- */
 .value-ring {
   position: relative;
   display: inline-grid;
+  flex: 0 0 auto;
   place-items: center;
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 50%;
-  background: conic-gradient(var(--value-ring-tone) calc(var(--value-ring-pct, 0) * 1%), var(--color-border) 0);
+  background: conic-gradient(var(--value-ring-tone, var(--color-action)) calc(var(--value-ring-pct, 0) * 1%), var(--color-border) 0);
 }
 .value-ring::after {
   content: "";
@@ -712,10 +654,11 @@ a {
 .value-ring-value {
   position: relative;
   z-index: 1;
-  color: var(--value-ring-tone);
+  color: var(--value-ring-tone, var(--color-action));
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .value-ring--low {
   --value-ring-tone: var(--color-danger);
@@ -726,17 +669,41 @@ a {
 .value-ring--high {
   --value-ring-tone: var(--color-success);
 }
-/* Smaller variant — Trade Hub's confidence/realism rings sit inline next to
-   each other on a trade card, not alone in a Team Snapshot header. */
+/* An empty slot that keeps a ring's footprint (rows with no OVR stay
+   column-aligned with rows that have one): same size classes, no ring. */
+.value-ring-placeholder {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.value-ring--xs {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+.value-ring--xs::after {
+  inset: 0.22rem;
+}
+.value-ring--xs .value-ring-value {
+  font-size: 0.56rem;
+}
 .value-ring--sm {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 .value-ring--sm::after {
   inset: 0.3rem;
 }
 .value-ring--sm .value-ring-value {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+}
+.value-ring--md {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+.value-ring--md::after {
+  inset: 0.3rem;
+}
+.value-ring--md .value-ring-value {
+  font-size: 1rem;
 }
 
 /* ---------------------------------------------------------------------- */

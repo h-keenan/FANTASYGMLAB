@@ -78,9 +78,9 @@ player half), mobile `ValueStat`/`ToneBadge`/`AccentCard` call sites.
 | Module | Where used | Props / variants |
 |---|---|---|
 | `SnapshotTile` (+ `SnapshotTileGlyph`, `formatRank`) | /dashboard, /my-team, /waivers, /draft-center, /portfolio, /founder-analytics | `label`, `value`, `tone` neutral/risk/positive/premium, `note`, `glyph`, `wrapNote` |
-| `OvrGauge` | 15 routes | The only OVR rendering. `rating` (null keeps width), `size` sm/md/lg |
-| `ValueRing` | /my-team, /trade-hub, /trade-finder, /trade-analyzer | `percent`, `tone` low/mid/high, `display`, `size` sm/md |
-| `ConfidenceMeter` (+ `confidenceLevelFor`) | /waivers, /college-scouting | 3-step bar meter |
+| `OvrGauge` | 15 routes | The only OVR rendering: a `ValueRing` tinted by rating. `rating` (null keeps width), `size` sm/md/lg |
+| `ValueRing` | /my-team, /gm-plan, every OVR gauge | The one ring. `percent`, `tone` low/mid/high or `tint`, `display`, `size` xs/sm/md/lg |
+| `ConfidenceMeter` (+ `confidenceLevelFor`) | /waivers, /college-scouting, /trade-hub, /trade-analyzer | The only confidence/realism display: 3-step bar meter (`level` overrides) |
 | `LeanBarMeter` | /trade-hub, /trade-finder, /trade-analyzer | `sendScore`, `receiveScore` |
 
 ### Headers / section titles
@@ -108,7 +108,7 @@ player half), mobile `ValueStat`/`ToneBadge`/`AccentCard` call sites.
 | `TeamAvatar` | 7 routes | `size` |
 | `PositionBadge` | 19 routes | Square colored position badge |
 | `PlayerInjuryBadge` | 14 routes | `status` (a display label); renders nothing when healthy |
-| `ToneBadge` (new) | /league-rankings, /waivers, /guess-the-player-leaderboard, /trade-history, /portfolio, /alerts | `label`, `color` (semantic token), `variant` outline/pill |
+| `ToneBadge` | status pills everywhere; `PlayerInjuryBadge` is `size="xs"` | `label`, `color` (semantic token), `size` sm/xs. Mobile: also `icon`, `solid` (NEW, tier, usage trend are ToneBadge) |
 | `VerdictCallout` (new) | /trade-history, /community | `color`, `label`, `detail` |
 | `TradeCategoryGlyph`, `NavDestinationGlyph`, `SnapshotTileGlyph`, `PremiumGlyph` | as named | Icon sets, one per domain |
 

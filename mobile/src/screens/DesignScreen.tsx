@@ -14,7 +14,6 @@ import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
 import MeterRow from '../components/ConfidenceMeter';
 import MetricCard from '../components/MetricCard';
-import NewBadge from '../components/NewBadge';
 import PickPlate from '../components/PickPlate';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
@@ -23,7 +22,6 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
-import StatStrip from '../components/StatStrip';
 import ToneBadge from '../components/ToneBadge';
 import TradeValueBar from '../components/TradeValueBar';
 import ValueStat from '../components/ValueStat';
@@ -198,16 +196,16 @@ export default function DesignScreen() {
           </Spec>
           <Spec
             styles={styles}
-            name="ToneBadge vs NewBadge vs PositionBadge"
-            path="components/ToneBadge.tsx | components/NewBadge.tsx | components/PositionBadge.tsx"
-            duplicate="Several pill dialects (ToneBadge 10pt alpha tint, PositionBadge 20pt bordered, NewBadge). Also local TradeHubScreen CategoryBadge/ImpactBadge and TierBadge/UsageTrendPill/OverallRatingBadge."
+            name="ToneBadge / PositionBadge"
+            path="components/ToneBadge.tsx | components/PositionBadge.tsx"
           >
             <View style={styles.wrap}>
               <ToneBadge label="Starter" color={colors.success} />
               <ToneBadge label="Bench" color={colors.violet} />
               <ToneBadge label="Risk" color={colors.danger} />
               <ToneBadge label="Premium" color={colors.premium} />
-              <NewBadge />
+              <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} />
+              <ToneBadge size="xs" icon="arrow-up" label="12%" color={colors.success} />
             </View>
           </Spec>
           <Spec
@@ -308,9 +306,8 @@ export default function DesignScreen() {
         <Family styles={styles} title="Stat tiles & meters" note="Tiles show a number; meters show a magnitude.">
           <Spec
             styles={styles}
-            name="DashboardStatRow vs StatStrip vs MetricCard"
-            path="components/DashboardStatRow.tsx | components/StatStrip.tsx | components/MetricCard.tsx"
-            duplicate="Three stat-tile dialects (web has StatStrip/SnapshotTile and ValueStat)."
+            name="DashboardStatRow / MetricCard"
+            path="components/DashboardStatRow.tsx | components/MetricCard.tsx"
           >
             <DashboardStatRow
               items={[
@@ -320,20 +317,19 @@ export default function DesignScreen() {
                 { label: 'Avg Age', icon: 'time-outline', value: '26.4' },
               ]}
             />
-            <StatStrip
+            <DashboardStatRow
               items={[
-                { label: 'Starters', value: '#3', tone: 'positive' },
-                { label: 'Bench', value: '#9' },
-                { label: 'Injuries', value: '2', tone: 'risk' },
+                { label: 'Starters', icon: 'people-outline', value: '#3', tone: 'positive' },
+                { label: 'Bench', icon: 'albums-outline', value: '#9' },
+                { label: 'Injuries', icon: 'medkit-outline', value: '2', tone: 'risk' },
               ]}
             />
             <MetricCard label="Record" value="8-4" note="Second best in the league" />
           </Spec>
           <Spec
             styles={styles}
-            name="MeterRow vs CircularProgressRing"
+            name="MeterRow / CircularProgressRing"
             path="components/ConfidenceMeter.tsx | components/CircularProgressRing.tsx"
-            duplicate="Confidence drawn as a segment meter and as a ring."
           >
             <MeterRow label="Confidence" value="High" level={3} color={colors.success} />
             <MeterRow label="Confidence" value="Low" level={1} color={colors.danger} />

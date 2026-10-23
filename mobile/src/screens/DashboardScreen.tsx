@@ -21,7 +21,6 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
-import NewBadge from '../components/NewBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
@@ -925,7 +924,7 @@ function TopPriorityTradeCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</AppText>
-        {isNew ? <NewBadge /> : null}
+        {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
         <View style={styles.tradeBadge}>
           <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
           <AppText style={styles.tradeBadgeText}>TRADE</AppText>
@@ -1033,7 +1032,7 @@ function BriefingCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>
-        {isNew ? <NewBadge /> : null}
+        {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
         {/* Real signal for why this tile leads the priority ladder (roster
             need > injury pressure > future risk > upgrade opportunity) —
             not a fabricated confidence score, since that ladder is a strict

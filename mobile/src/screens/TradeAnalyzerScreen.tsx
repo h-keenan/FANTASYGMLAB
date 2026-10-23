@@ -25,7 +25,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import CircularProgressRing from '../components/CircularProgressRing';
+import MeterRow from '../components/ConfidenceMeter';
 import TeamAvatar from '../components/TeamAvatar';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -812,16 +812,13 @@ function VerdictCard({
           remaining width beside the ring before. */}
       <View style={styles.verdictHeroRow}>
         <TradeValueHero delta={verdict.value_delta} size="lg" style={styles.verdictValueHero} />
-        <View style={styles.verdictRingGroup}>
-          <CircularProgressRing
-            percent={confidencePercent(verdict.confidence)}
-            size={64}
-            strokeWidth={6}
+        <View style={styles.verdictMeter}>
+          <MeterRow
+            label="CONFIDENCE"
+            value={verdict.confidence}
+            level={confidencePercent(verdict.confidence) >= 80 ? 3 : confidencePercent(verdict.confidence) >= 50 ? 2 : 1}
             color={toneColor}
           />
-          <AppText style={styles.verdictRingCaption} numberOfLines={1}>
-            {verdict.confidence}
-          </AppText>
         </View>
       </View>
       {/* Same "who's winning" shape-reinforcement TradeValueBar gives Trade
@@ -1103,13 +1100,7 @@ function createStyles(colors: ThemeColors) {
   },
   verdictValueHero: { flex: 1 },
   verdictValueBar: { marginBottom: spacing.md },
-  verdictRingGroup: { alignItems: 'center', gap: 4 },
-  verdictRingCaption: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'capitalize',
-  },
+  verdictMeter: { flexShrink: 0 },
   verdictSection: { marginTop: spacing.sm },
   verdictSectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
   verdictLabel: {

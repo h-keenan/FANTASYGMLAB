@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import CompactPlayerModule from './CompactPlayerModule';
-import NewBadge from './NewBadge';
+import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -88,7 +88,7 @@ export default function PlayerInsightRow({
             <AppText style={[styles.label, { color }]} numberOfLines={1}>
               {label.toUpperCase()}
             </AppText>
-            {isNew ? <NewBadge /> : null}
+            {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
           </View>
         ) : null}
         {headline ? (

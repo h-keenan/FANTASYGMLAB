@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { ToneBadge } from "@/components/ToneBadge";
 import { injuryAbbreviation, injuryTone } from "@/lib/myTeamPresentation";
 
 /**
@@ -24,27 +25,15 @@ export function PlayerInjuryBadge({ status }: { status: string | null | undefine
   const tone = injuryTone(label);
   const color =
     tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)";
-  const background =
-    tone === "danger"
-      ? "var(--color-danger-soft)"
-      : tone === "warning"
-        ? "var(--color-warning-soft)"
-        : "var(--color-surface-muted)";
   return (
-    <span
-      data-testid="player-injury-badge"
+    <ToneBadge
+      testId="player-injury-badge"
       title={label}
-      className="inline-flex items-center px-1.5 text-[0.625rem] leading-4 font-extrabold uppercase shrink-0 whitespace-nowrap"
-      style={{
-        color,
-        background,
-        borderRadius: "var(--radius-pill)",
-        letterSpacing: "var(--letter-spacing-badge)",
-      }}
-    >
-      <span aria-hidden="true">{injuryAbbreviation(label)}</span>
-      <span className="sr-only">{label}</span>
-    </span>
+      size="xs"
+      color={color}
+      label={injuryAbbreviation(label)}
+      srLabel={label}
+    />
   );
 }
 
