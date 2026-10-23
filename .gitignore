@@ -100,3 +100,4 @@ settings.local.json
 
 # Cross-process refresh lock for data/sleeper_players.json (modules/sleeper.py)
 data/*.lock
+data/news_value_events.json

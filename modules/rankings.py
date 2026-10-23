@@ -3928,6 +3928,12 @@ def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
     work["score"] = composite.clip(lower=0).round().astype(int)
     work["age_penalty"] = (age_curve - market).round().astype(int)
     work["news_factor"] = 0.0
+    # Structured news-value events (env DYNASTYGM_NEWS_VALUE_EVENTS, default off).
+    # Single central hook: every consumer reads this score, so no per-page logic.
+    from modules import news_value_events
+
+    if news_value_events.is_enabled():
+        work = news_value_events.apply_to_frame(work)
     work["dynasty_score"] = work["score"]
     work["value_score"] = work["score"]
     return work
@@ -3988,7 +3994,8 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
         df[column] = production_df[column]
     df = apply_injury_risk_fields(df)
     df = compose_composite_score(df)
-    df["news_factor"] = 0.0
+    if "news_factor" not in df.columns:
+        df["news_factor"] = 0.0
     df["valuation_blend"] = (
         df["valuation_blend"].astype(str) + " + production/usage + depth opportunity"
     )
@@ -4090,7 +4097,8 @@ def hydrate_reconciled_valuations_from_cache(
         work[column] = production_df[column]
     work = apply_injury_risk_fields(work)
     work = compose_composite_score(work)
-    work["news_factor"] = 0.0
+    if "news_factor" not in work.columns:
+        work["news_factor"] = 0.0
     work["valuation_blend"] = (
         work["valuation_blend"].astype(str) + " + production/usage + depth opportunity"
     )
