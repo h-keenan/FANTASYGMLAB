@@ -1,3 +1,5 @@
+> **Historical / partly obsolete (2026-10):** this document describes the retired Streamlit web app (`app.py`, `streamlit run`, `/_stcore/health`, `st.session_state`), which has been removed. The production web app is `web-next/` (Next.js) on the FastAPI services. See [`streamlit-removal-2026-10.md`](streamlit-removal-2026-10.md). Streamlit-specific details below are no longer current.
+
 # Post-436 release stabilization
 
 Base: `165a2ac239c8cb32fa7c484b9fb9da3c2e030722` (latest origin/main after #436 merged).

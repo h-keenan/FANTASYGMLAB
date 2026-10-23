@@ -108,13 +108,4 @@ describe("DraftCenterContent", () => {
 
     expect(screen.getByText(/don't appear to have a roster/)).toBeInTheDocument();
   });
-
-  it("links out to the classic Draft Center for the live draft board and scouting", () => {
-    render(
-      <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />,
-    );
-
-    const link = screen.getByText("Open classic Draft Center").closest("a");
-    expect(link).toHaveAttribute("href", expect.stringContaining("page=draft_summary"));
-  });
 });

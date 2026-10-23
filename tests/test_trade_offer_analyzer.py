@@ -7,8 +7,6 @@ from pathlib import Path
 
 from modules import session_integrity
 from modules import trade_offer_analyzer as toa
-from modules.app_styles import APP_CSS
-from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 from modules.ui_architecture import current_platform_destinations
 
 
@@ -303,24 +301,6 @@ def test_logout_clears_trade_analyzer_package():
     assert state["keep"] == 1
 
 
-def test_trade_analyzer_css_not_in_app_css():
-    assert "toa-share-card" not in APP_CSS
-    assert "toa-share-card" in TRADE_ANALYZER_CSS
-    assert len(APP_CSS) < 393_000
-
-
-def test_app_uses_analyze_cta_and_no_idea_generator():
-    source = Path("app.py").read_text(encoding="utf-8")
-    start = source.index('if current_page == "trade_analyzer":')
-    end = source.index('if current_page == "premium":')
-    block = source[start:end]
-    assert "Analyze Trade" in block
-    assert "Evaluate an offer you received" in block
-    assert "Find me trades" not in block
-    assert "Trade Finder" not in block
-    assert "trade_offer_analyzer" in block
-
-
 def test_strategy_aware_verdict_uses_fit_components():
     rebuildish = toa.decide_offer_verdict(
         _fit(
@@ -340,18 +320,6 @@ def test_module_has_no_news_mutation_hooks():
     assert "mutate_news" not in calls
     source = Path("modules/trade_offer_analyzer.py").read_text(encoding="utf-8")
     assert "news" not in source.casefold() or "do not" in source.casefold()
-
-
-def test_add_asset_does_not_assign_search_widget_keys_inline():
-    """Live production: assigning widget keys after text_input raises StreamlitAPIException."""
-    ui = Path("modules/trade_analyzer_ui.py").read_text(encoding="utf-8")
-    assert 'st.session_state["trade_send_search_query"] = ""' not in ui
-    assert 'st.session_state["trade_receive_search_query"] = ""' not in ui
-    text_input_at = ui.index("st.text_input(")
-    add_at = ui.index('key=f"toa_add_{side}_{token}"')
-    assert text_input_at < add_at
-    assert "st.rerun(" not in ui
-    assert 'st.session_state[package_key].append(asset)' not in ui
 
 
 def test_trade_analyzer_package_clear_includes_search_reset_flags():

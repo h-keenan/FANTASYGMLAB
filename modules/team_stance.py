@@ -205,14 +205,7 @@ def _resolve_config(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if isinstance(config, Mapping) and config:
         return dict(config)
     try:
-        secrets = None
-        try:
-            import streamlit as st
-
-            secrets = st.secrets
-        except Exception:
-            secrets = None
-        return auth_supabase.get_supabase_config(secrets=secrets)
+        return auth_supabase.get_supabase_config()
     except Exception:
         return {}
 

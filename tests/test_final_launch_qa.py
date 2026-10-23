@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from modules import auth_supabase, guest_conversion, launch_analytics, premium_conversion
+from modules import auth_supabase, launch_analytics, premium_conversion
 from modules import session_integrity
 from modules.ui_architecture import (
     ARCHIVED_DESTINATION_KEYS,
@@ -48,59 +48,6 @@ def test_experiment_defaults_on_and_archived_hidden():
     }
     assert "live_draft" in conditional
     assert "gm_targets" in conditional
-
-
-def test_startup_and_espn_quick_actions_exclude_dead_routes():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert '("News", "news")' not in app
-    assert '("Players", "players")' not in app
-    # Startup draft path uses launch-safe CORE destinations.
-    startup_block = app[
-        app.index("Run Startup Draft Center") : app.index("ESPN limited review mode")
-    ]
-    assert '("Startup Draft Center", "startup_draft_center")' in startup_block
-    assert '("Dashboard", "dashboard")' in startup_block
-    assert '("League Rankings", "rankings")' in startup_block
-    espn_block = app[
-        app.index("ESPN limited review mode") : app.index(
-            "if not username or not selected_league_id:"
-        )
-    ]
-    assert '("Dashboard", "dashboard")' in espn_block
-    assert '("Premium", "premium")' in espn_block
-
-
-def test_open_player_detail_handoff_and_canonical_cta():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    start = app.index("def open_player_detail(")
-    end = app.index("\ndef ", start + 1)
-    body = app[start:end]
-    assert "open_player_quick_view(" in body
-    assert '_queue_platform_route("player_detail")' not in body
-    assert '"Unlock with Premium"' not in app
-    assert "Upgrade to Premium" in (ROOT / "modules" / "premium_conversion.py").read_text(
-        encoding="utf-8"
-    )
-
-
-def test_track_premium_event_normalizes_aliases(monkeypatch):
-    seen: list[str] = []
-
-    def _track(event, **_kwargs):
-        seen.append(event)
-        return True
-
-    monkeypatch.setattr(launch_analytics, "track_event", _track)
-    monkeypatch.setattr(
-        launch_analytics,
-        "build_context_props",
-        lambda *_a, **_k: {"route": "premium"},
-    )
-    with patch.object(premium_conversion, "st") as st_mod:
-        st_mod.session_state = {}
-        premium_conversion.track_premium_event("premium_checkout_started")
-        premium_conversion.track_premium_event("premium_checkout_completed")
-    assert seen == ["checkout_started", "checkout_completed"]
 
 
 def test_logout_clears_premium_checkout_intent():
@@ -147,46 +94,3 @@ def test_analytics_blocks_pii_and_strips_unknown_stripe_props():
     assert "checkout_session_id" not in cleaned
     assert cleaned.get("route") == "premium"
     assert cleaned.get("item_kind") == "trade_depth"
-
-
-def test_create_checkout_session_only_after_explicit_plan_cta():
-    page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
-    assert "premium_create_test_checkout" not in page
-    assert "Continue to checkout" not in page
-    assert page.index('key=f"premium_choose_{plan_interval}"') < page.index("create_checkout_session")
-    assert page.count("st.rerun()") == 1
-
-
-def test_waivers_faab_sort_guards_missing_score_column():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "if score_field in faab_pool.columns:" in app
-    assert "faab_pool.sort_values(score_field" in app
-
-
-def test_guest_soft_prompt_surfaces_and_free_language():
-    assert set(guest_conversion.SURFACE_REASONS) >= {
-        "dashboard",
-        "my_team",
-        "trade_hub",
-        "waivers",
-        "pqv",
-    }
-    blob = " ".join(guest_conversion.FREE_ACCOUNT_BENEFITS).casefold()
-    assert "premium" not in blob
-
-
-def test_no_concept_chip_in_styles_or_my_team():
-    styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    my_team = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
-    assert ".concept-chip" not in styles
-    assert "concept-chip" not in my_team
-
-
-def test_premium_included_now_includes_graduated_premium_depth():
-    page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
-    included = page[
-        page.index("PREMIUM_INCLUDED_NOW") : page.index("PREMIUM_EXPERIMENTAL_WHEN_ENABLED")
-    ]
-    assert "Decision Memory" in included
-    assert "GM Targets (full board)" in included
-    assert "Share Recommendation" not in included

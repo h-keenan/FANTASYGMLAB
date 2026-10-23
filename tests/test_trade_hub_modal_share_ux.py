@@ -10,8 +10,7 @@ import pytest
 from modules import recommendation_trust_ux
 from modules import share_card_renderer
 from modules import share_recommendation_cards as share
-from modules import trade_hub_ui
-from modules.trade_detail_styles import TRADE_DETAIL_CSS
+from modules import trade_hub_presentation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,91 +41,6 @@ def _asset_kwargs(**overrides):
     return payload
 
 
-def test_modal_hierarchy_is_package_verdict_reason_share_then_secondary():
-    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    dialog = source[
-        source.index("def _trade_detail_dialog()") : source.index(
-            'with performance.time_block("trade_hub_detail_modal"'
-        )
-    ]
-    package = dialog.index("trade-matchup-compact")
-    verdict = dialog.index("executive_trade_detail_html(")
-    useful = dialog.index("trade_review_first_useful")
-    share_at = dialog.index("render_share_controls")
-    actions = dialog.index("render_detail_actions")
-    assert package < verdict < useful < share_at < actions
-    assert "Load supporting metrics" not in dialog
-    assert "TRADE_HUB_SHARE_LABEL" in dialog
-    assert "compact_assets_html" in dialog
-    assert "trade-card-net-strip" not in dialog
-    assert 'expander("Inspect players"' not in source
-    assert "Tap a player in the package to inspect" in source
-    assert dialog.count("render_share_controls(") == 1
-    assert dialog.count("build_trade_share_card(") == 1
-    assert 'source_surface="trade_review"' in dialog
-    assert "build_trade_share_card(\n                        idea," in dialog
-
-
-def test_share_control_is_explicitly_framed_as_the_real_action():
-    # Recommendation-clarity audit (UI_V2_ARCHITECTURE_RESET.md): Trade Hub has
-    # no in-app trade-submission API, so sharing the branded card is the real,
-    # working way a user acts on a recommendation here. That must be stated
-    # explicitly next to the control, not left implicit in a plain button
-    # label, mirroring the mobile Trade Hub clarity fix (PR #758).
-    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    dialog = source[
-        source.index("def _trade_detail_dialog()") : source.index(
-            'with performance.time_block("trade_hub_detail_modal"'
-        )
-    ]
-    caption_at = dialog.index("There's no in-app trade submission here")
-    share_at = dialog.index("render_share_controls")
-    assert caption_at < share_at
-    assert "how you actually send the offer" in dialog
-
-
-def test_compact_modal_assets_drop_redundant_role_chips():
-    html = trade_hub_ui.trade_asset_html(
-        {
-            "asset_type": "player",
-            "player_id": "p1",
-            "label": "Pat Bryant",
-            "position": "WR",
-            "team": "DEN",
-            "age": 24,
-            "score": 3740,
-            "role": "Flex",
-            "player_tier": "Contributor",
-            "opportunity_label": "Backup With Upside",
-        },
-        compact=True,
-        **_asset_kwargs(),
-    )
-    assert "Pat Bryant" in html
-    assert "WR" in html
-    assert "DEN" in html
-    assert "trade-asset-row-compact" in html
-    assert ">Flex<" not in html
-    assert ">Contributor<" not in html
-    assert "Backup With Upside" not in html
-    full = trade_hub_ui.trade_asset_html(
-        {
-            "asset_type": "player",
-            "player_id": "p1",
-            "label": "Pat Bryant",
-            "position": "WR",
-            "team": "DEN",
-            "age": 24,
-            "score": 3740,
-            "role": "Flex",
-            "opportunity_label": "Backup With Upside",
-        },
-        compact=False,
-        **_asset_kwargs(),
-    )
-    assert "Backup With Upside" in full or "Flex" in full
-
-
 def test_verdict_is_one_compact_line_and_reason_is_primary():
     html = recommendation_trust_ux.executive_trade_detail_html(
         {
@@ -149,41 +63,6 @@ def test_verdict_is_one_compact_line_and_reason_is_primary():
     assert "Partner has RB surplus." not in html
 
 
-def test_modal_css_keeps_phone_matchup_and_desktop_width():
-    assert "overflow-x: clip" in TRADE_DETAIL_CSS
-    assert "@media (max-width: 700px)" in TRADE_DETAIL_CSS
-    assert "flex-direction: column" in TRADE_DETAIL_CSS
-    assert "@media (min-width: 1280px)" in TRADE_DETAIL_CSS
-    assert "@media (min-width: 1440px)" in TRADE_DETAIL_CSS
-    assert "minmax(0, 1fr) 3rem minmax(0, 1fr)" in TRADE_DETAIL_CSS
-    from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
-
-    assert ':has(.trade-detail-modal, .player-quick-view-shell)' in DECISION_SURFACE_DIALOG_CSS
-    # Width is parent-relative (100%), not viewport-relative (100dvw): the
-    # dialog's own flow parent already caps itself to calc(100% - 32px) of
-    # the viewport, so a dvw-based width here overflows that parent by its
-    # own side margins. Also pin the role=dialog selector itself as
-    # tag-agnostic -- Streamlit renders the dialog landmark as
-    # <section role="dialog">, not <div role="dialog">; a tag-qualified
-    # selector here silently never matches in production.
-    assert 'div[data-testid="stDialog"] [role="dialog"]' in DECISION_SURFACE_DIALOG_CSS
-    assert 'div[role="dialog"]' not in DECISION_SURFACE_DIALOG_CSS
-    assert "width: 100% !important;" in DECISION_SURFACE_DIALOG_CSS
-    assert "grid-template-columns: auto auto minmax(9rem, 1fr) auto" in TRADE_DETAIL_CSS
-    assert ".tvl-edge-mark" in TRADE_DETAIL_CSS and "width: 100%" in TRADE_DETAIL_CSS
-
-
-def test_mobile_summary_stacks_package_instead_of_two_column_assets():
-    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    assert ":has(> .dg-compact-asset:nth-child(3)):not(:has(> " not in css
-    mobile = css[css.index("@container trade-summary (max-width: 430px)") :]
-    assert "grid-template-columns: minmax(0, 1fr);" in mobile.split(".trade-summary-package", 1)[1][:220]
-    assert ".trade-summary-assets .dg-compact-asset-stack { display: flex; flex-direction: column;" in mobile
-    compare = css.split("@container trade-summary (min-width: 700px)", 1)[1]
-    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)" in compare.split(".trade-summary-package", 1)[1][:280]
-    assert "--size-asset-standard:var(--size-asset-compact)" in css.replace(" ", "")
-
-
 @pytest.mark.parametrize("delta", ("-991", "-160", "Even", "+160", "+991"))
 def test_review_balance_indicator_preserves_accessible_signed_value(delta):
     html = recommendation_trust_ux.executive_trade_detail_html(
@@ -197,13 +76,6 @@ def test_review_balance_indicator_preserves_accessible_signed_value(delta):
     assert "tvl-edge-mark" in html
     expected = "Even" if delta == "Even" else delta
     assert expected in html
-
-
-def test_share_trade_idea_label_is_trade_hub_only():
-    assert share.TRADE_HUB_SHARE_LABEL == "Share Trade Idea"
-    assert share.FEATURE_LABEL == "Share Recommendation"
-    ui = (ROOT / "modules" / "share_recommendation_ui.py").read_text(encoding="utf-8")
-    assert "button_label" in ui
 
 
 def _example_trade_card():

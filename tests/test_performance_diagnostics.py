@@ -1,7 +1,6 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import app
 from modules import performance, sleeper
 
 
@@ -61,46 +60,6 @@ def test_sleeper_api_calls_are_timed_without_ids_in_labels():
         assert label in source
     assert "_request_json(" in source
     assert "performance.time_block(label, category=\"sleeper\")" in source
-
-
-def test_cached_public_data_load_has_single_entry_point():
-    source = Path("app.py").read_text(encoding="utf-8")
-    assert "public_player_data_load" in source
-    assert "ensure_players(" in source
-    assert "ensure_players_for_startup" in source
-    assert "build_players_table_fn=players_refresh_flight.build_players_table_out_of_process" in source
-    assert "load_players_fn=load_players" in source
-
-
-def test_gm_feedback_and_quick_view_do_not_call_heavy_builders_directly():
-    source = Path("app.py").read_text(encoding="utf-8")
-    gm_start = source.index("def render_mobile_navigation_shell")
-    gm_end = source.index("def _render_premium_entitlement_diagnostics")
-    feedback_start = source.index("def render_global_feedback_entry")
-    feedback_end = source.index("free_agent_priority_badge =")
-    gm_source = source[gm_start:gm_end]
-    feedback_source = source[feedback_start:feedback_end]
-    quick_view_start = source.index("def render_player_quick_view_modal")
-    quick_view_end = source.index("def render_structured_decision_cards")
-    quick_view_source = source[quick_view_start:quick_view_end]
-
-    for heavy_call in ("build_trade_ideas(", "build_league_summary(", "cached_trade_ideas("):
-        assert heavy_call not in gm_source
-        assert heavy_call not in feedback_source
-        assert heavy_call not in quick_view_source
-
-
-def test_app_records_route_level_and_expensive_builder_timings():
-    source = Path("app.py").read_text(encoding="utf-8")
-    for label in (
-        "app_rerun_total_",
-        "shared_league_context_generation",
-        "trade_hub_board_generation",
-        "my_team_advice_generation",
-        "player_quick_view_render",
-        "draft_pick_assets_generation",
-    ):
-        assert label in source
 
 
 def test_live_draft_polling_has_isolated_timing():

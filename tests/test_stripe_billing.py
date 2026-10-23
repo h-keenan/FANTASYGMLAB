@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from pathlib import Path
 
 from modules import premium
-from modules import premium_page
+from modules import premium_benefits
 from modules import stripe_billing
 from modules import stripe_webhook
 from services import stripe_webhook_service
@@ -867,42 +867,6 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(second, (True, ""))
         self.assertEqual(session.patch.call_count, 2)
 
-    def test_premium_page_copy_separates_now_and_future_without_guarantee(self):
-        html = premium_page.premium_page_html(entitlement=premium.FREE)
-
-        self.assertIn("Included now with Premium", html)
-        self.assertIn("Possible future features", html)
-        self.assertIn("not guaranteed", html)
-        self.assertIn("Premium checkout will appear here once billing is enabled", html)
-        self.assertNotIn("Subscribe now", html)
-
-    def test_premium_page_shows_test_mode_copy_when_configured(self):
-        html = premium_page.premium_page_html(
-            entitlement=premium.FREE,
-            billing_config=stripe_billing.StripeBillingConfig(
-                secret_key="sk_test_123",
-                price_monthly="price_month",
-                price_annual="price_year",
-            ),
-        )
-
-        self.assertIn("Secure Premium checkout uses Stripe test mode", html)
-        self.assertIn("no live charge will be made", html.casefold())
-
-    def test_premium_page_shows_recurring_live_billing_contract(self):
-        html = premium_page.premium_page_html(
-            entitlement=premium.FREE,
-            billing_config=stripe_billing.StripeBillingConfig(
-                billing_mode="live",
-                secret_key="sk_live_123",
-                price_monthly="price_month",
-                price_annual="price_year",
-            ),
-        )
-
-        self.assertIn("Secure recurring Premium checkout", html)
-        self.assertIn("renewal or cancellation", html)
-        self.assertNotIn("no live charge", html.casefold())
 
     def test_webhook_health_endpoint(self):
         self.assertEqual(stripe_webhook_service.health(), {"status": "ok"})

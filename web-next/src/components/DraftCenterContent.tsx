@@ -7,7 +7,6 @@ import type { DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
 import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
   POSTURE_REASON_MESSAGE,
   groupPicksBySeason,
@@ -20,14 +19,8 @@ import { ValuesCredit } from "@/components/ValuesCredit";
  * Ports mobile's DraftCenterScreen.tsx (the GM_TOOLS "Draft Center" nav
  * destination) for Revision 14 — same two endpoints, same scope: your own
  * draft posture, pick values with a My Picks/League toggle, and the
- * league-wide decision/partner cards. Streamlit's Draft Center has three
- * more panes (Current Draft/History — a live draft board with manual pick
- * overrides, PR #1015 — and Scouting); none of those have a mobile
- * reference implementation or a backing endpoint (see GET
- * .../draft-center's own docstring), so inventing them here would be
- * guessed scope, not a thin wrapper over something real. They stay on the
- * classic page via the deep link at the bottom of this one, same
- * "not yet ported" contract LeagueRecapsContent.tsx's Storylines tab uses.
+ * league-wide decision/partner cards. The live draft board lives on the
+ * Live Draft page and prospect scouting on College Scouting.
  */
 export function DraftCenterContent({
   leagueName,
@@ -170,23 +163,6 @@ export function DraftCenterContent({
       <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} />
       <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} />
 
-      <section className="flex flex-col gap-2" aria-labelledby="classic-draft-heading">
-        <SectionHeading id="classic-draft-heading">
-          More Draft Tools
-        </SectionHeading>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Live board, draft history and scouting are on the classic page.
-        </p>
-        <a
-          href={streamlitPageUrl("draft_summary")}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="self-start text-xs font-bold uppercase px-3 py-2"
-          style={{ background: "var(--color-accent)", color: "var(--color-bg)", letterSpacing: "var(--letter-spacing-badge)" }}
-        >
-          Open classic Draft Center
-        </a>
-      </section>
       <ValuesCredit />
     </main>
   );

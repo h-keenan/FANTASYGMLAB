@@ -49,29 +49,3 @@ def test_og_brand_asset_updated_with_positioning():
     assert path.exists()
     with Image.open(path) as image:
         assert image.size == (1200, 630)
-
-
-def test_authenticated_app_does_not_reference_launch_assets():
-    """Performance guard: launch kit must not enter Streamlit protobuf path."""
-    forbidden = "assets/marketing/launch"
-    for rel in (
-        "app.py",
-        "modules/marketing_landing.py",
-        "modules/application_shell.py",
-        "modules/startup_coordinator.py",
-        "modules/brand_identity.py",
-    ):
-        text = (ROOT / rel).read_text(encoding="utf-8")
-        assert forbidden not in text, rel
-
-
-def test_marketing_landing_asset_dir_stays_legacy_folder():
-    source = (ROOT / "modules" / "marketing_landing.py").read_text(encoding="utf-8")
-    assert "MARKETING_ASSET_DIR" in source
-    assert ' / "marketing"' in source
-    assert ' / "launch"' not in source
-
-
-def test_generator_script_exists():
-    assert (ROOT / "scripts" / "generate_launch_marketing_assets.py").exists()
-    assert (ROOT / "scripts" / "capture_launch_screenshots.py").exists()

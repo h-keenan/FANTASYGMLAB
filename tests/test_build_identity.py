@@ -1,5 +1,4 @@
 from modules.build_identity import BuildIdentity, resolve_build_identity
-from modules.interface_reimagining_styles import INTERFACE_REIMAGINING_CSS
 
 
 def test_render_git_identity_is_authoritative_and_shortened():
@@ -41,9 +40,3 @@ def test_identity_sanitizes_untrusted_environment_labels():
     assert ">" not in identity.label
     assert identity.revision == "release-script-alert-1-/script"
     assert identity.branch == "feature/-unsafe"
-
-
-def test_build_identity_has_token_backed_nonintrusive_footer_style():
-    assert ".dg-build-identity" in INTERFACE_REIMAGINING_CSS
-    assert "var(--color-text-muted)" in INTERFACE_REIMAGINING_CSS
-    assert "font-size: var(--font-size-badge)" in INTERFACE_REIMAGINING_CSS

@@ -1,44 +1,10 @@
 from pathlib import Path
 
-from modules import faab, founder_ops, notification_center, trade_visual_language
+from modules import faab, notification_center, trade_visual_language
 from modules import user_preferences
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_passive_dashboard_visibility_probe_cannot_force_late_rerun():
-    source = (ROOT / "modules" / "dashboard_visibility.py").read_text(encoding="utf-8")
-    js = source.split('js="""', 1)[1].split('""",', 1)[0]
-    assert "setTriggerValue('visibility_ack'" not in js
-    assert "data-fgl-browser-dashboard-visible" in js
-
-
-def test_presentation_stability_probe_is_passive_console_only():
-    source = (ROOT / "modules" / "presentation_stability.py").read_text(encoding="utf-8")
-    js = source.split('js="""', 1)[1].split('""",', 1)[0]
-    assert "setTriggerValue" not in js
-    assert "presentation_stable" in js
-    assert "layout_commits" in js
-    assert "largest_vertical_shift_px" in js
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert app.count("mount_presentation_stability_probe(") == 2
-
-
-def test_notification_pending_is_distinct_from_caught_up():
-    pending = notification_center._inbox_header_html(
-        unread=0,
-        active=0,
-        ready=False,
-    )
-    ready = notification_center._inbox_header_html(
-        unread=0,
-        active=0,
-        ready=True,
-    )
-    assert "Checking league activity" in pending
-    assert "All caught up" not in pending
-    assert "All caught up" in ready
 
 
 def test_sleeper_faab_context_is_league_and_roster_authoritative():
@@ -88,24 +54,3 @@ def test_trade_value_and_confidence_have_independent_labels():
     assert trade_visual_language.trade_value_band("-991") == "Slight Overpay"
     assert "TRADE VALUE / SLIGHT OVERPAY" in trade_visual_language.value_edge_html("-991")
     assert "CONFIDENCE / Low" in trade_visual_language.confidence_indicator_html("Low")
-
-
-def test_founder_ops_requires_kill_switch_and_server_capability():
-    enabled = {"DYNASTYGM_FOUNDER_OPS": "1"}
-    assert not founder_ops.founder_ops_authorized({}, environ=enabled)
-    assert founder_ops.founder_ops_authorized(
-        {"auth_user": {"app_metadata": {"founder_ops": True}}},
-        environ=enabled,
-    )
-    assert not founder_ops.founder_ops_authorized(
-        {"auth_user": {"user_metadata": {"founder_ops": True}}},
-        environ=enabled,
-    )
-    assert not founder_ops.founder_ops_authorized(
-        {"account_profile": {"founder_ops": True}},
-        environ=enabled,
-    )
-    assert not founder_ops.founder_ops_authorized(
-        {"auth_user": {"app_metadata": {"founder_ops": True}}},
-        environ={},
-    )

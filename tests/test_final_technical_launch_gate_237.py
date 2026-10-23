@@ -7,14 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from modules import (
-    experimental_graduation,
-    game_plan_process_cache,
-    mobile_interaction_overlay_styles,
-    mobile_visual_polish_styles,
-    tail_latency_diagnostics,
-)
-from modules.app_styles import APP_CSS
+from modules import experimental_graduation, game_plan_process_cache, tail_latency_diagnostics
 from modules.brand_identity import GM_ORB_ARIA_LABEL
 from scripts import verify_package_miss_path
 
@@ -39,13 +32,6 @@ def test_gate_doc_records_verdict_fields():
     assert "package-MISS" in text or "package MISS" in text
     assert "protobuf" in text.casefold()
     assert "PRODUCTION" in text or "production" in text
-
-
-def test_protobuf_headroom_contract():
-    # Hard ceiling must remain; preferred headroom is asserted via measured budget.
-    assert PROTOBUF_PREFERRED < PROTOBUF_HARD
-    assert len(APP_CSS) < 393_000  # CSS headroom recovery after #258
-    assert "home-quick-actions-shell {" not in APP_CSS
 
 
 def test_startup_summary_owner_stage_not_tiny_auth_apply(monkeypatch):
@@ -99,33 +85,6 @@ def test_experiment_defaults_unchanged():
         )
         is False
     )
-
-
-def test_deep_analysis_236_regression_still_fixed():
-    source = (ROOT / "modules" / "workspace_ui.py").read_text(encoding="utf-8")
-    block = source.split("def render_home_quick_actions", 1)[1].split("\ndef ", 1)[0]
-    assert "home-quick-actions-shell" not in block
-    assert "dg_cta_secondary_deep_" in block
-    polish = mobile_visual_polish_styles.MOBILE_VISUAL_POLISH_CSS
-    assert "dashboard_deep_analysis_nav" in polish
-    assert "min-width:0!important" in polish.replace(" ", "")
-
-
-def test_gm_orb_regression_still_fixed():
-    overlay = mobile_interaction_overlay_styles.MOBILE_INTERACTION_OVERLAY_CSS
-    assert "border-radius: 50%" in overlay
-    assert ' [data-testid="stButton"] button' in overlay
-    assert GM_ORB_ARIA_LABEL == "Open GM menu"
-
-
-def test_no_new_provider_or_rerun_architecture_regression():
-    from scripts.audit_founder_beta_performance import inventory
-
-    inv = inventory()
-    # Trade Analyzer add/remove must rerun so chips paint after mutation.
-    assert inv["explicit_rerun_count"] <= 63
-    assert inv["deferred_gate_count"] >= 4
-    assert inv["reduced_context_call_count"] >= 4
 
 
 def test_summary_excludes_pii_keys(monkeypatch, capsys):

@@ -85,12 +85,14 @@ def _current_memory_mb() -> float | None:
 
 
 def _session_state():
-    try:
-        import streamlit as st
+    """Per-browser-session store for timings.
 
-        return st.session_state
-    except Exception:
-        return None
+    The only session store was the retired Streamlit app's ``st.session_state``;
+    the API services are stateless per request, so this is always ``None`` and
+    every caller already treats ``None`` as "no session-scoped timing".
+    """
+
+    return None
 
 
 def _append_session_timing(entry: dict[str, Any]) -> None:
@@ -535,35 +537,3 @@ def _critical_path_cache_diagnostics(session_state: Any) -> dict[str, Any]:
     except Exception:
         pass
     return payload
-
-
-def render_debug_panel(*, route: str = "unknown") -> None:
-    if not debug_enabled():
-        return
-    try:
-        import streamlit as st
-
-        snapshot = performance_snapshot(route=route)
-        cache_diag = _critical_path_cache_diagnostics(st.session_state)
-        if cache_diag:
-            snapshot["critical_path_caches"] = cache_diag
-        with st.expander("Performance Report", expanded=False):
-            cols = st.columns(4)
-            cols[0].metric("Rerun", f"{snapshot['rerun']['total_ms']:.0f} ms")
-            cols[1].metric("Cache", snapshot["rerun"]["classification"].title())
-            cols[2].metric("Memory", f"{snapshot['current_memory_mb'] or 0:.1f} MB")
-            cols[3].metric("API calls", snapshot["sleeper_call_count"] + snapshot["supabase_call_count"])
-            st.caption("Debug-only sanitized diagnostics. No secrets, emails, raw IDs, cache keys, or API payloads are included.")
-            if cache_diag:
-                st.caption("Critical-path caches (prepared_frame / game_plan / auth_restore)")
-                st.json(cache_diag)
-            st.json(snapshot)
-            st.download_button(
-                "Copy Performance Snapshot",
-                data=json.dumps(snapshot, indent=2, sort_keys=True),
-                file_name="dynastygm-performance-snapshot.json",
-                mime="application/json",
-                key="download_performance_snapshot",
-            )
-    except Exception:
-        return

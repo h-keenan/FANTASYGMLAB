@@ -1,3 +1,5 @@
+> **Historical / partly obsolete (2026-10):** this document describes the retired Streamlit web app (`app.py`, `streamlit run`, `/_stcore/health`, `st.session_state`), which has been removed. The production web app is `web-next/` (Next.js) on the FastAPI services. See [`streamlit-removal-2026-10.md`](streamlit-removal-2026-10.md). Streamlit-specific details below are no longer current.
+
 # Self-Hosted Migration (Ubuntu 24.04 LTS)
 
 Status: **additive prep only**. Nothing in this document, or in the Docker
@@ -29,7 +31,7 @@ production hostname when wiring up the real Stripe webhook URL at cutover.
 
 | Render service | Container (docker-compose) | Start command |
 |---|---|---|
-| `fantasygm-lab` (Streamlit) | `web` | `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true` |
+| ~~`fantasygm-lab` (Streamlit)~~ | ~~`web`~~ | Removed 2026-10 -- see `docs/streamlit-removal-2026-10.md` (APP_DOMAIN now proxies to `web-next`) |
 | `fantasygm-lab-mobile-api` | `mobile-api` | `uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $PORT` |
 | `fantasygm-lab-stripe-webhook` | `stripe-webhook` | `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT` |
 | `fantasygm-lab-revenuecat-webhook` | `revenuecat-webhook` | `uvicorn services.revenuecat_webhook_service:app --host 0.0.0.0 --port $PORT` |
@@ -591,7 +593,7 @@ silently fill the disk over time.
 
 ```bash
 docker compose logs -f                 # all services, follow
-docker compose logs -f web             # just the Streamlit app
+docker compose logs -f mobile-api      # just the API
 docker compose logs --since 1h caddy   # last hour, Caddy only
 ```
 

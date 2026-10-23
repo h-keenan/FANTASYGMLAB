@@ -10,30 +10,13 @@ from unittest.mock import patch
 
 import pytest
 
-from modules import (
-    brand_identity,
-    decision_memory,
-    experimental_graduation,
-    game_plan_process_cache,
-    gm_targets,
-    guest_conversion,
-    launch_analytics,
-    mobile_interaction_overlay_styles,
-    premium_conversion,
-    session_integrity,
-    share_recommendation_cards,
-    tail_latency_diagnostics,
-)
-from modules.app_styles import APP_CSS
+from modules import brand_identity, decision_memory, experimental_graduation, game_plan_process_cache, gm_targets, launch_analytics, premium_conversion, session_integrity, share_recommendation_cards, tail_latency_diagnostics
 from modules.ui_architecture import ARCHIVED_DESTINATION_KEYS, current_platform_destinations
 from scripts import verify_package_miss_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "final-launch-flow-regression-235.md"
-OVERLAY = mobile_interaction_overlay_styles.MOBILE_INTERACTION_OVERLAY_CSS
-VALIDATE = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -49,52 +32,6 @@ def test_launch_doc_exists_and_records_verdict_fields():
     assert "GO" in text or "CONDITIONAL GO" in text or "NO-GO" in text
     assert "package-MISS" in text or "package MISS" in text
     assert "GM control" in text or "GM orb" in text
-
-
-def test_header_mobile_contracts_present():
-    assert "executive_command_actions" in APP or "COMMAND_COLUMN_WEIGHTS" in APP
-    assert "League" in VALIDATE or "SWITCH LEAGUE" in VALIDATE.upper() or "command" in VALIDATE
-    assert "320" in VALIDATE and "390" in VALIDATE and "430" in VALIDATE
-
-
-def test_gm_icon_no_visible_label_contract_uses_descendant_button_selectors():
-    """Streamlit tooltip wrappers require descendant button selectors (#235)."""
-
-    assert ' [data-testid="stButton"] button' in OVERLAY
-    assert 'button[data-testid^="stBaseButton"]' in OVERLAY
-    assert "border-radius: 50%" in OVERLAY
-    assert "text-indent: -9999px" in OVERLAY
-    assert "font-size: 0" in OVERLAY
-    # Must not rely only on broken direct-child selector for the orb face.
-    assert (
-        'div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {'
-        not in OVERLAY
-    )
-    html = brand_identity.gm_orb_floating_trigger_html()
-    assert "stBaseButton" in html
-    assert brand_identity.GM_ORB_ARIA_LABEL == "Open GM menu"
-    assert "GM control must be circular (50%)" in VALIDATE
-
-
-def test_guest_free_continuity_and_premium_intent_helpers():
-    assert hasattr(guest_conversion, "guest_account_label") or "guest" in guest_conversion.__doc__.casefold()
-    assert hasattr(premium_conversion, "maybe_emit_entitlement_activated") or "checkout" in (
-        premium_conversion.__doc__ or ""
-    ).casefold()
-    # Checkout must remain explicit (no auto Stripe session on auth alone).
-    assert premium_conversion.CHECKOUT_CTA == "Choose a Premium plan"
-    premium_page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
-    assert "premium_choose_{plan_interval}" in premium_page
-    assert "create_checkout_session" in premium_page
-
-
-def test_account_and_league_isolation_helpers():
-    clearer = getattr(session_integrity, "clear_account_bound_transient_state", None)
-    assert callable(clearer)
-    assert "clear_account_bound_transient_state" in (
-        ROOT / "modules" / "auth_supabase.py"
-    ).read_text(encoding="utf-8")
-    assert "Log out" in (ROOT / "modules" / "account_ui.py").read_text(encoding="utf-8")
 
 
 def test_decision_memory_and_gm_targets_scope_defaults():
@@ -116,14 +53,6 @@ def test_share_privacy_blocks_identifiers():
     source = (ROOT / "modules" / "share_recommendation_cards.py").read_text(encoding="utf-8")
     assert "email" in source.casefold()  # blocklist / scrubbing references
     assert "public" in source.casefold() or "sanitize" in source.casefold() or "safe" in source.casefold()
-
-
-def test_player_explorer_is_core_and_lazy():
-    keys = {page.key for page in current_platform_destinations(False)}
-    assert "players" in keys
-    explorer = (ROOT / "modules" / "player_asset_explorer_ui.py").read_text(encoding="utf-8")
-    # No module-level provider fetch tax — work stays behind route render.
-    assert "def render_" in explorer or "def player_asset" in explorer
 
 
 def test_archived_routes_not_in_default_nav():
@@ -185,11 +114,3 @@ def test_analytics_pii_safeguards():
     source = (ROOT / "modules" / "launch_analytics.py").read_text(encoding="utf-8")
     for key in ("email", "username", "access_token", "stripe"):
         assert key in source.casefold() or key in {str(k).casefold() for k in blocked}
-
-
-def test_app_css_budget_after_gm_fix():
-    assert len(APP_CSS) <= 422_000
-
-
-def test_secondary_command_cards_excluded_from_near_zero_check():
-    assert "home-command-card-secondary" in VALIDATE

@@ -42,12 +42,6 @@ def test_compact_inbox_avoids_repeated_player_name_in_body():
     assert compact["reason_line"] == "You move from TE surplus."
 
 
-def test_notification_html_omits_fake_cta_div():
-    html = nc.notification_item_html(_trade_item())
-    assert "dg-notification-item__cta" not in html
-    assert "Open Trade Hub" not in html
-
-
 def test_gm_orb_label_is_compact():
     assert brand_identity.GM_ORB_LABEL == "GM"
 
@@ -66,20 +60,3 @@ def test_overlay_contract_document_exists():
         "Automated click-path coverage",
     ):
         assert section in doc
-
-
-def test_mobile_overlay_css_loaded_last():
-    app_styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "MOBILE_INTERACTION_OVERLAY_CSS" in app_styles
-    assert app_styles.rindex("MOBILE_INTERACTION_OVERLAY_CSS") > app_styles.index(
-        "EXECUTIVE_DESIGN_UNIFY_CSS"
-    )
-
-
-def test_validate_mobile_ui_has_command_bar_click_paths():
-    source = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-    assert "_capture_command_bar_interactions(" in source
-    assert "data-fixture-notification-destination='trade_hub'" in source
-    assert "data-fixture-gm-destination='trade_hub'" in source
-    assert "_capture_alerts_dropdown(" in source
-    assert "ALERTS_CAPTURE_WIDTHS" in source

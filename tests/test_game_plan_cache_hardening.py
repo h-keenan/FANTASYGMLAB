@@ -15,18 +15,6 @@ from modules import trade_trust
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
-
-
-def test_trade_trust_context_not_defined_in_app_main():
-    assert "class TradeTrustContext" not in APP
-    assert "from modules.trade_trust import TradeTrustContext" in APP
-    assert "serialize_trade_trust_context" in APP
-
-
-def test_cached_league_context_serializes_trust_before_return():
-    assert "trade_trust.serialize_trade_trust_context" in APP
-    assert "assert_pickle_safe_league_context" in APP
 
 
 def test_trade_trust_round_trip_pickle_and_hydrate():
@@ -191,12 +179,6 @@ def test_package_invalidates_on_league_and_roles():
     assert a != game_plan_package.build_package_signature(
         **{**base, "account_user_id": "u2"}
     )
-
-
-def test_app_emits_fingerprint_component_diagnostics():
-    assert "game_plan_package_fingerprint_components" in APP
-    assert "trade_inventory_fingerprint_components" in APP
-    assert "football_digest" in APP
 
 
 def test_post_auth_save_package_hit_contract():

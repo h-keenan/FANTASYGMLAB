@@ -6,56 +6,6 @@ from modules import launch_analytics
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CUSTOMER_PATHS = (
-    ROOT / "app.py",
-    ROOT / "modules" / "account_ui.py",
-    ROOT / "modules" / "feedback_ui.py",
-    ROOT / "modules" / "notification_center.py",
-    ROOT / "modules" / "premium_page.py",
-    ROOT / "modules" / "trade_hub_ui.py",
-    ROOT / "modules" / "gm_targets.py",
-    ROOT / "modules" / "launch_analytics.py",
-)
-
-
-def test_launch_analytics_events_are_all_wired():
-    sources = "\n".join(path.read_text(encoding="utf-8") for path in CUSTOMER_PATHS)
-    for event in sorted(launch_analytics.TRACKED_EVENTS):
-        assert f'"{event}"' in sources or f"'{event}'" in sources, event
-
-
-def test_customer_surfaces_avoid_developer_infrastructure_copy():
-    banned = (
-        "architecture supports",
-        "feedback dashboard",
-        "enabled in Supabase",
-        "How the MVP may",
-        "TODO",
-        "FIXME",
-        "lorem ipsum",
-    )
-    for path in CUSTOMER_PATHS:
-        text = path.read_text(encoding="utf-8")
-        lowered = text.casefold()
-        for phrase in banned:
-            assert phrase.casefold() not in lowered, f"{path.name}: {phrase}"
-
-
-def test_trade_hub_launch_contract_remains_unified_feed():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    # The Trade Hub route body (render_trade_hub_workspace) was extracted
-    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
-    # the last function defined there, so slice to end-of-file.
-    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    board = hub_src[hub_src.index("def render_trade_hub_workspace(") :]
-    assert "annotate_trade_hub_feed_categories(" in board
-    assert "render_trade_hub_section_filter(" not in board
-    assert "st.pills(" not in board
-    # Route milestones emit via navigation sync (avoid per-rerun spam in page body).
-    assert '"trade_hub": "trade_hub_opened"' in (ROOT / "modules" / "launch_analytics.py").read_text(
-        encoding="utf-8"
-    )
-    assert "track_route_opened" in source
 
 
 def test_launch_candidate_report_documents_decision_and_blockers():

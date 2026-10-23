@@ -83,15 +83,6 @@ def _safe_text(value: Any, default: str = "") -> str:
     return text if text else default
 
 
-def _safe_secrets() -> Any:
-    try:
-        import streamlit as st
-
-        return st.secrets
-    except Exception:
-        return None
-
-
 def _is_mapping(value: Any) -> bool:
     return isinstance(value, Mapping)
 
@@ -158,7 +149,7 @@ def referral_link(user_id: Any, *, base_url: str = "") -> str:
     code = referral_code_for_user(user_id)
     if not code:
         return ""
-    clean_base = _safe_text(base_url).rstrip("/") or app_config.app_base_url(secrets=_safe_secrets())
+    clean_base = _safe_text(base_url).rstrip("/") or app_config.app_base_url()
     return f"{clean_base}/?{REFERRAL_QUERY_PARAM}={code}"
 
 
@@ -175,9 +166,8 @@ def _first_query_value(raw: Any) -> str:
 def capture_referral_code(raw_query_value: Any, session_state: MutableMapping[str, Any]) -> None:
     """Session-only capture of a visiting ``?ref=`` code.
 
-    Pure with respect to ``session_state`` — the one Streamlit-dependent
-    line (``st.query_params.get(...)``) lives at the call site in
-    ``app.py`` so this stays unit-testable with a plain dict. Never
+    Pure with respect to ``session_state`` — callers read the ``?ref=`` query value
+    themselves and pass it in, so this stays unit-testable with a plain dict. Never
     attributes a user to themselves, and silently ignores an invalid or
     missing code (never raises, never clears an already-pending code on a
     blank re-read).
@@ -480,7 +470,7 @@ def handle_sleeper_connected(
     if attribution_error:
         return attribution_error
 
-    credit_config = service_config if service_config is not None else _service_role_config(secrets=_safe_secrets())
+    credit_config = service_config if service_config is not None else _service_role_config()
     granted, credit_error = grant_referral_credit(
         config=credit_config,
         referrer_user_id=pending_referrer,

@@ -33,7 +33,7 @@ def test_build_valued_players_frame_cached_concurrent_misses_single_flight(monke
 
     Same Redis-backed single-flight guarantee
     (modules.redis_cache.redis_single_flight_cache) modules.league_rankings
-    and modules.waivers_ui already enforce for their own caches — see
+    and modules.waivers_logic already enforce for their own caches — see
     tests/test_league_rankings.py's equivalent test. tests/conftest.py's
     autouse fakeredis fixture backs this cache with a real (fake) Redis
     here, so this exercises the actual code path, not a mock of it."""

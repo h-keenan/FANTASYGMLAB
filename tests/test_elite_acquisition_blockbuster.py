@@ -311,70 +311,6 @@ def _trust_context_for_league(frame, rosters):
     }
 
 
-def test_elite_acquisition_survives_rendered_search_trust():
-    frame, summary, rosters, adapter, draft_status, picks = _elite_positive_league()
-    with _search_gates():
-        result = trade_ideas.build_player_trade_hub_ideas(
-            df_players=frame,
-            league_id="L1",
-            df_summary=summary,
-            my_roster_id=1,
-            role_map={"high-end-wr": "Flex", "depth-rb": "Bench"},
-            untouchable_names=[],
-            mode="target_player",
-            selected_player_id="elite-rb",
-            max_ideas=6,
-            adapter=adapter,
-            league_settings=ONE_QB_DYNASTY,
-            draft_status=draft_status,
-            prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
-            prefetched_pick_assets=picks,
-        )
-    raw = list(result["ideas"] or [])
-    assert raw
-    assert result["diagnostics"]["blockbuster_mode_triggered"] is True
-    assert any(bool(asset.get("is_protected")) for idea in raw for asset in idea.get("send_assets") or [])
-    untagged = [{**idea, "hub_mode": ""} for idea in raw]
-    automatic = enforce_trade_board(untagged, **_trust_context_for_league(frame, rosters))
-    assert automatic.blocked_count == len(untagged)
-    assert "protected_constraint" in dict(automatic.blocked_reason_counts)
-
-    visible = enforce_trade_board(
-        raw,
-        **{
-            **_trust_context_for_league(frame, rosters),
-            "explicit_acquisition_target": True,
-        },
-    )
-    diagnostics = dict(result["diagnostics"] or {})
-    trade_ideas.record_player_search_trust_funnel(
-        diagnostics,
-        raw_ideas=raw,
-        enforced_ideas=list(visible.recommendations),
-        blocked_reason_counts=dict(visible.blocked_reason_counts),
-        trust_elapsed_ms=1.0,
-    )
-    from modules import trade_hub_ui
-
-    presentation = trade_hub_ui.present_player_search_ideas(list(visible.recommendations))
-    lead, _reason = trade_ideas.player_search_empty_state_copy(
-        {"ideas": list(visible.recommendations), "diagnostics": diagnostics}
-    )
-    assert visible.blocked_count == 0
-    assert len(visible.recommendations) >= 1
-    assert diagnostics["candidates_before_trust"] >= 1
-    assert diagnostics["candidates_after_trust"] >= 1
-    assert diagnostics["expanded_count_visible"] >= 1
-    assert presentation["show_empty"] is False
-    assert lead == ""
-    assert any(
-        str(asset.get("player_id") or "") == "elite-rb"
-        for idea in visible.recommendations
-        for asset in idea.get("receive_assets") or []
-    )
-    assert adapter.get_rosters.call_count == 0
-
-
 def test_explicit_acquisition_still_blocks_untouchables_and_unowned_assets():
     send = [
         {**player("High-End WR", 7200, "WR"), "player_id": "high-end-wr", "is_protected": True, "label": "High-End WR"},
@@ -761,13 +697,13 @@ def test_elite_search_copy_is_not_health_relief():
             prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
             prefetched_pick_assets=picks,
         )
-    from modules import trade_hub_ui
+    from modules import trade_hub_presentation
 
     assert result["ideas"]
     for idea in result["ideas"]:
         assert "Health Relief" not in (idea.get("reasoning_tags") or [])
         assert "health relief" not in str(idea.get("hub_path") or "").casefold()
-        assert trade_hub_ui.trade_hub_display_section(idea) != "Health Relief"
+        assert trade_hub_presentation.trade_hub_display_section(idea) != "Health Relief"
         path = str(idea.get("hub_path") or "").casefold()
         assert any(
             token in path
@@ -833,13 +769,13 @@ def test_health_relief_renders_when_receive_covers_injury_hole():
             prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
             prefetched_pick_assets=picks,
         )
-    from modules import trade_hub_ui
+    from modules import trade_hub_presentation
 
     assert result["ideas"]
     for idea in result["ideas"]:
         assert idea.get("injury_motivated") is True
         assert "Health Relief" in (idea.get("reasoning_tags") or [])
-        assert trade_hub_ui.trade_hub_display_section(idea) == "Health Relief"
+        assert trade_hub_presentation.trade_hub_display_section(idea) == "Health Relief"
 
 
 def test_unrelated_roster_injury_does_not_label_health_relief():
@@ -892,14 +828,14 @@ def test_unrelated_roster_injury_does_not_label_health_relief():
             prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
             prefetched_pick_assets=picks,
         )
-    from modules import trade_hub_ui
+    from modules import trade_hub_presentation
 
     assert result["ideas"]
     for idea in result["ideas"]:
         assert idea.get("injury_motivated") is False
         assert "Health Relief" not in (idea.get("reasoning_tags") or [])
-        assert trade_hub_ui.trade_hub_display_section(idea) != "Health Relief"
-        assert trade_hub_ui.trade_hub_display_section(idea).casefold() in {
+        assert trade_hub_presentation.trade_hub_display_section(idea) != "Health Relief"
+        assert trade_hub_presentation.trade_hub_display_section(idea).casefold() in {
             "star + capital",
             "elite consolidation",
             "premium pick package",
@@ -931,24 +867,4 @@ def test_presentation_cleanup_does_not_change_package_order():
         "exploratory",
     ]
     assert str(result["ideas"][-1].get("trade_confidence_label") or "") == "Low"
-    assert adapter.get_rosters.call_count == 0
-
-
-def test_live_card_category_path_omits_health_relief_without_injury():
-    from modules import trade_hub_ui
-
-    result, adapter = _run_target_search(
-        _elite_positive_league(),
-        ONE_QB_DYNASTY,
-        {"high-end-wr": "Flex", "depth-rb": "Bench"},
-    )
-    assert result["ideas"]
-    for idea in result["ideas"]:
-        stale = dict(idea)
-        stale["reasoning_tags"] = ["Health Relief"]
-        stale["reasoning_summary"] = "The return brings healthy help at RB."
-        stale["_display_section"] = "Health Relief"
-        stale["injury_motivated"] = False
-        assert trade_hub_ui.trade_summary_card_category(stale) == ""
-        assert "health relief" not in trade_hub_ui.trade_summary_card_category(stale).casefold()
     assert adapter.get_rosters.call_count == 0

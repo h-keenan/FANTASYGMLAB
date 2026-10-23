@@ -18,7 +18,6 @@ from scripts import diagnose_tail_latency
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -29,17 +28,6 @@ def _reset(monkeypatch):
     yield
     game_plan_process_cache.clear_process_game_plan_caches()
     tail_latency_diagnostics.reset_process_boot_for_tests()
-
-
-def test_dashboard_loader_avoids_nested_shared_league_context():
-    """Cold package MISS must not re-enter get_or_build via get_shared_league_context."""
-
-    start = APP.index("def _load_game_plan_league_context()")
-    end = APP.index("render_home_dashboard(", start)
-    body = APP[start:end]
-    assert "get_shared_league_context(" not in body
-    assert "cached_league_context(" in body
-    assert "non-reentrant" in body or "deadlock" in body.casefold()
 
 
 def test_nested_same_signature_does_not_deadlock():
@@ -288,15 +276,3 @@ def test_diagnose_stall_classification_package_miss():
     result = diagnose_tail_latency.classify_session_stall(rows)
     assert result["classification"] == "UNKNOWN_AFTER_PACKAGE_MISS"
     assert result["last_stage"] == "game_plan_trade"
-
-
-def test_app_wires_fail_soft_and_stall_helpers():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "game_plan_startup_stall" in app
-    assert "Retry Game Plan" in app
-    title, body = stall.fail_soft_copy()
-    assert "Game Plan is taking longer than expected" in title
-    assert "Trade Hub" in body
-    assert "SINGLEFLIGHT_WAIT_TIMEOUT_S" in (
-        ROOT / "modules" / "game_plan_process_cache.py"
-    ).read_text(encoding="utf-8")

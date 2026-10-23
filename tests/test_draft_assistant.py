@@ -694,58 +694,6 @@ class TestDraftAssistant(unittest.TestCase):
         self.assertEqual(rows[0]["grade"], "Ungraded")
         self.assertIn("Unmatched", rows[0]["grade_reason"])
 
-    def test_completed_draft_ui_hides_active_recommendations(self):
-        source = Path("modules/draft_center_ui.py").read_text(encoding="utf-8")
-
-        completed_idx = source.index('workspace_ui.render_section_header(\n            "Completed Draft Review"')
-        return_idx = source.index("return", completed_idx)
-        recommendation_idx = source.index("Recommendation Buckets")
-        available_idx = source.index('"Available Board"')
-
-        self.assertLess(return_idx, recommendation_idx)
-        self.assertLess(return_idx, available_idx)
-        self.assertIn("Completed Draft Review", source)
-        self.assertIn("Historical remaining pool", source)
-        self.assertIn("Unmatched Sleeper picks", source)
-        self.assertIn('"review_mode": True', source)
-        self.assertIn('"active_mode": True', source)
-        self.assertIn("draft-review-pick-card", source)
-        self.assertIn("_completed_round_cards_html", source)
-        self.assertIn("Your picks in this draft", source)
-        self.assertNotIn("Your picked player IDs", source)
-        round_start = source.index("for round_no in sorted(round_groups):")
-        historical_start = source.index('with st.expander("Historical remaining pool"', round_start)
-        completed_round_block = source[round_start:historical_start]
-        self.assertNotIn("st.dataframe", completed_round_block)
-        self.assertIn("Best Overall", "".join(draft_assistant.RECOMMENDATION_BUCKETS))
-
-    def test_draft_center_mobile_hierarchy_demotes_diagnostics_and_manual_overrides(self):
-        source = Path("modules/draft_center_ui.py").read_text(encoding="utf-8")
-
-        self.assertIn("Review mode: this Sleeper draft is complete", source)
-        self.assertIn("Diagnostics: Unmatched Sleeper picks", source)
-        self.assertIn('manual_expander_label = "Manual overrides (optional)"', source)
-        self.assertIn("Active draft mode only", source)
-        self.assertIn("Review mode only", source)
-        self.assertIn("Historical remaining pool", source)
-
-    def test_draft_center_espn_limited_mode_has_degraded_state(self):
-        source = Path("app.py").read_text(encoding="utf-8")
-
-        self.assertIn('"ESPN limited review mode"', source)
-        self.assertIn("Draft Center is gated for ESPN", source)
-        self.assertIn("st.session_state.get(\"espn_limited_mode\")", source)
-        self.assertIn("app-degraded-state", source)
-        self.assertIn("Sleeper remains the full Draft Center path", source)
-
-    def test_completed_draft_review_mobile_card_css_exists(self):
-        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
-
-        self.assertIn(".draft-review-round-grid", css)
-        self.assertIn("grid-template-columns: 1fr", css)
-        self.assertIn(".draft-review-pick-card", css)
-        self.assertIn("min-height: 0", css)
-
 
 if __name__ == "__main__":
     unittest.main()

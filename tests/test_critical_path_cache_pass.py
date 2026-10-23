@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from modules import account_ui
 from modules import auth_restore_lifecycle
 from modules import auth_supabase
 from modules import game_plan_package
@@ -18,7 +17,6 @@ from scripts import measure_critical_path_caches
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 def _auth_payload(user_id: str = "user-a") -> dict:
@@ -31,42 +29,6 @@ def _auth_payload(user_id: str = "user-a") -> dict:
         "expires_at": 9999999999,
         "token_type": "bearer",
     }
-
-
-def test_returning_authenticated_skips_bridge_remount():
-    state: dict = {}
-    auth_supabase.apply_auth_payload(state, _auth_payload())
-    with (
-        patch.object(account_ui.st, "session_state", state),
-        patch.object(account_ui, "AUTH_STORAGE_COMPONENT") as component,
-        patch.object(account_ui.auth_supabase, "is_configured", return_value=True),
-    ):
-        result = account_ui.render_durable_auth_bridge(
-            config={"url": "https://example.supabase.co", "anon_key": "anon"}
-        )
-    assert component.call_count == 0
-    assert auth_restore_lifecycle.current_hydration_outcome(state).name == "AUTHENTICATED"
-    assert state.get(auth_restore_lifecycle.AUTH_LAST_EVENT_KEY) == "SKIP_BRIDGE"
-    assert result.get("identical") is True
-
-
-def test_auth_callback_still_mounts_when_unsigned():
-    state: dict = {}
-    fake = MagicMock()
-    fake.status = None
-    fake.stored = None
-    fake.auth_callback = None
-    with (
-        patch.object(account_ui.st, "session_state", state),
-        patch.object(account_ui, "AUTH_STORAGE_COMPONENT", return_value=fake) as component,
-        patch.object(account_ui.auth_supabase, "is_configured", return_value=True),
-    ):
-        result = account_ui.render_durable_auth_bridge(
-            config={"url": "https://example.supabase.co", "anon_key": "anon"}
-        )
-    assert component.call_count == 1
-    assert result.get("pending") is True
-    assert auth_restore_lifecycle.current_hydration_outcome(state).name == "RESTORING"
 
 
 def test_prepared_frame_fingerprint_stable_for_semantic_inputs():
@@ -212,14 +174,6 @@ def test_game_plan_process_hit_after_session_cold():
     assert state2.get(game_plan_package.LAST_CACHE_STATUS_KEY) == "process_hit"
 
 
-def test_dashboard_route_and_trade_analyzer_do_not_clear_caches_in_app():
-    ta = APP.index('if current_page == "trade_analyzer":')
-    block = APP[ta : APP.index('if current_page == "premium":', ta)]
-    assert "clear_prepared_player_frame" not in block
-    assert "clear_game_plan_package" not in block
-    assert "clear_process_game_plan_packages" not in block
-
-
 def test_a_b_a_reuses_process_package_and_isolates_session():
     game_plan_package.clear_process_game_plan_packages()
     prepared_player_frame.clear_process_valued_ranked_frames()
@@ -307,17 +261,6 @@ def test_debug_panel_exposes_critical_path_cache_diagnostics():
     assert diag["auth_restore"]["event"] == "SKIP_BRIDGE"
     assert "prepared_frame" in diag
     assert "game_plan" in diag
-
-
-def test_app_prefers_league_season_for_prepared_frame_signature():
-    idx = APP.index("prepared_frame_signature = prepared_player_frame.build_frame_signature")
-    window = APP[idx - 1200 : idx]
-    assert "league_value_settings.get(\"season\")" in window
-    # League season must be preferred before stats_season.
-    league_pos = window.rfind("league_value_settings.get(\"season\")")
-    stats_pos = window.rfind("st.session_state.get(\"stats_season\")")
-    assert league_pos != -1 and stats_pos != -1
-    assert league_pos < stats_pos
 
 
 def test_measure_script_targets_pass():

@@ -14,19 +14,7 @@ from modules import trade_analyzer_builder as builder
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
-UI = (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
 ASSEMBLY = (ROOT / "modules" / "trade_analyzer_assembly.py").read_text(encoding="utf-8")
-HARNESS = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
-VALIDATOR = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-
-
-def _route_block() -> str:
-    return APP[
-        APP.index('if current_page == "trade_analyzer":') : APP.index(
-            'if current_page == "premium":'
-        )
-    ]
 
 
 def _player_row(pid: str, name: str, *, position: str, team: str, score: int, owner: str):
@@ -53,58 +41,6 @@ def _pick(label: str, *, owner: str, season=2027, round_no=1, score=800):
         "owner_roster_id": owner,
         "owner_team_name": "Roster",
     }
-
-
-def test_assembly_and_ui_never_execute_analysis():
-    for source in (ASSEMBLY, UI):
-        assert "evaluate_trade_analyzer_fit" not in source
-        assert "decide_offer_verdict" not in source
-        assert "search_trade_assets" not in source
-        assert "get_shared_league_context" not in source
-        assert "apply_strategy_age_curve" not in source
-    tree = ast.parse(ASSEMBLY)
-    imported = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.extend(alias.name.split(".")[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            imported.append((node.module or "").split(".")[0])
-    assert "requests" not in imported
-    assert "sleeper" not in imported
-
-
-def test_analyze_trade_is_the_only_execution_boundary():
-    block = _route_block()
-    assert "if analyze_clicked:" in block
-    analyze_at = block.index("if analyze_clicked:")
-    # Trade-fit evaluation only ever happens inside the analyze_clicked
-    # boundary — never scattered into assembly/UI or run on every rerun.
-    # There are now two call sites in this block: the original verdict
-    # evaluation, and the counter-offer package generator's regrade closure
-    # (which re-evaluates fit for 1-3 candidate packages, only when the
-    # original offer graded unfavorably) — both still strictly gated behind
-    # this same click, so every occurrence must fall after it.
-    fit_positions: list[int] = []
-    search_from = 0
-    while True:
-        idx = block.find("evaluate_trade_analyzer_fit(", search_from)
-        if idx == -1:
-            break
-        fit_positions.append(idx)
-        search_from = idx + 1
-    assert fit_positions
-    assert all(pos > analyze_at for pos in fit_positions)
-    assert "render_trade_analyzer_assembly(" in block
-    assert "search_trade_assets_for_side(" not in block
-    assert "+ Add asset" not in block
-    assert "st.rerun(" not in block
-    assert "st.columns(2)" not in block
-    assert "st.columns(2)" in UI
-    assert "@st.fragment" not in UI
-    assert "canonical state owner" in UI
-    assert "st.rerun(" not in UI
-    assert "Analyze Trade" not in UI
-    assert "Analyze Trade" in block
 
 
 def test_filter_and_search_do_not_call_mutate_or_analysis():
@@ -250,18 +186,6 @@ def test_player_and_pick_catalog_and_identity():
     assert all(item["asset_type"] == "pick" for item in picks_only)
 
 
-def test_no_duplicate_assembly_widget_trees():
-    assert UI.count("def render_trade_analyzer_assembly(") == 1
-    assert UI.count('key=f"toa_add_{side}_{token}"') == 1
-    assert UI.count('key=f"toa_rm_{side}_{idx}_{token}"') == 1
-    assert UI.count('key=f"toa_{side}_kind"') == 1
-    assert UI.count('f"trade_{side}_search_query"') == 1
-    block = _route_block()
-    assert block.count("render_trade_analyzer_assembly(") == 1
-    assert "def render_asset_adder(" not in APP
-    assert "def add_trade_asset(" not in APP
-
-
 def test_session_clear_includes_assembly_catalog_keys():
     for key in assembly.ASSEMBLY_STATE_KEYS:
         assert key in session_integrity.TRADE_ANALYZER_PACKAGE_KEYS
@@ -269,35 +193,6 @@ def test_session_clear_includes_assembly_catalog_keys():
     session_integrity.clear_trade_analyzer_package(state)
     assert assembly.CATALOG_PLAYERS_ME not in state
     assert "trade_send_assets" not in state
-
-
-def test_search_widget_keys_are_not_assigned_after_inputs():
-    assert 'st.session_state["trade_send_search_query"] = ""' not in UI
-    assert 'st.session_state["trade_receive_search_query"] = ""' not in UI
-    text_at = UI.index("st.text_input(")
-    add_marker = 'key=f"toa_add_{side}_{token}"'
-    assert add_marker in UI
-    assert UI.index(add_marker) > text_at
-
-
-def test_mobile_and_harness_contracts():
-    css = (ROOT / "modules" / "trade_analyzer_styles.py").read_text(encoding="utf-8")
-    assert "st-key-toa_roster_" in css
-    assert "max-height: min(40vh, 16.5rem)" in css
-    assert "flex-wrap: wrap" in css
-    assert "You receive" in UI
-    assert "You send" in UI
-    assert "st.columns(2)" in UI
-    assert "flex-direction: column" in css
-    harness_fn = HARNESS[
-        HARNESS.index("def _trade_analyzer()") : HARNESS.index("def _player_asset_explorer()")
-    ]
-    assert "render_trade_analyzer_assembly(" in harness_fn
-    assert "+ Add asset" not in harness_fn
-    assert "st.columns(2)" not in harness_fn
-    assert '"trade-analyzer"' in VALIDATOR
-    assert "You receive" in VALIDATOR
-    assert "Build the trade" in VALIDATOR
 
 
 def test_ensure_catalogs_reuses_cache_without_rebuild():

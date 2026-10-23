@@ -234,21 +234,6 @@ def test_invalidate_rank_columns_clears_rank_context_keys():
     assert state["keep_me"] is True
 
 
-def test_explorer_prefers_canonical_overall_rank():
-    from modules import player_asset_explorer_ui
-
-    frame = ranking.attach_canonical_ranks(
-        _players(),
-        scoring_format="PPR",
-        score_field="dynasty_score",
-    )
-    ranked = player_asset_explorer_ui.ranked_player_frame(frame, "dynasty_score")
-    assert int(ranked.loc[ranked.player_id == "wr1", "explorer_rank"].iloc[0]) == 1
-    assert int(ranked.loc[ranked.player_id == "wr1", "explorer_rank"].iloc[0]) == int(
-        ranked.loc[ranked.player_id == "wr1", "canonical_overall_rank"].iloc[0]
-    )
-
-
 def test_free_and_premium_share_identical_underlying_rank_helper():
     # Entitlement must not fork ranking math; both plans consume attach_canonical_ranks.
     free = ranking.attach_canonical_ranks(
@@ -270,16 +255,6 @@ def test_free_and_premium_share_identical_underlying_rank_helper():
         "rank_scoring_format",
     ]
     assert free[cols].equals(premium[cols])
-
-
-def test_explorer_never_reuses_sleeper_search_rank_as_ovr():
-    from modules import player_asset_explorer_ui
-
-    bare = _players().copy()
-    bare["search_rank"] = [1, 2, 3, 4, 5, 6]
-    ranked = player_asset_explorer_ui.ranked_player_frame(bare, "dynasty_score")
-    assert ranked["explorer_rank"].isna().all()
-    assert "search_rank" not in ranked["explorer_rank"].astype(str).tolist()
 
 
 def test_lookup_does_not_silently_label_missing_format_as_ppr():
@@ -333,15 +308,6 @@ def test_same_player_compact_rank_is_stable_across_surface_helpers():
         looked.position,
     )
     assert ranking.ranks_match_across_rows([row, row])
-
-
-def test_app_wires_canonical_ranks_after_valuation():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "canonical_player_ranking.attach_canonical_ranks(" in source
-    assert "canonical_player_ranking.resolve_scoring_rank_context(" in source
-    assert source.index("apply_active_valuation(") < source.index(
-        "canonical_player_ranking.attach_canonical_ranks("
-    )
 
 
 def test_contract_doc_exists_with_required_sections():

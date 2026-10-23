@@ -6,7 +6,6 @@ import re
 import pytest
 
 from modules import share_recommendation_cards as share
-from modules import share_recommendation_ui
 
 
 def _player(player_id: str, name: str) -> dict:
@@ -84,27 +83,6 @@ def test_duplicate_input_asset_is_emitted_once_preserving_first_seen_order():
     )
     assert payload.count("Tank Bigsby") == 1
     assert payload.index("Tank Bigsby") < payload.index("2027 Round 3")
-
-
-def test_native_and_clipboard_paths_embed_the_exact_same_canonical_payload():
-    card = share.build_trade_share_card(
-        _idea([_player("1", "Tank Bigsby"), _pick("2027 Round 3")], [_player("2", "Omar Cooper")])
-    )
-    payload = share.build_share_text_payload(card)
-    html = share_recommendation_ui.native_share_markup(
-        b"\x89PNG\r\n\x1a\n",
-        file_name="trade.png",
-        title=card.title,
-        text=payload,
-        button_label="Share Trade Idea",
-    )
-    encoded = re.search(r"const canonicalText = (.*?);\n", html).group(1)
-    assert json.loads(encoded) == payload
-    assert "navigator.share(shareData)" in html
-    assert "navigator.clipboard.writeText(canonicalText)" in html
-    assert 'area.value = canonicalText' in html
-    assert "Share Trade Idea" in html
-    assert "downloadFull(blob)" in html
 
 
 def test_no_public_trade_url_is_invented():

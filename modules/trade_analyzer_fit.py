@@ -34,7 +34,7 @@ from modules.frame_records import frame_records
 from modules import trade_grade
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
-from modules.league_workspace_ui import _format_score
+from modules.league_display import _format_score
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
 from modules.roster_needs import TeamNeedsAssessment, assess_team_needs
 from modules.team_eval import (

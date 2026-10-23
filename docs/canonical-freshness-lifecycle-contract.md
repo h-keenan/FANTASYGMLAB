@@ -1,3 +1,5 @@
+> **Historical / partly obsolete (2026-10):** this document describes the retired Streamlit web app (`app.py`, `streamlit run`, `/_stcore/health`, `st.session_state`), which has been removed. The production web app is `web-next/` (Next.js) on the FastAPI services. See [`streamlit-removal-2026-10.md`](streamlit-removal-2026-10.md). Streamlit-specific details below are no longer current.
+
 # Canonical Freshness, Change Detection & Recommendation Lifecycle
 
 Presentation and lifecycle contract only. Does **not** change football logic,

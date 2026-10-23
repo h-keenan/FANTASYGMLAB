@@ -1,13 +1,15 @@
 # FantasyDesk — self-hosted stack.
 #
-# Replicates render.yaml's four real (non-cron) services plus a Caddy
-# reverse proxy with automatic HTTPS. The 4 cron jobs in render.yaml
+# Replicates render.yaml's real (non-cron) services plus a Caddy reverse
+# proxy with automatic HTTPS. The legacy Streamlit `web` service (app.py)
+# was removed in 2026-10 -- see docs/streamlit-removal-2026-10.md.
+# The 4 cron jobs in render.yaml
 # (push-trigger sweep, trade-outcome-result sweep, players-db refresh,
 # injury-status sync) are deliberately NOT part of this stack — they are
 # being migrated to GitHub Actions in a separate PR and will not run on
 # this box. See docs/SELF_HOSTED_MIGRATION.md.
 #
-# All four app services are built from the same image (./Dockerfile) and
+# All Python app services are built from the same image (./Dockerfile) and
 # differ only in `command:`, copied verbatim from each service's
 # render.yaml startCommand. Secrets are never set here directly — every
 # service reads from `.env` (gitignored; see .env.example for every
@@ -17,7 +19,7 @@
 # service got its own isolated instance, so one runaway service could not
 # starve another. Colocating all six containers on one shared box removes
 # that isolation — a leak or a CPU-bound spike (pandas/Monte Carlo work in
-# `web` or `mobile-api`) in one container could otherwise exhaust the host's
+# `mobile-api`) in one container could otherwise exhaust the host's
 # RAM/CPU and take the others down with it. `mem_limit`/`cpus` are the
 # plain (non-`deploy.resources`) Compose fields, which is deliberate: the
 # `deploy.resources.limits` key is only enforced by `docker stack deploy`
@@ -31,8 +33,8 @@
 # in tests/test_self_hosted_resource_isolation.py's prior version; flagging
 # for coridian_ to confirm the 6c/12t figure is the real, current box before
 # this ships, since the whole mobile-api worker-count/resource sizing below
-# is derived from it): `web` and `mobile-api` do the real pandas/Monte
-# Carlo/player-cache work, so they get the largest share; `redis` is a
+# is derived from it): `mobile-api` does the real pandas/Monte
+# Carlo/player-cache work, so it gets the largest share; `redis` is a
 # small, fast in-memory state store (not a database) so it needs very
 # little; the two webhook services only handle occasional small
 # Stripe/RevenueCat POSTs; Caddy just proxies.
@@ -50,27 +52,9 @@
 # playoff-odds caches are NOT duplicated per worker the way they used to
 # be.
 #
-# `web` got a smaller, single-process bump instead of the same `--workers`
-# treatment: Streamlit is a single reactive server process per instance —
-# there's no `--workers N` flag the way uvicorn has, because a Streamlit
-# process keeps every open browser session's widget/script-rerun state
-# (`st.session_state`) in its own process memory, not in a shared store.
-# Splitting `web` across N Streamlit processes was evaluated and rejected
-# for this change (see the `web` service's own comment below for the
-# full reasoning) — it would need sticky, session-affine routing at Caddy
-# PLUS moving `st.session_state` out of process memory, which is a real
-# architecture project, not a resource-limit tweak; left as a follow-up for
-# a human to scope separately. So `web` still only ever uses one core's
-# worth of raw Python/GIL-bound execution at a time per request, same as
-# `mobile-api` did pre-migration — its bump below is sized for the real
-# pandas/numpy work (which *can* use extra threads/memory within that one
-# process, e.g. BLAS-backed vector ops and holding bigger Monte
-# Carlo/player-table arrays) and for give multiple concurrent browser
-# sessions more headroom, not for added parallelism the process can't use.
-#
-# Total mem_limit across all six is now ~13.5GB of this box's 16GB,
-# leaving ~2.5GB headroom for the host OS/Docker itself; total cpus is
-# ~8.75 of the 12 logical threads, leaving ~3.25 threads of headroom.
+# Total mem_limit across the remaining services is ~8.5GB of this box's
+# 16GB (the removed Streamlit `web` service used to take 5g / 3.0 cpus), so
+# host headroom is larger than the historical ~2.5GB / ~3.25 threads below.
 # These are ceilings, not reservations, so normal (non-spiking) operation
 # is unaffected — they only bound the worst case. Sign-off note: this is a
 # real production resource-limit change (new, not tightening something
@@ -88,7 +72,7 @@
 # web-next becomes the real production frontend.
 
 services:
-  web:
+  mobile-api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -97,9 +81,8 @@ services:
       # reporting the right commit/timestamp across a container restart
       # that doesn't go through deploy/release_deploy.sh — e.g. the
       # systemd unit's `docker compose up -d` on every host boot, which
-      # has no shell env set at all. A runtime-only var would silently
-      # reset to "local"/empty on any such restart. deploy/release_deploy.sh
-      # exports both from the commit it's about to build right before
+      # has no shell env set at all. deploy/release_deploy.sh exports both
+      # from the commit it's about to build right before
       # `docker compose build`; `:-local`/empty only applies to a manual
       # `docker compose build` run outside that script.
       args:
@@ -112,93 +95,7 @@ services:
     # through unexpanded. The doubled "$$" escapes Compose's own
     # variable-interpolation pass over this file so a literal "$PORT"
     # reaches the container's sh, which then expands it from `environment:`
-    # below — mirroring exactly how Render's platform invokes startCommand
-    # through a shell.
-    command: ["sh", "-c", "streamlit run app.py --server.address 0.0.0.0 --server.port $$PORT --server.headless true"]
-    environment:
-      PORT: "8080"
-      # Render sets its own RENDER/RENDER_SERVICE_ID/RENDER_EXTERNAL_URL
-      # markers automatically; nothing does that here. Without this,
-      # modules/app_config.py's is_managed_cloud_host() cannot tell this
-      # production box apart from a contributor's local checkout, which
-      # silently disables the managed-host config safety net (missing
-      # Supabase config fails open instead of fail-closed with a clear
-      # st.error()) and unlocks customer-unsafe debug/premium-override
-      # switches by default. See docs/SELF_HOSTED_MIGRATION.md.
-      DYNASTYGM_SELF_HOSTED: "1"
-    env_file:
-      - .env
-    # Bumped from the old single-process 4g/2.0 (see this file's top-of-file
-    # resource-limit comment for the full box budget) — `web` does the same
-    # class of real pandas/Monte Carlo work `mobile-api` does (playoff odds,
-    # league rankings, trade hub ideas, the player table itself), so it was
-    # under-provisioned relative to `mobile-api`'s post-migration 7g/4.0 even
-    # though it never got the `--workers` treatment.
-    #
-    # Streamlit has no documented way to run multiple server processes
-    # behind one shared port the way uvicorn's `--workers` does for
-    # `mobile-api`: a Streamlit process keeps every open browser tab's
-    # `st.session_state` in its own process memory (there is no shared
-    # session store), and Streamlit's own deployment docs only describe
-    # running one process per app instance. Running 2 Streamlit processes
-    # behind Caddy would need (a) Caddy's cookie-based sticky-session load
-    # balancing so a given browser tab's HTTP AND WebSocket (Streamlit's
-    # live-rerun channel) traffic always lands on the same backend process —
-    # without that, a session landing on "the other" process mid-session
-    # would hit a process that has never seen its session_state and would
-    # silently reset the user's whole app state — and (b) auditing every
-    # existing `st.session_state`/module-level cache usage in this app for
-    # anything that implicitly assumes a single shared process (e.g.
-    # anything cached at import time rather than per-session or in Redis).
-    # That is a real session-state/architecture project, not a resource-
-    # limit tweak, so it was deliberately NOT attempted here — this is the
-    # resource-bump-only fix, with a note for a human to decide whether true
-    # horizontal Streamlit scaling is worth a dedicated follow-up.
-    #
-    # Sized against the box's remaining budget after the other five
-    # services (see top-of-file comment): mem 5g (was 4g) keeps the total
-    # at ~13.5GB of 16GB, ~2.5GB headroom for the host; cpus 3.0 (was 2.0)
-    # keeps total cpus at ~8.75 of 12 logical threads, ~3.25 threads of
-    # headroom. Smaller than mobile-api's jump (4g->7g, 2.0->4.0) on
-    # purpose: mobile-api's bump covers 4 separate worker PROCESSES, each
-    # with its own copy of in-memory state, while `web` is still exactly
-    # one process — the extra room here is for bigger in-process data
-    # (Monte Carlo trial arrays, the warmed player table, concurrent
-    # browser sessions' own state), not for added parallelism the process
-    # can't use.
-    mem_limit: 5g
-    cpus: 3.0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    restart: unless-stopped
-    # `web` also calls into modules/league_rankings.py and
-    # modules/trade_hub_engine.py, both of which now route through
-    # modules/redis_cache.redis_single_flight_cache (see the `mobile-api`
-    # service's Redis migration comment below). Without this, `web` can
-    # start serving requests before Redis's healthcheck passes, and every
-    # affected cache call pays its ~0.5s socket_connect_timeout/
-    # socket_timeout before falling back uncached on each stack restart.
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - internal
-
-  mobile-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      # See the "web" service's build.args comment above.
-      args:
-        DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
-        DYNASTYGM_DEPLOYED_AT: ${DYNASTYGM_DEPLOYED_AT:-}
-    image: fantasygmlab-app:latest
-    # See the "web" service's command comment above for why this is
-    # wrapped in sh -c and uses the doubled "$$PORT"/"$$MOBILE_API_WORKERS".
+    # below.
     #
     # Now runs multiple uvicorn worker PROCESSES (`--workers`) to actually
     # use the box's cores under concurrent load — previously pinned to one
@@ -226,7 +123,7 @@ services:
     # correct, but not the steady-state this should run in.
     #
     # MOBILE_API_WORKERS defaults to 4: on the stated 6-core/12-thread box,
-    # that leaves `web`'s 2 cores, the two webhooks' 1 combined core,
+    # that leaves the two webhooks' 1 combined core,
     # caddy's 0.5, and redis' 0.25 all still fitting comfortably under the
     # 12 logical threads with real headroom (see this file's top-of-file
     # resource-limit comment for the full budget) -- override via `.env`
@@ -235,7 +132,13 @@ services:
     environment:
       PORT: "8080"
       MOBILE_API_WORKERS: "${MOBILE_API_WORKERS:-4}"
-      # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
+      # Render sets its own RENDER/RENDER_SERVICE_ID/RENDER_EXTERNAL_URL
+      # markers automatically; nothing does that here. Without this,
+      # modules/app_config.py's is_managed_cloud_host() cannot tell this
+      # production box apart from a contributor's local checkout, which
+      # silently disables the managed-host config safety net and unlocks
+      # customer-unsafe debug/premium-override switches by default. See
+      # docs/SELF_HOSTED_MIGRATION.md.
       DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
@@ -288,12 +191,12 @@ services:
       context: .
       dockerfile: Dockerfile
     image: fantasygmlab-app:latest
-    # See the "web" service's command comment above for why this is
+    # See the "mobile-api" service's command comment above for why this is
     # wrapped in sh -c and uses the doubled "$$PORT".
     command: ["sh", "-c", "uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $$PORT"]
     environment:
       PORT: "8080"
-      # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
+      # See the "mobile-api" service's DYNASTYGM_SELF_HOSTED comment above.
       DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
@@ -314,12 +217,12 @@ services:
       context: .
       dockerfile: Dockerfile
     image: fantasygmlab-app:latest
-    # See the "web" service's command comment above for why this is
+    # See the "mobile-api" service's command comment above for why this is
     # wrapped in sh -c and uses the doubled "$$PORT".
     command: ["sh", "-c", "uvicorn services.revenuecat_webhook_service:app --host 0.0.0.0 --port $$PORT"]
     environment:
       PORT: "8080"
-      # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
+      # See the "mobile-api" service's DYNASTYGM_SELF_HOSTED comment above.
       DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
@@ -335,14 +238,10 @@ services:
     networks:
       - internal
 
-  # web-next: additive, test-subdomain-only preview of the Next.js frontend
-  # (see docs/SELF_HOSTED_MIGRATION.md's "web-next test-subdomain preview"
-  # section). Routed from a brand-new {$WEB_NEXT_DOMAIN} in the Caddyfile,
-  # NOT from {$APP_DOMAIN} — Streamlit's `web` service keeps serving the
-  # real production domain untouched. This is purely a parallel, reachable
-  # preview so the already-merged, already-tested web-next frontend can be
-  # smoke-tested against the real production mobile-api before any actual
-  # cutover decision is made.
+  # web-next: the Next.js frontend (web-next/). Routed by the Caddyfile from
+  # {$APP_DOMAIN}, {$WEB_NEXT_DOMAIN} and fantasydesk.app (the legacy
+  # Streamlit `web` service that used to serve {$APP_DOMAIN} was removed in
+  # 2026-10 -- see docs/streamlit-removal-2026-10.md).
   web-next:
     build:
       context: .
@@ -356,7 +255,6 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
-        NEXT_PUBLIC_STREAMLIT_BASE_URL: ${NEXT_PUBLIC_STREAMLIT_BASE_URL:-}
     image: fantasygmlab-web-next:latest
     # No "sh -c"/doubled "$$PORT" trick needed here (unlike the Python
     # services above) — `next start` reads PORT directly from its process
@@ -423,14 +321,12 @@ services:
     restart: unless-stopped
     # condition: service_healthy (not the bare list form) so Caddy starts
     # proxying only once each app container's own healthcheck above passes,
-    # not merely once the container process has started — `web` in
+    # not merely once the container process has started — `mobile-api` in
     # particular spends real time on cold imports/pip-installed deps before
-    # /_stcore/health responds, and Caddy proxying to it too early produces
+    # /health responds, and Caddy proxying to it too early produces
     # exactly the kind of partially-broken first-load experience ("page up,
     # but pieces of it fail") this stack should not risk on every restart.
     depends_on:
-      web:
-        condition: service_healthy
       mobile-api:
         condition: service_healthy
       stripe-webhook:

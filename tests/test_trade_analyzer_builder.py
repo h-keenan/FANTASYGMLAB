@@ -4,10 +4,6 @@ import time
 from pathlib import Path
 
 from modules import trade_analyzer_builder as builder
-from modules.component_family_styles import COMPONENT_FAMILY_CSS
-from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
-
-UI_SRC = Path("modules/trade_analyzer_ui.py").read_text(encoding="utf-8")
 
 
 def _player(pid: str, name: str, *, owner: str, position="WR", team="DAL", score=1200):
@@ -266,60 +262,6 @@ def test_result_row_html_interactive_flag_reaches_compact_player_row_html():
     assert calls[0]["interactive"] is False
 
 
-def test_result_row_html_with_real_compact_player_row_html_emits_tap_markup():
-    """End-to-end through the real production compact_player_row_html (not a
-    fake), confirming interactive=True actually produces the
-    data-player-id/player-card-tappable attributes the site's tap
-    delegation (interaction_contract.TAP_DELEGATION_JS) binds to."""
-
-    from modules import player_cards
-
-    def _real_compact_player_row_html(row, *, score_field, score_label, interactive=False, **_kwargs):
-        return player_cards.compact_player_row_html(
-            row,
-            score_field=score_field,
-            score_label=score_label,
-            player_display_name=lambda r: r["name"],
-            format_age=lambda value: str(value),
-            format_score=lambda value: str(value),
-            cached_headshot_data_url=lambda _player_id: "",
-            avatar_html=lambda *_args, **_kwargs: "<div class='compact-player-avatar'></div>",
-            asset_initials=lambda _name: "PA",
-            is_injury_status=lambda _row: False,
-            interactive=interactive,
-        )
-
-    player = _player("p1", "Player A", owner="partner")
-
-    tappable_row = builder.result_row_html(
-        player,
-        compact_player_row_html=_real_compact_player_row_html,
-        interactive=True,
-    )
-    assert "data-player-id='p1'" in tappable_row
-    assert "player-card-tappable" in tappable_row
-
-    inert_row = builder.result_row_html(
-        player,
-        compact_player_row_html=_real_compact_player_row_html,
-    )
-    assert "data-player-id" not in inert_row
-    assert "player-card-tappable" not in inert_row
-
-
-def test_trade_analyzer_assembly_injects_compact_player_card():
-    ui = UI_SRC
-    assert "compact_player_row_html: Callable[..., str] | None = None" in ui
-    assert "compact_player_row_html=compact_player_row_html" in ui
-    app = Path("app.py").read_text(encoding="utf-8")
-    assert "compact_player_row_html=_compact_player_row_html" in app[
-        app.index("analyzer_ui.render_trade_analyzer_assembly(") : app.index(
-            "analyzer_ui.render_trade_analyzer_assembly("
-        )
-        + 600
-    ]
-
-
 def test_add_remove_latency_is_local():
     send, receive = [], []
     started = time.perf_counter()
@@ -344,50 +286,3 @@ def test_add_remove_latency_is_local():
     assert mutation.ok
     assert add_ms < 25
     assert remove_ms < 10
-
-
-def test_analyze_timing_is_local_to_verdict():
-    from modules import trade_offer_analyzer as toa
-
-    fit = {
-        "available": True,
-        "value_delta": 400,
-        "explanation": "Even swap.",
-        "lineup_summary": "Starter lineup stays close to neutral.",
-        "strategy_summary": "Retool-friendly.",
-        "injury_summary": "Health context stays close to neutral.",
-        "roster_fit_verdict": "Mixed Fit",
-        "component_scores": {"value": 0, "lineup": 0, "needs": 0, "age": 0, "draft": 0, "strategy": 0, "injury": 0},
-    }
-    one = [_player("a", "A", owner="me")]
-    two = [_player("b", "B", owner="partner")]
-    started = time.perf_counter()
-    toa.decide_offer_verdict(fit, send_assets=one, receive_assets=two)
-    one_ms = (time.perf_counter() - started) * 1000
-    send3 = [_player("s1", "S1", owner="me"), _player("s2", "S2", owner="me"), _pick("2027 2nd", owner="me")]
-    recv2 = [_player("r1", "R1", owner="partner"), _pick("2027 1st", owner="partner")]
-    started = time.perf_counter()
-    toa.decide_offer_verdict(fit, send_assets=send3, receive_assets=recv2)
-    multi_ms = (time.perf_counter() - started) * 1000
-    assert one_ms < 50
-    assert multi_ms < 50
-    ui = Path("modules/trade_analyzer_ui.py").read_text(encoding="utf-8")
-    assert "on_click=assembly.mutate_package" in ui
-    assert "st.rerun(" not in ui
-    assert "trade_receive_adder_open" not in ui
-
-
-def test_builder_layout_and_select_family_contracts():
-    assert "toa-assembly-stack" in TRADE_ANALYZER_CSS or "st-key-toa_roster_" in TRADE_ANALYZER_CSS
-    assert "st-key-toa_roster_" in TRADE_ANALYZER_CSS
-    assert ":not(:has(.toa-block))" in TRADE_ANALYZER_CSS
-    assert "stSelectboxVirtualDropdown" in COMPONENT_FAMILY_CSS
-    app = Path("app.py").read_text(encoding="utf-8")
-    block = app[app.index('if current_page == "trade_analyzer":') : app.index('if current_page == "premium":')]
-    assert "You receive" in UI_SRC
-    assert "You send" in UI_SRC
-    assert "Analyze Trade" in block
-    assert "include_intelligence=False" in block
-    assert "render_todays_game_plan" not in block
-    assert "render_trade_analyzer_assembly(" in block
-    assert "st.columns(2)" not in block

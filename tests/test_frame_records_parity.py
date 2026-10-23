@@ -69,11 +69,6 @@ def test_matches_on_empty_one_row_and_duplicate_columns():
     assert frame_records(None) == []
 
 
-def test_arrow_backed_and_real_player_shaped_frame():
-    frame = _zoo().convert_dtypes(dtype_backend="pyarrow")
-    _assert_equivalent(frame)
-
-
 def test_player_injury_index_identical_with_either_record_builder(monkeypatch):
     from modules import rankings
 

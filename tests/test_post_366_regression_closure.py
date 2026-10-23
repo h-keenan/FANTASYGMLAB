@@ -6,21 +6,11 @@ from unittest.mock import patch
 
 from modules import alerts_activity
 from modules import player_history
-from modules import trade_hub_player_search
 from modules import trade_ideas
 from modules import transaction_grades
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_real_component_player_event_crosses_parent_window_boundary():
-    source = (ROOT / "modules" / "interaction_contract.py").read_text(encoding="utf-8")
-    assert "window.parent && window.parent !== window" in source
-    assert "bridgeWindow.dispatchEvent" in source
-    trade = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    assert '"bridgePlayerOpens": True' in trade
-    assert '"sourceLabel": "Trade Hub"' in trade
 
 
 def test_alerts_compose_session_and_cached_news_instead_of_short_circuiting():
@@ -90,33 +80,6 @@ def test_internal_corroboration_copy_is_humanized():
     })
     assert row["context"] == "Player status has not yet been confirmed."
     assert "structured status" not in row["context"]
-
-
-def test_trade_hub_player_focus_replaces_and_is_league_scoped():
-    state = {}
-    trade_hub_player_search.queue_player_focus(state, league_id="A", player_id="p1")
-    trade_hub_player_search.queue_player_focus(state, league_id="A", player_id="p2")
-    assert not trade_hub_player_search.consume_player_focus(state, league_id="A", player_id="p1")
-    assert trade_hub_player_search.consume_player_focus(state, league_id="A", player_id="p2")
-    trade_hub_player_search.queue_player_focus(state, league_id="A", player_id="p3")
-    assert not trade_hub_player_search.consume_player_focus(state, league_id="B", player_id="p3")
-
-
-def test_multi_season_dossier_cache_preserves_2023_2024_2025(tmp_path):
-    for season, points in ((2023, 200), (2024, 250), (2025, 300)):
-        (tmp_path / f"sleeper_player_stats_{season}.json").write_text(
-            json.dumps({"p1": {"stats_season": season, "fantasy_points_ppr": points, "games_played": 17}}),
-            encoding="utf-8",
-        )
-    resume = player_history.load_cached_career_resume(
-        player_id="p1",
-        current_row={"player_id": "p1", "position": "WR", "stats_season": 2025},
-        position_lookup={"p1": "WR"},
-        cache_dir=tmp_path,
-    )
-    assert [season.season for season in resume.seasons] == [2025, 2024, 2023]
-    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "season_stats_history_html(stats_resume)" in app_source
 
 
 def _pick_trade(picks):
@@ -194,18 +157,3 @@ def test_pick_missing_all_identity_remains_pending():
         current_week=10,
     )
     assert report["pending"]
-
-
-def test_header_and_team_comparison_mobile_contracts_are_square_and_unclipped():
-    header = (ROOT / "modules" / "executive_command_header_styles.py").read_text(encoding="utf-8")
-    assert "border-radius: 0 !important" in header
-    dense = (ROOT / "modules" / "dense_list_styles.py").read_text(encoding="utf-8")
-    assert 'grid-template-areas:"lead id" "state state" "tendencies tendencies" "activity activity"' in dense
-    assert "dg-team-comparison-activity" in dense
-    assert "overflow-wrap:normal;word-break:normal" in dense
-
-
-def test_bridge_has_no_layout_height_below_command_header():
-    source = (ROOT / "modules" / "player_quick_view_bridge.py").read_text(encoding="utf-8")
-    assert "width=1" in source
-    assert 'height="content"' in source

@@ -4,7 +4,6 @@ from pathlib import Path
 from modules import trade_analyzer_builder as builder
 from modules import trade_analyzer_assembly as assembly
 from modules import trade_ideas
-from modules import transaction_grades_ui
 from modules import alerts_activity
 
 
@@ -113,49 +112,6 @@ def test_shell_and_analyzer_contexts_do_not_alternate_package_reset():
         "Parker Washington"
     ]
     assert state["trade_asset_strategy_context"] == "ppr|fringe_contender"
-
-
-def test_analyzer_is_not_fragment_split_from_analyze_owner():
-    ui = (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "@st.fragment" not in ui
-    assert "package_is_analyzable(" in app
-    assert 'data-dg-scroll-anchor="trade-analyzer-builder"' in app
-
-
-def test_history_uses_one_why_and_one_future_pick_note():
-    report = {
-        "kind": "trade",
-        "provisional": True,
-        "sides": [
-            {
-                "team": "A",
-                "letter": "A",
-                "tone": "success",
-                "confidence": "Low confidence",
-                "why": "Received 2000 current value against 1500 sent. Future pick value is estimated until the selection is known.",
-            },
-            {
-                "team": "B",
-                "letter": "D",
-                "tone": "risk",
-                "confidence": "Low confidence",
-                "why": "Received 1500 current value against 2000 sent. Future pick value is estimated until the selection is known.",
-            },
-        ],
-    }
-    html = transaction_grades_ui.trade_grade_html(report)
-    assert html.count("<span>Why</span>") == 1
-    assert html.count("Future pick value is estimated") == 1
-
-
-def test_semantic_values_never_use_ellipsis_and_header_bridge_is_zero_layout():
-    dense = (ROOT / "modules" / "dense_list_styles.py").read_text(encoding="utf-8")
-    header = (ROOT / "modules" / "executive_command_header_styles.py").read_text(encoding="utf-8")
-    assert "min-width:max-content" in dense
-    assert "text-overflow:clip" in dense
-    assert "st-key-player_quick_view_parent_bridge" in header
-    assert "height: 0 !important" in header
 
 
 def test_alerts_real_composer_populates_each_applicable_source_filter():

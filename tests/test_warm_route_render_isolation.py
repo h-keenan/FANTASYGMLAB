@@ -12,7 +12,6 @@ from modules import warm_route_render
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 PROVIDER_TOKENS = (
     "get_league(",
     "get_matchups(",
@@ -20,53 +19,6 @@ PROVIDER_TOKENS = (
     "get_rosters(",
     "get_league_drafts(",
 )
-
-
-def test_my_team_advisor_is_presentation_memo_not_game_plan_headline():
-    assert "family=\"my_team_advisor\"" in APP or "family='my_team_advisor'" in APP
-    advisor_region = APP.split("def _build_my_team_advisor_model")[1].split(
-        "my_team_snapshot_insights"
-    )[0]
-    assert "apply_strategy_age_curve" in advisor_region
-    assert "cached_trade_ideas" in advisor_region
-    assert "get_or_build_trade_headline" not in advisor_region
-    assert "cached_dashboard_trade_headline" not in advisor_region
-
-
-def test_route_local_blocks_cover_my_team_and_shared_tail():
-    for name in (
-        "post_football_players_refresh_arm",
-        "my_team_league_context",
-        "my_team_injury_enrichment",
-        "my_team_roles_strategy_canon",
-        "my_team_lineup_model",
-        "my_team_advice_model",
-        "my_team_advisor_model",
-        "my_team_age_curve",
-        "my_team_cached_trade_ideas",
-        "my_team_fa_preview",
-        "my_team_roster_injury_context",
-        "my_team_franchise_trade_summary",
-        "my_team_franchise_future_outlook",
-        "my_team_roster_limit_status",
-        "my_team_trade_candidate_prioritize",
-        "my_team_snapshot_assembly",
-        "my_team_workspace_emit",
-        "player_scan_cards",
-        "my_team_deferred_tables_emit",
-        "league_overview_standings_bundle",
-        "player_quick_view_modal",
-        "legal_footer_emit",
-    ):
-        assert name in APP
-    assert "my_team_snapshot_insights" not in APP
-    injury_at = APP.index('"my_team_roster_injury_context"')
-    trade_at = APP.index('"my_team_franchise_trade_summary"')
-    outlook_at = APP.index('"my_team_franchise_future_outlook"')
-    limit_at = APP.index('"my_team_roster_limit_status"')
-    prioritize_at = APP.index('"my_team_trade_candidate_prioritize"')
-    assembly_at = APP.index('"my_team_snapshot_assembly"')
-    assert injury_at < trade_at < outlook_at < limit_at < prioritize_at < assembly_at
 
 
 def test_blocks_are_sequential_and_exclusive():
@@ -189,25 +141,3 @@ def test_substages_do_not_inflate_exclusive_accounted_ms():
     assert summary["accounted_ms"] >= 50
     children = [row for row in warm_route_render.recorded_blocks(state) if row["block"] == "child"]
     assert children and children[0]["exclusive"] is False
-
-
-def test_diff_adds_no_provider_calls():
-    main_app = subprocess.check_output(
-        ["git", "show", "origin/main:app.py"],
-        cwd=ROOT,
-        encoding="utf-8",
-        errors="replace",
-    )
-    try:
-        main_wrr = subprocess.check_output(
-            ["git", "show", "origin/main:modules/warm_route_render.py"],
-            cwd=ROOT,
-            encoding="utf-8",
-            errors="replace",
-        )
-    except subprocess.CalledProcessError:
-        main_wrr = ""
-    current_wrr = (ROOT / "modules" / "warm_route_render.py").read_text(encoding="utf-8")
-    for token in PROVIDER_TOKENS:
-        assert APP.count(token) <= main_app.count(token), token
-        assert current_wrr.count(token) <= main_wrr.count(token), token

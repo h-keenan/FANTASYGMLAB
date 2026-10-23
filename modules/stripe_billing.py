@@ -571,7 +571,7 @@ def create_checkout_session(
     (success_url + cancel_url) XOR return_url depending on ui_mode — never
     both — so this branches the kwargs rather than always building the
     same dict. Default stays "hosted" (the redirect flow) so every
-    existing caller (Streamlit's premium_page.py) is unaffected.
+    existing caller (the removed Streamlit premium page) is unaffected.
     """
 
     _require_checkout_runtime(config)

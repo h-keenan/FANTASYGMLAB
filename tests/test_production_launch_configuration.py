@@ -64,14 +64,6 @@ def test_smoke_script_is_pass_fail_ordered():
         assert marker in text
 
 
-def test_verifier_probes_webhook_and_robots():
-    source = Path("scripts/verify_production_domain_cutover.py").read_text(encoding="utf-8")
-    assert "webhook_probe_urls" in source
-    assert "webhook_ready" in source
-    assert "STATIC_ROBOTS" in source
-    assert "webhook_health_ok" in source
-
-
 def test_production_constants_and_flag_defaults():
     assert app_config.PRODUCTION_BASE_URL == "https://app.fantasygmlab.com"
     assert app_config.PRODUCTION_MARKETING_URL == "https://fantasygmlab.com"

@@ -741,35 +741,15 @@ def _note_provider_timing(
     cache_status: str = "miss",
     timeout: bool = False,
 ) -> None:
-    """Best-effort provider timing into the active Streamlit session (no PII)."""
+    """Provider-timing hook (intentional no-op).
 
-    try:
-        import streamlit as st
+    These diagnostics were recorded into a per-browser-session store that only
+    existed in the retired Streamlit app; the API services have no such
+    session, so nothing is recorded. Call sites are kept so provider
+    timing can be re-attached to a request-scoped sink later.
+    """
 
-        from modules import tail_latency_diagnostics
-
-        tail_latency_diagnostics.note_provider_call(
-            st.session_state,
-            category=_provider_category(label),
-            duration_ms=duration_ms,
-            cache_status=cache_status,
-            timeout=timeout,
-            endpoint=_safe_provider_endpoint(label),
-        )
-        try:
-            from modules import dashboard_waterfall as _waterfall
-
-            _waterfall.note_provider(
-                provider="sleeper",
-                endpoint=_safe_provider_endpoint(label),
-                duration_ms=duration_ms,
-                cache_status=cache_status,
-                session_state=st.session_state,
-            )
-        except Exception:
-            pass
-    except Exception:
-        pass
+    return None
 
 
 def _safe_provider_endpoint(label: str) -> str:

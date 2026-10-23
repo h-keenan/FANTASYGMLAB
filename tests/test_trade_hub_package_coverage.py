@@ -8,7 +8,7 @@ from pathlib import Path
 from modules import canonical_recommendation_narrative as crn
 from modules import premium
 from modules import share_recommendation_cards as share
-from modules import trade_hub_ui
+from modules import trade_hub_presentation
 from modules import trade_ideas
 
 
@@ -62,41 +62,6 @@ def _idea(**overrides) -> dict:
     return idea
 
 
-def test_default_reveal_is_two_when_inventory_allows():
-    # The Trade Hub route body was extracted out of app.py's route
-    # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
-    board = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    section = board[
-        board.index("visible_count_key = f\"{feed_key}_visible\"") : board.index(
-            "trade_hub_first_useful.mark_trade_hub_milestone(\"trade_hub_rec1_ready\")"
-        )
-    ]
-    assert "default_visible = min(2, max(1, len(ranked_feed)))" in section
-    assert 'st.session_state.get(visible_count_key, default_visible)' in section
-    assert 'st.session_state.get(visible_count_key, 1)' not in section
-
-
-def test_scarce_inventory_copy_is_honest_for_one_approved():
-    presentation = trade_hub_ui.trade_hub_entitlement_presentation(
-        [_idea(partner_roster_id="only")],
-        [],
-        entitlement=premium.PREMIUM,
-    )
-    summary = trade_hub_ui.trade_hub_entitlement_summary(presentation, section_count=1)
-    assert summary == "One trade currently clears FantasyDesk's approval threshold."
-    assert "hidden" not in summary.casefold()
-
-
-def test_reordered_package_shares_stable_recommendation_identity():
-    first = _idea()
-    second = _idea(
-        send_assets=list(reversed(first["send_assets"])),
-    )
-    assert crn.trade_idea_identity_tuple(first) == crn.trade_idea_identity_tuple(second)
-    assert trade_hub_ui._trade_idea_identity(first) == trade_hub_ui._trade_idea_identity(second)
-    assert crn.trade_recommendation_id(first) == crn.trade_recommendation_id(second)
-
-
 def test_package_key_dedupes_reordered_players_and_picks():
     """Generation already sorts labels within each side — keep that contract."""
 
@@ -135,24 +100,6 @@ def test_board_generation_source_covers_multi_asset_shapes():
     assert "2 players + pick" not in source.casefold()
 
 
-def test_trade_hub_summary_renders_full_multi_asset_package():
-    idea = _idea(
-        send_assets=[
-            _asset_player("a", "Alpha Wide"),
-            _asset_player("b", "Beta Back"),
-            _asset_pick("2027 2nd"),
-        ],
-        receive_assets=[_asset_player("c", "Charlie Elite")],
-    )
-    html = trade_hub_ui._trade_summary_assets_html(idea["send_assets"])
-    assert "Alpha Wide" in html
-    assert "Beta Back" in html
-    assert "2027 2nd" in html
-    assert "dg-compact-pick-plate" in html
-    receive_html = trade_hub_ui._trade_summary_assets_html(idea["receive_assets"])
-    assert "Charlie Elite" in receive_html
-
-
 def test_share_card_preserves_two_player_and_pick_package():
     idea = _idea(
         send_assets=[
@@ -186,23 +133,6 @@ def test_share_renderer_overflow_announces_remaining_assets():
     assert "overflow = max(0, len(line_list) - len(visible))" in source
 
 
-def test_free_entitlement_still_caps_membership_independently_of_reveal():
-    ideas = [_idea(partner_roster_id=f"r{i}", tag=f"Tag {i}") for i in range(5)]
-    free = trade_hub_ui.trade_hub_entitlement_presentation(
-        ideas,
-        [],
-        entitlement=premium.FREE,
-    )
-    assert len(free["visible_ideas"]) == 2
-    assert free["hidden_count"] == 3
-
-
-def test_mobile_css_keeps_compact_multi_asset_rows():
-    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    assert "var(--size-asset-compact)" in css
-    assert "dg-compact-asset-stack" in css
-
-
 def test_trust_entrypoints_unchanged_for_multi_asset():
     """Multi-asset packages must not gain a separate Trust bypass."""
 
@@ -211,14 +141,6 @@ def test_trust_entrypoints_unchanged_for_multi_asset():
     assert "relaxed multi" not in trust.casefold()
     assert "bypass for 2-for-1" not in trust.casefold()
     assert "separate multi-asset trust" not in trust.casefold()
-
-
-def test_identity_digest_stable_across_hub_and_canonical():
-    idea = _idea(
-        send_assets=[_asset_player("b", "B"), _asset_player("a", "A")],
-    )
-    hub = sha256(repr(trade_hub_ui._trade_idea_identity(idea)).encode("utf-8")).hexdigest()[:16]
-    assert crn.trade_recommendation_id(idea) == hub
 
 
 def test_audit_doc_exists_with_matrix():

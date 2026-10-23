@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from modules import trade_hub_first_useful
-from modules import trade_hub_ui
+from modules import trade_hub_presentation
 from scripts.profile_trade_hub import FixtureSpec, build_fixture, run_trade_hub
 
 
@@ -72,16 +72,16 @@ def _board_from_run(result: dict[str, Any], *, entitlement: str) -> dict[str, An
         for idea in ideas
         if str(idea.get("trade_surface_tier") or "").strip().casefold() == "secondary"
     ]
-    presentation = trade_hub_ui.trade_hub_entitlement_presentation(
+    presentation = trade_hub_presentation.trade_hub_entitlement_presentation(
         primary,
         secondary,
         entitlement=entitlement,
     )
-    eligible = trade_hub_ui.order_trade_hub_visible_ideas(presentation["visible_ideas"])
+    eligible = trade_hub_presentation.order_trade_hub_visible_ideas(presentation["visible_ideas"])
     return {
         "eligible_ideas": eligible,
         "presentation": presentation,
-        "ranked_feed": trade_hub_ui.annotate_trade_hub_feed_categories(
+        "ranked_feed": trade_hub_presentation.annotate_trade_hub_feed_categories(
             eligible, headline_idea=eligible[0] if eligible else None
         ),
         "headline_idea": eligible[0] if eligible else None,

@@ -3,8 +3,8 @@
 On Render, every service in render.yaml got its own isolated instance, so
 one runaway service could not starve another and uvicorn's lack of a
 `--workers` flag just meant "one process per already-isolated instance."
-Colocating all six services (web, mobile-api, redis, stripe-webhook,
-revenuecat-webhook, caddy) on one self-hosted box (docker-compose.yml)
+Colocating all the services (mobile-api, redis, stripe-webhook,
+revenuecat-webhook, web-next, caddy) on one self-hosted box (docker-compose.yml)
 removes both of those properties, so this test file pins down the
 decisions that keep that safe:
 
@@ -58,7 +58,6 @@ def test_every_app_proxy_and_state_service_has_memory_and_cpu_limits():
     # budget below, but it still needs its own explicit ceiling like every
     # other service here.
     expected = [
-        ("web", "5g", "3.0"),
         ("mobile-api", "7g", "4.0"),
         ("redis", "256m", "0.25"),
         ("stripe-webhook", "512m", "0.5"),
@@ -80,7 +79,6 @@ def test_resource_limits_leave_headroom_on_target_box():
     # throttled and the host/Docker daemon itself always has room to
     # breathe.
     mem_limits_gb = {
-        "web": 5,
         "mobile-api": 7,
         "redis": 0.25,
         "stripe-webhook": 0.5,
@@ -88,7 +86,6 @@ def test_resource_limits_leave_headroom_on_target_box():
         "caddy": 0.25,
     }
     cpu_limits = {
-        "web": 3.0,
         "mobile-api": 4.0,
         "redis": 0.25,
         "stripe-webhook": 0.5,
@@ -123,7 +120,7 @@ def test_mobile_api_runs_multiple_workers_with_documented_rationale():
 
 def test_mobile_api_depends_on_redis_being_healthy():
     text = _compose_text()
-    names = ["web", "mobile-api", "redis", "stripe-webhook", "revenuecat-webhook", "caddy"]
+    names = ["mobile-api", "redis", "stripe-webhook", "revenuecat-webhook", "caddy"]
     block = _service_block(text, "mobile-api", names)
     assert "depends_on:" in block
     assert "redis:" in block
@@ -132,7 +129,7 @@ def test_mobile_api_depends_on_redis_being_healthy():
 
 def test_redis_service_has_a_healthcheck_and_no_hardcoded_cache_dependency():
     text = _compose_text()
-    names = ["web", "mobile-api", "redis", "stripe-webhook", "revenuecat-webhook", "caddy"]
+    names = ["mobile-api", "redis", "stripe-webhook", "revenuecat-webhook", "caddy"]
     block = _service_block(text, "redis", names)
     assert "redis-cli" in block and "ping" in block, "redis service should healthcheck via redis-cli ping"
     assert "image: redis" in block
@@ -169,7 +166,7 @@ def test_every_app_service_sets_self_hosted_managed_host_marker():
     # production box as a contributor's local checkout (see
     # docs/SELF_HOSTED_MIGRATION.md).
     text = _compose_text()
-    for name in ("web", "mobile-api", "stripe-webhook", "revenuecat-webhook"):
+    for name in ("mobile-api", "stripe-webhook", "revenuecat-webhook"):
         service_header = f"\n  {name}:\n"
         start = text.index(service_header) + len(service_header)
         rest = text[start:]
@@ -185,8 +182,8 @@ def test_every_app_service_sets_self_hosted_managed_host_marker():
 
 def test_caddy_waits_for_healthy_app_services_before_proxying():
     # The bare depends_on list form only waits for the container process to
-    # start, not for its healthcheck to pass -- `web` in particular spends
-    # real time on cold imports before /_stcore/health responds, so Caddy
+    # start, not for its healthcheck to pass -- `mobile-api` in particular spends
+    # real time on cold imports before /health responds, so Caddy
     # needs the long-form `condition: service_healthy` to avoid proxying to
     # an app service that isn't actually ready yet.
     text = _compose_text()
@@ -194,6 +191,7 @@ def test_caddy_waits_for_healthy_app_services_before_proxying():
     # web-next (additive test-subdomain preview — docs/SELF_HOSTED_MIGRATION.md
     # section 9) is included here too: Caddy waits on its healthcheck before
     # proxying, same as every other app service.
-    for name in ("web", "mobile-api", "stripe-webhook", "revenuecat-webhook", "web-next"):
+    for name in ("mobile-api", "stripe-webhook", "revenuecat-webhook", "web-next"):
         assert f"{name}:\n" in depends_on_block
-    assert depends_on_block.count("condition: service_healthy") == 5
+    assert depends_on_block.count("condition: service_healthy") == 4
+    assert "web:\n" not in depends_on_block.replace("web-next:\n", "")

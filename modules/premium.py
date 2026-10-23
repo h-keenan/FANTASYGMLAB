@@ -4,8 +4,6 @@ from collections.abc import Mapping
 from html import escape
 from typing import Any
 
-import streamlit as st
-
 from modules import app_config
 
 
@@ -464,19 +462,6 @@ def premium_lock_html(
     )
 
 
-def render_premium_lock(
-    title: str,
-    body: str = "",
-    *,
-    feature: str = "",
-    cta: str = "Upgrade to Premium",
-) -> None:
-    st.markdown(
-        premium_lock_html(title, body, feature=feature, cta=cta),
-        unsafe_allow_html=True,
-    )
-
-
 def premium_blur_preview_html(label: str, *, rows: int = 3) -> str:
     """Abstract, non-data-revealing preview rows for a locked section.
 
@@ -486,7 +471,7 @@ def premium_blur_preview_html(label: str, *, rows: int = 3) -> str:
     are empty placeholders with a literal CSS blur() (see
     modules.paywall_gate_styles.PAYWALL_GATE_CSS), not a blur() filter over
     real Pro-only data — same "tease the shape, not the content" principle
-    as modules.trade_hub_ui.trade_hub_locked_preview_html.
+    as modules.trade_hub_presentation.trade_hub_locked_preview_html.
     """
 
     slots = max(0, min(int(rows or 0), 5))

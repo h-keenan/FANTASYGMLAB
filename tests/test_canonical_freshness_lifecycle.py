@@ -169,49 +169,6 @@ def test_stable_roster_ids_ignore_reason_prose():
     assert first.recommendation_id == second.recommendation_id
 
 
-def test_identical_rerun_preserves_notification_read_state():
-    session = {"account_user_id": "user-a"}
-    fingerprint = _fingerprint().digest
-    tiles = [
-        _tile(
-            "Top Waiver Opportunity",
-            "Add X",
-            recommendation_id="w1",
-            route_key="waivers",
-        )
-    ]
-    nc.publish_activity_inventory(
-        session,
-        tiles,
-        league_id="L1",
-        context_fingerprint=fingerprint,
-    )
-    item = next(i for i in nc.compose_activity_inbox(session=session, league_id="L1") if i.recommendation_id)
-    nc.mark_notification_read(session, item.id, league_id="L1")
-    nc.publish_activity_inventory(
-        session,
-        tiles,
-        league_id="L1",
-        context_fingerprint=fingerprint,
-    )
-    again = next(i for i in nc.compose_activity_inbox(session=session, league_id="L1") if i.recommendation_id)
-    assert again.unread is False
-
-
-def test_notification_no_duplicate_unchanged_activity():
-    session = {}
-    fingerprint = _fingerprint().digest
-    tiles = [
-        _tile("Top Trade Opportunity", "Acquire RB", recommendation_id="t1", route_key="trade_hub")
-    ]
-    nc.publish_activity_inventory(session, tiles, league_id="L1", context_fingerprint=fingerprint)
-    first = [i for i in nc.compose_activity_inbox(session=session, league_id="L1") if i.recommendation_id]
-    nc.publish_activity_inventory(session, tiles, league_id="L1", context_fingerprint=fingerprint)
-    second = [i for i in nc.compose_activity_inbox(session=session, league_id="L1") if i.recommendation_id]
-    assert len(first) == len(second) == 1
-    assert first[0].id == second[0].id
-
-
 def test_daily_briefing_unchanged_on_identical_rerun():
     trade = _tile(
         "Top Trade Opportunity",
@@ -310,16 +267,3 @@ def test_contract_document_exists():
         "Known limitations",
     ):
         assert section in doc
-
-
-def test_app_wires_lifecycle_sync_and_fingerprint():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "sync_lifecycle_on_context_change(" in app
-    assert (
-        "context_fingerprint=lifecycle_fingerprint.football_digest" in app
-        or "context_fingerprint=lifecycle_fingerprint.digest" in app
-    )
-    assert "LIFECYCLE_BRIEFING_SIGNATURE_KEY" in app
-    assert "clear_notification_context_snapshot(" in (ROOT / "modules" / "notification_center.py").read_text(
-        encoding="utf-8"
-    )

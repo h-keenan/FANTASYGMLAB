@@ -1,14 +1,3 @@
-"""Web Alerts parity with mobile PR #786: matched-player identity chips.
-
-Mobile's Alerts screen was fixed to show a prestige ring, position badge, and
-team abbreviation whenever an alert row's `matched_player_id` resolves against
-the currently-loaded roster/player frame (services/mobile_api_service.py's
-`player_info_by_id`). Web's `modules/alerts_activity_ui.py` had the same gap:
-a bare portrait with no identity metadata at all, even when the row already
-carried `player_id`. These tests cover the equivalent web fix:
-`modules.alert_presentation.attach_player_identity_fields` (the presentation
-lookup) and `modules.alerts_activity_ui.timeline_row_html` (the render).
-"""
 
 from __future__ import annotations
 
@@ -16,7 +5,6 @@ import pandas as pd
 
 from modules import alert_presentation
 from modules import alerts_activity
-from modules import alerts_activity_ui
 
 
 def _players_frame() -> pd.DataFrame:
@@ -120,47 +108,6 @@ def test_attach_player_identity_fields_handles_missing_frame():
         rows, players_df=pd.DataFrame()
     )
     assert "matched_player_position" not in out_empty[0]
-
-
-def test_timeline_row_html_renders_position_team_and_prestige_ring():
-    row = {
-        "player_id": "9001",
-        "headline": "Star Wideout ankle update",
-        "category": "NEWS",
-        "matched_player_position": "WR",
-        "matched_player_team": "KC",
-        "matched_player_tier": "Elite",
-    }
-    html = alerts_activity_ui.timeline_row_html(row)
-    assert "dg-alerts-identity" in html
-    assert ">WR<" in html
-    assert ">KC<" in html
-    # "Elite" (stored) maps onto the canonical "generational" tier id — see
-    # modules/player_tier_identity.STORED_PLAYER_TIER_TO_ID. Same ring
-    # mechanism (`dg-tier-frame`) every other player card uses.
-    assert "dg-tier-frame--generational" in html
-    assert "dg-tier-frame--ring" in html
-
-
-def test_timeline_row_html_omits_identity_when_player_unresolved():
-    """No position/team/tier on the row -> no fabricated chips, no ring."""
-
-    row = {
-        "player_id": "9099",
-        "headline": "Some other news",
-        "category": "NEWS",
-    }
-    html = alerts_activity_ui.timeline_row_html(row)
-    assert "dg-alerts-identity" not in html
-    assert "dg-tier-frame" not in html
-    # Portrait itself still renders — just without identity metadata.
-    assert "dg-alerts-portrait" in html
-
-
-def test_timeline_row_html_has_no_identity_block_without_player_id():
-    row = {"headline": "League-wide news", "category": "NEWS"}
-    html = alerts_activity_ui.timeline_row_html(row)
-    assert "dg-alerts-identity" not in html
 
 
 def test_compose_activity_timeline_threads_players_df_into_matched_player_fields():

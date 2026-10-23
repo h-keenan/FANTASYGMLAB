@@ -19,8 +19,9 @@ Agents must:
 10. Report the final merge SHA.
 
 A missing local browser connection is not, by itself, a valid reason to leave a
-pull request in draft. UI changes use the deterministic GitHub Actions browser
-workflow in `.github/workflows/ci.yml`.
+pull request in draft. Web (`web-next/`) and mobile UI changes are validated by
+the path-scoped jobs in `.github/workflows/ci.yml` (typecheck, lint, unit tests,
+build).
 
 A pull request may remain draft only for:
 

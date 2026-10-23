@@ -117,22 +117,3 @@ def test_harness_script_passes_in_process():
     results = harness._run_asgi_cases()
     assert results["health"]["status_code"] == 200
     assert results["duplicate_event"]["supabase_patch_calls"] == 1
-
-
-def test_founder_ops_requires_webhook_health_url():
-    from modules import founder_ops
-
-    with patch.object(founder_ops, "_probe_webhook_health", return_value="http_404") as probe:
-        snap = founder_ops.collect_ops_snapshot(
-            environ={"DYNASTYGM_FOUNDER_OPS": "1"},
-            secrets={},
-            session_state={},
-        )
-    probe.assert_not_called()
-    assert snap.stripe_webhook_health == "not_configured"
-
-
-def test_public_probe_documents_no_server_routing():
-    source = (ROOT / "scripts" / "founder_beta_ops_public_probe.py").read_text(encoding="utf-8")
-    assert "render_routing" in source
-    assert "no-server" in source

@@ -260,16 +260,6 @@ def test_diagnostics_disabled_and_recording_failure_remain_outside_row_lifetime(
     pd.testing.assert_frame_equal(expected, actual, check_exact=True)
 
 
-def test_no_persistent_row_cache_or_app_change():
-    source = Path("modules/player_eligibility.py").read_text(encoding="utf-8")
-
-    assert "st.session_state" not in source
-    assert "cache_data" not in source
-    assert "cache_resource" not in source
-    assert "rows = [row for _, row in annotated.iterrows()]" in source
-    assert Path("app.py").read_text(encoding="utf-8")
-
-
 def test_benchmark_locations_are_sanitized():
     location = _safe_location(
         r"C:\Users\controlled-user\venv\Lib\site-packages\pandas\core.py",

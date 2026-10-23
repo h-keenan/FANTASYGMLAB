@@ -318,7 +318,7 @@ def build_league_rankings_frame(
 # trade_hub_engine already use for their own caches.
 # coridian_, 2026-10-19, performance audit: widened from the original 30s
 # to 2 minutes, alongside the same change in modules.league_value_settings/
-# modules.trade_hub_engine/modules.waivers_ui — a real league's roster
+# modules.trade_hub_engine/modules.waivers_logic — a real league's roster
 # doesn't change faster than every couple minutes in practice (trades/
 # waivers/drops happen a handful of times a week), so 30s was paying for
 # far more recomputation than the data's real freshness ever needed.
@@ -798,7 +798,7 @@ def build_draft_workspace_frame(
     draft_year: int | None = None,
 ) -> pd.DataFrame:
     """Ported verbatim from app.py (confirmed pure pandas, no Streamlit
-    dependency anywhere in it) — feeds modules.draft_center_ui's
+    dependency anywhere in it) — feeds modules.draft_center_cards's
     build_draft_decision_cards/build_draft_partner_cards. `df_intel` is
     optional: every column it would otherwise supply (power_rank,
     franchise_rank, age_rank, avg_age, strategy_display, trading_style,

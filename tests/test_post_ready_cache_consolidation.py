@@ -10,7 +10,6 @@ from modules import game_plan_process_cache
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
 CACHE = (ROOT / "modules" / "game_plan_process_cache.py").read_text(encoding="utf-8")
 
 RICH_FLAGS = (True, True, True, True)  # intel=1 roster=1 trust=1 mat=1
@@ -311,24 +310,3 @@ def test_game_plan_context_cannot_satisfy_intelligence_request():
     assert hit is False
     assert calls["n"] == 2
     assert payload["slice"] == 2
-
-
-def test_central_superset_wiring_is_not_route_aliased():
-    assert "build_league_identity_signature(" in APP
-    assert "flags=context_key" in APP
-    assert "identity=league_identity_sig" in APP
-    assert "def context_flags_cover(" in CACHE
-    assert "Never serve a narrower cache" in CACHE
-    assert "get_shared_league_context(include_trust=True)" not in APP.split(
-        "league_context = get_shared_league_context(include_trust=False)", 1
-    )[1][:400]
-
-
-def test_fingerprint_none_is_not_treated_as_lookup_status():
-    miss_log = APP.split("game_plan_package_fingerprint_diff", 1)[1].split(
-        "except Exception:", 1
-    )[0]
-    assert "miss_reason" in miss_log
-    assert "exact_key_present" in miss_log
-    assert "process_contains_signature" in miss_log
-    assert "cache_status=miss_reason" in miss_log

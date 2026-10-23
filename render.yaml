@@ -1,53 +1,7 @@
 services:
-  # Always-on Streamlit application (app.fantasygmlab.com).
-  # Free/sleeping plans cause 10–15+ s cold first-paint before Python starts.
-  # Founder Ops must select a paid always-on instance type in the Render
-  # dashboard — Blueprint cannot set billing plan.
-  - type: web
-    name: fantasygm-lab
-    branch: main
-    runtime: python
-    autoDeploy: true
-    buildCommand: pip install -r requirements.txt && python scripts/prepare_public_player_cache.py
-    startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
-    healthCheckPath: /_stcore/health
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.10
-      - key: APP_BASE_URL
-        value: https://app.fantasygmlab.com
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_BILLING_MODE
-        sync: false
-        # test until live-billing review; live requires matching sk_live_ secret
-      - key: STRIPE_PRICE_MONTHLY
-        sync: false
-      - key: STRIPE_PRICE_ANNUAL
-        sync: false
-      - key: STRIPE_CUSTOMER_PORTAL_RETURN_URL
-        sync: false
-      - key: STRIPE_CHECKOUT_SUCCESS_URL
-        sync: false
-      - key: STRIPE_CHECKOUT_CANCEL_URL
-        sync: false
-      - key: DYNASTYGM_BUILD
-        sync: false
-      - key: DYNASTYGM_SHOW_EXPERIMENTAL
-        sync: false
-      # Optional crash reporting (see app.py's top-of-file guard). Fully
-      # inert — no code path executes differently — until this is set to a
-      # real Sentry project DSN. Leave unset/blank until that project exists.
-      - key: SENTRY_DSN
-        sync: false
   # Static marketing landing (fantasygmlab.com).
   # After Blueprint sync: attach custom domains fantasygmlab.com + www,
-  # then remove those domains from the Streamlit service so auth/session
-  # has a single app origin (app.fantasygmlab.com).
+  # so auth/session has a single app origin (app.fantasygmlab.com).
   - type: web
     name: fantasygm-lab-marketing
     branch: main
@@ -133,19 +87,13 @@ services:
         sync: false
       - key: RATE_LIMIT_MUTATING_WINDOW_SECONDS
         sync: false
-  # web-next (Next.js) frontend, migrating off Streamlit page-by-page.
-  # Calls fantasygm-lab-mobile-api (see that entry above — same Supabase
-  # project, same bearer-token auth) and deep-links remaining
-  # not-yet-migrated pages out to Streamlit via NEXT_PUBLIC_STREAMLIT_BASE_URL
-  # (see web-next/src/lib/streamlitLink.ts). Not deployed until Founder Ops
-  # syncs this Blueprint entry and selects a paid always-on instance type
-  # (free/sleeping plans cause a cold first request, same as the other web
-  # services here). Cutover to app.fantasygmlab.com is a separate, manual,
-  # deliberate dashboard step — see docs/p0-launch-blocker-clearance.md for
-  # how that domain is currently attached to fantasygm-lab (Streamlit):
-  # detach app.fantasygmlab.com from fantasygm-lab and attach it here only
-  # after this service's own *.onrender.com URL has been verified end to
-  # end. Do not flip that domain as part of this Blueprint sync.
+  # web-next (Next.js) frontend (the web app). Calls fantasygm-lab-mobile-api
+  # (see that entry above — same Supabase project, same bearer-token auth).
+  # Not deployed until Founder Ops syncs this Blueprint entry and selects a
+  # paid always-on instance type (free/sleeping plans cause a cold first
+  # request, same as the other web services here). The legacy Streamlit
+  # service (fantasygm-lab) was removed in 2026-10 — see
+  # docs/streamlit-removal-2026-10.md.
   - type: web
     name: fantasygm-lab-web-next
     branch: main
@@ -158,7 +106,7 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # Same Supabase project the Streamlit app and mobile app already use.
+      # Same Supabase project the mobile app uses.
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -169,14 +117,6 @@ services:
       # http://localhost:8000 if unset (web-next/src/lib/env.ts) — must be
       # set here or every API call fails.
       - key: NEXT_PUBLIC_API_BASE_URL
-        sync: false
-      # The live Streamlit app, for pages web-next hasn't migrated yet
-      # (web-next/src/lib/streamlitLink.ts). https://app.fantasygmlab.com
-      # until the custom-domain cutover above happens, at which point this
-      # should point at fantasygm-lab's own *.onrender.com host instead (so
-      # deep-links keep working even mid-cutover, before/after the domain
-      # move).
-      - key: NEXT_PUBLIC_STREAMLIT_BASE_URL
         sync: false
   # RevenueCat webhook -> Supabase entitlement sync (mobile IAP + RC Billing
   # web). Not deployed until Founder Ops syncs this Blueprint entry and

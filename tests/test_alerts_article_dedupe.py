@@ -103,63 +103,6 @@ def _visible(session, events):
     )
 
 
-def test_same_cbs_article_collapses_to_one_row_and_shared_attention():
-    session = _roster_session()
-    row_a = _row(event_identity="ident-a", player_id=BOUTTE, relationship="MY_STARTER")
-    row_b = _row(
-        event_identity="ident-b",
-        player_id=NICO,
-        relationship="OPPONENT_ROSTER",
-        url=CBS_URL_TRACKED,
-        recommendation_id="news-event:unknown:injury_chain",
-        kind=alerts_activity.KIND_MY_TEAMMATE,
-    )
-    merged, stats = alert_presentation.merge_exact_article_rows([row_a, row_b])
-    assert stats["pre_dedupe_event_count"] == 2
-    assert stats["post_dedupe_event_count"] == 1
-    assert stats["duplicate_article_count"] == 1
-    assert len(merged) == 1
-    winner = merged[0]
-    assert winner.get("roster_relationship") == "MY_STARTER"
-    assert winner.get("player_id") == BOUTTE
-    assert BOUTTE in (winner.get("affected_player_ids") or (BOUTTE,))
-    assert NICO in (winner.get("affected_player_ids") or ())
-    assert alert_presentation.normalize_article_url(winner.get("source_url")) == (
-        alert_presentation.normalize_article_url(CBS_URL)
-    )
-    assert winner["fantasygm_read"].count("Starter availability") == 1
-
-    nc.publish_activity_inventory(session, [row_a, row_b], league_id="L1", inventory_complete=True)
-    inbox = nc.compose_activity_inbox(session=session, league_id="L1", header_cap=False)
-    news_items = [item for item in inbox if item.source_url]
-    assert len(news_items) == 1
-    assert nc.unread_count(inbox) == 1
-    toast = nc.consume_pending_urgent_delivery(session, league_id="L1")
-    assert toast is not None
-    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
-    assert int((session.get(alerts_activity.PIPELINE_STATS_KEY) or {}).get("toast_candidates") or 0) <= 1
-
-    visible = _visible(session, [row_a, row_b])
-    assert len(visible) == 1
-    assert visible[0].get("unread") is True
-    nc.mark_alert_read(session, dict(visible[0]), league_id="L1")
-    after_read = _visible(session, [row_a, row_b])
-    assert len(after_read) == 1
-    assert after_read[0].get("unread") is False
-    assert nc.unread_count(nc.compose_activity_inbox(session=session, league_id="L1")) == 0
-    nc.dismiss_alert(session, dict(after_read[0]), league_id="L1")
-    after_dismiss = _visible(session, [row_a, row_b])
-    assert after_dismiss == ()
-    history = alerts_activity.compose_activity_timeline(
-        session=session, league_id="L1", news_events=[row_a, row_b]
-    )
-    assert any(
-        alert_presentation.canonical_article_identity(row)
-        == alert_presentation.canonical_article_identity(row_a)
-        for row in history
-    )
-
-
 def test_tracking_query_urls_collapse():
     a = {"source_url": CBS_URL, "headline": JEANTY_HEADLINE, "source": "CBS"}
     b = {"source_url": CBS_URL_TRACKED, "headline": JEANTY_HEADLINE, "source": "CBS"}

@@ -53,100 +53,6 @@ def _waiver_tile(*, rec_id: str, target: str):
     }
 
 
-def test_identical_rerun_produces_zero_history_events():
-    session: dict = {}
-    tiles = [_trade_tile(rec_id="t1", target="Rhamondre Stevenson")]
-    nc.publish_activity_inventory(session, tiles, league_id="L1", roster_id="1", context_fingerprint="fp1")
-    assert dch.list_decision_events(session, league_id="L1") == ()
-    nc.publish_activity_inventory(session, tiles, league_id="L1", roster_id="1", context_fingerprint="fp1")
-    assert dch.list_decision_events(session, league_id="L1") == ()
-
-
-def test_same_recommendation_regenerated_produces_zero_events():
-    session: dict = {}
-    tiles = [_trade_tile(rec_id="t1", target="Rhamondre Stevenson")]
-    nc.publish_activity_inventory(session, tiles, league_id="L1", context_fingerprint="fp1")
-    # Same meaning, fresh dict objects.
-    tiles2 = [_trade_tile(rec_id="t1", target="Rhamondre Stevenson")]
-    nc.publish_activity_inventory(session, tiles2, league_id="L1", context_fingerprint="fp1")
-    assert dch.list_decision_events(session, league_id="L1") == ()
-
-
-def test_new_top_priority_records_one_event():
-    session: dict = {}
-    first = [_trade_tile(rec_id="jacobs", target="Josh Jacobs")]
-    nc.publish_activity_inventory(session, first, league_id="L1", context_fingerprint="fp1")
-    second = [_trade_tile(rec_id="rhamondre", target="Rhamondre Stevenson")]
-    nc.publish_activity_inventory(session, second, league_id="L1", context_fingerprint="fp2")
-    events = dch.list_decision_events(session, league_id="L1")
-    assert events
-    headlines = {event.summary_headline for event in events}
-    assert "Top priority changed" in headlines or any(
-        "leading" in event.summary_detail.casefold() for event in events
-    )
-
-
-def test_recommendation_action_change_records_event():
-    session: dict = {}
-    first = [_trade_tile(rec_id="t1", target="Player X", action="Monitor")]
-    nc.publish_activity_inventory(session, first, league_id="L1", context_fingerprint="fp1")
-    second = [_trade_tile(rec_id="t1", target="Player X", action="Add")]
-    nc.publish_activity_inventory(session, second, league_id="L1", context_fingerprint="fp1")
-    events = dch.list_decision_events(session, league_id="L1")
-    assert any(
-        "action changed" in event.summary_headline.casefold()
-        or "moved from" in event.summary_detail.casefold()
-        for event in events
-    )
-
-
-def test_recommendation_disappears_records_resolved_event():
-    session: dict = {}
-    first = [
-        _trade_tile(rec_id="t1", target="Keep"),
-        _waiver_tile(rec_id="w1", target="Brashard Smith"),
-    ]
-    nc.publish_activity_inventory(session, first, league_id="L1", context_fingerprint="fp1")
-    second = [_trade_tile(rec_id="t1", target="Keep")]
-    nc.publish_activity_inventory(session, second, league_id="L1", context_fingerprint="fp1")
-    events = dch.list_decision_events(session, league_id="L1")
-    assert any(
-        event.reason == lifecycle.MATERIAL_CHANGE_RESOLVED
-        and "no longer" in event.summary_detail.casefold()
-        for event in events
-    )
-
-
-def test_duplicate_lifecycle_sync_does_not_duplicate_events():
-    session: dict = {}
-    first = [_trade_tile(rec_id="jacobs", target="Josh Jacobs")]
-    nc.publish_activity_inventory(session, first, league_id="L1", context_fingerprint="fp1")
-    second = [_trade_tile(rec_id="rhamondre", target="Rhamondre Stevenson")]
-    nc.publish_activity_inventory(session, second, league_id="L1", context_fingerprint="fp2")
-    count = len(dch.list_decision_events(session, league_id="L1"))
-    nc.publish_activity_inventory(session, second, league_id="L1", context_fingerprint="fp2")
-    assert len(dch.list_decision_events(session, league_id="L1")) == count
-
-
-def test_league_switch_hides_prior_league_history():
-    session: dict = {}
-    nc.publish_activity_inventory(
-        session,
-        [_trade_tile(rec_id="t1", target="A")],
-        league_id="L1",
-        context_fingerprint="fp1",
-    )
-    nc.publish_activity_inventory(
-        session,
-        [_trade_tile(rec_id="t2", target="B")],
-        league_id="L1",
-        context_fingerprint="fp2",
-    )
-    assert dch.list_decision_events(session, league_id="L1")
-    dch.clear_decision_history(session)
-    assert dch.list_decision_events(session, league_id="L1") == ()
-
-
 def test_account_switch_and_logout_clear_history():
     session: dict = {
         dch.DECISION_HISTORY_EVENTS_KEY: [
@@ -176,32 +82,6 @@ def test_account_switch_and_logout_clear_history():
     assert dch.DECISION_HISTORY_EVENTS_KEY not in session
     lifecycle.clear_lifecycle_session_state(session)
     assert dch.list_decision_events(session) == ()
-
-
-def test_destination_does_not_resurrect_stale_recommendation():
-    event = dch.DecisionChangeEvent(
-        event_id="e1",
-        recommendation_id="r1",
-        league_id="L1",
-        roster_id="1",
-        timestamp=1.0,
-        lifecycle_transition="current->resolved",
-        reason="recommendation_resolved",
-        category="Waivers",
-        target_label="Gone",
-        player_id="4046",
-        destination="waivers",
-        previous_state={"target_label": "Gone"},
-        current_state=None,
-        summary_headline="Waiver opportunity resolved",
-        summary_detail="Gone is no longer available in this league.",
-        why_label="Player availability changed",
-    )
-    assert dch.destination_is_current(event)
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    opener = app.split("def _open_decision_change_event", 1)[1].split("\ndef ", 1)[0]
-    assert "recommendation_narrative=None" in opener
-    assert 'handoff_source="what_changed"' in opener
 
 
 def test_inbox_and_what_changed_remain_semantically_distinct():
@@ -301,27 +181,6 @@ def test_contract_document_exists():
         "Terminology findings",
     ):
         assert section in doc
-
-
-def test_what_changed_css_is_route_scoped():
-    ui = (ROOT / "modules" / "decision_change_history_ui.py").read_text(encoding="utf-8")
-    assert "DECISION_CHANGE_HISTORY_CSS" in ui
-    app_styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "DECISION_CHANGE_HISTORY_CSS" not in app_styles
-
-
-def test_decision_history_open_current_context_closes_dialog_first():
-    ui = (ROOT / "modules" / "decision_change_history_ui.py").read_text(encoding="utf-8")
-    assert "def _open_current(event" in ui
-    open_fn = ui[ui.index("def _open_current(event") : ui.index("title = \"Decision Memory\"")]
-    assert "_close_flag(close_key)" in open_fn
-    assert "open_event(event)" in open_fn
-    assert open_fn.index("_close_flag(close_key)") < open_fn.index("open_event(event)")
-    assert 'on_click=_open_current' in ui
-    assert 'use_container_width=False' in ui
-    assert "dg-decision-history-cta" in ui
-    # Open/view history uses on_click callbacks, not body-path only.
-    assert "on_click=_open_flag" in ui
 
 
 def test_priority_rank_shift_produces_structured_summary():

@@ -22,7 +22,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from modules import trade_hub_ui, trade_ideas, trust_engine
+from modules import trade_hub_presentation, trade_ideas, trust_engine
 from modules.player_eligibility import annotate_player_eligibility
 from modules.trust_enforcement import (
     enforce_trade_board,
@@ -292,9 +292,9 @@ def run_trade_hub(fixture: dict[str, Any], *, cached_raw: list[dict] | None = No
         (idea for idea in approved if idea.get("trade_headline_ready")),
         approved[0] if approved else None,
     )
-    grouped = trade_hub_ui.group_trade_hub_ideas(approved, headline_idea=headline)
+    grouped = trade_hub_presentation.group_trade_hub_ideas(approved, headline_idea=headline)
     cards = [
-        trade_hub_ui.trade_card_presentation_contract(idea)
+        trade_hub_presentation.trade_card_presentation_contract(idea)
         for ideas in grouped.values()
         for idea in ideas
     ]

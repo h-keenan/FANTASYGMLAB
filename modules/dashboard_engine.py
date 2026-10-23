@@ -3,7 +3,7 @@
 This is a from-scratch, session-independent sibling to the web app's
 render_home_dashboard (app.py) — it calls the exact same underlying engines
 (modules.team_eval, modules.trade_analyzer_fit, modules.injury_ui,
-modules.waivers_ui, modules.sleeper) so the mobile app's "Next Move" briefing
+modules.waivers_logic, modules.sleeper) so the mobile app's "Next Move" briefing
 agrees with the web app's Dashboard, without importing from app.py (modules/
 never imports app.py — app.py imports modules/). `select_need_headline` is
 imported from modules.roster_needs, the single source of truth this module
@@ -16,7 +16,7 @@ app does — those two modules were already pure and session-independent.
 
 `build_trade_tile`'s Top Trade Opportunity is composed the same way app.py
 builds its own `trade_item`: every reason/label/verdict piece is a real
-modules/ function app.py itself calls (modules.trade_hub_ui.trade_target_reason
+modules/ function app.py itself calls (modules.trade_hub_presentation.trade_target_reason
 et al., modules.trade_analyzer_fit.trade_value_verdict,
 modules.canonical_recommendation_narrative.build_trade_narrative) — app.py's
 `_trade_target_reason` etc. are themselves just thin aliases to these same
@@ -53,14 +53,14 @@ from modules import (
     sleeper,
     sleeper_leagues,
     team_stance,
-    trade_hub_ui,
+    trade_hub_presentation,
     trade_hub_engine,
 )
 from modules.canonical_recommendation_narrative import build_waiver_narrative
 from modules import league_calendar
 from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
-from modules.league_workspace_ui import _format_score
+from modules.league_display import _format_score
 from modules.player_cards import recommendation_reason_text
 from modules.rankings import injury_display_label, injury_level
 from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
@@ -72,7 +72,7 @@ from modules.trade_analyzer_fit import (
     roster_injury_context,
     trade_value_verdict,
 )
-from modules.waivers_ui import select_top_waiver_opportunity, waiver_recommendation_label
+from modules.waivers_logic import select_top_waiver_opportunity, waiver_recommendation_label
 
 
 def _text(value: object, default: str = "") -> str:
@@ -386,9 +386,9 @@ def build_news_tiles(
     )
 
 
-_trade_asset_injury_context = partial(trade_hub_ui.trade_asset_injury_context, injury_level=injury_level)
+_trade_asset_injury_context = partial(trade_hub_presentation.trade_asset_injury_context, injury_level=injury_level)
 _trade_idea_injury_display_context = partial(
-    trade_hub_ui.trade_idea_injury_display_context, asset_injury_context=_trade_asset_injury_context
+    trade_hub_presentation.trade_idea_injury_display_context, asset_injury_context=_trade_asset_injury_context
 )
 
 
@@ -404,18 +404,18 @@ def build_trade_tile(
     if not headline_idea:
         return None
 
-    target_reason = trade_hub_ui.trade_target_reason(
+    target_reason = trade_hub_presentation.trade_target_reason(
         headline_idea, recommendation_reason_text=recommendation_reason_text
     )
-    partner_reason = trade_hub_ui.trade_partner_reason(
+    partner_reason = trade_hub_presentation.trade_partner_reason(
         headline_idea, recommendation_reason_text=recommendation_reason_text
     )
-    confidence_reason = trade_hub_ui.trade_confidence_reason(
+    confidence_reason = trade_hub_presentation.trade_confidence_reason(
         headline_idea,
         recommendation_reason_text=recommendation_reason_text,
         injury_display_context=_trade_idea_injury_display_context,
     )
-    confidence_label = trade_hub_ui.trade_display_confidence_label(
+    confidence_label = trade_hub_presentation.trade_display_confidence_label(
         headline_idea, injury_display_context=_trade_idea_injury_display_context
     )
     gain = int(headline_idea.get("trade_gain") or 0)
@@ -566,7 +566,6 @@ def _shared_trade_independent_tiles(
         compute=compute,
         lock_timeout_seconds=_TRADE_INDEPENDENT_TILES_LOCK_TIMEOUT_SECONDS,
     )
-
 
 
 def compose_next_move_briefing(
@@ -733,7 +732,7 @@ def compose_next_move_briefing(
                 gm_target_player_ids=gm_target_player_ids,
             )
         )
-        ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+        ranked_records = trade_hub_presentation.order_trade_hub_visible_ideas(list(records))
         headline_idea = ranked_records[0] if ranked_records else None
         trade_tile = build_trade_tile(
             headline_idea, league_id=league_id, roster_id=roster_id, score_field=score_field
@@ -1010,7 +1009,7 @@ def build_league_summary(
     # the shared "asker-independent, redone from scratch" cost
     # build_valued_players_frame_cached already exists to fix (same 30s
     # Redis-backed, single-flight cache modules.league_rankings/
-    # modules.trade_hub_engine/modules.playoff_simulator/modules.waivers_ui
+    # modules.trade_hub_engine/modules.playoff_simulator/modules.waivers_logic
     # already use for their own downstream work) — this call site just
     # never used it, so every one of Portfolio's per-league fan-out threads
     # paid the full cost independently instead of sharing one cache entry

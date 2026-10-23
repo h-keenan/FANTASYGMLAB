@@ -3,7 +3,7 @@ from collections import UserDict
 from pathlib import Path
 
 from modules import premium
-from modules import premium_page
+from modules import premium_benefits
 
 
 class TestPremiumEntitlements(unittest.TestCase):
@@ -215,135 +215,13 @@ class TestPremiumEntitlements(unittest.TestCase):
         for blocked_word in ("checkout", "stripe", "subscribe now", "payment link"):
             self.assertNotIn(blocked_word, html.casefold())
 
-    def test_page_gates_keep_free_value_and_hide_premium_expansion(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        waiver_source = Path("modules/waivers_ui.py").read_text(encoding="utf-8")
-        my_team_source = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
-
-        self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", app_source)
-        # This call site moved into modules/trade_hub_ui.py's
-        # render_trade_hub_workspace, extracted out of app.py's route
-        # dispatch; it is now an unqualified in-module call.
-        trade_hub_ui_source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
-        self.assertIn("trade_hub_entitlement_presentation(", trade_hub_ui_source)
-        self.assertIn("rank_priority_add_candidates(", waiver_source)
-        self.assertIn("priority_adds", waiver_source)
-        self.assertIn("if not is_premium:", waiver_source)
-        self.assertIn("return", waiver_source)
-        self.assertIn("Advanced roster decisions", my_team_source)
-        self.assertIn("Bench insulation detail", my_team_source)
-
-    def test_free_waivers_defer_premium_only_candidate_slices(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        start = app_source.index('if not startup_waiver_blocked and selected_league_id and not free_agents_ranked.empty:')
-        end = app_source.index("waivers_ui.render_waiver_workspace_sections(")
-        waiver_branch = app_source[start:end]
-
-        self.assertLess(
-            waiver_branch.index("is_premium = current_user_is_premium()"),
-            waiver_branch.index("if is_premium:"),
-        )
-        self.assertIn("stash_candidates = featured_free_agents[", waiver_branch)
-        self.assertIn("watchlist_candidates = featured_free_agents[", waiver_branch)
-        self.assertIn("faab_pool = free_agents_ranked[", waiver_branch)
-        self.assertIn("if score_field in faab_pool.columns:", waiver_branch)
-        self.assertIn("stash_candidates = featured_free_agents.iloc[0:0].copy()", waiver_branch)
-        self.assertIn("watchlist_candidates = featured_free_agents.iloc[0:0].copy()", waiver_branch)
-        self.assertIn("faab_targets = free_agents_ranked.iloc[0:0].copy()", waiver_branch)
-
-    def test_premium_page_renders_free_and_premium_plan_content(self):
-        html = premium_page.premium_page_html(entitlement=premium.FREE)
-
-        self.assertIn("Current plan", html)
-        self.assertIn("Free", html)
-        self.assertIn("Free includes", html)
-        self.assertIn("Dashboard overview", html)
-        self.assertIn("Included now with Premium", html)
-        self.assertIn("Full Trade Hub", html)
-        self.assertIn("More next moves", html)
-        self.assertIn("Possible future features", html)
-        self.assertIn("not guaranteed", html)
-        self.assertIn("Premium checkout will appear here once billing is enabled", html)
-        self.assertNotIn("DYNASTYGM_PREMIUM_OVERRIDE=true", html)
-        debug_html = premium_page.premium_page_html(
-            entitlement=premium.FREE,
-            show_local_override_note=True,
-        )
-        self.assertIn("DYNASTYGM_PREMIUM_OVERRIDE=true", debug_html)
-
-    def test_premium_page_highlights_the_two_most_quantified_unlocks(self):
-        # Parity fix: mobile's PaywallScreen bolds + badges "GM Targets" and
-        # "Trade Hub" (its two most concretely quantified unlocks — 50 vs. a
-        # 3-player cap, every idea vs. the first 2) instead of a flat
-        # checklist where every row reads with equal weight. Web's
-        # comparison table had the identical gap; this pins that the same
-        # two rows (and only those two) get the matching "Biggest unlock"
-        # treatment here.
-        html = premium_page.premium_page_html(entitlement=premium.FREE)
-
-        self.assertEqual(html.count("Biggest unlock"), 2)
-        self.assertEqual(html.count("premium-plan-row-highlight"), 2)
-        # Free-tier rows (e.g. the limited GM Targets row) never get the
-        # Premium-only highlight treatment, even though its title also
-        # contains "GM Targets".
-        free_section = html[html.index("Free includes"):html.index("Included now with Premium")]
-        self.assertNotIn("premium-plan-row-highlight", free_section)
-
-    def test_premium_page_displays_premium_current_plan(self):
-        html = premium_page.premium_page_html(entitlement=premium.PREMIUM)
-
-        self.assertIn("premium-status-premium", html)
-        self.assertIn(">Premium<", html)
-
-    def test_premium_page_missing_config_has_no_fake_checkout_or_secret_values(self):
-        page_html = premium_page.premium_page_html(entitlement=premium.FREE).casefold()
-        app_source = Path("app.py").read_text(encoding="utf-8").casefold()
-
-        for blocked_word in ("subscribe now", "payment link", "sk_live_", "whsec_"):
-            self.assertNotIn(blocked_word, page_html)
-            self.assertNotIn(blocked_word, app_source)
-        self.assertIn("premium checkout will appear here once billing is enabled", page_html)
-
-    def test_premium_destination_and_lock_route_are_registered(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        architecture_source = Path("modules/ui_architecture.py").read_text(encoding="utf-8")
-
-        self.assertIn('PageDefinition("premium", "Premium", "SUPPORT"', architecture_source)
-        self.assertIn('if current_page == "premium":', app_source)
-        self.assertIn('force=billing_flag == "success"', app_source)
-        self.assertIn("_refresh_supabase_account_profile(force=", app_source)
-        self.assertIn("account_profile=profile", app_source)
-        self.assertIn('premium_page.render_premium_page(entitlement=current_user_entitlement())', app_source)
-        self.assertIn("premium_conversion.begin_upgrade_flow", app_source)
-        self.assertIn("premium_conversion.PRIMARY_CTA", app_source)
-        self.assertIn("premium_conversion", app_source)
-        self.assertIn("clear_entitlement_presentation_memo", app_source)
-
-    def test_profile_fetch_status_is_detectable_without_exposing_secrets(self):
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        diagnostic_source = app_source[
-            app_source.index("def _render_premium_entitlement_diagnostics"):
-            app_source.index("def _persist_supabase_account_context")
-        ]
-
-        self.assertIn('st.session_state["account_profile_status"] = "loaded" if profile else "missing"', app_source)
-        self.assertIn('st.session_state["account_profile_status"] = "error"', app_source)
-        self.assertIn('st.session_state["account_profile_error"] = error', app_source)
-        self.assertIn("premium.debug_auth_enabled", diagnostic_source)
-        self.assertIn("Developer entitlement diagnostics", diagnostic_source)
-        self.assertIn("account_profile_entitlement", diagnostic_source)
-        self.assertIn("entitlement_source", diagnostic_source)
-        self.assertNotIn("access_token", diagnostic_source)
-        self.assertNotIn("refresh_token", diagnostic_source)
-        self.assertNotIn("anon_key", diagnostic_source)
-        self.assertNotIn("SUPABASE_ANON_KEY", app_source)
 
     def test_billing_foundation_does_not_add_client_side_self_upgrade(self):
         combined = "\n".join(
             Path(path).read_text(encoding="utf-8").casefold()
             for path in (
                 "modules/premium.py",
-                "modules/premium_page.py",
+                "modules/premium_benefits.py",
                 "modules/account_store.py",
                 "modules/stripe_billing.py",
             )

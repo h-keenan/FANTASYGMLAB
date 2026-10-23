@@ -2,63 +2,11 @@ import unittest
 
 import pandas as pd
 
-import app
 from modules import player_profile_ui, player_quick_view
 
 
 class TestPlayerProfileUI(unittest.TestCase):
-    def test_avatar_html_wrapper_preserves_markup(self):
-        expected = (
-            "<div class='player-avatar dg-player-headshot dg-player-headshot--standard'>"
-            "<span class='dg-player-headshot-fallback' aria-hidden='true'>TP</span>"
-            "<img class='dg-player-headshot-image' src='https://example.com/player.png' alt='' width='44' height='44' decoding='async'>"
-            "</div>"
-        )
-        self.assertEqual(
-            player_profile_ui.avatar_html(
-                "https://example.com/player.png",
-                "TP",
-            ),
-            expected,
-        )
-        self.assertEqual(
-            app.avatar_html("https://example.com/player.png", "TP"),
-            expected,
-        )
 
-    def test_player_display_name_wrapper_removes_raw_injury_prefix(self):
-        row = {
-            "name": "INJ Test Player",
-            "status": "IR",
-            "injury_status": "season-ending",
-        }
-        self.assertEqual(app.player_display_name(row), "Test Player")
-
-    def test_stat_groups_preserve_zeroes_and_share_formatting(self):
-        row = pd.Series(
-            {
-                "games_played": 2,
-                "targets": 0,
-                "receiving_yards": 120,
-                "snap_share": 0.75,
-                "fantasy_points_ppr": 27.0,
-                "ppg": 13.5,
-            }
-        )
-
-        module_groups = player_profile_ui.player_profile_stat_groups(row)
-        wrapper_groups = app._player_profile_stat_groups(row)
-
-        self.assertEqual(wrapper_groups, module_groups)
-        self.assertEqual(player_profile_ui.format_share_pct(0.75), "75%")
-        production = dict(
-            (item["label"], item["value"])
-            for label, items in module_groups
-            if label == "NFL Stats"
-            for item in items
-        )
-        self.assertEqual(production["Targets"], "0")
-        self.assertEqual(production["Rec Yards"], "120")
 
     def test_college_stats_render_only_when_college_production_exists(self):
         row = pd.Series(
@@ -109,38 +57,6 @@ class TestPlayerProfileUI(unittest.TestCase):
 
         self.assertIn("college_receiving_yards", message)
 
-    def test_quick_view_source_uses_clear_stat_and_action_copy(self):
-        source = (
-            open("app.py", encoding="utf-8").read()
-            + open("modules/player_quick_view.py", encoding="utf-8").read()
-        )
-
-        self.assertIn("player-quick-view-stats-empty", source)
-        self.assertIn("No professional statistics are available for the loaded season.", source)
-        self.assertIn("college_unavailable_message()", source)
-        self.assertIn('"Open in Trade Hub"', source)
-        self.assertIn('"Untouchable"', source)
-        self.assertNotIn('"Open Trade Hub for Player"', source)
-        self.assertNotIn('"Add Untouchable"', source)
-
-    def test_quick_view_stats_use_dense_non_tappable_rows(self):
-        source = (
-            open("app.py", encoding="utf-8").read()
-            + open("modules/player_quick_view.py", encoding="utf-8").read()
-        )
-
-        self.assertIn("player-quick-view-stat-grid", source)
-        self.assertIn("player-quick-view-stat-row", source)
-        self.assertIn("pqv-bio", source)
-        self.assertIn("player-dossier-snapshot", source)
-        self.assertIn("player-dossier-recommendation-context", source)
-        self.assertIn("pqv_detail_nav_", source)
-        self.assertIn("build_stats_view", source)
-        self.assertIn("Professional Production", source)
-        self.assertIn("Fantasy Production", source)
-        self.assertIn("College Production", source)
-        self.assertIn("Career Context", source)
-        self.assertNotIn("render_summary_tiles(quick_view_tiles", source)
 
     def test_quick_view_stat_helpers_preserve_existing_values_by_section(self):
         row = pd.Series(

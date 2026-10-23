@@ -4,8 +4,7 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 
-import app
-from modules import player_cards, waivers_ui
+from modules import player_cards, waivers_logic
 
 
 class TestWaiversUI(unittest.TestCase):
@@ -13,7 +12,7 @@ class TestWaiversUI(unittest.TestCase):
     def _render_card(row):
         tap_renderer = Mock(return_value="")
         quick_view = Mock()
-        waivers_ui.render_free_agent_cards(
+        waivers_logic.render_free_agent_cards(
             pd.DataFrame([row]),
             "value_score",
             recommendation_reason_text=lambda value, _limit: str(value),
@@ -38,63 +37,6 @@ class TestWaiversUI(unittest.TestCase):
         )
         return tap_renderer.call_args.kwargs["html"], tap_renderer, quick_view
 
-    def test_waiver_cards_use_one_section_level_feedback_control(self):
-        free_agents = pd.DataFrame(
-            [
-                {
-                    "player_id": f"player-{index}",
-                    "name": f"Player {index}",
-                    "position": "RB",
-                    "team": "DAL",
-                    "age": 24,
-                    "value_score": 70 - index,
-                    "market_score": 60,
-                    "opportunity_score": 55,
-                    "position_rank": index + 1,
-                    "stale_free_agent": False,
-                }
-                for index in range(3)
-            ]
-        )
-        feedback = Mock()
-
-        tap_renderer = Mock(return_value="")
-        waivers_ui.render_free_agent_cards(
-            free_agents,
-            "value_score",
-            recommendation_reason_text=lambda value, _limit: str(value),
-            player_display_name=lambda row: row.get("name"),
-            cached_headshot_data_url=lambda _player_id: "",
-            asset_initials=lambda _name: "P",
-            player_status_style=lambda label: {
-                "label": label,
-                "tone": "neutral",
-            },
-            canonical_player_status=lambda value: str(value),
-            tier_chip_html=lambda _value: "",
-            player_support_chip_html=lambda _value, _tone: "",
-            player_status_pill_html=lambda value: f"<span>{value}</span>",
-            render_tappable_player_html=tap_renderer,
-            open_player_quick_view=Mock(),
-            render_recommendation_feedback=feedback,
-        )
-
-        html = tap_renderer.call_args.kwargs["html"]
-        # Compact row redesign: avatar (ring) + bold name + colored
-        # position pill + team + ONE inline FAAB stat — see
-        # modules.waivers_ui.render_free_agent_cards' docstring.
-        self.assertIn("dg-compact-asset--standard", html)
-        self.assertIn("dg-tier-frame--ring", html)
-        self.assertIn("dg-football-position--rb", html)
-        self.assertIn("DAL", html)
-        self.assertIn("FAAB ", html)
-        self.assertNotIn("Age 24", html)
-        self.assertNotIn("RB | DAL | Age 24", html)
-        feedback.assert_called_once()
-        self.assertEqual(
-            feedback.call_args.kwargs["recommendation_title"],
-            "Waiver recommendation board",
-        )
 
     def test_top_waiver_suppresses_kicker_when_roster_has_viable_kicker(self):
         free_agents = pd.DataFrame(
@@ -116,7 +58,7 @@ class TestWaiversUI(unittest.TestCase):
             ]
         )
 
-        selected = waivers_ui.select_top_waiver_opportunity(
+        selected = waivers_logic.select_top_waiver_opportunity(
             free_agents,
             roster,
             {"k_count": 1},
@@ -133,7 +75,7 @@ class TestWaiversUI(unittest.TestCase):
             ]
         )
 
-        selected = waivers_ui.select_top_waiver_opportunity(
+        selected = waivers_logic.select_top_waiver_opportunity(
             free_agents,
             pd.DataFrame(
                 [{"player_id": "rb-0", "position": "RB", "team": "DAL"}]
@@ -169,7 +111,7 @@ class TestWaiversUI(unittest.TestCase):
         other_rosters = [{"roster_id": i, "players": []} for i in range(2, 11)]
         rosters = [my_roster] + other_rosters
 
-        selected = waivers_ui.select_top_waiver_opportunity(
+        selected = waivers_logic.select_top_waiver_opportunity(
             free_agents,
             pd.DataFrame([{"player_id": "rb-0", "position": "RB", "team": "DAL"}]),
             {"k_count": 1},
@@ -198,7 +140,7 @@ class TestWaiversUI(unittest.TestCase):
         ]
         rosters = [my_roster] + other_rosters
 
-        selected = waivers_ui.select_top_waiver_opportunity(
+        selected = waivers_logic.select_top_waiver_opportunity(
             free_agents,
             pd.DataFrame([{"player_id": "rb-0", "position": "RB", "team": "DAL"}]),
             {"k_count": 1},
@@ -218,7 +160,7 @@ class TestWaiversUI(unittest.TestCase):
             ]
         )
 
-        selected = waivers_ui.select_top_waiver_opportunity(
+        selected = waivers_logic.select_top_waiver_opportunity(
             free_agents,
             pd.DataFrame(),
             {"k_count": 0},
@@ -228,328 +170,20 @@ class TestWaiversUI(unittest.TestCase):
 
         self.assertEqual(selected["player_id"], "rb-1")
 
-    def test_priority_badge_is_exposed_through_app(self):
-        self.assertIs(
-            app.free_agent_priority_badge,
-            waivers_ui.free_agent_priority_badge,
-        )
-        self.assertEqual(
-            app.free_agent_priority_badge(
-                {"score": 80, "stale_free_agent": False},
-                1,
-            )[0],
-            "Best Available",
-        )
-        self.assertEqual(
-            app.free_agent_priority_badge(
-                {"score": 0, "stale_free_agent": True},
-                1,
-            )[0],
-            "Deprioritized",
-        )
-
-    def test_reason_wrapper_preserves_roster_need_context(self):
-        reason = app.free_agent_reason_text(
-            {
-                "position": "WR",
-                "score": 70,
-                "age": 25,
-                "stale_free_agent": False,
-            },
-            4,
-            "Value Score",
-            needed_positions=["WR"],
-        )
-
-        self.assertIn("Matches your current WR need", reason)
-
-    def test_priority_add_reason_keeps_player_specific_opportunity(self):
-        explanation = (
-            "Player is deep on the depth chart and mostly profiles as insurance "
-            "behind a locked-in starter, but still has some standalone receiving "
-            "upside if the lead back misses time."
-        )
-        reason = app.free_agent_reason_text(
-            {
-                "position": "RB",
-                "score": 70,
-                "age": 26,
-                "stale_free_agent": False,
-                "priority_value_opportunity": True,
-                "opportunity_explanation": explanation,
-            },
-            1,
-            "Value Score",
-            needed_positions=["WR"],
-        )
-        self.assertIn("depth chart", reason)
-        self.assertNotIn(waivers_ui.GENERIC_DYNASTY_VALUE_PREFIX, reason)
-        self.assertLessEqual(len(reason), waivers_ui.WAIVER_CARD_WHY_MAX_CHARS)
-        section = waivers_ui.priority_adds_section_note("Value Score", [])
-        self.assertIn("high-value dynasty adds", section)
-
-    def test_summary_cards_render_html(self):
-        free_agents = pd.DataFrame(
-            [
-                {
-                    "player_id": "player-1",
-                    "name": "Test Player",
-                    "position": "WR",
-                    "age": 24,
-                    "value_score": 75,
-                    "stale_free_agent": False,
-                    "_overall_rating_col": 78,
-                    "canonical_position_rank": 21,
-                }
-            ]
-        )
-        with patch.object(waivers_ui.st, "markdown") as markdown:
-            waivers_ui.render_free_agent_summary_cards(
-                free_agents,
-                "value_score",
-                player_display_name=lambda row: row.get("name"),
-            )
-
-        html = markdown.call_args.args[0]
-        self.assertIn("free-agent-summary-grid", html)
-        self.assertIn("Test Player", html)
-        # Compact density now (matches the Priority Adds rows' avatar size),
-        # not the old full-width-hero "standard" density (88px avatar).
-        self.assertIn("dg-football-asset--compact", html)
-        self.assertNotIn("dg-football-asset--standard", html)
-        self.assertNotIn("dg-football-asset--stacked", html)
-        # Mobile parity (PlayerIdentityRow.tsx metaRow): colored position
-        # badge first, team as plain text, no inline age.
-        self.assertNotIn("Age 24", html)
-        self.assertIn("dg-football-position--wr", html)
-        self.assertIn("WR", html)
-        self.assertIn("Best Available", html)
-        # No inline Why: reasoning text and no raw value-score number on the
-        # compact card -- an OVR gauge takes the trailing slot instead.
-        self.assertNotIn("Why:", html)
-        self.assertNotIn("Value Score: 75", html)
-        self.assertIn("dg-ovr-gauge", html)
-        self.assertIn("78", html)
-        self.assertIn("waiver-snapshot-avatar", html)
-        self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
-
-    def test_free_agent_card_wrapper_injects_app_callbacks(self):
-        with patch.object(
-            waivers_ui,
-            "render_free_agent_cards",
-        ) as render_cards:
-            app.render_free_agent_cards(
-                pd.DataFrame(),
-                "value_score",
-                key_prefix="test",
-            )
-
-        kwargs = render_cards.call_args.kwargs
-        self.assertIs(
-            kwargs["open_player_quick_view"],
-            app.open_player_quick_view,
-        )
-        self.assertIs(
-            kwargs["render_recommendation_feedback"],
-            app.render_recommendation_feedback,
-        )
-        self.assertIs(
-            kwargs["cached_headshot_data_url"],
-            app.cached_headshot_data_url,
-        )
-        self.assertIs(
-            kwargs["render_tappable_player_html"],
-            app._render_tappable_player_html,
-        )
-        self.assertEqual(kwargs["key_prefix"], "test")
-
-    def test_waiver_workspace_surfaces_personalized_board_before_snapshot(self):
-        source = Path("modules/waivers_ui.py").read_text(encoding="utf-8")
-
-        priority_idx = source.index('"Priority Adds"')
-        beyond_idx = source.index('"Beyond Priority Adds"')
-        stash_idx = source.index('"Stash Candidates"')
-        watchlist_idx = source.index('"Watchlist Depth"')
-        faab_idx = source.index('"FAAB Shortlist"')
-        snapshot_idx = source.index('"Waiver Snapshot"')
-        detailed_idx = source.index('with st.expander("Detailed Table View", expanded=False):')
-
-        # Personalized, roster-aware content (the Premium secondary board)
-        # must render before the generic Best Available/Snapshot browsing —
-        # Magna Carta §31 — and must not be hidden behind a click-to-open
-        # expander the way the legacy V1 "Secondary waiver board" was.
-        self.assertLess(priority_idx, beyond_idx)
-        self.assertLess(beyond_idx, stash_idx)
-        self.assertLess(stash_idx, watchlist_idx)
-        self.assertLess(watchlist_idx, faab_idx)
-        self.assertLess(faab_idx, snapshot_idx)
-        self.assertLess(snapshot_idx, detailed_idx)
-        self.assertNotIn('with st.expander("Secondary waiver board"', source)
-        self.assertIn("Waiver Snapshot", source)
-        self.assertIn("FAAB Shortlist", source)
-        self.assertIn("waiver_section_header_html", source)
-        self.assertNotIn("<span class='dg-semantic-icon' aria-hidden='true'>+</span>Waiver Snapshot", source)
-        self.assertNotIn("<span class='dg-semantic-icon' aria-hidden='true'>+</span>Priority Adds", source)
-        # Recommendation-clarity: the page must explain that there is no
-        # in-app waiver-claim submission, and where the real action happens.
-        self.assertIn("does not submit waiver claims for you", source)
-        self.assertIn("Sleeper", source)
-        self.assertIn("waivers_priority_adds_emit", source)
-        self.assertIn("waiver_card_render", source)
-        self.assertIn("waiver_action_controls_emit", source)
-        self.assertIn("waivers_secondary_sections_emit", source)
-
-        header_html = waivers_ui.waiver_section_header_html(
-            "Priority Adds",
-            kicker="Next Add",
-            note="Start here.",
-            preset="opportunity-list",
-        )
-        self.assertIn("dg-section-opportunity-list", header_html)
-        self.assertIn("dg-ui-section-title", header_html)
-        self.assertIn("<h2", header_html)
-
-    def test_waiver_copy_and_avatar_polish_markers_are_present(self):
-        rankings_source = Path("modules/rankings.py").read_text(encoding="utf-8")
-        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
-
-        self.assertIn("_append_display_sentence", rankings_source)
-        self.assertNotIn("alive Player", rankings_source)
-        self.assertNotIn("role Player", rankings_source)
-        self.assertIn(".dg-player-portrait > .free-agent-avatar", css)
-        self.assertIn("--avatar-size: 100% !important", css)
-        self.assertNotIn("--avatar-size: 56px !important", css)
-        self.assertNotIn("--avatar-size: 48px !important", css)
-        self.assertIn("object-position: var(--dg-player-image-position) !important", css)
-
-    def test_compact_row_shows_identity_recommendation_and_faab(self):
-        html, _, _ = self._render_card(
-            {
-                "player_id": "player-1",
-                "name": "A Very Long Waiver Target Name",
-                "position": "WR",
-                "team": "DAL",
-                "age": 23,
-                "value_score": 71,
-                "position_rank": 4,
-                "opportunity_label": "Backup With Upside",
-                "opportunity_explanation": "Role could expand after a depth-chart change.",
-                "opportunity_confidence": "Medium",
-                "stale_free_agent": False,
-            }
-        )
-
-        self.assertIn("dg-compact-asset--standard", html)
-        self.assertIn("dg-football-position--wr", html)
-        self.assertIn("A Very Long Waiver Target Name", html)
-        self.assertIn("FAAB ", html)
-        # App-parity pass (coridian_, 2026-10-13): restored row density —
-        # the Add/Stash/Watch recommendation pill renders inline alongside
-        # the FAAB figure (via waiver_recommendation_label/
-        # player_support_chip_html), matching mobile's WaiverRecommendationCard
-        # compact branch. Still none of the full prose (reason sentence,
-        # "Review add ->" link, the old full decision-card chrome) — that
-        # stays behind the tap, in Player Quick View.
-        #
-        # The raw value-score number was deliberately removed from this row
-        # (coridian_, 2026-10-13: "you can just remove that value score on
-        # there because [it doesn't] really make any sense") — asserted
-        # absent below, alongside the dead `waiver-compact-score` CSS class
-        # name it used to carry.
-        self.assertIn("waiver-compact-row-trailing", html)
-        self.assertIn(">Stash<", html)
-        self.assertNotIn("waiver-compact-score", html)
-        self.assertNotIn("dg-ui-card dg-ui-card--elevated", html)
-        self.assertNotIn("Role could expand after a depth-chart change.", html)
-        self.assertNotIn("Medium confidence", html)
-        self.assertNotIn("Review add →", html)
-        self.assertNotIn("View Details", html)
-        self.assertNotIn("Why now?", html)
-        self.assertNotIn("Dynasty context", html)
-        self.assertNotIn("waiver-context-grid", html)
-
-    def test_recommendation_labels_do_not_mutate_or_reorder_input(self):
-        frame = pd.DataFrame(
-            [
-                {
-                    "player_id": "add",
-                    "name": "Add Player",
-                    "position": "RB",
-                    "age": 27,
-                    "position_rank": 1,
-                    "value_score": 80,
-                    "stale_free_agent": False,
-                },
-                {
-                    "player_id": "watch",
-                    "name": "Watch Player",
-                    "position": "WR",
-                    "age": 29,
-                    "position_rank": 10,
-                    "value_score": 50,
-                    "stale_free_agent": True,
-                },
-            ]
-        )
-        original = frame.copy(deep=True)
-        tap_renderer = Mock(return_value="")
-
-        waivers_ui.render_free_agent_cards(
-            frame,
-            "value_score",
-            recommendation_reason_text=lambda value, _limit: str(value),
-            player_display_name=lambda value: value.get("name"),
-            cached_headshot_data_url=lambda _player_id: "",
-            asset_initials=lambda _name: "P",
-            player_status_style=lambda label: {"label": label, "tone": "neutral"},
-            canonical_player_status=lambda value: str(value),
-            tier_chip_html=lambda _value: "",
-            player_support_chip_html=lambda _value, _tone: "",
-            player_status_pill_html=lambda _value: "",
-            render_tappable_player_html=tap_renderer,
-            open_player_quick_view=Mock(),
-            render_recommendation_feedback=Mock(),
-        )
-
-        pd.testing.assert_frame_equal(frame, original)
-        rendered = [call.kwargs["html"] for call in tap_renderer.call_args_list]
-        self.assertIn("Add Player", rendered[0])
-        self.assertIn("Watch Player", rendered[1])
-
-    def test_card_escapes_player_and_context_content(self):
-        html, _, _ = self._render_card(
-            {
-                "player_id": "safe-id",
-                "name": "<script>alert(1)</script>",
-                "position": "WR",
-                "team": "FA",
-                "age": 22,
-                "value_score": 60,
-                "position_rank": 8,
-                "opportunity_label": "<b>Role</b>",
-                "opportunity_explanation": "<img src=x onerror=alert(1)>",
-                "stale_free_agent": False,
-            }
-        )
-
-        self.assertNotIn("<script>", html)
-        self.assertNotIn("<img src=x", html)
-        self.assertIn("&lt;script&gt;", html)
-        self.assertNotIn("<b>Role</b>", html)
 
     def test_waiver_confidence_label_reflects_real_need_fit_and_value_signals(self):
         # High: a real, already-computed roster-need match (or an injury
         # replacement fit) — the strongest signal rank_priority_add_candidates
         # itself sorts on first.
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": True, "priority_value_opportunity": False, "score": 40},
                 3,
             ),
             ("High", "Matches a real roster need on this roster."),
         )
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": False, "injury_replacement_fit": True, "score": 40},
                 5,
             )[0],
@@ -557,14 +191,14 @@ class TestWaiversUI(unittest.TestCase):
         )
         # Medium: elite wire value, but not tied to a stated roster need.
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": False, "priority_value_opportunity": True, "score": 40},
                 4,
             )[0],
             "Medium",
         )
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": False, "priority_value_opportunity": False, "score": 40},
                 1,
             )[0],
@@ -572,14 +206,14 @@ class TestWaiversUI(unittest.TestCase):
         )
         # Low: stale or non-positive score under the current lens.
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": True, "priority_value_opportunity": True, "score": 0},
                 1,
             )[0],
             "Low",
         )
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {
                     "priority_need_fit": True,
                     "priority_value_opportunity": True,
@@ -592,7 +226,7 @@ class TestWaiversUI(unittest.TestCase):
         )
         # Depth-level add: neither a need match nor standout wire value.
         self.assertEqual(
-            waivers_ui.waiver_confidence_label(
+            waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": False, "priority_value_opportunity": False, "score": 40},
                 8,
             )[0],
@@ -602,248 +236,10 @@ class TestWaiversUI(unittest.TestCase):
         # Watchlist/FAAB Shortlist) carry neither flag at all — an honest
         # empty label rather than a fabricated one.
         self.assertEqual(
-            waivers_ui.waiver_confidence_label({"score": 40}, 1),
+            waivers_logic.waiver_confidence_label({"score": 40}, 1),
             ("", ""),
         )
 
-    def test_priority_confidence_renders_inline_as_a_segmented_meter(self):
-        # App-parity pass: confidence is back on the row, but as the slim
-        # inline 3-segment meter mobile's ConfidenceMeter.tsx MeterRow uses
-        # (modules.trade_visual_language.confidence_segments_html's
-        # "tvl-seg-row"/"tvl-seg" classes) — never the bigger standalone
-        # radial "tvl-conf" ring Dashboard cards use elsewhere.
-        html, _, _ = self._render_card(
-            {
-                "player_id": "priority-1",
-                "name": "Priority Player",
-                "position": "RB",
-                "team": "SEA",
-                "age": 24,
-                "value_score": 55,
-                "position_rank": 2,
-                "stale_free_agent": False,
-                "priority_need_fit": True,
-                "priority_value_opportunity": False,
-            }
-        )
-        self.assertIn("tvl-seg-row", html)
-        self.assertIn("High confidence", html)
-        self.assertNotIn("tvl-conf", html)
-
-    def test_priority_confidence_badge_absent_without_real_ranker_signals(self):
-        # Stash/Watchlist/FAAB Shortlist rows never went through
-        # rank_priority_add_candidates, so no priority_need_fit/
-        # priority_value_opportunity columns exist — no fabricated badge.
-        html, _, _ = self._render_card(
-            {
-                "player_id": "stash-1",
-                "name": "Stash Player",
-                "position": "WR",
-                "team": "SEA",
-                "age": 22,
-                "value_score": 30,
-                "position_rank": 9,
-                "stale_free_agent": False,
-            }
-        )
-        self.assertNotIn("tvl-conf", html)
-        self.assertNotIn("tvl-seg-row", html)
-
-    def test_trending_pill_renders_inline_on_compact_row(self):
-        # App-parity pass: the Sleeper global trending-add signal is back
-        # on the row as a short pill (waiver_trending_add_pill_html) —
-        # deliberately different copy from the longer Player Quick View
-        # narrative sentence below ("Trending across Sleeper over the last
-        # 24h."), so this inline chip and that narrative sentence can
-        # never be confused for each other in these assertions.
-        html, _, _ = self._render_card(
-            {
-                "player_id": "trend-1",
-                "name": "Trending Player",
-                "position": "WR",
-                "team": "SEA",
-                "age": 23,
-                "value_score": 40,
-                "position_rank": 5,
-                "stale_free_agent": False,
-                "sleeper_trending_add": True,
-                "sleeper_trending_add_count": 1284,
-            }
-        )
-        self.assertIn("waiver-trending-pill", html)
-        self.assertIn("Trending on Sleeper +1,284", html)
-        self.assertNotIn("Trending across Sleeper", html)
-
-    def test_trending_badge_absent_when_not_trending(self):
-        html, _, _ = self._render_card(
-            {
-                "player_id": "trend-2",
-                "name": "Quiet Player",
-                "position": "WR",
-                "team": "SEA",
-                "age": 23,
-                "value_score": 40,
-                "position_rank": 5,
-                "stale_free_agent": False,
-                "sleeper_trending_add": False,
-            }
-        )
-        self.assertNotIn("Trending across Sleeper", html)
-
-    def test_overall_rating_gauge_renders_plain_percentile_tint(self):
-        # coridian_, 2026-10-13: "I have no clue what the 78/71 and 55
-        # mean... that should be [a labeled badge] like the app" — the
-        # bare value-score number stays, this gauge is the added OVR
-        # context, fed by _overall_rating_col (never the value score).
-        # Then, 2026-10-14, on the pill this shipped as elsewhere in the
-        # app: "the overall ALWAYS needs to be a circular gauge throughout
-        # the site" — so this renders the shared circular gauge, not a pill.
-        html, _, _ = self._render_card(
-            {
-                "player_id": "ovr-1",
-                "name": "Mid Rating Player",
-                "position": "RB",
-                "team": "SEA",
-                "age": 23,
-                "value_score": 71,
-                "position_rank": 5,
-                "stale_free_agent": False,
-                "_overall_rating_col": 78,
-                "canonical_position_rank": 9,
-            }
-        )
-        self.assertIn("dg-ovr-gauge", html)
-        self.assertIn("78", html)
-        self.assertNotIn("dg-ovr-gauge--crowned", html)
-
-    def test_overall_rating_gauge_absent_when_rating_missing(self):
-        html, _, _ = self._render_card(
-            {
-                "player_id": "ovr-2",
-                "name": "No Rating Player",
-                "position": "RB",
-                "team": "SEA",
-                "age": 23,
-                "value_score": 40,
-                "position_rank": 11,
-                "stale_free_agent": False,
-            }
-        )
-        self.assertNotIn("dg-ovr-gauge", html)
-
-    def test_overall_rating_gauge_crowns_top_five_league_wide_position_rank(self):
-        # Top-5 league-wide positional rank (canonical_position_rank, the
-        # same "rank among ALL players, rostered included" field
-        # _waiver_detail_note's own docstring distinguishes from the
-        # wire-relative position_rank) swaps the plain percentile tint for
-        # a crowned gold/silver/bronze prestige fill — mobile parity with
-        # lib/positionRankPrestige.ts.
-        html, _, _ = self._render_card(
-            {
-                "player_id": "ovr-3",
-                "name": "Elite Rank Player",
-                "position": "RB",
-                "team": "SEA",
-                "age": 23,
-                "value_score": 90,
-                "position_rank": 1,
-                "stale_free_agent": False,
-                "_overall_rating_col": 91,
-                "canonical_position_rank": 2,
-            }
-        )
-        self.assertIn("dg-ovr-gauge--crowned", html)
-        self.assertIn("dg-ovr-gauge-crown", html)
-        self.assertIn("91", html)
-
-    def test_overall_rating_gauge_not_crowned_outside_top_five(self):
-        html, _, _ = self._render_card(
-            {
-                "player_id": "ovr-4",
-                "name": "Deep Rank Player",
-                "position": "RB",
-                "team": "SEA",
-                "age": 23,
-                "value_score": 60,
-                "position_rank": 9,
-                "stale_free_agent": False,
-                "_overall_rating_col": 65,
-                "canonical_position_rank": 6,
-            }
-        )
-        self.assertIn("dg-ovr-gauge", html)
-        self.assertNotIn("dg-ovr-gauge--crowned", html)
-
-    def test_overall_rating_gauge_delegates_to_shared_player_cards_gauge(self):
-        # Waivers no longer keeps its own prestige/tint formula copy — it
-        # delegates straight to the one shared, canonical gauge builder.
-        row = {"_overall_rating_col": 78, "canonical_position_rank": 9}
-        self.assertEqual(
-            waivers_ui.waiver_overall_rating_gauge_html(row),
-            player_cards.overall_rating_gauge_html(row, size="sm"),
-        )
-
-    def test_sleeper_trending_add_sentence_plain_text(self):
-        self.assertEqual(
-            waivers_ui.sleeper_trending_add_sentence(
-                {"sleeper_trending_add": True, "sleeper_trending_add_count": 1284}
-            ),
-            "Trending across Sleeper (+1,284 adds in the last 24h).",
-        )
-        self.assertEqual(
-            waivers_ui.sleeper_trending_add_sentence({"sleeper_trending_add": False}),
-            "",
-        )
-
-    def test_tapping_the_compact_row_opens_detail_with_faab_and_trending_folded_in(self):
-        # The compact row only shows the FAAB figure inline; the full
-        # reason, FAAB rationale, and Sleeper trending-add signal — all
-        # genuinely missing from Player Quick View otherwise — travel as
-        # part of the recommendation narrative handed to
-        # open_player_quick_view when the row is tapped.
-        player_id = "trend-detail-1"
-        tap_renderer = Mock(return_value=player_id)
-        quick_view = Mock()
-        waivers_ui.render_free_agent_cards(
-            pd.DataFrame(
-                [
-                    {
-                        "player_id": player_id,
-                        "name": "Detail Player",
-                        "position": "WR",
-                        "team": "SEA",
-                        "age": 23,
-                        "value_score": 40,
-                        "position_rank": 5,
-                        "stale_free_agent": False,
-                        "sleeper_trending_add": True,
-                        "sleeper_trending_add_count": 1284,
-                    }
-                ]
-            ),
-            "value_score",
-            recommendation_reason_text=lambda value, _limit: str(value),
-            player_display_name=lambda value: value.get("name"),
-            cached_headshot_data_url=lambda _player_id: "",
-            asset_initials=lambda _name: "P",
-            player_status_style=lambda label: {"label": label, "tone": "neutral"},
-            canonical_player_status=lambda value: str(value),
-            tier_chip_html=lambda _value: "",
-            player_support_chip_html=lambda _value, _tone: "",
-            player_status_pill_html=lambda value: f"<span>{value}</span>",
-            render_tappable_player_html=tap_renderer,
-            open_player_quick_view=quick_view,
-            render_recommendation_feedback=Mock(),
-        )
-
-        quick_view.assert_called_once()
-        kwargs = quick_view.call_args.kwargs
-        self.assertIn("Wire WR #5", kwargs["source_note"])
-        self.assertIn("FAAB guidance:", kwargs["source_note"])
-        self.assertIn("Trending across Sleeper (+1,284 adds in the last 24h).", kwargs["source_note"])
-        narrative_reason = kwargs["recommendation_narrative"]["reason"]
-        self.assertIn("FAAB guidance:", narrative_reason)
-        self.assertIn("Trending across Sleeper", narrative_reason)
 
     def test_annotate_sleeper_trending_add_marks_only_mapped_players(self):
         free_agents = pd.DataFrame(
@@ -852,7 +248,7 @@ class TestWaiversUI(unittest.TestCase):
                 {"player_id": "200", "name": "B"},
             ]
         )
-        annotated = waivers_ui.annotate_sleeper_trending_add(
+        annotated = waivers_logic.annotate_sleeper_trending_add(
             free_agents, {"100": {"count": 42, "rank": 1}}
         )
         self.assertTrue(bool(annotated.loc[0, "sleeper_trending_add"]))
@@ -863,72 +259,9 @@ class TestWaiversUI(unittest.TestCase):
 
     def test_annotate_sleeper_trending_add_defaults_when_map_empty(self):
         free_agents = pd.DataFrame([{"player_id": "100", "name": "A"}])
-        annotated = waivers_ui.annotate_sleeper_trending_add(free_agents, None)
+        annotated = waivers_logic.annotate_sleeper_trending_add(free_agents, None)
         self.assertFalse(bool(annotated.loc[0, "sleeper_trending_add"]))
         self.assertIsNone(annotated.loc[0, "sleeper_trending_add_count"])
-
-    def test_empty_board_uses_canonical_empty_state(self):
-        with patch.object(
-            waivers_ui.ui_primitives,
-            "render_empty_state_panel",
-        ) as empty_state:
-            waivers_ui.render_free_agent_cards(
-                pd.DataFrame(),
-                "value_score",
-                recommendation_reason_text=Mock(),
-                player_display_name=Mock(),
-                cached_headshot_data_url=Mock(),
-                asset_initials=Mock(),
-                player_status_style=Mock(),
-                canonical_player_status=Mock(),
-                tier_chip_html=Mock(),
-                player_support_chip_html=Mock(),
-                player_status_pill_html=Mock(),
-                render_tappable_player_html=Mock(),
-                open_player_quick_view=Mock(),
-                render_recommendation_feedback=Mock(),
-            )
-
-        empty_state.assert_called_once()
-        self.assertEqual(empty_state.call_args.args[0], "No waiver targets available")
-
-    def test_waivers_styles_are_token_backed_and_mobile_safe(self):
-        source = Path("modules/waivers_presentation_styles.py").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn("var(--touch-target-min)", source)
-        self.assertIn("@media (max-width: 700px)", source)
-        self.assertIn("@media (max-width: 430px)", source)
-        self.assertIn("@media (max-width: 390px)", source)
-        self.assertIn("-webkit-line-clamp: 2", source)
-        self.assertNotRegex(source, r"#[0-9a-fA-F]{3,8}\b")
-        self.assertNotIn("rgb(", source)
-
-    def test_customer_waivers_overview_hides_raw_league_id(self):
-        source = Path("app.py").read_text(encoding="utf-8")
-        waivers = source.split('if current_page == "waivers":', 1)[1].split("# MY TEAM", 1)[0]
-        self.assertNotIn("League ID: {selected_league_id}", waivers)
-        self.assertIn("Imported Sleeper league", waivers)
-        self.assertIn("Founder diagnostics", waivers)
-        self.assertIn("Sleeper league ID:", waivers)
-        self.assertIn("waivers_summary_emit", waivers)
-        self.assertIn("waivers_priority_adds_build", waivers)
-        # Dead waivers_ui page header removed; executive command bar owns titles.
-        self.assertFalse(hasattr(waivers_ui, "render_waivers_page_header"))
-        app_source = Path("app.py").read_text(encoding="utf-8")
-        self.assertNotIn("render_waivers_page_header", app_source)
-
-    def test_waivers_faab_helper_is_collapsed_and_espn_limited_mode_is_gated(self):
-        source = Path("app.py").read_text(encoding="utf-8")
-
-        self.assertIn('with st.expander("FAAB Helper", expanded=False):', source)
-        self.assertIn("Use this after choosing a bid target", source)
-        self.assertIn('"Waivers are gated for ESPN until free-agent', source)
-        self.assertIn("st.session_state.get(\"active_platform\") == \"espn\"", source)
-        self.assertIn("st.session_state.get(\"espn_limited_mode\")", source)
-        self.assertIn("app-degraded-state", source)
-        self.assertIn("Sleeper remains the full Waivers path", source)
 
 
 if __name__ == "__main__":

@@ -155,7 +155,7 @@ from modules import (
     community_trades,
     dashboard_engine,
     draft_assistant,
-    draft_center_ui,
+    draft_center_cards,
     espn_leagues,
     external_leagues,
     faab,
@@ -176,7 +176,7 @@ from modules import (
     league_standings,
     league_storylines,
     league_value_settings,
-    league_workspace_ui,
+    league_display,
     live_draft,
     live_draft_trade_evaluator,
     manager_activity,
@@ -204,7 +204,7 @@ from modules import (
     players_refresh_flight,
     playoff_simulator,
     premium,
-    premium_page,
+    premium_benefits,
     push_tokens,
     push_triggers,
     rankings,
@@ -225,11 +225,11 @@ from modules import (
     team_trade_history,
     trade_analyzer_fit,
     trade_hub_engine,
-    trade_hub_ui,
+    trade_hub_presentation,
     trade_ideas,
     trade_offer_analyzer,
     transaction_grades,
-    waivers_ui,
+    waivers_logic,
     weekly_box_scores,
 )
 from modules import external_news_contract
@@ -997,7 +997,7 @@ def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str
     return {"entitlement": "free", "sleeper_username": "", "status": "ok"}
 
 
-# Mirrors modules.premium_page.MOBILE_PREMIUM_BENEFIT_LINES exactly — used only
+# Mirrors modules.premium_benefits.MOBILE_PREMIUM_BENEFIT_LINES exactly — used only
 # if that module raises (e.g. a future edit desyncs it from PREMIUM_INCLUDED_NOW),
 # so /v1/me still returns something rather than a 500. Mobile has its own
 # equivalent hardcoded fallback in PaywallScreen.tsx for when the request itself
@@ -1014,7 +1014,7 @@ _FALLBACK_PREMIUM_BENEFIT_LINES = [
 
 def _premium_benefit_lines() -> list[str]:
     try:
-        lines = premium_page.mobile_premium_benefit_lines()
+        lines = premium_benefits.mobile_premium_benefit_lines()
         return lines if lines else list(_FALLBACK_PREMIUM_BENEFIT_LINES)
     except Exception:
         return list(_FALLBACK_PREMIUM_BENEFIT_LINES)
@@ -1233,7 +1233,7 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
             "trial_ends_at": trial_ends_at,
         },
         # Canonical Premium benefit copy — single source of truth is
-        # modules.premium_page (PREMIUM_INCLUDED_NOW / MOBILE_PREMIUM_BENEFIT_LINES),
+        # modules.premium_benefits (PREMIUM_INCLUDED_NOW / MOBILE_PREMIUM_BENEFIT_LINES),
         # the same list web's Premium page renders. The mobile Paywall fetches
         # this instead of keeping its own independently-authored copy.
         "premium_benefits": _premium_benefit_lines(),
@@ -1420,7 +1420,7 @@ def get_my_referral_code(user: dict[str, Any] = Depends(require_user)) -> dict[s
 
 # All three billing endpoints below are thin wrappers around
 # modules.stripe_billing's already-correct, already-unit-tested functions —
-# the same ones modules/premium_page.py (Streamlit) has used all along.
+# the same ones modules/premium_benefits.py (Streamlit) has used all along.
 # This is the first non-Streamlit caller of that module; no Stripe
 # integration logic is reimplemented here, only an HTTP surface web-next
 # can call. Every redirect URL below points at this app's own /premium
@@ -1490,7 +1490,7 @@ def get_billing_plans(user: dict[str, Any] = Depends(require_user)) -> dict[str,
     # Front Office is no longer in _BILLING_PLAN_KEYS (see that constant's
     # own comment) -- every plan here is Pro, so there's only one features
     # list to build, not a per-tier branch.
-    features = premium_page.mobile_premium_benefit_lines()
+    features = premium_benefits.mobile_premium_benefit_lines()
     plans = []
     for detail_key, tier, interval in _BILLING_PLAN_KEYS:
         label, price, cadence = details.get(detail_key) or stripe_billing.DEFAULT_PLAN_DETAILS[detail_key]
@@ -1616,7 +1616,7 @@ def create_billing_checkout(
 def create_billing_portal(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Open the Stripe customer portal for an existing subscriber to manage
     or cancel. Needs `profiles.stripe_customer_id` — the same column
-    modules/premium_page.py's existing "Manage Billing" button already
+    modules/premium_benefits.py's existing "Manage Billing" button already
     reads (written by modules.stripe_webhook on a completed checkout), not
     a new lookup invented for this endpoint.
     """
@@ -2590,7 +2590,7 @@ def get_league_draft_center(
     Shares the web app's real computation chain: modules.league_rankings
     (build_league_summary_and_draft_capital, build_draft_workspace_frame —
     the latter ported verbatim from app.py, confirmed pure pandas with no
-    Streamlit dependency) plus modules.draft_center_ui's already-pure
+    Streamlit dependency) plus modules.draft_center_cards's already-pure
     build_draft_decision_cards / build_draft_partner_cards /
     draft_posture_profile.
 
@@ -2676,8 +2676,8 @@ def get_league_draft_center(
             "partner_cards": [],
         }
 
-    decision_cards = draft_center_ui.build_draft_decision_cards(draft_workspace)
-    partner_cards = draft_center_ui.build_draft_partner_cards(draft_workspace)
+    decision_cards = draft_center_cards.build_draft_decision_cards(draft_workspace)
+    partner_cards = draft_center_cards.build_draft_partner_cards(draft_workspace)
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
@@ -2693,7 +2693,7 @@ def get_league_draft_center(
             posture_reason = "no_draft_capital_row"
         else:
             team_row = match.iloc[0]
-            profile_posture = draft_center_ui.draft_posture_profile(team_row, len(draft_workspace))
+            profile_posture = draft_center_cards.draft_posture_profile(team_row, len(draft_workspace))
             posture_reason = ""
             posture = {
                 "label": profile_posture["label"],
@@ -3471,7 +3471,7 @@ def get_league_live_draft_state(
         "my_upcoming_picks": [_clean_json_value(pick) for pick in (state.get("my_upcoming_picks") or [])],
         "positional_run": state.get("positional_run"),
         "last_updated": state.get("last_updated"),
-        "score_label": league_workspace_ui.league_score_label(score_field),
+        "score_label": league_display.league_score_label(score_field),
         "league_settings": {
             "qb_format": settings.get("qb_format"),
             "scoring_format": settings.get("scoring_format"),
@@ -3949,7 +3949,7 @@ def _project_team_injury_narrative(context: Any) -> dict[str, Any]:
 
     modules.rankings.roster_injury_context already computes all of this for
     every roster; web renders it as the `Key injuries: ...` caption
-    (modules.league_workspace_ui) and injury_ui.team_injury_display_note's
+    (modules.league_display) and injury_ui.team_injury_display_note's
     impact summary. Mobile was forwarding only the flag itself, so this is
     a pure "stop dropping already-computed fields" projection — no new
     computation, no mobile-only rewording of the engine's own text.
@@ -8820,7 +8820,7 @@ def get_league_dashboard(
     (modules.dashboard_workflow.organize_dashboard_items ->
     modules.daily_gm_briefing.compose_daily_gm_briefing) and the same
     underlying engines for each tile (modules.team_eval,
-    modules.trade_analyzer_fit, modules.injury_ui, modules.waivers_ui) via
+    modules.trade_analyzer_fit, modules.injury_ui, modules.waivers_logic) via
     modules.dashboard_engine — see that module's docstring for why it's a
     fresh composition rather than importing app.py directly (modules/ never
     imports app.py). Includes a Top Trade Opportunity tile fed by the same
@@ -9079,8 +9079,8 @@ def get_league_dashboard(
         # of) the ONE shared per-user pool Trade Hub / All Trades draw from,
         # so Dashboard + Trade Hub + switching lens can't each hand out
         # their own free idea.
-        headline_records = trade_hub_ui.order_trade_hub_visible_ideas(list(trade_idea_records or []))
-        headline_id = trade_hub_ui.idea_recommendation_id(headline_records[0]) if headline_records else ""
+        headline_records = trade_hub_presentation.order_trade_hub_visible_ideas(list(trade_idea_records or []))
+        headline_id = trade_hub_presentation.idea_recommendation_id(headline_records[0]) if headline_records else ""
         _applied, pool_cap = _free_trade_idea_cap(user_id)
         trade_tile_allowed = bool(headline_id) and headline_id in free_tier_ledger.claim_trade_ideas(
             user_id, [headline_id], pool_cap
@@ -9196,7 +9196,7 @@ _PORTFOLIO_UPSELL = {
 }
 
 # GM Plan and Trade Finder are both Premium-only on app.py (see
-# render_gm_plan... and modules/trade_hub_ui.py's current_user_is_premium()
+# render_gm_plan... and modules/trade_hub_presentation.py's current_user_is_premium()
 # gates), but shipped fully free/ungated on this API — coridian_, 2026-10-17:
 # "streamlit had proper premium bqarriers" (confirming these should match).
 _GM_PLAN_UPSELL = {
@@ -12603,7 +12603,7 @@ def _project_waiver_row(
         "injury_replacement_note": _clean_json_value(row.get("injury_replacement_note")) or "",
         # Sleeper's GLOBAL trending-add signal — cross-league, last-24h add
         # velocity across all of Sleeper, NOT scoped to this league (see
-        # waivers_ui.annotate_sleeper_trending_add). sleeper_trending_add_rank
+        # waivers_logic.annotate_sleeper_trending_add). sleeper_trending_add_rank
         # is 1-indexed within that global list (1 = most added platform-wide).
         "sleeper_trending_add": bool(row.get("sleeper_trending_add") or False),
         "sleeper_trending_add_count": _clean_json_value(row.get("sleeper_trending_add_count")),
@@ -12628,14 +12628,14 @@ def _project_priority_add(
 ) -> dict[str, Any]:
     projected = _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
     position_rank = int(row.get("position_rank") or 99) or 99
-    label, tone = waivers_ui.waiver_recommendation_label(row, position_rank)
+    label, tone = waivers_logic.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
     projected["recommendation_tone"] = tone
     # Real need-fit/standout-value confidence for this Priority Add — same
     # already-computed signals rank_priority_add_candidates used to rank it
-    # (see waivers_ui.waiver_confidence_label), shown with Trade Ideas'
+    # (see waivers_logic.waiver_confidence_label), shown with Trade Ideas'
     # High/Medium/Low confidence language rather than no signal at all.
-    confidence_label, confidence_reason = waivers_ui.waiver_confidence_label(row, position_rank)
+    confidence_label, confidence_reason = waivers_logic.waiver_confidence_label(row, position_rank)
     projected["confidence_label"] = confidence_label
     projected["confidence_reason"] = confidence_reason
     # Always an object (never null) so installed app builds that read
@@ -12674,7 +12674,7 @@ def get_league_waivers(
     waivers page uses: modules.player_state_authority for the
     rostered-id exclusion, modules.rankings.is_probably_stale_free_agent
     for stale/retired detection, modules.trade_analyzer_fit for roster
-    needs + injury-replacement context, modules.waivers_ui for the
+    needs + injury-replacement context, modules.waivers_logic for the
     Priority Adds ranking, and modules.faab for bid guidance.
     """
 
@@ -12703,10 +12703,10 @@ def get_league_waivers(
     # Sleeper trending-add, position/overall ranking) is identical for every
     # caller asking about this (league_id, lens) combo within the same live
     # window, so it's single-flighted + Redis-cached — see
-    # modules.waivers_ui.build_waiver_free_agent_pool_cached and the big
+    # modules.waivers_logic.build_waiver_free_agent_pool_cached and the big
     # comment above its private compute function for why only this part
     # (not the per-roster work below) is in the cache boundary.
-    valued, free_agents = waivers_ui.build_waiver_free_agent_pool_cached(
+    valued, free_agents = waivers_logic.build_waiver_free_agent_pool_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if valued.empty:
@@ -12745,7 +12745,7 @@ def get_league_waivers(
     # not previously exposed past this function. Mirrors app.py's own
     # free_agent_injured_starters, the exact count the web Waivers route's
     # "Injury replacement watch is active for ..." caption reads
-    # (modules/waivers_ui.py's render_waiver_workspace_sections).
+    # (modules/waivers_logic.py's render_waiver_workspace_sections).
     injured_starters = 0
     if not roster_df.empty:
         lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
@@ -12847,7 +12847,7 @@ def get_league_waivers(
         for _, row in limited.iterrows()
     ]
 
-    priority_df = waivers_ui.rank_priority_add_candidates(
+    priority_df = waivers_logic.rank_priority_add_candidates(
         free_agents,
         score_field=score_field,
         needed_positions=needed_positions,
@@ -12916,7 +12916,7 @@ def get_league_waivers(
         )
 
     # Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
-    # Shortlist) — matches web's Premium-only gate (modules/waivers_ui.py:
+    # Shortlist) — matches web's Premium-only gate (modules/waivers_logic.py:
     # "if not is_premium: render_premium_lock(...); return", app.py's
     # classification just above that call). Adapted, not a byte-for-byte
     # port: web dedupes against its own `featured_free_agents` presentation
@@ -12981,9 +12981,9 @@ def get_league_waivers(
 
 
 # Mobile-only reveal mechanic: watching a rewarded ad temporarily raises the
-# Free-tier visible count above modules.trade_hub_ui.FREE_VISIBLE_IDEAS (2),
+# Free-tier visible count above modules.trade_hub_presentation.FREE_VISIBLE_IDEAS (2),
 # same board/ranking as web. Web has no ad path, so this bonus is layered on
-# top of the shared engine rather than added to trade_hub_ui itself.
+# top of the shared engine rather than added to trade_hub_presentation itself.
 AD_BONUS_IDEAS_PER_UNLOCK = 2
 MAX_AD_UNLOCKS = 3
 
@@ -13003,7 +13003,7 @@ def _free_trade_idea_cap(user_id: str, *, claimed_ad_unlocks: int | None = None)
         applied = min(free_tier_ledger.ad_unlocks_granted(user_id), MAX_AD_UNLOCKS)
     else:
         applied = free_tier_ledger.grant_ad_unlock_if_claimed(user_id, claimed_ad_unlocks, MAX_AD_UNLOCKS)
-    return applied, trade_hub_ui.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * applied
+    return applied, trade_hub_presentation.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * applied
 
 
 def _project_and_enrich_trade_idea_cards(
@@ -13018,7 +13018,7 @@ def _project_and_enrich_trade_idea_cards(
     # Rank on the raw engine records (trade_confidence_label, tier, etc.) —
     # the same fields the web app's Trade Hub sorts on — then project only
     # the visible slice to the narrower mobile card shape.
-    ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+    ranked_records = trade_hub_presentation.order_trade_hub_visible_ideas(list(records))
     ranked = [
         trade_hub_engine.project_trade_idea_card(record, is_headline=(index == 0)).to_dict()
         for index, record in enumerate(ranked_records)
@@ -13102,7 +13102,7 @@ def get_trade_hub_ideas(
     app.py directly (modules/ never imports app.py).
 
     Free-tier gating reuses the web app's own ranking and free-count
-    contract (modules.trade_hub_ui.order_trade_hub_visible_ideas /
+    contract (modules.trade_hub_presentation.order_trade_hub_visible_ideas /
     FREE_VISIBLE_IDEAS) so the "first 2 ideas" a Free mobile user sees are
     identically chosen to the web app's. `ad_unlocks` (client-tracked,
     reset per session) temporarily raises that ceiling — a mobile-only
@@ -13224,7 +13224,7 @@ def get_trade_hub_ideas(
             "approved_count": approved_count,
             "visible_count": len(visible),
             "hidden_count": approved_count - len(visible),
-            "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+            "free_limit": trade_hub_presentation.FREE_VISIBLE_IDEAS,
             "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
             "max_ad_unlocks": MAX_AD_UNLOCKS,
             "ad_unlocks_applied": ad_unlocks_applied,
@@ -13255,7 +13255,7 @@ def get_trade_hub_idea_share_card(
     GET .../trade-hub itself reads (trade_hub_engine.
     generate_trade_idea_records_cached, keyed on league_id/roster_id/
     strategy/lens/untouchables/gm-targets — see that function's own
-    docstring) and matched by trade_hub_ui.idea_recommendation_id, rather
+    docstring) and matched by trade_hub_presentation.idea_recommendation_id, rather
     than trusting any idea payload a client could post — a caller can only
     ever get a branded card for a trade idea this server itself just
     generated for their own roster, never a client-fabricated "trade". If
@@ -13308,7 +13308,7 @@ def get_trade_hub_idea_share_card(
         keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
     )
     idea = next(
-        (record for record in records if trade_hub_ui.idea_recommendation_id(record) == recommendation_id),
+        (record for record in records if trade_hub_presentation.idea_recommendation_id(record) == recommendation_id),
         None,
     )
     # A Free caller may only render a card for an idea already in its own
@@ -13387,7 +13387,7 @@ def get_trade_finder_ideas(
     user_id = str(user.get("id") or "")
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
 
-    # Trade Finder is Premium-only on app.py (modules.trade_hub_ui's
+    # Trade Finder is Premium-only on app.py (modules.trade_hub_presentation's
     # current_user_is_premium() gate on the whole workspace) — coridian_,
     # 2026-10-17: "streamlit had proper premium bqarriers." Checked before
     # the selected-players validation below since a free user can't use
@@ -13475,7 +13475,7 @@ def get_league_all_trades(
     client re-calls with the next cursor on "Load More" — no team is ever
     left out, it just isn't all generated up front.
 
-    Same free-tier gating as /trade-hub (modules.trade_hub_ui.
+    Same free-tier gating as /trade-hub (modules.trade_hub_presentation.
     FREE_VISIBLE_IDEAS), applied cumulatively via `shown_count` (how many
     ideas the client has already been shown across prior pages) — a Free
     user's cap doesn't reset every time they tap Load More.
@@ -13509,7 +13509,7 @@ def get_league_all_trades(
             "trade_window": trade_window,
             "entitlement": {
                 "is_premium": is_premium,
-                "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+                "free_limit": trade_hub_presentation.FREE_VISIBLE_IDEAS,
                 "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
                 "max_ad_unlocks": MAX_AD_UNLOCKS,
                 "ad_unlocks_applied": 0,
@@ -13528,7 +13528,7 @@ def get_league_all_trades(
             "reason": _reason,
             "entitlement": {
                 "is_premium": False,
-                "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+                "free_limit": trade_hub_presentation.FREE_VISIBLE_IDEAS,
                 "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
                 "max_ad_unlocks": MAX_AD_UNLOCKS,
                 "ad_unlocks_applied": 0,
@@ -13605,14 +13605,14 @@ def get_league_all_trades(
             )
         except Exception:
             continue
-        ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+        ranked_records = trade_hub_presentation.order_trade_hub_visible_ideas(list(records))
         # Cap per-team so one roster's board can't eat a whole page —
         # "All Trades" is meant to sample across the league, not repeat
         # Trade Hub's own full-depth board once per team.
         for record in ranked_records[:2]:
             if not is_premium:
                 if not free_tier_ledger.claim_trade_ideas(
-                    user_id, [trade_hub_ui.idea_recommendation_id(record)], free_cap
+                    user_id, [trade_hub_presentation.idea_recommendation_id(record)], free_cap
                 ):
                     remaining_free = 0
                     break
@@ -13638,7 +13638,7 @@ def get_league_all_trades(
         "total_teams": total_teams,
         "entitlement": {
             "is_premium": is_premium,
-            "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+            "free_limit": trade_hub_presentation.FREE_VISIBLE_IDEAS,
             "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
             "max_ad_unlocks": MAX_AD_UNLOCKS,
             "ad_unlocks_applied": ad_unlocks_applied,

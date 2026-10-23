@@ -35,7 +35,7 @@ from modules import league_value_settings
 from modules import player_quick_view
 from modules import redis_cache
 from modules import sleeper
-from modules import trade_hub_ui
+from modules import trade_hub_presentation
 from modules import trade_ideas as trade_ideas_module
 from modules import trade_trust
 from modules import trade_visual_language
@@ -242,7 +242,6 @@ def enforce_generated_trade_ideas(
     return list(board.recommendations)
 
 
-
 # Opportunity labels (modules.rankings' real opportunity-tier
 # classification, already on every player asset via _player_asset) that
 # mean "role trending up, price probably hasn't caught up yet" — the same
@@ -310,7 +309,7 @@ class TradeIdeaCard:
     # read it are unaffected.
     send_score: int = 0
     receive_score: int = 0
-    # Stable identity for this exact idea (modules.trade_hub_ui.
+    # Stable identity for this exact idea (modules.trade_hub_presentation.
     # idea_recommendation_id — the same canonical hash Trade Hub's own
     # session-state handoff/focus plumbing already keys on), added so a
     # client can ask GET .../trade-hub/{recommendation_id}/share-card.png
@@ -353,7 +352,7 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
     # already computes that same ordering) tells us via is_headline rather
     # than this function re-deriving rank from a Mapping with no board
     # context. modules/ can't import app.py to reuse that helper directly.
-    category = "Headline Recommendation" if is_headline else trade_hub_ui.trade_hub_display_section(dict(idea))
+    category = "Headline Recommendation" if is_headline else trade_hub_presentation.trade_hub_display_section(dict(idea))
     confidence_label = _safe_text(idea.get("trade_confidence_label"), "Low")
     return TradeIdeaCard(
         partner_team_name=_safe_text(idea.get("partner_team_name"), "Trade partner"),
@@ -371,7 +370,7 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         ),
         send_score=int(idea.get("my_score") or 0),
         receive_score=int(idea.get("their_score") or 0),
-        recommendation_id=trade_hub_ui.idea_recommendation_id(idea),
+        recommendation_id=trade_hub_presentation.idea_recommendation_id(idea),
     )
 
 
@@ -465,7 +464,7 @@ def generate_trade_idea_records(
     keeper_context: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
-    and modules.trade_hub_ui already work with (trade_confidence_label,
+    and modules.trade_hub_presentation already work with (trade_confidence_label,
     send_assets/receive_assets, fit_grade, hub_* reason fields, etc.).
 
     `untouchable_player_ids` hard-blocks those players from every outgoing
@@ -499,7 +498,7 @@ def generate_trade_idea_records(
 
     `generate_trade_ideas` narrows these to TradeIdeaCard for the mobile
     Trade Hub card UI; callers that need the raw engine fields — ranking via
-    modules.trade_hub_ui.order_trade_hub_visible_ideas, or narrative
+    modules.trade_hub_presentation.order_trade_hub_visible_ideas, or narrative
     building via modules.canonical_recommendation_narrative.build_trade_narrative
     (the Dashboard's Top Trade Opportunity tile) — should call this instead.
 
@@ -625,7 +624,7 @@ def generate_trade_idea_records(
 # earlier for the same user.
 # coridian_, 2026-10-19, performance audit: widened from the original 30s
 # to 2 minutes, alongside the same change in modules.league_value_settings/
-# modules.league_rankings/modules.waivers_ui — a real league's roster
+# modules.league_rankings/modules.waivers_logic — a real league's roster
 # doesn't change faster than every couple minutes in practice.
 TRADE_HUB_IDEAS_TTL_SECONDS = 120
 
@@ -654,7 +653,7 @@ def _generate_trade_idea_records_cached(
     # to run its own load -> filter -> apply_valuation_lens pass here, the
     # exact same "asker-independent, redone from scratch" cost
     # build_valued_players_frame_cached already exists to fix (same 30s
-    # Redis-backed cache league_rankings/waivers_ui/playoff_simulator and
+    # Redis-backed cache league_rankings/waivers_logic/playoff_simulator and
     # this same function's own df_summary call just below already share).
     # get_league_dashboard had already computed and cached this identical
     # (league_id, lens) frame moments earlier in the same request via that

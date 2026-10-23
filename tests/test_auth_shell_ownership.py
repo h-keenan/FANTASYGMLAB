@@ -11,29 +11,6 @@ from modules import auth_supabase
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
-
-
-def test_guest_landing_gates_live_executive_command_header():
-    """Logged-out + no league must not mount Dashboard SELECT/ALERTS/YOU."""
-
-    assert "_guest_landing_without_workspace" in APP
-    assert "if not _guest_landing_without_workspace:" in APP
-    main = APP.split("def main():", 1)[1]
-    gate = main.index("_guest_landing_without_workspace")
-    topbar = main.index("render_platform_topbar(")
-    assert gate < topbar
-    early = APP.split("_early_league_id = _safe_text", 1)[1][:900]
-    assert "LIVE_DRAFT_DISCOVERY_SKIP_ROUTES" in early
-    assert "_query_param_page() or st.session_state.get(\"platform_nav_page\")" in early
-    assert APP.count("render_platform_topbar(") == 2
-
-
-def test_early_launch_flag_is_cleared_each_script_run():
-    assert 'st.session_state.pop("_early_launch_account_rendered", None)' in APP
-    clear_at = APP.index('st.session_state.pop("_early_launch_account_rendered", None)')
-    early_set = APP.index('st.session_state["_early_launch_account_rendered"] = True')
-    assert clear_at < early_set
 
 
 def test_signup_classifies_unreachable_provider():
@@ -118,23 +95,3 @@ def test_signup_client_validation_before_network():
     assert payload is None
     assert "6 characters" in error.casefold()
     post.assert_not_called()
-
-
-def test_live_header_ownership_invariant_document():
-    """Source invariant: guest landing gate exists; one production topbar call."""
-
-    rca = Path("docs/auth-shell-ownership-rca.md").read_text(encoding="utf-8")
-    assert "Guest landing" in rca
-    assert "if not _guest_landing_without_workspace:" in APP
-    assert APP.count("render_platform_topbar(") == 2
-
-
-def test_anonymous_isolation_still_strips_account_league():
-    from modules import session_isolation
-
-    state = {
-        "selected_league_id": "league-a",
-        "selected_league_name": "League A",
-    }
-    result = session_isolation.enforce_anonymous_account_league_boundary(state)
-    assert result["stripped"] is True

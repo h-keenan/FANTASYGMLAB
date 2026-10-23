@@ -5,7 +5,7 @@ Regression coverage for the Chimere Dike "STARTER" tag bug report: a
 player with a high long-horizon value/dynasty score (draft capital, market
 hype) but no live current role — rankings.py's own
 ``workload_trend == "Blocked"`` signal, the same column
-modules.waivers_ui.rank_priority_add_candidates already gates Priority Adds
+modules.waivers_logic.rank_priority_add_candidates already gates Priority Adds
 on for the identical reason — must never show a tier at or above "Starter".
 """
 

@@ -59,7 +59,7 @@ DESIGN_TOKEN_CSS = """
     /* Small inverted "founder badge" / brand-mark glyph: a fixed light chip
        (--color-text-primary) with dark ink text, independent of the dark
        theme's normal foreground/background pairing. Was copy-pasted as the
-       raw literal #0b1220 across trade_hub_ui, startup_coordinator, and
+       raw literal #0b1220 across trade_hub_presentation, startup_coordinator, and
        brand_identity_styles — promoted here so it has one source instead
        of three. */
     --color-brand-mark-ink: #0b1220;

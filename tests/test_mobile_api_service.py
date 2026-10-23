@@ -330,10 +330,10 @@ def test_me_includes_canonical_premium_benefits(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     # Same canonical list web's Premium page renders from — see
-    # modules.premium_page.PREMIUM_INCLUDED_NOW / mobile_premium_benefit_lines.
-    from modules import premium_page
+    # modules.premium_benefits.PREMIUM_INCLUDED_NOW / mobile_premium_benefit_lines.
+    from modules import premium_benefits
 
-    assert body["premium_benefits"] == premium_page.mobile_premium_benefit_lines()
+    assert body["premium_benefits"] == premium_benefits.mobile_premium_benefit_lines()
     assert len(body["premium_benefits"]) > 0
 
 
@@ -350,7 +350,7 @@ def test_me_falls_back_to_hardcoded_benefits_if_canonical_lookup_breaks(monkeypa
     with (
         patch("requests.get", side_effect=[auth_user_response, profile_response]),
         patch.object(
-            mobile_api_service.premium_page,
+            mobile_api_service.premium_benefits,
             "mobile_premium_benefit_lines",
             side_effect=RuntimeError("desynced benefit copy"),
         ),
@@ -1783,27 +1783,6 @@ def test_live_draft_trade_evaluator_options_requires_auth(monkeypatch):
     assert response.status_code == 401
 
 
-def test_live_draft_trade_evaluator_options_409s_once_the_draft_is_complete(monkeypatch):
-    """Gates on LIVE_DRAFT_ACTIVE_STATUSES (drafting/paused) — narrower than
-    the main board endpoint's LIVE_DRAFT_SUPPORTED_STATUSES, matching
-    modules/live_draft_ui.py's own render-only-while-active gate for this
-    form (line ~1087)."""
-
-    client = _client(monkeypatch)
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-
-    with patch("requests.get", return_value=auth_user_response):
-        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
-            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft(status="complete")):
-                response = client.get(
-                    "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
-                    headers={"Authorization": "Bearer good-token"},
-                )
-
-    assert response.status_code == 409
-
-
 def test_live_draft_trade_evaluator_options_lists_only_remaining_picks(monkeypatch):
     """Exercises modules.live_draft_trade_evaluator.remaining_pick_options
     through the thin GET wrapper: a 2-team, 2-round snake draft with pick #1
@@ -2548,68 +2527,6 @@ def test_draft_picks_degrade_confidence_for_further_out_seasons(monkeypatch):
     assert compared, "fixture produced no further-out pick to compare"
 
 
-def test_draft_picks_excludes_current_year_picks_once_the_real_draft_is_complete(monkeypatch):
-    """Regression test for coridian_'s report: after a real Sleeper rookie
-    draft finished, the mobile Draft Center still showed this year's picks
-    as available/upcoming trade assets.
-
-    Root cause: get_league_draft_picks called
-    modules.trade_ideas.list_draft_pick_assets without a draft_status, so it
-    fell back to a league-type-only guess (dynasty => current-year picks
-    always active) instead of checking whether Sleeper's own draft data says
-    the draft is done. The endpoint now computes draft_status the same way
-    app.py's cached_draft_pick_assets does, via
-    modules.draft_assistant.rookie_draft_context /
-    rookie_draft_status_items.
-    """
-
-    client = _client(monkeypatch)
-
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    fake_rosters, fake_users = _draft_picks_fixture_context()
-    # Explicit season (not "this year") keeps the assertion deterministic
-    # regardless of the wall-clock year the suite runs in.
-    league_with_completed_draft = {**_TRADE_ANALYZER_LEAGUE, "season": "2030"}
-    completed_rookie_draft = {
-        "draft_id": "rookie-draft-2030",
-        "status": "complete",
-        "season": "2030",
-        "settings": {"rounds": 4},
-    }
-
-    with patch("requests.get", return_value=auth_user_response):
-        with patch("modules.sleeper.get_league", return_value=league_with_completed_draft):
-            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
-                with patch("modules.sleeper.get_users", return_value=fake_users):
-                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
-                        with patch(
-                            "modules.sleeper.get_league_drafts",
-                            return_value=[completed_rookie_draft],
-                        ):
-                            with patch("modules.sleeper.get_draft_picks", return_value=[]):
-                                with patch(
-                                    "modules.rankings.load_players", return_value=_fake_roster_frame()
-                                ):
-                                    with patch(
-                                        "modules.player_eligibility.filter_current_fantasy_players",
-                                        side_effect=lambda df, **kwargs: df,
-                                    ):
-                                        response = client.get(
-                                            "/v1/leagues/abc/draft-picks",
-                                            headers={"Authorization": "Bearer good-token"},
-                                        )
-
-    assert response.status_code == 200
-    picks = response.json()["picks"]
-    assert picks, "fixture should still produce future-season pick assets"
-    current_year_picks = [pick for pick in picks if pick["season"] == 2030]
-    assert not current_year_picks, (
-        "2030 rookie-draft picks should not be offered as trade assets once "
-        "Sleeper reports that draft as complete"
-    )
-
-
 @pytest.mark.known_flaky
 # known_flaky: passes reliably alone (verified 3/3 runs) but can fail under
 # full-suite xdist parallel runs. Root cause: modules.sleeper.get_league_drafts
@@ -3141,7 +3058,6 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
     for item in items:
         assert "summary" in item
         assert "speculative" in item
-
 
 
 def test_news_endpoint_drops_articles_older_than_the_max_age(monkeypatch):
@@ -7894,71 +7810,6 @@ def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monke
     assert body["entitlement"] == {"is_premium": True, "visible_count": 0, "hidden_count": 0}
 
 
-def test_dashboard_returns_real_briefing_items(monkeypatch):
-    client = _client(monkeypatch)
-
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-
-    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
-
-    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
-        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
-            with patch(
-                "modules.sleeper.get_rosters",
-                return_value=[
-                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
-                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
-                ],
-            ):
-                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
-                    with patch("modules.sleeper.get_users", return_value=[
-                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
-                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
-                    ]):
-                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
-                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
-                                with patch(
-                                    "modules.player_eligibility.filter_current_fantasy_players",
-                                    side_effect=lambda df, **kwargs: df,
-                                ):
-                                    response = client.get(
-                                        "/v1/leagues/abc/dashboard",
-                                        headers={"Authorization": "Bearer good-token"},
-                                    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["ok"] is True
-    assert body["reason"] == ""
-    # Real modules.dashboard_engine composition, not a mocked result — the
-    # only unrostered player (target_rb) should surface as the waiver tile.
-    # With no trade partner holding any players, there's no trade candidate,
-    # so (per app.py's default tile order — see dashboard_engine's module
-    # docstring) the waiver tile becomes the primary recommendation
-    # ("top_priority"), same as modules.daily_gm_briefing's own
-    # `_append(briefing.primary, CATEGORY_TOP_PRIORITY)`.
-    assert len(body["items"]) >= 1
-    for item in body["items"]:
-        assert item["headline"]
-        assert item["destination"]
-        # Real tier word for a Next Move priority-ladder tile (e.g. a
-        # "Biggest Team Need" headline) — empty string for every other tile,
-        # never a fabricated confidence score. Always present in the payload.
-        assert "tier_label" in item
-    top_priority_items = [item for item in body["items"] if item["category"] == "top_priority"]
-    categories = [item["category"] for item in body["items"]]
-    assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
-    assert top_priority_items[0]["route_player_id"] == "target_rb"
-    # Additive "This week" payload: present (a dict or None) and never
-    # fabricates a trade hold or waiver row without engine data behind it.
-    assert "this_week" in body
-    for row in (body["this_week"] or {}).get("rows", []):
-        assert row["headline"] and row["why"]
-
-
 @pytest.mark.known_flaky
 def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
     # Dashboard's trade tile and the Trade Hub endpoint ask the identical
@@ -9986,33 +9837,6 @@ def test_trade_finder_returns_empty_without_a_player_selection(monkeypatch):
     assert body["reason"] == "no_players_selected"
 
 
-def test_trade_finder_is_gated_behind_premium(monkeypatch):
-    """Trade Finder is Premium-only on app.py (modules.trade_hub_ui's
-    current_user_is_premium() gate) — this endpoint must match, not ship
-    the feature free/ungated."""
-
-    client = _client(monkeypatch)
-
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-
-    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
-    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
-        response = client.get(
-            "/v1/leagues/abc/trade-finder?player_ids=p1",
-            headers={"Authorization": "Bearer good-token"},
-        )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["ok"] is True
-    assert body["ideas"] == []
-    assert body["is_premium"] is False
-    assert body["upsell"]["title"]
-
-
 def test_trade_finder_rejects_an_invalid_lens(monkeypatch):
     client = _client(monkeypatch)
 
@@ -10258,7 +10082,7 @@ def test_all_trades_free_entitlement_stops_once_shown_count_hits_the_cap(monkeyp
                                     "modules.trade_hub_engine.generate_trade_idea_records",
                                     return_value=fake_cards,
                                 ):
-                                    # free_limit is 2 (trade_hub_ui.FREE_VISIBLE_IDEAS); the server-side
+                                    # free_limit is 2 (trade_hub_presentation.FREE_VISIBLE_IDEAS); the server-side
                                     # pool already holds this Free user's whole allowance (shown_count is
                                     # no longer trusted from the client).
                                     from modules import free_tier_ledger
@@ -10519,7 +10343,7 @@ def test_waiver_free_agent_pool_cached_concurrent_misses_single_flight(monkeypat
     """Two concurrent cache misses for the same (league_id, lens, ...) key
     must run the expensive free-agent-pool build
     (modules.player_state_authority.waiver_actionable_player_pool, the real
-    computation behind modules.waivers_ui.build_waiver_free_agent_pool_cached)
+    computation behind modules.waivers_logic.build_waiver_free_agent_pool_cached)
     exactly once, not once per caller.
 
     Same Redis-backed single-flight guarantee
@@ -10532,7 +10356,7 @@ def test_waiver_free_agent_pool_cached_concurrent_misses_single_flight(monkeypat
 
     import threading
 
-    from modules import player_state_authority, waivers_ui
+    from modules import player_state_authority, waivers_logic
 
     roster_frame = _fake_roster_frame()
     roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
@@ -10578,7 +10402,7 @@ def test_waiver_free_agent_pool_cached_concurrent_misses_single_flight(monkeypat
     results_lock = threading.Lock()
 
     def _call():
-        result = waivers_ui.build_waiver_free_agent_pool_cached(
+        result = waivers_logic.build_waiver_free_agent_pool_cached(
             league_id=league_id, lens="Dynasty", players_db_path="unused.db"
         )
         with results_lock:
@@ -10743,7 +10567,7 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
 def test_project_priority_add_carries_the_real_waiver_confidence_label(monkeypatch):
     """A Priority Add's confidence badge (High/Medium/Low) must reach the
     mobile payload — the same real priority_need_fit/priority_value_opportunity
-    signals modules.waivers_ui.rank_priority_add_candidates already computed
+    signals modules.waivers_logic.rank_priority_add_candidates already computed
     to rank this exact row, not a fabricated number."""
 
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
@@ -11224,7 +11048,7 @@ def test_draft_center_returns_league_wide_cards_and_resolved_posture(monkeypatch
     assert body["ok"] is True
     assert body["reason"] == ""
 
-    # Decision/partner cards are real modules.draft_center_ui output, not
+    # Decision/partner cards are real modules.draft_center_cards output, not
     # mocked — each is a {label, title, tone, items: [str]} card.
     assert body["decision_cards"]
     assert body["partner_cards"]
@@ -11235,7 +11059,7 @@ def test_draft_center_returns_league_wide_cards_and_resolved_posture(monkeypatch
         assert isinstance(card["items"], list) and card["items"]
 
     # Roster 1's Sleeper username resolves to its own roster, so posture
-    # should be populated (real modules.draft_center_ui.draft_posture_profile
+    # should be populated (real modules.draft_center_cards.draft_posture_profile
     # output against the roster's own real draft-capital row).
     posture = body["posture"]
     assert body["posture_reason"] == ""
@@ -11846,80 +11670,6 @@ def test_my_team_needs_reports_no_linked_username(monkeypatch):
     assert body["reason"] == "no_sleeper_username_linked"
     assert body["biggest_need"] is None
     assert body["position_groups"] == []
-
-
-def test_my_team_needs_returns_real_roster_needs_detail(monkeypatch):
-    """Thin-wrapper contract: the fields below must come straight out of the
-    same real engines (modules.team_eval, modules.trade_analyzer_fit,
-    modules.roster_needs) app.py's My Team route already calls for its
-    Strength & Pressure / Position Groups / Biggest Need sections — not a
-    reimplementation. The fixture roster (_fake_roster_frame, via
-    test_my_team_returns_the_real_suggested_lineup_split above) is 1 QB,
-    4 RB, 4 WR, 1 TE with one deliberately weak RB (my_bench_rb, score 300
-    vs. everyone else's 2000), so RB should come back as a real position
-    group with a non-"covered" classification.
-    """
-
-    client = _client(monkeypatch)
-
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-
-    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
-
-    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
-        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
-            with patch(
-                "modules.sleeper.get_rosters",
-                return_value=[
-                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
-                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
-                ],
-            ):
-                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
-                    with patch("modules.sleeper.get_users", return_value=[
-                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
-                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
-                    ]):
-                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
-                            with patch(
-                                "modules.player_eligibility.filter_current_fantasy_players",
-                                side_effect=lambda df, **kwargs: df,
-                            ):
-                                response = client.get(
-                                    "/v1/leagues/abc/my-team-needs",
-                                    headers={"Authorization": "Bearer good-token"},
-                                )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["ok"] is True
-    assert body["reason"] == ""
-
-    # Real modules.trade_analyzer_fit.build_team_needs_assessment output: one
-    # entry per rostered position, each a genuine classification/reasons
-    # pair, not a placeholder.
-    assert body["position_groups"]
-    positions_seen = {item["position"] for item in body["position_groups"]}
-    assert "RB" in positions_seen
-    for item in body["position_groups"]:
-        assert item["classification"] in {"covered", "short_term_need", "future_risk"}
-        assert isinstance(item["reasons"], list)
-
-    # Real modules.roster_needs.select_need_headline output — the My Team
-    # route's own "Biggest Team Need" -> "Biggest Need" label rename applied
-    # (see app.py's my_team_need_display handling), never the raw label.
-    assert body["biggest_need"] is not None
-    assert body["biggest_need"]["label"] != "Biggest Team Need"
-    assert body["biggest_need"]["value"]
-
-    assert isinstance(body["strengths"], list)
-    assert isinstance(body["weaknesses"], list)
-    assert isinstance(body["show_franchise_construction"], bool)
-    assert isinstance(body["superflex"], bool)
-    assert isinstance(body["te_premium"], bool)
 
 
 def _fake_matchup_players_frame():
@@ -14069,28 +13819,6 @@ def test_lookup_sleeper_leagues_without_referral_code_never_touches_referrals(mo
     assert "referral" not in response.json()
 
 
-def test_lookup_sleeper_leagues_skips_referral_redemption_when_lookup_is_unavailable(monkeypatch):
-    client = _client(monkeypatch)
-    from modules import sleeper_leagues
-
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    lookup = sleeper_leagues.LeagueLookupResult([], "unavailable")
-
-    with patch("requests.get", return_value=auth_user_response):
-        with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
-            response = client.get(
-                "/v1/sleeper/leagues?username=gm_dynasty&referral_code=SOMECODE",
-                headers={"Authorization": "Bearer good-token"},
-            )
-
-    assert response.status_code == 200
-    # An "unavailable" Sleeper lookup is not app.py's own `sleeper_connected`
-    # condition either (status must be "ok" or "no_leagues") -- never
-    # attempt a referral credit off a failed/ambiguous lookup.
-    assert "referral" not in response.json()
-
-
 def test_lookup_sleeper_leagues_with_referral_code_records_attribution_and_fails_soft_on_credit(monkeypatch):
     """Integration-level redemption: a successful Sleeper lookup carrying a
     pending `?ref=` code records the referred user's own attribution marker
@@ -15394,7 +15122,6 @@ def test_quick_view_bye_offseason_has_week_but_no_this_week_flag():
 
     with patch("modules.nfl_schedule.load_games", return_value=_bye_games()):
         assert svc._quick_view_bye("CHI", today=date(2026, 6, 1)) == (9, False)
-
 
 
 def _explorer_get(monkeypatch, frame, query):

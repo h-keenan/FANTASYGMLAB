@@ -1,31 +1,9 @@
-"""General News feed player-identity surfacing.
-
-coridian_ asked for player photos/cards on News items tied to one clear
-player. The general feed (modules.news.general_news_feed) is RSS-sourced
-and never carried a player_id — unlike the roster-scoped surfaces (my_news
-matched_player, mobile Alerts matched_player_id). These tests cover the
-fail-closed resolver added to attach that identity (modules.news.
-_attach_general_news_player_identity) and the presentation gate in
-modules.general_news_ui that only renders a chip when it is present.
-
-coridian_'s follow-up feedback ("all of the news/alerts articles need the
-player PFP is not just one") extended coverage one step further: a
-two-player story (e.g. a two-player trade) now also resolves, to both
-named players (``matched_players``), rather than being discarded the same
-way a genuinely player-less, team-level story still is. Three or more
-named players stays a hard fail-closed case -- too ambiguous to guess which
-two of several are the real subject.
-"""
 
 from __future__ import annotations
 
 import pandas as pd
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import sync_playwright
 
-from modules import general_news_ui
 from modules import news
-from modules.interaction_contract import TAP_DELEGATION_JS
 
 
 def _players_frame(rows):
@@ -114,47 +92,6 @@ def test_general_news_feed_accepts_players_df_kwarg_without_it(monkeypatch):
     assert news.general_news_feed(5) == []
 
 
-def test_identity_chip_renders_only_when_resolved():
-    resolved_item = {
-        "matched_player_id": "6794",
-        "matched_player": "Justin Jefferson",
-        "matched_player_position": "WR",
-        "matched_player_team": "MIN",
-    }
-    html = general_news_ui._news_identity_chip_html(resolved_item)
-    assert "data-player-id='6794'" in html
-    assert "Justin" in html and "Jefferson" in html
-    # Identity-only: no value/score chip, and never the raw h3 tag that
-    # leaks Streamlit's native heading size elsewhere in the app.
-    assert "dg-compact-asset-value" not in html
-    assert "<h3" not in html
-
-    assert general_news_ui._news_identity_chip_html({}) == ""
-    assert general_news_ui._news_identity_chip_html({"title": "no player here"}) == ""
-
-
-def test_news_item_card_includes_identity_row_only_for_resolved_item(monkeypatch):
-    captured: list[str] = []
-    monkeypatch.setattr(general_news_ui.st, "markdown", lambda html, **_kwargs: captured.append(html))
-
-    general_news_ui.render_news_item_card(
-        {
-            "title": "Justin Jefferson downgraded to out",
-            "matched_player_id": "6794",
-            "matched_player": "Justin Jefferson",
-            "matched_player_position": "WR",
-            "matched_player_team": "MIN",
-        },
-        0,
-    )
-    assert "news-card-identity" in captured[0]
-    assert "data-player-id='6794'" in captured[0]
-
-    captured.clear()
-    general_news_ui.render_news_item_card({"title": "Team fires offensive coordinator"}, 1)
-    assert "news-card-identity" not in captured[0]
-
-
 _TWO_PLAYER_ITEM = {
     "title": "Davante Adams and DeAndre Hopkins swap teams in trade",
     "matched_players": [
@@ -171,53 +108,6 @@ _TWO_PLAYER_ITEM = {
         },
     ],
 }
-
-
-def test_two_player_identity_renders_both_chips_stacked():
-    html = general_news_ui._news_two_player_identity_html(_TWO_PLAYER_ITEM)
-    assert "news-card-identity-pair" in html
-    assert "data-player-id='2133'" in html
-    assert "data-player-id='1426'" in html
-    assert "Davante" in html and "Adams" in html
-    assert "DeAndre" in html and "Hopkins" in html
-    # Each chip is the same identity primitive the single-player case uses.
-    assert html.count("dg-compact-asset") >= 2
-
-
-def test_two_player_identity_returns_empty_for_malformed_or_missing_pair():
-    assert general_news_ui._news_two_player_identity_html({}) == ""
-    assert general_news_ui._news_two_player_identity_html({"matched_players": []}) == ""
-    assert general_news_ui._news_two_player_identity_html({"matched_players": [{"matched_player_id": "1"}]}) == ""
-    assert (
-        general_news_ui._news_two_player_identity_html(
-            {"matched_players": [{"matched_player_id": "1"}, {}]}
-        )
-        == ""
-    )
-
-
-def test_news_identity_html_dispatches_single_vs_pair_vs_none():
-    single_item = {
-        "matched_player_id": "6794",
-        "matched_player": "Justin Jefferson",
-        "matched_player_position": "WR",
-        "matched_player_team": "MIN",
-    }
-    assert "news-card-identity-pair" not in general_news_ui._news_identity_html(single_item)
-    assert "data-player-id='6794'" in general_news_ui._news_identity_html(single_item)
-    assert "news-card-identity-pair" in general_news_ui._news_identity_html(_TWO_PLAYER_ITEM)
-    assert general_news_ui._news_identity_html({"title": "Team fires offensive coordinator"}) == ""
-
-
-def test_news_item_card_renders_both_chips_for_a_two_player_item(monkeypatch):
-    captured: list[str] = []
-    monkeypatch.setattr(general_news_ui.st, "markdown", lambda html, **_kwargs: captured.append(html))
-
-    general_news_ui.render_news_item_card(_TWO_PLAYER_ITEM, 0)
-    assert "news-card-identity" in captured[0]
-    assert "news-card-identity-pair" in captured[0]
-    assert "data-player-id='2133'" in captured[0]
-    assert "data-player-id='1426'" in captured[0]
 
 
 def test_resolve_article_player_identities_handles_zero_one_two_and_three_plus():
@@ -253,91 +143,3 @@ def test_resolve_article_player_identities_handles_zero_one_two_and_three_plus()
         )
         == []
     )
-
-
-def _captured_card_html(item: dict, idx: int, monkeypatch) -> str:
-    captured: list[str] = []
-    monkeypatch.setattr(general_news_ui.st, "markdown", lambda html, **_kwargs: captured.append(html))
-    general_news_ui.render_news_item_card(item, idx)
-    return captured[0]
-
-
-def test_chip_tap_opens_player_quick_view_without_navigating_the_article_link(monkeypatch):
-    """Site-wide tappability audit follow-up (coridian_, 2026-10-14): the
-    player identity chip sits inside the card's own outer article
-    <a href target=_blank> (see render_news_item_card's docstring for why
-    no anchor-nesting restructure was needed). This proves, against the
-    real production card HTML and the real shared tap-delegation JS
-    (modules.interaction_contract.TAP_DELEGATION_JS -- the same contract
-    every other tappable card/row on the site uses), that a tap landing on
-    the chip is caught first and never reaches the native <a> (no
-    popup/navigation, just a player-click trigger), while a tap anywhere
-    else on the card still lets the real article link navigate."""
-
-    item = {
-        "title": "Justin Jefferson downgraded to out after practice report",
-        "link": "https://example.test/news/jefferson-out",
-        "matched_player_id": "6794",
-        "matched_player": "Justin Jefferson",
-        "matched_player_position": "WR",
-        "matched_player_team": "MIN",
-    }
-    card_html = _captured_card_html(item, 0, monkeypatch)
-    assert "data-player-id='6794'" in card_html
-    assert 'href="https://example.test/news/jefferson-out"' in card_html
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context()
-        # example.test is a reserved, intentionally non-resolving test
-        # domain (RFC 2606) -- stub it so a real popup navigation doesn't
-        # hit a live DNS lookup and surface as chrome-error instead of the
-        # requested URL.
-        context.route(
-            "https://example.test/**",
-            lambda route: route.fulfill(status=200, content_type="text/plain", body="ok"),
-        )
-        page = context.new_page()
-        page.set_content("<div id='player-scan-tap-root'></div>")
-        page.add_script_tag(
-            content=TAP_DELEGATION_JS.replace(
-                "export default function(component)",
-                "window.initGrid = function(component)",
-            )
-        )
-        page.evaluate(
-            """html => {
-                window.triggers = [];
-                window.initGrid({
-                    data: {html, rootId: 'player-scan-tap-root'},
-                    parentElement: document.body,
-                    setTriggerValue: (name, payload) => window.triggers.push([name, payload]),
-                })
-            }""",
-            card_html,
-        )
-
-        chip = page.locator("[data-player-id='6794']")
-        try:
-            with context.expect_event("page", timeout=600):
-                chip.click()
-            popped_up = True
-        except PlaywrightTimeoutError:
-            popped_up = False
-        assert not popped_up, "chip tap must not navigate the outer article link"
-        triggers = page.evaluate("window.triggers")
-        assert len(triggers) == 1
-        assert triggers[0][0] == "clicked"
-        assert triggers[0][1]["player_id"] == "6794"
-
-        title = page.locator(".news-card-title")
-        with context.expect_event("page", timeout=2000) as popup_info:
-            title.click()
-        popup = popup_info.value
-        assert "example.test/news/jefferson-out" in popup.url
-        popup.close()
-        # The outer-link click must not have also fired a player trigger.
-        assert page.evaluate("window.triggers.length") == 1
-
-        context.close()
-        browser.close()

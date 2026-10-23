@@ -171,18 +171,6 @@ def test_missing_player_value_is_pending_with_coverage():
     assert all(side["letter"] == grades.PENDING for side in report["sides"])
 
 
-def test_waiver_copy_is_value_cost_not_production():
-    tx, later = _waiver(faab=0, player="cheap")
-    report = grades.grade_waiver(tx, player_lookup=LOOKUP, current_week=10, later_events=later)
-    html = __import__("modules.transaction_grades_ui", fromlist=["waiver_grade_html"]).waiver_grade_html(report)
-    assert report["grade_model_label"] == "Current pickup grade"
-    assert report["timing_label"] == "Value / cost grade"
-    assert "production" in report["watch"].casefold()
-    assert "not part of this grade" in report["watch"].casefold()
-    assert "CURRENT PICKUP GRADE" in html.upper() or "Current pickup grade" in html
-    assert "PPG" not in report["why"]
-
-
 def test_zero_faab_useful_pickup_is_not_penalized():
     tx, later = _waiver(faab=0, player="cheap")
     paid = grades.grade_waiver(tx, player_lookup=LOOKUP, current_week=10, later_events=later)

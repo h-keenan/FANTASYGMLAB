@@ -11,10 +11,8 @@ from modules import compact_fantasy_assets as compact
 from modules import share_card_renderer
 from modules import share_recommendation_cards as share
 from modules import trade_offer_analyzer as toa
-from modules.app_styles import APP_CSS
 from modules.player_images import get_player_image_url
 from modules.trade_analyzer_builder import chip_html, result_row_html
-from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -300,16 +298,3 @@ def test_share_mixed_package_matrix(tmp_path):
         (ARTIFACTS / f"share-{name}-320.png").write_bytes(phone_320)
         assert Image.open(BytesIO(phone_390)).size[0] == 390
         assert image_ok
-
-
-def test_css_budget_and_lazy_analyzer_owner():
-    assert "dg-compact-asset" not in APP_CSS
-    assert "dg-compact-asset" in TRADE_ANALYZER_CSS
-    assert "toa-share-card" not in APP_CSS
-    assert len(APP_CSS) < 393_000
-    tokens = Path("modules/design_tokens.py").read_text(encoding="utf-8")
-    assert "--size-asset-compact" in tokens
-    assert "--size-asset-standard" in tokens
-    assert "--size-asset-chip" in tokens
-    assert "--size-roster-core-portrait" in tokens
-    assert "--size-roster-core-portrait-lg" in tokens

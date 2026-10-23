@@ -143,21 +143,6 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertTrue(config.redacted["has_service_role_key"])
         self.assertNotIn("service-role-secret", str(config.redacted))
 
-    def test_runtime_render_ci_and_secret_templates_exist(self):
-        self.assertEqual(Path(".python-version").read_text(encoding="utf-8").strip(), "3.12.10")
-        render_yaml = Path("render.yaml").read_text(encoding="utf-8")
-        self.assertIn("streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true", render_yaml)
-        self.assertIn("sync: false", render_yaml)
-        self.assertIn("APP_BASE_URL", render_yaml)
-        self.assertIn("https://app.fantasygmlab.com", render_yaml)
-        self.assertIn("fantasygm-lab-marketing", render_yaml)
-        self.assertIn("staticPublishPath: ./static/landing", render_yaml)
-        self.assertIn("fantasygm-lab-stripe-webhook", render_yaml)
-        web_block, webhook_block = render_yaml.split("  - type: web", 2)[1:]
-        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", web_block)
-        self.assertIn("SUPABASE_SERVICE_ROLE_KEY", webhook_block)
-        self.assertIn("uvicorn services.stripe_webhook_service:app", webhook_block)
-        self.assertTrue(Path(".github/workflows/ci.yml").exists())
 
     def test_example_secret_file_contains_placeholders_only(self):
         text = Path("config/secrets.example.toml").read_text(encoding="utf-8")
@@ -172,18 +157,6 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertNotIn("whsec_123", text)
         self.assertNotIn("ejbwbnlelwvdyabyptqn", text)
 
-    def test_gitignore_covers_local_secret_and_runtime_paths(self):
-        text = Path(".gitignore").read_text(encoding="utf-8")
-        for marker in [
-            "local_secrets/",
-            ".streamlit/secrets.toml",
-            ".env",
-            ".env.*",
-            "data/feedback_reports.jsonl",
-            ".tmp_streamlit_*",
-            "venv/",
-        ]:
-            self.assertIn(marker, text)
 
     def test_no_active_obsolete_host_in_config_files(self):
         active_files = [

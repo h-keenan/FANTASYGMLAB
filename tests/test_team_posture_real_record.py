@@ -1,23 +1,3 @@
-"""Regression tests for the THIRD instance of coridian_'s draft-pick "real
-record isn't being taken into account" bug class.
-
-`modules.team_eval._classify_team_strategy` auto-computes each team's roster
-"posture" (contender / fringe_contender / retool / rebuild / tank) purely
-from a roster-VALUE percentile + age vs. league median -- zero win-loss
-input anywhere. That posture feeds `_assign_team_archetype`, which produces
-the user-facing "Juggernaut" / "Aging Contender" / "Full Rebuild" / etc.
-archetype labels shown on the My Team screen (mobile TeamAnalysisPanel /
-MyTeamScreen, web `modules.my_team_ui`). A team with a strong roster on
-paper but a real bad start (e.g. 0-2) still read as "Contender" -- exactly
-the bug class already fixed once for draft-pick projections in
-`modules.trade_ideas._pick_team_context` (PR #737).
-
-Fixed the same way: a real win-loss record is now blended into the
-percentile, weighted by how much of the season has been played, via
-`modules.record_signal` -- the SAME shared helper `trade_ideas` uses, so the
-two call sites can't drift apart. See that module's docstring for the
-floor/ceiling/slope rationale.
-"""
 
 from __future__ import annotations
 

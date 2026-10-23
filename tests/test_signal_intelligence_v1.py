@@ -11,11 +11,8 @@ from modules import news_signal
 from modules import notification_center as nc
 from modules import signal_corroboration as corr
 from modules import signal_freshness
-from modules.app_styles import APP_CSS
-from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
 from modules.rankings import injury_level, injury_multiplier, risk_multiplier
 from modules.ui_architecture import PLATFORM_DESTINATIONS
-from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -128,17 +125,6 @@ def test_see_all_timeline_includes_general_news(monkeypatch):
     assert news_only
 
 
-def test_dashboard_cache_hit_refresh_uses_cached_pool_not_football_rebuild():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    hit = app.split("if game_plan_package_hit and cached_package:", 1)[1][:2500]
-    assert "refresh_news_alerts_for_presentation" in hit
-    assert "load_cached_news_pool()" in hit
-    assert "build_players_table(" not in hit
-    digest = (ROOT / "modules" / "news_intelligence.py").read_text(encoding="utf-8")
-    assert "news_freshness_bucket" in digest
-    assert "news_corroboration" in digest
-
-
 def test_news_timestamp_freshness_does_not_invent_published_at():
     item = {"title": "x", "fetched_at": NOW - 90, "source": "RotoWire"}
     meta = signal_freshness.normalize_news_freshness(item, now=NOW)
@@ -231,13 +217,6 @@ def test_structured_injury_propagation_states():
             assert changed <= healthy_risk
 
 
-def test_waiver_injury_replacement_fit_stays_structured():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert 'free_agents["injury_replacement_fit"] = injury_fit' in app
-    assert "is_injury_status" in app
-    assert "injury_need_positions" in app
-
-
 def test_trade_injury_guardrail_unchanged_entry():
     source = (ROOT / "modules" / "trade_ideas.py").read_text(encoding="utf-8")
     assert "def _temporary_injury_trade_guardrail" in source
@@ -252,128 +231,6 @@ def test_stale_news_and_missing_mapping_fail_soft():
     event = ni.football_event_from_article(_article(title="Unknown guy limited", matched_player="", matched_player_id=""))
     mapped = corr.corroborate_news_with_status(event, sleeper_status="Q", player_id="")
     assert mapped["label"] == corr.LABEL_NEWS_ONLY
-
-
-def test_duplicate_headline_collapse_and_escalation_resurfaces():
-    session = {}
-    q = ni.football_event_from_article(_article(title="Star Runner questionable with ankle"))
-    q = ni.FootballEvent(**{**q.as_dict(), "roster_relationship": ni.REL_MY_STARTER, "player_id": "p1"})
-    out = ni.football_event_from_article(_article(title="Star Runner now ruled out", link="https://www.espn.com/out"))
-    out = ni.FootballEvent(**{**out.as_dict(), "roster_relationship": ni.REL_MY_STARTER, "player_id": "p1"})
-    first = ni.apply_dedupe_and_escalation(ni.build_news_alert(q), session, league_id="L1", now=NOW)
-    dup = ni.apply_dedupe_and_escalation(ni.build_news_alert(q), session, league_id="L1", now=NOW + 30)
-    second = ni.apply_dedupe_and_escalation(ni.build_news_alert(out), session, league_id="L1", now=NOW + 120)
-    assert first.should_alert
-    assert dup.should_alert is False
-    assert second.should_alert
-    assert second.escalated_from
-    tile_q = first.as_tile()
-    tile_out = second.as_tile()
-    assert tile_q["recommendation_id"] == tile_out["recommendation_id"]
-    read_session: dict = {}
-    nc.mark_notification_read(read_session, "rec:news-event:p1:injury_chain", league_id="L1")
-    nc.unmark_notification_read(read_session, "rec:news-event:p1:injury_chain", league_id="L1")
-    assert nc.is_notification_read(read_session, "rec:news-event:p1:injury_chain", league_id="L1") is False
-
-
-def test_pqv_recent_news_limit_and_card_fields():
-    from modules import player_quick_view
-
-    card = player_quick_view.news_card_html(
-        player_quick_view.NewsItem(
-            headline="Player limited in practice",
-            source="RotoWire",
-            freshness="28m",
-            event_type="INJURY",
-            status_line="STATUS: QUESTIONABLE",
-            corroboration_note="News and Sleeper status agree",
-        )
-    )
-    assert "INJURY · 28m" in card
-    assert "RotoWire" in card
-    assert "STATUS: QUESTIONABLE" in card
-    assert "News and Sleeper status agree" in card
-    renderer = (ROOT / "modules" / "player_quick_view.py").read_text(encoding="utf-8")
-    assert "default_limit: int = 3" in renderer
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "max_items: int = 3" in app.split("def _player_quick_view_news_items", 1)[1][:400]
-
-
-def test_alerts_route_square_controls_and_css_budget():
-    assert any(page.key == "alerts" and page.category == "CORE" for page in PLATFORM_DESTINATIONS)
-    assert ALERTS_ACTIVITY_CSS not in APP_CSS
-    assert len(APP_CSS) < 393_000
-    ui = (ROOT / "modules" / "alerts_activity_ui.py").read_text(encoding="utf-8")
-    assert "st.pills(" in ui
-    assert "<h2>Alerts</h2>" not in ui
-    assert "Priority signals in one timeline" in ui
-    assert "border-radius:0" in ALERTS_ACTIVITY_CSS
-    assert "st-key-alerts_filter_" in ALERTS_ACTIVITY_CSS
-    assert count_explicit_reruns() <= 63
-
-
-def test_viewport_harness_covers_390_and_1440_alerts():
-    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
-    validate = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-    assert '"alerts"' in harness or "'alerts'" in harness
-    assert '"alerts"' in validate
-    assert "390" in validate
-    assert "1440" in validate
-    assert "Ashton Jeanty status changed" in harness
-    assert "expected exactly one Alerts page title owner" in validate
-
-
-def test_alerts_page_header_has_single_owner():
-    from unittest.mock import patch
-
-    from modules import alerts_activity_ui
-
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    alerts_block = app.split('if current_page == "alerts":', 1)[1].split(
-        "# LEAGUE RECAPS", 1
-    )[0]
-    assert "render_section_header(" not in alerts_block
-    assert alerts_block.count("render_section_header=render_section_header") == 2
-    ui = (ROOT / "modules" / "alerts_activity_ui.py").read_text(encoding="utf-8")
-    assert ui.count('render_section_header(\n                "Alerts"') == 1
-    assert "<h2>Alerts</h2>" not in ui
-    assert "Not a second History" not in ui
-
-    headers: list[str] = []
-    html_chunks: list[str] = []
-
-    def _header(title, **_kwargs):
-        headers.append(title)
-
-    class _Session(dict):
-        pass
-
-    session = _Session()
-    with (
-        patch.object(alerts_activity_ui.st, "session_state", session),
-        patch.object(alerts_activity_ui, "inject_global_styles"),
-        patch.object(
-            alerts_activity_ui,
-            "render_html_fragment",
-            side_effect=lambda html: html_chunks.append(html),
-        ),
-        patch.object(alerts_activity_ui.st, "container"),
-        patch.object(alerts_activity_ui.st, "pills", return_value="All"),
-        patch.object(alerts_activity_ui.st, "columns", return_value=[]),
-        patch.object(alerts_activity_ui.st, "button", return_value=False),
-        patch.object(alerts_activity_ui.st, "caption"),
-    ):
-        alerts_activity_ui.render_alerts_page(
-            league_id="L1",
-            session=session,
-            entitlement="free",
-            render_section_header=_header,
-        )
-    assert headers == ["Alerts"]
-    joined = "\n".join(html_chunks)
-    assert joined.count("<h2") == 0
-    assert "<h2>Alerts</h2>" not in joined
-    assert "Not a second History" not in joined
 
 
 def _jeanty_event(*, league_id: str) -> dict:
@@ -448,124 +305,3 @@ def test_read_time_guard_ignores_other_league_timeline_before_refresh():
     )
     assert not any("Jeanty" in str(row.get("headline")) for row in leaked)
     assert not any(row.get("player_id") == "jeanty-a" for row in leaked)
-
-
-def test_alerts_timeline_a_to_b_to_a_and_rapid_switch(monkeypatch):
-    # This test owns its league-specific events. Unrelated current disk news
-    # can mention the same player in any league and is not session leakage.
-    monkeypatch.setattr(news, "load_cached_news_pool", lambda: [])
-    from unittest.mock import patch
-
-    import app
-
-    state = _league_session("league-a", include_jeanty=True)
-    state["_effective_entitlement"] = "premium"
-    class _State(dict):
-        def __getattr__(self, name):
-            try:
-                return self[name]
-            except KeyError as exc:
-                raise AttributeError(name) from exc
-
-        def __setattr__(self, name, value):
-            self[name] = value
-
-        def __delattr__(self, name):
-            del self[name]
-
-    session = _State(state)
-    rapid_b = alerts_activity.compose_activity_timeline(
-        session=session, league_id="league-b"
-    )
-    assert not any("Jeanty" in str(row.get("headline")) for row in rapid_b)
-
-    with patch.object(app.st, "session_state", session):
-        app._clear_league_switch_transient_state(previous_league_id="league-a")
-    assert alerts_activity.TIMELINE_SESSION_KEY not in session
-    assert ni.TIMELINE_EVENT_KEY not in session
-    assert ni.ALERT_STATE_KEY not in session
-    assert ni.PRESENTATION_DIGEST_KEY not in session
-    assert nc.ACTIVITY_INBOX_SNAPSHOT_KEY not in session
-    assert session.get("_effective_entitlement") == "premium"
-
-    b_before_refresh = alerts_activity.compose_activity_timeline(
-        session=session, league_id="league-b"
-    )
-    assert not any("Jeanty" in str(row.get("headline") or "") for row in b_before_refresh)
-    header_b = alerts_activity.compose_header_alerts(
-        nc.compose_activity_inbox(session=session, league_id="league-b")
-    )
-    assert all("Jeanty" not in item.title for item in header_b)
-
-    b_event = {
-        "recommendation_id": "news-pickens-b",
-        "event_identity": "role:pickens-b",
-        "player_id": "pickens-b",
-        "value": "George Pickens role update",
-        "should_alert": False,
-        "news_event_severity": "LOW",
-        "category": "NEWS",
-        "league_id": "league-b",
-    }
-    session["selected_league_id"] = "league-b"
-    session[nc.ACTIVITY_INBOX_SNAPSHOT_KEY] = {
-        "league_id": "league-b",
-        "records": [
-            {
-                "id": "news-pickens-b",
-                "category": "NEWS",
-                "title": "George Pickens role update",
-                "body": "B news",
-                "source_kind": "canonical",
-                "player_id": "pickens-b",
-                "age_label": "9m",
-            }
-        ],
-    }
-    alerts_activity.store_timeline_events(session, [b_event], league_id="league-b")
-    b_rows = alerts_activity.compose_activity_timeline(session=session, league_id="league-b")
-    assert any("George Pickens role update" in row["headline"] for row in b_rows)
-    assert not any("Jeanty" in row["headline"] for row in b_rows)
-
-    with patch.object(app.st, "session_state", session):
-        app._clear_league_switch_transient_state(previous_league_id="league-b")
-    a_from_b_leak = alerts_activity.compose_activity_timeline(
-        session=session, league_id="league-a"
-    )
-    blob = " ".join(str(row) for row in a_from_b_leak)
-    assert "Jeanty" not in blob
-    assert "pickens-b" not in blob
-
-    restored = _league_session("league-a", include_jeanty=True)
-    session.update(restored)
-    a_restored = alerts_activity.compose_activity_timeline(
-        session=session, league_id="league-a"
-    )
-    assert any("Ashton Jeanty ruled out" in row["headline"] for row in a_restored)
-    b_isolated = alerts_activity.compose_activity_timeline(
-        session=session, league_id="league-b"
-    )
-    assert not any("Jeanty" in row["headline"] for row in b_isolated)
-
-
-def test_signal_intelligence_keys_are_league_scoped():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    keys = app.split("LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (", 1)[1].split(
-        "LEAGUE_SETTINGS_OVERRIDE_KEYS", 1
-    )[0]
-    for key in (
-        "_signal_intelligence_timeline",
-        "_news_intelligence_timeline_events",
-        "_news_intelligence_alert_state",
-        "_news_intelligence_presentation_digest",
-        "_news_intelligence_roster_context",
-    ):
-        assert key in keys
-        from modules import session_integrity
-
-        assert session_integrity.SESSION_KEY_LIFETIMES[key] == "LEAGUE"
-    clearer = app.split("def _clear_league_switch_transient_state(", 1)[1].split(
-        "\ndef _open_notification_destination(", 1
-    )[0]
-    assert "clear_signal_intelligence_timeline" in clearer
-    assert "news_intelligence.clear_alert_state" in clearer

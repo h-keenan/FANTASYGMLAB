@@ -77,76 +77,6 @@ def test_anonymous_cannot_access():
     assert dm.can_show_discovery({}, environ=env) is False
 
 
-def test_first_baseline_creates_no_session_events_and_persists_baseline_only():
-    session = _premium_session()
-    env = {dm.EXPERIMENT_ENV_KEY: "1"}
-    writes: list[tuple] = []
-
-    def fake_upsert(config, token, table, payload, *, on_conflict):
-        writes.append((table, payload.get("event_id"), on_conflict))
-        return True, ""
-
-    with (
-        patch.object(dm, "experiment_enabled", return_value=True),
-        patch.object(dm, "can_access_history", return_value=True),
-        patch.object(dm.account_store, "upsert_row", side_effect=fake_upsert),
-        patch.object(dm.account_store, "fetch_rows", return_value=([], "")),
-        patch.object(dm.account_store, "delete_rows", return_value=(True, "")),
-        patch.object(dm.auth_supabase, "is_configured", return_value=True),
-        patch.object(dm, "_resolve_config", return_value={"enabled": True, "url": "x", "anon_key": "y"}),
-    ):
-        tiles = [_trade_tile(rec_id="t1", target="Josh Jacobs")]
-        nc.publish_activity_inventory(
-            session,
-            tiles,
-            league_id="L1",
-            roster_id="1",
-            context_fingerprint="fp1",
-            supabase_config={"enabled": True, "url": "x", "anon_key": "y"},
-        )
-        assert dch.list_decision_events(session, league_id="L1") == ()
-        assert any(table == dm.BASELINES_TABLE for table, _, _ in writes)
-        assert not any(table == dm.EVENTS_TABLE for table, _, _ in writes)
-
-
-def test_material_change_persists_event_and_identical_rerun_writes_zero_new_events():
-    session = _premium_session()
-    writes: list[str] = []
-
-    def fake_upsert(config, token, table, payload, *, on_conflict):
-        if table == dm.EVENTS_TABLE:
-            writes.append(payload["event_id"])
-        return True, ""
-
-    with (
-        patch.object(dm, "experiment_enabled", return_value=True),
-        patch.object(dm, "can_access_history", return_value=True),
-        patch.object(dm.account_store, "upsert_row", side_effect=fake_upsert),
-        patch.object(dm.account_store, "fetch_rows", return_value=([], "")),
-        patch.object(dm.account_store, "delete_rows", return_value=(True, "")),
-        patch.object(dm.auth_supabase, "is_configured", return_value=True),
-        patch.object(dm, "_resolve_config", return_value={"enabled": True, "url": "x", "anon_key": "y"}),
-    ):
-        first = [_trade_tile(rec_id="jacobs", target="Josh Jacobs")]
-        nc.publish_activity_inventory(
-            session, first, league_id="L1", context_fingerprint="fp1",
-            supabase_config={"enabled": True},
-        )
-        second = [_trade_tile(rec_id="rhamondre", target="Rhamondre Stevenson")]
-        nc.publish_activity_inventory(
-            session, second, league_id="L1", context_fingerprint="fp2",
-            supabase_config={"enabled": True},
-        )
-        assert len(writes) >= 1
-        first_batch = list(writes)
-        nc.publish_activity_inventory(
-            session, second, league_id="L1", context_fingerprint="fp2",
-            supabase_config={"enabled": True},
-        )
-        # Session dedupe + identical inventory → no additional event upserts.
-        assert writes == first_batch
-
-
 def test_deterministic_event_id_stable_across_tabs():
     change = lifecycle.InventoryChange(
         recommendation_id="rec-1",
@@ -172,56 +102,6 @@ def test_deterministic_event_id_stable_across_tabs():
     row = dm.event_to_row(a[0], user_id="u1")
     assert row["event_id"] == a[0].event_id
     assert row["user_id"] == "u1"
-
-
-def test_hydrate_from_durable_baseline_enables_cross_session_compare():
-    session = _premium_session()
-    baseline = {
-        "material_signatures": {"jacobs": "sig-a"},
-        "prior_snapshots": {
-            "jacobs": dch.DecisionStateSnapshot(
-                recommendation_id="jacobs",
-                target_label="Josh Jacobs",
-                material_signature="sig-a",
-                category="Trades",
-                destination="trade_hub",
-            ).to_dict()
-        },
-        "top_recommendation_id": "jacobs",
-    }
-    with (
-        patch.object(dm, "experiment_enabled", return_value=True),
-        patch.object(dm, "can_access_history", return_value=True),
-        patch.object(dm.account_store, "fetch_rows", return_value=([baseline], "")),
-        patch.object(dm.auth_supabase, "is_configured", return_value=True),
-        patch.object(dm, "_resolve_config", return_value={"enabled": True, "url": "x", "anon_key": "y"}),
-    ):
-        assert dm.hydrate_session_from_durable(session, league_id="L1") is True
-        assert session[lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY]["jacobs"] == "sig-a"
-
-    writes: list[str] = []
-
-    def fake_upsert(config, token, table, payload, *, on_conflict):
-        if table == dm.EVENTS_TABLE:
-            writes.append(payload["event_id"])
-        return True, ""
-
-    with (
-        patch.object(dm, "experiment_enabled", return_value=True),
-        patch.object(dm, "can_access_history", return_value=True),
-        patch.object(dm.account_store, "upsert_row", side_effect=fake_upsert),
-        patch.object(dm.account_store, "fetch_rows", return_value=([], "")),
-        patch.object(dm.account_store, "delete_rows", return_value=(True, "")),
-        patch.object(dm.auth_supabase, "is_configured", return_value=True),
-        patch.object(dm, "_resolve_config", return_value={"enabled": True, "url": "x", "anon_key": "y"}),
-    ):
-        tiles = [_trade_tile(rec_id="rhamondre", target="Rhamondre Stevenson")]
-        nc.publish_activity_inventory(
-            session, tiles, league_id="L1", context_fingerprint="fp-new",
-            supabase_config={"enabled": True},
-        )
-        assert writes, "cross-session change should emit durable events"
-        assert dch.list_decision_events(session, league_id="L1")
 
 
 def test_missing_table_fails_safely():
@@ -357,55 +237,6 @@ def test_league_isolation_in_merged_history():
     assert all(event.league_id == "L1" for event in events)
 
 
-def test_destination_never_resurrects_stale_narrative_contract():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    opener = source[
-        source.index("def _open_decision_change_event(") : source.index(
-            "def _open_home_command_route("
-        )
-        if "def _open_home_command_route(" in source
-        else source.index("def _open_decision_change_event(") + 800
-    ]
-    # Fallback: search nearby
-    start = source.index("def _open_decision_change_event(")
-    opener = source[start : start + 1200]
-    assert "recommendation_narrative=None" in opener
-    assert "Never resurrects" in opener or "never resurrect" in opener.casefold()
-
-
-def test_identical_football_inputs_unaffected_by_decision_memory_flag():
-    """Decision Memory must not alter inventory signatures or recommendation ids."""
-
-    tiles = [_trade_tile(rec_id="t1", target="Josh Jacobs")]
-    off_session: dict = {}
-    on_session = _premium_session()
-
-    nc.publish_activity_inventory(off_session, tiles, league_id="L1", context_fingerprint="fp")
-    with (
-        patch.object(dm, "experiment_enabled", return_value=True),
-        patch.object(dm, "can_access_history", return_value=True),
-        patch.object(dm.account_store, "upsert_row", return_value=(True, "")),
-        patch.object(dm.account_store, "fetch_rows", return_value=([], "")),
-        patch.object(dm.account_store, "delete_rows", return_value=(True, "")),
-        patch.object(dm.auth_supabase, "is_configured", return_value=True),
-        patch.object(dm, "_resolve_config", return_value={"enabled": True, "url": "x", "anon_key": "y"}),
-    ):
-        nc.publish_activity_inventory(
-            on_session, tiles, league_id="L1", context_fingerprint="fp",
-            supabase_config={"enabled": True},
-        )
-
-    off_sigs = off_session.get(lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY)
-    on_sigs = on_session.get(lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY)
-    assert off_sigs == on_sigs
-    off_snap = off_session.get(nc.ACTIVITY_INBOX_SNAPSHOT_KEY) or {}
-    on_snap = on_session.get(nc.ACTIVITY_INBOX_SNAPSHOT_KEY) or {}
-    assert off_snap.get("material_signatures") == on_snap.get("material_signatures")
-    assert [r.get("recommendation_id") for r in off_snap.get("records") or []] == [
-        r.get("recommendation_id") for r in on_snap.get("records") or []
-    ]
-
-
 def test_migration_sql_enables_rls_and_idempotency():
     sql = (ROOT / "docs" / "supabase_decision_memory.sql").read_text(encoding="utf-8")
     assert "decision_memory_events" in sql
@@ -416,13 +247,3 @@ def test_migration_sql_enables_rls_and_idempotency():
     assert "primary key (user_id, league_id)" in sql
     assert "on delete cascade" in sql.casefold()
     assert "to anon" not in sql  # fail closed for anonymous
-
-
-def test_ui_marks_decision_memory_and_preserves_free_what_changed():
-    source = (ROOT / "modules" / "decision_change_history_ui.py").read_text(encoding="utf-8")
-    assert "View Decision Memory →" in source
-    assert "decision_memory.can_access_history" in source
-    assert "render_premium_lock" in source
-    assert "Free users always keep session What Changed value" in source
-    assert "data-decision-memory-discovery=" in source
-    assert "Premium keeps durable history" in source

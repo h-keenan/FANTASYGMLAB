@@ -1,9 +1,3 @@
-"""build_players_table_out_of_process runs the expensive rebuild in a
-subprocess instead of in-process, so the background refresh thread (see
-services/mobile_api_service.py's _maybe_schedule_players_refresh and
-app.py's ensure_players_for_startup/maybe_refresh_players_after_shell call
-sites) can't hold this process's GIL and stall concurrent request handling.
-"""
 
 from __future__ import annotations
 

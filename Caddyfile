@@ -16,7 +16,7 @@
 # compose's `environment:`/`env_file:` on the caddy service.
 #
 # Internal services are reached by their Docker Compose service name on the
-# shared network (Docker's embedded DNS resolves "web", "mobile-api", etc.
+# shared network (Docker's embedded DNS resolves "web-next", "mobile-api", etc.
 # to the right container) — none of those ports are published to the host,
 # only Caddy's 80/443 are, so port 8080 behind each name is never directly
 # reachable from outside the box.
@@ -36,15 +36,13 @@
 	encode zstd gzip
 }
 
-# --- fantasygm-lab (Streamlit web app) --------------------------------------
-# Matches render.yaml's healthCheckPath (/_stcore/health) and startCommand
-# (streamlit run ... --server.port $PORT) — see docker-compose.yml's `web`
-# service. Streamlit uses WebSockets for live UI updates, so this proxy
-# forwards the Connection/Upgrade headers Caddy already handles by default
-# for HTTP/1.1 upstreams.
+# --- fantasygm-lab (web app: Next.js) ----------------------------------------
+# The legacy Streamlit app (`web` service, app.py) was removed in 2026-10 --
+# see docs/streamlit-removal-2026-10.md. {$APP_DOMAIN} now proxies to the
+# Next.js frontend (web-next), same upstream as {$WEB_NEXT_DOMAIN} below.
 {$APP_DOMAIN} {
 	import encode_responses
-	reverse_proxy web:8080
+	reverse_proxy web-next:8080
 }
 
 # --- fantasygm-lab-marketing-www --------------------------------------------
@@ -99,14 +97,10 @@
 	file_server
 }
 
-# --- fantasygm-lab-web-next (Next.js frontend, test-subdomain preview) ------
-# Additive only — a separate, non-production subdomain so the already-
-# merged, already-tested web-next frontend can be smoke-tested against the
-# real production mobile-api before any cutover decision. Does NOT replace
-# or modify the {$APP_DOMAIN} block above, which keeps routing to `web`
-# (Streamlit) exactly as before. Making web-next the thing {$APP_DOMAIN}
-# points to is a separate, deliberate, later decision — see
-# docs/SELF_HOSTED_MIGRATION.md's "web-next test-subdomain preview"
+# --- fantasygm-lab-web-next (Next.js frontend, test-subdomain) -------------
+# A separate subdomain that serves the same web-next upstream as
+# {$APP_DOMAIN} above (kept so existing links/smoke tests keep working) --
+# see docs/SELF_HOSTED_MIGRATION.md's "web-next test-subdomain preview"
 # section.
 #
 # IMPORTANT: production's actual, live Caddy config is generated

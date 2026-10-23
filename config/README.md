@@ -17,14 +17,12 @@ Rules:
 - Never upload `local_secrets/secrets.toml`.
 - The local app reads it automatically.
 - Render production values go into Render Environment Variables, not GitHub.
-- Existing `.streamlit/secrets.toml` support remains as a compatibility fallback.
 
 Runtime configuration is loaded in this order:
 
 1. Environment variables, used by Render and CI.
-2. Streamlit secrets, for compatibility with existing `.streamlit/secrets.toml` setups.
-3. `local_secrets/secrets.toml`, for local Windows development.
-4. Safe missing-config behavior locally. On Render/managed hosts, missing
+2. `local_secrets/secrets.toml`, for local development.
+3. Safe missing-config behavior locally. On Render/managed hosts, missing
    `SUPABASE_URL` / `SUPABASE_ANON_KEY` (or a loopback `APP_BASE_URL`) fails closed
    instead of looking like a guest/dev install. Canonical inventory:
    [`docs/runtime-environment-contract.md`](../docs/runtime-environment-contract.md).
@@ -45,11 +43,11 @@ Runtime configuration is loaded in this order:
 | `STRIPE_CHECKOUT_SUCCESS_URL` | `STRIPE_CHECKOUT_SUCCESS_URL` | Web app | Premium page success return URL. |
 | `STRIPE_CHECKOUT_CANCEL_URL` | `STRIPE_CHECKOUT_CANCEL_URL` | Web app | Premium page cancel return URL. |
 | `STRIPE_WEBHOOK_SECRET` | `STRIPE_WEBHOOK_SECRET` | Stripe webhook backend only | Stripe webhook endpoint signing secret. Put this on the Render webhook service, not in browser-visible UI. |
-| `SUPABASE_SERVICE_ROLE_KEY` | `SUPABASE_SERVICE_ROLE_KEY` | Stripe webhook backend only | Supabase project settings -> API -> service role key. Do not put this on the Streamlit web app service. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `SUPABASE_SERVICE_ROLE_KEY` | Stripe webhook backend only | Supabase project settings -> API -> service role key. Do not put this on the web app or API service. |
 | `DYNASTYGM_PREMIUM_OVERRIDE` | `DYNASTYGM_PREMIUM_OVERRIDE` | Local/dev only | Set `true` only to simulate Premium locally. |
 | `DYNASTYGM_DEBUG_AUTH` | `DYNASTYGM_DEBUG_AUTH` | Local/dev only | Set `true` only for temporary auth diagnostics. |
 | `DYNASTYGM_DEBUG_PERF` | `DYNASTYGM_DEBUG_PERF` | Local/dev only | Set `true` only for temporary performance diagnostics. |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | `DYNASTYGM_SHOW_EXPERIMENTAL` | Web app optional | Set `true` only when beta testers should see experimental destinations. |
 | `DYNASTYGM_SHOW_DEV_DESTINATIONS` | `DYNASTYGM_SHOW_DEV_DESTINATIONS` | Local/dev only | Set `true` only for developer-only routes. |
 
-Backend-only values belong in the Stripe webhook backend service. Do not show them in Streamlit diagnostics, HTML, browser code, screenshots, logs, or support output.
+Backend-only values belong in the Stripe webhook backend service. Do not show them in diagnostics, HTML, browser code, screenshots, logs, or support output.

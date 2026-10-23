@@ -135,14 +135,7 @@ def _resolve_config(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if isinstance(config, Mapping) and config:
         return dict(config)
     try:
-        secrets = None
-        try:
-            import streamlit as st
-
-            secrets = st.secrets
-        except Exception:
-            secrets = None
-        return auth_supabase.get_supabase_config(secrets=secrets)
+        return auth_supabase.get_supabase_config()
     except Exception:
         return {}
 
@@ -894,7 +887,7 @@ class EnrichedTargetCard:
     # status before reaching presentation, so a user could see "Add/Trade for
     # this player" with zero visibility into whether they were hurt or on IR.
     # Reuses rankings.injury_display_label(), the app's one injury vocabulary
-    # (same helper waivers_ui.py already renders from) rather than inventing
+    # (same helper waivers_logic.py already renders from) rather than inventing
     # a second one.
     injury_display: str = ""
 

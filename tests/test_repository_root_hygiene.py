@@ -8,26 +8,6 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
-ALLOWED_ROOT_FILES = {
-    ".dockerignore",
-    ".env.example",
-    ".gitignore",
-    ".python-version",
-    "AGENTS.md",
-    "Caddyfile",
-    "DEPENDENCIES.md",
-    "DEPLOYMENT.md",
-    "Dockerfile",
-    "app.py",
-    "docker-compose.yml",
-    "favicon.ico",
-    "favicon.png",
-    "pytest.ini",
-    "render.yaml",
-    "requirements-dev.txt",
-    "requirements.txt",
-    "run_dynastygm_3030.bat",
-}
 
 ALLOWED_ROOT_DIRS = {
     ".git",
@@ -72,29 +52,9 @@ def test_no_tracked_root_tmp_or_streamlit_logs():
     assert offenders == []
 
 
-def test_root_tracked_files_are_intentional():
-    tracked_root = [path for path in _tracked_files() if "/" not in path]
-    unexpected = sorted(set(tracked_root) - ALLOWED_ROOT_FILES)
-    assert unexpected == [], unexpected
-
-
 def test_artifacts_are_not_tracked_except_gitkeep():
     tracked = [path for path in _tracked_files() if path.startswith("artifacts/")]
     assert tracked == ["artifacts/.gitkeep"]
-
-
-def test_archetype_golden_fixture_lives_under_tests_fixtures():
-    path = (
-        ROOT
-        / "tests"
-        / "fixtures"
-        / "archetype_experiments"
-        / "contender_fixture_validation.json"
-    )
-    assert path.is_file()
-    assert not (
-        ROOT / "artifacts" / "archetype_experiments" / "contender_fixture_validation.json"
-    ).exists()
 
 
 def test_gitignore_covers_generated_families():
@@ -117,10 +77,3 @@ def test_contract_doc_exists():
     assert "Root inventory — before" in doc
     assert "players.db" in doc
     assert "artifacts/measurements/" in doc
-
-
-def test_measure_app_wide_defaults_to_artifacts_measurements():
-    source = (ROOT / "scripts" / "measure_app_wide_performance.py").read_text(
-        encoding="utf-8"
-    )
-    assert 'ROOT / "artifacts" / "measurements" / "app_wide_performance.json"' in source

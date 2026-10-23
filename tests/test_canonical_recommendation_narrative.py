@@ -8,7 +8,6 @@ from pathlib import Path
 from modules import canonical_recommendation_narrative as crn
 from modules import notification_center
 from modules import player_quick_view
-from modules.trade_hub_ui import _trade_idea_identity
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,12 +48,6 @@ def _trade_idea(**overrides):
     }
     idea.update(overrides)
     return idea
-
-
-def test_trade_recommendation_id_matches_trade_hub_identity_digest():
-    idea = _trade_idea()
-    expected = sha256(repr(_trade_idea_identity(idea)).encode("utf-8")).hexdigest()[:16]
-    assert crn.trade_recommendation_id(idea) == expected
 
 
 def test_same_trade_narrative_agrees_across_dashboard_trade_hub_and_pqv():
@@ -126,49 +119,6 @@ def test_league_switch_clears_narrative_provenance():
         )
         is None
     )
-
-
-def test_player_without_recommendation_shows_neutral_context():
-    neutral = crn.build_neutral_player_narrative(
-        {
-            "player_id": "solo-1",
-            "name": "Solo Player",
-            "opportunity_explanation": "Role is still forming on the depth chart.",
-        },
-        league_id="league-a",
-        roster_id="roster-1",
-        valuation_lens="value_score",
-    )
-    assert neutral.is_active_recommendation is False
-    presentation = neutral.pqv_presentation()
-    assert presentation["heading"] == "Player Context"
-    assert presentation["action"] == ""
-    assert "not an active recommendation" in presentation["context"].casefold()
-
-    html = player_quick_view.recommendation_context_html(
-        presentation["summary"],
-        presentation["context"],
-        action="No active recommendation",
-        active_recommendation=False,
-        recommendation_id=neutral.recommendation_id,
-    )
-    assert "Player Context" in html
-    assert "No active recommendation" in html
-    assert "Hold" not in html
-    assert "Monitor" not in html
-    assert "player-dossier-neutral-context" in html
-
-
-def test_pqv_neutral_refuses_synthetic_hold_action():
-    html = player_quick_view.recommendation_context_html(
-        "Depth chart context.",
-        "General player analysis — not an active recommendation.",
-        action="Hold",
-        active_recommendation=False,
-    )
-    assert "No active recommendation" in html
-    assert "player-dossier-context-action\">Hold<" not in html
-    assert "player-dossier-neutral-context" in html
 
 
 def test_pqv_presentation_keeps_full_reason_by_default():
@@ -262,45 +212,6 @@ def test_no_recommendation_ordering_or_trust_math_in_narrative_module():
     )
     for token in forbidden:
         assert token not in source
-
-
-def test_app_wiring_binds_and_clears_narrative_provenance():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "canonical_recommendation_narrative" in source
-    assert "recommendation_narrative" in source
-    assert "NARRATIVE_SESSION_KEY" in source
-    assert "build_neutral_player_narrative" in source
-    assert "visible_recommendation_for_player" in source
-    assert "bind_pqv_owned_narrative" in source
-    clearer = source[
-        source.index("def _clear_player_quick_view(") : source.index(
-            "def open_player_quick_view("
-        )
-    ]
-    assert "clear_narrative" in clearer
-
-
-def test_trade_hub_consumes_canonical_narrative_for_detail_and_pqv():
-    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    assert "build_trade_narrative" in source
-    assert "recommendation_narrative" in source
-    assert "bind_narrative" in source
-
-
-def test_notification_summary_uses_canonical_narrative_when_present():
-    idea = _trade_idea()
-    narrative = crn.build_trade_narrative(
-        idea,
-        league_id="league-a",
-        roster_id="roster-1",
-        source_surface="notifications",
-        target_reason="Adds immediate lineup production at WR.",
-        confidence_label="High",
-    )
-    summary = notification_center.summary_from_recommendation_narrative(narrative)
-    assert "Acquire Player X" in summary
-    assert "immediate lineup" in summary.casefold()
-    assert notification_center.summary_from_recommendation_narrative(None) == ""
 
 
 def test_audit_document_exists_with_required_sections():
