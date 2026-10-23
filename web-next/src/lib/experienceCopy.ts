@@ -35,7 +35,9 @@ export const BEGINNER_HELP = {
   // add_league_detail_ranks, modules/team_eval.py
   // _score_starter_weighted_roster).
   dashboardGamePlan:
-    "Game Plan lists the roster moves that would help your team most right now, most urgent first.",
+    "Today lists the roster moves that would help your team most right now, most urgent first.",
+  dashboardNothingUrgent:
+    "No move is needed right now. Before game day, check Matchup to confirm your lineup is set in your league app.",
   dashboardSnapshot:
     "Team Snapshot ranks your team against every other team in this league. #1 is best, and T- means tied.",
   powerRank:

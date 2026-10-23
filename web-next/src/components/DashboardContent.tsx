@@ -84,23 +84,26 @@ export function DashboardContent({
                 label: "Power Rank",
                 value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
                 tone: snapshot.power_rank === 1 ? "premium" : "neutral",
-                note: copy.help("powerRank") ?? undefined,
               },
               {
                 glyph: "franchise",
                 label: "Franchise Rank",
                 value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
                 tone: snapshot.franchise_rank === 1 ? "premium" : "neutral",
-                note: copy.help("franchiseRank") ?? undefined,
               },
               {
                 glyph: "age",
                 label: copy.label("averageAge", "Avg Age"),
                 value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
-                note: copy.help("averageAge") ?? undefined,
               },
             ]}
           />
+          {/* Beginner term explanations as short lines under the strip, like
+              the mobile Dashboard. As per-tile captions inside four 390px-wide
+              columns they were ~450px tall and pushed Today below the fold. */}
+          <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
+          <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
+          <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
         </section>
       ) : null}
 
@@ -118,7 +121,9 @@ export function DashboardContent({
                 emptyRoster: "Your roster doesn't have any players yet. This is expected if your draft is still in progress.",
               }) || "No urgent roster issues right now."
             }
-          />
+          >
+            {!data.reason ? <BeginnerHelp term="dashboardNothingUrgent" className="mt-1" /> : null}
+          </EmptyState>
         ) : (
           topItems.map((item) => (
             <GamePlanCard key={item.recommendation_id || item.headline} item={item} leagueId={leagueId} leagueName={leagueName} />
@@ -171,14 +176,12 @@ export function DashboardContent({
                 label: "Starter Strength",
                 value: formatRank(snapshot.starter_rank, snapshot.starter_rank_tied),
                 tone: snapshot.starter_rank === 1 ? "premium" : "neutral",
-                note: copy.help("starterStrength") ?? undefined,
               },
               {
                 glyph: "bench",
                 label: "Bench Strength",
                 value: formatRank(snapshot.bench_rank, snapshot.bench_rank_tied),
                 tone: snapshot.bench_rank === 1 ? "premium" : "neutral",
-                note: copy.help("benchStrength") ?? undefined,
               },
               {
                 glyph: "injury",
@@ -188,6 +191,8 @@ export function DashboardContent({
               },
             ]}
           />
+          <BeginnerHelp text={copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null} />
+          <BeginnerHelp text={copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null} />
         </section>
       ) : null}
       <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />

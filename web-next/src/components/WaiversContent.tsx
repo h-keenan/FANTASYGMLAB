@@ -473,6 +473,7 @@ export function WaiversContent({
         </div>
         <StatStrip items={stats} />
       </header>
+      {data.faab_enabled !== false ? <BeginnerHelp term="faab" /> : null}
       {copy.isBeginner ? <BeginnerHelp text={copy.help("averageWireValue")} /> : null}
 
       <PillRow options={TAB_OPTIONS} active={tab} onSelect={(value) => setTab(value as WaiverTab)} fullWidth />
