@@ -21,6 +21,7 @@ export type NavGlyphName =
   | "liveDraft"
   | "teamSituation"
   | "community"
+  | "games"
   | "founderAnalytics";
 
 /**
@@ -232,6 +233,16 @@ export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; s
           <circle cx="352" cy="180" r="52" {...stroke} />
           <path d="M48 432c0-84 64-140 128-140s128 56 128 140" {...stroke} />
           <path d="M296 320c56 4 104 52 104 112" {...stroke} />
+        </svg>
+      );
+    case "games":
+      // A simple die: rounded square with three pips.
+      return (
+        <svg {...common}>
+          <rect x="64" y="64" width="384" height="384" rx="64" {...stroke} />
+          <circle cx="176" cy="176" r="16" fill="currentColor" />
+          <circle cx="256" cy="256" r="16" fill="currentColor" />
+          <circle cx="336" cy="336" r="16" fill="currentColor" />
         </svg>
       );
     case "founderAnalytics":

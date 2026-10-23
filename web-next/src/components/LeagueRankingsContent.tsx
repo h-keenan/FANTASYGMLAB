@@ -50,7 +50,7 @@ function rankBadgeColor(tone: "positive" | "negative" | "neutral" = "neutral"): 
   return tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
 }
 
-function RankingRow({
+export function RankingRow({
   rankLabel,
   teamName,
   avatarUrl,

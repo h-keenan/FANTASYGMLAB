@@ -233,6 +233,14 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.violet,
       subtitle: 'Weekly league recap and stories',
     },
+    {
+      label: 'Games',
+      route: 'Games',
+      icon: 'dice-outline',
+      needsLeague: true,
+      color: colors.violet,
+      subtitle: "Season simulator and weekly pick'em",
+    },
   ];
 }
 
