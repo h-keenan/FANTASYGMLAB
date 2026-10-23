@@ -61,7 +61,17 @@ L = polish. "Fixed" = changed in this PR.
 - **Error / not-found**: use primary ink token now; no retry on not-found by design.
 - **Desktop 1280 spot check**: no card stretched to a sibling's height found on Dashboard, My Team, Trade Hub, Waivers, Matchup, GM Plan, Players, Account, Premium. Half-empty rows: My Team snapshot (3+2), GM Plan Plan Snapshot (one tile), Waivers stat chips. Premium plans grid leaves a 2-card second row. Sev L.
 
-## Position badge usage (redesign pending, untouched)
+## Position badge (redesigned 2026-10-22, owner option A: tinted pill)
+
+Shared pill on web (`PositionBadge`, `.position-badge*`), mobile and share cards:
+`--radius-pill`, 14% hue fill, 45% hue border, text = hue 70% + text-primary 30%,
+sm 11px/20px, md 13px/24px, min-width 32/38px. New lanes: DL, LB, DB, FLEX
+(neutral; SUPERFLEX/IDP_FLEX/BN/IR). Text contrast vs tinted fill (dark: bg / surface / raised;
+light: white / bg / muted): dark 8.6-12.6 / 6.1-8.5 / 4.0-5.5 (DB 3.99 only on raised #3d4248);
+light 6.2-9.9 / 5.6-8.9 / 5.4-8.5. Rank chips (RB12), lineup slot cells and
+Matchup move slots now use it.
+
+## Position badge usage (before redesign)
 
 `PositionBadge` (single shared component) renders in: PlayerRow/PlayerIdentity
 (Players, My Team, Waivers, Dashboard watchlist, Trade Hub/Finder exchange

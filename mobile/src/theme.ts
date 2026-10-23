@@ -235,6 +235,11 @@ export const positionColors: Record<string, string> = {
   K: '#A78BFA',
   DEF: '#D4D4D8',
   DST: '#D4D4D8',
+  // IDP lanes + the neutral lane for flex-type slots (pill redesign, 2026-10-22).
+  DL: '#F472B6',
+  LB: '#2DD4BF',
+  DB: '#818CF8',
+  FLEX: '#D4D4D8',
 };
 
 // coridian_ (2026-09-22): "a lot of the colored aspects blend in" on light
@@ -251,6 +256,10 @@ export const positionColorsLight: Record<string, string> = {
   K: '#6D28D9',
   DEF: '#3F3F46',
   DST: '#3F3F46',
+  DL: '#BE185D',
+  LB: '#0F766E',
+  DB: '#4338CA',
+  FLEX: '#3F3F46',
 };
 
 export function positionColor(
@@ -259,7 +268,82 @@ export function positionColor(
   fallback: string = colors.textSecondary,
 ): string {
   const table = isDark ? positionColors : positionColorsLight;
-  return table[(position ?? '').toUpperCase()] ?? fallback;
+  return table[positionLane(position)] ?? fallback;
+}
+
+// Lane aliases: finer positions / lineup slots share the lane of their group.
+// Mirrors web-next/src/lib/playerPresentation.ts POSITION_COLOR_VAR.
+const POSITION_LANE: Record<string, string> = {
+  'D/ST': 'DST',
+  DE: 'DL',
+  DT: 'DL',
+  OLB: 'LB',
+  ILB: 'LB',
+  CB: 'DB',
+  S: 'DB',
+  SUPER_FLEX: 'FLEX',
+  SUPERFLEX: 'FLEX',
+  REC_FLEX: 'FLEX',
+  'WR/RB': 'FLEX',
+  'WR/TE': 'FLEX',
+  'RB/WR/TE': 'FLEX',
+  IDP_FLEX: 'FLEX',
+  BN: 'FLEX',
+  IR: 'FLEX',
+  TAXI: 'FLEX',
+};
+
+function positionLane(position: string | null | undefined): string {
+  const key = (position ?? '').trim().toUpperCase();
+  return POSITION_LANE[key] ?? key;
+}
+
+/** Short pill text so every position/slot fits the same pill width.
+ * Mirrors web-next playerPresentation.positionBadgeLabel. */
+export function positionBadgeLabel(position: string): string {
+  const label = position.trim().toUpperCase();
+  if (label === 'SUPER_FLEX' || label === 'SUPERFLEX') return 'SF';
+  if (label === 'WR/RB') return 'W/R';
+  if (label === 'REC_FLEX') return 'W/T';
+  if (label === 'IDP_FLEX') return 'IDP';
+  if (label === 'DST' || label === 'D/ST') return 'DEF';
+  return label;
+}
+
+function hexChannels(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/** a*pct + b*(1-pct), literal hex (RN has no color-mix). */
+function mixHex(a: string, b: string, pct: number): string {
+  const ca = hexChannels(a);
+  const cb = hexChannels(b);
+  return `#${[0, 1, 2]
+    .map((i) =>
+      Math.round(ca[i] * pct + cb[i] * (1 - pct))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}
+
+/** Pill colors for PositionBadge: 14% tint fill, 45% hue border, text pulled
+ * 30% toward text-primary. Same recipe as web's `.position-badge` CSS, so
+ * both clients clear AA (>= 6:1 on the page surfaces) in both themes. */
+export function positionBadgeColors(
+  position: string | null | undefined,
+  isDark: boolean,
+  textPrimary: string,
+  fallback: string,
+): { fill: string; border: string; text: string } {
+  const hue = positionColor(position, isDark, fallback);
+  const rgb = hexChannels(hue);
+  return {
+    fill: `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.14)`,
+    border: `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.45)`,
+    text: mixHex(hue, textPrimary, 0.7),
+  };
 }
 
 /**

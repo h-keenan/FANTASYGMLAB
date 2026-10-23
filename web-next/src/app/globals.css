@@ -108,6 +108,10 @@
   --color-position-te: #fb923c;
   --color-position-k: #a78bfa;
   --color-position-dst: #d4d4d8;
+  --color-position-dl: #f472b6;
+  --color-position-lb: #2dd4bf;
+  --color-position-db: #818cf8;
+  --color-position-flex: #d4d4d8;
 
   /* Semantic soft surfaces */
   --color-success-soft: rgba(34, 197, 94, 0.15);
@@ -296,6 +300,10 @@
     --color-position-te: #c2410c;
     --color-position-k: #6d28d9;
     --color-position-dst: #3f3f46;
+    --color-position-dl: #be185d;
+    --color-position-lb: #0f766e;
+    --color-position-db: #4338ca;
+    --color-position-flex: #3f3f46;
 
     --color-success-soft: rgba(34, 197, 94, 0.16);
     --color-opportunity-soft: rgba(20, 184, 166, 0.16);
@@ -334,6 +342,10 @@
   --color-position-te: var(--color-position-te);
   --color-position-k: var(--color-position-k);
   --color-position-dst: var(--color-position-dst);
+  --color-position-dl: var(--color-position-dl);
+  --color-position-lb: var(--color-position-lb);
+  --color-position-db: var(--color-position-db);
+  --color-position-flex: var(--color-position-flex);
   --font-sans: var(--font-family-sans);
 }
 
@@ -869,6 +881,42 @@ a {
 }
 .tone-opportunity .tone-value {
   color: var(--color-opportunity);
+}
+
+/* Position pill (shared PositionBadge, web + mobile + share cards): fully
+   rounded, tinted by the position's fixed semantic color. Text is the
+   position hue pulled 30% toward --color-text-primary so it clears AA on
+   the tint in both themes (contrast table in
+   docs/ui-consistency-audit-2026-10.md). min-width keeps 1-, 2- and
+   3-letter positions the same width feel. */
+.position-badge {
+  --pb: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--pb) 45%, transparent);
+  background: color-mix(in srgb, var(--pb) 14%, transparent);
+  color: color-mix(in srgb, var(--pb) 70%, var(--color-text-primary));
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.position-badge-sm {
+  font-size: 11px;
+  height: 20px;
+  min-width: 32px;
+  padding: 0 8px;
+}
+.position-badge-md {
+  font-size: 13px;
+  height: 24px;
+  min-width: 38px;
+  padding: 0 10px;
 }
 
 /* Position-colored plain text (e.g. "Biggest Need: Running Back") — ports
@@ -1763,6 +1811,10 @@ a {
   --color-position-te: #fb923c;
   --color-position-k: #a78bfa;
   --color-position-dst: #d4d4d8;
+  --color-position-dl: #f472b6;
+  --color-position-lb: #2dd4bf;
+  --color-position-db: #818cf8;
+  --color-position-flex: #d4d4d8;
   --color-success-soft: rgba(34, 197, 94, 0.15);
   --color-opportunity-soft: rgba(20, 184, 166, 0.14);
   --color-action-soft: rgba(250, 204, 21, 0.14);

@@ -342,14 +342,7 @@ function TargetRowView({
             <ValueStat value={formatWaiverScore(player.score)} />
           ) : null}
           {player?.position_rank ? (
-            <span
-              className="px-1.5 py-0.5 text-xs font-bold"
-              style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-              title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league.`}
-            >
-              {player.position}
-              {player.position_rank}
-            </span>
+            <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league.`} />
           ) : null}
           <OvrGauge rating={player?.overall_rating ?? null} size="sm" />
         </div>
