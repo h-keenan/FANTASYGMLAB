@@ -91,7 +91,9 @@ def _short_hash(*parts: Any, n: int = 16) -> str:
     return hashlib.sha256("\x1f".join(str(p) for p in parts).encode("utf-8")).hexdigest()[:n]
 
 
-def resolve_player_identity(players_df: Any, player_id: str, player_name: str) -> dict[str, Any]:
+def resolve_player_identity(
+    players_df: Any, player_id: str, player_name: str, gsis_crosswalk: Any = None
+) -> dict[str, Any]:
     """Canonical ids. GSIS only when the table carries a well-formed
     ``gsis_id`` for this exact row AND the (name, team) pair is unique among
     rows in the table. Otherwise null with a machine-readable reason. Today's
@@ -113,7 +115,20 @@ def resolve_player_identity(players_df: Any, player_id: str, player_name: str) -
     row = rows.iloc[0]
     team = str(row.get("team") or "").strip().upper()
     if "gsis_id" not in players_df.columns:
-        return result(None, "no_gsis_crosswalk_available", team)
+        if gsis_crosswalk is None:
+            return result(None, "no_gsis_crosswalk_available", team)
+        # Optional crosswalk (modules.gsis_crosswalk; None unless flagged on).
+        # Sleeper-id lookup, and the name+team+position triple must not point
+        # at a different row/id, so a stale row cannot leak a wrong GSIS.
+        gsis, reason = gsis_crosswalk.lookup(player_id)
+        if gsis is None:
+            return result(None, reason, team)
+        c_gsis, c_sid, c_reason = gsis_crosswalk.lookup_canonical(player_name, team, str(row.get("position") or ""))
+        if c_reason == "ambiguous_name_team_position" or (
+            c_sid is not None and (c_sid != str(player_id) or c_gsis != gsis)
+        ):
+            return result(None, "ambiguous_name_team_mapping", team)
+        return result(gsis, None, team)
     candidate = str(row.get("gsis_id") or "").strip()
     if not candidate or candidate.lower() in ("nan", "none"):
         return result(None, "gsis_not_mapped_for_player", team)
