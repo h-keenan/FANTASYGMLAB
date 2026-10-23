@@ -33,6 +33,7 @@ import {
   api,
   type DashboardEntitlementInfo,
   type DashboardItem,
+  type DashboardResponse,
   type MatchupResponse,
   type PresentationAsset,
   type RankedPlayer,
@@ -246,7 +247,25 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // for all three fetches below, not just this one.
   const dashboardQuery = useQuery({
     queryKey: queryKeys.dashboard(leagueId),
-    queryFn: () => api.getLeagueDashboard(leagueId),
+    queryFn: async () => {
+      // Progressive load (mirrors web-next's Dashboard page): a first call
+      // without the trade-idea search paints sooner; the full call then
+      // replaces it. A cached full response is never overwritten by the
+      // lighter first pass, and an empty/quiet first pass is not painted
+      // (it would flash the "all quiet" state).
+      const firstPass = await api.getLeagueDashboard(leagueId, { deferTradeIdeas: true });
+      if (!firstPass.trade_ideas_deferred) return firstPass;
+      const key = queryKeys.dashboard(leagueId);
+      if (!firstPass.quiet && firstPass.items.length > 0 && !queryClient.getQueryData(key)) {
+        queryClient.setQueryData(key, firstPass);
+      }
+      try {
+        return await api.getLeagueDashboard(leagueId);
+      } catch (err) {
+        if (queryClient.getQueryData(key)) return queryClient.getQueryData(key) as DashboardResponse;
+        throw err;
+      }
+    },
     enabled: !isRestoring,
   });
   // League Pulse's source data — previously fetched fresh on every focus

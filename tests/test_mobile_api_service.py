@@ -15500,3 +15500,69 @@ def test_warmup_status_endpoint_reports_stages(monkeypatch):
     body = response.json()
     assert body["state"] == "running"
     assert body["stages"] == {"roster": True, "values": True, "trades": False}
+
+
+def test_dashboard_defer_trade_ideas_skips_the_search_and_the_full_call_is_unchanged(monkeypatch):
+    # Progressive first paint: ?defer_trade_ideas=true must not run the
+    # trade-idea search (nor the GM Targets read that only feeds it) and
+    # marks itself; the plain call afterwards is the unchanged full response
+    # (no marker key) and does run the search.
+    client = _client(monkeypatch)
+    from modules import trade_hub_engine
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    searches = {"n": 0}
+    real_generate = trade_hub_engine.generate_trade_idea_records
+
+    def counting_generate(*args, **kwargs):
+        searches["n"] += 1
+        return real_generate(*args, **kwargs)
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch(
+            "services.mobile_api_service.auth_supabase.fetch_auth_user",
+            return_value=({"id": "user-123", "email": "gm@example.com"}, ""),
+        ))
+        stack.enter_context(patch(
+            "services.mobile_api_service._fetch_profile_fields",
+            return_value={"entitlement": "free", "sleeper_username": "gm_dynasty"},
+        ))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch(
+            "modules.sleeper.get_rosters",
+            return_value=[
+                {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+            ],
+        ))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE))
+        stack.enter_context(patch("modules.sleeper.get_users", return_value=[
+            {"user_id": "sleeper-user-1", "display_name": "GM One"},
+            {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+        ]))
+        stack.enter_context(patch("modules.sleeper.get_traded_picks", return_value=[]))
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+        stack.enter_context(patch(
+            "modules.player_eligibility.filter_current_fantasy_players",
+            side_effect=lambda df, **kwargs: df,
+        ))
+        stack.enter_context(patch.object(
+            trade_hub_engine, "generate_trade_idea_records", side_effect=counting_generate
+        ))
+        gm_targets = stack.enter_context(patch(
+            "services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ())
+        ))
+        headers = {"Authorization": "Bearer good-token"}
+        deferred = client.get("/v1/leagues/abc/dashboard?defer_trade_ideas=true", headers=headers)
+        searches_after_deferred = searches["n"]
+        gm_targets_after_deferred = gm_targets.call_count
+        full = client.get("/v1/leagues/abc/dashboard", headers=headers)
+
+    assert deferred.status_code == 200 and full.status_code == 200
+    assert deferred.json()["trade_ideas_deferred"] is True
+    assert searches_after_deferred == 0
+    assert gm_targets_after_deferred == 0
+    assert "trade_ideas_deferred" not in full.json()
+    assert searches["n"] == 1
+    assert not [i for i in deferred.json()["items"] if "trade_package" in (i.get("presentation") or {})]
+    assert full.json()["team_snapshot"] == deferred.json()["team_snapshot"]

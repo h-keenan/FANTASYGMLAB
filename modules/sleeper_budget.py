@@ -190,6 +190,15 @@ def note_stale_served(key: str, fetched_at: float) -> None:
     served[key] = fetched_at
 
 
+def stale_served_total() -> int:
+    """Process-wide count of stale (last-known) payloads served so far.
+
+    Compared before/after a fetch to tell whether that fetch returned live
+    data (never shared across workers if it did not)."""
+
+    return _stale_total
+
+
 def note_deferred() -> None:
     global _deferred_total
     _deferred_total += 1

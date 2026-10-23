@@ -52,13 +52,38 @@ export default function DashboardPage() {
     void Promise.resolve().then(() => {
       if (!cancelled) setTeamRankings(rankings);
     });
+    // Progressive load: the first call skips the trade-idea search so the
+    // page paints sooner; the second (started only once the first lands, so
+    // the two never compete for the server) fills in the trade tile.
+    const loadFull = () =>
+      api
+        .getDashboard(leagueId, lens)
+        .then((result) => {
+          if (!cancelled) {
+            setData(result);
+            setError(null);
+          }
+        });
     api
-      .getDashboard(leagueId, lens)
+      .getDashboard(leagueId, lens, { deferTradeIdeas: true })
       .then((result) => {
-        if (!cancelled) {
+        if (cancelled) return;
+        if (!result.trade_ideas_deferred) {
+          setData(result);
+          setError(null);
+          return;
+        }
+        // An empty/quiet first pass would flash the "all quiet" state until
+        // the real answer lands, so keep the skeleton in that case.
+        const painted = !result.quiet && result.items.length > 0;
+        if (painted) {
           setData(result);
           setError(null);
         }
+        return loadFull().catch((err) => {
+          // Keep an already-painted first pass if the follow-up fails.
+          if (!cancelled && !painted) setError(err instanceof Error ? err.message : "Could not load the Dashboard.");
+        });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load the Dashboard.");

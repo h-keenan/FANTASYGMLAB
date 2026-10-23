@@ -322,6 +322,10 @@ export interface DashboardResponse {
   team_snapshot: TeamSnapshot | null;
   reason: string;
   entitlement: { is_premium: boolean; visible_count: number; hidden_count: number };
+  /** Only present (true) on the progressive first call
+   * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
+   * and the full response is still to come. */
+  trade_ideas_deferred?: boolean;
 }
 
 /** GET /v1/guess-the-player's `prompt` — the hidden-identity payload for
@@ -3080,9 +3084,13 @@ export const api = {
   getLeagueWarmupStatus: (leagueId: string) =>
     authorizedRequest<LeagueWarmupStatus>(`/v1/leagues/${encodeURIComponent(leagueId)}/warmup-status`),
 
-  getDashboard: (leagueId: string, lens: string = "Dynasty") =>
+  // `deferTradeIdeas` is the progressive first call: same payload minus the
+  // (expensive) Top Trade Opportunity tile. Follow it with the plain call.
+  getDashboard: (leagueId: string, lens: string = "Dynasty", options?: { deferTradeIdeas?: boolean }) =>
     authorizedRequest<DashboardResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/dashboard?lens=${encodeURIComponent(lens)}`,
+      `/v1/leagues/${encodeURIComponent(leagueId)}/dashboard?lens=${encodeURIComponent(lens)}${
+        options?.deferTradeIdeas ? "&defer_trade_ideas=true" : ""
+      }`,
     ),
 
   // "Guess the Player" Dashboard mini-game (coridian_, 2026-10-19) —
