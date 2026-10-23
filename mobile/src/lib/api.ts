@@ -1971,8 +1971,34 @@ export interface DashboardEntitlementInfo extends EntitlementGateInfo {
   hidden_count: number;
 }
 
+/** One row of the Dashboard's "This week" strip (modules/this_week.py). */
+export interface ThisWeekRow {
+  key: 'lineup' | 'waiver' | 'trade';
+  status: string;
+  tone: 'positive' | 'risk' | 'waiver' | 'trade' | 'neutral';
+  headline: string;
+  why: string;
+  cta_label: string | null;
+  route: 'matchup' | 'waivers' | 'trade_hub' | null;
+  player_id: string;
+}
+
+export interface ThisWeek {
+  mode: 'in_season' | 'next_action';
+  week: number | null;
+  rows: ThisWeekRow[];
+  next_action: {
+    headline: string;
+    why: string;
+    cta_label: string;
+    route: 'draft_center' | 'live_draft' | 'trade_hub' | 'connect_league';
+  } | null;
+}
+
 export interface DashboardResponse {
   ok: true;
+  /** Additive; absent on older servers, null when there is nothing real to show. */
+  this_week?: ThisWeek | null;
   items: DashboardItem[];
   quiet: boolean;
   quiet_reason?: string;

@@ -11,6 +11,7 @@ import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { EmptyState } from "@/components/EmptyState";
 import { formatRank } from "@/components/SnapshotTile";
 import { StatStrip } from "@/components/StatStrip";
+import { ThisWeekStrip } from "@/components/ThisWeekStrip";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
@@ -106,6 +107,8 @@ export function DashboardContent({
           <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
         </section>
       ) : null}
+
+      {data.this_week ? <ThisWeekStrip data={data.this_week} leagueId={leagueId} leagueName={leagueName} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
         <SectionHeading id="game-plan-heading" action={<ViewAllLink href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`} label="View all game plan items" />}>

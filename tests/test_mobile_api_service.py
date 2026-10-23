@@ -7804,6 +7804,10 @@ def test_dashboard_reports_no_linked_username(monkeypatch):
     # present in some shape.
     assert body["quiet_reason"] == "no_sleeper_username_linked"
     assert body["entitlement"] == {"is_premium": False, "visible_count": 0, "hidden_count": 0}
+    # "This week" strip: one next action (connect a league), never empty rows.
+    assert body["this_week"]["mode"] == "next_action"
+    assert body["this_week"]["next_action"]["route"] == "connect_league"
+    assert body["this_week"]["rows"] == []
 
 
 def test_dashboard_empty_roster_never_pays_for_the_full_valuation_pipeline(monkeypatch):
@@ -7948,6 +7952,11 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     categories = [item["category"] for item in body["items"]]
     assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
     assert top_priority_items[0]["route_player_id"] == "target_rb"
+    # Additive "This week" payload: present (a dict or None) and never
+    # fabricates a trade hold or waiver row without engine data behind it.
+    assert "this_week" in body
+    for row in (body["this_week"] or {}).get("rows", []):
+        assert row["headline"] and row["why"]
 
 
 @pytest.mark.known_flaky
