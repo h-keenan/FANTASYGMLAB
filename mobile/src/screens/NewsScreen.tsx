@@ -212,7 +212,7 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
   ].filter((bit): bit is string => Boolean(bit));
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.row, showDivider && styles.rowDivider]}
       onPress={() => {
         if (item.link) void Linking.openURL(item.link);

@@ -336,7 +336,7 @@ function AlertRow({
   const opensLink = Boolean(alert.link);
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.row, showDivider && styles.rowDivider, alert.read && styles.rowRead]}
       onPress={onPress}
       activeOpacity={0.7}

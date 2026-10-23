@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -85,7 +86,7 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load playoff odds" message={error} />
       </View>
     );
   }

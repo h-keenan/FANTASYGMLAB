@@ -399,7 +399,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       {/* Entry point to the full Next Move briefing — demoted from its old
           "first card on the page" position now that the matchup leads, but
           still present (feature parity) one tap away. */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
       >

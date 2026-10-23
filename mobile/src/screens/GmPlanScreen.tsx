@@ -299,7 +299,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         />
       </View>
       <OverallRatingBadge rating={ranked.get(player.player_id)?.overall_rating ?? null} />
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={[styles.tag, protectedIds.has(player.player_id) && styles.tagActive]}
         onPress={() => onToggleProtect(player.player_id, !protectedIds.has(player.player_id))}
         disabled={busyPlayerId === player.player_id}
@@ -317,7 +317,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   );
 
   const rosterLine = (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={styles.moreRow}
       onPress={() => {
         setTab('core');
@@ -332,7 +332,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   );
 
   const link = (label: string, onPress: () => void) => (
-    <TouchableOpacity onPress={onPress} hitSlop={8}>
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} hitSlop={8}>
       <AppText style={styles.link}>{label}</AppText>
     </TouchableOpacity>
   );
@@ -359,7 +359,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 {TEAM_STANCE_OPTIONS.map((option) => {
                   const active = stance === option.value;
                   return (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={option.value}
                       style={[styles.stanceChip, active && styles.stanceChipActive]}
                       onPress={() => {
@@ -379,7 +379,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 <AppText style={styles.caption}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
               ) : null}
               {weekAhead !== null ? (
-                <TouchableOpacity style={styles.banner} onPress={openTradeHub}>
+                <TouchableOpacity accessibilityRole="button" style={styles.banner} onPress={openTradeHub}>
                   <Ionicons name="megaphone-outline" size={18} color={colors.accent} />
                   <View style={styles.bannerText}>
                     <AppText style={styles.bannerTitle}>Trade deadline: Week {weekAhead}</AppText>
@@ -518,17 +518,17 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
                       </View>
                       <View style={styles.actions}>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.action}
                           disabled={!player}
                           onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
                         >
                           <AppText style={styles.actionText}>Compare</AppText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
+                        <TouchableOpacity accessibilityRole="button" style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
                           <AppText style={styles.actionText}>Mark untouchable</AppText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
+                        <TouchableOpacity accessibilityRole="button" style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
                           <AppText style={[styles.actionText, { color: colors.danger }]}>Remove</AppText>
                         </TouchableOpacity>
                       </View>
@@ -640,7 +640,7 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
         <AppText style={[styles.caption, styles.flex]}>
           {showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
         </AppText>
-        <TouchableOpacity style={styles.action} onPress={onViewDetails}>
+        <TouchableOpacity accessibilityRole="button" style={styles.action} onPress={onViewDetails}>
           <AppText style={styles.actionText}>View details</AppText>
         </TouchableOpacity>
       </View>

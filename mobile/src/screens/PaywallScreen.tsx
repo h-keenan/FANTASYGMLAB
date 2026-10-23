@@ -299,7 +299,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
           <AppText style={styles.successSubtitle}>
             It may take a moment to reflect everywhere in the app.
           </AppText>
-          <TouchableOpacity style={styles.primaryButton} onPress={exit}>
+          <TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={exit}>
             <AppText style={styles.primaryButtonText}>Done</AppText>
           </TouchableOpacity>
         </View>
@@ -323,7 +323,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         />
       }
     >
-      <TouchableOpacity style={styles.closeButton} onPress={exit} hitSlop={8}>
+      <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={exit} hitSlop={8}>
         <AppText style={styles.closeButtonText}>{fromOnboarding ? 'Skip' : 'Close'}</AppText>
       </TouchableOpacity>
 
@@ -375,7 +375,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       ) : loadError ? (
         <View style={styles.loadErrorBlock}>
           <AppText style={styles.error}>{loadError}</AppText>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.retryButton, retrying && styles.primaryButtonDisabled]}
             onPress={onRetry}
             disabled={retrying}
@@ -470,7 +470,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       {purchaseError ? <AppText style={styles.error}>{purchaseError}</AppText> : null}
 
       <PremiumGlow radius={radii.md} active={Boolean(selected) && !purchasing} style={styles.glowWrap}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.primaryButton, styles.premiumButton, (!selected || purchasing) && styles.primaryButtonDisabled]}
           onPress={() => selected && onPurchase(selected)}
           disabled={!selected || purchasing}
@@ -497,7 +497,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
           thing on a screen this conversion-critical. Still visually
           subordinate to the cyan primary Continue button above it (Magna
           Carta button hierarchy), just no longer easy to miss entirely. */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         onPress={onRestore}
         disabled={restoring}
         style={[styles.restoreButton, restoring && styles.primaryButtonDisabled]}
@@ -510,7 +510,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       </TouchableOpacity>
 
       {fromOnboarding ? (
-        <TouchableOpacity onPress={exit} style={styles.skipFree} hitSlop={8}>
+        <TouchableOpacity accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={8}>
           <AppText style={styles.skipFreeText}>Skip for now — continue free</AppText>
         </TouchableOpacity>
       ) : null}

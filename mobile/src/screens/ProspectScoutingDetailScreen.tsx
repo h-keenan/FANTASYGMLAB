@@ -126,7 +126,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
                 {prospect.draft_year ? ` · ${prospect.draft_year} class` : ''}
               </AppText>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.watchlistButton}
               onPress={() => void toggleWatchlist()}
               hitSlop={8}
@@ -156,7 +156,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           <AppText style={styles.fieldLabel}>Overall grade (1 = pass, 5 = elite)</AppText>
           <View style={styles.pillRow}>
             {GRADE_OPTIONS.map((value) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={value}
                 style={[styles.pill, grade === value && styles.pillActive]}
                 onPress={() => setGrade(value)}
@@ -171,7 +171,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           </AppText>
           <View style={styles.pillRow}>
             {ROUND_OPTIONS.map((value) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={value}
                 style={[styles.pill, roundProjection === value && styles.pillActive]}
                 onPress={() => setRoundProjection(roundProjection === value ? null : value)}
@@ -200,7 +200,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           {error ? <AppText style={styles.error}>{error}</AppText> : null}
           {saved ? <AppText style={styles.saved}>Saved — thanks for scouting.</AppText> : null}
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.submitButton, grade == null && styles.submitButtonDisabled]}
             onPress={() => void submit()}
             disabled={grade == null || submitting}

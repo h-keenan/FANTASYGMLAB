@@ -444,7 +444,7 @@ export default function MoreScreen({ navigation }: Props) {
         ) : null}
 
         {/* Hidden dev path: long-press (1.5s) opens the design-system reference. */}
-        <Pressable onLongPress={() => navigation.navigate('Design')} delayLongPress={1500}>
+        <Pressable accessibilityRole="button" onLongPress={() => navigation.navigate('Design')} delayLongPress={1500}>
           <SectionHeading title="Legal" topGap={16} />
         </Pressable>
         <AnimatedCard style={styles.groupCard}>
@@ -572,7 +572,7 @@ function OptionCard({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.optionCard, active && styles.optionCardActive]}
       onPress={onPress}
       activeOpacity={0.8}
@@ -641,7 +641,7 @@ function SettingsRow({
   );
   if (!onPress) return content;
   return (
-    <TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.7}>
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} disabled={disabled} activeOpacity={0.7}>
       {content}
     </TouchableOpacity>
   );

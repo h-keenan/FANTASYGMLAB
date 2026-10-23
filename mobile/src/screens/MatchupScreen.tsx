@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -176,7 +177,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load your matchup" message={error} onRetry={() => void matchupQuery.refetch()} />
       </View>
     );
   }

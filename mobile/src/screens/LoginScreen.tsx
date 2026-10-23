@@ -146,7 +146,7 @@ export default function LoginScreen() {
         ) : null}
 
         {!resetMode && google.available ? (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.socialButton, !google.ready && styles.buttonDisabled]}
             onPress={() => void google.signIn()}
             disabled={!google.ready || google.submitting}
@@ -199,7 +199,7 @@ export default function LoginScreen() {
 
         {resetMode ? (
           <>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.button, (resetSubmitting || !email) && styles.buttonDisabled]}
               onPress={onResetPasswordPress}
               disabled={resetSubmitting || !email}
@@ -211,7 +211,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               onPress={() => {
                 setResetMode(false);
                 setError(null);
@@ -223,7 +223,7 @@ export default function LoginScreen() {
           </>
         ) : (
           <>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.button, (submitting || !email || !password) && styles.buttonDisabled]}
               onPress={submit}
               disabled={submitting || !email || !password}
@@ -238,7 +238,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             {mode === 'signIn' ? (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={() => {
                   setResetMode(true);
                   setError(null);
@@ -249,7 +249,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
             ) : null}
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
             >
               <AppText style={styles.switchMode}>
@@ -277,7 +277,7 @@ export default function LoginScreen() {
           <GridBackground />
           <View style={[styles.legalModalHeader, { paddingTop: insets.top + spacing.md }]}>
             <AppText style={styles.legalModalTitle}>{legalPageKey ? LEGAL_PAGES[legalPageKey]?.title : ''}</AppText>
-            <Pressable onPress={() => setLegalPageKey(null)} hitSlop={12}>
+            <Pressable accessibilityRole="button" onPress={() => setLegalPageKey(null)} hitSlop={12}>
               <AppText style={styles.legalModalClose}>Done</AppText>
             </Pressable>
           </View>
