@@ -11,7 +11,8 @@ import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { LEVEL_SEGMENTS, levelColor } from "@/lib/tradeHubPresentation";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
+import { isCompletedShare } from "@/lib/shareImage";
+import { useShareImage } from "@/lib/useShareImage";
 import { trackUse } from "@/lib/analytics";
 import { ideaTags, shortReason } from "@/lib/tradeHubFilters";
 import {
@@ -45,7 +46,8 @@ export function ShareTradeButton({
   lens?: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const [preparingImage, setPreparingImage] = useState(false);
+  const recommendationId = idea.recommendation_id;
+  const canBuild = Boolean(leagueId && recommendationId);
 
   // Records the share for the later "Did this trade happen?" prompt, same
   // as mobile's TradeSharePreviewModal.recordShare: fire-and-forget, once
@@ -58,27 +60,32 @@ export function ShareTradeButton({
     void api.recordTradeShare(leagueId, tradeIdeaShareRecord(idea, lens)).catch(() => {});
   };
 
-  const onShare = async () => {
-    const recommendationId = idea.recommendation_id;
-    const outcome = await shareImageOrText({
-      fetchImage:
-        leagueId && recommendationId
-          ? () => api.getTradeHubIdeaShareCardBlob(leagueId, recommendationId, strategy, lens)
-          : undefined,
-      filename: `fantasydesk-trade-${recommendationId ?? "idea"}.png`,
-      text: tradeIdeaShareText(idea),
-      title: `Trade idea vs. ${idea.partner_team_name}`,
-      onPreparingImage: setPreparingImage,
-    });
-    if (isCompletedShare(outcome)) recordShare();
-    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  // The PNG is pre-rendered once the card is on screen so the tap can call
+  // navigator.share({files}) inside the user gesture (iOS Safari).
+  const share = useShareImage({
+    cacheKey: canBuild ? `trade:${leagueId}:${recommendationId}:${strategy}:${lens}` : null,
+    build: canBuild ? () => api.getTradeHubIdeaShareCardBlob(leagueId!, recommendationId!, strategy, lens) : undefined,
+    filename: `fantasydesk-trade-${recommendationId ?? "idea"}.png`,
+    text: tradeIdeaShareText(idea),
+    title: `Trade idea vs. ${idea.partner_team_name}`,
+    itemKind: "trade_idea",
+    leagueId,
+    lazy: true,
+    onOutcome: (outcome) => {
+      if (isCompletedShare(outcome)) recordShare();
+      if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    },
+  });
+  const onShare = share.onClick;
+  const preparingImage = share.busy;
 
   return (
+    <>
     <button
+      ref={share.observe}
       type="button"
       onClick={onShare}
       disabled={preparingImage}
@@ -100,8 +107,14 @@ export function ShareTradeButton({
         <path d="M16 6l-4-4-4 4" />
         <path d="M12 2v13" />
       </svg>
-      {preparingImage ? "Preparing…" : copied ? "Copied!" : "Share Trade"}
+      {copied ? "Copied!" : share.label("Share Trade")}
     </button>
+    {share.status ? (
+      <p role="status" className="basis-full w-full text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {share.status}
+      </p>
+    ) : null}
+    </>
   );
 }
 

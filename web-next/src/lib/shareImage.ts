@@ -76,32 +76,61 @@ async function shareTextOnly(text: string, title: string): Promise<ShareOutcome>
   }
 }
 
+/** True when this browser can attach files through the Web Share API. */
+export function canShareFiles(blob?: Blob): boolean {
+  const capable =
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function";
+  if (!capable || !blob) return capable;
+  try {
+    return navigator.canShare({ files: [new File([blob], "card.png", { type: "image/png" })] });
+  } catch {
+    return false;
+  }
+}
+
+/** Short, privacy-safe error name (never the message) for analytics. */
+export function shareErrorName(error: unknown): string {
+  const raw = error instanceof Error && error.name ? error.name : "Error";
+  return raw.replace(/[^A-Za-z0-9_]/g, "").slice(0, 40) || "Error";
+}
+
 export async function shareImageOrText({
   fetchImage,
+  preparedBlob,
   filename,
   text,
   title,
   onPreparingImage,
+  onImageFailed,
 }: {
   /** Omit to skip straight to the text share. */
   fetchImage?: () => Promise<Blob>;
+  /** A PNG already built ahead of the tap. iOS Safari only lets
+   * navigator.share run inside the tap's user-activation window, so when this
+   * is given NOTHING is awaited before the share call. */
+  preparedBlob?: Blob | null;
+  /** Called when the image could not be built or shared, before the
+   * fallback runs, so the UI never degrades silently. */
+  onImageFailed?: (error: unknown, stage: "build" | "share") => void;
   filename: string;
   text: string;
   title: string;
   onPreparingImage?: (preparing: boolean) => void;
 }): Promise<ShareOutcome> {
-  const filesCapable =
-    typeof navigator !== "undefined" &&
-    typeof navigator.share === "function" &&
-    typeof navigator.canShare === "function";
+  const filesCapable = canShareFiles();
 
-  if (fetchImage) {
-    onPreparingImage?.(true);
-    let blob: Blob | null = null;
-    try {
-      blob = await fetchImage();
-    } catch {
-      // The PNG fetch failed (network, a stale id's 404): text fallback.
+  if (preparedBlob || fetchImage) {
+    let blob: Blob | null = preparedBlob ?? null;
+    if (!blob && fetchImage) {
+      onPreparingImage?.(true);
+      try {
+        blob = await fetchImage();
+      } catch (error) {
+        // The PNG fetch failed (network, a stale id's 404): text fallback.
+        onImageFailed?.(error, "build");
+      }
     }
     if (blob) {
       try {
@@ -120,6 +149,7 @@ export async function shareImageOrText({
           return "cancelled";
         }
         // The platform rejected the file: fall through to copy/save.
+        onImageFailed?.(error, "share");
       }
       // No Files-capable share (typically desktop): still give them the PNG.
       if (await copyImage(blob)) {
