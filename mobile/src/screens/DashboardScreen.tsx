@@ -467,6 +467,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           <AppText style={styles.emptyText}>
             {quietReason || 'Nothing urgent right now — your roster looks steady.'}
           </AppText>
+          {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
         </View>
       ) : (
         grouped.topPriority.map((item, index) => (

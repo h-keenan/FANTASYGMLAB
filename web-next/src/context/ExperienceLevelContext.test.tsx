@@ -126,8 +126,8 @@ describe("experience level copy on Dashboard", () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
     render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
 
-    expect(await screen.findByText(BEGINNER_HELP.powerRank)).toBeInTheDocument();
-    expect(screen.getByText(BEGINNER_HELP.franchiseRank)).toBeInTheDocument();
+    expect(await screen.findByText(`Power Rank: ${BEGINNER_HELP.powerRank}`)).toBeInTheDocument();
+    expect(screen.getByText(`Franchise Rank: ${BEGINNER_HELP.franchiseRank}`)).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.dashboardSnapshot)).toBeInTheDocument();
     expect(screen.getByText("Average Age")).toBeInTheDocument();
     expect(screen.queryByText("Avg Age")).not.toBeInTheDocument();
