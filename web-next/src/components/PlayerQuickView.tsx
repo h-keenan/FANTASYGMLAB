@@ -338,7 +338,7 @@ export function PlayerQuickView({
  * the real status text stays as an sr-only live region right below it so
  * assistive tech and existing "Loading player detail" assertions both
  * still see it. */
-function PqvBodySkeleton() {
+export function PqvBodySkeleton() {
   return (
     <>
       <div aria-hidden="true">
