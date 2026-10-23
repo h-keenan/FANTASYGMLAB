@@ -3,7 +3,7 @@ import type { SaveLeagueResponse } from "@/lib/api";
 /** Honest copy for the saved-league cap (modules/saved_leagues.py). */
 export const LEAGUE_CAP_UPSELL = {
   title: "Add more leagues with Pro",
-  body: "Free includes 1 league. Pro supports up to 5.",
+  body: "Free includes 1 league. Upgrade to add more.",
 };
 
 /** Messages for every non-cap refusal reason POST /v1/leagues/save returns. */

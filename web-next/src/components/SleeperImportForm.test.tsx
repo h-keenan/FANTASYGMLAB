@@ -256,7 +256,7 @@ describe("SleeperImportForm", () => {
     fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
-    await waitFor(() => expect(screen.getByText("Free includes 1 league. Pro supports up to 5.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: /upgrade/i })).toHaveAttribute("href", "/premium");
     expect(onLeagueChosen).not.toHaveBeenCalled();
     expect(trackFeatureUse).not.toHaveBeenCalledWith("league_import_completed", expect.anything());
@@ -283,7 +283,7 @@ describe("SleeperImportForm", () => {
     await waitFor(() => expect(screen.getByText("League B")).toBeInTheDocument());
     fireEvent.click(screen.getByText("League B"));
 
-    await waitFor(() => expect(screen.getByText("Free includes 1 league. Pro supports up to 5.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
     expect(onLeagueChosen).not.toHaveBeenCalled();
   });
 

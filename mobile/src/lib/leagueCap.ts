@@ -3,7 +3,7 @@
  * the save with `reason: 'at_cap'`; the client must show this and never open
  * the league as if it had been added.
  */
-export const LEAGUE_CAP_MESSAGE = 'Free includes 1 league. Pro supports up to 5.';
+export const LEAGUE_CAP_MESSAGE = 'Free includes 1 league. Upgrade to add more.';
 
 export function leagueCapMessage(): string {
   return LEAGUE_CAP_MESSAGE;

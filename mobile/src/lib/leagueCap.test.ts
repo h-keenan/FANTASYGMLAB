@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { LEAGUE_CAP_MESSAGE, leagueCapMessage, saveSucceeded } from './leagueCap.ts';
 
 test('cap copy is the honest Free/Pro statement', () => {
-  assert.equal(leagueCapMessage(), 'Free includes 1 league. Pro supports up to 5.');
+  assert.equal(leagueCapMessage(), 'Free includes 1 league. Upgrade to add more.');
   assert.equal(LEAGUE_CAP_MESSAGE, leagueCapMessage());
 });
 

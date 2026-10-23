@@ -197,7 +197,7 @@ describe("ESPN import in the Connect League flow", () => {
     fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
     fireEvent.click(screen.getByRole("button", { name: /add this league/i }));
 
-    await waitFor(() => expect(screen.getByText("Free includes 1 league. Pro supports up to 5.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: /upgrade/i })).toHaveAttribute("href", "/premium");
     expect(onLeagueChosen).not.toHaveBeenCalled();
   });
