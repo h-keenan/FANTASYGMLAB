@@ -1,8 +1,21 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ShareTradeButton } from "./TradeIdeaCard";
 import { api, type TradeAsset, type TradeIdea } from "@/lib/api";
+import { resetShareBlobCache } from "@/lib/useShareImage";
+import * as analytics from "@/lib/analytics";
+
+const PNG = () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });
+
+/** The PNG is pre-rendered when the card mounts; wait until it is cached so
+ * the tap runs the activation-safe synchronous path. */
+async function waitForPrerender() {
+  await waitFor(() => expect(api.getTradeHubIdeaShareCardBlob).toHaveBeenCalled());
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -104,6 +117,7 @@ function stubClipboard() {
 
 describe("ShareTradeButton", () => {
   beforeEach(() => {
+    resetShareBlobCache();
     vi.mocked(api.getTradeHubIdeaShareCardBlob).mockReset();
     vi.mocked(api.recordTradeShare).mockReset();
     vi.mocked(api.recordTradeShare).mockResolvedValue({ ok: true, reason: "" });
@@ -122,9 +136,10 @@ describe("ShareTradeButton", () => {
     );
 
     render(<ShareTradeButton idea={idea()} leagueId="league-1" strategy="retool" lens="Dynasty" />);
+    await waitForPrerender();
     fireEvent.click(screen.getByRole("button"));
-
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    // Activation-safe: share() ran synchronously inside the click handler.
+    expect(share).toHaveBeenCalledTimes(1);
 
     expect(api.getTradeHubIdeaShareCardBlob).toHaveBeenCalledWith("league-1", "rec-abc123", "retool", "Dynasty");
     const shareArgs = share.mock.calls[0][0] as ShareData;
@@ -134,8 +149,8 @@ describe("ShareTradeButton", () => {
     expect(shareArgs.text).toBeTruthy();
   });
 
-  it("shows a loading state on the button while the PNG fetches", async () => {
-    stubShare();
+  it("tap before the image is ready shows Preparing, then a second-step Share image button", async () => {
+    const share = stubShare();
     stubCanShare(() => true);
     let resolveBlob: (blob: Blob) => void = () => {};
     vi.mocked(api.getTradeHubIdeaShareCardBlob).mockReturnValue(
@@ -148,11 +163,38 @@ describe("ShareTradeButton", () => {
     fireEvent.click(screen.getByRole("button"));
 
     await waitFor(() => expect(screen.getByRole("button")).toBeDisabled());
-    expect(screen.getByRole("button").textContent).toMatch(/preparing/i);
+    expect(screen.getByRole("button").textContent).toMatch(/preparing image/i);
+    expect(share).not.toHaveBeenCalled();
 
-    resolveBlob(new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }));
+    resolveBlob(PNG());
 
-    await waitFor(() => expect(screen.getByRole("button")).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button").textContent).toMatch(/share image/i));
+    expect(share).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button"));
+    expect(share).toHaveBeenCalledTimes(1);
+    expect((share.mock.calls[0][0] as ShareData).files).toHaveLength(1);
+  });
+
+  it("shows an inline message and records image_failed when the image cannot be built", async () => {
+    stubShare();
+    stubCanShare(() => true);
+    const track = vi.spyOn(analytics, "trackUse").mockImplementation(() => {});
+    const err = new Error("boom");
+    err.name = "EncodingError";
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockRejectedValue(err);
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toMatch(/Couldn't build the image on this device/);
+    expect(status.textContent).toMatch(/Sharing text instead/);
+    expect(track).toHaveBeenCalledWith(
+      "share",
+      "image_failed",
+      expect.objectContaining({ props: expect.objectContaining({ result: "EncodingError" }) }),
+    );
+    track.mockRestore();
   });
 
   it("falls back to the text copy when there's no recommendation to render a card for", async () => {
@@ -187,6 +229,7 @@ describe("ShareTradeButton", () => {
     vi.mocked(api.getTradeHubIdeaShareCardBlob).mockRejectedValue(new Error("not found"));
 
     render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    await waitForPrerender();
     fireEvent.click(screen.getByRole("button"));
 
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
@@ -229,6 +272,7 @@ describe("ShareTradeButton", () => {
     );
 
     render(<ShareTradeButton idea={idea()} leagueId="league-1" lens="Rebuild" />);
+    await waitForPrerender();
     fireEvent.click(screen.getByRole("button"));
 
     await waitFor(() => expect(api.recordTradeShare).toHaveBeenCalledTimes(1));
@@ -293,6 +337,7 @@ describe("ShareTradeButton", () => {
     );
 
     render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    await waitForPrerender();
     fireEvent.click(screen.getByRole("button"));
 
     await waitFor(() => expect(navigator.share).toHaveBeenCalledTimes(1));

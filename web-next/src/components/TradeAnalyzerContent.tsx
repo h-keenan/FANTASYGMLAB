@@ -12,7 +12,10 @@ import {
   type TradeVerdict,
 } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
-import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
+import { isCompletedShare } from "@/lib/shareImage";
+import { useShareImage } from "@/lib/useShareImage";
+import { isPrivacyMode } from "@/lib/privacy";
+import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
@@ -234,7 +237,6 @@ function ShareVerdictButton({
   receiveAssets: TradeAsset[];
   cardTeams: AnalyzerCardTeams;
 }) {
-  const [preparing, setPreparing] = useState(false);
   const [copied, setCopied] = useState(false);
   const label = (assets: TradeAsset[]) => assets.map((a) => a.name).join(", ") || "nothing";
 
@@ -254,43 +256,54 @@ function ShareVerdictButton({
       .catch(() => {});
   };
 
-  const onShare = async () => {
-    const title = partnerTeamName ? `Trade vs. ${partnerTeamName}` : "Trade analysis";
-    const text =
-      `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
-      `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
-      `Balance: ${formatTradeGain(verdict.value_delta)}`;
-    // Branded PNG (QR + "For <partner>") drawn in the browser from the
-    // analysis already on screen (no server call, no quota use), through the
-    // OS share sheet so the user can pick the partner's messaging app;
-    // clipboard-image / download / text fallbacks.
-    const outcome = await shareImageOrText({
-      fetchImage: async () => {
-        const { renderAnalyzerCardBlob } = await import("@/lib/shareCard/clientRender");
-        return renderAnalyzerCardBlob({ sendAssets, receiveAssets, verdict, lens, partnerName: partnerTeamName, ...cardTeams });
-      },
-      filename: "fantasydesk-trade.png",
-      text,
-      title,
-      onPreparingImage: setPreparing,
-    });
-    if (isCompletedShare(outcome)) recordShare();
-    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const title = partnerTeamName ? `Trade vs. ${partnerTeamName}` : "Trade analysis";
+  const text =
+    `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
+    `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
+    `Balance: ${formatTradeGain(verdict.value_delta)}`;
+
+  // Branded PNG (QR + "For <partner>") drawn in the browser from the
+  // analysis already on screen (no server call, no quota use). It is built
+  // as soon as the result is on screen, so the Share tap calls
+  // navigator.share({files}) inside the user gesture (iOS Safari).
+  const params = { sendAssets, receiveAssets, verdict, lens, partnerName: partnerTeamName, ...cardTeams };
+  const share = useShareImage({
+    cacheKey: shareCardCacheKey({ params, privacy: isPrivacyMode() }),
+    build: async () => {
+      const { renderAnalyzerCardBlob } = await import("@/lib/shareCard/clientRender");
+      return renderAnalyzerCardBlob(params);
+    },
+    filename: "fantasydesk-trade.png",
+    text,
+    title,
+    itemKind: "trade_analyzer",
+    leagueId,
+    onOutcome: (outcome) => {
+      if (isCompletedShare(outcome)) recordShare();
+      if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    },
+  });
 
   return (
-    <button
-      type="button"
-      onClick={onShare}
-      disabled={preparing}
-      className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
-      style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
-    >
-      {copied ? "Copied!" : preparing ? "Preparing..." : "Share"}
-    </button>
+    <span className="inline-flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={share.onClick}
+        disabled={share.busy}
+        className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
+        style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
+      >
+        {copied ? "Copied!" : share.label("Share")}
+      </button>
+      {share.status ? (
+        <span role="status" className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
+          {share.status}
+        </span>
+      ) : null}
+    </span>
   );
 }
 

@@ -40,6 +40,14 @@ const FONT_WEIGHTS = [500, 700, 800, 900] as const;
 const ASSET_BASE = "/share-card";
 const IMAGE_TIMEOUT_MS = 2500;
 
+/** AbortSignal.timeout is missing on older iOS Safari: use a controller. */
+export function timeoutSignal(ms: number): { signal: AbortSignal | undefined; clear: () => void } {
+  if (typeof AbortController === "undefined") return { signal: undefined, clear: () => {} };
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(id) };
+}
+
 function toDataUri(bytes: Uint8Array, mime: string): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -68,7 +76,13 @@ export function isAllowedImageUrl(url: string): boolean {
 async function fetchImageDataUri(url: string | null | undefined): Promise<string | null> {
   if (!url || !isAllowedImageUrl(url)) return null;
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
+    const timer = timeoutSignal(IMAGE_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: timer.signal });
+    } finally {
+      timer.clear();
+    }
     if (!response.ok) return null;
     const bytes = new Uint8Array(await response.arrayBuffer());
     const type = sniffImageType(bytes);
@@ -183,15 +197,35 @@ export async function svgToPngBlob(svg: string, width: number, height: number): 
   });
   image.src = svgDataUri(svg);
   await loaded;
+  // Safari can fire onload before an SVG image is rasterized (blank first
+  // draw): wait for decode() where it exists.
+  try {
+    await image.decode?.();
+  } catch {
+    // decode() rejects for some SVGs even though they draw fine.
+  }
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Could not draw the share card.");
   context.drawImage(image, 0, 0, width, height);
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not draw the share card."))), "image/png");
+  const blob = await new Promise<Blob | null>((resolve) => {
+    try {
+      canvas.toBlob((b) => resolve(b), "image/png");
+    } catch {
+      resolve(null);
+    }
   });
+  if (blob) return blob;
+  // toBlob returned null (memory pressure / old Safari): go via a data URL.
+  const dataUrl = canvas.toDataURL("image/png");
+  const comma = dataUrl.indexOf(",");
+  if (!dataUrl.startsWith("data:image/png") || comma < 0) throw new Error("Could not draw the share card.");
+  const binary = atob(dataUrl.slice(comma + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: "image/png" });
 }
 
 /** The whole browser flow: assets -> Satori SVG -> PNG Blob. */

@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlayerProfileContent } from "./PlayerProfileContent";
+import { resetShareBlobCache } from "@/lib/useShareImage";
 import {
   api,
   type CareerResponse,
@@ -127,6 +128,8 @@ function awardsResult(overrides: Partial<PlayerAwardsResponse> = {}): PlayerAwar
 }
 
 describe("PlayerProfileContent", () => {
+  beforeEach(() => resetShareBlobCache());
+
   beforeEach(() => {
     vi.mocked(api.getPlayerQuickView).mockReset();
     vi.mocked(api.getPlayerAwards).mockReset();
@@ -284,9 +287,12 @@ describe("PlayerProfileContent", () => {
     Object.defineProperty(navigator, "canShare", { value: () => true, configurable: true, writable: true });
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" lens="Rebuild" />);
+    await waitFor(() => expect(api.getPlayerShareCardBlob).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     fireEvent.click(screen.getByText("Share card"));
-
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledTimes(1);
     expect(api.getPlayerShareCardBlob).toHaveBeenCalledWith("league-1", "p1", "Rebuild");
     const data = (share.mock.calls[0] as unknown as [ShareData])[0];
     expect(data.files?.[0].type).toBe("image/png");

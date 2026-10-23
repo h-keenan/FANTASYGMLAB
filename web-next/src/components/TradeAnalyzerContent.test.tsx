@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TradeAnalyzerContent } from "./TradeAnalyzerContent";
 import type { DraftPickAsset, MyRosterResponse, RankedPlayer, TeamProfile, TradeVerdict } from "@/lib/api";
 import { api } from "@/lib/api";
+import { resetShareBlobCache } from "@/lib/useShareImage";
 
 /**
  * This is a jsdom/testing-library substitute for live E2E (no Supabase/
@@ -325,6 +326,7 @@ describe("TradeAnalyzerContent", () => {
 
   describe("Share (client-side template card)", () => {
     afterEach(() => {
+      resetShareBlobCache();
       vi.unstubAllGlobals();
       vi.restoreAllMocks();
       renderAnalyzerCardBlob.mockReset();
@@ -353,6 +355,11 @@ describe("TradeAnalyzerContent", () => {
       vi.stubGlobal("fetch", fetchSpy);
       await analyze();
       const analyzeCalls = vi.mocked(api.postTradeAnalyzer).mock.calls.length;
+      // The PNG is pre-rendered once the result is on screen.
+      await waitFor(() => expect(renderAnalyzerCardBlob).toHaveBeenCalled());
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Share" }));
       });
@@ -406,6 +413,8 @@ describe("TradeAnalyzerContent", () => {
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Share" }));
       });
+      expect((await screen.findByRole("status")).textContent).toMatch(/Couldn't build the image on this device.*Sharing text instead/);
+      await waitFor(() => expect(share).toHaveBeenCalled());
       expect(share.mock.calls[0][0].files).toBeUndefined();
       expect(share.mock.calls[0][0].text).toContain("ACCEPT");
     });
