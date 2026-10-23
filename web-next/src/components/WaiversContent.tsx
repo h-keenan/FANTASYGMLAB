@@ -285,14 +285,7 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
         <ValueStat value={formatWaiverScore(player.score)} align="left" />
         <OvrGauge rating={player.overall_rating} size="sm" />
         {player.position_rank ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-bold"
-            style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-            title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just free agents.`}
-          >
-            {player.position}
-            {player.position_rank}
-          </span>
+          <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just free agents.`} />
         ) : null}
       </div>
     </div>

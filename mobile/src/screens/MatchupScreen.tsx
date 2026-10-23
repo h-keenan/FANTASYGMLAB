@@ -46,7 +46,6 @@ import {
   moveOverLine,
   moveSlotLabel,
   recordLabel,
-  slotDisplayLabel,
   winProbabilityUnavailableMessage,
   type LineupPlayer,
   type VerdictTone,
@@ -636,7 +635,7 @@ function LineupComparison({
                 onEdit={plan && editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined}
               />
               <View style={styles.slotCell}>
-                <AppText style={styles.slotText}>{slotDisplayLabel(row.slot)}</AppText>
+                <PositionBadge position={row.slot} />
               </View>
               <LineupCell player={row.opponent} mine={false} maxValue={maxValue} onPress={onPressPlayer} />
             </View>
@@ -656,7 +655,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   return (
     <View style={styles.moveCard}>
       <View style={styles.moveSlot}>
-        <ToneBadge label={slotLabel} color={colors.accent} />
+        <PositionBadge position={move.slot} label={slotLabel} />
       </View>
       <PlayerAvatar playerId={move.start.player_id} tier={move.start.tier} size={40} />
       <View style={styles.moveBody}>
@@ -806,13 +805,11 @@ function createStyles(colors: ThemeColors) {
     barTrack: { height: 4, alignSelf: 'stretch', borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
     barFill: { height: '100%' },
     slotCell: {
-      width: 38,
+      width: 44,
       alignItems: 'center',
       justifyContent: 'center',
       marginHorizontal: 4,
-      backgroundColor: colors.accentMuted,
     },
-    slotText: { fontSize: 11, fontWeight: '800', color: colors.textSecondary },
     viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
     moveList: { gap: spacing.sm },
     moveCard: {

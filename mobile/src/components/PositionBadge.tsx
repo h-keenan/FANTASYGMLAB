@@ -3,32 +3,40 @@ import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 
 import { useThemeMode } from '../context/ThemeModeContext';
-import { positionColor, radii, spacing } from '../theme';
+import { positionBadgeColors, positionBadgeLabel, radii } from '../theme';
 
-/** Colored position chip — QB/RB/WR/TE/K/DEF each get web's exact
- * position-identity color (modules/design_tokens.py's --color-position-*
- * tokens) instead of plain text. Same tinted-chip visual language as
- * TierBadge. */
+/** The single shared position pill (owner decision 2026-10-22, option A).
+ * Fully rounded, tinted by a fixed semantic color per position, tight
+ * uppercase tracking, min-width so 1-3 letter positions share a width feel.
+ * Mirrors web-next's PositionBadge (`.position-badge*` in globals.css) and
+ * the share-card SharePositionBadge: same sizes (sm 11/20, md 13/24), same
+ * 14% fill / 45% border / 70% hue text recipe. `rank` appends a position
+ * rank ("RB12"); `label` overrides the text (e.g. a numbered slot). */
 export default function PositionBadge({
   position,
   size = 'sm',
+  rank,
+  label,
 }: {
   position: string | null | undefined;
   size?: 'sm' | 'md';
+  rank?: number | string | null;
+  label?: string;
 }) {
   const { isDark, colors } = useThemeMode();
   if (!position) return null;
-  const color = positionColor(position, isDark, colors.textSecondary);
+  const tint = positionBadgeColors(position, isDark, colors.textPrimary, colors.textSecondary);
+  const text = `${label ?? positionBadgeLabel(position)}${rank != null && rank !== '' ? rank : ''}`;
   return (
     <View
       style={[
         styles.badge,
         size === 'md' && styles.badgeMd,
-        { backgroundColor: `${color}26`, borderColor: `${color}80` },
+        { backgroundColor: tint.fill, borderColor: tint.border },
       ]}
     >
-      <AppText style={[styles.text, size === 'md' && styles.textMd, { color }]} numberOfLines={1}>
-        {position.toUpperCase()}
+      <AppText style={[styles.text, size === 'md' && styles.textMd, { color: tint.text }]} numberOfLines={1}>
+        {text}
       </AppText>
     </View>
   );
@@ -37,14 +45,15 @@ export default function PositionBadge({
 const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    // coridian_, 2026-10-17: "positions need to be squared off not a
-    // pill" — matches web-next's PositionBadge.tsx, same explicit call.
-    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.pill,
     borderWidth: 1,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 1,
+    height: 20,
+    minWidth: 32,
+    paddingHorizontal: 8,
   },
-  badgeMd: { paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  text: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  textMd: { fontSize: 11 },
+  badgeMd: { height: 24, minWidth: 38, paddingHorizontal: 10 },
+  text: { fontSize: 11, fontWeight: '800', letterSpacing: 0.44, textTransform: 'uppercase' },
+  textMd: { fontSize: 13, letterSpacing: 0.52 },
 });

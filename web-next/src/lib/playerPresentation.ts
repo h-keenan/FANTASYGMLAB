@@ -19,7 +19,42 @@ export const POSITION_COLOR_VAR: Record<string, string> = {
   DEF: "--color-position-dst",
   DST: "--color-position-dst",
   "D/ST": "--color-position-dst",
+  // IDP lanes (new for the pill redesign) + the shared neutral "flex" lane
+  // for lineup slots that are not a single position.
+  DL: "--color-position-dl",
+  DE: "--color-position-dl",
+  DT: "--color-position-dl",
+  LB: "--color-position-lb",
+  OLB: "--color-position-lb",
+  ILB: "--color-position-lb",
+  DB: "--color-position-db",
+  CB: "--color-position-db",
+  S: "--color-position-db",
+  FLEX: "--color-position-flex",
+  SUPER_FLEX: "--color-position-flex",
+  SUPERFLEX: "--color-position-flex",
+  REC_FLEX: "--color-position-flex",
+  "WR/RB": "--color-position-flex",
+  "WR/TE": "--color-position-flex",
+  "RB/WR/TE": "--color-position-flex",
+  IDP_FLEX: "--color-position-flex",
+  BN: "--color-position-flex",
+  IR: "--color-position-flex",
+  TAXI: "--color-position-flex",
 };
+
+/** Short pill text so every position/slot fits the same pill width
+ * (SUPER_FLEX -> SF, IDP_FLEX -> IDP, D/ST -> DEF). Mirrors
+ * mobile/src/theme.ts positionBadgeLabel. */
+export function positionBadgeLabel(position: string): string {
+  const label = position.trim().toUpperCase();
+  if (label === "SUPER_FLEX" || label === "SUPERFLEX") return "SF";
+  if (label === "WR/RB") return "W/R";
+  if (label === "REC_FLEX") return "W/T";
+  if (label === "IDP_FLEX") return "IDP";
+  if (label === "DST" || label === "D/ST") return "DEF";
+  return label;
+}
 
 /** position -> the `.position-text-*` className defined in globals.css
  * (ports modules/football_assets.py's position_text_html — a position NAME

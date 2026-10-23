@@ -1,30 +1,40 @@
-import { positionColorVar } from "@/lib/playerPresentation";
+import { positionBadgeLabel, positionColorVar } from "@/lib/playerPresentation";
 
 /**
- * Colored position pill — ports modules/football_assets.py's
- * position_badge_html. Extracted (Revision 3 CSS-cleanup pass) from three
- * byte-identical inline copies that had drifted into MyTeamContent.tsx's
- * local `PositionBadge`, GamePlanCard.tsx's inline span, and this
- * component's own Trade Hub card use — one definition instead of three
- * copies to keep in sync by hand.
+ * The single shared position pill (owner decision, 2026-10-22, option A):
+ * fully rounded (--radius-pill), tinted by a fixed semantic color per
+ * position (QB/RB/WR/TE/K/DEF + IDP DL/LB/DB + a neutral lane for FLEX /
+ * SUPERFLEX / IDP_FLEX / BN / IR), tight uppercase tracking, and a min-width
+ * so 1-, 2- and 3-letter positions have the same width feel. Styles live in
+ * globals.css (`.position-badge*`); mobile/src/components/PositionBadge.tsx
+ * and lib/shareCard/frame.tsx's SharePositionBadge mirror this look.
+ *
+ * `rank` appends a position rank ("RB12") inside the same pill.
  */
-export function PositionBadge({ position }: { position: string | null | undefined }) {
+export function PositionBadge({
+  position,
+  size = "sm",
+  rank,
+  title,
+  label,
+}: {
+  position: string | null | undefined;
+  size?: "sm" | "md";
+  rank?: number | string | null;
+  title?: string;
+  /** Override the pill text (e.g. a numbered slot like "RB2"). */
+  label?: string;
+}) {
   if (!position) return null;
   const colorVar = positionColorVar(position);
   return (
     <span
-      className="px-1.5 py-0.5 text-xs font-bold"
-      style={{
-        background: colorVar ? `var(${colorVar})` : "var(--color-surface-raised)",
-        color: colorVar ? "var(--color-brand-mark-ink)" : "var(--color-text-secondary)",
-        // coridian_, 2026-10-17: "positions need to be squared off not a
-        // pill" — overrides the brand-continuity audit's earlier pill
-        // treatment (which matched mobile's capsule shape); explicit
-        // direct feedback wins.
-        borderRadius: 0,
-      }}
+      className={`position-badge position-badge-${size}`}
+      style={colorVar ? ({ "--pb": `var(${colorVar})` } as React.CSSProperties) : undefined}
+      title={title}
     >
-      {position}
+      {label ?? positionBadgeLabel(position)}
+      {rank != null && rank !== "" ? rank : null}
     </span>
   );
 }
