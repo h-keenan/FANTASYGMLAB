@@ -852,3 +852,13 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
     assert push_call.kwargs["json"][0]["title"] == "Set Your Team Situation — Test League"
     assert push_call.kwargs["json"][0]["data"]["category"] == "gm_stance_reminder"
     assert push_call.kwargs["json"][0]["data"]["league_name"] == "Test League"
+
+
+def test_delete_invalid_push_tokens_deletes_each_exact_token():
+    from unittest.mock import patch as _patch
+
+    config = push_triggers.PushTriggerConfig(url="https://x.supabase.co", service_role_key="k")
+    with _patch("requests.delete") as delete:
+        push_triggers.delete_invalid_push_tokens(config, ["ExponentPushToken[a]", "garbage"])
+    assert delete.call_count == 1
+    assert delete.call_args.kwargs["params"] == {"expo_push_token": "eq.ExponentPushToken[a]"}

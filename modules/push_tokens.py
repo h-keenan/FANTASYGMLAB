@@ -146,6 +146,7 @@ def send_expo_push_notifications(
 
     sent = 0
     tickets: list[Any] = []
+    invalid_tokens: list[str] = []
     for chunk in _chunked(valid_tokens, EXPO_PUSH_CHUNK_SIZE):
         messages = [
             {"to": token, "title": title, "body": body, "data": dict(data or {})}
@@ -169,6 +170,19 @@ def send_expo_push_notifications(
         chunk_tickets = payload.get("data") if isinstance(payload, Mapping) else None
         if isinstance(chunk_tickets, list):
             tickets.extend(chunk_tickets)
+            # Tickets come back in request order. DeviceNotRegistered means
+            # the app was uninstalled / token revoked -- the caller should
+            # delete it so it stops being retried every sweep.
+            for token, ticket in zip(chunk, chunk_tickets):
+                if _ticket_is_device_not_registered(ticket):
+                    invalid_tokens.append(token)
         sent += len(chunk)
 
-    return {"ok": True, "sent": sent, "tickets": tickets, "error": ""}
+    return {"ok": True, "sent": sent, "tickets": tickets, "invalid_tokens": invalid_tokens, "error": ""}
+
+
+def _ticket_is_device_not_registered(ticket: Any) -> bool:
+    if not isinstance(ticket, Mapping) or ticket.get("status") != "error":
+        return False
+    details = ticket.get("details")
+    return isinstance(details, Mapping) and details.get("error") == "DeviceNotRegistered"
