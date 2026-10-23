@@ -222,6 +222,33 @@ def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
+ESPN_IMPORT_FAIL_RESULTS = ("espn_private", "espn_not_found", "espn_error")
+
+
+def _espn_import_outcomes(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Failed ESPN import attempts from ``feature_use`` ``league_import`` /
+    ``failed`` events, split by ``result``. None (UI shows nothing) when there
+    are none. Only failures are emitted, so ``private_pct`` is the share of
+    failed attempts that were private leagues."""
+
+    counts = dict.fromkeys(ESPN_IMPORT_FAIL_RESULTS, 0)
+    for row in rows:
+        if la.normalize_event_name(str(row.get("event") or "")) != "feature_use":
+            continue
+        props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+        if str(props.get("feature") or "").strip() != "league_import":
+            continue
+        if str(props.get("action") or "").strip() != "failed":
+            continue
+        result = str(props.get("result") or "").strip()
+        if result in counts:
+            counts[result] += 1
+    total = sum(counts.values())
+    if total == 0:
+        return None
+    return {**counts, "total_failed": total, "private_pct": _pct(counts["espn_private"], total)}
+
+
 def _unique_ids(rows: list[dict[str, Any]], *, field: str) -> int:
     values = {str(row.get(field) or "").strip() for row in rows}
     values.discard("")
@@ -313,6 +340,7 @@ def build_report(
         "platforms": _platform_counts(rows),
         "feature_use": _feature_use_table(rows),
         "onboarding_funnel": _onboarding_funnel(rows),
+        "espn_import_outcomes": _espn_import_outcomes(rows),
         "errors": health.get("errors_by_class") or {},
         "error_sessions": health.get("error_sessions") or 0,
         "performance": health.get("performance") or {},

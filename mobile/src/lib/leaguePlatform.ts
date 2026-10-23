@@ -70,3 +70,14 @@ export const ESPN_SAVE_FAILURE_COPY: Record<string, string> = {
   espn_team_not_selected: 'Pick which team is yours first.',
   mapping_too_low: "Too few of this league's players matched FantasyDesk's player list to value it accurately.",
 };
+
+/** ESPN setting a league manager changes to make a private league readable. */
+export const ESPN_PRIVATE_LEAGUE_HINT =
+  "This league is private. Ask your league manager to turn on League Settings > Make League Viewable to Public in ESPN, then retry.";
+
+/** Privacy-safe analytics `result` for a failed ESPN import preview. */
+export function espnImportFailureResult(reason: string | null | undefined): "espn_private" | "espn_not_found" | "espn_error" {
+  if (reason === "private_league") return "espn_private";
+  if (reason === "league_not_found") return "espn_not_found";
+  return "espn_error";
+}

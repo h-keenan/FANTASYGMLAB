@@ -160,9 +160,9 @@ class ESPNLeagueError(RuntimeError):
 ERROR_MESSAGES = {
     "invalid_input": "Enter an ESPN league ID (numbers only) and a season.",
     "private_league": (
-        "This ESPN league is private, or the league ID is wrong. FantasyDesk can only read ESPN "
-        "leagues that are viewable to the public. Your league manager can turn that on in ESPN's "
-        "league settings."
+        "This ESPN league is private. FantasyDesk can only read ESPN leagues that are viewable "
+        "to the public. Your league manager can turn that on in ESPN under League Settings > "
+        "Make League Viewable to Public."
     ),
     "league_not_found": "We couldn't find that ESPN league for that season. Check the league ID and season.",
     "no_teams": "That ESPN league loaded, but it has no teams or rosters yet.",
@@ -519,9 +519,15 @@ espn_crosswalk_provider: Callable[[dict[str, Any]], dict[str, str]] = _default_e
 
 def _classify_load_error(exc: Exception) -> ESPNLeagueError:
     name = type(exc).__name__
-    if name == "ESPNAccessDenied":
+    # ESPN answers a private league with HTTP 401 (espn_api: ESPNAccessDenied)
+    # and a nonexistent league/season with 404 (ESPNInvalidLeague). Anything
+    # else -- timeouts, 5xx, connection errors -- is an outage, never "private".
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    if name == "ESPNAccessDenied" or status in (401, 403):
         return ESPNLeagueError("private_league", ERROR_MESSAGES["private_league"])
-    if name == "ESPNInvalidLeague":
+    if name == "ESPNInvalidLeague" or status == 404:
         return ESPNLeagueError("league_not_found", ERROR_MESSAGES["league_not_found"])
     return ESPNLeagueError("espn_unavailable", ERROR_MESSAGES["espn_unavailable"])
 

@@ -43,3 +43,13 @@ describe("leaguePlatform", () => {
     expect(leagueHomePath(ESPN_ID, "FFLR Test League")).toBe(`/my-team/${ENCODED}?name=FFLR%20Test%20League`);
   });
 });
+
+describe("espnImportFailureResult", () => {
+  it("maps reasons to privacy-safe analytics results", async () => {
+    const { espnImportFailureResult } = await import("./leaguePlatform");
+    expect(espnImportFailureResult("private_league")).toBe("espn_private");
+    expect(espnImportFailureResult("league_not_found")).toBe("espn_not_found");
+    expect(espnImportFailureResult("espn_unavailable")).toBe("espn_error");
+    expect(espnImportFailureResult(undefined)).toBe("espn_error");
+  });
+});

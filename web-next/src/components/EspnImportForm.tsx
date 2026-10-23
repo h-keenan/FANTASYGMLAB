@@ -3,9 +3,9 @@
 import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { trackFeatureUse } from "@/lib/analytics";
+import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
-import { espnSeasonOptions } from "@/lib/leaguePlatform";
+import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
 
 export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
 
@@ -88,9 +88,10 @@ export function EspnImportForm({
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<EspnLeaguePreviewResponse | null>(null);
   const [rosterId, setRosterId] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     const clean = leagueId.trim();
     if (!/^\d{1,12}$/.test(clean)) {
       setMessage(copy.notFound);
@@ -98,6 +99,7 @@ export function EspnImportForm({
     }
     setStatus("loading");
     setMessage(null);
+    setIsPrivate(false);
     setPreview(null);
     setRosterId("");
     trackFeatureUse("league_import_started", { props: { platform } });
@@ -114,7 +116,10 @@ export function EspnImportForm({
         platform === "espn" ? await api.previewEspnLeague(clean, season) : await api.previewImportedLeague(platform, clean, season);
       setStatus("idle");
       if (!result.league) {
-        setMessage(result.message || `That ${copy.label} league couldn't be loaded.`);
+        const espnPrivate = platform === "espn" && result.reason === "private_league";
+        setIsPrivate(espnPrivate);
+        setMessage(espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
+        if (platform === "espn") trackUse("league_import", "failed", { props: { result: espnImportFailureResult(result.reason) } });
         trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
         return;
       }
@@ -126,6 +131,7 @@ export function EspnImportForm({
     } catch (error) {
       setStatus("idle");
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      if (platform === "espn") trackUse("league_import", "failed", { props: { result: "espn_error" } });
       trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: "exception" } });
     }
   };
@@ -304,6 +310,17 @@ export function EspnImportForm({
         <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>
           {message}
         </p>
+      ) : null}
+      {isPrivate ? (
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={status === "loading"}
+          className="text-xs font-bold self-start"
+          style={{ color: "var(--color-accent)" }}
+        >
+          Retry
+        </button>
       ) : null}
       <button
         type="submit"

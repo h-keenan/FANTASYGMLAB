@@ -255,6 +255,17 @@ export function FounderAnalyticsContent({
         </section>
       ) : null}
 
+      {data.espn_import_outcomes && data.espn_import_outcomes.total_failed > 0 ? (
+        <section className="flex flex-col gap-2" data-testid="espn-import-outcomes">
+          {sectionLabel("ESPN import outcomes")}
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {data.espn_import_outcomes.total_failed.toLocaleString()} failed attempts · private{" "}
+            {data.espn_import_outcomes.espn_private} ({data.espn_import_outcomes.private_pct}%) · not found{" "}
+            {data.espn_import_outcomes.espn_not_found} · ESPN error {data.espn_import_outcomes.espn_error}
+          </p>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-2">
         {sectionLabel("Decision engagement")}
         <NamedCountList items={data.decision_engagement} />

@@ -20,7 +20,7 @@ export function StatStrip({ items, columns }: { items: StatStripItem[]; columns:
   return (
     <div className={`grid gap-2 ${columns === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
       {items.map((item) => (
-        <SnapshotTile key={item.label} compact wrapNote {...item} />
+        <SnapshotTile key={item.label} compact wrapNote reserveLabelLines={columns === 4} {...item} />
       ))}
     </div>
   );

@@ -6,7 +6,7 @@ import AppText from './AppText';
 import SegmentedTabBar from './SegmentedTabBar';
 import { ApiError, api, type EspnLeaguePreviewResponse } from '../lib/api';
 import { trackUse } from '../lib/analytics';
-import { ESPN_SAVE_FAILURE_COPY, espnSeasonOptions } from '../lib/leaguePlatform';
+import { ESPN_PRIVATE_LEAGUE_HINT, ESPN_SAVE_FAILURE_COPY, espnImportFailureResult, espnSeasonOptions } from '../lib/leaguePlatform';
 
 export type ImportPlatform = 'espn' | 'fleaflicker' | 'mfl';
 
@@ -64,6 +64,7 @@ export default function EspnLeagueImport({
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<EspnLeaguePreviewResponse | null>(null);
   const [rosterId, setRosterId] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const findLeague = async () => {
     const clean = leagueId.trim();
@@ -73,6 +74,7 @@ export default function EspnLeagueImport({
     }
     setBusy(true);
     setMessage(null);
+    setIsPrivate(false);
     setPreview(null);
     setRosterId('');
     try {
@@ -81,13 +83,17 @@ export default function EspnLeagueImport({
           ? await api.previewEspnLeague(clean, Number(season))
           : await api.previewImportedLeague(platform, clean, Number(season));
       if (!result.league) {
-        setMessage(result.message || `That ${copy.label} league couldn't be loaded.`);
+        const espnPrivate = platform === 'espn' && result.reason === 'private_league';
+        setIsPrivate(espnPrivate);
+        setMessage(espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
+        if (platform === 'espn') trackUse('league_import', 'failed', { props: { result: espnImportFailureResult(result.reason) } });
         return;
       }
       setPreview(result);
       if (!result.ok) setMessage(result.message);
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.');
+      if (platform === 'espn') trackUse('league_import', 'failed', { props: { result: 'espn_error' } });
     } finally {
       setBusy(false);
     }
@@ -234,6 +240,11 @@ export default function EspnLeagueImport({
         onChange={setSeason}
       />
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
+      {isPrivate ? (
+        <TouchableOpacity onPress={() => void findLeague()} disabled={busy} accessibilityRole="button" accessibilityLabel="Retry">
+          <AppText style={styles.retryText}>Retry</AppText>
+        </TouchableOpacity>
+      ) : null}
       <View style={styles.actions}>
         <TouchableOpacity style={styles.cancelButton} onPress={onCancel} disabled={busy}>
           <AppText style={styles.cancelText}>Cancel</AppText>
@@ -291,6 +302,7 @@ function createStyles(colors: ThemeColors) {
     },
     featureText: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
     featureStrong: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
+    retryText: { fontSize: 13, fontWeight: '700', color: colors.accent, marginTop: spacing.sm },
     error: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md },
     cancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
