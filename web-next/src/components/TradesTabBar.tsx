@@ -41,7 +41,7 @@ export function TradesTabBar({
         options={tabs.map((tab) => ({ label: tab.label, value: tab.key, href: tab.href }))}
         active={active}
       />
-      <Link href="/trade-history" className="text-xs font-bold uppercase self-end" style={{ color: "var(--color-accent)" }}>
+      <Link href="/trade-history" className="text-xs font-bold uppercase self-end inline-flex items-center min-h-[var(--touch-target-min)]" style={{ color: "var(--color-accent)" }}>
         Trade History →
       </Link>
     </div>

@@ -2630,8 +2630,8 @@ a {
   margin-top: var(--space-xs);
 }
 .landing-showcase-pause {
-  width: 24px;
-  height: 24px;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2648,8 +2648,8 @@ a {
 }
 .landing-showcase-dot {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
   padding: 0;
   border: 0;
   background: transparent;
