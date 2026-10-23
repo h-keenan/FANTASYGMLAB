@@ -565,7 +565,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.md },
   center: {

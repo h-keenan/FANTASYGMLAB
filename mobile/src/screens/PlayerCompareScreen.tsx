@@ -455,7 +455,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   discoveryCard: {
     marginHorizontal: spacing.lg,

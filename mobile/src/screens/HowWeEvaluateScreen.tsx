@@ -41,7 +41,7 @@ export default function HowWeEvaluateScreen() {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     // Was solid `colors.background` here, which fully covered GridBackground
     // and left the screen with no visible wash — matches the transparent
     // pattern Dashboard/MyTeam/TradeHub/Teams already use so the shared

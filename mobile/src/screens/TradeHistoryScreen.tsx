@@ -252,9 +252,9 @@ function formatDate(iso: string | null | undefined): string {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },
-    center: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, backgroundColor: 'transparent' },
     content: { paddingHorizontal: spacing.lg, gap: spacing.md },
     error: { color: colors.danger, textAlign: 'center', marginTop: spacing.md },
     card: { padding: spacing.md, gap: spacing.xs },

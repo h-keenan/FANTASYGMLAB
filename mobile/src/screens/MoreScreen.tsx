@@ -649,7 +649,7 @@ function SettingsRow({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.lg },
     sectionLabel: {

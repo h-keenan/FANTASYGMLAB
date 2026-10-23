@@ -247,7 +247,7 @@ function createRowStyles(colors: ThemeColors) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
     listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
     sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
     sectionHeaderText: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,12 +12,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppText from '../components/AppText';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
-import GridBackground from '../components/GridBackground';
 import type { ExperienceLevelValue } from '../lib/api';
 import { PLAIN_COPY } from '../lib/experienceCopy';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
@@ -54,6 +60,45 @@ const FEATURES = [
 const STEP_KEYS = [...FEATURES.map((f) => f.key), 'connect', 'level'] as const;
 type StepKey = (typeof STEP_KEYS)[number];
 const PHONE_ASPECT = 600 / 1298;
+
+// Web parity (globals.css onboarding-slide-next/back): 0.28s ease-out,
+// opacity 0 -> 1 and a 24px horizontal nudge toward the final position.
+// Opacity/transform only, on the UI thread; skipped under reduced motion.
+const SLIDE_NUDGE_PX = 24;
+const SLIDE_MS = 280;
+
+function SlideIn({ active, direction, children }: { active: boolean; direction: 'next' | 'back'; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(1);
+  const sign = direction === 'next' ? 1 : -1;
+  useLayoutEffect(() => {
+    // Inactive slides stay fully visible so a swipe in progress never shows
+    // a blank incoming page; only the slide that becomes active nudges in.
+    if (reduceMotion || !active) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = 0;
+    progress.value = withTiming(1, { duration: SLIDE_MS, easing: Easing.out(Easing.ease) });
+  }, [active, reduceMotion, progress]);
+  const style = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateX: (1 - progress.value) * SLIDE_NUDGE_PX * sign }],
+  }));
+  return <Animated.View style={[styles_slideFill, style]}>{children}</Animated.View>;
+}
+const styles_slideFill = { alignItems: 'center' as const, alignSelf: 'stretch' as const };
+
+// web: .onboarding-dot transition width/background 0.2s; active = 20px accent.
+function ProgressDot({ active, color, activeColor }: { active: boolean; color: string; activeColor: string }) {
+  const reduceMotion = useReducedMotion();
+  const w = useSharedValue(active ? 20 : 7);
+  useEffect(() => {
+    w.value = reduceMotion ? (active ? 20 : 7) : withTiming(active ? 20 : 7, { duration: 200 });
+  }, [active, reduceMotion, w]);
+  const style = useAnimatedStyle(() => ({ width: w.value }));
+  return <Animated.View style={[{ height: 7, borderRadius: 999, backgroundColor: active ? activeColor : color }, style]} />;
+}
 
 const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: ColorKey; title: string; body: string }[] = [
   {
@@ -93,6 +138,11 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
+  const prevIndex = useRef(0);
+  const direction: 'next' | 'back' = index >= prevIndex.current ? 'next' : 'back';
+  useEffect(() => {
+    prevIndex.current = index;
+  }, [index]);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
   const [saving, setSaving] = useState(false);
   // Replay (More > "Replay the tour"): feature slides only. No connect or
@@ -230,12 +280,10 @@ export default function OnboardingScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
-      <GridBackground />
-
       <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.dotsRow}>
           {stepKeys.map((key, i) => (
-            <View key={key} style={[styles.dot, i === index && styles.dotActive]} />
+            <ProgressDot key={key} active={i === index} color={colors.border} activeColor={colors.accent} />
           ))}
         </View>
         <TouchableOpacity onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel="Skip tutorial">
@@ -258,7 +306,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
             contentContainerStyle={styles.slide}
             showsVerticalScrollIndicator={false}
           >
-            {renderStep(key)}
+            <SlideIn active={stepKeys[index] === key} direction={direction}>
+              {renderStep(key)}
+            </SlideIn>
           </ScrollView>
         ))}
       </ScrollView>
@@ -296,7 +346,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     topRow: {
       flexDirection: 'row',
       alignItems: 'center',

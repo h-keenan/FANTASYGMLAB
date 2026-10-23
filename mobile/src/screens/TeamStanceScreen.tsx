@@ -264,7 +264,7 @@ function ProtectPlayerRow({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
     listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
     error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },

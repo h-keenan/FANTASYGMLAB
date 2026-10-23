@@ -324,7 +324,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
     listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
     sectionBlock: { marginBottom: spacing.md },

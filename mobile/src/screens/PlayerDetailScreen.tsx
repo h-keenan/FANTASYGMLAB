@@ -2091,7 +2091,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   // The injury/news pill used to live inside actionRow (flexWrap, sharing a
   // line with the buttons) — now its own row, positioned above actionRow, so

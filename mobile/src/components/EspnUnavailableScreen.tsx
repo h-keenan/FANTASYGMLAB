@@ -27,7 +27,7 @@ export default function EspnUnavailableScreen({
   const { colors } = useThemeMode();
   const params = { leagueId, leagueName };
   return (
-    <View style={[styles.root, { paddingTop: headerHeight, backgroundColor: colors.background }]}>
+    <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
       <EmptyState
         icon="construct-outline"

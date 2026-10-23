@@ -207,7 +207,7 @@ function PlayoffOddsRow({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     list: { backgroundColor: 'transparent' },
     listContent: { padding: spacing.lg },
     infoNoteWrap: { marginBottom: spacing.md },

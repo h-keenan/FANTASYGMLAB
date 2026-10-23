@@ -967,7 +967,7 @@ function TradeSide({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     beginnerHelp: { marginBottom: spacing.xs },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {
     flex: 1,

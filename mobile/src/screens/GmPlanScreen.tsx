@@ -733,7 +733,7 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: 'transparent' },
     scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl },
     skeleton: { marginBottom: spacing.md },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
