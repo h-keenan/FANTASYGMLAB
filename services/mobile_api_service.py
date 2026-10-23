@@ -233,6 +233,7 @@ from modules import (
     weekly_box_scores,
 )
 from modules import external_news_contract
+from modules import this_week
 from modules import idp_scoring
 from modules import guillotine as guillotine_module
 from modules import keepers as keepers_module
@@ -8768,6 +8769,7 @@ def get_league_dashboard(
             "team_snapshot": None,
             "reason": reason_value,
             "entitlement": {"is_premium": is_premium, "visible_count": 0, "hidden_count": 0},
+            "this_week": this_week.not_ready_this_week(reason_value),
         }
 
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
@@ -8989,9 +8991,10 @@ def get_league_dashboard(
         if not trade_tile_allowed:
             visible_items = [item for item in visible_items if not _is_trade_briefing_item(item)]
 
+    projected_items = [_project_briefing_item(item) for item in visible_items]
     return {
         "ok": True,
-        "items": [_project_briefing_item(item) for item in visible_items],
+        "items": projected_items,
         "quiet": briefing.quiet,
         "quiet_reason": briefing.quiet_reason,
         "team_snapshot": team_snapshot,
@@ -9001,7 +9004,69 @@ def get_league_dashboard(
             "visible_count": len(visible_items),
             "hidden_count": len(all_items) - len(visible_items),
         },
+        # Additive. Built only from data computed above; see modules.this_week.
+        "this_week": _dashboard_this_week(
+            league=league,
+            my_roster=my_roster,
+            roster_df=roster_df,
+            items=projected_items,
+            trade_idea_records=trade_idea_records,
+            stance=declared_team_stance,
+        ),
     }
+
+
+def _dashboard_this_week(
+    *,
+    league: dict[str, Any],
+    my_roster: dict[str, Any],
+    roster_df: pd.DataFrame,
+    items: list[dict[str, Any]],
+    trade_idea_records: list[Any] | None,
+    stance: str,
+) -> dict[str, Any] | None:
+    """The Dashboard's "This week" strip. Never raises: a failure here must not
+    take the whole Dashboard down, so it just omits the strip."""
+
+    try:
+        roster_rows: dict[str, dict[str, Any]] = {}
+        bye_ids: set[str] = set()
+        if league_calendar.is_in_season(league) and not roster_df.empty:
+            week = league_calendar.current_league_week(league) or 0
+            games = None
+            season = 0
+            if week:
+                try:
+                    season = int(league.get("season") or 0) or sleeper.default_player_stats_season()
+                    games = nfl_schedule.load_games()
+                except Exception:
+                    games = None
+            for _, row in roster_df.iterrows():
+                player_id = str(row.get("player_id") or "")
+                if not player_id:
+                    continue
+                roster_rows[player_id] = {
+                    "name": row.get("name"),
+                    "position": row.get("position"),
+                    "status": row.get("status"),
+                    "injury_status": row.get("injury_status"),
+                }
+                team = str(row.get("team") or "").strip().upper()
+                if games is not None and team and week:
+                    matchup = nfl_schedule.team_matchup_for_week(team, week, season, games=games)
+                    if matchup is not None and matchup.get("bye"):
+                        bye_ids.add(player_id)
+        return this_week.build_this_week(
+            league=league,
+            roster=my_roster,
+            roster_rows=roster_rows,
+            bye_player_ids=bye_ids,
+            items=items,
+            trade_records=trade_idea_records,
+            stance=stance,
+        )
+    except Exception:
+        return None
 
 
 # Bounds the per-request fan-out in get_portfolio below — plenty for
