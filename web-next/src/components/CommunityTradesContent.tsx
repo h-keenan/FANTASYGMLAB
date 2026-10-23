@@ -54,7 +54,7 @@ function ReactionRow({
             type="button"
             aria-pressed={active}
             onClick={() => onReact(emoji, active)}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-bold"
+            className="flex items-center justify-center gap-1 px-3 min-h-[var(--touch-target-min)] min-w-[var(--touch-target-min)] text-xs font-bold"
             style={{
               borderRadius: "var(--radius-pill)",
               border: `var(--border-width-default) solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
@@ -174,7 +174,7 @@ export function CommunityTradesContent({
               setTogglingOptOut(true);
               Promise.resolve(onToggleOptOut(!optedOut)).finally(() => setTogglingOptOut(false));
             }}
-            className="px-2.5 py-1 text-xs font-bold"
+            className="px-3 min-h-[var(--touch-target-min)] text-xs font-bold"
             style={{
               border: "var(--border-width-default) solid var(--color-border)",
               color: optedOut ? "var(--color-danger)" : "var(--color-success)",

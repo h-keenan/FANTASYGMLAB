@@ -132,12 +132,12 @@ export function PlayerHeroHeader({
             <span className="pqv-stat-tile-caption">Player score</span>
           </div>
           <div className="pqv-stat-tile">
-            <span className="pqv-stat-tile-caption">Value</span>
             <span className={`pqv-stat-tile-value${score != null ? "" : " pqv-stat-tile-value--empty"}`}>
               {score != null ? formatScore(score) : "—"}
             </span>
+            <span className="pqv-stat-tile-caption">Value</span>
             {score == null && !loadingIdentity ? (
-              <span className="pqv-stat-tile-caption">{valueNote || "No market value yet"}</span>
+              <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span>
             ) : null}
           </div>
           <UsageTile trend={usageTrend} loading={usageLoading} />

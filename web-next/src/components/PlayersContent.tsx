@@ -172,7 +172,8 @@ function PlayerRow({
       >
         {player.team || "—"}
       </PlayerIdentity>
-      <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">
+      <div className="contents">
+      <div className="flex items-center gap-2 max-sm:w-full max-sm:justify-end">
         <SortedStatTile player={player} sortOption={sortOption} sortMode={sortMode} />
         {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
             should say in small print value above it so its not glaring
@@ -199,10 +200,12 @@ function PlayerRow({
             {player.position_rank}
           </span>
         ) : null}
+      </div>
+      <div className="flex items-center gap-2 max-sm:w-full">
         {idpConfidence ? null : (
           <a
             href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-            className="inline-flex items-center min-h-10 px-3 text-xs font-bold"
+            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold max-sm:flex-1"
             style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
           >
             Compare
@@ -220,12 +223,13 @@ function PlayerRow({
         {idpConfidence ? null : (
           <a
             href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
-            className="inline-flex items-center min-h-10 px-3 text-xs font-bold"
+            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold max-sm:flex-1"
             style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
           >
             Add to Trade
           </a>
         )}
+      </div>
       </div>
     </div>
   );
@@ -338,6 +342,7 @@ export function PlayersContent({
           ]}
           active={view}
           onSelect={(value) => setView(value as PlayersView)}
+          fullWidth
         />
       ) : null}
 

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { markAlertReadSynced, overlayPendingAlertReads, reconcileAlertReads } from "@/lib/alertReadSync";
+import { useRouter } from "next/navigation";
+import { EmptyState } from "@/components/EmptyState";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -204,6 +206,7 @@ export function AlertsContent({
   /** Scopes this browser's not-yet-synced reads to the signed-in account. */
   userId?: string;
 }) {
+  const router = useRouter();
   // `read` comes from the server's cross-device read table (the same one
   // the mobile app writes), overlaid with any read tapped here that hasn't
   // reached the server yet — see lib/alertReadSync.ts.
@@ -224,10 +227,13 @@ export function AlertsContent({
   const notice = data.reason ? alertsReasonMessage(data.reason) : null;
   if (notice) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
-          {notice}
-        </p>
+      <main className="flex-1 flex flex-col justify-center px-4 py-8 max-w-3xl w-full mx-auto">
+        <EmptyState
+          title={data.reason === "empty_roster" ? "No players to watch yet" : "Connect a league to get alerts"}
+          subtitle={notice}
+          actionLabel={data.reason === "empty_roster" ? undefined : "Connect a league"}
+          onAction={() => router.push("/connect-league")}
+        />
       </main>
     );
   }

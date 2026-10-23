@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { trackClientError } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
+import { Button } from "@/components/Button";
 
 /**
  * Launch-readiness pass, 2026-10-18: without this, an uncaught render
@@ -32,18 +33,13 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Something went wrong. It&apos;s been logged.
       </p>
-      <button
+      <Button
         type="button"
         onClick={reset}
-        className="px-4 py-2 text-sm font-bold"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-        }}
+        style={{ alignSelf: "auto" }}
       >
         Try again
-      </button>
+      </Button>
     </main>
   );
 }

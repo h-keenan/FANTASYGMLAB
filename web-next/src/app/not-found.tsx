@@ -1,7 +1,7 @@
 import Image from "next/image";
-import Link from "next/link";
 
 import { BRAND_NAME } from "@/lib/brand";
+import { ButtonLink } from "@/components/Button";
 
 /**
  * Launch-readiness pass, 2026-10-18: Next.js's default 404 is a bare,
@@ -19,17 +19,12 @@ export default function NotFound() {
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         That page doesn&apos;t exist.
       </p>
-      <Link
+      <ButtonLink
         href="/"
-        className="px-4 py-2 text-sm font-bold"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-        }}
+        style={{ alignSelf: "auto" }}
       >
         Back to FantasyDesk
-      </Link>
+      </ButtonLink>
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { BRAND_NAME as PRODUCT_NAME } from "@/lib/brand";
+import { Button } from "@/components/Button";
 
 /**
  * Ports modules/age_gate.py's web COPPA gate: a neutral date-of-birth
@@ -111,17 +112,11 @@ export function AgeGate({ onConfirmed }: { onConfirmed: () => void }) {
           {error}
         </p>
       ) : null}
-      <button
+      <Button
         type="submit"
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-        }}
       >
         Confirm date of birth
-      </button>
+      </Button>
     </form>
   );
 }

@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
 import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
+import { Button } from "@/components/Button";
 
 export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
 
@@ -235,20 +236,14 @@ export function EspnImportForm({
         ) : null}
         <div className="flex items-center gap-3">
           {preview.ok ? (
-            <button
+            <Button
               type="button"
               onClick={saveLeague}
               disabled={!rosterId || status === "saving"}
-              className="px-4 py-2 text-sm font-bold"
-              style={{
-                background: "var(--color-accent-strong)",
-                color: "var(--color-on-accent)",
-                fontWeight: "var(--font-weight-button)",
-                opacity: !rosterId || status === "saving" ? "var(--opacity-disabled)" : 1,
-              }}
-            >
+        style={{ alignSelf: "auto" }}
+      >
               {status === "saving" ? "Saving…" : "Add this league"}
-            </button>
+            </Button>
           ) : null}
           <button
             type="button"
@@ -322,19 +317,12 @@ export function EspnImportForm({
           Retry
         </button>
       ) : null}
-      <button
+      <Button
         type="submit"
         disabled={status === "loading"}
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-          opacity: status === "loading" ? "var(--opacity-disabled)" : 1,
-        }}
       >
         {status === "loading" ? `Loading league from ${copy.label}…` : copy.findLabel}
-      </button>
+      </Button>
     </form>
   );
 }

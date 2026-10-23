@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
+import { Button } from "@/components/Button";
 
 /**
  * Ports modules/account_ui.py's render_mobile_auth_entry sign-in/create-
@@ -156,23 +157,17 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           We sent a confirmation link to <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>.
           Confirm your account, then come back here to sign in.
         </p>
-        <button
+        <Button
           type="button"
           onClick={() => {
             setStep("password");
             setNeedsAgeGate(false);
             setError(null);
           }}
-          className="px-4 py-2.5 text-sm font-bold"
-          style={{
-            background: "var(--color-accent-strong)",
-            color: "var(--color-on-accent)",
-            fontWeight: "var(--font-weight-button)",
-            borderRadius: "var(--radius-control)",
-          }}
-        >
+        style={{ alignSelf: "auto" }}
+      >
           Back to sign in
-        </button>
+        </Button>
       </div>
     );
   }
@@ -206,18 +201,12 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               {error}
             </p>
           ) : null}
-          <button
+          <Button
             type="submit"
-            className="px-4 py-2.5 text-sm font-bold"
-            style={{
-              background: "var(--color-accent-strong)",
-              color: "var(--color-on-accent)",
-              fontWeight: "var(--font-weight-button)",
-              borderRadius: "var(--radius-control)",
-            }}
-          >
+        style={{ alignSelf: "auto" }}
+      >
             Continue
-          </button>
+          </Button>
         </form>
 
         <div className="flex items-center gap-3">
@@ -305,20 +294,12 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               {error}
             </p>
           ) : null}
-          <button
+          <Button
             type="submit"
             disabled={busy}
-            className="px-4 py-2.5 text-sm font-bold self-start"
-            style={{
-              background: "var(--color-accent-strong)",
-              color: "var(--color-on-accent)",
-              fontWeight: "var(--font-weight-button)",
-              opacity: busy ? "var(--opacity-disabled)" : 1,
-              borderRadius: "var(--radius-control)",
-            }}
           >
             {busy ? "Continuing…" : "Continue"}
-          </button>
+          </Button>
         </form>
       )}
     </div>

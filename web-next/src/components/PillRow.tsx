@@ -33,7 +33,7 @@ export function PillRow({
               type="button"
               onClick={() => onSelect(option.value)}
               aria-pressed={isActive}
-              className="flex-1 py-3 text-xs font-bold uppercase"
+              className="flex-1 min-w-0 px-1 min-h-[var(--touch-target-min)] py-3 text-[0.6875rem] sm:text-xs font-bold uppercase"
               style={{
                 letterSpacing: "0.03em",
                 background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
@@ -59,7 +59,7 @@ export function PillRow({
             type="button"
             onClick={() => onSelect(option.value)}
             aria-pressed={isActive}
-            className="px-3 py-3 text-xs font-bold uppercase"
+            className="px-3 min-h-[var(--touch-target-min)] py-3 text-xs font-bold uppercase"
             style={{
               letterSpacing: "0.03em",
               background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",

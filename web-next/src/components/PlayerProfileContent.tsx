@@ -222,6 +222,7 @@ export function PlayerProfileContent({
               options={PROFILE_TABS.map((option) => ({ label: option.label, value: option.value }))}
               active={tab}
               onSelect={(value) => setTab(value as ProfileTab)}
+              fullWidth
             />
 
             <div className="flex flex-col gap-4">

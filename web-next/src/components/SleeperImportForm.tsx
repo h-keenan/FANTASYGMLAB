@@ -8,6 +8,7 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { EspnImportForm } from "@/components/EspnImportForm";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { PillRow } from "@/components/PillRow";
+import { Button } from "@/components/Button";
 
 /**
  * Ports app.py's guest Sleeper-username import (load_leagues_for_username /
@@ -51,11 +52,11 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
   const [platform, setPlatform] = useState<LeaguePlatform>("sleeper");
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-2">
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
           Your league is on
         </span>
-        <PillRow options={PLATFORM_OPTIONS} active={platform} onSelect={(value) => setPlatform(value as LeaguePlatform)} />
+        <PillRow options={PLATFORM_OPTIONS} active={platform} onSelect={(value) => setPlatform(value as LeaguePlatform)} fullWidth />
       </div>
       {platform !== "sleeper" ? (
         // key: switching platform resets the form (league id, preview, team pick).
@@ -283,19 +284,12 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
           ) : null}
         </div>
       ) : null}
-      <button
+      <Button
         type="submit"
         disabled={status === "loading"}
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{
-          background: "var(--color-accent-strong)",
-          color: "var(--color-on-accent)",
-          fontWeight: "var(--font-weight-button)",
-          opacity: status === "loading" ? "var(--opacity-disabled)" : 1,
-        }}
       >
         {status === "loading" ? "Loading leagues from Sleeper…" : "Load my leagues"}
-      </button>
+      </Button>
     </form>
   );
 }
