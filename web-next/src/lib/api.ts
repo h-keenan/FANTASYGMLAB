@@ -2,6 +2,7 @@ import { env } from "./env";
 import { supabase } from "./supabase";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
+import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 
 /**
@@ -82,6 +83,10 @@ async function performRequest<T>(
         : "";
     reportApiFailure(response.status);
     throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
+  }
+
+  if (isFreeLeagueLockedBody(body)) {
+    throw new ApiError(200, FREE_LEAGUE_CAP_MESSAGE);
   }
 
   return maskIfPrivate(body) as T;

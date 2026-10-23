@@ -4,6 +4,13 @@ import pytest
 
 from modules import idp_league_values, sleeper
 
+@pytest.fixture(autouse=True)
+def _open_free_league_gate(monkeypatch):
+    # Stubbed `requests.get` makes every account look Free; the league cap is
+    # covered by tests/test_paywall_league_cap.py.
+    monkeypatch.setattr("services.mobile_api_service._league_access_allowed", lambda *a, **k: True)
+
+
 IDP_LEAGUE = {
     "roster_positions": ["QB", "RB", "WR", "TE", "FLEX", "DL", "LB", "DB", "BN"],
     "scoring_settings": {"rec": 1.0, "idp_tkl_solo": 1.0, "idp_tkl_ast": 0.5, "idp_sack": 4.0, "idp_int": 4.0},

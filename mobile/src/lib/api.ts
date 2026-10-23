@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap';
 import type { PercentileExplorerResponse } from './percentileExplorer';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
 import type {
@@ -107,6 +108,10 @@ async function performRequest<T>(
         ? String((body as { error: unknown }).error)
         : `Request failed (${response.status}).`;
     throw new ApiError(response.status, message);
+  }
+
+  if (isFreeLeagueLockedBody(body)) {
+    throw new ApiError(200, FREE_LEAGUE_CAP_MESSAGE);
   }
 
   return body as T;
