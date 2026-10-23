@@ -2005,6 +2005,10 @@ export interface DashboardResponse {
   team_snapshot: TeamSnapshot | null;
   entitlement?: DashboardEntitlementInfo;
   reason: string;
+  /** Only present (true) on the progressive first call
+   * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
+   * and the full response is still to come. */
+  trade_ideas_deferred?: boolean;
 }
 
 /**
@@ -2597,8 +2601,12 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/recap${query ? `?${query}` : ''}`,
     );
   },
-  getLeagueDashboard: (leagueId: string) =>
-    authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
+  // `deferTradeIdeas` is the progressive first call: same payload minus the
+  // (expensive) Top Trade Opportunity tile. Follow it with the plain call.
+  getLeagueDashboard: (leagueId: string, options?: { deferTradeIdeas?: boolean }) =>
+    authorizedFetch<DashboardResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/dashboard${options?.deferTradeIdeas ? '?defer_trade_ideas=true' : ''}`,
+    ),
   // "Guess the Player" mini-game (coridian_, 2026-10-19) — league-
   // independent, one shared daily pick for every signed-in user, so it
   // doesn't take a leagueId the way getLeagueDashboard does.

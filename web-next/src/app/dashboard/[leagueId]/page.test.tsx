@@ -53,7 +53,7 @@ describe("DashboardPage fetch order", () => {
     // Neither request has resolved, and the second one is already out.
     expect(api.getTeamRankings).toHaveBeenCalledTimes(1);
     expect(api.getTeamRankings).toHaveBeenCalledWith("league-1", "Dynasty");
-    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Dynasty");
+    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Dynasty", { deferTradeIdeas: true });
 
     await act(async () => {
       dash.resolve(dashboard);
@@ -71,7 +71,7 @@ describe("DashboardPage fetch order", () => {
 
     await screen.findByTestId("dashboard-content");
     expect(api.getDashboard).toHaveBeenCalledTimes(1);
-    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Non-Dynasty");
+    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Non-Dynasty", { deferTradeIdeas: true });
     expect(api.getTeamRankings).toHaveBeenCalledTimes(1);
     expect(api.getTeamRankings).toHaveBeenCalledWith("league-1", "Non-Dynasty");
   });
@@ -86,6 +86,38 @@ describe("DashboardPage fetch order", () => {
 
     await screen.findByTestId("dashboard-content");
     expect(api.getDashboard).toHaveBeenCalledTimes(1);
-    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Non-Dynasty");
+    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Non-Dynasty", { deferTradeIdeas: true });
+  });
+
+  it("paints the deferred first pass, then swaps in the full response", async () => {
+    mockLeagueType(2);
+    const full = deferred<DashboardResponse>();
+    const firstPass = { ...dashboard, quiet: false, items: [{}], trade_ideas_deferred: true } as unknown as DashboardResponse;
+    vi.mocked(api.getDashboard).mockResolvedValueOnce(firstPass).mockReturnValueOnce(full.promise);
+    vi.mocked(api.getTeamRankings).mockResolvedValue(rankings);
+
+    renderWithLens(<DashboardPage />);
+
+    await screen.findByTestId("dashboard-content");
+    await waitFor(() => expect(api.getDashboard).toHaveBeenCalledTimes(2));
+    expect(api.getDashboard).toHaveBeenNthCalledWith(1, "league-1", "Dynasty", { deferTradeIdeas: true });
+    expect(api.getDashboard).toHaveBeenNthCalledWith(2, "league-1", "Dynasty");
+    await act(async () => full.resolve(dashboard));
+    expect(screen.getByTestId("dashboard-content")).toBeInTheDocument();
+  });
+
+  it("keeps the skeleton (no quiet flash) when the deferred first pass is empty", async () => {
+    mockLeagueType(2);
+    const full = deferred<DashboardResponse>();
+    const firstPass = { ...dashboard, quiet: true, items: [], trade_ideas_deferred: true } as unknown as DashboardResponse;
+    vi.mocked(api.getDashboard).mockResolvedValueOnce(firstPass).mockReturnValueOnce(full.promise);
+    vi.mocked(api.getTeamRankings).mockResolvedValue(rankings);
+
+    renderWithLens(<DashboardPage />);
+
+    await waitFor(() => expect(api.getDashboard).toHaveBeenCalledTimes(2));
+    expect(screen.queryByTestId("dashboard-content")).not.toBeInTheDocument();
+    await act(async () => full.resolve(dashboard));
+    expect(await screen.findByTestId("dashboard-content")).toBeInTheDocument();
   });
 });

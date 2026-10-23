@@ -32,6 +32,7 @@ aren't replicated here.
 
 from __future__ import annotations
 
+import os
 from functools import partial
 from typing import Any, Mapping
 
@@ -518,6 +519,56 @@ def build_trade_tile(
     }
 
 
+# The Dashboard is requested twice per open (a first paint without trade
+# ideas, then the full call), and everything below except the trade tile is
+# a pure function of the same inputs. This shares those tiles between the
+# two calls (and across workers) for a short TTL (the key is a content digest
+# of every input, plus the valued frame's own versioned cache key, so only the
+# background-refreshed news cache is unkeyed), so the second call only pays for the trade
+# search. The key covers every input of the tile computation; when the
+# valued frame is not one handed out by build_valued_players_frame_cached
+# (so its version is unknown) nothing is shared.
+TRADE_INDEPENDENT_TILES_TTL_SECONDS = 90
+_TRADE_INDEPENDENT_TILES_LOCK_TIMEOUT_SECONDS = 20.0
+
+
+def _shared_trade_independent_tiles(
+    compute,
+    *,
+    players_df: pd.DataFrame,
+    league_id: str,
+    roster_id: Any,
+    roster_player_ids: set[str],
+    all_rostered_player_ids: set[str],
+    league_settings: Mapping[str, Any] | None,
+    score_field: str,
+    injury_display_context: Mapping[str, Any],
+) -> dict[str, Any]:
+    frame_key = league_value_settings.valued_players_frame_cache_key(players_df)
+    if not frame_key or os.environ.get("DASHBOARD_SHARED_TILES", "1") == "0":  # kill switch / A-B harness
+        return compute()
+    try:
+        digest_parts = (
+            frame_key,
+            str(league_id),
+            str(roster_id),
+            str(score_field),
+            tuple(sorted(str(pid) for pid in roster_player_ids)),
+            tuple(sorted(str(pid) for pid in all_rostered_player_ids)),
+            repr(sorted((league_settings or {}).items(), key=lambda kv: str(kv[0]))),
+            repr(sorted(injury_display_context.items(), key=lambda kv: str(kv[0]))),
+        )
+    except Exception:
+        return compute()
+    return redis_cache.redis_single_flight_cache(
+        cache_key=redis_cache.build_cache_key("dashboard_trade_independent_tiles", *digest_parts),
+        ttl_seconds=TRADE_INDEPENDENT_TILES_TTL_SECONDS,
+        compute=compute,
+        lock_timeout_seconds=_TRADE_INDEPENDENT_TILES_LOCK_TIMEOUT_SECONDS,
+    )
+
+
+
 def compose_next_move_briefing(
     *,
     league_id: str,
@@ -599,27 +650,66 @@ def compose_next_move_briefing(
     if injury_context is None:
         injury_context = roster_injury_context(roster_df, lineup_df)
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
-    team_needs_assessment = build_team_needs_assessment(
-        roster_df, None, league_settings, lineup_df=lineup_df, score_field=score_field
-    )
-    needed_positions = get_needed_positions(
-        roster_df, None, league_settings, assessment=team_needs_assessment, lineup_df=lineup_df
-    )
+    def _compute_trade_independent_tiles() -> dict[str, Any]:
+        team_needs_assessment = build_team_needs_assessment(
+            roster_df, None, league_settings, lineup_df=lineup_df, score_field=score_field
+        )
+        needed_positions = get_needed_positions(
+            roster_df, None, league_settings, assessment=team_needs_assessment, lineup_df=lineup_df
+        )
 
-    free_agents_df = players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)]
-    top_waiver = select_top_waiver_opportunity(
-        free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions
-    )
+        free_agents_df = players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)]
+        top_waiver = select_top_waiver_opportunity(
+            free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions
+        )
 
-    need_tile = select_need_headline(team_needs_assessment)
-    need_tile["route_key"] = "my_team"
-    injury_tile = build_injury_tile(injury_display_context)
-    roster_pressure_tile = build_roster_pressure_tile(
-        league_id=league_id, roster_id=roster_id, roster_df=roster_df, league_settings=league_settings
+        need_tile = select_need_headline(team_needs_assessment)
+        need_tile["route_key"] = "my_team"
+        injury_tile = build_injury_tile(injury_display_context)
+        roster_pressure_tile = build_roster_pressure_tile(
+            league_id=league_id, roster_id=roster_id, roster_df=roster_df, league_settings=league_settings
+        )
+        waiver_tile = build_waiver_tile(
+            top_waiver, league_id=league_id, roster_id=roster_id, score_field=score_field
+        )
+
+        value_trend_tile = build_value_trend_tile(roster_df, score_field)
+        news_tiles = list(
+            build_news_tiles(
+                league_id=league_id,
+                league_settings=league_settings,
+                roster_df=roster_df,
+                lineup_df=lineup_df,
+                free_agents_df=free_agents_df,
+                players_df=players_df,
+            )
+        )
+        return {
+            "roster_pressure_tile": roster_pressure_tile,
+            "waiver_tile": waiver_tile,
+            "need_tile": need_tile,
+            "injury_tile": injury_tile,
+            "value_trend_tile": value_trend_tile,
+            "news_tiles": news_tiles,
+        }
+
+    tiles = _shared_trade_independent_tiles(
+        _compute_trade_independent_tiles,
+        players_df=players_df,
+        league_id=league_id,
+        roster_id=roster_id,
+        roster_player_ids=roster_player_ids,
+        all_rostered_player_ids=all_rostered_player_ids,
+        league_settings=league_settings,
+        score_field=score_field,
+        injury_display_context=injury_display_context,
     )
-    waiver_tile = build_waiver_tile(
-        top_waiver, league_id=league_id, roster_id=roster_id, score_field=score_field
-    )
+    roster_pressure_tile = tiles["roster_pressure_tile"]
+    waiver_tile = tiles["waiver_tile"]
+    need_tile = tiles["need_tile"]
+    injury_tile = tiles["injury_tile"]
+    value_trend_tile = tiles["value_trend_tile"]
+    news_tiles = tiles["news_tiles"]
 
     trade_tile = None
     try:
@@ -661,7 +751,6 @@ def compose_next_move_briefing(
         items.append(waiver_tile)
     items.extend([need_tile, injury_tile])
 
-    value_trend_tile = build_value_trend_tile(roster_df, score_field)
     if value_trend_tile is not None:
         items.append(value_trend_tile)
     strategy_check_tile = build_strategy_check_tile(
@@ -673,16 +762,7 @@ def compose_next_move_briefing(
     )
     if strategy_check_tile is not None:
         items.append(strategy_check_tile)
-    items.extend(
-        build_news_tiles(
-            league_id=league_id,
-            league_settings=league_settings,
-            roster_df=roster_df,
-            lineup_df=lineup_df,
-            free_agents_df=free_agents_df,
-            players_df=players_df,
-        )
-    )
+    items.extend(news_tiles)
 
     immediate_labels = frozenset(
         label

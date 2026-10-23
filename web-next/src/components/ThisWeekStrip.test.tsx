@@ -79,4 +79,13 @@ describe("ThisWeekStrip", () => {
   it("builds draft routes", () => {
     expect(thisWeekHref("draft_center", "x y", "L")).toBe("/draft-center/x%20y?name=L");
   });
+
+  it("reserves the trade row's space on the deferred first pass and drops it once the row arrives", () => {
+    const withoutTrade: ThisWeek = { ...IN_SEASON, rows: IN_SEASON.rows.filter((row) => row.key !== "trade") };
+    const { container, rerender } = render(<ThisWeekStrip data={withoutTrade} leagueId="a" leagueName="L" tradePending />);
+    expect(container.querySelector("[data-fgl-this-week-trade-pending]")).not.toBeNull();
+    expect(screen.queryByText(/Hold: no trade improves/)).toBeNull();
+    rerender(<ThisWeekStrip data={IN_SEASON} leagueId="a" leagueName="L" />);
+    expect(container.querySelector("[data-fgl-this-week-trade-pending]")).toBeNull();
+  });
 });

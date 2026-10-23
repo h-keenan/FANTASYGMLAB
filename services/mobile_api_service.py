@@ -8721,9 +8721,17 @@ FREE_DASHBOARD_VISIBLE_ITEMS = 4
 def get_league_dashboard(
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
+    defer_trade_ideas: bool = False,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """The caller's "Next Move" briefing for this league.
+
+    `defer_trade_ideas=true` is the progressive first call: it returns the
+    same payload minus the Top Trade Opportunity tile (the trade-idea search
+    is the largest single piece of cold compute that is not needed to paint
+    the page) and marks itself with `trade_ideas_deferred: true`. Clients
+    follow it with the plain call, which is byte-for-byte the pre-existing
+    response. The flag is never set on a response that already has the tile.
 
     Shares the same composition pipeline as the web app's Dashboard
     (modules.dashboard_workflow.organize_dashboard_items ->
@@ -8828,15 +8836,21 @@ def get_league_dashboard(
     # rather than letting compose_next_move_briefing recompute the identical
     # (league, roster, strategy, lens) search a user may have just triggered
     # moments earlier by opening Trade Hub.
-    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
-        config, user_id, str(user.get("_access_token") or ""), league_id
-    )
     trade_idea_records = None
+    trade_ideas_deferred = False
     if league_calendar.trade_deadline_passed(league):
         # Past the trade deadline: no Top Trade Opportunity tile — an empty
         # (not None) list keeps compose_next_move_briefing from regenerating.
         trade_idea_records = []
+    elif defer_trade_ideas:
+        # Progressive first paint: skip the search (and the GM Targets read
+        # that only feeds it); the client re-asks without this flag.
+        trade_idea_records = []
+        trade_ideas_deferred = True
     else:
+        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+            config, user_id, str(user.get("_access_token") or ""), league_id
+        )
         try:
             trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
                 league_id=league_id,
@@ -8992,7 +9006,7 @@ def get_league_dashboard(
             visible_items = [item for item in visible_items if not _is_trade_briefing_item(item)]
 
     projected_items = [_project_briefing_item(item) for item in visible_items]
-    return {
+    response = {
         "ok": True,
         "items": projected_items,
         "quiet": briefing.quiet,
@@ -9010,10 +9024,15 @@ def get_league_dashboard(
             my_roster=my_roster,
             roster_df=roster_df,
             items=projected_items,
-            trade_idea_records=trade_idea_records,
+            # Deferred pass: the search has not run, so there is no "Hold"
+            # verdict to give. None = omit the trade row; the full pass fills it.
+            trade_idea_records=None if trade_ideas_deferred else trade_idea_records,
             stance=declared_team_stance,
         ),
     }
+    if trade_ideas_deferred:
+        response["trade_ideas_deferred"] = True
+    return response
 
 
 def _dashboard_this_week(

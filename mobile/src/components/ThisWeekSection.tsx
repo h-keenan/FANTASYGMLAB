@@ -5,6 +5,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
 import SectionHeading from './SectionHeading';
+import SkeletonBlock from './SkeletonBlock';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ThisWeek } from '../lib/api';
@@ -21,11 +22,15 @@ export default function ThisWeekSection({
   leagueId,
   leagueName,
   onNavigate,
+  tradePending = false,
 }: {
   data: ThisWeek | null | undefined;
   leagueId: string;
   leagueName: string;
   onNavigate: (name: string, params: object) => void;
+  /** The progressive first Dashboard pass has no trade verdict yet: reserve
+   * the trade row's space so the full response fills it without a layout jump. */
+  tradePending?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -61,6 +66,9 @@ export default function ThisWeekSection({
           );
         })
       )}
+      {tradePending && !next && !data.rows.some((row) => row.key === 'trade') ? (
+        <SkeletonBlock height={84} radius={12} />
+      ) : null}
     </View>
   );
 }

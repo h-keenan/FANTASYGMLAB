@@ -12,7 +12,19 @@ import { thisWeekHref, thisWeekToneColor } from "@/lib/thisWeek";
  * (modules/this_week.py). Offseason, pre-draft and not-ready leagues get one
  * next action instead. A row with no real data is simply not sent.
  */
-export function ThisWeekStrip({ data, leagueId, leagueName }: { data: ThisWeek; leagueId: string; leagueName: string }) {
+export function ThisWeekStrip({
+  data,
+  leagueId,
+  leagueName,
+  tradePending = false,
+}: {
+  data: ThisWeek;
+  leagueId: string;
+  leagueName: string;
+  /** The progressive first Dashboard pass has no trade verdict yet: reserve
+   * the trade row's space so the full response fills it without a layout jump. */
+  tradePending?: boolean;
+}) {
   const nextAction = data.next_action;
   if (!nextAction && data.rows.length === 0) return null;
   return (
@@ -42,6 +54,9 @@ export function ThisWeekStrip({ data, leagueId, leagueName }: { data: ThisWeek; 
           </AccentCard>
         ))
       )}
+      {tradePending && !nextAction && !data.rows.some((row) => row.key === "trade") ? (
+        <div className="pqv-skeleton-chart w-full" style={{ height: 84 }} aria-hidden="true" data-fgl-this-week-trade-pending="true" />
+      ) : null}
     </section>
   );
 }

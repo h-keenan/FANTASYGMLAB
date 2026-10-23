@@ -108,7 +108,7 @@ export function DashboardContent({
         </section>
       ) : null}
 
-      {data.this_week ? <ThisWeekStrip data={data.this_week} leagueId={leagueId} leagueName={leagueName} /> : null}
+      {data.this_week ? <ThisWeekStrip data={data.this_week} leagueId={leagueId} leagueName={leagueName} tradePending={Boolean(data.trade_ideas_deferred)} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
         <SectionHeading id="game-plan-heading" action={<ViewAllLink href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`} label="View all game plan items" />}>
