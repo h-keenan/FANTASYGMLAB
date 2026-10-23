@@ -7,6 +7,8 @@ import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
 import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
 import { Button } from "@/components/Button";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
+import { LEAGUE_CAP_UPSELL, saveFailureMessage } from "@/lib/leagueSave";
 
 export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
 
@@ -55,13 +57,6 @@ const PLATFORM_COPY: Record<
   },
 };
 
-const SAVE_FAILURE_COPY: Record<string, string> = {
-  at_cap: "Your plan's saved-league limit is reached. Upgrade to Premium to add another league.",
-  league_not_found: "That league didn't load just now. Please try again.",
-  espn_team_not_selected: "Pick which team is yours first.",
-  mapping_too_low: "Too few of this league's players matched FantasyDesk's player list to value it accurately.",
-};
-
 /**
  * ESPN half of the Connect League flow (SleeperImportForm's platform
  * choice). Public ESPN leagues only: the user enters the league ID and
@@ -90,6 +85,7 @@ export function EspnImportForm({
   const [preview, setPreview] = useState<EspnLeaguePreviewResponse | null>(null);
   const [rosterId, setRosterId] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [atCap, setAtCap] = useState(false);
 
   const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -144,10 +140,14 @@ export function EspnImportForm({
     setMessage(null);
     try {
       const result = await api.saveLeague({ leagueId: key, leagueName: name, rosterId, makeDefault: true });
-      if (!result.ok) {
+      if (!result?.ok) {
         setStatus("idle");
-        setMessage(SAVE_FAILURE_COPY[result.reason] || "Could not save that league right now. Please try again in a moment.");
-        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
+        if (result?.reason === "at_cap") {
+          setAtCap(true);
+        } else {
+          setMessage(saveFailureMessage(result?.reason));
+        }
+        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result?.reason || "unavailable" } });
         return;
       }
       trackFeatureUse("league_import_completed", { leagueId: key, props: { platform } });
@@ -159,6 +159,12 @@ export function EspnImportForm({
       trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: "exception" } });
     }
   };
+
+  if (atCap) {
+    return (
+      <PremiumUpsellCard bare kicker="Saved leagues" upsell={LEAGUE_CAP_UPSELL} fallbackTitle={LEAGUE_CAP_UPSELL.title} fallbackBody={LEAGUE_CAP_UPSELL.body} />
+    );
+  }
 
   if (preview?.league) {
     const diagnostics = preview.diagnostics;

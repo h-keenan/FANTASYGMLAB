@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 
-import { api, type SleeperLeagueSummary } from "@/lib/api";
+import { api, type SaveLeagueResponse, type SleeperLeagueSummary } from "@/lib/api";
+import { LEAGUE_CAP_UPSELL, isSaveFailure, saveFailureMessage } from "@/lib/leagueSave";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { EspnImportForm } from "@/components/EspnImportForm";
@@ -83,7 +85,26 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
   // data; shows real progress until it is ready, then continues.
   const [warming, setWarming] = useState<{ leagueId: string; name: string } | null>(null);
 
-  const finishSave = (saved: { warming?: boolean }, leagueId: string, name: string) => {
+  // Set when the server refuses the save because the plan's league cap is hit.
+  const [atCap, setAtCap] = useState(false);
+
+  // Returns false (and never opens the league) unless the server saved it.
+  const finishSave = (saved: SaveLeagueResponse): boolean => {
+    if (isSaveFailure(saved)) {
+      if (saved?.reason === "at_cap") {
+        setStatus("idle");
+        setAtCap(true);
+      } else {
+        setStatus("error");
+        setMessage(saveFailureMessage(saved?.reason));
+      }
+      trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: saved?.reason || "unavailable" } });
+      return false;
+    }
+    return true;
+  };
+
+  const continueAfterSave = (saved: SaveLeagueResponse, leagueId: string, name: string) => {
     if (saved?.warming) {
       setWarming({ leagueId, name });
       return;
@@ -142,11 +163,13 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       if (result.leagues.length === 1) {
         const only = result.leagues[0];
         const saved = await api.saveLeague({ leagueId: only.league_id, sleeperUsername: clean, leagueName: only.name, makeDefault: true });
-        // once_key scoped by leagueId (trackFeatureUse's default dedupe),
-        // matching app.py's set_selected_league: once_key=selected_league_id.
-        trackFeatureUse("league_import_completed", { leagueId: only.league_id });
-        setStatus("idle");
-        finishSave(saved, only.league_id, only.name);
+        if (finishSave(saved)) {
+          // once_key scoped by leagueId (trackFeatureUse's default dedupe),
+          // matching app.py's set_selected_league: once_key=selected_league_id.
+          trackFeatureUse("league_import_completed", { leagueId: only.league_id });
+          setStatus("idle");
+          continueAfterSave(saved, only.league_id, only.name);
+        }
         return;
       }
 
@@ -163,15 +186,23 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
     setStatus("loading");
     try {
       const saved = await api.saveLeague({ leagueId: league.league_id, sleeperUsername: username.trim(), leagueName: league.name });
-      trackFeatureUse("league_import_completed", { leagueId: league.league_id });
-      setStatus("idle");
-      finishSave(saved, league.league_id, league.name);
+      if (finishSave(saved)) {
+        trackFeatureUse("league_import_completed", { leagueId: league.league_id });
+        setStatus("idle");
+        continueAfterSave(saved, league.league_id, league.name);
+      }
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Could not open that league.");
       trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
     }
   };
+
+  if (atCap) {
+    return (
+      <PremiumUpsellCard bare kicker="Saved leagues" upsell={LEAGUE_CAP_UPSELL} fallbackTitle={LEAGUE_CAP_UPSELL.title} fallbackBody={LEAGUE_CAP_UPSELL.body} />
+    );
+  }
 
   if (warming) {
     return <LeagueWarmupProgress leagueId={warming.leagueId} onDone={() => onLeagueChosen(warming.leagueId, warming.name)} />;

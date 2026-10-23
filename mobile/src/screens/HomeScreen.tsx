@@ -48,6 +48,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
+import { leagueCapMessage } from '../lib/leagueCap';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -217,10 +218,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   // purely numeric entry skips the username lookup and saves directly.
   const looksLikeLeagueId = (value: string) => /^\d{6,}$/.test(value);
 
-  const capMessageFor = (cap: number) =>
-    cap === 1
-      ? 'Your plan keeps 1 saved league. Upgrade to Premium to manage all of your leagues here.'
-      : `Your plan keeps ${cap} saved leagues. Upgrade to Premium to manage all of your leagues here.`;
+  // Honest, plan-accurate copy (lib/leagueCap.ts).
+  const capMessageFor = (_cap: number) => leagueCapMessage();
 
   // Dashboard for Sleeper leagues, My Team for ESPN leagues (which have no
   // Dashboard yet — lib/leaguePlatform.ts).
