@@ -6,8 +6,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Switch,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -39,7 +37,9 @@ import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import type { ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
-import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
+import Input from '../components/Input';
+import Toggle from '../components/Toggle';
+import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -392,11 +392,11 @@ export default function MoreScreen({ navigation }: Props) {
                   description={item.description}
                   showDivider={index < PUSH_CATEGORY_LABELS.length - 1}
                   right={
-                    <Switch
+                    <Toggle
                       value={pushCategories[item.value]}
                       onValueChange={(next) => onTogglePushCategory(item.value, next)}
                       disabled={updatingCategory === item.value}
-                      trackColor={{ true: colors.accent, false: colors.border }}
+                      label={item.label}
                     />
                   }
                 />
@@ -436,11 +436,7 @@ export default function MoreScreen({ navigation }: Props) {
                 description="Hides manager, team and league names, avatars and email for screenshots. Display only; player and football data are untouched."
                 showDivider={false}
                 right={
-                  <Switch
-                    value={showcaseMode}
-                    onValueChange={setShowcaseMode}
-                    trackColor={{ true: colors.premium, false: colors.border }}
-                  />
+                  <Toggle value={showcaseMode} onValueChange={setShowcaseMode} tone="premium" label="Privacy mode" />
                 }
               />
             </AnimatedCard>
@@ -513,62 +509,42 @@ export default function MoreScreen({ navigation }: Props) {
         </AnimatedCard>
       </ScrollView>
 
-      <SheetModal visible={guestUpgradeOpen} animationType="fade" transparent onRequestClose={closeGuestUpgrade}>
-        <View style={styles.guestUpgradeBackdrop}>
-          <SwipeDismissCard style={styles.guestUpgradeCard} onDismiss={closeGuestUpgrade}>
-            <AppText style={styles.guestUpgradeTitle}>Create account</AppText>
-            <AppText style={styles.guestUpgradeHint}>
-              Your connected league carries over automatically — nothing to re-enter.
-            </AppText>
-            <TextInput
-              style={styles.guestUpgradeInput}
-              placeholder="Email"
-              placeholderTextColor={colors.textTertiary}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="username"
-              autoComplete="email"
-              value={guestUpgradeEmail}
-              onChangeText={setGuestUpgradeEmail}
-              editable={!guestUpgradeSubmitting}
-            />
-            <TextInput
-              style={styles.guestUpgradeInput}
-              placeholder="Password"
-              placeholderTextColor={colors.textTertiary}
-              secureTextEntry
-              textContentType="newPassword"
-              autoComplete="new-password"
-              value={guestUpgradePassword}
-              onChangeText={setGuestUpgradePassword}
-              editable={!guestUpgradeSubmitting}
-            />
-            {guestUpgradeError ? <AppText style={styles.guestUpgradeError}>{guestUpgradeError}</AppText> : null}
-            {guestUpgradeNotice ? <AppText style={styles.guestUpgradeNotice}>{guestUpgradeNotice}</AppText> : null}
-            <View style={styles.guestUpgradeActions}>
-              <TouchableOpacity
-                style={styles.guestUpgradeCancelButton}
-                onPress={closeGuestUpgrade}
-                disabled={guestUpgradeSubmitting}
-              >
-                <AppText style={styles.guestUpgradeCancelText}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.guestUpgradeSaveButton}
-                onPress={onSubmitGuestUpgrade}
-                disabled={guestUpgradeSubmitting || !guestUpgradeEmail || !guestUpgradePassword}
-              >
-                {guestUpgradeSubmitting ? (
-                  <ActivityIndicator size="small" color={colors.onAccent} />
-                ) : (
-                  <AppText style={styles.guestUpgradeSaveText}>Create account</AppText>
-                )}
-              </TouchableOpacity>
-            </View>
-          </SwipeDismissCard>
-        </View>
-      </SheetModal>
+      <ModalFormCard visible={guestUpgradeOpen} onClose={closeGuestUpgrade}>
+        <ModalFormTitle>Create account</ModalFormTitle>
+        <ModalFormHint>Your connected league carries over automatically — nothing to re-enter.</ModalFormHint>
+        <Input
+          style={styles.modalInput}
+          placeholder="Email"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="username"
+          autoComplete="email"
+          value={guestUpgradeEmail}
+          onChangeText={setGuestUpgradeEmail}
+          editable={!guestUpgradeSubmitting}
+        />
+        <Input
+          style={styles.modalInput}
+          placeholder="Password"
+          secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          value={guestUpgradePassword}
+          onChangeText={setGuestUpgradePassword}
+          editable={!guestUpgradeSubmitting}
+        />
+        {guestUpgradeError ? <AppText style={styles.guestUpgradeError}>{guestUpgradeError}</AppText> : null}
+        {guestUpgradeNotice ? <AppText style={styles.guestUpgradeNotice}>{guestUpgradeNotice}</AppText> : null}
+        <ModalFormActions
+          onCancel={closeGuestUpgrade}
+          cancelDisabled={guestUpgradeSubmitting}
+          confirmLabel="Create account"
+          onConfirm={onSubmitGuestUpgrade}
+          confirmDisabled={!guestUpgradeEmail || !guestUpgradePassword}
+          confirmLoading={guestUpgradeSubmitting}
+        />
+      </ModalFormCard>
     </View>
   );
 }
@@ -750,52 +726,8 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       color: colors.textSecondary,
     },
-    // Mirrors HomeScreen's rename/add-league modal styling (same backdrop/
-    // card/input/action tokens) rather than inventing a new form pattern.
-    guestUpgradeBackdrop: {
-      flex: 1,
-      backgroundColor: scrim,
-      justifyContent: 'center',
-      padding: spacing.xl,
-    },
-    guestUpgradeCard: {
-      backgroundColor: colors.backgroundElevated,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      padding: spacing.lg,
-    },
-    guestUpgradeTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-    guestUpgradeHint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
-    guestUpgradeInput: {
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      borderRadius: radii.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 10,
-      fontSize: 15,
-      backgroundColor: colors.surface,
-      color: colors.textPrimary,
-      marginBottom: spacing.sm,
-    },
+    modalInput: { marginBottom: spacing.sm },
     guestUpgradeError: { fontSize: 12, color: colors.danger, marginTop: spacing.xs, lineHeight: 16 },
     guestUpgradeNotice: { fontSize: 12, color: colors.success, marginTop: spacing.xs, lineHeight: 16 },
-    guestUpgradeActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: spacing.sm,
-      marginTop: spacing.md,
-    },
-    guestUpgradeCancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
-    guestUpgradeCancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
-    guestUpgradeSaveButton: {
-      backgroundColor: colors.accent,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: 10,
-      borderRadius: radii.sm,
-      minWidth: 120,
-      alignItems: 'center',
-    },
-    guestUpgradeSaveText: { fontSize: 14, fontWeight: '700', color: colors.onAccent },
   });
 }

@@ -34,6 +34,7 @@ import {
 } from "@/lib/waiversPresentation";
 import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { EmptyState } from "@/components/EmptyState";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -517,9 +518,7 @@ export function WaiversContent({
                 />
               </div>
               {visibleSecondary.length === 0 ? (
-                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                  None in this group.
-                </p>
+                <EmptyState title="None in this group." />
               ) : (
                 <div className="glass-surface flex flex-col px-3">
                   {visibleSecondary.map((player, index) => (
@@ -602,9 +601,7 @@ export function WaiversContent({
             </select>
           </div>
           {visibleFreeAgents.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              No free agents match.
-            </p>
+            <EmptyState title="No free agents match." />
           ) : (
             <>
               <div className="glass-surface flex flex-col px-3">
@@ -638,9 +635,7 @@ export function WaiversContent({
               Loading…
             </p>
           ) : watchlistPlayers.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              None of your GM Targets are free agents right now.
-            </p>
+            <EmptyState title="None of your GM Targets are free agents right now." />
           ) : (
             <div className="glass-surface flex flex-col px-3">
               {watchlistPlayers.map((player) => (

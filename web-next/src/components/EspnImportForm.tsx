@@ -9,6 +9,7 @@ import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } 
 import { Button } from "@/components/Button";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LEAGUE_CAP_UPSELL, saveFailureMessage } from "@/lib/leagueSave";
+import { Input, Select } from "@/components/Input";
 
 export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
 
@@ -245,7 +246,8 @@ export function EspnImportForm({
             <Button
               type="button"
               onClick={saveLeague}
-              disabled={!rosterId || status === "saving"}
+              disabled={!rosterId}
+              loading={status === "saving"}
         style={{ alignSelf: "auto" }}
       >
               {status === "saving" ? "Saving…" : "Add this league"}
@@ -282,30 +284,26 @@ export function EspnImportForm({
       </div>
       <label className="flex flex-col gap-1 text-sm">
         {copy.label} league ID
-        <input
+        <Input
           value={leagueId}
           onChange={(event) => setLeagueId(event.target.value)}
           placeholder={copy.placeholder}
           inputMode="numeric"
           autoComplete="off"
-          className="glass-input px-3 py-2"
-          style={{ color: "var(--color-text-primary)" }}
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
         Season
-        <select
+        <Select
           value={season}
           onChange={(event) => setSeason(Number(event.target.value))}
-          className="glass-input px-3 py-2"
-          style={{ color: "var(--color-text-primary)" }}
         >
           {seasons.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       {message ? (
         <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>

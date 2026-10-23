@@ -11,6 +11,7 @@ import { verdictDetailText, verdictToneColorVar } from "@/lib/tradeHistoryPresen
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { SharedTradesFeed } from "@/components/SharedTradesFeed";
 import type { SharedCommunityTrade } from "@/lib/api";
+import { Toggle } from "@/components/Toggle";
 
 /**
  * Social/community layer (docs/roadmap.md), coridian_ 2026-10-19: an
@@ -165,23 +166,16 @@ export function CommunityTradesContent({
           <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             I don&apos;t want MY trades to appear in this feed
           </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={optedOut}
+          <Toggle
+            tone="danger"
+            checked={optedOut}
             disabled={togglingOptOut}
-            onClick={() => {
+            stateLabel={optedOut ? "Opted out" : "Opted in"}
+            onChange={(next) => {
               setTogglingOptOut(true);
-              Promise.resolve(onToggleOptOut(!optedOut)).finally(() => setTogglingOptOut(false));
+              Promise.resolve(onToggleOptOut(next)).finally(() => setTogglingOptOut(false));
             }}
-            className="px-3 min-h-[var(--touch-target-min)] text-xs font-bold"
-            style={{
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: optedOut ? "var(--color-danger)" : "var(--color-success)",
-            }}
-          >
-            {optedOut ? "Opted out" : "Opted in"}
-          </button>
+          />
         </div>
       </header>
 

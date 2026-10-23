@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 import { isPrivacyMode, setPrivacyMode, subscribePrivacyMode } from "@/lib/privacy";
+import { Toggle } from "@/components/Toggle";
 
 export function usePrivacyMode(): boolean {
   return useSyncExternalStore(subscribePrivacyMode, isPrivacyMode, () => false);
@@ -55,22 +56,7 @@ export function PrivacyModeToggle() {
           Hides manager, team and league names, avatars and email for screenshots. Display only.
         </span>
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label="Privacy mode"
-        onClick={() => changePrivacyMode(!on)}
-        className="px-3 py-1.5 text-xs font-bold shrink-0"
-        style={{
-          borderRadius: "var(--radius-pill)",
-          border: `var(--border-width-default) solid ${on ? "var(--color-accent)" : "var(--color-border)"}`,
-          background: on ? "var(--color-accent-soft)" : "transparent",
-          color: on ? "var(--color-accent)" : "var(--color-text-secondary)",
-        }}
-      >
-        {on ? "On" : "Off"}
-      </button>
+      <Toggle label="Privacy mode" checked={on} onChange={changePrivacyMode} stateLabel={on ? "On" : "Off"} />
     </div>
   );
 }

@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Linking,
   RefreshControl,
   SectionList,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -47,8 +45,9 @@ import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
 import { leagueCapMessage } from '../lib/leagueCap';
+import Input from '../components/Input';
+import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -608,9 +607,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         }}
       />
 
-      <SheetModal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
-        <View style={styles.renameBackdrop}>
-          <SwipeDismissCard style={styles.renameCard} onDismiss={closeAddLeague} handleOnly>
+      <ModalFormCard visible={addOpen} onClose={closeAddLeague} handleOnly>
             {warmingLeague ? (
               <LeagueWarmupProgress
                 leagueId={warmingLeague.leagueId}
@@ -620,7 +617,7 @@ export default function HomeScreen({ navigation, route }: Props) {
               />
             ) : (
             <>
-            <AppText style={styles.renameTitle}>Add a league</AppText>
+            <ModalFormTitle>Add a league</ModalFormTitle>
             <View style={styles.platformTabs}>
               <SegmentedTabBar<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>
                 options={[
@@ -659,15 +656,13 @@ export default function HomeScreen({ navigation, route }: Props) {
               )
             ) : (
             <>
-            <AppText style={styles.renameHint}>
+            <ModalFormHint>
               Enter your Sleeper username to pick from your leagues — or paste a league ID directly.
-            </AppText>
-            <TextInput
-              style={styles.renameInput}
+            </ModalFormHint>
+            <Input
               value={addQuery}
               onChangeText={setAddQuery}
               placeholder="Sleeper username or league ID"
-              placeholderTextColor={colors.textTertiary}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!addBusy}
@@ -765,69 +760,38 @@ export default function HomeScreen({ navigation, route }: Props) {
               </View>
             ) : null}
 
-            <View style={styles.renameActions}>
-              <TouchableOpacity
-                style={styles.renameCancelButton}
-                onPress={closeAddLeague}
-                disabled={addBusy}
-              >
-                <AppText style={styles.renameCancelText}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.renameSaveButton}
-                onPress={() => void findLeagues()}
-                disabled={addBusy}
-              >
-                {addBusy ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <AppText style={styles.renameSaveText}>Find leagues</AppText>
-                )}
-              </TouchableOpacity>
-            </View>
-            </>
-            )}
-            </>
-            )}
-          </SwipeDismissCard>
-        </View>
-      </SheetModal>
-
-      <SheetModal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
-        <View style={styles.renameBackdrop}>
-          <SwipeDismissCard style={styles.renameCard} onDismiss={() => setRenamingLeague(null)}>
-            <AppText style={styles.renameTitle}>Rename League</AppText>
-            <AppText style={styles.renameHint}>
-              Only changes what you see here — the real league name in Sleeper stays the same.
-            </AppText>
-            <TextInput
-              style={styles.renameInput}
-              value={renameText}
-              onChangeText={setRenameText}
-              placeholder="League name"
-              placeholderTextColor={colors.textTertiary}
-              autoFocus
-              maxLength={80}
+            <ModalFormActions
+              onCancel={closeAddLeague}
+              cancelDisabled={addBusy}
+              confirmLabel="Find leagues"
+              onConfirm={() => void findLeagues()}
+              confirmLoading={addBusy}
             />
-            <View style={styles.renameActions}>
-              <TouchableOpacity
-                style={styles.renameCancelButton}
-                onPress={() => setRenamingLeague(null)}
-                disabled={renameBusy}
-              >
-                <AppText style={styles.renameCancelText}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.renameSaveButton} onPress={saveLeagueRename} disabled={renameBusy}>
-                {renameBusy ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <AppText style={styles.renameSaveText}>Save</AppText>
-                )}
-              </TouchableOpacity>
-            </View>
-          </SwipeDismissCard>
-        </View>
-      </SheetModal>
+            </>
+            )}
+            </>
+            )}
+      </ModalFormCard>
+
+      <ModalFormCard visible={renamingLeague !== null} onClose={() => setRenamingLeague(null)}>
+        <ModalFormTitle>Rename League</ModalFormTitle>
+        <ModalFormHint>Only changes what you see here — the real league name in Sleeper stays the same.</ModalFormHint>
+        <Input
+          value={renameText}
+          onChangeText={setRenameText}
+          placeholder="League name"
+          autoFocus
+          maxLength={80}
+        />
+        <ModalFormActions
+          onCancel={() => setRenamingLeague(null)}
+          cancelDisabled={renameBusy}
+          confirmLabel="Save"
+          onConfirm={saveLeagueRename}
+          confirmDisabled={false}
+          confirmLoading={renameBusy}
+        />
+      </ModalFormCard>
     </View>
   );
 }
@@ -1013,48 +977,6 @@ function createStyles(colors: ThemeColors) {
   },
   defaultBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   renameButton: { marginLeft: spacing.sm, marginRight: spacing.sm, padding: 2 },
-  renameBackdrop: {
-    flex: 1,
-    backgroundColor: scrim,
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  renameCard: {
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: spacing.lg,
-  },
-  renameTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  renameHint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
-  renameInput: {
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-  },
-  renameActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  renameCancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
-  renameCancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
-  renameSaveButton: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 10,
-    borderRadius: radii.sm,
-    minWidth: 64,
-    alignItems: 'center',
-  },
-  renameSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   error: {
     color: colors.danger,
     paddingHorizontal: spacing.xl,

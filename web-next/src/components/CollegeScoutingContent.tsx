@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PillRow } from "@/components/PillRow";
+import { Button } from "@/components/Button";
 import { PositionBadge } from "@/components/PositionBadge";
 import { confidenceColor } from "@/lib/waiversPresentation";
 import { aggregateText, classLabel, scoutingConfidenceLabel } from "@/lib/collegeScoutingPresentation";
@@ -219,15 +220,9 @@ function ProspectCard({
               {hasReport ? "Update grade" : "Submit grade"}
             </button>
             {hasReport ? (
-              <button
-                type="button"
-                onClick={onRemove}
-                disabled={busy}
-                className="px-3 py-1.5 text-xs font-bold"
-                style={{ color: "var(--color-danger)", border: "var(--border-width-default) solid var(--color-danger)", opacity: busy ? 0.6 : 1 }}
-              >
+              <Button variant="dangerOutline" size="sm" onClick={onRemove} disabled={busy}>
                 Remove my report
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>

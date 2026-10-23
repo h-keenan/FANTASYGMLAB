@@ -47,7 +47,7 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
       <Button
         type="button"
         onClick={subscribe}
-        disabled={busy}
+        loading={busy}
         style={{ alignSelf: "auto" }}
       >
         {busy ? "Starting…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}

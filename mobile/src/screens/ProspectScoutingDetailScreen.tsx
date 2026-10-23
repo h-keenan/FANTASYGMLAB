@@ -15,6 +15,7 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import Button from '../components/Button';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CollegeProspectDetail'>;
 
@@ -212,11 +213,13 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           </TouchableOpacity>
 
           {hadReport ? (
-            <TouchableOpacity style={styles.removeButton} onPress={() => void removeReport()} disabled={removing}>
-              <AppText style={styles.removeButtonText}>
-                {removing ? 'Removing…' : 'Remove my report'}
-              </AppText>
-            </TouchableOpacity>
+            <Button
+              label="Remove my report"
+              variant="dangerOutline"
+              onPress={() => void removeReport()}
+              loading={removing}
+              style={styles.removeButton}
+            />
           ) : null}
         </AnimatedCard>
       </ScrollView>
@@ -286,7 +289,6 @@ function createStyles(colors: ThemeColors) {
     },
     submitButtonDisabled: { opacity: 0.5 },
     submitButtonText: { color: colors.onAccent, fontSize: 14, fontWeight: '700' },
-    removeButton: { marginTop: spacing.sm, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm },
-    removeButtonText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+    removeButton: { marginTop: spacing.sm },
   });
 }

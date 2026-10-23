@@ -5,6 +5,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { thisWeekHref, thisWeekToneColor } from "@/lib/thisWeek";
 import { ButtonLink } from "@/components/Button";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 /**
  * The Dashboard's "This week" strip: up to three moves (lineup, waivers,
@@ -55,7 +56,7 @@ export function ThisWeekStrip({
         ))
       )}
       {tradePending && !nextAction && !data.rows.some((row) => row.key === "trade") ? (
-        <div className="pqv-skeleton-chart w-full" style={{ height: 84 }} aria-hidden="true" data-fgl-this-week-trade-pending="true" />
+        <SkeletonBlock height={84} data-fgl-this-week-trade-pending="true" />
       ) : null}
     </section>
   );

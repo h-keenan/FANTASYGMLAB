@@ -19,6 +19,7 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 /**
  * Ports modules/portfolio_page.py's render_portfolio_page — the cross-
@@ -352,19 +353,19 @@ function PortfolioLeagueSkeleton({ league }: { league: PortfolioSavedLeague }) {
     <article className="glass-surface flex flex-col p-4" aria-busy="true">
       <span className="sr-only">Loading {league.league_name}…</span>
       <div className="flex items-start gap-2" aria-hidden="true">
-        <span className="pqv-skeleton-line" style={{ width: 32, height: 32, borderRadius: "var(--radius-pill)" }} />
+        <SkeletonBlock width={32} height={32} radius="var(--radius-pill)" />
         <div className="flex flex-col gap-2 min-w-0 flex-1">
           <h3 style={{ font: "var(--font-card-title)", color: "var(--color-text-muted)" }}>{league.league_name}</h3>
-          <span className="pqv-skeleton-line" style={{ width: "35%", height: 12 }} />
+          <SkeletonBlock width="35%" height={12} />
         </div>
       </div>
       <div className="flex flex-col gap-3 mt-4" aria-hidden="true">
-        <span className="pqv-skeleton-line" style={{ width: "85%", height: 14 }} />
-        <span className="pqv-skeleton-line" style={{ width: "70%", height: 12 }} />
-        <span className="pqv-skeleton-line" style={{ width: "80%", height: 14 }} />
-        <span className="pqv-skeleton-line" style={{ width: "60%", height: 12 }} />
+        <SkeletonBlock width="85%" height={14} />
+        <SkeletonBlock width="70%" height={12} />
+        <SkeletonBlock width="80%" height={14} />
+        <SkeletonBlock width="60%" height={12} />
       </div>
-      <span className="pqv-skeleton-line mt-4" aria-hidden="true" style={{ width: "45%", height: 14 }} />
+      <SkeletonBlock width="45%" height={14} className="mt-4" />
     </article>
   );
 }

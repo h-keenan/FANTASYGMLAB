@@ -23,6 +23,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { EmptyState } from "@/components/EmptyState";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -276,9 +277,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
       ) : null}
       {state === "ready" && result ? (
         result.reason || result.teams.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            {playoffOddsReasonMessage(result.reason)}
-          </p>
+          <EmptyState title={playoffOddsReasonMessage(result.reason)} />
         ) : (
           <div className="glass-surface flex flex-col">
             {result.teams.map((team, index) => (

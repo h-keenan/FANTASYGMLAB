@@ -8,7 +8,8 @@ import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 /**
  * The one button. `primary` is `onAccent` ink on the accent fill (dark ink on
  * dark-theme cyan; never a hard-coded white), `secondary` is outlined,
- * `ghost` is a text action. Mirrors web-next's components/Button.tsx.
+ * `ghost` is a text action, `danger` / `dangerOutline` are the destructive
+ * fill and outline, `loading` swaps the label for a spinner. Mirrors web-next's components/Button.tsx.
  */
 export default function Button({
   label,
@@ -20,14 +21,21 @@ export default function Button({
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline';
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const inkColor = variant === 'primary' ? colors.onAccent : variant === 'secondary' ? colors.textPrimary : colors.accent;
+  const inkColor =
+    variant === 'primary' || variant === 'danger'
+      ? colors.onAccent
+      : variant === 'secondary'
+        ? colors.textPrimary
+        : variant === 'dangerOutline'
+          ? colors.danger
+          : colors.accent;
   return (
     <TouchableOpacity
       accessibilityRole="button"
@@ -48,6 +56,7 @@ export default function Button({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     base: {
+      minHeight: 44,
       borderRadius: radii.md,
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.lg,
@@ -57,6 +66,8 @@ function createStyles(colors: ThemeColors) {
     primary: { backgroundColor: colors.accent },
     secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
     ghost: { backgroundColor: 'transparent' },
+    danger: { backgroundColor: colors.danger },
+    dangerOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
     disabled: { opacity: disabledOpacity },
     text: { fontSize: 15, fontWeight: '700' },
   });

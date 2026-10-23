@@ -39,7 +39,7 @@ export default function ErrorState({
       <IconCircle name={icon} color={colors.danger} size={compact ? 40 : 56} iconSize={compact ? 20 : 26} />
       <AppText style={styles.title}>{title}</AppText>
       {message ? <AppText style={styles.message}>{message}</AppText> : null}
-      {onRetry ? <Button label={retryLabel} variant="secondary" onPress={onRetry} style={styles.button} /> : null}
+      {onRetry ? <Button label={retryLabel} onPress={onRetry} style={styles.button} /> : null}
     </View>
   );
 }

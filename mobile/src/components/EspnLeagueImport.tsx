@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -33,6 +33,7 @@ const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFo
 };
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
+import Input from './Input';
 
 /**
  * ESPN half of Home's "Add a league" sheet (same sheet, platform chosen at
@@ -221,12 +222,11 @@ export default function EspnLeagueImport({
   return (
     <View>
       <AppText style={styles.hint}>{copy.hint}</AppText>
-      <TextInput
+      <Input
         style={styles.input}
         value={leagueId}
         onChangeText={setLeagueId}
         placeholder={`${copy.label} league ID`}
-        placeholderTextColor={colors.textTertiary}
         keyboardType="number-pad"
         autoCorrect={false}
         editable={!busy}
@@ -260,17 +260,7 @@ export default function EspnLeagueImport({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     hint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      borderRadius: radii.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 10,
-      fontSize: 15,
-      backgroundColor: colors.surface,
-      color: colors.textPrimary,
-      marginBottom: spacing.md,
-    },
+    input: { marginBottom: spacing.md },
     kicker: {
       ...typography.kicker,
       color: colors.textTertiary,

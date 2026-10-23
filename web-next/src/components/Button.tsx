@@ -4,13 +4,45 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties } from "
 /**
  * The one button. `primary` is dark ink on the cyan accent (the pairing
  * ErrorState, Account, Premium, SignIn, AgeGate and Onboarding already used);
- * `secondary` is a quiet outlined button; `ghost` is a text-style action.
+ * `secondary` is a quiet outlined button; `ghost` is a text-style action;
+ * `danger` / `dangerOutline` are the destructive fill and outline. `loading`
+ * marks an in-flight action (disabled, aria-busy, spinner before the label).
  * A disabled primary falls back to the muted surface so it never reads as
  * live. Never put white text on the cyan accent.
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dangerOutline";
 
 type ButtonLook = { variant?: ButtonVariant; size?: "sm" | "md"; fullWidth?: boolean };
+
+function palette(variant: ButtonVariant, disabled: boolean): CSSProperties {
+  const muted = "var(--color-text-muted)";
+  switch (variant) {
+    case "primary":
+      return {
+        background: disabled ? "var(--color-surface-muted)" : "var(--color-accent-strong)",
+        color: disabled ? muted : "var(--color-on-accent)",
+      };
+    case "danger":
+      return {
+        background: disabled ? "var(--color-surface-muted)" : "var(--color-danger)",
+        color: disabled ? muted : "var(--color-on-accent)",
+      };
+    case "dangerOutline":
+      return {
+        background: "transparent",
+        color: disabled ? muted : "var(--color-danger)",
+        border: `var(--border-width-default) solid ${disabled ? "var(--color-border-strong)" : "var(--color-danger)"}`,
+      };
+    case "secondary":
+      return {
+        background: "transparent",
+        color: disabled ? muted : "var(--color-text-primary)",
+        border: "var(--border-width-default) solid var(--color-border-strong)",
+      };
+    default:
+      return { background: "transparent", color: disabled ? muted : "var(--color-accent)" };
+  }
+}
 
 function buttonLook(
   { variant = "primary", size = "md", fullWidth = false }: ButtonLook,
@@ -18,23 +50,10 @@ function buttonLook(
   className: string,
   style?: CSSProperties,
 ) {
-  const palette =
-    variant === "primary"
-      ? {
-          background: disabled ? "var(--color-surface-muted)" : "var(--color-accent-strong)",
-          color: disabled ? "var(--color-text-muted)" : "var(--color-on-accent)",
-        }
-      : variant === "secondary"
-        ? {
-            background: "transparent",
-            color: disabled ? "var(--color-text-muted)" : "var(--color-text-primary)",
-            border: "var(--border-width-default) solid var(--color-border-strong)",
-          }
-        : { background: "transparent", color: disabled ? "var(--color-text-muted)" : "var(--color-accent)" };
   return {
     className: `${size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} min-h-[var(--touch-target-min)] inline-flex items-center justify-center font-bold ${fullWidth ? "w-full" : "self-start"} ${className}`.trim(),
     style: {
-      ...palette,
+      ...palette(variant, disabled),
       fontWeight: "var(--font-weight-button)",
       borderRadius: "var(--radius-control)",
       cursor: disabled ? "not-allowed" : "pointer",
@@ -43,17 +62,41 @@ function buttonLook(
   };
 }
 
+/** Small ring spinner shown inside a `loading` button (the label stays). */
+function ButtonSpinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+    />
+  );
+}
+
 export function Button({
   variant,
   size,
   fullWidth,
+  loading = false,
   className = "",
   style,
   type = "button",
+  children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook & { loading?: boolean }) {
   const look = buttonLook({ variant, size, fullWidth }, Boolean(rest.disabled), className, style);
-  return <button type={type} {...look} {...rest} />;
+  return (
+    <button
+      type={type}
+      {...look}
+      {...rest}
+      disabled={Boolean(rest.disabled) || loading}
+      aria-busy={loading || undefined}
+      style={loading ? { ...look.style, opacity: "var(--opacity-disabled)", cursor: "progress" } : look.style}
+    >
+      {loading ? <ButtonSpinner /> : null}
+      {children}
+    </button>
+  );
 }
 
 /** The same button as a navigation link (next/link). */

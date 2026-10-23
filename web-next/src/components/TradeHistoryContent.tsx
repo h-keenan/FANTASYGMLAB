@@ -12,6 +12,7 @@ import {
   verdictToneColorVar,
 } from "@/lib/tradeHistoryPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { EmptyState } from "@/components/EmptyState";
 
 /**
  * Ports modules/trade_outcomes_page.py's render_trade_history_page — the
@@ -93,9 +94,7 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
       </header>
 
       {data.outcomes.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No trade history yet. Confirm a trade to see it here.
-        </p>
+        <EmptyState title="No trade history yet. Confirm a trade to see it here." />
       ) : (
         <div className="flex flex-col gap-4">
           {data.outcomes.map((outcome) => (

@@ -5,7 +5,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -27,6 +26,7 @@ import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
+import Input from '../components/Input';
 
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
@@ -167,10 +167,9 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
-        <TextInput
+        <Input
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor={colors.textTertiary}
           autoCapitalize="none"
           keyboardType="email-address"
           // Without these, iOS/Android can't tell this is the username half
@@ -184,11 +183,10 @@ export default function LoginScreen() {
           onChangeText={setEmail}
         />
         {!resetMode ? (
-          <TextInput
+          <Input
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor={colors.textTertiary}
-            secureTextEntry
+              secureTextEntry
             textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
             autoComplete={mode === 'signUp' ? 'new-password' : 'password'}
             value={password}
@@ -337,17 +335,7 @@ function createStyles(colors: ThemeColors) {
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.md },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   dividerText: { color: colors.textTertiary, fontSize: 12, marginHorizontal: spacing.sm },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: 16,
-    marginBottom: spacing.md,
-    backgroundColor: colors.surfaceSolid,
-    color: colors.textPrimary,
-  },
+  input: { marginBottom: spacing.md },
   button: {
     backgroundColor: colors.accent,
     borderRadius: radii.md,

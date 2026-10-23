@@ -888,7 +888,7 @@ export function TradeAnalyzerContent({
             Queue send and receive assets, then Analyze.
           </p>
         ) : null}
-        <Button onClick={analyze} disabled={!hasAnyAssets || analyzing}>
+        <Button onClick={analyze} disabled={!hasAnyAssets} loading={analyzing}>
           {analyzing ? "Analyzing…" : "Analyze Trade"}
         </Button>
         {analyzeError ? (

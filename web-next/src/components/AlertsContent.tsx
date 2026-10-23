@@ -263,9 +263,7 @@ export function AlertsContent({
       </header>
 
       {groups.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          All quiet. No relevant news for your roster right now.
-        </p>
+        <EmptyState title="All quiet. No relevant news for your roster right now." />
       ) : (
         <div className="flex flex-col gap-5">
           {groups.map((group, index) => {
