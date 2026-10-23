@@ -11,6 +11,7 @@ import {
   sharedTradeGradeColor,
   toSharedTradeAssets,
 } from "@/lib/communityTradesPresentation";
+import { EmptyState } from "@/components/EmptyState";
 
 function SharedTradeCard({
   trade,
@@ -83,9 +84,7 @@ export function SharedTradesFeed({
     <section className="flex flex-col gap-3" aria-label="Shared trades">
       <h2 style={{ font: "var(--font-card-title)" }}>Shared by users</h2>
       {visible.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Nothing shared yet.
-        </p>
+        <EmptyState title="Nothing shared yet." />
       ) : (
         visible.map((trade) => (
           <SharedTradeCard

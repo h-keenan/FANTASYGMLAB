@@ -10,11 +10,12 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { api, type KeepersResponse, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 /** Reserves the final page's block heights so the content doesn't jump. */
 function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
   const block = (height: number, key: string) => (
-    <div key={key} className="pqv-skeleton-chart w-full" style={{ height }} aria-hidden="true" />
+    <SkeletonBlock key={key} height={height} />
   );
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto" aria-busy="true">

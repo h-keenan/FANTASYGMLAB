@@ -644,9 +644,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
           Suggested moves appear once Sleeper has your lineup for this week.
         </p>
       ) : moves.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Your Sleeper lineup already matches our suggested lineup.
-        </p>
+        <EmptyState title="Your Sleeper lineup already matches our suggested lineup." />
       ) : (
         <ul className="flex flex-col gap-2">
           {shown.map((move) => (

@@ -3,9 +3,10 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
+import Button from './Button';
 import IconCircle from './IconCircle';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -43,9 +44,7 @@ export default function EmptyState({
       <AppText style={styles.title}>{title}</AppText>
       {subtitle ? <AppText style={styles.subtitle}>{subtitle}</AppText> : null}
       {actionLabel && onPressAction ? (
-        <TouchableOpacity style={styles.button} onPress={onPressAction}>
-          <AppText style={styles.buttonText}>{actionLabel}</AppText>
-        </TouchableOpacity>
+        <Button label={actionLabel} onPress={onPressAction} style={styles.button} />
       ) : null}
       {secondaryLabel && onPressSecondary ? (
         <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
@@ -67,14 +66,7 @@ function createStyles(colors: ThemeColors) {
     },
     title: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
     subtitle: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 },
-    button: {
-      marginTop: spacing.md,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radii.pill,
-      backgroundColor: colors.accent,
-    },
-    buttonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
+    button: { marginTop: spacing.md },
     secondaryLink: { marginTop: spacing.sm, padding: spacing.xs },
     secondaryLinkText: {
       fontSize: 12,

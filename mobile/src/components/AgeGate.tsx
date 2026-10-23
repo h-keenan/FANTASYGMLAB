@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 
 import { calculateAge, MINIMUM_AGE, setPassedAgeGate } from '../lib/ageGate';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
+import Input from './Input';
 
 /**
  * Neutral date-of-birth gate shown once per device before LoginScreen's
@@ -70,7 +71,7 @@ export default function AgeGate({ onPassed }: { onPassed: () => void }) {
           <AppText style={styles.title}>Before you continue</AppText>
           <AppText style={styles.body}>Please enter your date of birth.</AppText>
           <View style={styles.row}>
-            <TextInput
+            <Input
               style={[styles.input, styles.inputSmall]}
               placeholder="MM"
               placeholderTextColor={colors.textTertiary}
@@ -79,7 +80,7 @@ export default function AgeGate({ onPassed }: { onPassed: () => void }) {
               value={month}
               onChangeText={setMonth}
             />
-            <TextInput
+            <Input
               style={[styles.input, styles.inputSmall]}
               placeholder="DD"
               placeholderTextColor={colors.textTertiary}
@@ -88,7 +89,7 @@ export default function AgeGate({ onPassed }: { onPassed: () => void }) {
               value={day}
               onChangeText={setDay}
             />
-            <TextInput
+            <Input
               style={[styles.input, styles.inputLarge]}
               placeholder="YYYY"
               placeholderTextColor={colors.textTertiary}
@@ -119,17 +120,7 @@ function createStyles(colors: ThemeColors) {
     title: { ...typography.title, fontSize: 22, color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.sm },
     body: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg, lineHeight: 20 },
     row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      borderRadius: radii.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      fontSize: 16,
-      backgroundColor: colors.surfaceSolid,
-      color: colors.textPrimary,
-      textAlign: 'center',
-    },
+    input: { textAlign: 'center' },
     inputSmall: { flex: 1 },
     inputLarge: { flex: 1.6 },
     button: {

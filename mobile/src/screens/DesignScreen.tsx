@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AccentCard from '../components/AccentCard';
@@ -29,6 +29,8 @@ import { SheetHandle } from '../components/SwipeDismissSheet';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { radii, scrim, spacing, typography, type ThemeColors } from '../theme';
+import Input from '../components/Input';
+import Toggle from '../components/Toggle';
 
 /**
  * Hidden design-system reference (mobile counterpart of web-next's /design).
@@ -163,21 +165,15 @@ export default function DesignScreen() {
           </Spec>
         </Family>
 
-        <Family styles={styles} title="Buttons" note="One Button: primary / secondary / ghost, with disabled and loading.">
+        <Family styles={styles} title="Buttons" note="One Button: primary / secondary / ghost / danger, with disabled and loading.">
           <Spec styles={styles} name="Button" path="mobile/src/components/Button.tsx">
             <Button label="Primary" onPress={noop} />
             <Button label="Secondary" variant="secondary" onPress={noop} />
             <Button label="Ghost" variant="ghost" onPress={noop} />
+            <Button label="Danger" variant="danger" onPress={noop} />
+            <Button label="Danger outline" variant="dangerOutline" onPress={noop} />
             <Button label="Disabled" disabled onPress={noop} />
             <Button label="Loading" loading onPress={noop} />
-          </Spec>
-          <Spec
-            styles={styles}
-            name="Button vs EmptyState action button"
-            path="components/Button.tsx | components/EmptyState.tsx"
-            duplicate="EmptyState hand-rolls its own pill accent button (radii.pill, 13pt) instead of Button (radii.md, 15pt)."
-          >
-            <EmptyState icon="people-outline" title="Pill action inside EmptyState" actionLabel="Connect league" onPressAction={noop} />
           </Spec>
         </Family>
 
@@ -287,17 +283,15 @@ export default function DesignScreen() {
           </Spec>
           <Spec
             styles={styles}
-            name="PremiumLock vs AccentCard"
-            path="components/PremiumLock.tsx | components/AccentCard.tsx"
-            duplicate="PremiumLock is its own card treatment (tapping opens Paywall) rather than an AccentCard in the premium lane."
+            name="PremiumLock (locked card)"
+            path="components/PremiumLock.tsx (AccentCard, premium edge)"
           >
             <PremiumLock title="Unlock Trade Finder" description="Static sample copy for the lock card." feature="design_sample" />
           </Spec>
           <Spec
             styles={styles}
-            name="EmptyState vs ErrorState"
-            path="components/EmptyState.tsx | components/ErrorState.tsx"
-            duplicate="Same centered icon-circle layout in two files with different action buttons (pill accent vs Button secondary)."
+            name="EmptyState"
+            path="components/EmptyState.tsx (shared Button action)"
           >
             <EmptyState icon="people-outline" title="Nothing here yet" subtitle="Add a league to see your team." actionLabel="Connect league" onPressAction={noop} />
           </Spec>
@@ -359,8 +353,7 @@ export default function DesignScreen() {
           <Spec
             styles={styles}
             name="Sheet shell + scrim"
-            path="components/SwipeDismissSheet.tsx (SheetHandle) | theme.ts (scrim)"
-            duplicate="Several screens re-declare their own modal card (More guest-upgrade, Home rename) next to SwipeDismissCard."
+            path="components/SwipeDismissSheet.tsx (SheetHandle) | components/ModalFormCard.tsx | theme.ts (scrim)"
           >
             <View style={{ backgroundColor: scrim, padding: spacing.lg, borderRadius: radii.md }}>
               <View style={styles.sheetPreview}>
@@ -371,16 +364,12 @@ export default function DesignScreen() {
           </Spec>
         </Family>
 
-        <Family styles={styles} title="Forms" note="No shared Input component: inputs are styled per screen.">
-          <Spec
-            styles={styles}
-            name="TextInput / Switch"
-            path="inline per screen (More, Home, Login)"
-            duplicate="Each form restyles TextInput (border/radii.input/colors.surface); no shared Input or Toggle."
-          >
-            <TextInput style={styles.input} placeholder="Sleeper username" placeholderTextColor={colors.textSecondary} />
+        <Family styles={styles} title="Forms" note="Shared Input and Toggle.">
+          <Spec styles={styles} name="Input / Toggle" path="components/Input.tsx | components/Toggle.tsx">
+            <Input placeholder="Sleeper username" />
+            <Input placeholder="Invalid" invalid />
             <View style={styles.row}>
-              <Switch value={toggle} onValueChange={setToggle} />
+              <Toggle value={toggle} onValueChange={setToggle} label="Share to community" />
               <AppText style={styles.body}>Share to community</AppText>
             </View>
           </Spec>

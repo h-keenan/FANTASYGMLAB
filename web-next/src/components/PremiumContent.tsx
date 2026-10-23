@@ -91,7 +91,7 @@ export function PlanCard({
       <Button
         type="button"
         onClick={subscribe}
-        disabled={busy}
+        loading={busy}
       >
         {busy ? "Starting checkout…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
       </Button>

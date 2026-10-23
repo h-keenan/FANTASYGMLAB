@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { BRAND_NAME as PRODUCT_NAME } from "@/lib/brand";
 import { Button } from "@/components/Button";
+import { Input } from "@/components/Input";
 
 /**
  * Ports modules/age_gate.py's web COPPA gate: a neutral date-of-birth
@@ -82,29 +83,29 @@ export function AgeGate({ onConfirmed }: { onConfirmed: () => void }) {
         You must be at least {MINIMUM_AGE} to use {PRODUCT_NAME}. Enter your date of birth — it is not stored.
       </p>
       <div className="flex gap-2">
-        <input
+        <Input
           aria-label="Birth month"
           placeholder="MM"
           maxLength={2}
           value={month}
           onChange={(event) => setMonth(event.target.value.replace(/\D/g, ""))}
-          className="glass-input w-16 px-2 py-2 text-center" style={{ color: "var(--color-text-primary)" }}
+          className="w-16 px-2 text-center"
         />
-        <input
+        <Input
           aria-label="Birth day"
           placeholder="DD"
           maxLength={2}
           value={day}
           onChange={(event) => setDay(event.target.value.replace(/\D/g, ""))}
-          className="glass-input w-16 px-2 py-2 text-center" style={{ color: "var(--color-text-primary)" }}
+          className="w-16 px-2 text-center"
         />
-        <input
+        <Input
           aria-label="Birth year"
           placeholder="YYYY"
           maxLength={4}
           value={year}
           onChange={(event) => setYear(event.target.value.replace(/\D/g, ""))}
-          className="glass-input w-20 px-2 py-2 text-center" style={{ color: "var(--color-text-primary)" }}
+          className="w-20 px-2 text-center"
         />
       </div>
       {error ? (

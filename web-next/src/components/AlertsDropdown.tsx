@@ -146,7 +146,7 @@ export function AlertsBell({
           <div
             data-testid="alerts-backdrop"
             className="absolute inset-0"
-            style={{ background: "var(--scrim, rgba(0,0,0,0.5))" }}
+            style={{ background: "var(--color-scrim)" }}
             onClick={close}
           />
           <div

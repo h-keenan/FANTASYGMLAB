@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
 import { Button } from "@/components/Button";
+import { Input } from "@/components/Input";
 
 /**
  * Ports modules/account_ui.py's render_mobile_auth_entry sign-in/create-
@@ -205,14 +206,12 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           </div>
           <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Email
-            <input
+            <Input
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="glass-input px-3 py-2.5"
-              style={{ color: "var(--color-text-primary)" }}
             />
           </label>
           {error ? (
@@ -303,15 +302,13 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Password
-            <input
+            <Input
               type="password"
               required
               autoFocus
               minLength={6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="glass-input px-3 py-2.5"
-              style={{ color: "var(--color-text-primary)" }}
             />
           </label>
 
@@ -322,7 +319,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           ) : null}
           <Button
             type="submit"
-            disabled={busy}
+            loading={busy}
           >
             {busy ? "Continuing…" : "Continue"}
           </Button>

@@ -11,6 +11,7 @@ import { EspnImportForm } from "@/components/EspnImportForm";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { PillRow } from "@/components/PillRow";
 import { Button } from "@/components/Button";
+import { Input } from "@/components/Input";
 
 /**
  * Ports app.py's guest Sleeper-username import (load_leagues_for_username /
@@ -287,12 +288,10 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       </div>
       <label className="flex flex-col gap-1 text-sm">
         Sleeper username
-        <input
+        <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
           placeholder="Sleeper username"
-          className="glass-input px-3 py-2"
-          style={{ color: "var(--color-text-primary)" }}
         />
       </label>
       {message ? (
@@ -317,7 +316,7 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       ) : null}
       <Button
         type="submit"
-        disabled={status === "loading"}
+        loading={status === "loading"}
       >
         {status === "loading" ? "Loading leagues from Sleeper…" : "Load my leagues"}
       </Button>

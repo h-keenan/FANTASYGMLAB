@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { api, type GuessThePlayerLeaderboardEntry, type GuessThePlayerLeaderboardResponse } from "@/lib/api";
 import { ToneBadge } from "@/components/ToneBadge";
+import { EmptyState } from "@/components/EmptyState";
 
 /**
  * League-scoped leaderboard across both Guess the Player mini-games' real,
@@ -145,9 +146,7 @@ export function GuessThePlayerLeaderboardContent({ leagueId }: { leagueId: strin
           The leaderboard isn&apos;t available right now. Check back later.
         </p>
       ) : entries.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Nobody else in this league has a FantasyDesk account yet. Invite your leaguemates to start a leaderboard.
-        </p>
+        <EmptyState title="Nobody else in this league has a FantasyDesk account yet. Invite your leaguemates to start a leaderboard." />
       ) : (
         <div className="flex flex-col" data-testid="guess-the-player-leaderboard-entries">
           {entries.map((entry) => (

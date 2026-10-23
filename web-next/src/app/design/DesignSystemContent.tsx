@@ -6,6 +6,9 @@ import { AlertRow } from "@/components/AlertsContent";
 import { Button, ButtonLink } from "@/components/Button";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { EmptyState } from "@/components/EmptyState";
+import { Input, Select } from "@/components/Input";
+import { SkeletonBlock, SkeletonCard, SkeletonRows } from "@/components/Skeleton";
+import { Toggle } from "@/components/Toggle";
 import { ErrorState } from "@/components/ErrorState";
 import { LeagueSwitcherButton } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
@@ -471,7 +474,7 @@ export function DesignSystemContent() {
 
       {/* 2. BUTTONS */}
       <Family id="buttons" title="Buttons" note="One Button/ButtonLink. Primary is dark ink on cyan; never white on cyan.">
-        <Spec name="Button" path="web-next/src/components/Button.tsx" note="variant primary | secondary | ghost; size sm | md; fullWidth.">
+        <Spec name="Button" path="web-next/src/components/Button.tsx" note="variant primary | secondary | ghost | danger | dangerOutline; size sm | md; fullWidth; loading.">
           <div className="grid grid-cols-2 gap-3">
             <Variant label="Primary">
               <Button>Analyze trade</Button>
@@ -482,13 +485,11 @@ export function DesignSystemContent() {
             <Variant label="Ghost">
               <Button variant="ghost">View all</Button>
             </Variant>
-            <Variant label="Danger (no variant exists)">
-              <Button
-                variant="secondary"
-                style={{ color: "var(--color-danger)", borderColor: "var(--color-danger)" }}
-              >
-                Remove league
-              </Button>
+            <Variant label="Danger">
+              <Button variant="danger">Delete account</Button>
+            </Variant>
+            <Variant label="Danger outline">
+              <Button variant="dangerOutline">Remove league</Button>
             </Variant>
             <Variant label="Disabled primary">
               <Button disabled>Analyze trade</Button>
@@ -498,8 +499,8 @@ export function DesignSystemContent() {
                 Cancel
               </Button>
             </Variant>
-            <Variant label="Loading (web has no loading prop)">
-              <Button disabled>Working…</Button>
+            <Variant label="Loading">
+              <Button loading>Working…</Button>
             </Variant>
             <Variant label="Size sm">
               <Button size="sm">Retry</Button>
@@ -702,9 +703,9 @@ export function DesignSystemContent() {
           <div className="glass-surface p-4 text-sm">Plain glass surface</div>
         </Spec>
         <Spec
-          name="PremiumUpsellCard vs AccentCard"
-          path="components/PremiumUpsellCard.tsx | components/AccentCard.tsx"
-          duplicate="PremiumUpsellCard hand-rolls a square gold-bordered box (action-soft fill) instead of a glass AccentCard; mobile PremiumLock is a separate look again."
+          name="PremiumUpsellCard (locked card)"
+          path="components/PremiumUpsellCard.tsx (AccentCard, premium edge)"
+          note="Mobile PremiumLock is the same card."
         >
           <PremiumUpsellCard
             bare
@@ -715,9 +716,9 @@ export function DesignSystemContent() {
           />
         </Spec>
         <Spec
-          name="EmptyState vs ErrorState vs bare muted text"
+          name="EmptyState and ErrorState"
           path="components/EmptyState.tsx | components/ErrorState.tsx"
-          duplicate="EmptyState is a left-aligned glass card; ErrorState is a centered full-page <main> with a bare red line; mobile EmptyState/ErrorState use centered icon circles. Several pages still use a bare muted <p>."
+          note="Same card shell: title, one-line reason, next-step button."
         >
           <EmptyState title="No trade ideas yet" subtitle="Check back after the next value refresh." actionLabel="Refresh" onAction={noop} />
         </Spec>
@@ -861,19 +862,8 @@ export function DesignSystemContent() {
             </div>
           </div>
         </Spec>
-        <Spec
-          name="Modal backdrop: --color-scrim vs .pqv-backdrop"
-          path="globals.css (--color-scrim 0.6 | .pqv-backdrop rgba(5,6,7,0.72))"
-          duplicate="Owner decision 11 says one backdrop (--color-scrim). The PQV backdrop still hard-codes a darker 0.72 value."
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <Variant label="--color-scrim (0.6)">
-              <div style={{ height: 80, background: "var(--color-scrim)", border: "var(--border-width-default) solid var(--color-border)" }} />
-            </Variant>
-            <Variant label=".pqv-backdrop (0.72)">
-              <div className="pqv-backdrop" style={{ position: "relative", inset: "auto", height: 80, padding: 0, zIndex: 0 }} />
-            </Variant>
-          </div>
+        <Spec name="Modal backdrop" path="globals.css (--color-scrim, used by .pqv-backdrop and every dialog)" note="One darkness for every sheet and dialog.">
+          <div style={{ height: 80, background: "var(--color-scrim)", border: "var(--border-width-default) solid var(--color-border)" }} />
         </Spec>
         <Spec name="SheetHandle" path="web-next/src/components/SheetHandle.tsx" note="Grab bar, touch devices only (hidden on fine pointers).">
           <div className="pqv-modal" style={{ width: "100%", minHeight: 40 }}>
@@ -883,27 +873,27 @@ export function DesignSystemContent() {
       </Family>
 
       {/* 9. FORMS */}
-      <Family id="forms" title="Forms" note="Inputs use .glass-input with --radius-control; there is no shared Input/Toggle component yet.">
-        <Spec name=".glass-input text input" path="web-next/src/app/globals.css (.glass-input)" note="Used by SignInForm and import forms; inputs are hand-assembled per form.">
-          <input className="glass-input px-3 text-sm" style={{ minHeight: "var(--control-min-height)" }} placeholder="Sleeper username" aria-label="Sample input" />
-          <input className="glass-input px-3 text-sm" style={{ minHeight: "var(--control-min-height)", borderColor: "var(--color-danger)" }} defaultValue="bad value" aria-label="Sample error input" />
-          <select className="glass-input px-3 text-sm" style={{ minHeight: "var(--control-min-height)" }} aria-label="Sample select" defaultValue="a">
+      <Family id="forms" title="Forms" note="Shared Input, Select and Toggle: radius-control, glass-input look, 44px, focus ring.">
+        <Spec name="Input / Select" path="web-next/src/components/Input.tsx" note="invalid swaps the border to the danger lane.">
+          <Input placeholder="Sleeper username" aria-label="Sample input" />
+          <Input invalid defaultValue="bad value" aria-label="Sample error input" />
+          <Select aria-label="Sample select" defaultValue="a">
             <option value="a">Sample select</option>
             <option value="b">Option B</option>
-          </select>
+          </Select>
         </Spec>
         <Spec name="Segmented control" path="web-next/src/components/PillRow.tsx" note="PillRow is the only segmented control.">
           <PillRow options={pillOptions} active={segment} onSelect={setSegment} />
         </Spec>
-        <Spec
-          name="Toggle / switch"
-          path="none shared (inline in ShareToCommunityToggle.tsx and settings forms)"
-          duplicate="No shared Toggle component on web; each form hand-rolls a checkbox. Mobile uses the native Switch."
-        >
-          <label className="flex items-center gap-3 text-sm" style={{ minHeight: "var(--touch-target-min)" }}>
-            <input type="checkbox" checked={toggleOn} onChange={() => setToggleOn((v) => !v)} />
-            Share to community
-          </label>
+        <Spec name="Toggle" path="web-next/src/components/Toggle.tsx" note="role=switch; optional state word; danger tone for opt-outs.">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span>Share to community</span>
+            <Toggle label="Share to community" checked={toggleOn} onChange={setToggleOn} />
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span>Community feed</span>
+            <Toggle tone="danger" checked={!toggleOn} onChange={(next) => setToggleOn(!next)} stateLabel={toggleOn ? "Opted in" : "Opted out"} />
+          </div>
         </Spec>
       </Family>
 
@@ -914,9 +904,18 @@ export function DesignSystemContent() {
             <LoadingScreen status="Loading league…" />
           </div>
         </Spec>
-        <Spec name="Skeletons" path="components/PlayerQuickView.tsx (PqvBodySkeleton) | components/TradeHubFilters.tsx (TradeHubSkeleton)" duplicate="Skeletons are written per layout (.pqv-skeleton-line reused, shapes re-declared in each). Mobile has SkeletonBlock/SkeletonCard/SkeletonRows.">
+        <Spec name="Skeletons" path="components/Skeleton.tsx (SkeletonBlock, SkeletonCard, SkeletonRows)" note="Every per-layout skeleton is composed from these.">
+          <Variant label="SkeletonBlock">
+            <SkeletonBlock height={48} />
+          </Variant>
+          <Variant label="SkeletonCard">
+            <SkeletonCard />
+          </Variant>
+          <Variant label="SkeletonRows">
+            <SkeletonRows count={3} />
+          </Variant>
           <Variant label="PqvBodySkeleton">
-            <div className="glass-surface p-3">
+            <div className="glass-surface p-3" style={{ maxHeight: 240, overflow: "hidden" }}>
               <PqvBodySkeleton />
             </div>
           </Variant>
@@ -927,7 +926,7 @@ export function DesignSystemContent() {
           </Variant>
         </Spec>
         <Spec name="ErrorState" path="web-next/src/components/ErrorState.tsx" note="Message + Try again button.">
-          <div className="glass-surface flex" style={{ minHeight: 160 }}>
+          <div className="flex" style={{ minHeight: 160 }}>
             <ErrorState message="We could not load your league." onRetry={noop} />
           </div>
         </Spec>

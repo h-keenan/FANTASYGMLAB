@@ -26,7 +26,8 @@ describe("/design reference page", () => {
     for (const id of ["typography", "buttons", "badges", "rows", "cards", "tiles", "headers", "sheets", "forms", "states"]) {
       expect(screen.getByTestId(`family-${id}`)).toBeTruthy();
     }
-    expect(screen.getAllByText("Duplicate").length).toBeGreaterThan(3);
+    // Every family was consolidated (2026-10-23): no DUPLICATE flags should remain.
+    expect(screen.queryAllByText("Duplicate")).toHaveLength(0);
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });

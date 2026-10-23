@@ -13,6 +13,7 @@ import { PlayerRow } from "@/components/PlayerRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { StatStrip } from "@/components/StatStrip";
 import { ValueStat } from "@/components/ValueStat";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 type SortKey = "leagues" | "value";
 
@@ -143,18 +144,9 @@ export function PortfolioExposureView({ lens = "Dynasty" }: { lens?: string }) {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
         <span className="sr-only">Loading exposure…</span>
-        <span
-          className="pqv-skeleton-line"
-          style={{ width: "100%", height: 56 }}
-        />
-        <span
-          className="pqv-skeleton-line"
-          style={{ width: "85%", height: 40 }}
-        />
-        <span
-          className="pqv-skeleton-line"
-          style={{ width: "70%", height: 40 }}
-        />
+        <SkeletonBlock width="100%" height={56} />
+        <SkeletonBlock width="85%" height={40} />
+        <SkeletonBlock width="70%" height={40} />
       </div>
     );
   }
