@@ -29,6 +29,7 @@ export function SnapshotTile({
   glyph,
   wrapNote = false,
   compact = false,
+  reserveLabelLines = false,
 }: {
   label: string;
   value: string;
@@ -50,6 +51,9 @@ export function SnapshotTile({
   wrapNote?: boolean;
   /** Equal-column strip form: no min width, tighter padding, smaller value. */
   compact?: boolean;
+  /** Reserves two label lines so wrapped labels (Power Rank) and one-line
+   * ones (Record) keep their values on the same line across a 4-up strip. */
+  reserveLabelLines?: boolean;
 }) {
   const toneColor =
     tone === "risk"
@@ -66,7 +70,7 @@ export function SnapshotTile({
       style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
     >
       <span
-        className={compact ? "flex items-start gap-1 text-[0.6875rem] leading-tight min-h-[2.125rem]" : "flex items-center gap-1 text-xs"}
+        className={compact ? "flex items-start gap-1 text-[0.6875rem] leading-tight" + (reserveLabelLines ? " min-h-[2.125rem]" : "") : "flex items-center gap-1 text-xs"}
         style={{ color: "var(--color-text-muted)" }}
       >
         {glyph ? (
