@@ -9,7 +9,54 @@
  * (e.g. Trade Hub's "Did this trade happen?" prompt) and show "Copied!".
  */
 
-export type ShareOutcome = "shared-image" | "shared-text" | "copied" | "cancelled" | "failed";
+export type ShareOutcome =
+  | "shared-image"
+  | "shared-text"
+  | "copied"
+  | "copied-image"
+  | "saved-image"
+  | "cancelled"
+  | "failed";
+
+/** True for any outcome where the user actually got something to share. */
+export function isCompletedShare(outcome: ShareOutcome): boolean {
+  return outcome !== "cancelled" && outcome !== "failed";
+}
+
+/** Desktop fallback 1: put the PNG itself on the clipboard. */
+async function copyImage(blob: Blob): Promise<boolean> {
+  try {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.clipboard ||
+      typeof navigator.clipboard.write !== "function" ||
+      typeof ClipboardItem === "undefined"
+    ) {
+      return false;
+    }
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Desktop fallback 2: download the PNG through a temporary anchor. */
+function saveImage(blob: Blob, filename: string): boolean {
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function shareTextOnly(text: string, title: string): Promise<ShareOutcome> {
   if (typeof navigator !== "undefined" && navigator.share) {
@@ -48,25 +95,41 @@ export async function shareImageOrText({
     typeof navigator.share === "function" &&
     typeof navigator.canShare === "function";
 
-  if (filesCapable && fetchImage) {
+  if (fetchImage) {
     onPreparingImage?.(true);
+    let blob: Blob | null = null;
     try {
-      const blob = await fetchImage();
-      const file = new File([blob], filename, { type: "image/png" });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text, title });
-        onPreparingImage?.(false);
-        return "shared-image";
+      blob = await fetchImage();
+    } catch {
+      // The PNG fetch failed (network, a stale id's 404): text fallback.
+    }
+    if (blob) {
+      try {
+        if (filesCapable) {
+          const file = new File([blob], filename, { type: "image/png" });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], text, title });
+            onPreparingImage?.(false);
+            return "shared-image";
+          }
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          // The user closed the share sheet on purpose.
+          onPreparingImage?.(false);
+          return "cancelled";
+        }
+        // The platform rejected the file: fall through to copy/save.
       }
-      // Text works here but this file was rejected: use the text path.
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        // The user closed the share sheet on purpose.
+      // No Files-capable share (typically desktop): still give them the PNG.
+      if (await copyImage(blob)) {
         onPreparingImage?.(false);
-        return "cancelled";
+        return "copied-image";
       }
-      // The PNG fetch failed (network, a stale id's 404) or the platform
-      // rejected the file: fall back to the text share.
+      if (saveImage(blob, filename)) {
+        onPreparingImage?.(false);
+        return "saved-image";
+      }
     }
     onPreparingImage?.(false);
   }

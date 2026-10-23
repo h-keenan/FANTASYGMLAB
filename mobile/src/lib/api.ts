@@ -208,14 +208,26 @@ export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
-  league?: { league_key: string; espn_league_id: string; season: string; name: string; team_count: number };
+  platform?: 'fleaflicker' | 'mfl';
+  platform_label?: string;
+  league?: {
+    league_key: string;
+    espn_league_id?: string;
+    external_league_id?: string;
+    season: string;
+    name: string;
+    team_count: number;
+  };
   teams?: EspnLeagueTeam[];
   diagnostics?: {
     teams_found: number;
-    total_espn_players_seen: number;
+    total_espn_players_seen?: number;
+    total_players_seen?: number;
     canonical_matched_count: number;
     unmatched_count: number;
     matched_rate: number;
+    /** Players with no confident match; left off the roster, never guessed. */
+    unmapped_players?: Array<{ name: string; position: string; team: string; fantasy_team: string; reason: string }>;
   };
   features?: Array<{ feature: string; status: 'available' | 'not_available'; note: string }>;
 }
@@ -1959,8 +1971,34 @@ export interface DashboardEntitlementInfo extends EntitlementGateInfo {
   hidden_count: number;
 }
 
+/** One row of the Dashboard's "This week" strip (modules/this_week.py). */
+export interface ThisWeekRow {
+  key: 'lineup' | 'waiver' | 'trade';
+  status: string;
+  tone: 'positive' | 'risk' | 'waiver' | 'trade' | 'neutral';
+  headline: string;
+  why: string;
+  cta_label: string | null;
+  route: 'matchup' | 'waivers' | 'trade_hub' | null;
+  player_id: string;
+}
+
+export interface ThisWeek {
+  mode: 'in_season' | 'next_action';
+  week: number | null;
+  rows: ThisWeekRow[];
+  next_action: {
+    headline: string;
+    why: string;
+    cta_label: string;
+    route: 'draft_center' | 'live_draft' | 'trade_hub' | 'connect_league';
+  } | null;
+}
+
 export interface DashboardResponse {
   ok: true;
+  /** Additive; absent on older servers, null when there is nothing real to show. */
+  this_week?: ThisWeek | null;
   items: DashboardItem[];
   quiet: boolean;
   quiet_reason?: string;
@@ -2374,6 +2412,15 @@ export interface TradeHubEntitlement {
   ad_unlocks_applied: number;
 }
 
+export interface TradeHubHold {
+  verdict: 'hold';
+  reason: string;
+  headline: string;
+  why: { factor: string; text: string }[];
+  /** True when ideas below are still worth a look, but optional. */
+  ideas_optional: boolean;
+}
+
 export interface TradeHubResponse {
   ok: true;
   ideas: TradeIdea[];
@@ -2382,6 +2429,8 @@ export interface TradeHubResponse {
   /** reason === 'trade_deadline_passed' carries this user-facing copy. */
   message?: string;
   trade_window?: TradeWindow;
+  hold?: TradeHubHold | null;
+  posture_sentence?: string;
 }
 
 export interface AllTradesEntitlement {
@@ -2683,6 +2732,8 @@ export const api = {
     authorizedFetch<import('./leagueWarmup').WarmupStatus>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/warmup-status`,
     ),
+  previewImportedLeague: (platform: 'fleaflicker' | 'mfl', leagueId: string, season: number) =>
+    authorizedPost<EspnLeaguePreviewResponse>('/v1/import/preview', { platform, league_id: leagueId, season }),
   previewEspnLeague: (leagueId: string, season: number) =>
     authorizedPost<EspnLeaguePreviewResponse>('/v1/espn/leagues/preview', { league_id: leagueId, season }),
   getGmTargets: (leagueId: string) =>

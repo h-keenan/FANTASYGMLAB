@@ -38,9 +38,14 @@ Unknown event names and non-allowlisted props are silently dropped server-side, 
 | Share cards | none | `share_card shared` (player, trade idea) | none | `share_card shared` (trade) |
 | Alerts dropdown | none | `alerts_dropdown opened` | n/a | screen view only |
 | "Did this trade happen?" | none | `trade_outcome_prompt shown/answered/dismissed` | none | `answered` |
+| Onboarding funnel | page_view only | `feature_use onboarding step_viewed/back/skipped/experience_selected/completed` (carousel + paywall step) | none | same from `OnboardingScreen` (dark until analytics enabled) |
 | Waivers | `waivers_opened` | same | none | screen view |
 | Errors | console only | `application_error` (error boundary), `route_error` (shared `ErrorState`), `provider_error` (5xx / network failures in `lib/api.ts`); max 5/min/tab, de-duplicated | none | none (recommendation) |
 | Founder dashboard | feature adoption, decision engagement, funnel | + platform split and `feature_use` table (platform + free/pro columns) | n/a | n/a |
+
+## Onboarding funnel
+
+`feature_use` with `feature=onboarding`. Actions: `step_viewed` (once per step per session, deduped client-side), `back`, `skipped`, `experience_selected`, `completed`. Props (all fixed ids, added to `ALLOWED_PROP_KEYS`): `step` (`gameplan`, `tradehub`, `matchup`, `planner`, `pqv`, `playoff`, `tendencies`, `waivers`, `connect`, `level`, web-only `paywall`), `step_index`, `experience` (`new` = beginner, `expert` = advanced). `connect_started` is not emitted: the Connect step is informational (the actual Sleeper/ESPN connect is already `league_connect`). The founder page shows an "Onboarding funnel" section (users per step, drop-off vs previous step, skip rate, experience split, completion rate) from `founder_analytics._onboarding_funnel`; it is omitted entirely when no onboarding events are stored. Users are distinct account/anon ids; rates are among users who viewed at least one step.
 
 ## Gaps remaining
 

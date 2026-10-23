@@ -1,0 +1,72 @@
+{
+ "divisions": [
+  {
+   "id": 606681,
+   "name": "JDL North",
+   "teams": [
+    {
+     "id": 1371776,
+     "name": "Winter Hill Black Shamrocks",
+     "recordOverall": {
+      "wins": 5,
+      "losses": 8,
+      "winPercentage": {
+       "value": 0.3846154,
+       "formatted": ".385"
+      },
+      "rank": 11,
+      "formatted": "5-8"
+     },
+     "pointsFor": {
+      "value": 1379.9,
+      "formatted": "1,379.9"
+     },
+     "pointsAgainst": {
+      "value": 1503.94,
+      "formatted": "1,503.94"
+     },
+     "owners": [
+      {
+       "id": 894210,
+       "displayName": "Mitchw124"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 606684,
+   "name": "JDL West",
+   "teams": [
+    {
+     "id": 1373393,
+     "name": "Philadelphia Fire",
+     "recordOverall": {
+      "wins": 11,
+      "losses": 2,
+      "winPercentage": {
+       "value": 0.84615386,
+       "formatted": ".846"
+      },
+      "rank": 1,
+      "formatted": "11-2"
+     },
+     "pointsFor": {
+      "value": 2063.12,
+      "formatted": "2,063.12"
+     },
+     "pointsAgainst": {
+      "value": 1513.62,
+      "formatted": "1,513.62"
+     },
+     "owners": []
+    }
+   ]
+  }
+ ],
+ "season": 2025,
+ "league": {
+  "id": 206154,
+  "name": "Jackpot Dynasty League"
+ }
+}

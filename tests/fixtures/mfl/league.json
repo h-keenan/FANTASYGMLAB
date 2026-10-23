@@ -1,0 +1,67 @@
+{
+ "league": {
+  "id": "10015",
+  "name": "Dynasty Pioneer",
+  "starters": {
+   "position": [
+    {
+     "limit": "1",
+     "name": "QB"
+    },
+    {
+     "name": "RB",
+     "limit": "1-3"
+    },
+    {
+     "limit": "2-4",
+     "name": "WR"
+    },
+    {
+     "name": "TE",
+     "limit": "1-3"
+    },
+    {
+     "limit": "1",
+     "name": "PK"
+    },
+    {
+     "limit": "1-2",
+     "name": "DT"
+    },
+    {
+     "name": "DE",
+     "limit": "2"
+    },
+    {
+     "limit": "3-4",
+     "name": "LB"
+    },
+    {
+     "name": "CB",
+     "limit": "2"
+    },
+    {
+     "name": "S",
+     "limit": "2"
+    }
+   ],
+   "idp_starters": "11",
+   "count": "19"
+  },
+  "injuredReserve": "6",
+  "rosterSize": "45",
+  "franchises": {
+   "count": "2",
+   "franchise": [
+    {
+     "id": "0001",
+     "name": "Egbuka Me Crazy"
+    },
+    {
+     "id": "0002",
+     "name": "Danny Dime Less"
+    }
+   ]
+  }
+ }
+}

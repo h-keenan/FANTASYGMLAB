@@ -1,13 +1,23 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { espnRouteSupported, isEspnLeagueId, leagueHomeRoute } from './leaguePlatform.ts';
+import { espnRouteSupported, importedPlatformLabel, isEspnLeagueId, leagueHomeRoute, notAvailableMessage } from './leaguePlatform.ts';
 import { glanceEspnNote, glanceFailedNote } from './leaguesGlance.ts';
 
 test('recognises ESPN league ids by their prefix', () => {
   assert.equal(isEspnLeagueId('espn:42654852:2026'), true);
   assert.equal(isEspnLeagueId('1180112345678901234'), false);
   assert.equal(isEspnLeagueId(undefined), false);
+});
+
+test('Fleaflicker and MFL leagues are imported leagues with their own label', () => {
+  assert.equal(isEspnLeagueId('fleaflicker:206154:2025'), true);
+  assert.equal(isEspnLeagueId('mfl:10015:2025'), true);
+  assert.equal(isEspnLeagueId('yahoo:1:2025'), false);
+  assert.equal(importedPlatformLabel('mfl:10015:2025'), 'MFL');
+  assert.equal(notAvailableMessage('fleaflicker:206154:2025'), 'Not available for Fleaflicker leagues yet.');
+  assert.equal(notAvailableMessage('espn:1:2026'), 'Not available for ESPN leagues yet.');
+  assert.equal(leagueHomeRoute('mfl:10015:2025'), 'MyTeam');
 });
 
 test('ESPN leagues open My Team, Sleeper leagues open Dashboard', () => {

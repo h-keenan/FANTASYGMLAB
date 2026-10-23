@@ -1,0 +1,212 @@
+{
+ "rosters": [
+  {
+   "team": {
+    "id": 1371776,
+    "name": "Winter Hill Black Shamrocks",
+    "recordOverall": {
+     "wins": 5,
+     "losses": 8,
+     "winPercentage": {
+      "value": 0.3846154,
+      "formatted": ".385"
+     },
+     "rank": 11,
+     "formatted": "5-8"
+    },
+    "pointsFor": {
+     "value": 1379.9,
+     "formatted": "1,379.9"
+    },
+    "pointsAgainst": {
+     "value": 1503.94,
+     "formatted": "1,503.94"
+    }
+   },
+   "players": [
+    {
+     "proPlayer": {
+      "id": 8512,
+      "nameFull": "Lamar Miller",
+      "proTeamAbbreviation": "FA",
+      "position": "RB",
+      "nameFirst": "Lamar",
+      "nameLast": "Miller"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 14759,
+      "nameFull": "Tony Pollard",
+      "proTeamAbbreviation": "TEN",
+      "position": "RB",
+      "nameFirst": "Tony",
+      "nameLast": "Pollard"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 11177,
+      "nameFull": "Amari Cooper",
+      "proTeamAbbreviation": "FA",
+      "position": "WR",
+      "nameFirst": "Amari",
+      "nameLast": "Cooper"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 15528,
+      "nameFull": "Jalen Reagor",
+      "proTeamAbbreviation": "MIA",
+      "position": "WR",
+      "nameFirst": "Jalen",
+      "nameLast": "Reagor"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 14677,
+      "nameFull": "T.J. Hockenson",
+      "proTeamAbbreviation": "MIN",
+      "position": "TE",
+      "nameFirst": "T.J.",
+      "nameLast": "Hockenson"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 10405,
+      "nameFull": "Avery Williamson",
+      "proTeamAbbreviation": "FA",
+      "position": "LB",
+      "nameFirst": "Avery",
+      "nameLast": "Williamson"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 3356,
+      "nameFull": "Alex Smith",
+      "proTeamAbbreviation": "FA",
+      "position": "QB",
+      "nameFirst": "Alex",
+      "nameLast": "Smith"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 99999999,
+      "nameFull": "Zzyzx Unmappable",
+      "proTeamAbbreviation": "FA",
+      "position": "WR"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 1,
+      "nameFull": "Some Punter",
+      "proTeamAbbreviation": "DEN",
+      "position": "P"
+     }
+    }
+   ]
+  },
+  {
+   "team": {
+    "id": 1373393,
+    "name": "Philadelphia Fire",
+    "recordOverall": {
+     "wins": 11,
+     "losses": 2,
+     "winPercentage": {
+      "value": 0.84615386,
+      "formatted": ".846"
+     },
+     "rank": 1,
+     "formatted": "11-2"
+    },
+    "pointsFor": {
+     "value": 2063.12,
+     "formatted": "2,063.12"
+    },
+    "pointsAgainst": {
+     "value": 1513.62,
+     "formatted": "1,513.62"
+    }
+   },
+   "players": [
+    {
+     "proPlayer": {
+      "id": 8598,
+      "nameFull": "Russell Wilson",
+      "proTeamAbbreviation": "FA",
+      "position": "QB",
+      "nameFirst": "Russell",
+      "nameLast": "Wilson"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 11373,
+      "nameFull": "Mike Davis",
+      "proTeamAbbreviation": "FA",
+      "position": "RB",
+      "nameFirst": "Mike",
+      "nameLast": "Davis"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 12929,
+      "nameFull": "Dalvin Cook",
+      "proTeamAbbreviation": "FA",
+      "position": "RB",
+      "nameFirst": "Dalvin",
+      "nameLast": "Cook"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 11242,
+      "nameFull": "Tyler Lockett",
+      "proTeamAbbreviation": "FA",
+      "position": "WR",
+      "nameFirst": "Tyler",
+      "nameLast": "Lockett"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 12197,
+      "nameFull": "Tyreek Hill",
+      "proTeamAbbreviation": "FA",
+      "position": "WR",
+      "nameFirst": "Tyreek",
+      "nameLast": "Hill"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 6611,
+      "nameFull": "Rob Gronkowski",
+      "proTeamAbbreviation": "FA",
+      "position": "TE",
+      "nameFirst": "Rob",
+      "nameLast": "Gronkowski"
+     }
+    },
+    {
+     "proPlayer": {
+      "id": 10288,
+      "nameFull": "Christian Kirksey",
+      "proTeamAbbreviation": "FA",
+      "position": "LB",
+      "nameFirst": "Christian",
+      "nameLast": "Kirksey"
+     }
+    }
+   ]
+  }
+ ]
+}

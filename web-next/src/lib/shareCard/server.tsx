@@ -19,7 +19,7 @@ import { valuationLensLabel } from "@/lib/valuationLens";
 
 import { OG_SIZE, SHARE_FONT_FAMILY, STORY_SIZE, ShareBackdrop, type ShareBrandAssets } from "./frame";
 import { PlayerShareCard } from "./playerCard";
-import { TradeShareCard } from "./tradeCard";
+import { TradeShareCard, type TradePitch } from "./tradeCard";
 
 export type ShareFormat = "story" | "og";
 
@@ -200,6 +200,8 @@ export interface TradeCardOptions {
   /** The signed-in manager's own team (name + Sleeper avatar URL), when known. */
   myTeamName?: string | null;
   myAvatarUrl?: string | null;
+  /** Trade Analyzer card: pitch to the partner instead of a verdict. */
+  pitch?: TradePitch;
 }
 
 export async function renderTradeCardPng(idea: TradeIdea, lens: string, options: TradeCardOptions = {}): Promise<ArrayBuffer> {
@@ -221,6 +223,7 @@ export async function renderTradeCardPng(idea: TradeIdea, lens: string, options:
       images={{ headshots, partnerAvatar, myAvatar }}
       lens={valuationLensLabel(lens)}
       myTeamName={options.myTeamName}
+      pitch={options.pitch}
       {...shareSize(format)}
     />,
     format,
@@ -267,11 +270,25 @@ function apiBaseUrl(): string {
 /** GET an API path as the signed-in caller (their own bearer token, passed
  * through unchanged), so the card can only ever show data that user's own
  * session can already see. */
-export async function fetchUpstreamJson<T>(path: string, authorization: string): Promise<T> {
+export async function fetchUpstreamJson<T>(
+  path: string,
+  authorization: string,
+  init: { method?: "GET" | "POST"; jsonBody?: unknown; shareCardToken?: boolean } = {},
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl()}${path}`, {
-      headers: { Authorization: authorization },
+      method: init.method ?? "GET",
+      headers: {
+        Authorization: authorization,
+        ...(init.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
+        // Server-to-server only (never sent to browsers): lets the analyzer
+        // skip the free-tier quota for a share of an already-run analysis.
+        ...(init.shareCardToken && process.env.SHARE_CARD_INTERNAL_SECRET
+          ? { "X-Share-Card-Token": process.env.SHARE_CARD_INTERNAL_SECRET }
+          : {}),
+      },
+      body: init.jsonBody !== undefined ? JSON.stringify(init.jsonBody) : undefined,
       signal: AbortSignal.timeout(30_000),
       cache: "no-store",
     });

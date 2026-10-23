@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SleeperImportForm } from "./SleeperImportForm";
 import { useAuth } from "@/context/AuthContext";
+import { trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
 
 vi.mock("@/context/AuthContext", () => ({
@@ -11,6 +12,7 @@ vi.mock("@/context/AuthContext", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
+  trackUse: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -20,6 +22,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       previewEspnLeague: vi.fn(),
+      previewImportedLeague: vi.fn(),
       saveLeague: vi.fn(),
     },
   };
@@ -110,6 +113,35 @@ describe("ESPN import in the Connect League flow", () => {
     });
   });
 
+  it("imports an MFL league through the shared form, listing players left unmatched", async () => {
+    vi.mocked(api.previewImportedLeague).mockResolvedValue({
+      ...PREVIEW,
+      platform: "mfl",
+      league: { league_key: "mfl:10015:2025", external_league_id: "10015", season: "2025", name: "Dynasty Pioneer", team_count: 2 },
+      diagnostics: {
+        teams_found: 2,
+        total_players_seen: 10,
+        canonical_matched_count: 9,
+        unmatched_count: 1,
+        matched_rate: 0.9,
+        unmapped_players: [{ name: "Zzyzx Unmappable", position: "WR", team: "", fantasy_team: "Austin Astronauts", reason: "no_unique_match" }],
+      },
+    });
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 1 });
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    fireEvent.click(screen.getByRole("button", { name: "MFL" }));
+    fireEvent.change(screen.getByLabelText(/mfl league id/i), { target: { value: "10015" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my mfl league/i }));
+
+    await waitFor(() => expect(screen.getByText("Dynasty Pioneer")).toBeInTheDocument());
+    expect(api.previewImportedLeague).toHaveBeenCalledWith("mfl", "10015", expect.any(Number));
+    expect(screen.getByText(/9 of 10 rostered players matched/i)).toBeInTheDocument();
+    expect(screen.getByText(/zzyzx unmappable \(WR\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add this league/i }));
+    await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("mfl:10015:2025", "Dynasty Pioneer"));
+  });
+
   it("shows the private-league explanation the API returns", async () => {
     vi.mocked(api.previewEspnLeague).mockResolvedValue({
       ok: false,
@@ -122,5 +154,35 @@ describe("ESPN import in the Connect League flow", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/private/i));
     expect(api.saveLeague).not.toHaveBeenCalled();
+  });
+
+  it("shows the friendly ESPN setting hint, a Retry button and emits espn_private", async () => {
+    vi.mocked(trackUse).mockClear();
+    vi.mocked(api.previewEspnLeague).mockResolvedValue({ ok: false, reason: "private_league", message: "x" });
+    openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "99887766" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Make League Viewable to Public/));
+    expect(trackUse).toHaveBeenCalledWith("league_import", "failed", { props: { result: "espn_private" } });
+    expect(JSON.stringify(vi.mocked(trackUse).mock.calls)).not.toContain("99887766");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.previewEspnLeague).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not show the private hint or Retry for a wrong id or an outage", async () => {
+    vi.mocked(trackUse).mockClear();
+    vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "league_not_found", message: "Not found." });
+    openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Not found."));
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(trackUse).toHaveBeenLastCalledWith("league_import", "failed", { props: { result: "espn_not_found" } });
+
+    vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "espn_unavailable", message: "Down." });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => expect(trackUse).toHaveBeenLastCalledWith("league_import", "failed", { props: { result: "espn_error" } }));
   });
 });

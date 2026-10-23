@@ -46,6 +46,7 @@ import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
+import ThisWeekSection from '../components/ThisWeekSection';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
@@ -435,6 +436,12 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."}
         </AppText>
+        <ThisWeekSection
+          data={dashboardData?.this_week}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+        />
       </View>
     );
   }
@@ -468,6 +475,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
 
+      <ThisWeekSection
+        data={dashboardData?.this_week}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        tradePending={Boolean(dashboardData?.trade_ideas_deferred)}
+        onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+      />
+
       <SectionHeading
         title="Today"
         right={
@@ -486,6 +501,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           <AppText style={styles.emptyText}>
             {quietReason || 'Nothing urgent right now — your roster looks steady.'}
           </AppText>
+          {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
         </View>
       ) : (
         grouped.topPriority.map((item, index) => (

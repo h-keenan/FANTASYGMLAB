@@ -31,11 +31,13 @@ import { PillRow } from "@/components/PillRow";
  * exactly, so Founder Analytics' funnel keeps the same semantics it
  * already has for the legacy surface.
  */
-type LeaguePlatform = "sleeper" | "espn";
+type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl";
 
 const PLATFORM_OPTIONS: { label: string; value: LeaguePlatform }[] = [
   { label: "Sleeper", value: "sleeper" },
   { label: "ESPN", value: "espn" },
+  { label: "Fleaflicker", value: "fleaflicker" },
+  { label: "MFL", value: "mfl" },
 ];
 
 /**
@@ -55,8 +57,9 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
         </span>
         <PillRow options={PLATFORM_OPTIONS} active={platform} onSelect={(value) => setPlatform(value as LeaguePlatform)} />
       </div>
-      {platform === "espn" ? (
-        <EspnImportForm onLeagueChosen={onLeagueChosen} />
+      {platform !== "sleeper" ? (
+        // key: switching platform resets the form (league id, preview, team pick).
+        <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
       ) : (
         <SleeperUsernameImport onLeagueChosen={onLeagueChosen} />
       )}

@@ -3,13 +3,60 @@
 import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { trackFeatureUse } from "@/lib/analytics";
+import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
-import { espnSeasonOptions } from "@/lib/leaguePlatform";
+import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
+
+export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
+
+/** Per-platform copy. Everything else about the flow is shared. */
+const PLATFORM_COPY: Record<
+  ImportPlatform,
+  { label: string; idHelp: React.ReactNode; privateNote: string; notFound: string; placeholder: string; findLabel: string }
+> = {
+  espn: {
+    label: "ESPN",
+    idHelp: (
+      <>
+        FantasyDesk can read <strong>public</strong> ESPN leagues. Your league ID is the number after <code>leagueId=</code>{" "}
+        in your ESPN league&apos;s web address.
+      </>
+    ),
+    privateNote:
+      "Private ESPN leagues aren't supported yet. Your league manager can make the league viewable to the public in ESPN's league settings.",
+    notFound: "Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.",
+    placeholder: "e.g. 12345678",
+    findLabel: "Find my ESPN league",
+  },
+  fleaflicker: {
+    label: "Fleaflicker",
+    idHelp: (
+      <>
+        Your league ID is the number after <code>/leagues/</code> in your Fleaflicker league&apos;s web address.
+      </>
+    ),
+    privateNote: "Leagues that aren't viewable to the public can't be read.",
+    notFound: "Enter your Fleaflicker league ID. It's the number after /leagues/ in your league's web address.",
+    placeholder: "e.g. 206154",
+    findLabel: "Find my Fleaflicker league",
+  },
+  mfl: {
+    label: "MFL",
+    idHelp: (
+      <>
+        Your league ID is the number at the end of your MFL league&apos;s web address, like <code>/home/12345</code>.
+      </>
+    ),
+    privateNote: "MFL leagues that need a login aren't supported yet.",
+    notFound: "Enter your MFL league ID. It's the number at the end of your league's web address.",
+    placeholder: "e.g. 10015",
+    findLabel: "Find my MFL league",
+  },
+};
 
 const SAVE_FAILURE_COPY: Record<string, string> = {
   at_cap: "Your plan's saved-league limit is reached. Upgrade to Premium to add another league.",
-  league_not_found: "ESPN didn't return that league just now. Please try again.",
+  league_not_found: "That league didn't load just now. Please try again.",
   espn_team_not_selected: "Pick which team is yours first.",
   mapping_too_low: "Too few of this league's players matched FantasyDesk's player list to value it accurately.",
 };
@@ -25,7 +72,14 @@ const SAVE_FAILURE_COPY: Record<string, string> = {
  * Private leagues would need the user's espn_s2/SWID cookies stored on our
  * server, so they're out of scope and this form never asks for them.
  */
-export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: string, leagueName: string) => void }) {
+export function EspnImportForm({
+  onLeagueChosen,
+  platform = "espn",
+}: {
+  onLeagueChosen: (leagueId: string, leagueName: string) => void;
+  platform?: ImportPlatform;
+}) {
+  const copy = PLATFORM_COPY[platform];
   const { signInAsGuest, session } = useAuth();
   const seasons = espnSeasonOptions();
   const [leagueId, setLeagueId] = useState("");
@@ -34,19 +88,21 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<EspnLeaguePreviewResponse | null>(null);
   const [rosterId, setRosterId] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     const clean = leagueId.trim();
     if (!/^\d{1,12}$/.test(clean)) {
-      setMessage("Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.");
+      setMessage(copy.notFound);
       return;
     }
     setStatus("loading");
     setMessage(null);
+    setIsPrivate(false);
     setPreview(null);
     setRosterId("");
-    trackFeatureUse("league_import_started", { props: { platform: "espn" } });
+    trackFeatureUse("league_import_started", { props: { platform } });
     try {
       if (!session) {
         const { error } = await signInAsGuest();
@@ -56,22 +112,27 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
           return;
         }
       }
-      const result = await api.previewEspnLeague(clean, season);
+      const result =
+        platform === "espn" ? await api.previewEspnLeague(clean, season) : await api.previewImportedLeague(platform, clean, season);
       setStatus("idle");
       if (!result.league) {
-        setMessage(result.message || "That ESPN league couldn't be loaded.");
-        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: result.reason || "unavailable" } });
+        const espnPrivate = platform === "espn" && result.reason === "private_league";
+        setIsPrivate(espnPrivate);
+        setMessage(espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
+        if (platform === "espn") trackUse("league_import", "failed", { props: { result: espnImportFailureResult(result.reason) } });
+        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
         return;
       }
       setPreview(result);
       if (!result.ok) {
         setMessage(result.message);
-        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: result.reason || "unavailable" } });
+        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
       }
     } catch (error) {
       setStatus("idle");
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
-      trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: "exception" } });
+      if (platform === "espn") trackUse("league_import", "failed", { props: { result: "espn_error" } });
+      trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: "exception" } });
     }
   };
 
@@ -85,16 +146,16 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       if (!result.ok) {
         setStatus("idle");
         setMessage(SAVE_FAILURE_COPY[result.reason] || "Could not save that league right now. Please try again in a moment.");
-        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: result.reason || "unavailable" } });
+        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
         return;
       }
-      trackFeatureUse("league_import_completed", { leagueId: key, props: { platform: "espn" } });
+      trackFeatureUse("league_import_completed", { leagueId: key, props: { platform } });
       setStatus("idle");
       onLeagueChosen(key, name);
     } catch (error) {
       setStatus("idle");
       setMessage(error instanceof Error ? error.message : "Could not save that league.");
-      trackFeatureUse("league_import_failed", { dedupe: false, props: { platform: "espn", reason: "exception" } });
+      trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: "exception" } });
     }
   };
 
@@ -108,14 +169,24 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
         <div className="flex flex-col gap-1">
           <h2 style={{ font: "var(--font-card-title)" }}>{preview.league.name}</h2>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            ESPN · {preview.league.season} season · {preview.league.team_count} teams
+            {copy.label} · {preview.league.season} season · {preview.league.team_count} teams
           </span>
         </div>
         {diagnostics ? (
           <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            {diagnostics.canonical_matched_count} of {diagnostics.total_espn_players_seen} rostered players matched
+            {diagnostics.canonical_matched_count} of {diagnostics.total_espn_players_seen ?? diagnostics.total_players_seen} rostered players matched
             FantasyDesk&apos;s player list ({matchedPercent}%). Team defenses (D/ST) and players we don&apos;t track yet
             aren&apos;t valued.
+          </p>
+        ) : null}
+        {diagnostics?.unmapped_players?.length ? (
+          <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            <strong>Left off rosters (no confident match):</strong>{" "}
+            {diagnostics.unmapped_players
+              .slice(0, 12)
+              .map((player) => `${player.name}${player.position ? ` (${player.position})` : ""}`)
+              .join(", ")}
+            {diagnostics.unmapped_players.length > 12 ? `, +${diagnostics.unmapped_players.length - 12} more` : ""}.
           </p>
         ) : null}
         {preview.ok ? (
@@ -123,7 +194,7 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
             <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
               Which team is yours?
             </span>
-            <div className="flex flex-col gap-2" role="radiogroup" aria-label="Your ESPN team">
+            <div className="flex flex-col gap-2" role="radiogroup" aria-label={`Your ${copy.label} team`}>
               {(preview.teams ?? []).map((team) => {
                 const selected = team.roster_id === rosterId;
                 return (
@@ -151,10 +222,10 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
         ) : null}
         <div className="glass-input flex flex-col gap-1 px-3 py-3 text-xs" style={{ color: "var(--color-text-secondary)" }}>
           <p className="m-0">
-            <strong>Works for ESPN leagues:</strong> {available.map((item) => item.feature).join(", ")}.
+            <strong>Works for {copy.label} leagues:</strong> {available.map((item) => item.feature).join(", ")}.
           </p>
           <p className="m-0">
-            <strong>Not available for ESPN leagues yet:</strong> {unavailable.map((item) => item.feature).join(", ")}.
+            <strong>Not available for {copy.label} leagues yet:</strong> {unavailable.map((item) => item.feature).join(", ")}.
           </p>
         </div>
         {message ? (
@@ -205,21 +276,15 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
           color: "var(--color-text-secondary)",
         }}
       >
-        <p className="m-0">
-          FantasyDesk can read <strong>public</strong> ESPN leagues. Your league ID is the number after{" "}
-          <code>leagueId=</code> in your ESPN league&apos;s web address.
-        </p>
-        <p className="m-0">
-          Private ESPN leagues aren&apos;t supported yet. Your league manager can make the league viewable to the public in
-          ESPN&apos;s league settings.
-        </p>
+        <p className="m-0">{copy.idHelp}</p>
+        <p className="m-0">{copy.privateNote}</p>
       </div>
       <label className="flex flex-col gap-1 text-sm">
-        ESPN league ID
+        {copy.label} league ID
         <input
           value={leagueId}
           onChange={(event) => setLeagueId(event.target.value)}
-          placeholder="e.g. 12345678"
+          placeholder={copy.placeholder}
           inputMode="numeric"
           autoComplete="off"
           className="glass-input px-3 py-2"
@@ -246,6 +311,17 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
           {message}
         </p>
       ) : null}
+      {isPrivate ? (
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={status === "loading"}
+          className="text-xs font-bold self-start"
+          style={{ color: "var(--color-accent)" }}
+        >
+          Retry
+        </button>
+      ) : null}
       <button
         type="submit"
         disabled={status === "loading"}
@@ -257,7 +333,7 @@ export function EspnImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
           opacity: status === "loading" ? "var(--opacity-disabled)" : 1,
         }}
       >
-        {status === "loading" ? "Loading league from ESPN…" : "Find my ESPN league"}
+        {status === "loading" ? `Loading league from ${copy.label}…` : copy.findLabel}
       </button>
     </form>
   );

@@ -95,26 +95,61 @@ describe("TradeHubContent", () => {
     expect(screen.getByText("3 more trade ideas available on Premium.")).toBeInTheDocument();
   });
 
-  // Logic/valuation audit, 2026-10-18: Trade Hub applies a team-strategy
-  // age-curve adjustment to player value that Waivers/Dashboard/PQV's
-  // plain valuation pipeline doesn't — nothing in the UI explained why the
-  // same player could show a different number across tabs.
-  it("names the strategy these values were generated under", () => {
-    const contender: TradeHubResponse = { ...RESPONSE, team_strategy: "fringe_contender" };
-    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={contender} />);
+  // New-user guidance audit, 2026-10: plain-English posture line replaces the
+  // "Fringe Contender strategy" jargon above the first idea.
+  it("shows a plain-English posture sentence, not the strategy jargon", () => {
+    const data: TradeHubResponse = {
+      ...RESPONSE,
+      team_strategy: "fringe_contender",
+      posture_sentence: "You're in the hunt, so ideas favor players who help soon.",
+    };
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={data} />);
 
-    expect(screen.getByText("Fringe Contender")).toBeInTheDocument();
+    expect(screen.getByText("You're in the hunt, so ideas favor players who help soon.")).toBeInTheDocument();
+    expect(screen.queryByText(/Fringe Contender/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/What does this mean/)).not.toBeInTheDocument();
   });
 
-  // coridian_, screenshot: "there's no explanation of what retool means...
-  // people's natural inclination when they don't know what something is
-  // on a phone is probably to tap it."
-  it("reveals a plain-language explanation of the strategy on tap", () => {
-    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
+  it("renders the hold verdict with its why, and labels the ideas below optional", () => {
+    const data: TradeHubResponse = {
+      ...RESPONSE,
+      hold: {
+        verdict: "hold",
+        reason: "none_clear_bar",
+        headline: "Holding is the best move right now.",
+        why: [
+          { factor: "ideas", text: "None of today's ideas is a clear win for you." },
+          { factor: "competition", text: "Your team ranks #2 of 12 for power in this league." },
+        ],
+        ideas_optional: true,
+      },
+    };
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={data} />);
 
-    expect(screen.queryByText(/middle ground/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /What does this mean\?/ }));
-    expect(screen.getByText(/middle ground/)).toBeInTheDocument();
+    expect(screen.getByText("Holding is the best move right now.")).toBeInTheDocument();
+    expect(screen.getByText(/ranks #2 of 12/)).toBeInTheDocument();
+    expect(screen.getByText("Ideas below are optional.")).toBeInTheDocument();
+    expect(screen.getByText("Rival GM")).toBeInTheDocument();
+  });
+
+  it("shows the hold card (not just a notice) when the trade deadline has passed", () => {
+    const data: TradeHubResponse = {
+      ...RESPONSE,
+      ideas: [],
+      reason: "trade_deadline_passed",
+      hold: {
+        verdict: "hold",
+        reason: "trade_deadline_passed",
+        headline: "Trading is closed. Hold.",
+        why: [{ factor: "context", text: "Your league's trade deadline was week 11." }],
+        ideas_optional: false,
+      },
+    };
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={data} />);
+
+    expect(screen.getByText("Trading is closed. Hold.")).toBeInTheDocument();
+    expect(screen.getByText(/deadline was week 11/)).toBeInTheDocument();
+    expect(screen.queryByText("Ideas below are optional.")).not.toBeInTheDocument();
   });
 
   it("shows the roster-not-ready message instead of an empty board when `reason` is set", () => {

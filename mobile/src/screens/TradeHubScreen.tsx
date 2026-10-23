@@ -20,6 +20,7 @@ import BeginnerHelp from '../components/BeginnerHelp';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
+import TradeHubHoldCard from '../components/TradeHubHoldCard';
 import TradeIdeaCard, { impactTagConfig, type ImpactTagKey } from '../components/TradeIdeaCard';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
@@ -32,6 +33,7 @@ import {
   type RankedPlayer,
   type TeamStrategy,
   type TradeHubEntitlement,
+  type TradeHubHold,
   type TradeIdea,
   type TradeVerdict,
   type ValuationLens,
@@ -106,6 +108,8 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
   const [entitlement, setEntitlement] = useState<TradeHubEntitlement | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
+  const [hold, setHold] = useState<TradeHubHold | null>(null);
+  const [postureSentence, setPostureSentence] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adUnlocks, setAdUnlocks] = useState(0);
@@ -138,6 +142,8 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
       setError(null);
       try {
         const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks, nextLens);
+        setHold(result.hold ?? null);
+        setPostureSentence(result.posture_sentence ?? '');
         if (result.reason) {
           setNotReadyReason(result.reason);
           setIdeas(null);
@@ -331,7 +337,16 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               compact
             />
           ) : null}
-          {showNotReady ? (
+          {isForYou && !activeLoading && !activeError && postureSentence ? (
+            <View style={styles.postureBlock}>
+              <AppText style={styles.postureText}>{postureSentence}</AppText>
+              <BeginnerHelp term="tradeHubPosture" />
+            </View>
+          ) : null}
+          {isForYou && !activeLoading && !activeError && hold ? (
+            <TradeHubHoldCard hold={hold} ideaCount={ideas?.length ?? 0} />
+          ) : null}
+          {showNotReady && !(hold && notReadyReason === 'trade_deadline_passed') ? (
             <AppText style={styles.notReadyText}>
               {NOT_READY_MESSAGES[notReadyReason ?? ""] ?? "Couldn't build Trade Hub ideas for this league."}
             </AppText>
@@ -342,7 +357,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
         <TradeIdeaCard idea={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       )}
       ListEmptyComponent={
-        !activeLoading && !activeError && !showNotReady ? (
+        !activeLoading && !activeError && !showNotReady && !(isForYou && hold && (ideas?.length ?? 0) === 0) ? (
           impactFilterActiveWithNoResults ? (
             <EmptyState
               icon="filter-outline"
@@ -687,6 +702,8 @@ function createStyles(colors: ThemeColors) {
   skeletonWrap: { marginTop: spacing.sm },
   skeletonCard: { padding: spacing.md },
   skeletonValueBlock: { marginTop: spacing.md },
+  postureBlock: { marginBottom: spacing.sm, gap: 2 },
+  postureText: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, lineHeight: 20 },
   card: { padding: 0, marginBottom: spacing.md },

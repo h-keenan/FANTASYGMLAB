@@ -133,6 +133,122 @@ def _feature_use_table(rows: list[dict[str, Any]], *, limit: int = 40) -> list[d
     return ordered[:limit]
 
 
+def _row_user_id(row: Mapping[str, Any]) -> str:
+    for field in ("user_key", "account_hash", "anon_id"):
+        value = str(row.get(field) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _pct(part: int, whole: int) -> float:
+    return round(100.0 * part / whole, 1) if whole > 0 else 0.0
+
+
+def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Onboarding funnel from stored ``feature_use`` / ``onboarding`` events.
+
+    Users are distinct anon/account ids. Returns None (the UI shows nothing)
+    when no onboarding event was actually stored -- never zeros."""
+
+    viewed: dict[str, set[str]] = {}
+    step_index: dict[str, int] = {}
+    skipped: dict[str, set[str]] = {}
+    skipped_any: set[str] = set()
+    completed: set[str] = set()
+    started: set[str] = set()
+    experience: dict[str, set[str]] = {}
+    seen = False
+    for row in rows:
+        if la.normalize_event_name(str(row.get("event") or "")) != "feature_use":
+            continue
+        props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+        if str(props.get("feature") or "").strip() != "onboarding":
+            continue
+        user = _row_user_id(row)
+        if not user:
+            continue
+        action = str(props.get("action") or "").strip()
+        step = str(props.get("step") or "").strip()[:40]
+        seen = True
+        if action == "step_viewed" and step:
+            viewed.setdefault(step, set()).add(user)
+            started.add(user)
+            try:
+                idx = int(props.get("step_index"))
+            except (TypeError, ValueError):
+                idx = 999
+            step_index[step] = min(step_index.get(step, idx), idx)
+        elif action == "skipped":
+            skipped_any.add(user)
+            if step:
+                skipped.setdefault(step, set()).add(user)
+        elif action == "completed":
+            completed.add(user)
+        elif action == "experience_selected":
+            choice = str(props.get("experience") or "").strip().casefold()
+            if choice in {"new", "expert"}:
+                experience.setdefault(choice, set()).add(user)
+    if not seen:
+        return None
+    order = sorted(viewed, key=lambda name: (step_index.get(name, 999), name))
+    steps: list[dict[str, Any]] = []
+    prev: int | None = None
+    for name in order:
+        users = len(viewed[name])
+        steps.append(
+            {
+                "step": name,
+                "step_index": step_index.get(name, 999),
+                "users": users,
+                "drop_off_pct": _pct(max(prev - users, 0), prev) if prev else None,
+                "skipped_users": len(skipped.get(name, set())),
+            }
+        )
+        prev = users
+    base = len(started)
+    exp_total = sum(len(v) for v in experience.values())
+    return {
+        "started_users": base,
+        "completed_users": len(completed),
+        "completion_rate_pct": _pct(len(completed), base) if base else None,
+        "skipped_users": len(skipped_any),
+        "skip_rate_pct": _pct(len(skipped_any), base) if base else None,
+        "steps": steps,
+        "experience": {
+            key: {"users": len(experience[key]), "pct": _pct(len(experience[key]), exp_total)}
+            for key in sorted(experience)
+        },
+    }
+
+
+ESPN_IMPORT_FAIL_RESULTS = ("espn_private", "espn_not_found", "espn_error")
+
+
+def _espn_import_outcomes(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Failed ESPN import attempts from ``feature_use`` ``league_import`` /
+    ``failed`` events, split by ``result``. None (UI shows nothing) when there
+    are none. Only failures are emitted, so ``private_pct`` is the share of
+    failed attempts that were private leagues."""
+
+    counts = dict.fromkeys(ESPN_IMPORT_FAIL_RESULTS, 0)
+    for row in rows:
+        if la.normalize_event_name(str(row.get("event") or "")) != "feature_use":
+            continue
+        props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+        if str(props.get("feature") or "").strip() != "league_import":
+            continue
+        if str(props.get("action") or "").strip() != "failed":
+            continue
+        result = str(props.get("result") or "").strip()
+        if result in counts:
+            counts[result] += 1
+    total = sum(counts.values())
+    if total == 0:
+        return None
+    return {**counts, "total_failed": total, "private_pct": _pct(counts["espn_private"], total)}
+
+
 def _unique_ids(rows: list[dict[str, Any]], *, field: str) -> int:
     values = {str(row.get(field) or "").strip() for row in rows}
     values.discard("")
@@ -223,6 +339,8 @@ def build_report(
         "checkout_intervals": _interval_counts(rows),
         "platforms": _platform_counts(rows),
         "feature_use": _feature_use_table(rows),
+        "onboarding_funnel": _onboarding_funnel(rows),
+        "espn_import_outcomes": _espn_import_outcomes(rows),
         "errors": health.get("errors_by_class") or {},
         "error_sessions": health.get("error_sessions") or 0,
         "performance": health.get("performance") or {},

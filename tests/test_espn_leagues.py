@@ -191,6 +191,24 @@ def test_private_and_missing_leagues_map_to_stable_reasons(monkeypatch):
         assert "espn_s2" not in caught.value.message
 
 
+def test_http_status_classification_private_vs_not_found_vs_outage(monkeypatch):
+    class HttpError(Exception):
+        def __init__(self, status):
+            super().__init__(f"HTTP {status}")
+            self.status_code = status
+
+    for status, reason in ((401, "private_league"), (403, "private_league"), (404, "league_not_found"),
+                           (500, "espn_unavailable"), (503, "espn_unavailable")):
+        def factory(_s=status, **_kwargs):
+            raise HttpError(_s)
+
+        monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda f=factory: f)
+        with pytest.raises(espn_leagues.ESPNLeagueError) as caught:
+            espn_leagues.load_league_snapshot(KEY)
+        assert caught.value.reason == reason
+    assert "Make League Viewable to Public" in espn_leagues.ERROR_MESSAGES["private_league"]
+
+
 def test_sleeper_getters_serve_espn_keys_from_the_snapshot_and_never_call_sleeper():
     with patch("modules.sleeper._request_json") as request_json:
         assert sleeper.get_league(KEY)["name"] == "FFLR Test League"

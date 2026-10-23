@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { ESPN_NOT_AVAILABLE_MESSAGE } from "@/lib/leaguePlatform";
+import { importedPlatformLabel, notAvailableMessage } from "@/lib/leaguePlatform";
 
 /**
  * Shown in place of a league page an ESPN league can't feed yet (see
@@ -24,9 +24,9 @@ export function EspnUnavailableState({ leagueId }: { leagueId: string }) {
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4 py-12 text-center">
       <div className="glass-surface w-full max-w-sm flex flex-col gap-3 p-5">
-        <h1 style={{ font: "var(--font-card-title)" }}>{ESPN_NOT_AVAILABLE_MESSAGE}</h1>
+        <h1 style={{ font: "var(--font-card-title)" }}>{notAvailableMessage(leagueId)}</h1>
         <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          {leagueName} is an ESPN league. This page needs league data FantasyDesk can only read from Sleeper so far.
+          {leagueName} is {importedPlatformLabel(leagueId) === "ESPN" ? "an" : "a"} {importedPlatformLabel(leagueId) || "ESPN"} league. This page needs league data FantasyDesk can only read from Sleeper so far.
           These pages work for it now:
         </p>
         <div className="flex flex-wrap justify-center gap-2">

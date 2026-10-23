@@ -98,7 +98,11 @@ async function authorizedRequest<T>(
  * JSON, and parsing it as such would always throw). `baseUrl` is the API
  * by default; "" targets this web app's own origin (the share-card
  * routes). */
-async function authorizedBinaryRequest(path: string, baseUrl: string = env.apiBaseUrl): Promise<Blob> {
+async function authorizedBinaryRequest(
+  path: string,
+  baseUrl: string = env.apiBaseUrl,
+  jsonBody?: unknown,
+): Promise<Blob> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) {
@@ -111,7 +115,12 @@ async function authorizedBinaryRequest(path: string, baseUrl: string = env.apiBa
   let response: Response;
   try {
     response = await fetch(`${baseUrl}${path}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      method: jsonBody === undefined ? "GET" : "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(jsonBody === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: jsonBody === undefined ? undefined : JSON.stringify(jsonBody),
       signal: controller.signal,
     });
   } catch (error) {
@@ -208,7 +217,7 @@ export interface SaveLeagueResponse {
   /** True when the server started warming this league's first-load data;
    * poll getLeagueWarmupStatus for real progress. */
   warming?: boolean;
-  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" };
+  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" | "fleaflicker" | "mfl" };
 }
 
 /** GET /v1/leagues/{id}/warmup-status: "none" means nothing to wait for. */
@@ -238,15 +247,28 @@ export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
-  league?: { league_key: string; espn_league_id: string; season: string; name: string; team_count: number };
+  /** Fleaflicker / MFL previews (POST /v1/import/preview) only. */
+  platform?: "fleaflicker" | "mfl";
+  platform_label?: string;
+  league?: {
+    league_key: string;
+    espn_league_id?: string;
+    external_league_id?: string;
+    season: string;
+    name: string;
+    team_count: number;
+  };
   teams?: EspnLeagueTeam[];
   diagnostics?: {
     teams_found: number;
-    total_espn_players_seen: number;
+    total_espn_players_seen?: number;
+    total_players_seen?: number;
     canonical_matched_count: number;
     unmatched_count: number;
     matched_rate: number;
-    unmatched_examples: Array<{ name: string; position: string; team: string }>;
+    unmatched_examples?: Array<{ name: string; position: string; team: string }>;
+    /** Players that couldn't be matched to a FantasyDesk player; left off the roster. */
+    unmapped_players?: Array<{ name: string; position: string; team: string; fantasy_team: string; reason: string }>;
   };
   features?: EspnFeatureSupport[];
 }
@@ -314,8 +336,34 @@ export interface TeamSnapshot {
   bench_rank_tied: boolean;
 }
 
+/** One row of the Dashboard's "This week" strip (modules/this_week.py). */
+export interface ThisWeekRow {
+  key: "lineup" | "waiver" | "trade";
+  status: string;
+  tone: "positive" | "risk" | "waiver" | "trade" | "neutral";
+  headline: string;
+  why: string;
+  cta_label: string | null;
+  route: "matchup" | "waivers" | "trade_hub" | null;
+  player_id: string;
+}
+
+export interface ThisWeek {
+  mode: "in_season" | "next_action";
+  week: number | null;
+  rows: ThisWeekRow[];
+  next_action: {
+    headline: string;
+    why: string;
+    cta_label: string;
+    route: "draft_center" | "live_draft" | "trade_hub" | "connect_league";
+  } | null;
+}
+
 export interface DashboardResponse {
   ok: boolean;
+  /** Additive; absent on older servers, null when there is nothing real to show. */
+  this_week?: ThisWeek | null;
   items: BriefingItem[];
   quiet: boolean;
   quiet_reason: string;
@@ -831,6 +879,15 @@ export interface TradeHubEntitlement {
   free_limit: number;
 }
 
+export interface TradeHubHold {
+  verdict: "hold";
+  reason: string;
+  headline: string;
+  why: { factor: string; text: string }[];
+  /** True when ideas below are still worth a look, but optional. */
+  ideas_optional: boolean;
+}
+
 export interface TradeHubResponse {
   ok: boolean;
   ideas: TradeIdea[];
@@ -844,6 +901,10 @@ export interface TradeHubResponse {
   team_strategy: string;
   /** reason === "trade_deadline_passed" carries this user-facing copy. */
   message?: string;
+  /** Honest "make no trade" answer; null when trading is the better move. */
+  hold?: TradeHubHold | null;
+  /** Plain-English line for the effective strategy. */
+  posture_sentence?: string;
   trade_window?: TradeWindow;
 }
 
@@ -2160,6 +2221,24 @@ export interface FounderAnalyticsStorage {
   scope_label: string;
 }
 
+export interface FounderOnboardingFunnel {
+  started_users: number;
+  completed_users: number;
+  completion_rate_pct: number | null;
+  skipped_users: number;
+  skip_rate_pct: number | null;
+  steps: { step: string; step_index: number; users: number; drop_off_pct: number | null; skipped_users: number }[];
+  experience: Record<string, { users: number; pct: number }>;
+}
+
+export interface FounderEspnImportOutcomes {
+  espn_private: number;
+  espn_not_found: number;
+  espn_error: number;
+  total_failed: number;
+  private_pct: number;
+}
+
 export interface FounderAnalyticsReport {
   window_key: string;
   window_label: string;
@@ -2176,6 +2255,10 @@ export interface FounderAnalyticsReport {
   platforms?: Record<string, number>;
   /** feature_use events by (feature, action) with platform and Free/Pro split. */
   feature_use?: FounderAnalyticsFeatureUse[];
+  /** Onboarding funnel from stored events; null/absent when none stored. */
+  onboarding_funnel?: FounderOnboardingFunnel | null;
+  /** Failed ESPN import attempts by result; null/absent when none stored. */
+  espn_import_outcomes?: FounderEspnImportOutcomes | null;
   errors: Record<string, number>;
   error_sessions: number;
   performance: Record<string, FounderAnalyticsLatencyStat>;
@@ -3043,6 +3126,12 @@ export const api = {
       },
     }),
 
+  previewImportedLeague: (platform: "fleaflicker" | "mfl", leagueId: string, season: number) =>
+    authorizedRequest<EspnLeaguePreviewResponse>("/v1/import/preview", {
+      method: "POST",
+      jsonBody: { platform, league_id: leagueId, season },
+    }),
+
   previewEspnLeague: (leagueId: string, season: number) =>
     authorizedRequest<EspnLeaguePreviewResponse>("/v1/espn/leagues/preview", {
       method: "POST",
@@ -3197,6 +3286,20 @@ export const api = {
       `/share-card/trade?leagueId=${encodeURIComponent(leagueId)}&rec=${encodeURIComponent(recommendationId)}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
       "",
     ),
+
+  // Branded 1080x1350 PNG for an ad-hoc Trade Analyzer trade
+  // (app/share-card/analyzer). Posts only the picked ids; the server
+  // re-runs the analyzer and resolves every asset itself.
+  getTradeAnalyzerShareCardBlob: (
+    leagueId: string,
+    body: {
+      sendPlayerIds: string[];
+      receivePlayerIds: string[];
+      sendPickIds: string[];
+      receivePickIds: string[];
+      partnerRosterId: string;
+    },
+  ) => authorizedBinaryRequest("/share-card/analyzer", "", { leagueId, ...body }),
 
   // Branded 1080x1350 player card PNG (app/share-card/player) for the
   // Player Profile page's Share button, built from the same

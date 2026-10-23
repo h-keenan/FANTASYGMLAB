@@ -157,6 +157,7 @@ from modules import (
     draft_assistant,
     draft_center_ui,
     espn_leagues,
+    external_leagues,
     faab,
     founder_analytics,
     gm_plan,
@@ -231,6 +232,8 @@ from modules import (
     waivers_ui,
     weekly_box_scores,
 )
+from modules import external_news_contract
+from modules import this_week
 from modules import idp_scoring
 from modules import guillotine as guillotine_module
 from modules import keepers as keepers_module
@@ -565,10 +568,10 @@ class _EspnLeagueRouteGate:
         if (
             scope.get("type") == "http"
             and scope.get("method") != "OPTIONS"
-            and "espn:" in (scope.get("path") or "")
-            and espn_leagues.gated_league_path(scope.get("path") or "")
+            and any(prefix in (scope.get("path") or "") for prefix in external_leagues.PREFIXES)
+            and external_leagues.gated_league_path(scope.get("path") or "")
         ):
-            response = JSONResponse(status_code=409, content=espn_leagues.not_available_payload())
+            response = JSONResponse(status_code=409, content=external_leagues.not_available_payload(scope.get("path") or ""))
             await response(scope, receive, send)
             return
         await self.app(scope, receive, send)
@@ -1669,6 +1672,31 @@ def preview_espn_league(
     return espn_leagues.preview_payload(snapshot)
 
 
+class ImportLeaguePreviewRequest(BaseModel):
+    platform: str
+    league_id: str
+    season: int
+
+
+@app.post("/v1/import/preview")
+def preview_imported_league(
+    body: ImportLeaguePreviewRequest,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Fleaflicker / MFL twin of POST /v1/espn/leagues/preview.
+
+    Public leagues only: no credentials of any kind are accepted. Read-only
+    (saves nothing); `league.league_key` is what POST /v1/leagues/save takes.
+    `diagnostics.unmapped_players` lists, honestly, every rostered player that
+    could not be matched to a FantasyDesk player id (those are left off the
+    roster, never guessed)."""
+
+    platform = str(body.platform or "").strip().lower()
+    if platform not in external_leagues.IMPORT_PLATFORMS:
+        raise HTTPException(status_code=422, detail="Unsupported league platform.")
+    return external_leagues.preview_league(platform, body.league_id, body.season)
+
+
 @app.post("/v1/leagues/save")
 def save_league(
     payload: SaveLeagueRequest,
@@ -1689,14 +1717,14 @@ def save_league(
     if not league_id:
         raise HTTPException(status_code=422, detail="league_id is required.")
 
-    is_espn = espn_leagues.is_espn_league_key(league_id)
+    is_espn = external_leagues.is_external_league_key(league_id)
     espn_roster_id = str(payload.roster_id or "").strip()
     if is_espn:
         # Same "verify before writing" rule as Sleeper below, against ESPN.
-        espn_snapshot = espn_leagues.get_league_snapshot(league_id)
+        espn_snapshot = external_leagues.get_league_snapshot(league_id)
         if not espn_snapshot:
             return {"ok": False, "reason": "league_not_found", "cap": 0}
-        if espn_leagues.mapping_blocks_import(espn_snapshot):
+        if external_leagues.mapping_blocks_import(espn_snapshot):
             return {"ok": False, "reason": "mapping_too_low", "cap": 0}
         if not any(str(roster.get("roster_id")) == espn_roster_id for roster in espn_snapshot["rosters"]):
             return {"ok": False, "reason": "espn_team_not_selected", "cap": 0}
@@ -1776,7 +1804,7 @@ def save_league(
             "league_id": league_id,
             "league_name": league_name,
             "is_default": is_default,
-            "platform": espn_leagues.league_platform(league_id),
+            "platform": external_leagues.league_platform(league_id),
         },
     }
 
@@ -1963,7 +1991,7 @@ def resolve_league_path_id(
     league_id_clean = str(league_id or "").strip()
     if not league_id_clean:
         return league_id
-    if espn_leagues.is_espn_league_key(league_id_clean):
+    if external_leagues.is_external_league_key(league_id_clean):
         # ESPN league ids don't change between seasons, and the season is
         # part of the key, so there is nothing to resolve (and no reason to
         # load the league just to read a Sleeper status).
@@ -2320,7 +2348,7 @@ def get_league_team_rankings(
         )
         # ESPN leagues have no transaction feed here (modules.espn_leagues),
         # so a zero count means "unknown", not a "Quiet Manager".
-        if activity_badge and not espn_leagues.is_espn_league_key(league_id):
+        if activity_badge and not external_leagues.is_external_league_key(league_id):
             team_badges.append(activity_badge)
         pick_flow_badge = pick_flow.classify_pick_flow(firsts_acquired, firsts_sent)
         if pick_flow_badge:
@@ -2642,7 +2670,7 @@ def get_league_draft_picks(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         # ESPN's API doesn't expose who owns which future picks, so listing
         # every team's own picks would be a guess. Trade Analyzer runs
         # players-only for ESPN leagues instead.
@@ -2976,7 +3004,7 @@ def _resolve_my_roster(
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         return _resolve_my_espn_roster(config, access_token, user_id, league_id)
     if profile is None:
         profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
@@ -4219,8 +4247,16 @@ def post_trade_analyzer(
     body: TradeAnalyzerRequest,
     league_id: str = Depends(resolve_league_path_id),
     user: dict[str, Any] = Depends(require_user),
+    x_share_card_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
     """Real accept/decline/counter verdict for a proposed trade package.
+
+    The web share-card route re-runs this call server-to-server to re-derive
+    the grade for an analysis the user already ran. It authenticates with the
+    shared secret SHARE_CARD_INTERNAL_SECRET (header X-Share-Card-Token) and
+    is then exempt from the free-tier weekly gate/counter. With the secret
+    unset or the header wrong/absent, the normal gate applies: a client can't
+    bypass the quota with this header.
 
     Shares the exact same fit engine as the web app's Trade Analyzer
     (modules.trade_analyzer_fit, extracted from app.py) and the same
@@ -4265,7 +4301,9 @@ def post_trade_analyzer(
     # (modules.trade_eval_usage); web enforced it, this API did not. The
     # counter is server-side (Redis), not the user-writable user_settings.
     analyzer_user_id = str(user.get("id") or "")
-    if not _manager_tendencies_gate(user):
+    secret = os.environ.get("SHARE_CARD_INTERNAL_SECRET", "")
+    share_card_call = bool(secret) and secrets.compare_digest(str(x_share_card_token or ""), secret)
+    if not share_card_call and not _manager_tendencies_gate(user):
         if not free_tier_ledger.consume_weekly_trade_eval(
             analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
         ):
@@ -7194,6 +7232,8 @@ def _external_news_payload(
     *,
     superseded_by: str,
     checked_at: str,
+    identity: Mapping[str, Any] | None = None,
+    now_ts: int | None = None,
 ) -> dict[str, Any]:
     """Shape one modules.news_intelligence.group_player_events_by_identity
     group into the external contract (docs/external-api-contract.md):
@@ -7211,7 +7251,19 @@ def _external_news_payload(
         if event.article_time and event.article_time > 0
         else None
     )
+    # Additive source-backed contract fields (modules/external_news_contract.py).
+    contract = (
+        external_news_contract.build_contract_fields(
+            group=group,
+            identity=identity,
+            superseded_by=superseded_by,
+            now_ts=now_ts if now_ts is not None else int(time.time()),
+        )
+        if identity is not None
+        else {}
+    )
     return {
+        **contract,
         "player_id": str(player_id),
         "event_identity": event.event_identity,
         "event_type": event.event_type,
@@ -7289,6 +7341,12 @@ def get_external_player_news(
         )
     superseded = news_intelligence.detect_supersession(groups)
     checked_at = datetime.now(timezone.utc).isoformat()
+    from modules import gsis_crosswalk as _gsis_crosswalk  # None unless DYNASTYGM_NEWS_EVIDENCE_FETCH=1
+
+    identity = external_news_contract.resolve_player_identity(
+        players_df, str(player_id), player_name, gsis_crosswalk=_gsis_crosswalk.load_gsis_crosswalk()
+    )
+    now_ts = int(time.time())
 
     items = [
         _external_news_payload(
@@ -7296,6 +7354,8 @@ def get_external_player_news(
             group,
             superseded_by=superseded.get(group["event"].event_identity, ""),
             checked_at=checked_at,
+            identity=identity,
+            now_ts=now_ts,
         )
         for group in groups[:limit]
     ]
@@ -8717,6 +8777,7 @@ def get_league_dashboard(
             "team_snapshot": None,
             "reason": reason_value,
             "entitlement": {"is_premium": is_premium, "visible_count": 0, "hidden_count": 0},
+            "this_week": this_week.not_ready_this_week(reason_value),
         }
 
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
@@ -8944,9 +9005,10 @@ def get_league_dashboard(
         if not trade_tile_allowed:
             visible_items = [item for item in visible_items if not _is_trade_briefing_item(item)]
 
+    projected_items = [_project_briefing_item(item) for item in visible_items]
     response = {
         "ok": True,
-        "items": [_project_briefing_item(item) for item in visible_items],
+        "items": projected_items,
         "quiet": briefing.quiet,
         "quiet_reason": briefing.quiet_reason,
         "team_snapshot": team_snapshot,
@@ -8956,10 +9018,74 @@ def get_league_dashboard(
             "visible_count": len(visible_items),
             "hidden_count": len(all_items) - len(visible_items),
         },
+        # Additive. Built only from data computed above; see modules.this_week.
+        "this_week": _dashboard_this_week(
+            league=league,
+            my_roster=my_roster,
+            roster_df=roster_df,
+            items=projected_items,
+            # Deferred pass: the search has not run, so there is no "Hold"
+            # verdict to give. None = omit the trade row; the full pass fills it.
+            trade_idea_records=None if trade_ideas_deferred else trade_idea_records,
+            stance=declared_team_stance,
+        ),
     }
     if trade_ideas_deferred:
         response["trade_ideas_deferred"] = True
     return response
+
+
+def _dashboard_this_week(
+    *,
+    league: dict[str, Any],
+    my_roster: dict[str, Any],
+    roster_df: pd.DataFrame,
+    items: list[dict[str, Any]],
+    trade_idea_records: list[Any] | None,
+    stance: str,
+) -> dict[str, Any] | None:
+    """The Dashboard's "This week" strip. Never raises: a failure here must not
+    take the whole Dashboard down, so it just omits the strip."""
+
+    try:
+        roster_rows: dict[str, dict[str, Any]] = {}
+        bye_ids: set[str] = set()
+        if league_calendar.is_in_season(league) and not roster_df.empty:
+            week = league_calendar.current_league_week(league) or 0
+            games = None
+            season = 0
+            if week:
+                try:
+                    season = int(league.get("season") or 0) or sleeper.default_player_stats_season()
+                    games = nfl_schedule.load_games()
+                except Exception:
+                    games = None
+            for _, row in roster_df.iterrows():
+                player_id = str(row.get("player_id") or "")
+                if not player_id:
+                    continue
+                roster_rows[player_id] = {
+                    "name": row.get("name"),
+                    "position": row.get("position"),
+                    "status": row.get("status"),
+                    "injury_status": row.get("injury_status"),
+                }
+                team = str(row.get("team") or "").strip().upper()
+                if games is not None and team and week:
+                    matchup = nfl_schedule.team_matchup_for_week(team, week, season, games=games)
+                    if matchup is not None and matchup.get("bye"):
+                        bye_ids.add(player_id)
+        return this_week.build_this_week(
+            league=league,
+            roster=my_roster,
+            roster_rows=roster_rows,
+            bye_player_ids=bye_ids,
+            items=items,
+            trade_records=trade_idea_records,
+            stance=stance,
+        )
+    except Exception:
+        return None
 
 
 # Bounds the per-request fan-out in get_portfolio below — plenty for
@@ -9049,7 +9175,7 @@ def _build_portfolio_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         # Portfolio's Next Move briefing is the Dashboard engine, which ESPN
         # leagues can't feed yet (see modules.espn_leagues).
         return {
@@ -9413,7 +9539,7 @@ def get_portfolio_exposure(lens: str = "Dynasty", user: dict[str, Any] = Depends
             continue
         seen.add(league_id)
         league_name = str(row.get("league_name") or "").strip() or league_id
-        if espn_leagues.is_espn_league_key(league_id):
+        if external_leagues.is_external_league_key(league_id):
             skipped.append(
                 {"league_id": league_id, "league_name": league_name, "reason": espn_leagues.ESPN_NOT_AVAILABLE_REASON}
             )
@@ -9661,7 +9787,7 @@ def _build_league_glance_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
-    if espn_leagues.is_espn_league_key(league_id):
+    if external_leagues.is_external_league_key(league_id):
         return {
             "status": "failed",
             "league_id": league_id,
@@ -12933,6 +13059,7 @@ def get_trade_hub_ideas(
             "reason": league_calendar.TRADE_DEADLINE_PASSED_REASON,
             "message": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
             "trade_window": trade_window,
+            "hold": trade_hub_engine.build_hold_verdict([], trade_window=trade_window),
         }
 
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
@@ -12970,10 +13097,35 @@ def get_trade_hub_ideas(
             user_id, [str(card.get("recommendation_id") or "") for card in ranked], pool_cap
         )
         visible = [card for card in ranked if str(card.get("recommendation_id") or "") in allowed_ids][:pool_cap]
+    # Hold verdict: judged on the full approved board (not the free-tier slice)
+    # using one already-cached rankings row; no extra idea search.
+    power_rank = team_count = None
+    try:
+        frame = league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        if not frame.empty:
+            team_count = int(len(frame))
+            mine = frame[frame["roster_id"].astype(str) == str(roster_id)]
+            if not mine.empty:
+                power_rank = int(mine.iloc[0].get("power_rank"))
+    except Exception:
+        power_rank = team_count = None
+    hold = trade_hub_engine.build_hold_verdict(
+        ranked,
+        strategy=strategy,
+        power_rank=power_rank,
+        team_count=team_count,
+        season_progress=record_signal.season_progress_fraction(league),
+        in_season=league_calendar.is_in_season(league),
+        trade_window=trade_window,
+    )
     return {
         "ok": True,
         "ideas": visible,
         "reason": "",
+        "hold": hold,
+        "posture_sentence": trade_hub_engine.posture_sentence(strategy),
         # Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
         # strategy age-curve adjustment (modules.trade_hub_engine.
         # apply_strategy_age_curve, inside generate_trade_idea_records_cached

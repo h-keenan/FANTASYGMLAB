@@ -7804,6 +7804,10 @@ def test_dashboard_reports_no_linked_username(monkeypatch):
     # present in some shape.
     assert body["quiet_reason"] == "no_sleeper_username_linked"
     assert body["entitlement"] == {"is_premium": False, "visible_count": 0, "hidden_count": 0}
+    # "This week" strip: one next action (connect a league), never empty rows.
+    assert body["this_week"]["mode"] == "next_action"
+    assert body["this_week"]["next_action"]["route"] == "connect_league"
+    assert body["this_week"]["rows"] == []
 
 
 def test_dashboard_empty_roster_never_pays_for_the_full_valuation_pipeline(monkeypatch):
@@ -7948,6 +7952,11 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     categories = [item["category"] for item in body["items"]]
     assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
     assert top_priority_items[0]["route_player_id"] == "target_rb"
+    # Additive "This week" payload: present (a dict or None) and never
+    # fabricates a trade hold or waiver row without engine data behind it.
+    assert "this_week" in body
+    for row in (body["this_week"] or {}).get("rows", []):
+        assert row["headline"] and row["why"]
 
 
 @pytest.mark.known_flaky
@@ -15073,6 +15082,7 @@ def test_trade_hub_stops_pushing_trades_after_the_deadline(monkeypatch):
     assert body["message"] == _DEADLINE_MESSAGE
     assert body["trade_window"]["trade_deadline_week"] == 11
     assert body["trade_window"]["trade_deadline_passed"] is True
+    assert body["hold"]["reason"] == "trade_deadline_passed"
     generate.assert_not_called()
 
 
@@ -15552,6 +15562,16 @@ def test_dashboard_defer_trade_ideas_skips_the_search_and_the_full_call_is_uncha
         gm_targets = stack.enter_context(patch(
             "services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ())
         ))
+        from modules import this_week as this_week_module
+
+        seen_trade_records = []
+        real_build = this_week_module.build_this_week
+
+        def capture_build(**kwargs):
+            seen_trade_records.append(kwargs.get("trade_records"))
+            return real_build(**kwargs)
+
+        stack.enter_context(patch.object(this_week_module, "build_this_week", side_effect=capture_build))
         headers = {"Authorization": "Bearer good-token"}
         deferred = client.get("/v1/leagues/abc/dashboard?defer_trade_ideas=true", headers=headers)
         searches_after_deferred = searches["n"]
@@ -15566,3 +15586,10 @@ def test_dashboard_defer_trade_ideas_skips_the_search_and_the_full_call_is_uncha
     assert searches["n"] == 1
     assert not [i for i in deferred.json()["items"] if "trade_package" in (i.get("presentation") or {})]
     assert full.json()["team_snapshot"] == deferred.json()["team_snapshot"]
+    # This week must not claim a "Hold: no trade improves your team" verdict
+    # on the deferred pass: the search has not run, so it gets None (omit the
+    # trade row); the full pass passes the real (searched) records.
+    assert seen_trade_records[0] is None
+    assert seen_trade_records[1] is not None
+    deferred_rows = ((deferred.json().get("this_week") or {}).get("rows")) or []
+    assert not [r for r in deferred_rows if r["key"] == "trade" and r["status"] == "Hold" and "no trade improves" in r["headline"]]

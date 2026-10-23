@@ -36,7 +36,7 @@ export default function ConnectLeaguePage() {
       <div className="w-full max-w-sm flex flex-col gap-1 text-center">
         <h1 style={{ font: "var(--font-page-title)" }}>Add a league</h1>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Add a Sleeper or public ESPN league alongside the leagues you already have.
+          Add a Sleeper, ESPN, Fleaflicker or MFL league alongside the leagues you already have.
         </p>
       </div>
       <div className="w-full max-w-sm">

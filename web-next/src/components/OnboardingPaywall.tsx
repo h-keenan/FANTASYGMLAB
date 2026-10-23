@@ -4,6 +4,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState } from "react";
 
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
+import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
 
 // Zach: "have one product here and call it Get Started For Free with a few
@@ -74,9 +75,16 @@ function FreeTrialButton({ plan, publishableKey }: { plan: BillingPlan; publisha
  * an existing, onboarded user). Skippable: this is a trial offer, not a
  * hard gate — Free access stays real and immediate.
  */
+// The step after the carousel's last step (8 features + connect + level = 0..9).
+const PAYWALL_STEP_INDEX = 10;
+
 export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   const [plans, setPlans] = useState<BillingPlansResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    trackOnboardingStepViewed("paywall", PAYWALL_STEP_INDEX);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +126,10 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
 
       <button
         type="button"
-        onClick={onSkip}
+        onClick={() => {
+          trackOnboarding("skipped", { step: "paywall", step_index: PAYWALL_STEP_INDEX });
+          onSkip();
+        }}
         className="text-xs underline self-center"
         style={{ color: "var(--color-text-muted)" }}
       >

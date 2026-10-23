@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +20,7 @@ import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
 import type { ExperienceLevelValue } from '../lib/api';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
+import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
@@ -98,13 +99,20 @@ export default function OnboardingScreen({ navigation }: Props) {
   // first run gets the trial-offer step.
   const isFirstRun = onboardingComplete === false;
 
+  // One step_viewed per step per session (deduped in the helper).
+  useEffect(() => {
+    trackOnboardingStepViewed(STEP_KEYS[index], index);
+  }, [index]);
+
   const goTo = (next: number) => {
     const clamped = Math.max(0, Math.min(STEP_KEYS.length - 1, next));
+    if (clamped < index) trackOnboarding('back', { step: STEP_KEYS[index], step_index: index });
     setIndex(clamped);
     scrollRef.current?.scrollTo({ x: clamped * width, animated: true });
   };
 
   const onSkip = () => {
+    trackOnboarding('skipped', { step: STEP_KEYS[index], step_index: index });
     if (isFirstRun) {
       navigation.navigate('Paywall', { fromOnboarding: 'skip' });
       return;
@@ -115,6 +123,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
   const onFinish = async () => {
     if (!level) return;
+    trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(level) });
     setSaving(true);
     // Applies the beginner/advanced copy immediately and saves it to
     // /v1/preferences in the background. Best-effort, same as web: a failed
@@ -176,7 +185,10 @@ export default function OnboardingScreen({ navigation }: Props) {
                 return (
                   <TouchableOpacity
                     key={option.value}
-                    onPress={() => setLevel(option.value)}
+                    onPress={() => {
+                      setLevel(option.value);
+                      trackOnboarding('experience_selected', { experience: experienceBucket(option.value) });
+                    }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
                     activeOpacity={0.85}

@@ -1,0 +1,247 @@
+{
+ "players": {
+  "player": [
+   {
+    "id": "10775",
+    "team": "WAS",
+    "name": "Wagner, Bobby",
+    "position": "LB"
+   },
+   {
+    "name": "Kelce, Travis",
+    "position": "TE",
+    "team": "KCC",
+    "id": "11244"
+   },
+   {
+    "id": "12626",
+    "team": "BAL",
+    "position": "RB",
+    "name": "Henry, Derrick"
+   },
+   {
+    "name": "Clark, Kenny",
+    "position": "DT",
+    "team": "DAL",
+    "id": "12739"
+   },
+   {
+    "name": "Jones, Chris",
+    "position": "DT",
+    "id": "12741",
+    "team": "KCC"
+   },
+   {
+    "name": "Kupp, Cooper",
+    "position": "WR",
+    "team": "SEA",
+    "id": "13164"
+   },
+   {
+    "name": "Woods, Xavier",
+    "position": "S",
+    "team": "TEN",
+    "id": "13325"
+   },
+   {
+    "id": "13690",
+    "team": "ARI",
+    "name": "Sweat, Josh",
+    "position": "DE"
+   },
+   {
+    "name": "Oluokun, Foyesade",
+    "position": "LB",
+    "team": "JAC",
+    "id": "13813"
+   },
+   {
+    "name": "Montgomery, David",
+    "position": "RB",
+    "team": "DET",
+    "id": "14071"
+   },
+   {
+    "position": "DE",
+    "name": "Sweat, Montez",
+    "id": "14148",
+    "team": "CHI"
+   },
+   {
+    "id": "14219",
+    "team": "TBB",
+    "position": "CB",
+    "name": "Dean, Jamel"
+   },
+   {
+    "team": "LAC",
+    "id": "14779",
+    "name": "Herbert, Justin",
+    "position": "QB"
+   },
+   {
+    "name": "Jeudy, Jerry",
+    "position": "WR",
+    "team": "CLE",
+    "id": "14833"
+   },
+   {
+    "position": "TE",
+    "name": "Parkinson, Colby",
+    "id": "14871",
+    "team": "LAR"
+   },
+   {
+    "id": "14892",
+    "team": "MIA",
+    "name": "Brooks, Jordyn",
+    "position": "LB"
+   },
+   {
+    "team": "SFO",
+    "id": "15241",
+    "name": "Jones, Mac",
+    "position": "QB"
+   },
+   {
+    "name": "Etienne, Travis",
+    "position": "RB",
+    "id": "15253",
+    "team": "JAC"
+   },
+   {
+    "team": "WAS",
+    "id": "15344",
+    "position": "TE",
+    "name": "Bates, John"
+   },
+   {
+    "name": "White, Rachaad",
+    "position": "RB",
+    "id": "15721",
+    "team": "TBB"
+   },
+   {
+    "id": "15751",
+    "team": "ATL",
+    "name": "London, Drake",
+    "position": "WR"
+   },
+   {
+    "position": "WR",
+    "name": "Robinson, Wan'Dale",
+    "team": "NYG",
+    "id": "15757"
+   },
+   {
+    "name": "McBride, Trey",
+    "position": "TE",
+    "team": "ARI",
+    "id": "15794"
+   },
+   {
+    "name": "Bonitto, Nik",
+    "position": "DE",
+    "id": "15861",
+    "team": "DEN"
+   },
+   {
+    "name": "Belton, Dane",
+    "position": "S",
+    "id": "15875",
+    "team": "NYG"
+   },
+   {
+    "id": "15904",
+    "team": "DAL",
+    "position": "CB",
+    "name": "Bland, DaRon"
+   },
+   {
+    "position": "CB",
+    "name": "Witherspoon, Devon",
+    "team": "SEA",
+    "id": "16241"
+   },
+   {
+    "id": "16244",
+    "team": "DET",
+    "position": "S",
+    "name": "Branch, Brian"
+   },
+   {
+    "name": "Turner, Kobie",
+    "position": "DT",
+    "team": "LAR",
+    "id": "16282"
+   },
+   {
+    "position": "PK",
+    "name": "Aubrey, Brandon",
+    "id": "16414",
+    "team": "DAL"
+   },
+   {
+    "name": "Turner, Dallas",
+    "position": "DE",
+    "team": "MIN",
+    "id": "16650"
+   },
+   {
+    "name": "Lassiter, Kamari",
+    "position": "CB",
+    "id": "16672",
+    "team": "HOU"
+   },
+   {
+    "id": "16680",
+    "team": "JAC",
+    "name": "Little, Cam",
+    "position": "PK"
+   },
+   {
+    "id": "16689",
+    "team": "SEA",
+    "position": "DT",
+    "name": "Murphy, Byron"
+   },
+   {
+    "name": "Bishop, Cole",
+    "position": "S",
+    "team": "BUF",
+    "id": "16700"
+   },
+   {
+    "name": "Knight, Tyrice",
+    "position": "LB",
+    "id": "16722",
+    "team": "SEA"
+   },
+   {
+    "name": "Bates, Jake",
+    "position": "PK",
+    "id": "16846",
+    "team": "DET"
+   },
+   {
+    "status": "R",
+    "name": "Cook, Brady",
+    "position": "QB",
+    "team": "NYJ",
+    "id": "17040"
+   },
+   {
+    "team": "LAR",
+    "id": "9431",
+    "name": "Stafford, Matthew",
+    "position": "QB"
+   },
+   {
+    "id": "99999",
+    "name": "Unmappable, Zzyzx",
+    "position": "WR",
+    "team": "FA"
+   }
+  ]
+ }
+}
