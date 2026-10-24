@@ -50,6 +50,7 @@ import LoadingScreen from '../screens/LoadingScreen';
 import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
 import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
+import FounderAnalyticsScreen from '../screens/FounderAnalyticsScreen';
 import LiveDraftScreen from '../screens/LiveDraftScreen';
 import GuessThePlayerLeaderboardScreen from '../screens/GuessThePlayerLeaderboardScreen';
 import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
@@ -123,6 +124,8 @@ export type RootStackParamList = {
   // Not league-scoped — the whole point is standing/needs across every
   // saved league at once, not one league's context.
   Portfolio: undefined;
+  // Founder-only (server enforces founder_ops; the screen also bounces non-founders).
+  FounderAnalytics: undefined;
   // Sleeper-only (gated like the other league screens) — read-only draft room.
   LiveDraft: { leagueId: string; leagueName: string };
   GuessThePlayerLeaderboard: { leagueId: string; leagueName: string };
@@ -328,6 +331,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
+          <AppStack.Screen name="FounderAnalytics" component={FounderAnalyticsScreen} options={{ title: 'Founder Analytics' }} />
           <AppStack.Screen name="LiveDraft" component={EspnLiveDraftScreen} />
           <AppStack.Screen name="GuessThePlayerLeaderboard" component={EspnGuessLeaderboardScreen} />
           <AppStack.Screen

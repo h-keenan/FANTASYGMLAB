@@ -45,6 +45,8 @@ import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from '../lib/playerSearch
 import { OPEN_ORB_SEARCH_EVENT } from '../lib/orbEvents';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { isFounderSession } from '../lib/founderAnalytics';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { motion, radii, shadows, spacing, type ThemeColors } from '../theme';
 
@@ -235,7 +237,7 @@ const MANAGE_SUBSCRIPTION_ROUTE = '__manage_subscription__';
  * store settings More's row opens, instead of a Paywall they've already
  * bought through. A web (Stripe) or unknown subscriber stays on Premium ->
  * Paywall, unchanged, since the store page wouldn't show their plan. */
-function generalDestinations(colors: ThemeColors, storeSubscriber = false): Destination[] {
+function generalDestinations(colors: ThemeColors, storeSubscriber = false, founder = false): Destination[] {
   return [
     { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: 'Switch leagues and manage account' },
     // Account-wide, not league-scoped — belongs here with Home/News/Premium,
@@ -252,6 +254,17 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false): Dest
       color: colors.violet,
       subtitle: 'Your standing across every saved league',
     },
+    ...(founder
+      ? [
+          {
+            label: 'Founder Analytics',
+            route: 'FounderAnalytics',
+            icon: 'stats-chart-outline' as IconName,
+            color: colors.violet,
+            subtitle: 'Internal product usage (founder accounts only)',
+          },
+        ]
+      : []),
     { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
     storeSubscriber
       ? {
@@ -518,6 +531,8 @@ export default function GmOrb() {
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [tradeHubHasNew, setTradeHubHasNew] = useState(false);
   const [storeSubscriber, setStoreSubscriber] = useState(false);
+  // UX gate only; GET /v1/founder/analytics enforces founder_ops server-side.
+  const founder = isFounderSession(useAuth().session);
   // This used to clamp bottom to a 100pt ceiling, on the theory that a
   // reported "orb sits mid-screen" bug meant some device was inflating the
   // inset. Measured rawInsets.bottom on a real iPhone (34), an iOS simulator
@@ -559,9 +574,9 @@ export default function GmOrb() {
     () => [
       ...(league ? coreLeagueDestinations(colors) : []),
       ...(league ? gmToolsDestinations(colors) : []),
-      ...generalDestinations(colors, storeSubscriber),
+      ...generalDestinations(colors, storeSubscriber, founder),
     ],
-    [colors, league, storeSubscriber],
+    [colors, league, storeSubscriber, founder],
   );
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const searchResults = useMemo(() => {
@@ -1003,7 +1018,7 @@ export default function GmOrb() {
                 ) : null}
 
                 <NavSection label="General">
-                  {generalDestinations(colors, storeSubscriber).map((destination) => (
+                  {generalDestinations(colors, storeSubscriber, founder).map((destination) => (
                     <NavRow
                       key={destination.route}
                       destination={destination}

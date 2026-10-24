@@ -2821,6 +2821,116 @@ export interface GuessThePlayerLeaderboardResponse {
   name_match: { entries: GuessThePlayerLeaderboardEntry[] };
 }
 
+/** GET /v1/founder/analytics — mirrors modules.founder_analytics.build_report's
+ * return shape exactly (services/mobile_api_service.py's get_founder_analytics
+ * serializes it as-is, no reshaping). Gated server-side on the caller's own
+ * Supabase Auth app_metadata.founder_ops claim — any non-founder caller gets
+ * a real 403, never an empty/filtered report (see that endpoint's docstring).
+ */
+export interface FounderAnalyticsProductModule {
+  module: string;
+  users: number;
+  sessions: number;
+  views: number;
+  meaningful_interactions: number;
+}
+
+export interface FounderAnalyticsNamedCount {
+  event: string;
+  label: string;
+  count: number;
+}
+
+export interface FounderAnalyticsFeatureUse {
+  feature: string;
+  action: string;
+  total: number;
+  web: number;
+  ios: number;
+  android: number;
+  free: number;
+  pro: number;
+}
+
+export interface FounderAnalyticsLatencyStat {
+  p50: number | null;
+  p90: number | null;
+  p95: number | null;
+  n: number;
+}
+
+export interface FounderAnalyticsStorage {
+  kind: "supabase" | "host_local_jsonl";
+  file_name: string;
+  directory: string;
+  exists: boolean;
+  size_bytes: number;
+  writes_enabled: boolean;
+  retention_days: number;
+  survives_render_deploy: boolean;
+  multi_instance: string;
+  scope_label: string;
+}
+
+export interface FounderOnboardingFunnel {
+  started_users: number;
+  completed_users: number;
+  completion_rate_pct: number | null;
+  skipped_users: number;
+  skip_rate_pct: number | null;
+  steps: { step: string; step_index: number; users: number; drop_off_pct: number | null; skipped_users: number }[];
+  experience: Record<string, { users: number; pct: number }>;
+}
+
+export interface FounderEspnImportOutcomes {
+  espn_private: number;
+  espn_not_found: number;
+  espn_error: number;
+  total_failed: number;
+  private_pct: number;
+}
+
+export interface FounderAnalyticsReport {
+  window_key: string;
+  window_label: string;
+  measured: boolean;
+  event_count: number;
+  sessions: number;
+  anonymous_users: number;
+  hashed_accounts: number;
+  product_modules: FounderAnalyticsProductModule[];
+  decision_engagement: FounderAnalyticsNamedCount[];
+  premium: FounderAnalyticsNamedCount[];
+  checkout_intervals: Record<string, number>;
+  /** Event counts by client platform (web / ios / android). */
+  platforms?: Record<string, number>;
+  /** feature_use events by (feature, action) with platform and Free/Pro split. */
+  feature_use?: FounderAnalyticsFeatureUse[];
+  /** Onboarding funnel from stored events; null/absent when none stored. */
+  onboarding_funnel?: FounderOnboardingFunnel | null;
+  /** Failed ESPN import attempts by result; null/absent when none stored. */
+  espn_import_outcomes?: FounderEspnImportOutcomes | null;
+  errors: Record<string, number>;
+  error_sessions: number;
+  performance: Record<string, FounderAnalyticsLatencyStat>;
+  startup_latency_buckets: Record<string, number>;
+  storage: FounderAnalyticsStorage;
+  unavailable: string[];
+  partial_notes: string[];
+}
+
+export interface FounderAnalyticsResponse {
+  ok: boolean;
+  report: FounderAnalyticsReport;
+}
+
+export const FOUNDER_ANALYTICS_WINDOWS: Array<{ value: string; label: string }> = [
+  { value: "24h", label: "Last 24 hours" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "all", label: "All retained data" },
+];
+
 export const api = {
   /**
    * Arms/disarms showcase-mode masking of every response this client
@@ -3336,4 +3446,8 @@ export const api = {
         lens: body.lens ?? 'Dynasty',
       },
     ),
+  /** Founder-only product analytics. The server enforces the real
+   * app_metadata.founder_ops gate; a non-founder caller gets a 403 ApiError. */
+  getFounderAnalytics: (window: string = '7d', signal?: AbortSignal) =>
+    authorizedRequest<FounderAnalyticsResponse>(`/v1/founder/analytics?window=${encodeURIComponent(window)}`, signal ? { signal } : undefined),
 };
