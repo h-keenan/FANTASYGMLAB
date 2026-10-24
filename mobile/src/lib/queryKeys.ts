@@ -75,5 +75,6 @@ export const queryKeys = {
   // row instantly and only refetches what's stale.
   portfolioIndex: () => [...userScopeKey(), 'portfolio', 'index'] as const,
   portfolioExposure: () => [...userScopeKey(), 'portfolio', 'exposure'] as const,
+  founderAnalytics: (window: string) => [...userScopeKey(), 'founder-analytics', window] as const,
   portfolioLeague: (leagueId: string) => [...userScopeKey(), 'portfolio', 'league', leagueId] as const,
 };
