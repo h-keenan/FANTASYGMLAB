@@ -23,7 +23,7 @@ import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
-import { TradeAssetRow } from './DashboardScreen';
+import TradeAssetRow from '../components/TradeAssetRow';
 import {
   api,
   TEAM_STANCE_OPTIONS,
