@@ -502,3 +502,28 @@ def test_build_gm_plan_never_touches_value_score_or_similar_valuation_fields():
                 _walk(value)
 
     _walk(plan)
+
+
+def test_trade_focus_area_assets_from_real_trade_ideas_carry_player_name():
+    # Regression: modules.trade_ideas._player_asset only sets `label` (no
+    # `name`), and GM Plan passed those raw dicts through, so web/mobile
+    # rendered the literal "Player" for every player row.
+    from modules import trade_ideas
+
+    mine = trade_ideas._player_asset(
+        {"name": "Jaylen Wright", "player_id": "11", "position": "RB", "team": "MIA", "age": 23,
+         "player_tier": "Elite", "value_score": 3293}
+    )
+    theirs = trade_ideas._player_asset(
+        {"name": "Tetairoa McMillan", "player_id": "22", "position": "WR", "team": "NO", "age": 22,
+         "value_score": 3529}
+    )
+    pick = trade_ideas._pick_asset({"label": "2027 Round 3", "season": "2027", "round": 3, "score": 100})
+    assert "name" not in mine  # the raw shape this bug depends on
+    ideas = [{"partner_team_name": "Team", "send_assets": [mine, pick], "receive_assets": [theirs]}]
+    plan = gm_plan.build_gm_plan(team_stance="", season_phase=gm_plan.PHASE_EARLY_SEASON, trade_ideas=ideas)
+    item = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_TRADE)["items"][0]
+    assert item["send_assets"][0]["name"] == "Jaylen Wright"
+    assert item["send_assets"][0]["tier"] == "Elite"
+    assert item["receive_assets"][0]["name"] == "Tetairoa McMillan"
+    assert item["send_assets"][1]["label"] == "2027 Round 3"
