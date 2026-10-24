@@ -80,7 +80,7 @@ export default function BrandHeaderBar({
           <TouchableOpacity
             style={styles.iconButton}
             hitSlop={8}
-            onPress={() => navigation.navigate('GmTargets', { leagueId, leagueName })}
+            onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName, initialTab: 'watching' })}
             accessibilityRole="button"
             accessibilityLabel="GM Targets"
           >

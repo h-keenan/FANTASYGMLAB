@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -39,6 +39,7 @@ import {
 } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { buildPlanSnapshot, deadlineWeek, type PlanSnapshotTile } from '../lib/gmPlanSnapshot';
+import { normalizeGmPlanTab } from '../lib/homeRedirects';
 import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -96,7 +97,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<GmPlanResponse | null>(null);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(normalizeGmPlanTab(route.params.initialTab));
   const [showRoster, setShowRoster] = useState(false);
   const [snapshot, setSnapshot] = useState<PlanSnapshotTile[]>([]);
   const [roster, setRoster] = useState<LineupPlayer[]>([]);
@@ -104,6 +105,13 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const [ranked, setRanked] = useState<Map<string, RankedPlayer>>(new Map());
   const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
   const [tradeWindow, setTradeWindow] = useState<GmPlanResponse['trade_window']>(undefined);
+
+  // Re-selecting GM Plan with a tab (header star -> Watching) while it is
+  // already mounted should switch tabs too.
+  const requestedTab = route.params.initialTab;
+  useEffect(() => {
+    if (requestedTab) setTab(normalizeGmPlanTab(requestedTab));
+  }, [requestedTab]);
 
   useScreenHeaderTitle(navigation, 'GM Plan', leagueName);
 
