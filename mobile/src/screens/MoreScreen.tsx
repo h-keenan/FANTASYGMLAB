@@ -77,6 +77,8 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
   { value: 'watch', label: 'Watch items', description: 'Worth knowing, not urgent' },
   { value: 'recap', label: 'Weekly recaps', description: 'When a new League Recap is ready' },
   { value: 'injury', label: 'Injury updates', description: 'A status change on your own roster (Questionable, Out, etc.)' },
+  { value: 'team_situation', label: 'Team Situation reminder', description: 'A one-time nudge to set rebuilding, competing, or balanced' },
+  { value: 'trade_followup', label: 'Trade follow-ups', description: 'Asking whether a trade you shared actually happened' },
 ];
 
 export default function MoreScreen({ navigation }: Props) {

@@ -13,7 +13,7 @@ import { trackOnboarding } from "@/lib/onboardingAnalytics";
 import { Toggle } from "@/components/Toggle";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
- * — same four categories, same copy — so a user who's seen this in the app
+ * — same six categories, same copy — so a user who's seen this in the app
  * recognizes it here. Order matches modules.push_triggers.
  * TOGGLEABLE_PUSH_CATEGORIES. */
 const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; description: string }> = [
@@ -21,6 +21,8 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
   { value: "watch", label: "Watch items", description: "Worth knowing, not urgent" },
   { value: "recap", label: "Weekly recaps", description: "When a new League Recap is ready" },
   { value: "injury", label: "Injury updates", description: "A status change on your own roster (Questionable, Out, etc.)" },
+  { value: "team_situation", label: "Team Situation reminder", description: "A one-time nudge to set rebuilding, competing, or balanced" },
+  { value: "trade_followup", label: "Trade follow-ups", description: "Asking whether a trade you shared actually happened" },
 ];
 
 function SectionHeading({ id, children, color }: { id: string; children: React.ReactNode; color?: string }) {

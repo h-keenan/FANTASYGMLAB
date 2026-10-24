@@ -86,3 +86,29 @@ def test_send_expo_push_notifications_reports_device_not_registered_tokens():
     with patch("requests.post", return_value=response):
         result = push_tokens.send_expo_push_notifications(tokens, title="Hi", body="There")
     assert result["invalid_tokens"] == ["ExponentPushToken[b]"]
+
+
+def test_register_token_stores_timezone_and_falls_back_when_column_missing():
+    from unittest.mock import patch
+
+    calls = []
+
+    def fake_upsert(config, access_token, table, payload, *, on_conflict):
+        calls.append(dict(payload))
+        if "timezone" in payload:
+            return False, "column timezone does not exist"
+        return True, ""
+
+    with patch("modules.account_store.upsert_row", side_effect=fake_upsert):
+        ok, _ = push_tokens.register_token(
+            {}, "jwt", user_id="u1", expo_push_token="ExponentPushToken[a]", timezone="America/Chicago"
+        )
+    assert ok is True
+    assert calls[0]["timezone"] == "America/Chicago"
+    assert "timezone" not in calls[1]
+
+
+def test_normalize_timezone_rejects_unknown_zones():
+    assert push_tokens.normalize_timezone("America/Chicago") == "America/Chicago"
+    assert push_tokens.normalize_timezone("nope") == ""
+    assert push_tokens.normalize_timezone(None) == ""
