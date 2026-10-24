@@ -38,6 +38,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
 
@@ -263,6 +264,7 @@ function PlayerRankRow({
 }
 
 export default function PlayersScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -399,7 +401,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
                 isFirst={index === 0}
                 isLast={index === filtered.length - 1}
                 grid={viewMode === 'grid'}
-                onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
+                onPress={() => openQuickView(item, { leagueId, leagueName })}
                 onAddToTrade={
                   shortcuts.canAddToTrade
                     ? () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'make', tradePlayer: item })

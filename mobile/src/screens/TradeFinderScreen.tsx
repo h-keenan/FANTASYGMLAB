@@ -36,6 +36,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { TRADE_FINDER_MAX_PICKS, ownedPicksForRoster, toggleCappedSelection } from '../lib/tradeFinderPicks';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 // Prop-driven now (TradesScreen owns the single `Trades` route and hosts
 // this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
@@ -380,6 +381,7 @@ function ResultCard({
  * to whatever the caller picks here instead of the unrestricted pool.
  */
 export default function TradeFinderScreen({ leagueId, leagueName, navigation, presetPlayerId }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
 
   const { colors } = useThemeMode();
@@ -496,7 +498,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   }, [loadingRoster, presetPlayerId, roster]);
 
   const openPlayer = (asset: PresentationAsset) =>
-    navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
+    openQuickView(assetToRankedPlayer(asset), { leagueId, leagueName });
   const openPick = (asset: PresentationAsset) =>
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 

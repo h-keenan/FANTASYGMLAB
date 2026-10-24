@@ -59,6 +59,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Matchup'>;
 
@@ -121,6 +122,7 @@ function toneColor(colors: ThemeColors, tone: VerdictTone): string {
 }
 
 export default function MatchupScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -237,7 +239,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
       }
     : matchup;
   const openPlayer = (player: LineupPlayer) =>
-    navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
+    openQuickView(toRankedPlayer(player), { leagueId, leagueName });
 
   return (
     <View style={styles.root}>

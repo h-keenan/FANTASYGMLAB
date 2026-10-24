@@ -49,6 +49,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveDraft'>;
 
@@ -93,6 +94,7 @@ function leanPlayer(row: {
 }
 
 export default function LiveDraftScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -188,7 +190,7 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
   };
 
   const openPlayer = (row: Parameters<typeof leanPlayer>[0]) =>
-    navigation.navigate('PlayerDetail', { player: leanPlayer(row), leagueId, leagueName });
+    openQuickView(leanPlayer(row), { leagueId, leagueName });
 
   if (!discovery && !discoveryError) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;

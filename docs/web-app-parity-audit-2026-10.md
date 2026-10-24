@@ -134,7 +134,7 @@ Size: S = under half a day, M = about a day, L = multi-day or needs API work.
 5. League Pulse: promote the local `LeaguePulseSection` to a shared component with the web tile set (M).
 6. Trade Hub/Finder: migrate local `ExchangeAssetList`/`CategoryBadge`/`ImpactBadge` to `TradeAssetRow` / `ToneBadge` (M).
 7. OVR ring: one spec across web `OvrGauge`/`ValueRing` and app `CircularProgressRing`/`OverallRatingBadge` (M).
-8. Player tap behavior: web Quick View sheet vs app full screen (L, product decision).
+8. Player tap behavior: DONE 2026-10-24 (coridian_ decision). The app now opens a shared PlayerQuickViewSheet; its Full profile action opens PlayerDetail.
 9. Visual pass of More vs Account card structure and Exposure tab (S each).
 10. Waivers deep-link highlight and Player tabs parity check (S verify).
 

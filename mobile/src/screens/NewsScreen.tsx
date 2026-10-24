@@ -12,6 +12,8 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { newsPlayerIdentities } from '../lib/newsIdentity';
+import { stubPlayer } from '../lib/playerQuickView';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -212,8 +214,9 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
     item.speculative ? 'Unconfirmed / speculative' : null,
     item.source ? `Source: ${item.source}` : null,
   ].filter((bit): bit is string => Boolean(bit));
-  // Backend-resolved identities only. Not tappable: News has no league
-  // context, and PlayerDetail requires one.
+  // Backend-resolved identities only. Tapping opens the shared quick view
+  // with no league (league-independent fields only).
+  const { openPlayer } = usePlayerQuickView();
   const identities = newsPlayerIdentities(item);
 
   return (
@@ -234,6 +237,20 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
           position={identity.matched_player_position}
           team={identity.matched_player_team}
           style={styles.identity}
+          onPress={
+            identity.matched_player_id
+              ? () =>
+                  openPlayer(
+                    stubPlayer({
+                      player_id: identity.matched_player_id as string,
+                      name: identity.matched_player,
+                      position: identity.matched_player_position,
+                      team: identity.matched_player_team,
+                    }),
+                    { sourceLabel: 'News' },
+                  )
+              : undefined
+          }
         />
       ))}
       <AppText style={styles.title} numberOfLines={2}>

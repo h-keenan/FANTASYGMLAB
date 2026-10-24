@@ -38,6 +38,7 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyTeam'>;
 
@@ -90,6 +91,7 @@ const ANALYSIS_TONE_COLOR = (tone: TeamAnalysisRow['tone'], colors: ThemeColors)
         : colors.accent;
 
 export default function MyTeamScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -203,7 +205,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
 
   const goToPlayer = useCallback(
     (player: LineupPlayer) => {
-      navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
+      openQuickView(toRankedPlayer(player), { leagueId, leagueName });
     },
     [navigation, leagueId, leagueName],
   );

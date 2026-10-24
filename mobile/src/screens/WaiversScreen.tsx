@@ -54,6 +54,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
 
@@ -103,6 +104,7 @@ function reasonMessage(reason: string): string | null {
  * a mix of ad hoc labels so "Priority Adds," "Best Available by Position,"
  * and "All Free Agents" all read as one family of section boundary. */
 export default function WaiversScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -236,7 +238,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
   const openPlayer = useCallback(
     (player: WaiverPlayer) =>
-      navigation.navigate('PlayerDetail', { player: rankedPlayerFromWaiverPlayer(player), leagueId, leagueName }),
+      openQuickView(rankedPlayerFromWaiverPlayer(player), { leagueId, leagueName }),
     [navigation, leagueId, leagueName],
   );
 

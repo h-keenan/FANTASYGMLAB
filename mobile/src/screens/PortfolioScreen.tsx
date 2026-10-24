@@ -39,6 +39,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -84,6 +85,7 @@ function recordLabel(league: PortfolioLeague): string {
  * background-refetch treatment the rest of the app already relies on.
  */
 export default function PortfolioScreen() {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<Navigation>();
@@ -175,8 +177,7 @@ export default function PortfolioScreen() {
 
   const openPlayer = useCallback(
     (league: PortfolioLeague, player: SignalPlayer) => {
-      navigation.navigate('PlayerDetail', {
-        player: {
+      openQuickView({
           player_id: player.player_id,
           name: player.name,
           position: player.position || null,
@@ -190,10 +191,7 @@ export default function PortfolioScreen() {
           position_rank: null,
           rank_unavailable_reason: null,
           opportunity_label: null,
-        },
-        leagueId: league.league_id,
-        leagueName: league.league_name,
-      });
+        }, { leagueId: league.league_id, leagueName: league.league_name });
     },
     [navigation],
   );

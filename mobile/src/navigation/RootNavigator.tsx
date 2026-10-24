@@ -30,6 +30,7 @@ import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
 import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
 import PlayersScreen from '../screens/PlayersScreen';
+import { PlayerQuickViewProvider } from '../context/PlayerQuickViewContext';
 import PlayerDetailScreen from '../screens/PlayerDetailScreen';
 import PlayerCompareScreen from '../screens/PlayerCompareScreen';
 import WaiversScreen from '../screens/WaiversScreen';
@@ -229,6 +230,7 @@ export default function RootNavigator() {
   const hideFloatingChrome = currentRouteName === 'Onboarding' || showOnboardingFirst;
 
   return (
+    <PlayerQuickViewProvider>
     <View style={{ flex: 1, backgroundColor: colors.background }}>
     {/* The single shared animated page background, behind every screen. */}
     <AppBackground />
@@ -357,5 +359,6 @@ export default function RootNavigator() {
       )}
     </NavigationContainer>
     </View>
+    </PlayerQuickViewProvider>
   );
 }
