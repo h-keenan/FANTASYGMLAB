@@ -23,6 +23,16 @@ import { maskSavedLeagueRows } from "@/lib/privacy";
  * real form arrives. Deliberately has no "Loading…" text: crawlers see the
  * marketing copy, not a loading state.
  */
+/**
+ * Both values are ours: the server builds the checkout return URLs (hosted
+ * success_url and embedded return_url). The embedded flow used to return
+ * "complete", which this page didn't recognize, so a paying user was
+ * dropped back on the first onboarding step.
+ */
+export function isBillingReturn(value: string | null | undefined): boolean {
+  return value === "success" || value === "complete";
+}
+
 export function LandingAuthSlotPlaceholder() {
   // 8.25rem = the measured height of the signed-out sign-in card at phone
   // width (131px). The old 15rem slot collapsed by ~110px when the real form
@@ -58,14 +68,13 @@ export function LandingAuthIsland() {
   // completed checkout (?billing=success) — OnboardingPaywall's own
   // checkout redirects back here, and showing the exact same trial offer
   // again to someone who just subscribed would be absurd.
-  const [paywallDismissed, setPaywallDismissed] = useState(
-    () => searchParams.get("billing") === "success",
-  );
+  const returnedFromCheckout = isBillingReturn(searchParams.get("billing"));
+  const [paywallDismissed, setPaywallDismissed] = useState(() => returnedFromCheckout);
   // Same reasoning as paywallDismissed just above (and the same session-
   // only, not-persisted tradeoff that one already accepts) — the carousel
   // sits before the paywall in this flow, so returning from a completed
   // checkout means it was necessarily already seen or skipped this session.
-  const [carouselDone, setCarouselDone] = useState(() => searchParams.get("billing") === "success");
+  const [carouselDone, setCarouselDone] = useState(() => returnedFromCheckout);
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
   const skippedExistingSession = useRef(false);
   // Guards the one-time `landing_viewed` fire below -- see its own effect's
@@ -186,6 +195,11 @@ export function LandingAuthIsland() {
       <OnboardingCarousel onDone={() => setCarouselDone(true)} />
     ) : paywallDismissed ? (
       <>
+        {returnedFromCheckout ? (
+          <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
+            You&apos;re in. Pro is unlocked. Connect your league to get started.
+          </p>
+        ) : null}
         <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
         <SampleLeagueLink />
       </>

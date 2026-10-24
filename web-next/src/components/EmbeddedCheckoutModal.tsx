@@ -11,10 +11,9 @@ import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
  * Zach, 2026-10-19: "We need to try to embed stripe so theres not a
  * million redirectes" — mounts Stripe's own Checkout UI in an overlay on
  * top of this app instead of redirecting the whole browser to
- * checkout.stripe.com and back. Apple Pay / Google Pay show up
- * automatically inside it (handled by the Checkout product itself, same
- * as the hosted flow — no separate Payment Element build or manual Apple
- * Pay domain registration needed). Card entry and payment processing stay
+ * checkout.stripe.com and back. Apple Pay shows up inside it only once
+ * the domain is registered with Stripe (docs/apple-pay-domain-setup.md;
+ * the association file is served from public/.well-known). Card entry and payment processing stay
  * entirely inside Stripe's own iframe; this app still never touches card
  * details, same contract as the hosted flow it's replacing.
  *
@@ -61,26 +60,29 @@ export function EmbeddedCheckoutModal({
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: "var(--color-scrim)", zIndex: 60 }}
+      // Bottom-aligned on phones, centered from sm up. Sized in dvh (not
+      // vh, which on iOS Safari includes the area under the browser bar
+      // and clipped the submit button) and padded for the home indicator.
+      className="fixed inset-x-0 top-0 flex items-end justify-center sm:items-center sm:p-4"
+      style={{ background: "var(--color-scrim)", zIndex: 60, height: "100dvh" }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
         ref={sheetRef}
-        className="flex flex-col gap-2 w-full max-w-lg"
+        className="flex flex-col w-full max-w-lg"
         style={{
           ...sheetStyle,
           background: "var(--color-surface-raised)",
           border: "var(--border-width-default) solid var(--color-border)",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          overscrollBehavior: "contain",
+          maxHeight: "calc(100dvh - env(safe-area-inset-top, 0px) - 0.5rem)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          overflow: "hidden",
         }}
       >
         <SheetHandle />
-        <div className="flex items-center justify-between px-4 pt-3">
+        <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-2">
           <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
             Checkout
           </span>
@@ -94,7 +96,9 @@ export function EmbeddedCheckoutModal({
             ×
           </button>
         </div>
-        <div className="px-1 pb-1">
+        {/* The only scroll area: the whole Stripe form, submit button
+            included, is reachable by scrolling inside it. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-1" style={{ overscrollBehavior: "contain" }}>
           {stripePromise ? (
             <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
               <EmbeddedCheckout />

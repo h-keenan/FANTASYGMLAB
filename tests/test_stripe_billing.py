@@ -148,6 +148,36 @@ class TestStripeBilling(unittest.TestCase):
         self.assertTrue(str(kwargs["idempotency_key"]).startswith("fgl-checkout-user-1-annual"))
         self.assertTrue(kwargs["allow_promotion_codes"])
 
+    def _session_kwargs(self, **extra):
+        created = Mock(return_value=SimpleNamespace(client_secret="cs", url=None))
+        fake_stripe = SimpleNamespace(api_key="", checkout=SimpleNamespace(Session=SimpleNamespace(create=created)))
+        config = stripe_billing.StripeBillingConfig(secret_key="sk_test_123", price_monthly="p_m", price_annual="p_y")
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            stripe_billing.create_checkout_session(
+                config=config, user_id="user-1", interval=stripe_billing.ANNUAL, ui_mode="embedded", **extra
+            )
+        return created.call_args.kwargs
+
+    def test_checkout_prefills_customer_email_when_no_customer(self):
+        kwargs = self._session_kwargs(email="user@example.com")
+        self.assertEqual(kwargs["customer_email"], "user@example.com")
+        self.assertNotIn("customer", kwargs)
+
+    def test_checkout_uses_customer_never_both(self):
+        kwargs = self._session_kwargs(email="user@example.com", customer_id="cus_1")
+        self.assertEqual(kwargs["customer"], "cus_1")
+        self.assertNotIn("customer_email", kwargs)
+
+    def test_checkout_without_email_or_customer_sends_neither(self):
+        kwargs = self._session_kwargs(email="")
+        self.assertNotIn("customer", kwargs)
+        self.assertNotIn("customer_email", kwargs)
+
+    def test_checkout_idempotency_key_changes_with_email(self):
+        a = self._session_kwargs(email="a@example.com")["idempotency_key"]
+        b = self._session_kwargs(email="b@example.com")["idempotency_key"]
+        self.assertNotEqual(a, b)
+
     # Zach, 2026-10-19: "We need to try to embed stripe so theres not a
     # million redirectes"
     def test_checkout_session_embedded_mode_uses_return_url_not_success_cancel(self):
@@ -169,13 +199,13 @@ class TestStripeBilling(unittest.TestCase):
                 email="user@example.com",
                 interval=stripe_billing.MONTHLY,
                 ui_mode="embedded",
-                return_url="https://app.test/premium?billing=complete",
+                return_url="https://app.test/premium?billing=success",
             )
 
         self.assertEqual(session.client_secret, "cs_test_embedded")
         kwargs = created.call_args.kwargs
         self.assertEqual(kwargs["ui_mode"], "embedded")
-        self.assertEqual(kwargs["return_url"], "https://app.test/premium?billing=complete")
+        self.assertEqual(kwargs["return_url"], "https://app.test/premium?billing=success")
         self.assertNotIn("success_url", kwargs)
         self.assertNotIn("cancel_url", kwargs)
         # Promo codes, metadata, idempotency, trial -- everything else about
