@@ -21,6 +21,8 @@ const ALL_CATEGORIES_ON: Record<PushCategory, boolean> = {
   watch: true,
   recap: true,
   injury: true,
+  team_situation: true,
+  trade_followup: true,
 };
 
 function renderContent(overrides: Partial<Parameters<typeof AccountContent>[0]> = {}) {

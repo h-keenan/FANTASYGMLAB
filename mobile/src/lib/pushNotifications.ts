@@ -6,6 +6,7 @@ import { StackActions } from '@react-navigation/routers';
 
 import { api, type RankedPlayer } from './api';
 import { navigationRef } from '../navigation/navigationRef';
+import { resolvePushTapTarget } from './pushRouting';
 
 /**
  * Expo's managed push service (not raw APNs/FCM handling) — idiomatic for an
@@ -67,6 +68,16 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
+/** Device IANA timezone (e.g. America/Chicago) for server-side push quiet
+ * hours; '' when the runtime can't tell (backend then assumes New York). */
+function deviceTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    return '';
+  }
+}
+
 /** Request permission, mint an Expo push token, and register it with our backend. */
 export async function syncPushToken(): Promise<void> {
   try {
@@ -75,7 +86,7 @@ export async function syncPushToken(): Promise<void> {
     if (!granted) return;
     const token = await getExpoPushToken();
     if (!token) return;
-    await api.registerPushToken(token, Platform.OS);
+    await api.registerPushToken(token, Platform.OS, '', deviceTimezone());
     lastRegisteredToken = token;
   } catch (err) {
     console.warn('[push] syncPushToken failed', err);
@@ -95,39 +106,23 @@ export async function unregisterCurrentPushToken(): Promise<void> {
   }
 }
 
-/**
- * Every push category (see modules/push_triggers.py) attaches at least
- * {league_id, league_name, category} as `data`. top_priority/watch items
- * sourced from a headline idea with a route_player_id, and injury items,
- * additionally carry player_id/player_name — those deep-link straight to
- * that player's Player Detail screen. recap and gm_stance_reminder (and
- * any payload missing player data) have no more-specific target than the
- * league itself, so they fall back to that league's hub, same as before.
- */
-export interface PushNotificationData {
-  league_id?: string;
-  league_name?: string;
-  category?: string;
-  player_id?: string;
-  player_name?: string;
-}
-
 function routeNotificationTap(data: unknown): void {
-  if (!data || typeof data !== 'object' || !navigationRef.isReady()) return;
-  const payload = data as PushNotificationData;
-  const leagueId = typeof payload.league_id === 'string' ? payload.league_id : '';
-  const leagueName = typeof payload.league_name === 'string' ? payload.league_name : '';
-  if (!leagueId) return;
+  if (!navigationRef.isReady()) return;
+  const target = resolvePushTapTarget(data);
+  if (!target) return;
 
-  const playerId = typeof payload.player_id === 'string' ? payload.player_id : '';
-  if (playerId) {
+  if (target.screen === 'TradeHistory') {
+    navigationRef.navigate('TradeHistory');
+    return;
+  }
+
+  if (target.screen === 'PlayerDetail') {
     // Same lean hand-built player pattern AlertsScreen/DashboardScreen use
-    // for their own player taps — Player Detail fetches everything else
+    // for their own player taps - Player Detail fetches everything else
     // itself from player_id, so a full player fetch isn't needed here.
-    const playerName = typeof payload.player_name === 'string' ? payload.player_name : '';
     const player: RankedPlayer = {
-      player_id: playerId,
-      name: playerName || null,
+      player_id: target.playerId,
+      name: target.playerName || null,
       position: null,
       team: null,
       age: null,
@@ -140,11 +135,17 @@ function routeNotificationTap(data: unknown): void {
       rank_unavailable_reason: null,
       opportunity_label: null,
     };
-    navigationRef.navigate('PlayerDetail', { player, leagueId, leagueName });
+    navigationRef.navigate('PlayerDetail', {
+      player,
+      leagueId: target.leagueId,
+      leagueName: target.leagueName,
+    });
     return;
   }
 
-  navigationRef.dispatch(StackActions.popTo('LeagueDetail', { leagueId, leagueName }));
+  navigationRef.dispatch(
+    StackActions.popTo('LeagueDetail', { leagueId: target.leagueId, leagueName: target.leagueName }),
+  );
 }
 
 /**

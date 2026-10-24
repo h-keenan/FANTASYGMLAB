@@ -2018,7 +2018,13 @@ export const MIN_ROUND_PROJECTION = 1;
 export const MAX_ROUND_PROJECTION = 7;
 
 // Matches modules/push_triggers.py's TOGGLEABLE_PUSH_CATEGORIES.
-export type PushCategory = 'top_priority' | 'watch' | 'recap' | 'injury';
+export type PushCategory =
+  | 'top_priority'
+  | 'watch'
+  | 'recap'
+  | 'injury'
+  | 'team_situation'
+  | 'trade_followup';
 
 export interface PushPreferencesResponse {
   ok: boolean;
@@ -3155,11 +3161,12 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-plan${query ? `?${query}` : ''}`,
     );
   },
-  registerPushToken: (expoPushToken: string, platform: string, deviceName = '') =>
+  registerPushToken: (expoPushToken: string, platform: string, deviceName = '', timezone = '') =>
     authorizedPost<PushMutationResponse>('/v1/push/register', {
       expo_push_token: expoPushToken,
       platform,
       device_name: deviceName,
+      timezone,
     }),
   unregisterPushToken: (expoPushToken: string) =>
     authorizedPost<PushMutationResponse>('/v1/push/unregister', {

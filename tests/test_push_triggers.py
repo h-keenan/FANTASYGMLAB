@@ -7,11 +7,31 @@ across the mobile API tests.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import pandas as pd
 
+import pytest
+
 from modules import push_tokens, push_triggers
+
+
+_real_count_recent_pushes = push_triggers.count_recent_pushes
+_real_fetch_push_timezones = push_triggers.fetch_push_timezones
+
+
+@pytest.fixture(autouse=True)
+def _daytime_no_history(monkeypatch):
+    """Default every sweep test to mid-day New York with no prior pushes, so
+    the older tests keep their exact request sequence. Quiet-hours / cap /
+    timezone behavior is covered by tests that override these."""
+
+    monkeypatch.setattr(push_triggers, "fetch_push_timezones", lambda config: {})
+    monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: 0)
+    monkeypatch.setattr(
+        push_triggers, "_utcnow", lambda: datetime(2026, 10, 21, 17, 0, tzinfo=timezone.utc)
+    )
 
 
 def _config() -> push_triggers.PushTriggerConfig:
@@ -185,7 +205,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
     assert push_call.kwargs["json"][0]["to"] == "ExponentPushToken[a]"
     log_call = mock_post.call_args_list[1]
     assert "push_notification_log" in log_call.args[0]
-    assert log_call.kwargs["json"]["recommendation_id"] == "rec-abc"
+    assert log_call.kwargs["json"][0]["recommendation_id"] == "rec-abc"
 
     # Second sweep: the log now reports this recommendation as already sent.
     with patch(
@@ -312,7 +332,7 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
 
     assert stats["pushes_sent"] == 1
     push_call = mock_post.call_args_list[0]
-    assert push_call.kwargs["json"][0]["title"] == "Recap Ready — Test League"
+    assert push_call.kwargs["json"][0]["title"] == "Recap Ready"
     assert push_call.kwargs["json"][0]["body"] == "Week 3 recap is ready"
     assert "player_id" not in push_call.kwargs["json"][0]["data"]
     assert "player_name" not in push_call.kwargs["json"][0]["data"]
@@ -505,7 +525,7 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
 
     assert stats["pushes_sent"] == 1
     push_call = mock_post.call_args_list[0]
-    assert push_call.kwargs["json"][0]["title"] == "Injury Update — Test League"
+    assert push_call.kwargs["json"][0]["title"] == "Injury Update"
     assert push_call.kwargs["json"][0]["body"] == "Hurt Guy is now Out"
     # The routing metadata reaches the actual Expo payload, not just the
     # intermediate push_item dict — this is what mobile's routeNotificationTap
@@ -522,8 +542,14 @@ def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
     ]
     with patch("requests.get", return_value=response):
         preferences = push_triggers.fetch_push_preferences(_config(), ["u1", "u2"])
-    assert preferences["u1"] == {"top_priority": True, "watch": True, "recap": True, "injury": False}
-    assert preferences["u2"] == {"top_priority": True, "watch": True, "recap": True, "injury": True}
+    assert preferences["u1"] == {
+        "top_priority": True, "watch": True, "recap": True, "injury": False,
+        "team_situation": True, "trade_followup": True,
+    }
+    assert preferences["u2"] == {
+        "top_priority": True, "watch": True, "recap": True, "injury": True,
+        "team_situation": True, "trade_followup": True,
+    }
 
 
 def test_fetch_push_preferences_empty_without_ids_or_config():
@@ -536,9 +562,11 @@ def test_fetch_push_preferences_empty_without_ids_or_config():
     mock_get.assert_not_called()
 
 
-def test_fetch_push_preferences_fails_open_on_transport_error():
+def test_fetch_push_preferences_returns_none_on_read_errors():
     with patch("requests.get", side_effect=Exception("network down")):
-        assert push_triggers.fetch_push_preferences(_config(), ["u1"]) == {}
+        assert push_triggers.fetch_push_preferences(_config(), ["u1"]) is None
+    with patch("requests.get", return_value=Mock(status_code=500)):
+        assert push_triggers.fetch_push_preferences(_config(), ["u1"]) is None
 
 
 def test_push_item_allowed_defaults_true_without_a_settings_row():
@@ -547,6 +575,12 @@ def test_push_item_allowed_defaults_true_without_a_settings_row():
 
 def test_push_item_allowed_respects_disabled_category():
     preferences = {"u1": {"top_priority": True, "watch": True, "recap": True, "injury": False}}
+    assert push_triggers.push_item_allowed(
+        {"u1": {"team_situation": False, "trade_followup": False}}, user_id="u1", category="gm_stance_reminder"
+    ) is False
+    assert push_triggers.push_item_allowed(
+        {"u1": {"team_situation": False, "trade_followup": False}}, user_id="u1", category="trade_followup"
+    ) is False
     assert push_triggers.push_item_allowed(preferences, user_id="u1", category="injury") is False
     assert push_triggers.push_item_allowed(preferences, user_id="u1", category="watch") is True
 
@@ -633,7 +667,8 @@ def test_run_trade_outcome_followup_sweep_sends_and_marks_pushed():
     tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
     expo_response = Mock(status_code=200, json=lambda: {"data": [{"status": "ok"}]})
 
-    with patch("requests.get", side_effect=[pending_response, tokens_response]):
+    prefs_response = Mock(status_code=200, json=lambda: [])
+    with patch("requests.get", side_effect=[pending_response, tokens_response, prefs_response]):
         with patch("requests.post", return_value=expo_response) as mock_post:
             with patch("requests.patch") as mock_patch:
                 stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
@@ -642,9 +677,16 @@ def test_run_trade_outcome_followup_sweep_sends_and_marks_pushed():
     assert stats["outcomes_checked"] == 1
     assert stats["pushes_sent"] == 1
     assert not stats["errors"]
-    assert mock_post.call_args.args[0] == push_tokens.EXPO_PUSH_API_URL
-    assert mock_post.call_args.kwargs["json"][0]["to"] == "ExponentPushToken[a]"
-    assert "Team Rocket" in mock_post.call_args.kwargs["json"][0]["body"]
+    expo_call = mock_post.call_args_list[0]
+    assert expo_call.args[0] == push_tokens.EXPO_PUSH_API_URL
+    assert expo_call.kwargs["json"][0]["to"] == "ExponentPushToken[a]"
+    # Privacy: partner team name is not in push text; league_id rides in data.
+    assert "Team Rocket" not in expo_call.kwargs["json"][0]["body"]
+    assert expo_call.kwargs["json"][0]["data"]["league_id"] == "league-1"
+    assert expo_call.kwargs["json"][0]["data"]["outcome_id"] == "outcome-1"
+    log_call = mock_post.call_args_list[1]
+    assert "push_notification_log" in log_call.args[0]
+    assert log_call.kwargs["json"][0]["recommendation_id"] == "trade_followup:outcome-1"
     mock_patch.assert_called_once()
     assert mock_patch.call_args.kwargs["params"] == {"id": "eq.outcome-1"}
 
@@ -657,8 +699,9 @@ def test_run_trade_outcome_followup_sweep_marks_pushed_without_a_token():
     ]
     tokens_response = Mock(status_code=200)
     tokens_response.json.return_value = []
+    prefs_response = Mock(status_code=200, json=lambda: [])
 
-    with patch("requests.get", side_effect=[pending_response, tokens_response]):
+    with patch("requests.get", side_effect=[pending_response, tokens_response, prefs_response]):
         with patch("requests.post") as mock_post:
             with patch("requests.patch") as mock_patch:
                 stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
@@ -849,7 +892,7 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
 
     assert stats["pushes_sent"] == 1
     push_call = mock_post.call_args_list[0]
-    assert push_call.kwargs["json"][0]["title"] == "Set Your Team Situation — Test League"
+    assert push_call.kwargs["json"][0]["title"] == "Set Your Team Situation"
     assert push_call.kwargs["json"][0]["data"]["category"] == "gm_stance_reminder"
     assert push_call.kwargs["json"][0]["data"]["league_name"] == "Test League"
 
@@ -862,3 +905,199 @@ def test_delete_invalid_push_tokens_deletes_each_exact_token():
         push_triggers.delete_invalid_push_tokens(config, ["ExponentPushToken[a]", "garbage"])
     assert delete.call_count == 1
     assert delete.call_args.kwargs["params"] == {"expo_push_token": "eq.ExponentPushToken[a]"}
+
+
+# --- push safety: quiet hours, weekly cap, batching, fail-closed -------------
+
+
+def test_is_quiet_hours_uses_the_device_timezone():
+    now = datetime(2026, 10, 21, 3, 0, tzinfo=timezone.utc)  # 23:00 NY, 20:00 LA
+    assert push_triggers.is_quiet_hours("America/New_York", now) is True
+    assert push_triggers.is_quiet_hours("America/Los_Angeles", now) is False
+    assert push_triggers.is_quiet_hours("", now) is True  # unknown -> New York
+    assert push_triggers.is_quiet_hours("Not/AZone", now) is True
+
+
+def test_is_quiet_hours_boundaries():
+    # 22:00 NY (EDT = UTC-4) starts quiet hours, 08:00 NY ends them.
+    assert push_triggers.is_quiet_hours("America/New_York", datetime(2026, 10, 22, 2, 0, tzinfo=timezone.utc)) is True
+    assert push_triggers.is_quiet_hours("America/New_York", datetime(2026, 10, 22, 1, 59, tzinfo=timezone.utc)) is False
+    assert push_triggers.is_quiet_hours("America/New_York", datetime(2026, 10, 21, 12, 0, tzinfo=timezone.utc)) is False
+    assert push_triggers.is_quiet_hours("America/New_York", datetime(2026, 10, 21, 11, 59, tzinfo=timezone.utc)) is True
+
+
+def test_apply_weekly_cap_reserves_the_last_slot_for_injury():
+    items = [{"category": "watch"}, {"category": "injury"}]
+    assert push_triggers.apply_weekly_cap(items, sent_this_week=2, cap=4) == items
+    assert push_triggers.apply_weekly_cap(items, sent_this_week=3, cap=4) == [{"category": "injury"}]
+    assert push_triggers.apply_weekly_cap(items, sent_this_week=4, cap=4) == []
+
+
+def test_build_batched_message_leads_with_injury_and_hides_league_names():
+    items = [
+        {"category": "watch", "headline": "Watch thing", "league_id": "l2", "league_name": "Secret League"},
+        {"category": "injury", "headline": "X is now Out", "league_id": "l1", "league_name": "Other League",
+         "player_id": "p1", "player_name": "X"},
+        {"category": "recap", "headline": "Week 3 recap is ready", "league_id": "l1", "league_name": "Other League"},
+    ]
+    title, body, data = push_triggers.build_batched_message(items)
+    assert title == "Injury Update"
+    assert body == "X is now Out (+2 more updates)"
+    assert "League" not in title + body
+    assert data["league_id"] == "l1" and data["player_id"] == "p1" and data["count"] == 3
+
+
+def test_count_recent_pushes_counts_distinct_sent_at_and_fails_closed(monkeypatch):
+    # The autouse fixture stubs count_recent_pushes; restore the real one.
+
+
+    real = _real_count_recent_pushes
+    rows = [{"sent_at": "t1"}, {"sent_at": "t1"}, {"sent_at": "t2"}]
+    with patch("requests.get", return_value=Mock(status_code=200, json=lambda: rows)):
+        assert real(_config(), "u1") == 2
+    with patch("requests.get", return_value=Mock(status_code=500)):
+        assert real(_config(), "u1") is None
+    with patch("requests.get", side_effect=Exception("down")):
+        assert real(_config(), "u1") is None
+
+
+def test_fetch_push_timezones_newest_device_wins_and_degrades():
+    rows = [
+        {"user_id": "u1", "timezone": "America/Chicago", "updated_at": "1"},
+        {"user_id": "u1", "timezone": "America/Denver", "updated_at": "2"},
+        {"user_id": "u2", "timezone": "garbage", "updated_at": "1"},
+    ]
+    real = _real_fetch_push_timezones
+    with patch("requests.get", return_value=Mock(status_code=200, json=lambda: rows)):
+        assert real(_config()) == {"u1": "America/Denver"}
+    with patch("requests.get", return_value=Mock(status_code=400)):  # column not migrated yet
+        assert real(_config()) == {}
+
+
+def _run_injury_sweep(*, preferences_response, expo_ok=True):
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    players_df = pd.DataFrame(
+        [
+            {"player_id": "p1", "name": "Hurt Guy", "position": "RB", "dynasty_score": 50, "injury_status": "Out"},
+            {"player_id": "p2", "name": "Other Guy", "position": "WR", "dynasty_score": 40, "injury_status": "IR"},
+        ]
+    )
+    tokens = Mock(status_code=200, json=lambda: [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}])
+    profiles = Mock(status_code=200, json=lambda: [{"user_id": "u1", "sleeper_username": "gm"}])
+    stance = Mock(status_code=200, json=lambda: [{"user_id": "u1", "league_id": "league-1"}])
+    untouch = Mock(status_code=200, json=lambda: [])
+    notified = Mock(status_code=200, json=lambda: [])
+    expo = Mock(status_code=200, json=lambda: {"data": [{"status": "ok"}]}) if expo_ok else Mock(status_code=500)
+    with patch("modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="su1"):
+            with patch("modules.sleeper_leagues.get_user_leagues", return_value=[{"league_id": "league-1"}]):
+                with patch("modules.sleeper.get_league", return_value={"name": "Secret League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "su1", "players": ["p1", "p2"]}],
+                    ):
+                        with patch("modules.dashboard_engine.compose_next_move_briefing", return_value=Mock(items=[])):
+                            with patch("modules.push_triggers.recap_push_item", return_value=None):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[tokens, profiles, preferences_response, stance, untouch, notified],
+                                ):
+                                    with patch("requests.post", return_value=expo) as mock_post:
+                                        stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+    return stats, mock_post
+
+
+def test_sweep_batches_multiple_items_into_one_push_and_one_log_insert():
+    stats, mock_post = _run_injury_sweep(preferences_response=Mock(status_code=200, json=lambda: []))
+    assert stats["pushes_sent"] == 1
+    expo_msgs = mock_post.call_args_list[0].kwargs["json"]
+    assert len(expo_msgs) == 1
+    assert expo_msgs[0]["title"] == "Injury Update"
+    assert "(+1 more update)" in expo_msgs[0]["body"]
+    assert "Secret League" not in expo_msgs[0]["title"] + expo_msgs[0]["body"]
+    log_rows = mock_post.call_args_list[1].kwargs["json"]
+    assert {row["recommendation_id"] for row in log_rows} == {"injury:p1:out", "injury:p2:ir"}
+
+
+def test_sweep_does_not_log_dedup_rows_when_send_fails():
+    stats, mock_post = _run_injury_sweep(
+        preferences_response=Mock(status_code=200, json=lambda: []), expo_ok=False
+    )
+    assert stats["pushes_sent"] == 0
+    assert mock_post.call_count == 1  # Expo attempt only, no push_notification_log insert
+
+
+def test_sweep_fails_closed_when_preferences_cannot_be_read():
+    stats, mock_post = _run_injury_sweep(preferences_response=Mock(status_code=500))
+    assert stats["ok"] is False
+    assert stats["pushes_sent"] == 0
+    mock_post.assert_not_called()
+
+
+def test_sweep_holds_everything_during_quiet_hours(monkeypatch):
+    monkeypatch.setattr(
+        push_triggers, "_utcnow", lambda: datetime(2026, 10, 22, 4, 0, tzinfo=timezone.utc)  # midnight NY
+    )
+    stats, mock_post = _run_injury_sweep(preferences_response=Mock(status_code=200, json=lambda: []))
+    assert stats["pushes_sent"] == 0
+    assert stats["held_quiet_hours"] == 1
+    mock_post.assert_not_called()
+
+
+def test_sweep_respects_the_weekly_cap_and_fails_closed_without_a_count(monkeypatch):
+    monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: 4)
+    stats, mock_post = _run_injury_sweep(preferences_response=Mock(status_code=200, json=lambda: []))
+    assert stats["pushes_sent"] == 0 and stats["capped"] == 1
+    mock_post.assert_not_called()
+
+    monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: None)
+    stats, mock_post = _run_injury_sweep(preferences_response=Mock(status_code=200, json=lambda: []))
+    assert stats["pushes_sent"] == 0
+    mock_post.assert_not_called()
+
+
+def test_trade_followup_held_in_quiet_hours_and_not_marked(monkeypatch):
+    monkeypatch.setattr(
+        push_triggers, "_utcnow", lambda: datetime(2026, 10, 22, 4, 0, tzinfo=timezone.utc)
+    )
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    pending = Mock(status_code=200, json=lambda: [{"id": "o1", "user_id": "u1", "league_id": "l1"}])
+    tokens = Mock(status_code=200, json=lambda: [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}])
+    prefs = Mock(status_code=200, json=lambda: [])
+    with patch("requests.get", side_effect=[pending, tokens, prefs]):
+        with patch("requests.post") as mock_post:
+            with patch("requests.patch") as mock_patch:
+                stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
+    assert stats["held"] == 1 and stats["pushes_sent"] == 0
+    mock_post.assert_not_called()
+    mock_patch.assert_not_called()
+
+
+def test_trade_followup_opt_out_marks_pushed_without_sending():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    pending = Mock(status_code=200, json=lambda: [{"id": "o1", "user_id": "u1", "league_id": "l1"}])
+    tokens = Mock(status_code=200, json=lambda: [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}])
+    prefs = Mock(
+        status_code=200,
+        json=lambda: [{"user_id": "u1", "settings": {"push_categories": {"trade_followup": False}}}],
+    )
+    with patch("requests.get", side_effect=[pending, tokens, prefs]):
+        with patch("requests.post") as mock_post:
+            with patch("requests.patch") as mock_patch:
+                stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
+    assert stats["pushes_sent"] == 0
+    mock_post.assert_not_called()
+    mock_patch.assert_called_once()
+
+
+def test_trade_followup_fails_closed_when_preferences_unreadable():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    pending = Mock(status_code=200, json=lambda: [{"id": "o1", "user_id": "u1", "league_id": "l1"}])
+    tokens = Mock(status_code=200, json=lambda: [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}])
+    with patch("requests.get", side_effect=[pending, tokens, Mock(status_code=500)]):
+        with patch("requests.post") as mock_post:
+            with patch("requests.patch") as mock_patch:
+                stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
+    assert stats["ok"] is False
+    mock_post.assert_not_called()
+    mock_patch.assert_not_called()

@@ -34,6 +34,21 @@ def normalize_platform(value: object) -> str:
     return text if text in VALID_PLATFORMS else ""
 
 
+def normalize_timezone(value: object) -> str:
+    """Return a valid IANA timezone name or "" (unknown)."""
+
+    text = _safe_text(value)
+    if not text or len(text) > 64:
+        return ""
+    try:
+        from zoneinfo import ZoneInfo
+
+        ZoneInfo(text)
+    except Exception:
+        return ""
+    return text
+
+
 def is_expo_push_token(value: object) -> bool:
     text = _safe_text(value)
     return text.startswith("ExponentPushToken[") or text.startswith("ExpoPushToken[")
@@ -47,6 +62,7 @@ def register_token(
     expo_push_token: str,
     platform: str = "",
     device_name: str = "",
+    timezone: str = "",
 ) -> tuple[bool, str]:
     """Upsert a device token for the caller. Primary key is the token itself,
     so re-registering the same device under a different account reassigns
@@ -60,17 +76,24 @@ def register_token(
     if not is_expo_push_token(token):
         return False, "That doesn't look like an Expo push token."
 
+    payload: dict[str, Any] = {
+        "expo_push_token": token,
+        "user_id": uid,
+        "platform": normalize_platform(platform),
+        "device_name": _safe_text(device_name)[:120],
+    }
+    tz_name = normalize_timezone(timezone)
+    if tz_name:
+        # `timezone` needs docs/supabase_push_safety.sql. Until that is
+        # applied the upsert with the extra column errors, so retry without
+        # it: registration itself must never break on an unapplied migration.
+        ok, error = account_store.upsert_row(
+            dict(config), access_token, TOKENS_TABLE, {**payload, "timezone": tz_name}, on_conflict="expo_push_token"
+        )
+        if ok:
+            return ok, error
     return account_store.upsert_row(
-        dict(config),
-        access_token,
-        TOKENS_TABLE,
-        {
-            "expo_push_token": token,
-            "user_id": uid,
-            "platform": normalize_platform(platform),
-            "device_name": _safe_text(device_name)[:120],
-        },
-        on_conflict="expo_push_token",
+        dict(config), access_token, TOKENS_TABLE, payload, on_conflict="expo_push_token"
     )
 
 

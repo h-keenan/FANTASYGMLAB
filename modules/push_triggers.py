@@ -16,15 +16,16 @@ Supabase table (docs/supabase_push_notification_log.sql) keyed on
 (user_id, recommendation_id) so a recommendation is pushed once, not every
 sweep.
 
-Not covered here (left for a later pass, per the same "basic first"
-request): per-user notification preferences/quiet hours, batching multiple
-leagues into one push, and league_movement-category pushes.
+Push safety (docs/notification-audit-2026-10.md): a global rolling-7-day
+cap per user, quiet hours in the user's device timezone, one batched push per
+sweep per user, fail-closed preference reads, and no league/team names in the
+visible push text. Not covered: league_movement-category pushes.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Mapping
 
 import pandas as pd
@@ -45,7 +46,25 @@ TRADE_OUTCOMES_TABLE = "trade_outcomes"
 TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
 # Every push category a user can individually toggle off — the Notification
 # Settings screen (mobile) reads/writes exactly this key set.
-TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury")
+TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup")
+# push item category -> the preference key that gates it. Only the two
+# one-off pushes differ from their category name.
+PREFERENCE_KEY_BY_CATEGORY = {
+    "gm_stance_reminder": "team_situation",
+    "trade_followup": "trade_followup",
+}
+# Highest priority first. Used for ordering a batch and for deciding which
+# items survive the weekly cap.
+PUSH_PRIORITY_ORDER = ("injury", "top_priority", "watch", "trade_followup", "recap", "gm_stance_reminder")
+DEFAULT_WEEKLY_PUSH_CAP = 4
+WEEKLY_CAP_WINDOW = timedelta(days=7)
+QUIET_HOURS_START = 22  # local hour, inclusive
+QUIET_HOURS_END = 8  # local hour, exclusive
+DEFAULT_TIMEZONE = "America/New_York"
+# No server-side privacy-mode flag exists (privacy mode is client-only display
+# masking), so visible push text never carries league or team names. League
+# context stays in the invisible `data` payload for tap routing.
+INCLUDE_LEAGUE_NAMES_IN_PUSH_TEXT = False
 PUSH_CATEGORIES = frozenset({"top_priority", "watch"})
 PUSH_TITLE_BY_CATEGORY = {
     "top_priority": "Your Next Move",
@@ -58,6 +77,7 @@ PUSH_TITLE_BY_CATEGORY = {
     # existing user still matches (see push_notification_log) rather than
     # firing the one-time nudge a second time after a rename.
     "gm_stance_reminder": "Set Your Team Situation",
+    "trade_followup": "Did this trade happen?",
 }
 DEFAULT_LENS = "Dynasty"
 
@@ -161,8 +181,12 @@ def fetch_sleeper_usernames(config: PushTriggerConfig, user_ids: list[str]) -> d
     return usernames
 
 
-def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, dict[str, bool]]:
+def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, dict[str, bool]] | None:
     """user_id -> {category: enabled}, defaulting every category to True.
+
+    Returns None when the read FAILED (transport/HTTP/parse error): callers
+    must fail closed and send nothing rather than ignore opt-outs. A user with
+    no settings row is simply absent from the dict (default-open).
 
     Reuses modules.account_store's existing user_settings table (one JSONB
     `settings` blob per user, auth.uid()=user_id RLS — service-role bypasses
@@ -183,13 +207,15 @@ def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> di
             timeout=15,
         )
     except Exception:
-        return {}
+        return None
     if response.status_code >= 400:
-        return {}
+        return None
     try:
         rows = response.json()
     except Exception:
-        return {}
+        return None
+    if not isinstance(rows, list):
+        return None
     preferences: dict[str, dict[str, bool]] = {}
     for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, Mapping):
@@ -211,7 +237,7 @@ def push_item_allowed(preferences: dict[str, dict[str, bool]], *, user_id: str, 
     user_prefs = preferences.get(user_id)
     if user_prefs is None:
         return True
-    return bool(user_prefs.get(category, True))
+    return bool(user_prefs.get(PREFERENCE_KEY_BY_CATEGORY.get(category, category), True))
 
 
 def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, set[str]]:
@@ -407,6 +433,174 @@ def record_notification(config: PushTriggerConfig, *, user_id: str, recommendati
         pass
 
 
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def load_weekly_push_cap(*, environ: dict | None = None, secrets: Any = None) -> int:
+    """Per-user pushes allowed in a rolling 7 days (PUSH_WEEKLY_CAP, default 4)."""
+
+    raw = app_config.config_value("PUSH_WEEKLY_CAP", environ=environ, secrets=secrets)
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return DEFAULT_WEEKLY_PUSH_CAP
+    return value if 1 <= value <= 50 else DEFAULT_WEEKLY_PUSH_CAP
+
+
+def fetch_push_timezones(config: PushTriggerConfig) -> dict[str, str]:
+    """user_id -> IANA timezone of that account's most recently registered
+    device. Needs push_tokens.timezone (docs/supabase_push_safety.sql); when
+    the column is not there yet the read errors and this returns {} so every
+    user falls back to DEFAULT_TIMEZONE.
+    """
+
+    if not config.configured:
+        return {}
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{PUSH_TOKENS_TABLE}",
+            headers=_headers(config),
+            params={"select": "user_id,timezone,updated_at", "order": "updated_at.asc"},
+            timeout=15,
+        )
+    except Exception:
+        return {}
+    if response.status_code >= 400:
+        return {}
+    try:
+        rows = response.json()
+    except Exception:
+        return {}
+    zones: dict[str, str] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, Mapping):
+            continue
+        user_id = _safe_text(row.get("user_id"))
+        zone = push_tokens.normalize_timezone(row.get("timezone"))
+        if user_id and zone:
+            zones[user_id] = zone  # ascending updated_at: newest device wins
+    return zones
+
+
+def _resolve_tzinfo(tz_name: str) -> tzinfo:
+    from zoneinfo import ZoneInfo
+
+    for name in (tz_name, DEFAULT_TIMEZONE):
+        try:
+            if name:
+                return ZoneInfo(name)
+        except Exception:
+            continue
+    return timezone(timedelta(hours=-5))
+
+
+def is_quiet_hours(tz_name: str, now: datetime | None = None) -> bool:
+    """True from QUIET_HOURS_START to QUIET_HOURS_END (22:00-08:00) local."""
+
+    current = (now or _utcnow()).astimezone(_resolve_tzinfo(tz_name))
+    return current.hour >= QUIET_HOURS_START or current.hour < QUIET_HOURS_END
+
+
+def count_recent_pushes(config: PushTriggerConfig, user_id: str, now: datetime | None = None) -> int | None:
+    """Pushes sent to this user in the last 7 days, from push_notification_log.
+
+    A batched push writes all its rows in ONE insert, so they share a
+    sent_at (the DB's now()); distinct sent_at values == distinct pushes.
+    Returns None on any read failure so the caller fails closed.
+    """
+
+    if not config.configured or not user_id:
+        return None
+    cutoff = ((now or _utcnow()) - WEEKLY_CAP_WINDOW).isoformat()
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
+            headers=_headers(config),
+            params={"select": "sent_at", "user_id": f"eq.{user_id}", "sent_at": f"gte.{cutoff}"},
+            timeout=15,
+        )
+    except Exception:
+        return None
+    if response.status_code >= 400:
+        return None
+    try:
+        rows = response.json()
+    except Exception:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return len({str(row.get("sent_at")) for row in rows if isinstance(row, Mapping) and row.get("sent_at")})
+
+
+def _priority(item: Mapping[str, Any]) -> int:
+    category = item.get("category")
+    return PUSH_PRIORITY_ORDER.index(category) if category in PUSH_PRIORITY_ORDER else len(PUSH_PRIORITY_ORDER)
+
+
+def apply_weekly_cap(items: list[dict[str, Any]], *, sent_this_week: int, cap: int) -> list[dict[str, Any]]:
+    """Items allowed to push given the user's rolling-7-day count.
+
+    One slot is reserved for injury: non-injury items stop at cap-1 sent,
+    injury items at cap, so injury is the last category dropped.
+    """
+
+    if sent_this_week >= cap:
+        return []
+    if sent_this_week >= cap - 1:
+        return [item for item in items if item.get("category") == "injury"]
+    return list(items)
+
+
+def build_batched_message(items: list[dict[str, Any]]) -> tuple[str, str, dict[str, Any]]:
+    """One push for all of a user's pending items: highest priority leads, the
+    rest are summarised ("+N more"). No league or team names in visible text
+    (see INCLUDE_LEAGUE_NAMES_IN_PUSH_TEXT); league context rides in `data`.
+    """
+
+    ordered = sorted(items, key=_priority)
+    lead = ordered[0]
+    title = PUSH_TITLE_BY_CATEGORY.get(lead["category"], "Watch")
+    if INCLUDE_LEAGUE_NAMES_IN_PUSH_TEXT and lead.get("league_name"):
+        title = f"{title} — {lead['league_name']}"
+    body = lead["headline"]
+    if len(ordered) > 1:
+        body = f"{body} (+{len(ordered) - 1} more update{'s' if len(ordered) > 2 else ''})"
+    data: dict[str, Any] = {
+        "league_id": lead.get("league_id", ""),
+        "league_name": lead.get("league_name", ""),
+        "category": lead["category"],
+    }
+    if lead.get("player_id"):
+        data["player_id"] = lead["player_id"]
+        data["player_name"] = lead.get("player_name", "")
+    if len(ordered) > 1:
+        data["count"] = len(ordered)
+    return title, body, data
+
+
+def record_notifications(config: PushTriggerConfig, *, user_id: str, entries: list[tuple[str, str]]) -> None:
+    """Log (recommendation_id, league_id) pairs in ONE insert so they share
+    sent_at and count as a single push toward the weekly cap."""
+
+    rows = [
+        {"user_id": user_id, "recommendation_id": rid, "league_id": _safe_text(lid)}
+        for rid, lid in entries
+        if rid
+    ]
+    if not config.configured or not user_id or not rows:
+        return
+    try:
+        requests.post(
+            f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
+            headers=_headers(config, prefer="return=minimal,resolution=ignore-duplicates"),
+            json=rows,
+            timeout=15,
+        )
+    except Exception:
+        pass
+
+
 def resolve_roster_for_sleeper_user(rosters: list[dict], sleeper_user_id: str) -> dict | None:
     """Faithful port of services/mobile_api_service.py's _resolve_my_roster
     matching step (owner_id == sleeper_user_id) — see module docstring."""
@@ -583,12 +777,15 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
     """
 
     config = load_push_trigger_config(environ=environ, secrets=secrets)
+    weekly_cap = load_weekly_push_cap(environ=environ, secrets=secrets)
     stats: dict[str, Any] = {
         "ok": True,
         "configured": config.configured,
         "accounts_checked": 0,
         "leagues_checked": 0,
         "pushes_sent": 0,
+        "held_quiet_hours": 0,
+        "capped": 0,
         "errors": [],
     }
     if not config.configured:
@@ -602,6 +799,12 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
 
     usernames = fetch_sleeper_usernames(config, list(recipients.keys()))
     preferences = fetch_push_preferences(config, list(recipients.keys()))
+    if preferences is None:
+        # Fail closed: without readable opt-outs, send nothing this run.
+        stats["ok"] = False
+        stats["errors"].append("Push preferences could not be read; sent nothing this run.")
+        return stats
+    timezones = fetch_push_timezones(config)
     gm_stance_leagues = fetch_gm_stance_leagues(config, list(recipients.keys()))
     gm_untouchable_ids = fetch_gm_targets_untouchable_ids(config, list(recipients.keys()))
     players_cache: dict[str, tuple[pd.DataFrame, str]] = {}
@@ -631,6 +834,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             stats["errors"].append(f"{user_id}: league lookup failed ({exc})")
             continue
 
+        candidates: list[dict[str, Any]] = []
         for league in leagues:
             league_id = _safe_text(league.get("league_id"))
             if not league_id:
@@ -696,40 +900,42 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 user_id=user_id,
                 recommendation_ids=[item["recommendation_id"] for item in push_items],
             )
-            for push_item in push_items:
-                recommendation_id = push_item["recommendation_id"]
-                if recommendation_id in already_sent:
-                    continue
-                title = PUSH_TITLE_BY_CATEGORY.get(push_item["category"], "Watch")
-                notification_data: dict[str, Any] = {
-                    "league_id": league_id,
-                    "league_name": push_item["league_name"],
-                    "category": push_item["category"],
-                }
-                # Only top_priority/watch (route_player_id-sourced) and
-                # injury items carry a player_id — recap and
-                # gm_stance_reminder stay league-level routing on purpose.
-                if push_item.get("player_id"):
-                    notification_data["player_id"] = push_item["player_id"]
-                    notification_data["player_name"] = push_item.get("player_name", "")
-                result = push_tokens.send_expo_push_notifications(
-                    tokens,
-                    title=f"{title} — {push_item['league_name']}",
-                    body=push_item["headline"],
-                    data=notification_data,
-                )
-                if result.get("invalid_tokens"):
-                    delete_invalid_push_tokens(config, list(result["invalid_tokens"]))
-                    tokens = [t for t in tokens if t not in set(result["invalid_tokens"])]
-                if result.get("ok"):
-                    # Only dedup-log a delivered push: a transient Expo
-                    # outage must not permanently swallow this notification.
-                    record_notification(config, user_id=user_id, recommendation_id=recommendation_id, league_id=league_id)
-                    stats["pushes_sent"] += 1
-                else:
-                    stats["errors"].append(f"{user_id}/{league_id}: {result.get('error')}")
-                    if not tokens:
-                        break
+            candidates.extend(
+                item for item in push_items if item["recommendation_id"] not in already_sent
+            )
+
+        if not candidates:
+            continue
+        if is_quiet_hours(timezones.get(user_id, DEFAULT_TIMEZONE)):
+            # Held, not dropped: nothing is logged, so the next sweep after
+            # quiet hours re-derives these items and sends what is still live.
+            stats["held_quiet_hours"] += 1
+            continue
+        sent_this_week = count_recent_pushes(config, user_id)
+        if sent_this_week is None:
+            stats["errors"].append(f"{user_id}: weekly push count unavailable; held")
+            continue
+        allowed = apply_weekly_cap(candidates, sent_this_week=sent_this_week, cap=weekly_cap)
+        if not allowed:
+            stats["capped"] += 1
+            continue
+        title, body, notification_data = build_batched_message(allowed)
+        result = push_tokens.send_expo_push_notifications(
+            tokens, title=title, body=body, data=notification_data
+        )
+        if result.get("invalid_tokens"):
+            delete_invalid_push_tokens(config, list(result["invalid_tokens"]))
+        if result.get("ok"):
+            # Only dedup-log a delivered push: a transient Expo outage must
+            # not permanently swallow these notifications.
+            record_notifications(
+                config,
+                user_id=user_id,
+                entries=[(item["recommendation_id"], item["league_id"]) for item in allowed],
+            )
+            stats["pushes_sent"] += 1
+        else:
+            stats["errors"].append(f"{user_id}: {result.get('error')}")
 
     return stats
 
@@ -796,11 +1002,13 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
     """
 
     config = load_push_trigger_config(environ=environ, secrets=secrets)
+    weekly_cap = load_weekly_push_cap(environ=environ, secrets=secrets)
     stats: dict[str, Any] = {
         "ok": True,
         "configured": config.configured,
         "outcomes_checked": 0,
         "pushes_sent": 0,
+        "held": 0,
         "errors": [],
     }
     if not config.configured:
@@ -813,6 +1021,14 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
         return stats
 
     recipients = fetch_push_recipients(config)
+    preferences = fetch_push_preferences(config, [_safe_text(r.get("user_id")) for r in pending])
+    if preferences is None:
+        # Fail closed: nothing is sent or marked, the next run retries.
+        stats["ok"] = False
+        stats["errors"].append("Push preferences could not be read; sent nothing this run.")
+        return stats
+    timezones = fetch_push_timezones(config)
+    sent_counts: dict[str, int | None] = {}
     for row in pending:
         stats["outcomes_checked"] += 1
         outcome_id = _safe_text(row.get("id"))
@@ -823,13 +1039,37 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
         if not tokens:
             mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
             continue
-        partner = _safe_text(row.get("partner_team_name")) or "your trade partner"
+        if not push_item_allowed(preferences, user_id=user_id, category="trade_followup"):
+            # Opted out: stop asking. The in-app pending prompt still covers it.
+            mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
+            continue
+        if is_quiet_hours(timezones.get(user_id, DEFAULT_TIMEZONE)):
+            stats["held"] += 1  # not marked: retried at the next sweep
+            continue
+        if user_id not in sent_counts:
+            sent_counts[user_id] = count_recent_pushes(config, user_id)
+        sent_this_week = sent_counts[user_id]
+        if sent_this_week is None:
+            stats["held"] += 1
+            continue
+        item = {"category": "trade_followup"}
+        if not apply_weekly_cap([item], sent_this_week=sent_this_week, cap=weekly_cap):
+            stats["held"] += 1
+            continue
+        league_id = _safe_text(row.get("league_id"))
+        # Generic copy: the partner team name is not put in push text (no
+        # server-side privacy flag exists; see INCLUDE_LEAGUE_NAMES_IN_PUSH_TEXT).
         try:
             result = push_tokens.send_expo_push_notifications(
                 tokens,
-                title="Did this trade happen?",
-                body=f"You shared a trade with {partner} — let us know if it went through.",
-                data={"type": "trade_outcome_followup", "outcome_id": outcome_id},
+                title=PUSH_TITLE_BY_CATEGORY["trade_followup"],
+                body="You shared a trade recently \u2014 let us know if it went through.",
+                data={
+                    "type": "trade_outcome_followup",
+                    "category": "trade_followup",
+                    "outcome_id": outcome_id,
+                    "league_id": league_id,
+                },
             )
         except Exception as exc:
             stats["errors"].append(f"{user_id}: trade outcome push failed ({exc})")
@@ -838,6 +1078,10 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
         mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
         if result.get("ok"):
             stats["pushes_sent"] += 1
+            sent_counts[user_id] = sent_this_week + 1
+            record_notifications(
+                config, user_id=user_id, entries=[(f"trade_followup:{outcome_id}", league_id)]
+            )
         else:
             stats["errors"].append(f"{user_id}: {result.get('error')}")
 

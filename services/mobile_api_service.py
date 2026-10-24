@@ -8879,6 +8879,9 @@ class RegisterPushTokenRequest(BaseModel):
     expo_push_token: str
     platform: str = ""
     device_name: str = ""
+    # IANA zone (e.g. "America/Chicago") for push quiet hours. Optional;
+    # unknown/invalid is stored as unknown and the sweep assumes New York.
+    timezone: str = ""
 
 
 class UnregisterPushTokenRequest(BaseModel):
@@ -8907,6 +8910,7 @@ def register_push_token(
         expo_push_token=payload.expo_push_token,
         platform=payload.platform,
         device_name=payload.device_name,
+        timezone=payload.timezone,
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}

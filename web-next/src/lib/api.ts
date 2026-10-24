@@ -2968,7 +2968,13 @@ export interface CommunityPreferencesResponse {
  * same four categories mobile's MoreScreen.tsx already lets a user toggle,
  * surfaced here too since the Account page is the first web-next place a
  * user can manage them. */
-export type PushCategory = "top_priority" | "watch" | "recap" | "injury";
+export type PushCategory =
+  | "top_priority"
+  | "watch"
+  | "recap"
+  | "injury"
+  | "team_situation"
+  | "trade_followup";
 
 export interface PushPreferencesResponse {
   ok: boolean;
