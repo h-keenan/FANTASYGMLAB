@@ -313,3 +313,31 @@ def test_build_report_with_explicit_path_never_contacts_supabase(tmp_path, monke
     mock_get.assert_not_called()
     assert report["storage"]["kind"] == "host_local_jsonl"
     assert report["event_count"] == 1
+
+
+def test_fetch_events_supabase_paginates_past_postgrest_max_rows():
+    page1 = Mock(status_code=200)
+    page1.json.return_value = [{"event": "page_view", "ts": float(i)} for i in range(la.SUPABASE_PAGE_SIZE)]
+    page2 = Mock(status_code=200)
+    page2.json.return_value = [{"event": "page_view", "ts": 5000.0}]
+    with patch("requests.get", side_effect=[page1, page2]) as mock_get:
+        rows, ok = la._fetch_events_supabase(_config())
+    assert ok is True
+    assert len(rows) == la.SUPABASE_PAGE_SIZE + 1
+    assert mock_get.call_count == 2
+    assert mock_get.call_args_list[1].kwargs["params"]["offset"] == str(la.SUPABASE_PAGE_SIZE)
+    assert mock_get.call_args_list[0].kwargs["params"]["order"] == "ts.asc,id.asc"
+
+
+def test_write_event_supabase_retries_once_on_5xx(monkeypatch):
+    monkeypatch.setattr(la, "_WRITE_RETRY_DELAY_S", 0)
+    with patch("requests.post", side_effect=[Mock(status_code=503), Mock(status_code=201)]) as mock_post:
+        assert la._write_event_supabase(_config(), {"event": "pqv_opened"}) is True
+    assert mock_post.call_count == 2
+    with patch("requests.post", return_value=Mock(status_code=400)) as mock_post:
+        assert la._write_event_supabase(_config(), {"event": "pqv_opened"}) is False
+    assert mock_post.call_count == 1
+
+
+def test_push_permission_os_result_prop_is_allowlisted():
+    assert la._safe_props({"feature": "push_permission", "os_result": "granted"})["os_result"] == "granted"

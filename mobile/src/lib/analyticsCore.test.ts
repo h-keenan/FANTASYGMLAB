@@ -187,3 +187,11 @@ test('storage failures and a throwing enabled() never throw', async () => {
   b.track('feature_use');
   await assert.doesNotReject(b.flush());
 });
+
+test('onboarding and push pre-prompt props survive sanitizeProps', () => {
+  assert.deepEqual(
+    sanitizeProps({ feature: 'onboarding', action: 'step_viewed', step: 'value', step_index: 0, experience: 'new', email: 'x@y.z' }),
+    { feature: 'onboarding', action: 'step_viewed', step: 'value', step_index: 0, experience: 'new' },
+  );
+  assert.deepEqual(sanitizeProps({ os_result: 'granted' }), { os_result: 'granted' });
+});

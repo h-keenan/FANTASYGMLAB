@@ -241,3 +241,20 @@ def test_slow_redis_hit_does_not_block_other_concurrent_requests(monkeypatch):
         "a slow (but reachable) Redis should only delay the request hitting it, not every "
         "other concurrent request on the same worker"
     )
+
+
+def test_analytics_ingest_has_its_own_budget_and_spares_mutating_tier(monkeypatch):
+    client, mobile_api_service = _client(monkeypatch)
+    _force_rate_limiting(
+        monkeypatch,
+        mobile_api_service,
+        RATE_LIMIT_MUTATING_MAX=2,
+        RATE_LIMIT_ANALYTICS_MAX=5,
+    )
+    body = {"event": "page_view", "anon_id": "anon_x", "props": {"route": "/x"}}
+    for _ in range(5):
+        assert client.post("/v1/analytics/event", json=body).status_code == 200
+    assert client.post("/v1/analytics/event", json=body).status_code == 429
+    # analytics traffic never consumed the mutating budget
+    other = client.post("/v1/preferences", json={})
+    assert other.status_code != 429

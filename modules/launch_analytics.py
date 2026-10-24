@@ -230,6 +230,9 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         "step",
         "step_index",
         "experience",
+        # Push pre-prompt outcome (feature_use push_permission prompt_accepted):
+        # granted | denied | undetermined only.
+        "os_result",
     }
 )
 
@@ -472,16 +475,26 @@ def _write_event_supabase(config: AnalyticsSupabaseConfig, row: Mapping[str, Any
 
     if not config.configured:
         return False
-    try:
-        response = requests.post(
-            f"{config.url}/rest/v1/{ANALYTICS_SUPABASE_TABLE}",
-            headers=_analytics_supabase_headers(config, prefer="return=minimal"),
-            json=dict(row),
-            timeout=8,
-        )
-    except Exception:
+    # One retry on transport error / 5xx / 429 (a blip used to lose the event
+    # for good). Runs on the background thread, so the delay is free.
+    for attempt in range(2):
+        try:
+            response = requests.post(
+                f"{config.url}/rest/v1/{ANALYTICS_SUPABASE_TABLE}",
+                headers=_analytics_supabase_headers(config, prefer="return=minimal"),
+                json=dict(row),
+                timeout=8,
+            )
+            status = response.status_code
+        except Exception:
+            status = 599
+        if status < 400:
+            return True
+        if attempt == 0 and (status >= 500 or status == 429):
+            time.sleep(_WRITE_RETRY_DELAY_S)
+            continue
         return False
-    return response.status_code < 400
+    return False
 
 
 def _spawn_background(fn) -> None:
@@ -512,6 +525,10 @@ def _queue_supabase_write(payload: Mapping[str, Any]) -> None:
         return
 
 
+SUPABASE_PAGE_SIZE = 1000
+_WRITE_RETRY_DELAY_S = 0.5
+
+
 def _fetch_events_supabase(
     config: AnalyticsSupabaseConfig,
     *,
@@ -525,38 +542,54 @@ def _fetch_events_supabase(
     ``limit`` bounds one Founder Analytics page load the same way the
     existing JSONL path is only viable up to ~10k DAU (see VOLUME_MODEL) —
     beyond that scale this needs a warehouse, not a bigger limit.
+
+    Paginated in ``SUPABASE_PAGE_SIZE`` rows: PostgREST silently caps a single
+    response at the project's "Max rows" setting (1000 by default), so one
+    request with ``limit=20000`` returned only the OLDEST 1000 rows of the
+    window and every report count (and funnel) was quietly truncated.
     """
 
     if not config.configured:
         return [], False
-    params: dict[str, str] = {
+    cap = max(1, int(limit))
+    base_params: dict[str, str] = {
         "select": "event,event_version,ts,build,environment,session_key,anon_id,user_key,account_hash,props",
-        "order": "ts.asc",
-        "limit": str(max(1, int(limit))),
+        # id breaks ts ties so offset pages never skip/duplicate rows.
+        "order": "ts.asc,id.asc",
     }
     if since_ts is not None:
         try:
-            params["ts"] = f"gte.{float(since_ts)}"
+            base_params["ts"] = f"gte.{float(since_ts)}"
         except (TypeError, ValueError):
             pass
-    try:
-        response = requests.get(
-            f"{config.url}/rest/v1/{ANALYTICS_SUPABASE_TABLE}",
-            headers=_analytics_supabase_headers(config),
-            params=params,
-            timeout=15,
-        )
-    except Exception:
-        return [], False
-    if response.status_code >= 400:
-        return [], False
-    try:
-        parsed = response.json()
-    except Exception:
-        return [], False
-    if not isinstance(parsed, list):
-        return [], False
-    return [dict(row) for row in parsed if isinstance(row, Mapping)], True
+    out: list[dict[str, Any]] = []
+    offset = 0
+    while len(out) < cap:
+        page_size = min(SUPABASE_PAGE_SIZE, cap - len(out))
+        params = {**base_params, "limit": str(page_size), "offset": str(offset)}
+        try:
+            response = requests.get(
+                f"{config.url}/rest/v1/{ANALYTICS_SUPABASE_TABLE}",
+                headers=_analytics_supabase_headers(config),
+                params=params,
+                timeout=15,
+            )
+        except Exception:
+            return [], False
+        if response.status_code >= 400:
+            return [], False
+        try:
+            parsed = response.json()
+        except Exception:
+            return [], False
+        if not isinstance(parsed, list):
+            return [], False
+        page = [dict(row) for row in parsed if isinstance(row, Mapping)]
+        out.extend(page)
+        if len(parsed) < page_size:
+            break
+        offset += len(parsed)
+    return out, True
 
 
 SESSION_ANON_KEY = "_launch_analytics_anon_id"

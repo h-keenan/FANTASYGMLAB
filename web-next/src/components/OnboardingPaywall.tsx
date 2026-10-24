@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel } from "@/lib/trialCopy";
 import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
+import { ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
 import dynamic from "next/dynamic";
 
 // Stripe.js + react-stripe-js load only when a checkout is actually opened.
@@ -77,8 +78,9 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
  * an existing, onboarded user). Skippable: this is a trial offer, not a
  * hard gate — Free access stays real and immediate.
  */
-// The step after the carousel's last step (8 features + connect + level = 0..9).
-const PAYWALL_STEP_INDEX = 10;
+// The step after the carousel's last step (value, connect, level = 0..2 -> 3).
+// Derived so it can never drift from the carousel again (it was a stale 10).
+const PAYWALL_STEP_INDEX = ONBOARDING_STEP_KEYS.length;
 
 export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   const [plans, setPlans] = useState<BillingPlansResponse | null>(null);

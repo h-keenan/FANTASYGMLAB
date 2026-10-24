@@ -69,6 +69,14 @@ const ALLOWED_PROP_KEYS = new Set([
   'interval',
   'trigger',
   'error_class',
+  // Onboarding funnel (feature_use feature=onboarding) -- fixed ids/indices.
+  // These were missing, so every mobile onboarding event reached the backend
+  // with its step / step_index / experience stripped.
+  'step',
+  'step_index',
+  'experience',
+  // Push pre-prompt outcome (granted | denied | undetermined).
+  'os_result',
   'league_id', // hashed server-side into league_key, never stored raw
 ]);
 

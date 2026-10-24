@@ -72,3 +72,13 @@ Legal copy today (`modules/legal_pages.py`, `mobile/src/data/legalContent.json`,
 - Decide on the App Privacy answers, then enable mobile analytics in a build.
 - Add a server-side entitlement lookup so `entitlement` is accurate on every event.
 - Add crash/error reporting on mobile (error boundary + `application_error`).
+
+
+## 2026-10-24 pipeline audit fixes
+
+- Ingest rate limit: `POST /v1/analytics/event` had shared the 20/min "mutating" bucket with real writes (429s dropped events and could fail trade analysis). It now has its own `analytics` bucket (`RATE_LIMIT_ANALYTICS_MAX`, default 240/min). Mobile now keeps 429s queued instead of dropping them.
+- Mobile sanitizer dropped `step`, `step_index`, `experience` (and `os_result`) on every onboarding / push pre-prompt event; added to mobile and backend allowlists. Mobile onboarding rows written before this build have no step data and cannot be recovered.
+- Founder report: Supabase reads are paginated (PostgREST caps one response at 1000 rows, so the report used the OLDEST 1000 rows of the window); rows stamped `environment=test` are excluded; onboarding users are stitched anon_id -> account key; legacy 10-step ids are returned in `onboarding_funnel.legacy_steps` instead of being merged into `steps`; completed/skipped users without a stored `step_viewed` are in the rate denominator.
+- Web paywall step index now derives from `ONBOARDING_STEP_KEYS.length` (was a stale 10).
+- `trial_started` / `subscribed` / `churned` / `feature_use trial` are derived in the report from `billing_webhook_events` (Stripe rows; RevenueCat is summarized in `billing_lifecycle` only because the table has no platform). Web checkout return (`?billing=success|complete`) emits `feature_use billing/checkout_return`.
+- Supabase event write retries once on transport error / 5xx / 429.

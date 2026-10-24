@@ -38,8 +38,9 @@ async function send(event: AnalyticsEvent): Promise<void> {
       body: JSON.stringify({ event: event.event, props: event.props, anon_id: event.anon_id }),
       signal: controller.signal,
     });
-    // 5xx / transport errors keep the event queued; 4xx would never succeed.
-    if (response.status >= 500) throw new Error('server');
+    // 5xx / 429 / transport errors keep the event queued; other 4xx would
+    // never succeed. (429 used to be dropped as a "success".)
+    if (response.status >= 500 || response.status === 429) throw new Error('server');
   } finally {
     clearTimeout(timer);
   }
