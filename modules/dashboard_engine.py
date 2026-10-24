@@ -460,7 +460,12 @@ def build_trade_tile(
     # Same raw asset dict compact_package/presentation_asset already reads
     # position/team/player_tier/score from (modules.trade_ideas._player_asset)
     # — not a second valuation source.
-    route_player_name = _text(headline_player_asset.get("name")) if headline_player_asset else ""
+    # Raw trade-idea assets carry the name under `label` only.
+    route_player_name = (
+        _text(headline_player_asset.get("name") or headline_player_asset.get("label"))
+        if headline_player_asset
+        else ""
+    )
     route_player_position = _text(headline_player_asset.get("position")) if headline_player_asset else ""
     route_player_team = _text(headline_player_asset.get("team")) if headline_player_asset else ""
     route_player_tier = _text(headline_player_asset.get("player_tier")) if headline_player_asset else ""

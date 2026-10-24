@@ -34,6 +34,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from modules import team_stance as team_stance_module
+from modules.compact_fantasy_assets import presentation_asset
 from modules.rankings import injury_display_label
 
 # --- Season phase detection -------------------------------------------------
@@ -394,8 +395,12 @@ def _trade_focus_area(
                 # photo, tier, position) — reused here rather than
                 # re-derived, so this page's Trade Opportunities list stops
                 # being pure reasoning text with zero player identity.
-                "send_assets": [dict(asset) for asset in send_assets],
-                "receive_assets": [dict(asset) for asset in receive_assets],
+                # Raw trade-idea assets carry the display name under `label`
+                # only (no `name`), so the clients rendered the literal
+                # "Player" fallback. presentation_asset is the same
+                # normalizer Trade Hub's cards use (name/tier/projected_range).
+                "send_assets": [presentation_asset(asset) for asset in send_assets],
+                "receive_assets": [presentation_asset(asset) for asset in receive_assets],
                 "trade_gain": idea.get("trade_gain"),
                 "source": "modules.trade_ideas / modules.trade_hub_engine.generate_trade_idea_records_cached",
             }
