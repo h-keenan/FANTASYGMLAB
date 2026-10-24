@@ -4,6 +4,7 @@ import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
+import { billingRequest, type BillingFunction } from "./billingClient";
 
 /**
  * Client for services/mobile_api_service.py. Mirrors mobile/src/lib/api.ts's
@@ -102,6 +103,20 @@ async function authorizedRequest<T>(
     throw new ApiError(401, "Not signed in.");
   }
   return performRequest<T>(path, init, accessToken);
+}
+
+/** Stripe web-billing call (plans / checkout / portal): same session lookup as
+ * authorizedRequest, but routed through lib/billingClient.ts. */
+async function authorizedBillingRequest<T>(
+  name: BillingFunction,
+  init?: { method?: "GET" | "POST"; jsonBody?: unknown },
+): Promise<T> {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) {
+    throw new ApiError(401, "Not signed in.");
+  }
+  return billingRequest<T>(name, accessToken, init);
 }
 
 /** Authenticated binary GET (e.g. a share-card PNG) — mirrors
@@ -3291,7 +3306,9 @@ export const api = {
       jsonBody: { experience_level: level },
     }),
 
-  getBillingPlans: () => authorizedRequest<BillingPlansResponse>("/v1/billing/plans"),
+  // Stripe web billing runs on Supabase Edge Functions (lib/billingClient.ts;
+  // rollback to the deprecated FastAPI routes via NEXT_PUBLIC_BILLING_BACKEND=fastapi).
+  getBillingPlans: () => authorizedBillingRequest<BillingPlansResponse>("billing-plans"),
 
   startBillingCheckout: (
     tier: BillingPlan["tier"],
@@ -3299,7 +3316,7 @@ export const api = {
     returnTo?: string,
     uiMode?: "hosted" | "embedded",
   ) =>
-    authorizedRequest<BillingCheckoutResponse>("/v1/billing/checkout", {
+    authorizedBillingRequest<BillingCheckoutResponse>("create-checkout-session", {
       method: "POST",
       jsonBody: {
         tier,
@@ -3310,7 +3327,7 @@ export const api = {
     }),
 
   openBillingPortal: () =>
-    authorizedRequest<BillingPortalResponse>("/v1/billing/portal", { method: "POST" }),
+    authorizedBillingRequest<BillingPortalResponse>("billing-portal-session", { method: "POST" }),
 
   lookupSleeperLeagues: (username: string) =>
     authorizedRequest<SleeperLeaguesResponse>(

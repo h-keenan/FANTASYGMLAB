@@ -5,8 +5,10 @@ payments or entitlements. Stripe and RevenueCat webhooks, checkout, and the
 billing portal run as Supabase Edge Functions. Provider keys live ONLY as
 Supabase function secrets.
 
-Status: **Phase 1 = code only, nothing deployed.** The Python services stay in
-the repo as the rollback path and are marked deprecated.
+Status (2026-10-24): **cutover state.**
+- Phase 1 (#1513): `stripe-webhook`, `revenuecat-webhook`, `create-checkout-session`, `billing-portal-session` deployed with secrets set; Stripe and RevenueCat webhooks now hit Supabase.
+- Phase 2 (this change): new public `billing-plans` function; web-next repointed from FastAPI `/v1/billing/*` to the Edge Functions through ONE client (`web-next/src/lib/billingClient.ts`). The mobile app has no Stripe web checkout/portal/plans calls (store purchases go through RevenueCat, untouched), so there is nothing to repoint there.
+- The self-hosted box no longer takes part in billing. The Python services and the FastAPI `/v1/billing/*` routes stay in the repo, marked deprecated, as the rollback path.
 
 ## Architecture
 
@@ -17,6 +19,7 @@ RevenueCat --webhook-> revenuecat-webhook    --service role-->  public.profiles 
 
 web / mobile --Supabase JWT--> create-checkout-session --> Stripe Checkout (embedded)
 web / mobile --Supabase JWT--> billing-portal-session  --> Stripe Billing Portal
+web (anon or JWT)  ----------> billing-plans           --> Stripe Prices (display), publishable key, trial copy
 
 FastAPI (require_league_access, tiers, founder/free codes) and web/mobile
 keep READING public.profiles.entitlement exactly as today. Untouched.
@@ -28,7 +31,7 @@ The existing trigger (`docs/supabase_entitlement_security_hardening.sql`) alread
 restricts entitlement writes to `service_role`/`postgres`; Edge Functions use the
 platform-injected service-role key, so no policy changes are needed.
 
-Layout: `supabase/functions/{stripe-webhook,revenuecat-webhook,create-checkout-session,billing-portal-session}/`
+Layout: `supabase/functions/{stripe-webhook,revenuecat-webhook,create-checkout-session,billing-portal-session,billing-plans}/`
 (each `index.ts` = `Deno.serve` wrapper, `handler.ts` = testable logic) and
 `supabase/functions/_shared/` (pure logic, fetch-based Supabase/Stripe/RevenueCat
 clients, tests). No npm/SDK dependencies: Stripe and RevenueCat are called over
@@ -56,7 +59,7 @@ passed resolves `free`.
 
 Auto-injected by Supabase (do not set): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
-Stripe: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_BILLING_MODE` (`test`|`live`),
+Stripe: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` (public key, served by `billing-plans`), `STRIPE_WEBHOOK_SECRET`, `STRIPE_BILLING_MODE` (`test`|`live`),
 `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`, `STRIPE_PRICE_PRO_ANNUAL_LAUNCH_WEEK` (optional),
 `STRIPE_PRICE_FRONT_OFFICE_ANNUAL` (optional), `STRIPE_TRIAL_DAYS` (optional).
 (Legacy `STRIPE_PRICE_MONTHLY`/`STRIPE_PRICE_ANNUAL` still accepted as fallbacks.)
@@ -88,6 +91,7 @@ supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy revenuecat-webhook --no-verify-jwt
 supabase functions deploy create-checkout-session
 supabase functions deploy billing-portal-session
+supabase functions deploy billing-plans --no-verify-jwt   # public; new in Phase 2
 ```
 
 Function URLs: `https://<PROJECT_REF>.supabase.co/functions/v1/<name>`.
@@ -115,13 +119,15 @@ Do TEST mode end to end first, then repeat for live.
 5. [ ] Smoke test (test mode): Stripe CLI `stripe trigger customer.subscription.created` is not enough (no `supabase_user_id`); run one real test checkout through `create-checkout-session` with test card 4242..., confirm `profiles.entitlement='premium'`, `trial_ends_at` set, one row in `billing_webhook_events`. Resend the same event from the Stripe Dashboard: expect `skipped/duplicate`, no change. Cancel in the portal: expect `free` at period end / immediately on delete.
 6. [ ] RevenueCat dashboard: set webhook URL to `.../functions/v1/revenuecat-webhook`, Authorization header value = `REVENUECAT_WEBHOOK_AUTH_TOKEN`; send RC's "Test" event (expect 200, skipped); do one sandbox purchase and confirm `profiles.entitlement`.
 7. [ ] LIVE cutover window (low traffic): set `STRIPE_BILLING_MODE=live` + live key/prices/webhook secret and `REVENUECAT_BILLING_MODE=live`; add the live Stripe endpoint; in the SAME window disable (not delete) the old Stripe and RevenueCat webhook endpoints so only one system writes `profiles`. (Both writing is safe thanks to the ordering guard, but pick one to avoid double analytics/confusion.)
-8. [ ] Repoint clients (Phase 2 code): web-next and mobile call `create-checkout-session` / `billing-portal-session` with the user's Supabase JWT instead of FastAPI `/v1/billing/checkout|portal`. Until then FastAPI still serves checkout/portal and needs its Stripe key (see "Not ported").
+8. [x] Repoint clients (Phase 2, code done): web-next calls `billing-plans` / `create-checkout-session` / `billing-portal-session` at `${NEXT_PUBLIC_SUPABASE_URL}/functions/v1/<name>` with the user's Supabase JWT (`Authorization`) and the anon key (`apikey`). TODO before merging/deploying: `supabase secrets set STRIPE_PUBLISHABLE_KEY=...` and `supabase functions deploy billing-plans --no-verify-jwt`; confirm `APP_BASE_URL` / `CORS_ALLOWED_ORIGINS` include every web origin (app.fantasygmlab.com, fantasygmlab.com, and app/fantasydesk.app when live) because the browser now calls the functions cross-origin.
 9. [ ] Verify live: real $-charge (refund after) or a 100%-off promo code; watch function logs (`supabase functions logs stripe-webhook`) for 24h.
 10. [ ] After a stable window: remove Stripe/RevenueCat/service-role secrets from the box and from the old Render services; then retire the Python services (separate PR).
 
 ## Rollback plan
 
-Nothing in Phase 1 changes production. After cutover, rollback = re-enable the old
+Client rollback (Phase 2): rebuild web-next with `NEXT_PUBLIC_BILLING_BACKEND=fastapi`; plans/checkout/portal then go to the deprecated FastAPI `/v1/billing/*` routes again (needs the Stripe key on the box). The landing-page trial headline falls back to its shared default (`DEFAULT_TRIAL_DAYS` in `web-next/src/lib/landingTrial.ts`).
+
+Webhook rollback: nothing in Phase 1 changes production data shape. After cutover, rollback = re-enable the old
 Stripe/RevenueCat webhook endpoints (Python services still deployed and the code
 still in the repo), disable the Supabase endpoints in the provider dashboards, and
 leave FastAPI checkout/portal as is. Data is compatible both ways (same `profiles`
@@ -152,13 +158,22 @@ Deliberate differences (improvements; review them):
 
 NOT ported (needs a decision or Phase 2):
 - Python launch analytics (`trial_started`, `subscribed`, `churned`, `feature_use trial`) fired from the webhook. The Edge Function stores `trial_transition`, `reason`, `entitlement` per event in `billing_webhook_events` so these can be backfilled/derived; real-time `track_event` is gone until reimplemented.
-- `GET /v1/billing/plans` (live Price display + publishable key + trial-eligibility copy) still lives in FastAPI/`modules/stripe_billing.py` and still needs a Stripe key on the box. A `billing-plans` function is the follow-up if the box must hold no Stripe key at all.
-- Clients still call FastAPI for checkout/portal until Phase 2 repoints them.
+- Nothing billing-related is left un-ported except the analytics above. `GET /v1/billing/plans` is now `billing-plans` (below).
 - Premium lifecycle bits outside webhooks (founder/free codes, `require_league_access`) are intentionally untouched and keep reading `profiles`.
 
-## Unverified in Phase 1
+## billing-plans (Phase 2)
+
+`GET /functions/v1/billing-plans`, `verify_jwt = false`. Same body as FastAPI `GET /v1/billing/plans`: `{ok, plans:[{tier,interval,label,price,cadence,features}], stripe_publishable_key, trial:{days,eligible}}`, plus one extra field `trial_days` (the offer length, session-independent, used by the landing page; one source: `TRIAL_DAYS` / `STRIPE_TRIAL_DAYS`).
+- Prices: live Stripe Price objects for `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_PRO_ANNUAL`, cached 5 min per isolate, falling back to `$3.99 / $19.99` on any Stripe failure or missing config (as before). Pro monthly + annual only; Front Office is not offered to new signups. Display always uses the standard annual price, never the Launch Week price (same as FastAPI; Launch Week only changes the price charged at checkout).
+- Trial: `eligible`/`days` are computed only when a valid user JWT is sent (profile has no billing history, trial enabled). Anonymous callers get `{days:0, eligible:false}`.
+- Error envelope for all billing functions is `{ok:false,error}` (FastAPI used `{detail}`); `billingClient.ts` normalizes both into the same `ApiError`.
+
+Client config: `NEXT_PUBLIC_BILLING_BACKEND` (default `supabase`; `fastapi` = rollback).
+
+## Unverified
 
 - Nothing was run against live Stripe, RevenueCat or Supabase. Deno was not installed on the authoring machine; the suite was run under Bun (same code, assertion shim) and type-checked with `tsc --strict`. The `deno test` CI job is the first Deno execution.
 - Stripe API request encoding and Embedded Checkout params are built to Stripe's documented form format but not exercised against Stripe.
 - PostgREST `or=(...)` filter behaviour is a straight port of the existing, previously-working Python filter; not re-tested against a live DB.
 - `supabase/config.toml` needs the real `project_id`; `verify_jwt` settings should be confirmed on first deploy.
+- Phase 2: `billing-plans` and the web client are covered by offline tests only (Deno suite + vitest); never exercised against live Stripe/Supabase. Browser CORS from each production origin to the function URLs, and that the Supabase gateway accepts the anon-key `Authorization` on the `verify_jwt=false` plans function, need a post-deploy smoke test.

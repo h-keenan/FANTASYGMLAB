@@ -388,3 +388,109 @@ Deno.test("portal: customer id comes from the verified user's profile; 404 when 
   const r3 = await portal(new Request("https://x.test/p", { method: "POST" }), { env: envOf(BASE_ENV), fetch: none.fn });
   assertEquals(r3.status, 401);
 });
+
+// ---------- billing-plans ----------
+import { handle as plans, formatPriceAmount, resetPriceCacheForTests, PREMIUM_FEATURE_LINES } from "../billing-plans/handler.ts";
+
+const plansReq = (jwt: string | null = null, method = "GET") =>
+  new Request("https://x.test/billing-plans", {
+    method,
+    headers: { origin: "https://app.example.test", ...(jwt ? { authorization: `Bearer ${jwt}` } : {}) },
+  });
+const priceRoutes = () => ({
+  [`GET https://api.stripe.com/v1/prices/${PRICE_PRO_MONTHLY}`]: () => j({ unit_amount: 499, currency: "usd", recurring: { interval: "month" } }),
+  [`GET https://api.stripe.com/v1/prices/${PRICE_PRO_ANNUAL}`]: () => j({ unit_amount: 2999, currency: "usd", recurring: { interval: "year" } }),
+});
+
+Deno.test("billing-plans: live Stripe prices, publishable key, trial days; anonymous works", async () => {
+  resetPriceCacheForTests();
+  const f = fakeFetch(priceRoutes());
+  const res = await plans(plansReq(), { env: envOf({ ...BASE_ENV, STRIPE_PUBLISHABLE_KEY: "pk_test_abc" }), fetch: f.fn });
+  assertEquals(res.status, 200);
+  assertEquals(res.headers.get("access-control-allow-origin"), "https://app.example.test");
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.stripe_publishable_key, "pk_test_abc");
+  assertEquals(body.trial, { days: 0, eligible: false });
+  assertEquals(body.trial_days, 3);
+  assertEquals(body.plans.length, 2);
+  assertEquals(body.plans[0], { tier: "pro", interval: "monthly", label: "Monthly", price: "$4.99", cadence: "per month", features: PREMIUM_FEATURE_LINES });
+  assertEquals(body.plans[1].price, "$29.99");
+  assertEquals(body.plans[1].cadence, "per year");
+  assert(f.calls.every((c) => (c.init.headers as Record<string, string>).Authorization === "Bearer sk_test_fixture"));
+});
+
+Deno.test("billing-plans: prices cached for 5 minutes, refreshed after", async () => {
+  resetPriceCacheForTests();
+  const f = fakeFetch(priceRoutes());
+  let t = 1_800_000_000_000;
+  const deps = { env: envOf(BASE_ENV), fetch: f.fn, now: () => new Date(t) };
+  await plans(plansReq(), deps);
+  await plans(plansReq(), deps);
+  assertEquals(f.calls.length, 2); // 2 price reads; second request served from cache
+  t += 301_000;
+  await plans(plansReq(), deps);
+  assertEquals(f.calls.length, 4);
+});
+
+Deno.test("billing-plans: Stripe failure or missing config falls back to defaults, never errors", async () => {
+  resetPriceCacheForTests();
+  const bad = fakeFetch({}); // every call unrouted -> 599
+  const r1 = await plans(plansReq(), { env: envOf(BASE_ENV), fetch: bad.fn });
+  const b1 = await r1.json();
+  assertEquals(r1.status, 200);
+  assertEquals(b1.plans.map((p: { price: string }) => p.price), ["$3.99", "$19.99"]);
+  resetPriceCacheForTests();
+  const none = fakeFetch({});
+  const r2 = await plans(plansReq(), { env: envOf({ SUPABASE_URL: "https://proj.supabase.test" }), fetch: none.fn });
+  assertEquals((await r2.json()).stripe_publishable_key, "");
+  assertEquals(none.calls.length, 0);
+});
+
+Deno.test("billing-plans: price without a usable amount falls back to defaults", async () => {
+  resetPriceCacheForTests();
+  const f = fakeFetch({
+    ...priceRoutes(),
+    [`GET https://api.stripe.com/v1/prices/${PRICE_PRO_ANNUAL}`]: () => j({ unit_amount: null, currency: "usd" }),
+  });
+  const body = await (await plans(plansReq(), { env: envOf(BASE_ENV), fetch: f.fn })).json();
+  assertEquals(body.plans.map((p: { price: string }) => p.price), ["$3.99", "$19.99"]);
+});
+
+Deno.test("billing-plans: signed-in account with no billing history is trial-eligible; with history is not", async () => {
+  resetPriceCacheForTests();
+  const mk = (profile: Record<string, unknown> | null) => fakeFetch({ ...priceRoutes(), ...userRoutes(profile) });
+  const fresh = await (await plans(plansReq("good-jwt"), { env: envOf(BASE_ENV), fetch: mk({}).fn })).json();
+  assertEquals(fresh.trial, { days: 3, eligible: true });
+  const used = await (await plans(plansReq("good-jwt"), { env: envOf(BASE_ENV), fetch: mk({ trial_ends_at: "2026-01-01" }).fn })).json();
+  assertEquals(used.trial, { days: 0, eligible: false });
+  const unreadable = await (await plans(plansReq("good-jwt"), { env: envOf(BASE_ENV), fetch: mk(null).fn })).json();
+  assertEquals(unreadable.trial, { days: 0, eligible: false });
+  // no Stripe customer-by-email lookup (FastAPI check_stripe=False)
+  const f = mk({});
+  await plans(plansReq("good-jwt"), { env: envOf(BASE_ENV), fetch: f.fn });
+  assert(!f.calls.some((c) => c.url.includes("/customers")));
+});
+
+Deno.test("billing-plans: invalid JWT or anon key is anonymous; trial disabled => 0 days", async () => {
+  resetPriceCacheForTests();
+  const f = fakeFetch({ ...priceRoutes(), ...userRoutes({}) });
+  const r = await plans(plansReq("anon-fixture"), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(r.status, 200);
+  assertEquals((await r.json()).trial.eligible, false);
+  const off = await (await plans(plansReq("good-jwt"), { env: envOf({ ...BASE_ENV, STRIPE_TRIAL_DAYS: "0" }), fetch: f.fn })).json();
+  assertEquals(off.trial, { days: 0, eligible: false });
+  assertEquals(off.trial_days, 0);
+});
+
+Deno.test("billing-plans: OPTIONS preflight allows GET; POST rejected; amount formatting", async () => {
+  const f = fakeFetch({});
+  const pre = await plans(plansReq(null, "OPTIONS"), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(pre.status, 204);
+  assert((pre.headers.get("access-control-allow-methods") ?? "").includes("GET"));
+  assertEquals((await plans(plansReq(null, "POST"), { env: envOf(BASE_ENV), fetch: f.fn })).status, 405);
+  assertEquals(formatPriceAmount(399, "usd"), "$3.99");
+  assertEquals(formatPriceAmount(123456, ""), "$1,234.56");
+  assertEquals(formatPriceAmount(399, "eur"), "EUR 3.99");
+  assertEquals(formatPriceAmount(null, "usd"), "");
+});

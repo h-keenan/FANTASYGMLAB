@@ -4,6 +4,7 @@ import { AppStoreModules } from "@/components/AppStoreModules";
 import { InlineScript } from "@/components/InlineScript";
 import { LandingAuthIsland, LandingAuthSlotPlaceholder } from "@/components/LandingAuthIsland";
 import { LandingShowcase } from "@/components/LandingShowcase";
+import { LandingTrialHeadline } from "@/components/LandingTrialHeadline";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
 
@@ -52,9 +53,7 @@ export default function LandingPage() {
           <LandingShowcase />
 
           <div className="landing-form flex flex-col gap-2">
-            <p className="text-xs font-bold text-center md:text-left" style={{ color: "var(--color-accent)" }}>
-              Start free for 3 days
-            </p>
+            <LandingTrialHeadline />
             {/* useSearchParams() (for ?billing=success) needs a Suspense
                 boundary or this page's static prerender fails the build.
                 Only the island sits inside it. */}

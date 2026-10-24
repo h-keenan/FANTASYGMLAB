@@ -17,3 +17,8 @@ verify_jwt = true
 
 [functions.billing-portal-session]
 verify_jwt = true
+
+# Public price display + publishable key + trial copy. Anonymous callers are
+# fine (landing page); a valid user JWT only adds per-account trial eligibility.
+[functions.billing-plans]
+verify_jwt = false
