@@ -45,10 +45,9 @@ import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
-import ThisWeekSection from '../components/ThisWeekSection';
+import TodayHero from '../components/TodayHero';
 import StartHereCard from '../components/StartHereCard';
 import { useAuth } from '../context/AuthContext';
-import { thisWeekTradeIdeaHeadline } from '../lib/thisWeek';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
@@ -439,8 +438,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."}
         </AppText>
-        <ThisWeekSection
-          data={dashboardData?.this_week}
+        <TodayHero
+          thisWeek={dashboardData?.this_week}
           leagueId={leagueId}
           leagueName={leagueName}
           onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
@@ -456,12 +455,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // `items` whenever this is true.
   const showEmptyState = quiet || !items || items.length === 0;
   const grouped = groupDashboardItems(showEmptyState ? [] : items!);
-  // The trade idea the This week strip already shows is not repeated in the Top Priority hero.
-  const duplicateTradeHeadline = thisWeekTradeIdeaHeadline(dashboardData?.this_week);
-  if (duplicateTradeHeadline) {
-    grouped.topPriority = grouped.topPriority.filter((item) => (item.headline ?? '').trim() !== duplicateTradeHeadline);
-  }
-
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -497,36 +490,23 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
 
-      <ThisWeekSection
-        data={dashboardData?.this_week}
+      {/* HERO: the one schedule-aware answer to "what should I do now?"
+          (Magna Carta §33). This week's moves and the top-priority briefing
+          cards are one module: today's items first, rest of the week after.
+          Items that used to appear in both are shown once (lib/todayPlan). */}
+      <TodayHero
+        thisWeek={dashboardData?.this_week}
+        items={grouped.topPriority}
         leagueId={leagueId}
         leagueName={leagueName}
         tradePending={Boolean(dashboardData?.trade_ideas_deferred)}
         onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
-      />
-
-      <SectionHeading
-        title="Today"
         right={
           <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={8}>
             <AppText style={styles.viewAll}>View All ›</AppText>
           </TouchableOpacity>
         }
-      />
-
-      {/* HERO — the single answer to "what should I do next?" (Magna Carta
-          §33/§4). Everything below this supports it; nothing above it but
-          the global header and the tiny "about this screen" affordance. */}
-      {showEmptyState ? (
-        <View style={styles.emptyCard}>
-          <BrandMark width={120} height={82} />
-          <AppText style={styles.emptyText}>
-            {quietReason || 'Nothing urgent right now — your roster looks steady.'}
-          </AppText>
-          {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
-        </View>
-      ) : (
-        grouped.topPriority.map((item, index) => (
+        renderCard={(item, index) => (
           <BriefingCard
             key={`top-priority-${index}`}
             item={item}
@@ -536,8 +516,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
             isNew={newRecommendationIds.has(item.recommendation_id)}
             showExplanations={showExplanations}
           />
-        ))
-      )}
+        )}
+        empty={
+          <View style={styles.emptyCard}>
+            <BrandMark width={120} height={82} />
+            <AppText style={styles.emptyText}>
+              {quietReason || 'Nothing urgent right now — your roster looks steady.'}
+            </AppText>
+            {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
+          </View>
+        }
+      />
 
       {/* Watchlist & Alerts: urgent risks and opportunities in one list. */}
       <WatchlistAlertsSection

@@ -1,23 +1,18 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
-import { ButtonLink } from "@/components/Button";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { StartHereCard } from "@/components/StartHereCard";
-import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
-import { EmptyState } from "@/components/EmptyState";
 import { formatRank } from "@/components/SnapshotTile";
 import { StatStrip } from "@/components/StatStrip";
-import { ThisWeekStrip } from "@/components/ThisWeekStrip";
-import { thisWeekTradeIdeaHeadline } from "@/lib/thisWeek";
+import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -64,13 +59,6 @@ export function DashboardContent({
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
   const query = `?name=${encodeURIComponent(leagueName)}`;
-  // The trade idea the This week strip already shows is not repeated as a Today card.
-  const duplicateTradeHeadline = thisWeekTradeIdeaHeadline(data.this_week);
-  const allTopItems = data.items.filter((item) => item.category === "top_priority");
-  const topItems = duplicateTradeHeadline
-    ? allTopItems.filter((item) => (item.headline ?? "").trim() !== duplicateTradeHeadline)
-    : allTopItems;
-  const droppedDuplicate = topItems.length < allTopItems.length;
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
 
   return (
@@ -130,47 +118,7 @@ export function DashboardContent({
         </p>
       ) : null}
 
-      {data.this_week ? <ThisWeekStrip data={data.this_week} leagueId={leagueId} leagueName={leagueName} tradePending={Boolean(data.trade_ideas_deferred)} /> : null}
-
-      {droppedDuplicate && topItems.length === 0 && watchItems.length === 0 && data.entitlement.hidden_count <= 0 ? null : (
-      <section className="flex flex-col gap-3" aria-labelledby="game-plan-heading" data-fgl-dashboard-useful="true">
-        <SectionHeading id="game-plan-heading" action={<ViewAllLink href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`} label="View all game plan items" />}>
-          Today
-        </SectionHeading>
-        <BeginnerHelp term="dashboardGamePlan" />
-
-        {topItems.length === 0 && watchItems.length === 0 ? (
-          <EmptyState
-            title={
-              notReadyReasonMessage(data.reason, {
-                linkAccount: "Connect your Sleeper account to see your Game Plan.",
-                emptyRoster: "Your roster doesn't have any players yet. This is expected if your draft is still in progress.",
-              }) || "No urgent roster issues right now."
-            }
-          >
-            {!data.reason ? <BeginnerHelp term="dashboardNothingUrgent" className="mt-1" /> : null}
-          </EmptyState>
-        ) : (
-          topItems.map((item) => (
-            <GamePlanCard key={item.recommendation_id || item.headline} item={item} leagueId={leagueId} leagueName={leagueName} />
-          ))
-        )}
-
-        {data.entitlement.hidden_count > 0 ? (
-          <div
-            className="p-4 flex flex-col gap-2 premium-glow-card"
-            style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
-          >
-            <p className="text-sm font-bold">
-              {data.entitlement.hidden_count} more move{data.entitlement.hidden_count === 1 ? "" : "s"} available on Premium.
-            </p>
-            <ButtonLink href="/premium" variant="premium" size="sm">
-              Upgrade →
-            </ButtonLink>
-          </div>
-        ) : null}
-      </section>
-      )}
+      <TodayModule data={data} leagueId={leagueId} leagueName={leagueName} />
 
       {watchItems.length > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
