@@ -7,6 +7,37 @@ require "json"
 # regenerates them fresh from app.json + package.json via `expo prebuild`.
 # That keeps signing config and native project state from drifting apart.
 
+# Expo inlines EXPO_PUBLIC_* at bundle time, and src/lib/env.ts throws at
+# module load when the required ones are empty. A build made from a checkout
+# without the gitignored mobile/.env (e.g. a fresh git worktree) therefore
+# compiles and uploads fine but dies on launch, stuck on the native splash
+# (TestFlight build 56, 2026-10-23). Refuse to build in that state.
+REQUIRED_RELEASE_ENV = %w[
+  EXPO_PUBLIC_SUPABASE_URL
+  EXPO_PUBLIC_SUPABASE_ANON_KEY
+  EXPO_PUBLIC_API_BASE_URL
+].freeze
+
+def ensure_release_env
+  file_vars = {}
+  env_path = File.expand_path("../.env", __dir__)
+  if File.exist?(env_path)
+    File.readlines(env_path).each do |line|
+      key, value = line.strip.split("=", 2)
+      next if key.nil? || key.start_with?("#") || value.nil?
+      file_vars[key] = value.strip.delete_prefix('"').delete_suffix('"')
+    end
+  end
+  missing = REQUIRED_RELEASE_ENV.select do |name|
+    (ENV[name] || file_vars[name]).to_s.strip.empty?
+  end
+  return if missing.empty?
+  UI.user_error!(
+    "Refusing to build: #{missing.join(', ')} not set (no #{env_path} here and not in the environment). " \
+    "The app would crash at launch on the splash screen. Copy mobile/.env into this checkout."
+  )
+end
+
 def ensure_native_project(platform, force: false)
   dir = platform == :ios ? "../ios" : "../android"
   if force || !Dir.exist?(dir)
@@ -135,6 +166,7 @@ platform :ios do
 
   desc "Build and upload a TestFlight build"
   lane :beta do
+    ensure_release_env
     api_key = asc_api_key
     bump_ios_build_number
     ensure_native_project(:ios, force: true)
@@ -168,6 +200,7 @@ platform :ios do
 
   desc "Build and archive only — no upload anywhere. Verifies the build compiles/signs before a real `beta` run."
   lane :build_only do
+    ensure_release_env
     api_key = asc_api_key
     bump_ios_build_number
     ensure_native_project(:ios, force: true)
@@ -213,6 +246,7 @@ end
 platform :android do
   desc "Build and upload a Play internal-testing build"
   lane :beta do
+    ensure_release_env
     bump_android_version_code
     ensure_native_project(:android, force: true)
     configure_android_release_signing
