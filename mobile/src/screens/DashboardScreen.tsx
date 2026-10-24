@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -21,7 +20,7 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import TradeAssetRow from '../components/TradeAssetRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
@@ -38,7 +37,6 @@ import {
   type DashboardItem,
   type DashboardResponse,
   type MatchupResponse,
-  type PresentationAsset,
   type RankedPlayer,
   type TeamRanking,
   type TeamSnapshot,
@@ -56,7 +54,6 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
 import ToneBadge from '../components/ToneBadge';
-import ValueStat from '../components/ValueStat';
 import { requestOrbSearch } from '../lib/orbEvents';
 import { WATCH_TAG_LABEL, usageTrendPct, watchTagKind } from '../lib/dashboardWatch';
 import BrandMark from '../components/BrandMark';
@@ -783,44 +780,6 @@ function DestinationButton({
       }}
     />
   );
-}
-
-export function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  if (asset.asset_type === 'pick') {
-    return (
-      <DraftPickAssetRow
-        round={asset.round ? Number(asset.round) : null}
-        pickNo={asset.pick_no ? Number(asset.pick_no) : null}
-        label={asset.label}
-        projectedRange={asset.projected_range}
-      />
-    );
-  }
-  return (
-    <PlayerIdentityRow
-      playerId={asset.player_id}
-      name={asset.name ?? 'Unknown'}
-      position={asset.position}
-      team={asset.team}
-      tier={asset.tier}
-      overallRating={asset.overall_rating}
-      injuryLabel={asset.injury_status ? injuryShortCode(asset.injury_status) : null}
-      injuryTone={asset.injury_status && /^(out|ir|injured reserve|sus)/i.test(asset.injury_status) ? 'risk' : 'watch'}
-      trailingExtra={<ValueStat value={asset.score != null ? Math.round(asset.score) : null} />}
-    />
-  );
-}
-
-/** Short injury code for the compact pill (Q, D, O, IR); anything else shows as-is. */
-function injuryShortCode(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  if (normalized.startsWith('quest')) return 'Q';
-  if (normalized.startsWith('doubt')) return 'D';
-  if (normalized === 'out') return 'O';
-  if (normalized === 'ir' || normalized.startsWith('injured')) return 'IR';
-  return status;
 }
 
 /**

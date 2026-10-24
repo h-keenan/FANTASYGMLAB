@@ -12,13 +12,16 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import FadeInView from '../components/FadeInView';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
-import InsightRow from '../components/InsightRow';
+import BriefingItemPlayers from '../components/BriefingItemPlayers';
+import TeamAvatar from '../components/TeamAvatar';
+import ToneBadge from '../components/ToneBadge';
+import SectionHeading from '../components/SectionHeading';
 import PortfolioExposurePanel from '../components/PortfolioExposurePanel';
 import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
-import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock from '../components/SkeletonBlock';
-import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSavedLeague } from '../lib/api';
+import { api, type DashboardItem, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSavedLeague } from '../lib/api';
+import { portfolioMetadata, showSignalReason, type SignalPlayer } from '../lib/portfolioSignals';
 import { composePortfolio, type PortfolioLeagueState } from '../lib/portfolioProgress';
 import {
   enabledLeagueIds,
@@ -170,6 +173,31 @@ export default function PortfolioScreen() {
     [navigation],
   );
 
+  const openPlayer = useCallback(
+    (league: PortfolioLeague, player: SignalPlayer) => {
+      navigation.navigate('PlayerDetail', {
+        player: {
+          player_id: player.player_id,
+          name: player.name,
+          position: player.position || null,
+          team: player.team || null,
+          age: null,
+          status: null,
+          injury_status: player.injury_status || null,
+          tier: player.tier || null,
+          score: player.score,
+          overall_rank: null,
+          position_rank: null,
+          rank_unavailable_reason: null,
+          opportunity_label: null,
+        },
+        leagueId: league.league_id,
+        leagueName: league.league_name,
+      });
+    },
+    [navigation],
+  );
+
   // Instant shell (skeleton rows of the final row height); the branded
   // spinner only if the first paint is still empty after the delay, and it
   // goes away the moment the index arrives.
@@ -272,22 +300,26 @@ export default function PortfolioScreen() {
             />
             {view === 'leagues' ? (
               <>
-            <View style={styles.infoNoteRow}>
-              <ScreenInfoNote
-                label="Portfolio"
-                text="Your standing, record, and top need or opportunity across every saved league — tap a league to open its Dashboard."
-              />
-              {/* Share waits for every row: a share card of a half-loaded
-                  portfolio would silently leave leagues out. */}
-              {composed.settled && composed.leagues.length > 0 ? (
-                <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
-                  <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
-                  <AppText style={styles.shareButtonText}>Share</AppText>
-                </TouchableOpacity>
-              ) : null}
+            <View style={styles.headerBlock}>
+              <View style={styles.headerTop}>
+                <View style={styles.headerTitleWrap}>
+                  <SectionHeading title="Your leagues" caption="Standing, record, and top need per league." />
+                </View>
+                {/* Share waits for every row: a share card of a half-loaded
+                    portfolio would silently leave leagues out. */}
+                {composed.settled && composed.leagues.length > 0 ? (
+                  <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+                    <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
+                    <AppText style={styles.shareButtonText}>Share</AppText>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Home')} hitSlop={8} accessibilityRole="link">
+                <AppText style={styles.linkText}>+ Add a league</AppText>
+              </TouchableOpacity>
             </View>
             {draftingLeagues.length > 0 ? (
-              <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} />
+              <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('LiveDraft', { leagueId: league.league_id, leagueName: league.league_name })} />
             ) : null}
             {espnNote ? (
               <View style={styles.failedNote}>
@@ -311,6 +343,7 @@ export default function PortfolioScreen() {
               colors={colors}
               styles={styles}
               onPress={() => openLeague(item.league)}
+              onPressPlayer={openPlayer}
             />
           ) : (
             <PortfolioLeagueSkeleton
@@ -335,19 +368,32 @@ function DraftingLeaguesNote({
   leagues,
   colors,
   styles,
+  onOpen,
 }: {
   leagues: PortfolioFailedLeague[];
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
+  onOpen: (league: PortfolioFailedLeague) => void;
 }) {
-  const names = leagues.map((league) => league.league_name).join(', ');
-  const plural = leagues.length === 1 ? 'league' : 'leagues';
   return (
     <View style={styles.failedNote}>
       <Ionicons name="time-outline" size={14} color={colors.textSecondary} style={styles.failedNoteIcon} />
-      <AppText style={styles.failedNoteText}>
-        {`Draft still in progress for ${leagues.length} ${plural}: ${names}. Rosters will show up here once each draft finishes.`}
-      </AppText>
+      <View style={styles.noteBody}>
+        <AppText style={styles.failedNoteText}>
+          {leagues.length === 1 ? 'Draft still in progress:' : 'Drafts still in progress:'} rosters will show up here
+          once each draft finishes.
+        </AppText>
+        {leagues.map((league) => (
+          <View key={league.league_id} style={styles.noteLeagueRow}>
+            <AppText style={styles.failedNoteText} numberOfLines={1}>
+              {league.league_name}
+            </AppText>
+            <TouchableOpacity onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
+              <AppText style={styles.linkTextSmall}>Watch live draft →</AppText>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -444,6 +490,7 @@ function PortfolioLeagueCard({
   colors,
   styles,
   onPress,
+  onPressPlayer,
 }: {
   league: PortfolioLeague;
   isFirst: boolean;
@@ -451,78 +498,98 @@ function PortfolioLeagueCard({
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
   onPress: () => void;
+  onPressPlayer: (league: PortfolioLeague, player: SignalPlayer) => void;
 }) {
   const isChampion = league.power_rank === 1;
-  const rankColor = isChampion ? colors.premium : colors.accent;
   const record = recordLabel(league);
+  const { showRankBadge, metadata, rankText } = portfolioMetadata(record, league.power_rank, league.power_rank_tied);
   const showHealthFlag = Boolean(league.health_flag) && league.health_flag !== 'Stable';
-  // Quick-glance signals for this league — value trending down, an injury,
-  // a live news story, actionable waiver info, whichever are genuinely true
-  // right now (never padded to a fixed count). Falls back to the single
-  // top_item for a response that predates top_items.
+  // Quick-glance signals for this league: whichever are genuinely true
+  // right now (never padded). Falls back to the single top_item for a
+  // response that predates top_items.
   const signals = league.top_items?.length ? league.top_items : league.top_item ? [league.top_item] : [];
   const meta = categoryMeta(colors);
 
   return (
     <FadeInView>
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      style={[
-        styles.row,
-        isFirst && styles.rowFirst,
-        isLast && styles.rowLast,
-        !isLast && styles.rowDivider,
-      ]}
-    >
-      <View style={styles.headerRow}>
-        <View style={styles.identityGroup}>
-          <AppText style={styles.teamName} numberOfLines={1}>
-            {league.team_name || 'Unclaimed team'}
-          </AppText>
-          <AppText style={styles.leagueName} numberOfLines={1}>
-            {league.league_name}
-          </AppText>
-          <View style={styles.metaRow}>
-            {record ? <AppText style={styles.record}>{record}</AppText> : null}
-            {showHealthFlag ? (
-              <View style={styles.healthBadge}>
-                <AppText style={styles.healthBadgeText} numberOfLines={1}>
-                  {league.health_flag}
-                </AppText>
+      <View style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, !isLast && styles.rowDivider]}>
+        <TouchableOpacity activeOpacity={0.7} onPress={onPress} accessibilityRole="button">
+          <View style={styles.headerRow}>
+            {/* Same Sleeper team avatar the website's league card shows. */}
+            <TeamAvatar avatarId={league.team_avatar_url} name={league.team_name} size={32} />
+            <View style={styles.identityGroup}>
+              <AppText style={styles.teamName} numberOfLines={2}>
+                {league.team_name || 'Unclaimed team'} — {league.league_name}
+              </AppText>
+              {metadata ? <AppText style={styles.record}>{metadata}</AppText> : null}
+            </View>
+            {showRankBadge ? (
+              <View style={[styles.rankPill, isChampion && styles.rankPillFirst]}>
+                {isChampion ? <Ionicons name="trophy" size={12} color={colors.premium} /> : null}
+                <AppText style={[styles.rankValue, { color: colors.premium }]}>{rankText}</AppText>
               </View>
             ) : null}
           </View>
-        </View>
-        {league.power_rank != null ? (
-          <View style={[styles.rankPill, isChampion && styles.rankPillFirst, { borderColor: `${rankColor}80` }]}>
-            {isChampion ? (
-              <Ionicons name="trophy" size={13} color={rankColor} style={styles.rankTrophy} />
-            ) : (
-              <AppText style={styles.rankLabel}>ROSTER POWER</AppText>
-            )}
-            <AppText style={[styles.rankValue, { color: rankColor }]}>
-              {league.power_rank_tied ? `T-${league.power_rank}` : `#${league.power_rank}`}
-            </AppText>
+          {showHealthFlag ? (
+            <ToneBadge label={league.health_flag} color={colors.danger} size="xs" style={styles.healthBadge} />
+          ) : null}
+        </TouchableOpacity>
+        {signals.length > 0 ? (
+          <View>
+            {signals.map((item, index) => (
+              <PortfolioSignal
+                key={item.recommendation_id || `${item.category}-${index}`}
+                item={item}
+                showDivider={index > 0}
+                styles={styles}
+                label={(meta[item.category] ?? meta.watch).label}
+                color={(meta[item.category] ?? meta.watch).color}
+                onPressPlayer={(player) => onPressPlayer(league, player)}
+              />
+            ))}
           </View>
-        ) : null}
+        ) : (
+          <AppText style={styles.emptySignals}>Open this league to see your Next Move.</AppText>
+        )}
+        <TouchableOpacity onPress={onPress} hitSlop={8} accessibilityRole="link" style={styles.openLink}>
+          <AppText style={styles.linkText} numberOfLines={1}>
+            Open {league.league_name} Dashboard →
+          </AppText>
+        </TouchableOpacity>
       </View>
-      {signals.map((item, index) => {
-        const itemMeta = meta[item.category] ?? meta.watch;
-        return (
-          <InsightRow
-            key={item.recommendation_id || `${item.category}-${index}`}
-            icon={itemMeta.icon}
-            color={itemMeta.color}
-            label={itemMeta.label}
-            headline={item.headline}
-            detail={item.reason}
-            last={index === signals.length - 1}
-          />
-        );
-      })}
-    </TouchableOpacity>
     </FadeInView>
+  );
+}
+
+/** One quick-glance signal: category pill, headline (+ reason), then the
+ * real player identities (headshot, position, tier ring) it names. */
+function PortfolioSignal({
+  item,
+  showDivider,
+  label,
+  color,
+  styles,
+  onPressPlayer,
+}: {
+  item: DashboardItem;
+  showDivider: boolean;
+  label: string;
+  color: string;
+  styles: ReturnType<typeof createStyles>;
+  onPressPlayer: (player: SignalPlayer) => void;
+}) {
+  if (!item.headline && !item.reason) return null;
+  return (
+    <View style={[styles.signal, showDivider && styles.signalDivider]}>
+      <View style={styles.signalTextRow}>
+        <ToneBadge label={label} color={color} size="xs" />
+        <View style={styles.signalText}>
+          {item.headline ? <AppText style={styles.signalHeadline}>{item.headline}</AppText> : null}
+          {showSignalReason(item) ? <AppText style={styles.signalReason}>{item.reason}</AppText> : null}
+        </View>
+      </View>
+      <BriefingItemPlayers item={item} onPressPlayer={onPressPlayer} />
+    </View>
   );
 }
 
@@ -532,7 +599,21 @@ function createStyles(colors: ThemeColors) {
     list: { backgroundColor: 'transparent' },
     listContent: { padding: spacing.lg },
     infoNoteWrap: { marginBottom: spacing.md, gap: spacing.sm },
-    infoNoteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    headerBlock: { gap: spacing.xs },
+    headerTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+    headerTitleWrap: { flex: 1 },
+    linkText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    linkTextSmall: { fontSize: 12, fontWeight: '700', color: colors.accent },
+    noteBody: { flex: 1, gap: spacing.xs },
+    noteLeagueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    openLink: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
+    emptySignals: { fontSize: 13, color: colors.textTertiary, paddingVertical: spacing.sm },
+    signal: { paddingTop: spacing.sm, gap: spacing.xs },
+    signalDivider: { marginTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline },
+    signalTextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    signalText: { flex: 1, gap: 2 },
+    signalHeadline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    signalReason: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
     shareButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -579,32 +660,25 @@ function createStyles(colors: ThemeColors) {
     rowFirst: {},
     rowLast: { marginBottom: 0 },
     rowDivider: {},
-    headerRow: { flexDirection: 'row', alignItems: 'flex-start', paddingBottom: spacing.sm },
-    identityGroup: { flex: 1, marginRight: spacing.sm },
+    headerRow: { flexDirection: 'row', alignItems: 'flex-start', paddingBottom: spacing.xs },
+    identityGroup: { flex: 1, marginHorizontal: spacing.sm },
     teamName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     leagueName: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
-    record: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-    healthBadge: {
-      backgroundColor: `${colors.danger}1F`,
+    record: { fontSize: 12, color: colors.textTertiary, marginTop: spacing.xs },
+    healthBadge: { alignSelf: 'flex-start', marginTop: spacing.xs },
+    // Top-3 rank pill, same soft gold pill as the website's rank badge.
+    rankPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: `${colors.premium}1F`,
       borderRadius: radii.pill,
       paddingHorizontal: spacing.sm,
-      paddingVertical: 1,
-    },
-    healthBadgeText: { fontSize: 10, fontWeight: '700', color: colors.danger },
-    rankPill: {
-      backgroundColor: colors.background,
-      borderRadius: radii.sm,
-      borderWidth: 1,
-      paddingHorizontal: spacing.sm,
       paddingVertical: 4,
-      alignItems: 'center',
-      minWidth: 52,
     },
-    rankLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-    rankValue: { fontSize: 15, fontWeight: '700' },
-    rankPillFirst: { backgroundColor: `${colors.premium}1F` },
-    rankTrophy: { marginBottom: 1 },
+    rankValue: { fontSize: 12, fontWeight: '800' },
+    rankPillFirst: {},
     skeletonGap: { marginTop: spacing.xs },
     skeletonSignals: { gap: spacing.xs, paddingBottom: spacing.md },
   });

@@ -2061,6 +2061,15 @@ export interface DashboardTradePresentation {
   partner_team_name: string;
 }
 
+export interface DashboardMentionedPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  player_tier: string;
+  injury_status?: string;
+}
+
 export interface DashboardItem {
   category: DashboardItemCategory;
   headline: string;
@@ -2079,6 +2088,11 @@ export interface DashboardItem {
   route_player_team: string;
   route_player_tier: string;
   route_player_score: number | null;
+  /** Sleeper status for the route player ('' when healthy / unknown). */
+  route_player_injury_status?: string;
+  /** Every player the tile's text names (e.g. "3 injured starters"), not
+   * just route_player_*. Absent on older cached responses. */
+  mentioned_players?: DashboardMentionedPlayer[];
   recommendation_narrative: Record<string, unknown> | null;
   presentation: DashboardTradePresentation | null;
   recommendation_id: string;
@@ -2354,6 +2368,8 @@ export interface PortfolioLeague {
   league_id: string;
   league_name: string;
   team_name: string;
+  /** Sleeper team avatar id (same field web's TeamAvatar reads); '' when none. */
+  team_avatar_url?: string;
   wins: number | null;
   losses: number | null;
   ties: number | null;
