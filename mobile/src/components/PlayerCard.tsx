@@ -281,10 +281,10 @@ function createStyles(colors: ThemeColors) {
     glowRim: { flex: 1, borderRadius: radii.md, padding: 1.5 },
     pressable: {
       flex: 1,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       borderRadius: radii.md,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       ...shadows.resting,
     },
     pressableGlowInner: { borderWidth: 0 },

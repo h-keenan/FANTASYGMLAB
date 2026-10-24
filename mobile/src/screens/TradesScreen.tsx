@@ -132,8 +132,8 @@ export default function TradesScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    root: { flex: 1, backgroundColor: colors.background },
-    topSection: { backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
+    topSection: { backgroundColor: 'transparent' },
     tabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm },
     contentArea: { flex: 1 },
     tabPane: { flex: 1 },

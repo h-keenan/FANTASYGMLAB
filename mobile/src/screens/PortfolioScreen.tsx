@@ -541,7 +541,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 4,
       borderRadius: radii.pill,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
     },
     shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
     center: {
@@ -563,7 +563,7 @@ function createStyles(colors: ThemeColors) {
     failedNoteIcon: { marginTop: 1 },
     failedNoteText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
     row: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       paddingHorizontal: spacing.md,
       paddingTop: spacing.md,
       // Same reserved height for the real row and its skeleton: no jump on fill-in.
@@ -572,7 +572,7 @@ function createStyles(colors: ThemeColors) {
       marginBottom: spacing.md,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
       borderRadius: radii.md,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
     },
     // Each league is its own module with a gap between, like the website
     // (coridian_, 2026-10-24); kept as no-ops so the call sites stay simple.

@@ -4,7 +4,6 @@ import AppText from '../components/AppText';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '../components/Button';
@@ -35,7 +34,7 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { TRADE_FINDER_MAX_PICKS, ownedPicksForRoster, toggleCappedSelection } from '../lib/tradeFinderPicks';
-import { radii, shadows, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 // Prop-driven now (TradesScreen owns the single `Trades` route and hosts
@@ -53,11 +52,6 @@ interface Props {
    * this player of yours once the roster loads and runs the search. */
   presetPlayerId?: string;
 }
-
-// Button height (paddingVertical * 2 + line height) plus its own gap above
-// the orb clearance zone (see the `bottom` override on the button below) —
-// the list's last row needs to clear both, not just the orb.
-const SEARCH_BUTTON_CLEARANCE = 56 + spacing.sm + spacing.lg;
 
 const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
@@ -387,7 +381,7 @@ function ResultCard({
  */
 export default function TradeFinderScreen({ leagueId, leagueName, navigation, presetPlayerId }: Props) {
   const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
+
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { strategy } = useGmStance(leagueId);
@@ -507,12 +501,12 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 
   if (loadingRoster) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <BrandedSpinner style={[styles.center]} />;
   }
 
   if (rosterError) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={[styles.center]}>
         <AppText style={styles.error}>{rosterError}</AppText>
       </View>
     );
@@ -526,7 +520,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         keyExtractor={(item) => item.player_id}
         contentContainerStyle={[
           styles.listContent,
-          { paddingTop: headerHeight, paddingBottom: orbClearance + SEARCH_BUTTON_CLEARANCE },
+          { paddingTop: spacing.sm, paddingBottom: selectionCount > 0 ? spacing.lg : orbClearance + spacing.lg },
         ]}
         ListHeaderComponent={
           <View>
@@ -602,30 +596,15 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         )}
       />
 
-      {/* coridian_: "find trades button is glitched and floating" at zero
-          selected. Two prior passes found the absolute-position math itself
-          correct (left/right/bottom all set, no stray relative ancestor) —
-          the real bug was the disabled treatment: a 50%-opacity *solid*
-          floating bar sitting on top of a scrollable list reads as a
-          translucent ghost over whatever roster row happens to be scrolled
-          underneath it, not as a dimmed button. There's nothing useful to
-          do with zero players picked anyway (search is a no-op), so this
-          hides the bar entirely instead of rendering a disabled one — also
-          keeps this screen inside Magna Carta's "no content hidden beneath
-          overlays" rule. */}
+      {/* Sticky CTA bar (coridian_, 2026-10-24: the floating button covered
+          roster rows). It is a normal flex sibling BELOW the list, not an
+          absolute overlay, so the list simply ends above it and no row can
+          be hidden. Hidden at zero selected (nothing to search). Bottom
+          padding keeps the button clear of the GM Orb zone. */}
       {selectionCount > 0 ? (
-        <Button
-          label={`Find Trades (${selectionCount})`}
-          loading={searching}
-          onPress={() => search()}
-          style={[
-            styles.searchButton,
-            // Sits above GM Orb's own darkening scrim rather than inside it —
-            // stacked there, the button's solid fill and the scrim gradient
-            // read as one muddy double-treatment at the bottom of the screen.
-            { bottom: orbClearance + spacing.sm },
-          ]}
-        />
+        <View style={[styles.ctaBar, { paddingBottom: orbClearance + spacing.sm }]}>
+          <Button label={`Find Trades (${selectionCount})`} loading={searching} onPress={() => search()} />
+        </View>
       ) : null}
     </View>
   );
@@ -638,7 +617,7 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.background,
+      backgroundColor: 'transparent',
       padding: spacing.xl,
     },
     // No `gap` here: the roster rows below need to render flush against
@@ -663,11 +642,11 @@ function createStyles(colors: ThemeColors) {
     rosterRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       paddingHorizontal: spacing.md,
       borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
       borderRightWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
     },
     rosterRowFirst: {
       borderTopWidth: StyleSheet.hairlineWidth * 1.5,
@@ -708,7 +687,7 @@ function createStyles(colors: ThemeColors) {
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glassInset,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -733,7 +712,7 @@ function createStyles(colors: ThemeColors) {
     // Trade Hub's idea feed uses for this exact content type.
     exchangeSide: {
       flex: 1,
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glassInset,
       borderRadius: radii.md,
       paddingHorizontal: spacing.sm,
       paddingTop: spacing.xs,
@@ -744,7 +723,7 @@ function createStyles(colors: ThemeColors) {
       width: 26,
       height: 26,
       borderRadius: 13,
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glassInset,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -780,7 +759,13 @@ function createStyles(colors: ThemeColors) {
     meterSegments: { flexDirection: 'row', gap: 3 },
     meterSegment: { width: 14, height: 4, borderRadius: 2 },
     meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-    searchButton: { position: 'absolute', left: spacing.lg, right: spacing.lg, ...shadows.resting },
+    ctaBar: {
+      backgroundColor: colors.glass,
+      borderTopWidth: StyleSheet.hairlineWidth * 1.5,
+      borderTopColor: colors.glassBorder,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+    },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
 }

@@ -134,7 +134,7 @@ function createStyles(colors: ThemeColors) {
     card: {
       minWidth: '46%',
       flexGrow: 1,
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glass,
       borderRadius: radii.sm,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,

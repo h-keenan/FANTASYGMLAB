@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '../components/Button';
@@ -99,7 +98,7 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 
 export default function TradeHubScreen({ leagueId, leagueName, navigation }: Props) {
   const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
+
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Read-only here: the header's GmStanceHeaderButton is the only place
@@ -277,7 +276,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
       style={styles.container}
       data={activeData}
       keyExtractor={(_, index) => String(index)}
-      contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       ListHeaderComponent={
         <View>
           <View style={styles.viewModeRow}>

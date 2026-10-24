@@ -102,10 +102,10 @@ export default function AnimatedCard({ style, children, glow, glowColor, onPress
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
     padding: spacing.lg,
     ...shadows.resting,
   },

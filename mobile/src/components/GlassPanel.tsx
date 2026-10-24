@@ -39,7 +39,7 @@ function createStyles(colors: ThemeColors) {
       overflow: 'hidden',
     },
     androidFallback: {
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glass,
     },
   });
 }

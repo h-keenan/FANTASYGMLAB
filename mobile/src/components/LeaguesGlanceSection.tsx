@@ -335,9 +335,9 @@ function createStyles(colors: ThemeColors) {
     // gets its own surface — the same surface/cardBorder/radius tokens as
     // HomeScreen's league rows, no new card chrome.
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       borderRadius: radii.md,
       paddingHorizontal: spacing.md,
       paddingTop: spacing.md,
