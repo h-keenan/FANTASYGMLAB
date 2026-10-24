@@ -207,6 +207,18 @@ export function LandingShowcase() {
         ))}
       </ul>
       <div className="landing-showcase-controls">
+        <div className="landing-showcase-dots" role="group" aria-label="Choose a screen">
+          {items.map((feature, i) => (
+            <button
+              key={feature.key}
+              type="button"
+              className="landing-showcase-dot"
+              aria-label={`Show ${feature.title}`}
+              aria-current={i === active ? "true" : undefined}
+              onClick={() => goTo(i)}
+            />
+          ))}
+        </div>
         {!reduced && (
           <button
             type="button"
@@ -220,18 +232,6 @@ export function LandingShowcase() {
             </svg>
           </button>
         )}
-        <div className="landing-showcase-dots" role="group" aria-label="Choose a screen">
-          {items.map((feature, i) => (
-            <button
-              key={feature.key}
-              type="button"
-              className="landing-showcase-dot"
-              aria-label={`Show ${feature.title}`}
-              aria-current={i === active ? "true" : undefined}
-              onClick={() => goTo(i)}
-            />
-          ))}
-        </div>
       </div>
     </section>
   );
