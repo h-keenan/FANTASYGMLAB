@@ -95,6 +95,26 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
   return { coreLeagueDestinations, gmToolsDestinations, generalDestinations };
 }
 
+/**
+ * Founder-only nav entry, shared by GmOrb (phone width) and DesktopSidebar
+ * so neither can drift. Callers must gate on `isFounderSession`.
+ */
+export const FOUNDER_DESTINATION: NavDestination = {
+  label: "Founder Analytics",
+  path: "/founder-analytics",
+  subtitle: "Internal product analytics",
+  glyph: "founderAnalytics",
+  color: "var(--color-diagnostic)",
+};
+
+/** Same server-issued app_metadata claim GET /v1/founder/analytics enforces
+ * (UX gate only; the backend 403 is the real boundary). */
+export function isFounderSession(
+  session: { user?: { app_metadata?: Record<string, unknown> } | null } | null | undefined,
+): boolean {
+  return session?.user?.app_metadata?.founder_ops === true;
+}
+
 /** First path segment -> page label, for Header's persistent page title
  * (coridian_, 2026-10-18: "where it says dashboard... should go up into
  * the header... so you can always see what page you're on"). Derived from
@@ -126,6 +146,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "trade-analyzer": "Trade Analyzer",
   "trade-finder": "Trade Finder",
   "player-compare": "Player Compare",
+  "founder-analytics": "Founder Analytics",
   premium: "Premium",
   account: "Account",
   legal: "Legal",
