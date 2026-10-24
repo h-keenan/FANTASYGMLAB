@@ -35,9 +35,9 @@ test('player pushes deep-link to PlayerDetail', () => {
   );
 });
 
-test('league-level pushes route to LeagueDetail', () => {
+test('league-level pushes route to the Dashboard landing', () => {
   assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'recap' }), {
-    screen: 'LeagueDetail',
+    screen: 'Dashboard',
     leagueId: 'L1',
     leagueName: 'X',
   });

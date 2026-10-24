@@ -220,7 +220,7 @@ export default function MoreScreen({ navigation }: Props) {
       Alert.alert('Select a league first', 'Open a league from Home, then come back to set your Team Situation.');
       return;
     }
-    navigation.navigate('TeamStance', league);
+    navigation.navigate('GmPlan', { ...league, initialTab: 'overview' });
   };
 
   // League-scoped entry points (Live Draft, Guess the Player leaderboard)

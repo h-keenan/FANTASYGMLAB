@@ -144,7 +144,7 @@ function routeNotificationTap(data: unknown): void {
   }
 
   navigationRef.dispatch(
-    StackActions.popTo('LeagueDetail', { leagueId: target.leagueId, leagueName: target.leagueName }),
+    StackActions.popTo('Dashboard', { leagueId: target.leagueId, leagueName: target.leagueName }),
   );
 }
 

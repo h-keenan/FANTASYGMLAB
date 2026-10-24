@@ -230,7 +230,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     closeAddLeague();
     await load();
     if (routeToTeamStance) {
-      navigation.navigate('TeamStance', { leagueId, leagueName: leagueName || 'League' });
+      navigation.navigate('GmPlan', { leagueId, leagueName: leagueName || 'League', initialTab: 'overview' });
     }
   };
 

@@ -28,6 +28,10 @@ import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHeal
 import GuillotineCard from '../components/GuillotineCard';
 import LeagueTypeControl from '../components/LeagueTypeControl';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
+import StorylineSummaryCard from '../components/StorylineSummaryCard';
+import WaiverSuggestionsStrip from '../components/WaiverSuggestionsStrip';
+import LeagueStandingStrips from '../components/LeagueStandingStrips';
+import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
 import {
   api,
   type DashboardEntitlementInfo,
@@ -302,6 +306,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
     enabled: !isRestoring,
   });
 
+  // Waiver Suggestions (moved from the retired League Overview): the same
+  // Priority Adds the Waivers screen leads with.
+  const waiversQuery = useQuery({
+    queryKey: queryKeys.waivers(leagueId),
+    queryFn: () => api.getLeagueWaivers(leagueId),
+    enabled: !isRestoring,
+  });
+  const priorityAdds = waiversQuery.data?.priority_adds ?? [];
+
   const dashboardData = dashboardQuery.data;
   const items: DashboardItem[] | null = dashboardData?.items ?? null;
   const teamSnapshot: TeamSnapshot | null = dashboardData?.team_snapshot ?? null;
@@ -395,6 +408,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.matchup(leagueId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.recap(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.waivers(leagueId) });
     }, [queryClient, leagueId]),
   );
 
@@ -461,7 +475,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} title="Dashboard" onSearch={requestOrbSearch} />
       <ScreenInfoNote
-        text={`The real Next Move briefing for ${leagueName} — the same roster-pressure, injury, need, and waiver signals the web app's Dashboard uses.`}
+        text={`Home base for ${leagueName}: today's game plan, your matchup, storylines and waiver suggestions, plus quick access to everything else.`}
       />
       <CollegeFootballInterestPrompt />
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
@@ -558,6 +572,22 @@ export default function DashboardScreen({ route, navigation }: Props) {
           device actually opens that recap (see recapOpened above) and
           never dominates the Hero/Needs Attention/Opportunities tiers
           above it (Magna Carta §33). */}
+      {readyRecap ? (
+        <View>
+          <SectionHeading title="Storylines" icon="newspaper-outline" />
+          <StorylineSummaryCard recap={readyRecap} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+        </View>
+      ) : null}
+      <WaiverSuggestionsStrip
+        adds={priorityAdds}
+        onPressPlayer={(player) =>
+          navigation.navigate('PlayerDetail', {
+            player: rankedPlayerFromWaiverPlayer(player),
+            leagueId,
+            leagueName,
+          })
+        }
+      />
       {showRecapModule && readyRecap ? (
         <RecapReadyCard
           week={readyRecap.week}
@@ -609,6 +639,12 @@ export default function DashboardScreen({ route, navigation }: Props) {
       {teamSnapshot ? (
         <TeamSnapshotRow snapshot={teamSnapshot} />
       ) : null}
+      <View style={styles.standingStrips}>
+        <LeagueStandingStrips
+          leagueId={leagueId}
+          onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+        />
+      </View>
       </ScrollView>
     </View>
   );
@@ -671,7 +707,7 @@ function quickActions(
   inSeason: boolean,
 ): Array<{
   label: string;
-  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter' | 'MyTeam';
+  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter' | 'MyTeam' | 'Matchup' | 'Alerts' | 'Teams' | 'GmPlan';
   icon: React.ComponentProps<typeof IconCircle>['name'];
   color: string;
 }> {
@@ -682,6 +718,13 @@ function quickActions(
     inSeason
       ? { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', color: colors.success }
       : { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
+    // Second row: the League Overview shortcuts (Matchup, Alerts, Teams) now
+    // live here, plus the one GM Plan entry. Same icon/color per destination
+    // as GmOrb.
+    { label: 'Matchup', route: 'Matchup', icon: 'american-football-outline', color: colors.success },
+    { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', color: colors.danger },
+    { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
+    { label: 'GM Plan', route: 'GmPlan', icon: 'map-outline', color: colors.premium },
   ];
 }
 
@@ -1262,6 +1305,7 @@ function createStyles(colors: ThemeColors) {
   // the wrapping `quickActionsSection` (below) now owns that spacing since
   // the grid sits under its own SectionHeading in secondary context.
   quickActionsGrid: { marginBottom: 0 },
+  standingStrips: { gap: spacing.md, marginTop: spacing.md },
   quickActionsSection: { marginTop: spacing.lg, marginBottom: spacing.md },
   lockWrap: { marginTop: spacing.md, marginBottom: spacing.md },
   // Shared "grouped surface" wrapper for the Needs Attention / Opportunities
