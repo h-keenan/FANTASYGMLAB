@@ -94,7 +94,7 @@ function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; l
     player.score != null ? `${Math.round(player.score).toLocaleString("en-US")} value` : null,
   ].filter(Boolean);
 
-  const share = useShareImage({
+  const { observe, onClick, busy, label, status } = useShareImage({
     cacheKey: `player:${leagueId}:${player.player_id}:${lens}`,
     build: () => api.getPlayerShareCardBlob(leagueId, player.player_id, lens),
     filename: `fantasydesk-player-${player.player_id}.png`,
@@ -114,10 +114,10 @@ function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; l
 
   return (
     <>
-      <button ref={share.observe} type="button" className="pqv-action-link" onClick={share.onClick} disabled={share.busy}>
-        {copied ? "Copied!" : share.label("Share card")}
+      <button ref={observe} type="button" className="pqv-action-link" onClick={onClick} disabled={busy}>
+        {copied ? "Copied!" : label("Share card")}
       </button>
-      {share.status ? <span role="status" className="text-xs">{share.status}</span> : null}
+      {status ? <span role="status" className="text-xs">{status}</span> : null}
     </>
   );
 }
