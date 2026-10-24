@@ -7,9 +7,8 @@ import AppText from './AppText';
 import AccentCard from './AccentCard';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
-import DraftPickAssetRow from './DraftPickAssetRow';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
-import PlayerCard from './PlayerCard';
+import { TradeAssetList } from './TradeAssetRow';
 import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';
 import TradeSharePreviewModal from './TradeSharePreviewModal';
@@ -21,7 +20,6 @@ import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeVerdict } from '../lib/api';
-import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
@@ -144,82 +142,6 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
 
 
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
-
-/**
- * One side (You Send / You Receive) of a trade package: players render via
- * the shared, flippable `PlayerCard` (coridian_'s circled reference card,
- * generalized — see components/PlayerCard.tsx's own doc comment), picks
- * via DraftPickAssetRow — never a malformed player row for a pick. Order
- * is preserved exactly as the API returned it; only the per-asset
- * presentation differs by `asset_type`.
- *
- * `presentationAssetBackStats` (lib/playerCardBackStats.ts) builds each
- * player's back-face stats from fields `PresentationAsset` already carries
- * — tier, role, injury (status + severity), the asset's own value score,
- * team/age, and the role's rationale sentence — several of which
- * (`score`, `injury_level`, `opportunity_explanation`) had nowhere to
- * render on the old row at all. Tapping a player card now flips it instead
- * of navigating straight to Player Detail (PlayerIdentityRow's old
- * behavior) — `onOpenDetail` wires the card's own small corner affordance
- * to that navigation instead, matching coridian_'s ask that the primary
- * tap flip the card and a separate control open the PQV.
- *
- * Fixed `size` (not a flex-filled column width) deliberately mirrors
- * Waivers' `BestAvailableCard` sizing precedent — a trade side can carry
- * 2-3 assets, and a card stretched to the full exchange column's width
- * would read as oversized stacked repeatedly.
- */
-export function ExchangeAssetList({
-  assets,
-  onPressPlayer,
-  onPressPick,
-}: {
-  assets: PresentationAsset[];
-  onPressPlayer: (asset: PresentationAsset) => void;
-  onPressPick: (asset: PresentationAsset) => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <>
-      {assets.map((asset, index) => {
-        const isLast = index === assets.length - 1;
-        if (asset.asset_type === 'pick') {
-          return (
-            <View key={`pick-${asset.pick_id ?? index}`} style={!isLast && styles.exchangeItemSpacing}>
-              <DraftPickAssetRow
-                pickId={asset.pick_id}
-                round={asset.round ? Number(asset.round) : null}
-                pickNo={asset.pick_no ? Number(asset.pick_no) : null}
-                label={asset.label}
-                projectedRange={asset.projected_range}
-                pickTier={asset.pick_tier}
-                onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
-              />
-            </View>
-          );
-        }
-        const { note, stats } = presentationAssetBackStats(asset);
-        return (
-          <View key={`player-${asset.player_id ?? index}`} style={[styles.exchangeCardWrap, !isLast && styles.exchangeItemSpacing]}>
-            <PlayerCard
-              size={120}
-              playerId={asset.player_id}
-              name={asset.name}
-              position={asset.position}
-              tier={asset.tier}
-              overallRating={asset.overall_rating}
-              injuryLabel={asset.injury_status}
-              backStats={stats}
-              backNote={note}
-              onOpenDetail={asset.player_id ? () => onPressPlayer(asset) : undefined}
-            />
-          </View>
-        );
-      })}
-    </>
-  );
-}
 
 function valueEdgeBandColor(colors: ThemeColors): Record<string, string> {
   return {
@@ -500,7 +422,7 @@ export default function TradeIdeaCard({
               <AppText style={styles.exchangeTotal}>{Math.round(idea.send_score).toLocaleString()}</AppText>
             ) : null}
           </View>
-          <ExchangeAssetList assets={idea.package.send} onPressPlayer={openPlayer} onPressPick={openPick} />
+          <TradeAssetList assets={idea.package.send} onPressPlayer={openPlayer} onPressPick={openPick} />
         </View>
         <View style={styles.exchangeGutter}>
           <View style={styles.swapDisc}>
@@ -515,7 +437,7 @@ export default function TradeIdeaCard({
               <AppText style={styles.exchangeTotal}>{Math.round(idea.receive_score).toLocaleString()}</AppText>
             ) : null}
           </View>
-          <ExchangeAssetList assets={idea.package.receive} onPressPlayer={openPlayer} onPressPick={openPick} />
+          <TradeAssetList assets={idea.package.receive} onPressPlayer={openPlayer} onPressPick={openPick} />
         </View>
       </View>
 
@@ -700,12 +622,6 @@ function createStyles(colors: ThemeColors) {
     paddingTop: spacing.xs,
     paddingBottom: 2,
   },
-  // PlayerCard is square and fixed-size (see ExchangeAssetList's doc
-  // comment) rather than stretched to the column's own flex:1 width, so
-  // each tile needs its own flex-start wrapper inside the stretch-aligned
-  // exchangeSide column.
-  exchangeCardWrap: { alignSelf: 'flex-start' },
-  exchangeItemSpacing: { marginBottom: spacing.sm },
   exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
   swapDisc: {
     width: 26,

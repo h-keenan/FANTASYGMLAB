@@ -43,7 +43,7 @@ export function abbreviatePlayerName(name: string | null | undefined): string {
  * layout callback at all.
  *
  * THRESHOLD is calibrated to the narrowest real container this component
- * renders in: Trade Hub's exchange columns (ExchangeAssetList inside
+ * renders in: Trade Hub's exchange columns (TradeAssetList inside
  * TradeHubScreen -> PlayerIdentityRow -> PlayerNameText). Walking that
  * layout's actual styles at a 375pt-wide screen (iPhone SE/13 mini, the
  * narrowest device this app still supports) —

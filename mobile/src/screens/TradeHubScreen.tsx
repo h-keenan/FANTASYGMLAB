@@ -11,7 +11,6 @@ import ErrorState from '../components/ErrorState';
 import MeterRow, { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import GridBackground from '../components/GridBackground';
-import PlayerCard from '../components/PlayerCard';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenInfoNote';
@@ -40,7 +39,6 @@ import {
 import { api } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
-import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
