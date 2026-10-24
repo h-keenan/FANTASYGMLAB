@@ -9,6 +9,7 @@ import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { AppContentShell } from "@/components/AppContentShell";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { GmOrb } from "@/components/GmOrb";
+import { PrivacyPill } from "@/components/PrivacyMode";
 import { Header } from "@/components/Header";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { TradeOutcomePrompt } from "@/components/TradeOutcomePrompt";
@@ -20,7 +21,7 @@ import { BRAND_NAME } from "@/lib/brand";
 // hand (icon.png, 180x180) is the wrong shape for a 1200x630 OG preview;
 // stretching it would look worse than no image. Add one once a real
 // 1200x630 asset exists (same blocker as the FD logomark).
-const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Next Move — not raw data you have to interpret yourself.";
+const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Game Plan — not raw data you have to interpret yourself.";
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
@@ -84,6 +85,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     like mobile's RootNavigator does. Decides for itself
                     whether to show; see that component's doc comment. */}
                 <TradeOutcomePrompt />
+                <PrivacyPill />
               </PlayerQuickViewProvider>
             </ValuationLensProvider>
           </ExperienceLevelProvider>

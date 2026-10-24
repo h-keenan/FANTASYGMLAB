@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
+import AppBackground from '../components/AppBackground';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import TrialLapsedScreen from '../screens/TrialLapsedScreen';
 import NewsScreen from '../screens/NewsScreen';
+import DesignScreen from '../screens/DesignScreen';
 import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
 import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
@@ -40,6 +42,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import TradesScreen from '../screens/TradesScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import PlayoffOddsScreen from '../screens/PlayoffOddsScreen';
+import GamesScreen from '../screens/GamesScreen';
 import DraftCenterScreen from '../screens/DraftCenterScreen';
 import PickDetailScreen from '../screens/PickDetailScreen';
 import MyTeamScreen from '../screens/MyTeamScreen';
@@ -48,6 +51,8 @@ import LoadingScreen from '../screens/LoadingScreen';
 import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
 import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
+import LiveDraftScreen from '../screens/LiveDraftScreen';
+import GuessThePlayerLeaderboardScreen from '../screens/GuessThePlayerLeaderboardScreen';
 import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { trackScreen } from '../lib/analytics';
@@ -56,7 +61,7 @@ export type RootStackParamList = {
   /** `openAddLeague`: opens Home's Add League sheet on arrival (the header
    * league switcher's "Add a league" row). */
   Home: { openAddLeague?: boolean } | undefined;
-  Onboarding: undefined;
+  Onboarding: { replay?: boolean } | undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
   /** `fromOnboarding`: shown as the first-run trial offer right after the
@@ -67,6 +72,8 @@ export type RootStackParamList = {
   TrialLapsed: undefined;
   News: undefined;
   More: undefined;
+  /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
+  Design: undefined;
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string };
@@ -102,6 +109,7 @@ export type RootStackParamList = {
     metric?: 'power' | 'franchise' | 'draft_capital' | 'starter' | 'bench' | 'age';
   };
   PlayoffOdds: { leagueId: string; leagueName: string };
+  Games: { leagueId: string; leagueName: string };
   DraftCenter: { leagueId: string; leagueName: string };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
   MyTeam: { leagueId: string; leagueName: string };
@@ -113,6 +121,9 @@ export type RootStackParamList = {
   // Not league-scoped — the whole point is standing/needs across every
   // saved league at once, not one league's context.
   Portfolio: undefined;
+  // Sleeper-only (gated like the other league screens) — read-only draft room.
+  LiveDraft: { leagueId: string; leagueName: string };
+  GuessThePlayerLeaderboard: { leagueId: string; leagueName: string };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -142,6 +153,7 @@ const EspnWaiversScreen = withEspnGate(WaiversScreen);
 const EspnRecapScreen = withEspnGate(RecapScreen);
 const EspnDashboardScreen = withEspnGate(DashboardScreen);
 const EspnPlayoffOddsScreen = withEspnGate(PlayoffOddsScreen);
+const EspnGamesScreen = withEspnGate(GamesScreen);
 const EspnDraftCenterScreen = withEspnGate(DraftCenterScreen);
 const EspnPickDetailScreen = withEspnGate(PickDetailScreen);
 const EspnMatchupScreen = withEspnGate(MatchupScreen);
@@ -149,6 +161,8 @@ const EspnAlertsScreen = withEspnGate(AlertsScreen);
 const EspnGmTargetsScreen = withEspnGate(GmTargetsScreen);
 const EspnTeamStanceScreen = withEspnGate(TeamStanceScreen);
 const EspnGmPlanScreen = withEspnGate(GmPlanScreen);
+const EspnLiveDraftScreen = withEspnGate(LiveDraftScreen);
+const EspnGuessLeaderboardScreen = withEspnGate(GuessThePlayerLeaderboardScreen);
 const AuthStack = createNativeStackNavigator();
 
 export default function RootNavigator() {
@@ -178,8 +192,9 @@ export default function RootNavigator() {
     colors: {
       ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
       primary: colors.accent,
-      background: colors.background,
-      card: colors.background,
+      // Transparent so the root AppBackground shows through every screen.
+      background: 'transparent',
+      card: 'transparent',
       text: colors.textPrimary,
       border: colors.hairline,
       notification: colors.danger,
@@ -205,6 +220,9 @@ export default function RootNavigator() {
   const hideFloatingChrome = currentRouteName === 'Onboarding' || showOnboardingFirst;
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    {/* The single shared animated page background, behind every screen. */}
+    <AppBackground />
     <NavigationContainer
       ref={navigationRef}
       theme={navigationTheme}
@@ -239,7 +257,11 @@ export default function RootNavigator() {
             headerTintColor: colors.textPrimary,
             headerShadowVisible: false,
             headerTitleAlign: 'center',
-            contentStyle: { backgroundColor: colors.background },
+            // Transparent: the shared animated AppBackground sits behind the
+            // whole navigator. 'fade' because a sliding transparent screen
+            // would show the previous screen through itself mid-transition.
+            contentStyle: { backgroundColor: 'transparent' },
+            animation: 'fade',
           }}
         >
           <AppStack.Screen
@@ -256,10 +278,10 @@ export default function RootNavigator() {
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8}>
+                  <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8} accessibilityRole="button" accessibilityLabel="News">
                     <Ionicons name="globe-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8}>
+                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8} accessibilityRole="button" accessibilityLabel="More">
                     <Ionicons name="ellipsis-horizontal-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
@@ -270,6 +292,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
+          <AppStack.Screen name="Design" component={DesignScreen} options={{ title: 'Design' }} />
           <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
           <AppStack.Screen
             name="HowWeEvaluate"
@@ -285,6 +308,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Trades" component={TradesScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
           <AppStack.Screen name="PlayoffOdds" component={EspnPlayoffOddsScreen} />
+          <AppStack.Screen name="Games" component={EspnGamesScreen} />
           <AppStack.Screen name="DraftCenter" component={EspnDraftCenterScreen} />
           <AppStack.Screen name="PickDetail" component={EspnPickDetailScreen} />
           <AppStack.Screen name="MyTeam" component={MyTeamScreen} />
@@ -297,15 +321,17 @@ export default function RootNavigator() {
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
+          <AppStack.Screen name="LiveDraft" component={EspnLiveDraftScreen} />
+          <AppStack.Screen name="GuessThePlayerLeaderboard" component={EspnGuessLeaderboardScreen} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}
-            options={{ presentation: 'modal', title: 'Premium' }}
+            options={{ presentation: 'modal', title: 'Premium', animation: 'default', contentStyle: { backgroundColor: colors.background } }}
           />
           <AppStack.Screen
             name="TrialLapsed"
             component={TrialLapsedScreen}
-            options={{ presentation: 'modal', headerShown: false }}
+            options={{ presentation: 'modal', headerShown: false, animation: 'default', contentStyle: { backgroundColor: colors.background } }}
           />
         </AppStack.Navigator>
         {hideFloatingChrome ? null : <GmOrb />}
@@ -314,10 +340,11 @@ export default function RootNavigator() {
         {hideFloatingChrome ? null : <GuessThePlayerNameMatchPrompt />}
         </View>
       ) : (
-        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+        <AuthStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
           <AuthStack.Screen name="Login" component={LoginScreen} />
         </AuthStack.Navigator>
       )}
     </NavigationContainer>
+    </View>
   );
 }

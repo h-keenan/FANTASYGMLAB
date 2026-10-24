@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -22,7 +23,7 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import StatStrip from '../components/StatStrip';
+import DashboardStatRow from '../components/DashboardStatRow';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import ValuesCredit from '../components/ValuesCredit';
@@ -46,7 +47,6 @@ import {
   moveOverLine,
   moveSlotLabel,
   recordLabel,
-  slotDisplayLabel,
   winProbabilityUnavailableMessage,
   type LineupPlayer,
   type VerdictTone,
@@ -177,7 +177,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load your matchup" message={error} onRetry={() => void matchupQuery.refetch()} />
       </View>
     );
   }
@@ -261,6 +261,13 @@ export default function MatchupScreen({ route, navigation }: Props) {
         <BeginnerHelp term="matchupIntro" />
         <BeginnerHelp term="matchupWinProbability" />
         <Scoreboard matchup={shown} mine={mine} opponent={opponent} />
+        {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
+          <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>
+            {`Not matched to a FantasyDesk player, so left out of the lineups and win odds: ${matchup.unmapped_players
+              .map((p) => `${p.name} (${p.fantasy_team})`)
+              .join(', ')}.`}
+          </AppText>
+        ) : null}
         <Insights matchup={shown} />
         <LineupComparison
           matchup={matchup}
@@ -386,8 +393,8 @@ function Scoreboard({
         <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText>
       )}
 
-      <StatStrip
-        fullWidth
+      <DashboardStatRow
+        style={{ marginBottom: 0 }}
         items={[
           { label: 'Your value', value: formatSeasonValue(comparison.my_season_value) },
           {
@@ -636,7 +643,7 @@ function LineupComparison({
                 onEdit={plan && editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined}
               />
               <View style={styles.slotCell}>
-                <AppText style={styles.slotText}>{slotDisplayLabel(row.slot)}</AppText>
+                <PositionBadge position={row.slot} />
               </View>
               <LineupCell player={row.opponent} mine={false} maxValue={maxValue} onPress={onPressPlayer} />
             </View>
@@ -656,7 +663,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   return (
     <View style={styles.moveCard}>
       <View style={styles.moveSlot}>
-        <ToneBadge label={slotLabel} color={colors.accent} />
+        <PositionBadge position={move.slot} label={slotLabel} />
       </View>
       <PlayerAvatar playerId={move.start.player_id} tier={move.start.tier} size={40} />
       <View style={styles.moveBody}>
@@ -729,7 +736,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.lg, paddingBottom: spacing.xl * 4, gap: spacing.md },
     center: {
@@ -806,13 +813,11 @@ function createStyles(colors: ThemeColors) {
     barTrack: { height: 4, alignSelf: 'stretch', borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
     barFill: { height: '100%' },
     slotCell: {
-      width: 38,
+      width: 44,
       alignItems: 'center',
       justifyContent: 'center',
       marginHorizontal: 4,
-      backgroundColor: colors.accentMuted,
     },
-    slotText: { fontSize: 11, fontWeight: '800', color: colors.textSecondary },
     viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
     moveList: { gap: spacing.sm },
     moveCard: {

@@ -212,7 +212,7 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
   ].filter((bit): bit is string => Boolean(bit));
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.row, showDivider && styles.rowDivider]}
       onPress={() => {
         if (item.link) void Linking.openURL(item.link);
@@ -247,7 +247,7 @@ function createRowStyles(colors: ThemeColors) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
     listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
     sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
     sectionHeaderText: {

@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Linking,
   RefreshControl,
   SectionList,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -30,7 +28,6 @@ import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
 import EspnLeagueImport from '../components/EspnLeagueImport';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { useAuth } from '../context/AuthContext';
@@ -47,7 +44,9 @@ import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { SheetModal, SwipeDismissCard } from '../components/SwipeDismissSheet';
+import { leagueCapMessage } from '../lib/leagueCap';
+import Input from '../components/Input';
+import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -217,19 +216,13 @@ export default function HomeScreen({ navigation, route }: Props) {
   // purely numeric entry skips the username lookup and saves directly.
   const looksLikeLeagueId = (value: string) => /^\d{6,}$/.test(value);
 
-  const capMessageFor = (cap: number) =>
-    cap === 1
-      ? 'Your plan keeps 1 saved league. Upgrade to Premium to manage all of your leagues here.'
-      : `Your plan keeps ${cap} saved leagues. Upgrade to Premium to manage all of your leagues here.`;
+  // Honest, plan-accurate copy (lib/leagueCap.ts).
+  const capMessageFor = (_cap: number) => leagueCapMessage();
 
-  // Dashboard for Sleeper leagues, My Team for ESPN leagues (which have no
-  // Dashboard yet — lib/leaguePlatform.ts).
+  // Every league opens on its Dashboard; imported leagues show what their
+  // platform data supports (lib/leaguePlatform.ts).
   const openLeague = (leagueId: string, leagueName: string) => {
-    if (isEspnLeagueId(leagueId)) {
-      navigation.navigate('MyTeam', { leagueId, leagueName });
-    } else {
-      navigation.navigate('Dashboard', { leagueId, leagueName });
-    }
+    navigation.navigate('Dashboard', { leagueId, leagueName });
   };
 
   const finishSave = async (leagueId: string, leagueName: string | undefined, routeToTeamStance: boolean) => {
@@ -429,23 +422,23 @@ export default function HomeScreen({ navigation, route }: Props) {
                     </AppText>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => void signOut()} hitSlop={8}>
                   <AppText style={styles.signOut}>Sign out</AppText>
                 </TouchableOpacity>
               </View>
               {me ? (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   disabled={me.entitlement === 'premium'}
                   onPress={() => (me.profile_status === 'error' ? void load() : navigation.navigate('Paywall'))}
                   style={[
                     styles.entitlementPill,
-                    me.entitlement === 'premium' && styles.entitlementPillPremium,
+                    me.profile_status !== 'error' && styles.entitlementPillPremium,
                   ]}
                 >
                   <AppText
                     style={[
                       styles.entitlementText,
-                      me.entitlement === 'premium' && styles.entitlementTextPremium,
+                      me.profile_status !== 'error' && styles.entitlementTextPremium,
                     ]}
                   >
                     {me.profile_status === 'error'
@@ -493,7 +486,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             <View style={styles.sectionHeader}>
               <AppText style={styles.sectionTitle}>Your leagues</AppText>
               {atLeagueCap ? null : (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.addLeagueButton}
                   onPress={() => {
                     setAddQuery(me?.sleeper_username ?? '');
@@ -565,7 +558,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           const isFirst = index === 0;
           const isLast = index === (leagues?.length ?? 0) - 1;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               activeOpacity={0.7}
               style={[
                 styles.leagueRow,
@@ -592,7 +585,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   stand-in, and rename prefills from it — saving would write
                   the fake name back into saved_leagues for real. */}
               {showcaseMode ? null : (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   hitSlop={8}
                   style={styles.renameButton}
                   onPress={() => {
@@ -609,9 +602,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         }}
       />
 
-      <SheetModal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
-        <View style={styles.renameBackdrop}>
-          <SwipeDismissCard style={styles.renameCard} onDismiss={closeAddLeague} handleOnly>
+      <ModalFormCard visible={addOpen} onClose={closeAddLeague} handleOnly>
             {warmingLeague ? (
               <LeagueWarmupProgress
                 leagueId={warmingLeague.leagueId}
@@ -621,7 +612,7 @@ export default function HomeScreen({ navigation, route }: Props) {
               />
             ) : (
             <>
-            <AppText style={styles.renameTitle}>Add a league</AppText>
+            <ModalFormTitle>Add a league</ModalFormTitle>
             <View style={styles.platformTabs}>
               <SegmentedTabBar<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>
                 options={[
@@ -653,22 +644,19 @@ export default function HomeScreen({ navigation, route }: Props) {
                     autoNavigated.current = true;
                     closeAddLeague();
                     void load();
-                    // ESPN leagues have no Dashboard yet (lib/leaguePlatform.ts).
-                    navigation.navigate('MyTeam', { leagueId, leagueName });
+                    navigation.navigate('Dashboard', { leagueId, leagueName });
                   }}
                 />
               )
             ) : (
             <>
-            <AppText style={styles.renameHint}>
+            <ModalFormHint>
               Enter your Sleeper username to pick from your leagues — or paste a league ID directly.
-            </AppText>
-            <TextInput
-              style={styles.renameInput}
+            </ModalFormHint>
+            <Input
               value={addQuery}
               onChangeText={setAddQuery}
               placeholder="Sleeper username or league ID"
-              placeholderTextColor={colors.textTertiary}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!addBusy}
@@ -682,7 +670,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 all — not only shown reactively after a failed search (see
                 findLeagues' auto-expand above), since someone might never
                 attempt a search in the first place without this nudge. */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               onPress={() => setShowNoLeagueHelp((value) => !value)}
               hitSlop={8}
               style={styles.noLeagueToggle}
@@ -701,7 +689,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   doesn't create or host leagues itself. Create a free league in the Sleeper app
                   (or at sleeper.com), then come back here and search your Sleeper username.
                 </AppText>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.noLeagueButton}
                   onPress={() => void Linking.openURL('https://sleeper.com')}
                 >
@@ -738,7 +726,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     <AppText style={styles.addOptionsSeasonHeader}>{section.title} season</AppText>
                   )}
                   renderItem={({ item }) => (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.addOptionRow}
                       disabled={addBusy}
                       onPress={() =>
@@ -766,76 +754,45 @@ export default function HomeScreen({ navigation, route }: Props) {
               </View>
             ) : null}
 
-            <View style={styles.renameActions}>
-              <TouchableOpacity
-                style={styles.renameCancelButton}
-                onPress={closeAddLeague}
-                disabled={addBusy}
-              >
-                <AppText style={styles.renameCancelText}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.renameSaveButton}
-                onPress={() => void findLeagues()}
-                disabled={addBusy}
-              >
-                {addBusy ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <AppText style={styles.renameSaveText}>Find leagues</AppText>
-                )}
-              </TouchableOpacity>
-            </View>
-            </>
-            )}
-            </>
-            )}
-          </SwipeDismissCard>
-        </View>
-      </SheetModal>
-
-      <SheetModal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
-        <View style={styles.renameBackdrop}>
-          <SwipeDismissCard style={styles.renameCard} onDismiss={() => setRenamingLeague(null)}>
-            <AppText style={styles.renameTitle}>Rename League</AppText>
-            <AppText style={styles.renameHint}>
-              Only changes what you see here — the real league name in Sleeper stays the same.
-            </AppText>
-            <TextInput
-              style={styles.renameInput}
-              value={renameText}
-              onChangeText={setRenameText}
-              placeholder="League name"
-              placeholderTextColor={colors.textTertiary}
-              autoFocus
-              maxLength={80}
+            <ModalFormActions
+              onCancel={closeAddLeague}
+              cancelDisabled={addBusy}
+              confirmLabel="Find leagues"
+              onConfirm={() => void findLeagues()}
+              confirmLoading={addBusy}
             />
-            <View style={styles.renameActions}>
-              <TouchableOpacity
-                style={styles.renameCancelButton}
-                onPress={() => setRenamingLeague(null)}
-                disabled={renameBusy}
-              >
-                <AppText style={styles.renameCancelText}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.renameSaveButton} onPress={saveLeagueRename} disabled={renameBusy}>
-                {renameBusy ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <AppText style={styles.renameSaveText}>Save</AppText>
-                )}
-              </TouchableOpacity>
-            </View>
-          </SwipeDismissCard>
-        </View>
-      </SheetModal>
+            </>
+            )}
+            </>
+            )}
+      </ModalFormCard>
+
+      <ModalFormCard visible={renamingLeague !== null} onClose={() => setRenamingLeague(null)}>
+        <ModalFormTitle>Rename League</ModalFormTitle>
+        <ModalFormHint>Only changes what you see here — the real league name in Sleeper stays the same.</ModalFormHint>
+        <Input
+          value={renameText}
+          onChangeText={setRenameText}
+          placeholder="League name"
+          autoFocus
+          maxLength={80}
+        />
+        <ModalFormActions
+          onCancel={() => setRenamingLeague(null)}
+          cancelDisabled={renameBusy}
+          confirmLabel="Save"
+          onConfirm={saveLeagueRename}
+          confirmDisabled={false}
+          confirmLoading={renameBusy}
+        />
+      </ModalFormCard>
     </View>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   header: {
     marginHorizontal: spacing.lg,
@@ -1014,48 +971,6 @@ function createStyles(colors: ThemeColors) {
   },
   defaultBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   renameButton: { marginLeft: spacing.sm, marginRight: spacing.sm, padding: 2 },
-  renameBackdrop: {
-    flex: 1,
-    backgroundColor: scrim,
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  renameCard: {
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: spacing.lg,
-  },
-  renameTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  renameHint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
-  renameInput: {
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-  },
-  renameActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  renameCancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
-  renameCancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
-  renameSaveButton: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 10,
-    borderRadius: radii.sm,
-    minWidth: 64,
-    alignItems: 'center',
-  },
-  renameSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   error: {
     color: colors.danger,
     paddingHorizontal: spacing.xl,

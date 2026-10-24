@@ -37,7 +37,15 @@ export function notAvailableMessage(leagueId: string | null | undefined): string
 }
 
 /** First path segment of every league-scoped page an ESPN league can open. */
-export const ESPN_SUPPORTED_SEGMENTS = new Set(["my-team", "trade-analyzer", "players", "player-compare", "league-rankings"]);
+export const ESPN_SUPPORTED_SEGMENTS = new Set([
+  "dashboard",
+  "matchup",
+  "my-team",
+  "trade-analyzer",
+  "players",
+  "player-compare",
+  "league-rankings",
+]);
 
 /** First path segment of every page that takes a league id as its second segment. */
 const LEAGUE_SCOPED_SEGMENTS = new Set([
@@ -78,11 +86,10 @@ export function espnUnavailableLeagueId(pathname: string | null | undefined): st
   return isEspnLeagueId(leagueId) ? leagueId : null;
 }
 
-/** Where opening a league lands: Dashboard for Sleeper, My Team for ESPN
- * (ESPN leagues have no Dashboard yet). */
+/** Where opening a league lands: the Dashboard, for every platform (imported
+ * leagues show what their data supports; see docs/platform-import-status.md). */
 export function leagueHomePath(leagueId: string, leagueName: string): string {
-  const page = isEspnLeagueId(leagueId) ? "my-team" : "dashboard";
-  return `/${page}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
+  return `/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
 }
 
 /** Seasons offered in the ESPN import's season picker, newest first. */

@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/Button";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
+import { ONBOARDING_FEATURES } from "@/lib/onboardingFeatures";
 import { PLAIN_COPY, type ExperienceLevel } from "@/lib/experienceCopy";
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 
@@ -28,36 +30,60 @@ import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/
  * normal light/dark theme toggle — this is a one-time, brief intro screen,
  * not a persistent themed surface.
  */
-export const ONBOARDING_FEATURES = [
-  { key: "gameplan", title: "Game Plan", benefit: "One clear top priority every time you open the app." },
-  { key: "tradehub", title: "Trade Hub", benefit: "Trade ideas your league partners would actually accept." },
-  { key: "matchup", title: "Matchup", benefit: "Win odds for your week, before kickoff." },
-  { key: "planner", title: "Lineup Planner", benefit: "See what a swap does to your win odds." },
-  { key: "pqv", title: "Player Quick View", benefit: "Value, usage, and fit for any player in one tap." },
-  { key: "playoff", title: "Playoff Odds", benefit: "Simulated playoff odds for every team in your league." },
-  { key: "tendencies", title: "Manager Tendencies", benefit: "Know how each manager trades before you pitch." },
-  { key: "waivers", title: "Waivers", benefit: "Priority Adds ranked for your roster, with FAAB ranges." },
-] as const;
+export { ONBOARDING_FEATURES };
 
 const SWIPE_THRESHOLD_PX = 50;
 
-export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
+export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => void; replay?: boolean }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
   const [saving, setSaving] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  // The shell is portaled to <body>. Rendered in place it sat inside the
+  // landing page's z-index:1 stacking context, so the site Header and the
+  // backdrop-filter store badges painted over it on iOS Safari. While it is
+  // open every other <body> child is made inert + aria-hidden.
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const root = document.createElement("div");
+    root.setAttribute("data-onboarding-root", "");
+    document.body.appendChild(root);
+    const hidden: Array<{ el: Element; inert: boolean; aria: string | null }> = [];
+    for (const el of Array.from(document.body.children)) {
+      if (el === root) continue;
+      hidden.push({ el, inert: el.hasAttribute("inert"), aria: el.getAttribute("aria-hidden") });
+      el.setAttribute("inert", "");
+      el.setAttribute("aria-hidden", "true");
+    }
+    setPortalRoot(root);
+    return () => {
+      for (const { el, inert, aria } of hidden) {
+        if (!inert) el.removeAttribute("inert");
+        if (aria === null) el.removeAttribute("aria-hidden");
+        else el.setAttribute("aria-hidden", aria);
+      }
+      root.remove();
+    };
+  }, []);
+  const [direction, setDirection] = useState<"next" | "back">("next");
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
 
   const featureCount = ONBOARDING_FEATURES.length;
-  const connectStep = featureCount;
-  const levelStep = featureCount + 1;
-  const totalSteps = featureCount + 2;
+  // Replay (Account > "Replay the tour"): feature slides only. No connect or
+  // experience step, so nothing is saved, no step_viewed/completed events
+  // (the signup funnel stays clean) and onboarding-completed is untouched.
+  const connectStep = replay ? -1 : featureCount;
+  const levelStep = replay ? -1 : featureCount + 1;
+  const lastStep = replay ? featureCount - 1 : levelStep;
+  const totalSteps = replay ? featureCount : featureCount + 2;
 
   const stepName = (i: number) => (i < featureCount ? ONBOARDING_FEATURES[i].key : i === connectStep ? "connect" : "level");
 
   // One step_viewed per step per session (deduped in the helper), so a
   // re-render or a Back/Next revisit never double counts.
   useEffect(() => {
+    if (replay) return;
     trackOnboardingStepViewed(stepName(step), step);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
@@ -81,17 +107,27 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
   };
 
   const next = () => {
+    if (replay && step === lastStep) {
+      onDone();
+      return;
+    }
     if (step === levelStep) {
       void finish();
       return;
     }
+    setDirection("next");
     setStep((s) => s + 1);
   };
   const back = () => {
-    if (step > 0) trackOnboarding("back", { step: stepName(step), step_index: step });
+    if (step > 0 && !replay) trackOnboarding("back", { step: stepName(step), step_index: step });
+    setDirection("back");
     setStep((s) => Math.max(0, s - 1));
   };
   const skip = () => {
+    if (replay) {
+      onDone();
+      return;
+    }
     trackOnboarding("skipped", { step: stepName(step), step_index: step });
     onDone();
   };
@@ -100,19 +136,29 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
     trackOnboarding("experience_selected", { experience: experienceBucket(value) });
   };
 
-  const onTouchEnd = (clientX: number) => {
+  const onTouchEnd = (clientX: number, clientY: number) => {
     const start = touchStartX.current;
+    const startY = touchStartY.current;
     touchStartX.current = null;
+    touchStartY.current = null;
     if (start === null) return;
     const dx = clientX - start;
+    // Mostly-vertical gestures are scrolls, never slide changes.
+    if (startY !== null && Math.abs(clientY - startY) > Math.abs(dx)) return;
     // The last step ends in an explicit choice, so a swipe never skips it.
-    if (dx <= -SWIPE_THRESHOLD_PX && step < levelStep) setStep(step + 1);
+    if (dx <= -SWIPE_THRESHOLD_PX && step < lastStep) {
+      setDirection("next");
+      setStep(step + 1);
+    }
     else if (dx >= SWIPE_THRESHOLD_PX) back();
   };
 
   const feature = step < featureCount ? ONBOARDING_FEATURES[step] : null;
 
-  return (
+  const nextFeature = step + 1 < featureCount ? ONBOARDING_FEATURES[step + 1] : null;
+
+  if (!portalRoot) return null;
+  return createPortal(
     <div className="onboarding-shell">
       <div className="onboarding-field" aria-hidden="true" />
       <div className="onboarding-sweep" aria-hidden="true" />
@@ -121,8 +167,9 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
         className="onboarding-content"
         onTouchStart={(e) => {
           touchStartX.current = e.touches[0]?.clientX ?? null;
+          touchStartY.current = e.touches[0]?.clientY ?? null;
         }}
-        onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
+        onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0, e.changedTouches[0]?.clientY ?? 0)}
       >
         <div className="onboarding-topbar">
           <div className="onboarding-dots">
@@ -136,7 +183,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
         </div>
 
         {feature ? (
-          <div className="onboarding-section onboarding-section--center onboarding-feature">
+          <div key={step} className={`onboarding-section onboarding-section--center onboarding-feature onboarding-slide onboarding-slide--${direction}`}>
             <span className="onboarding-eyebrow">{feature.title}</span>
             <div className="onboarding-phone">
               <Image
@@ -153,7 +200,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
         ) : null}
 
         {step === connectStep ? (
-          <div className="onboarding-hero">
+          <div key={step} className={`onboarding-hero onboarding-slide onboarding-slide--${direction}`}>
             <Image src="/brand-mark-white.png" alt="" width={56} height={56} className="onboarding-mark" />
             <span className="onboarding-eyebrow">One setup step</span>
             <h1 className="onboarding-headline onboarding-headline--sm">Connect Sleeper or ESPN</h1>
@@ -203,6 +250,19 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
           </div>
         ) : null}
 
+        {nextFeature ? (
+          // Warms the next slide's screenshot so swiping never shows a blank frame.
+          <div aria-hidden="true" className="onboarding-preload">
+            <Image
+              src={`/onboarding/onboarding-${nextFeature.key}.webp`}
+              alt=""
+              width={600}
+              height={1298}
+              loading="eager"
+            />
+          </div>
+        ) : null}
+
         <div className="onboarding-footer">
           {step > 0 ? (
             <button type="button" onClick={back} className="onboarding-back">
@@ -215,14 +275,17 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
             className="flex-1"
             style={{ alignSelf: "auto" }}
           >
-            {step === levelStep
-              ? saving
-                ? `Setting up ${BRAND_NAME}…`
-                : "Continue"
-              : "Next"}
+            {replay && step === lastStep
+              ? "Done"
+              : step === levelStep
+                ? saving
+                  ? `Setting up ${BRAND_NAME}…`
+                  : "Continue"
+                : "Next"}
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    portalRoot,
   );
 }

@@ -86,9 +86,10 @@ def test_routes_are_gated_with_a_platform_named_message():
     for key, label in ((FF_KEY, "Fleaflicker"), (MFL_KEY, "MFL")):
         assert not external_leagues.gated_league_path(f"/v1/leagues/{key}/my-team")
         assert not external_leagues.gated_league_path(f"/v1/leagues/{key}/trade-analyzer")
-        assert external_leagues.gated_league_path(f"/v1/leagues/{key}/dashboard")
-        assert external_leagues.gated_league_path(f"/v1/leagues/{key}/matchup")
-        payload = external_leagues.not_available_payload(f"/v1/leagues/{key}/dashboard")
+        assert not external_leagues.gated_league_path(f"/v1/leagues/{key}/dashboard")
+        assert not external_leagues.gated_league_path(f"/v1/leagues/{key}/matchup")
+        assert external_leagues.gated_league_path(f"/v1/leagues/{key}/waivers")
+        payload = external_leagues.not_available_payload(f"/v1/leagues/{key}/waivers")
         assert payload["error"] == f"Not available for {label} leagues yet."
         assert payload["reason"] == "espn_not_supported" and payload["platform"] == key.split(":")[0]
     assert not external_leagues.gated_league_path("/v1/leagues/123/dashboard")

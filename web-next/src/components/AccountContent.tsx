@@ -7,7 +7,10 @@ import { ReferralCard } from "@/components/ReferralCard";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import type { ExperienceLevel } from "@/lib/experienceCopy";
 import { trialEndLabel } from "@/lib/trialCopy";
-import { ButtonLink } from "@/components/Button";
+import { Button, ButtonLink } from "@/components/Button";
+import { OnboardingCarousel } from "@/components/OnboardingCarousel";
+import { trackOnboarding } from "@/lib/onboardingAnalytics";
+import { Toggle } from "@/components/Toggle";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same four categories, same copy — so a user who's seen this in the app
@@ -70,7 +73,12 @@ function BillingSection({
       {entitlement === "premium" ? (
         <>
           {trialEndLabel(trialEndsAt) ? (
-            <p className="text-sm font-semibold">{trialEndLabel(trialEndsAt)}</p>
+            <p
+              className="text-xs font-extrabold self-start px-2 py-1"
+              style={{ color: "var(--color-premium)", background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)" }}
+            >
+              {trialEndLabel(trialEndsAt)}
+            </p>
           ) : null}
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Manage your plan, payment method, or cancel anytime.
@@ -80,9 +88,10 @@ function BillingSection({
               {error}
             </p>
           ) : null}
-          <button
+          <Button
+            variant="premium"
             type="button"
-            disabled={busy}
+            loading={busy}
             onClick={() => {
               setBusy(true);
               setError(null);
@@ -90,11 +99,9 @@ function BillingSection({
                 .catch((err) => setError(err instanceof Error ? err.message : "Could not open the billing portal."))
                 .finally(() => setBusy(false));
             }}
-            className="px-4 py-2 text-sm font-bold self-start"
-            style={{ background: "var(--color-premium)", color: "var(--color-bg)", opacity: busy ? "var(--opacity-disabled)" : 1 }}
           >
             {busy ? "Opening…" : "Manage Billing"}
-          </button>
+          </Button>
         </>
       ) : (
         <>
@@ -103,6 +110,7 @@ function BillingSection({
           </p>
           <ButtonLink
             href="/premium"
+            variant="premium"
           >
             Upgrade to Premium
           </ButtonLink>
@@ -224,23 +232,16 @@ function PreferencesSection({
             I don&apos;t want MY trades to appear in this feed
           </span>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={communityOptedOut}
+        <Toggle
+          tone="danger"
+          checked={communityOptedOut}
           disabled={togglingCommunity}
-          onClick={() => {
+          stateLabel={communityOptedOut ? "Opted out" : "Opted in"}
+          onChange={(next) => {
             setTogglingCommunity(true);
-            Promise.resolve(onToggleCommunityOptOut(!communityOptedOut)).finally(() => setTogglingCommunity(false));
+            Promise.resolve(onToggleCommunityOptOut(next)).finally(() => setTogglingCommunity(false));
           }}
-          className="px-2.5 py-1 text-xs font-bold"
-          style={{
-            border: "var(--border-width-default) solid var(--color-border)",
-            color: communityOptedOut ? "var(--color-danger)" : "var(--color-success)",
-          }}
-        >
-          {communityOptedOut ? "Opted out" : "Opted in"}
-        </button>
+        />
       </div>
 
       {pushCategories ? (
@@ -261,25 +262,15 @@ function PreferencesSection({
                     {item.description}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={pushCategories[item.value]}
+                <Toggle
+                  checked={pushCategories[item.value]}
                   disabled={togglingPush === item.value}
-                  onClick={() => {
+                  stateLabel={pushCategories[item.value] ? "On" : "Off"}
+                  onChange={(next) => {
                     setTogglingPush(item.value);
-                    Promise.resolve(onTogglePushCategory(item.value, !pushCategories[item.value])).finally(() =>
-                      setTogglingPush(null),
-                    );
+                    Promise.resolve(onTogglePushCategory(item.value, next)).finally(() => setTogglingPush(null));
                   }}
-                  className="px-2.5 py-1 text-xs font-bold"
-                  style={{
-                    border: "var(--border-width-default) solid var(--color-border)",
-                    color: pushCategories[item.value] ? "var(--color-success)" : "var(--color-text-muted)",
-                  }}
-                >
-                  {pushCategories[item.value] ? "On" : "Off"}
-                </button>
+                />
               </div>
             ))}
           </div>
@@ -298,18 +289,31 @@ function AccountActionsSection({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replaying, setReplaying] = useState(false);
 
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-actions-heading">
       <SectionHeading id="account-actions-heading">Account actions</SectionHeading>
+      <button
+        type="button"
+        onClick={() => {
+          trackOnboarding("replayed");
+          setReplaying(true);
+        }}
+        className="px-4 py-2 text-sm font-bold self-start"
+        style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
+      >
+        Replay the tour
+      </button>
+      {replaying ? <OnboardingCarousel replay onDone={() => setReplaying(false)} /> : null}
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}
         </p>
       ) : null}
-      <button
-        type="button"
-        disabled={busy}
+      <Button
+        variant="secondary"
+        loading={busy}
         onClick={() => {
           setBusy(true);
           setError(null);
@@ -317,23 +321,12 @@ function AccountActionsSection({
             .catch((err) => setError(err instanceof Error ? err.message : "Could not export your data."))
             .finally(() => setBusy(false));
         }}
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{
-          border: "var(--border-width-default) solid var(--color-border)",
-          color: "var(--color-text-secondary)",
-          opacity: busy ? "var(--opacity-disabled)" : 1,
-        }}
       >
         {busy ? "Preparing export…" : "Export my data"}
-      </button>
-      <button
-        type="button"
-        onClick={onSignOut}
-        className="px-4 py-2 text-sm font-bold self-start"
-        style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
-      >
+      </Button>
+      <Button variant="secondary" onClick={onSignOut}>
         Sign out
-      </button>
+      </Button>
     </section>
   );
 }
@@ -362,19 +355,14 @@ function DeleteAccountSection({ onDeleteAccount }: { onDeleteAccount: () => Prom
         </p>
       ) : null}
       {!confirming ? (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="px-4 py-2 text-sm font-bold self-start"
-          style={{ background: "var(--color-danger)", color: "var(--color-bg)" }}
-        >
+        <Button variant="danger" onClick={() => setConfirming(true)}>
           Delete account
-        </button>
+        </Button>
       ) : (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={busy}
+          <Button
+            variant="danger"
+            loading={busy}
             onClick={() => {
               setBusy(true);
               setError(null);
@@ -383,20 +371,12 @@ function DeleteAccountSection({ onDeleteAccount }: { onDeleteAccount: () => Prom
                 setBusy(false);
               });
             }}
-            className="px-4 py-2 text-sm font-bold"
-            style={{ background: "var(--color-danger)", color: "var(--color-bg)", opacity: busy ? "var(--opacity-disabled)" : 1 }}
           >
             {busy ? "Deleting…" : "Confirm delete"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setConfirming(false)}
-            className="px-4 py-2 text-sm font-bold"
-            style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
-          >
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
       )}
     </section>

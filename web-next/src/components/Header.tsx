@@ -3,13 +3,15 @@
 import Image from "next/image";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import Link from "next/link";
-import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
+import { useSearchParams } from "@/lib/useSearchParams";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { AlertsBell } from "@/components/AlertsDropdown";
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
+import { maskSavedLeagueRows } from "@/lib/privacy";
 import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
@@ -22,12 +24,12 @@ const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "no_affiliation", label: "No-Affiliation Disclaimer" },
 ];
 
-interface SavedLeagueRow {
+export interface SavedLeagueRow {
   league_id: string;
   league_name: string | null;
 }
 
-function LeagueSwitcherButton({
+export function LeagueSwitcherButton({
   leagueId,
   leagueName,
   leagues,
@@ -234,7 +236,7 @@ function HeaderLeagueControls() {
       .from("saved_leagues")
       .select("league_id, league_name")
       .then(({ data }) => {
-        if (!cancelled) setSavedLeagues(data ?? []);
+        if (!cancelled) setSavedLeagues(maskSavedLeagueRows(data ?? []));
       });
     return () => {
       cancelled = true;
@@ -282,8 +284,8 @@ const ICON_BUTTON_STYLE = {
   color: "var(--color-text-secondary)",
   border: "var(--border-width-default) solid var(--color-border)",
   borderRadius: "var(--radius-control)",
-  width: "2.5rem",
-  height: "2.5rem",
+  width: "var(--touch-target-min)",
+  height: "var(--touch-target-min)",
 } as const;
 
 /**

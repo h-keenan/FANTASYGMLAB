@@ -74,8 +74,8 @@ function createStyles(colors: ThemeColors) {
       gap: 2,
     },
     segment: {
-      width: 30,
-      height: 26,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.pill,

@@ -28,12 +28,15 @@ export function ConfidenceMeter({
   label,
   value,
   color,
+  level: levelOverride,
 }: {
   label: string;
   value: string;
   color: string;
+  /** 1-3 segments; defaults to the High/Medium/Low reading of `value`. */
+  level?: number;
 }) {
-  const level = confidenceLevelFor(value);
+  const level = levelOverride ?? confidenceLevelFor(value);
   return (
     <div className="flex items-center gap-1.5" role="img" aria-label={`${label}: ${value}`}>
       <span

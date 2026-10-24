@@ -199,7 +199,11 @@ def grant_ad_unlock_if_claimed(user_id: str, claimed: int, max_unlocks: int) -> 
 
 def claim_league(user_id: str, league_id: str, capacity: int) -> bool:
     """Let a Free account use an unsaved league while it has spare league
-    capacity (cap minus saved leagues). Already-claimed leagues stay allowed."""
+    capacity (cap minus saved leagues). With no spare capacity (the account
+    has saved a league) NOTHING is allowed here, even a league claimed
+    earlier: the claim is released when a league is saved
+    (`release_league_claims`) and refused here regardless. Already-claimed
+    leagues stay allowed only while capacity remains."""
 
     uid = _text(user_id)
     lid = _text(league_id)
@@ -224,6 +228,38 @@ def claim_league(user_id: str, league_id: str, capacity: int) -> bool:
             pool.add(lid)
             return True
         return False
+
+
+def release_league_claims(user_id: str) -> None:
+    """Forget the account's unsaved-league claim. Called whenever the saved
+    league set changes (save or remove) so the claim is replaced by the real
+    saved league instead of lingering as a second allowed league."""
+
+    uid = _text(user_id)
+    if not uid:
+        return
+    key = redis_cache.build_cache_key("free_ledger", "leagues", uid)
+    with _memory_lock:
+        _memory_sets.pop(key, None)
+    try:
+        redis_cache.get_redis_client().delete(key)
+    except Exception:
+        pass
+
+
+def claimed_leagues(user_id: str) -> set[str]:
+    uid = _text(user_id)
+    if not uid:
+        return set()
+    key = redis_cache.build_cache_key("free_ledger", "leagues", uid)
+    try:
+        return {
+            m.decode() if isinstance(m, bytes) else str(m)
+            for m in redis_cache.get_redis_client().smembers(key)
+        }
+    except Exception:
+        with _memory_lock:
+            return set(_memory_sets.get(key, set()))
 
 
 # --------------------------------------------------------------------------

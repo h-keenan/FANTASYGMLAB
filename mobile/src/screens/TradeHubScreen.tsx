@@ -435,7 +435,7 @@ function AllTradesFooter({
         <AppText style={styles.gateBody}>
           Free shows {entitlement?.free_limit} ideas across All Trades. Go Pro to browse every team.
         </AppText>
-        <Button label="Upgrade to Pro" onPress={onUpgrade} style={styles.gatePrimaryButton} />
+        <Button label="Upgrade to Pro" variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </AnimatedCard>
     );
   }
@@ -485,7 +485,7 @@ function TradeHubGateCard({
             )}
           </TouchableOpacity>
         ) : null}
-        <Button label="Upgrade to Pro" onPress={onUpgrade} style={styles.gatePrimaryButton} />
+        <Button label="Upgrade to Pro" variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </View>
     </AnimatedCard>
   );
@@ -501,7 +501,7 @@ function TradeHubGateCard({
 // (_SELL_HIGH_OPPORTUNITY_LABELS — established trade value from a starter
 // reputation, but the opportunity signal underneath is already softening).
 // Reuses impactTagConfig's exact labels/colors so the legend, the filter
-// chips below, and each card's ImpactBadge never drift from one another.
+// chips below, and each card's impact pill never drift from one another.
 function impactLegend(colors: ThemeColors): ScreenInfoLegendItem[] {
   const config = impactTagConfig(colors);
   return [
@@ -692,7 +692,7 @@ function createStyles(colors: ThemeColors) {
   },
   gateSecondaryButtonText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   gatePrimaryButton: { flex: 1 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },

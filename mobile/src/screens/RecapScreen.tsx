@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -157,7 +158,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const error =
     recapQuery.isError && !recapData ? toUserErrorMessage(recapQuery.error, 'Failed to load recap.') : null;
 
-  useScreenHeaderTitle(navigation, 'Recap', leagueName);
+  useScreenHeaderTitle(navigation, 'League Recaps', leagueName);
 
   useEffect(() => {
     navigation.setOptions({
@@ -248,7 +249,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load the recap" message={error} onRetry={() => void recapQuery.refetch()} />
       </View>
     );
   }
@@ -259,7 +260,7 @@ export default function RecapScreen({ route, navigation }: Props) {
         {Array.from({ length: maxCompletedWeek }, (_, i) => i + 1).map((weekNum) => {
           const active = (selectedWeek ?? maxCompletedWeek) === weekNum;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={weekNum}
               style={[styles.weekPill, active && styles.weekPillActive]}
               onPress={() => setSelectedWeek(weekNum)}
@@ -319,7 +320,7 @@ export default function RecapScreen({ route, navigation }: Props) {
           <AppText style={styles.headline}>{recap.headline}</AppText>
         </View>
         {!recap.incomplete ? (
-          <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+          <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
             <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
             <AppText style={styles.shareButtonText}>Share</AppText>
           </TouchableOpacity>
@@ -583,7 +584,7 @@ function FeaturedStoryRow({
   const showMetric = Boolean(story.metric_label) && !isMatchup;
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.featuredRow, { backgroundColor: `${meta.color}14` }, showDivider && styles.rowDivider]}
       onPress={onPress}
       disabled={!onPress}
@@ -693,7 +694,7 @@ function StoryRow({
   const isTrade = story.story_type === 'trade';
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.row, showDivider && styles.rowDivider]}
       onPress={onPress}
       disabled={!onPress}
@@ -762,7 +763,7 @@ function StoryRow({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   center: {

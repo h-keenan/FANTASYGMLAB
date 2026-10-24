@@ -396,6 +396,61 @@ def load_league_snapshot(league_key: str) -> dict[str, Any]:
     )
 
 
+# ---------------------------------------------------------------------------
+# Weekly matchup + lineup (Dashboard / Matchup)
+# ---------------------------------------------------------------------------
+#
+# One extra public export, ``TYPE=liveScoring`` (no ``W``: the current week), read
+# lazily and cached 30 seconds by modules.external_matchups. It answers the
+# current ``week``, every pairing with each side's score, and each side's
+# *starters* with their scores. It does not list slot names or the bench (the
+# bench is the rest of the saved roster) and it carries no projections.
+
+
+def _live_franchise(item: dict[str, Any]) -> dict[str, Any]:
+    starters = [
+        {"platform_id": safe_text(p.get("id")), "points": safe_float(p.get("score"), 0.0) if p.get("score") not in (None, "") else None}
+        for p in as_list((item.get("players") or {}).get("player") if isinstance(item.get("players"), dict) else None)
+        if isinstance(p, dict) and safe_text(p.get("status")).lower() == "starter"
+    ]
+    score = item.get("score")
+    return {
+        "team_id": safe_text(item.get("id")),
+        "points": safe_float(score, 0.0) if score not in (None, "") else None,
+        "starters": starters,
+    }
+
+
+def fetch_live_scoring(league_key: str) -> dict[str, Any]:
+    parsed = parse_league_key(league_key)
+    if not parsed:
+        raise ExternalLeagueError("invalid_input", ERROR_MESSAGES["invalid_input"])
+    league_id, season = parsed
+    payload = fetch_provider(season, {"TYPE": "liveScoring", "L": league_id})
+    live = payload.get("liveScoring") if isinstance(payload, dict) else None
+    if not isinstance(live, dict):
+        raise ExternalLeagueError("mfl_unavailable", ERROR_MESSAGES["mfl_unavailable"])
+    pairs: list[list[dict[str, Any]]] = []
+    for matchup in as_list(live.get("matchup")):
+        sides = [_live_franchise(f) for f in as_list(matchup.get("franchise")) if isinstance(f, dict)] if isinstance(matchup, dict) else []
+        if len(sides) == 2:
+            pairs.append(sides)
+    return {"week": safe_int(live.get("week"), 0), "pairs": pairs}
+
+
+def player_info(season: int, platform_id: str) -> dict[str, str] | None:
+    """Name / position of an MFL player id from the 12h cached global list, for naming an unmapped starter."""
+
+    info = _players_by_id(season).get(safe_text(platform_id))
+    if not info:
+        return None
+    return {
+        "name": display_name(info.get("name")),
+        "position": _POSITION.get(safe_text(info.get("position")).upper(), ""),
+        "team": normalize_team_abbreviation(info.get("team")),
+    }
+
+
 def get_league_snapshot(league_key: str, *, refresh: bool = False) -> dict[str, Any] | None:
     if not parse_league_key(league_key):
         return None

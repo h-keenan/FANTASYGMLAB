@@ -342,14 +342,7 @@ function TargetRowView({
             <ValueStat value={formatWaiverScore(player.score)} />
           ) : null}
           {player?.position_rank ? (
-            <span
-              className="px-1.5 py-0.5 text-xs font-bold"
-              style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-              title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league.`}
-            >
-              {player.position}
-              {player.position_rank}
-            </span>
+            <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league.`} />
           ) : null}
           <OvrGauge rating={player?.overall_rating ?? null} size="sm" />
         </div>
@@ -543,8 +536,8 @@ export function GmPlanContent({
         fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
         bare
       />
-      <section className="glass-surface flex flex-col gap-1 p-4" data-testid="gm-plan-pro-preview">
-        <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+      <section className="glass-surface flex flex-col gap-1 p-4 premium-glow-card" data-testid="gm-plan-pro-preview">
+        <p className="text-sm font-bold" style={{ color: "var(--color-premium)" }}>
           {PLAIN_COPY.gmPlanProTitle}
         </p>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

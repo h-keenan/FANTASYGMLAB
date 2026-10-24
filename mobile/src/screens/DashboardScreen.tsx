@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import PickPlate from '../components/PickPlate';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -21,7 +21,6 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
-import NewBadge from '../components/NewBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
@@ -46,7 +45,9 @@ import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
-import ThisWeekSection from '../components/ThisWeekSection';
+import TodayHero from '../components/TodayHero';
+import StartHereCard from '../components/StartHereCard';
+import { useAuth } from '../context/AuthContext';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
@@ -231,6 +232,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { session } = useAuth();
   const { leagueId, leagueName } = route.params;
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
@@ -436,8 +438,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."}
         </AppText>
-        <ThisWeekSection
-          data={dashboardData?.this_week}
+        <TodayHero
+          thisWeek={dashboardData?.this_week}
           leagueId={leagueId}
           leagueName={leagueName}
           onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
@@ -453,7 +455,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // `items` whenever this is true.
   const showEmptyState = quiet || !items || items.length === 0;
   const grouped = groupDashboardItems(showEmptyState ? [] : items!);
-
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -473,38 +474,39 @@ export default function DashboardScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
+      {session?.user?.id ? (
+        <StartHereCard
+          userId={session.user.id}
+          accountCreatedAt={session.user.created_at}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+        />
+      ) : null}
+
       {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
 
-      <ThisWeekSection
-        data={dashboardData?.this_week}
+      {dashboardData?.platform_notice ? (
+        <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
+      ) : null}
+
+      {/* HERO: the one schedule-aware answer to "what should I do now?"
+          (Magna Carta §33). This week's moves and the top-priority briefing
+          cards are one module: today's items first, rest of the week after.
+          Items that used to appear in both are shown once (lib/todayPlan). */}
+      <TodayHero
+        thisWeek={dashboardData?.this_week}
+        items={grouped.topPriority}
         leagueId={leagueId}
         leagueName={leagueName}
         tradePending={Boolean(dashboardData?.trade_ideas_deferred)}
         onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
-      />
-
-      <SectionHeading
-        title="Today"
         right={
           <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={8}>
             <AppText style={styles.viewAll}>View All ›</AppText>
           </TouchableOpacity>
         }
-      />
-
-      {/* HERO — the single answer to "what should I do next?" (Magna Carta
-          §33/§4). Everything below this supports it; nothing above it but
-          the global header and the tiny "about this screen" affordance. */}
-      {showEmptyState ? (
-        <View style={styles.emptyCard}>
-          <BrandMark width={120} height={82} />
-          <AppText style={styles.emptyText}>
-            {quietReason || 'Nothing urgent right now — your roster looks steady.'}
-          </AppText>
-          {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
-        </View>
-      ) : (
-        grouped.topPriority.map((item, index) => (
+        renderCard={(item, index) => (
           <BriefingCard
             key={`top-priority-${index}`}
             item={item}
@@ -514,8 +516,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
             isNew={newRecommendationIds.has(item.recommendation_id)}
             showExplanations={showExplanations}
           />
-        ))
-      )}
+        )}
+        empty={
+          <View style={styles.emptyCard}>
+            <BrandMark width={120} height={82} />
+            <AppText style={styles.emptyText}>
+              {quietReason || 'Nothing urgent right now — your roster looks steady.'}
+            </AppText>
+            {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
+          </View>
+        }
+      />
 
       {/* Watchlist & Alerts: urgent risks and opportunities in one list. */}
       <WatchlistAlertsSection
@@ -736,10 +747,12 @@ export function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.asset_type === 'pick') {
     return (
-      <View style={styles.assetRow}>
-        <PickPlate round={asset.round ? Number(asset.round) : null} pickNo={asset.pick_no ? Number(asset.pick_no) : null} />
-        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
-      </View>
+      <DraftPickAssetRow
+        round={asset.round ? Number(asset.round) : null}
+        pickNo={asset.pick_no ? Number(asset.pick_no) : null}
+        label={asset.label}
+        projectedRange={asset.projected_range}
+      />
     );
   }
   return (
@@ -917,7 +930,7 @@ function TopPriorityTradeCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</AppText>
-        {isNew ? <NewBadge /> : null}
+        {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
         <View style={styles.tradeBadge}>
           <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
           <AppText style={styles.tradeBadgeText}>TRADE</AppText>
@@ -1025,7 +1038,7 @@ function BriefingCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>
-        {isNew ? <NewBadge /> : null}
+        {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
         {/* Real signal for why this tile leads the priority ladder (roster
             need > injury pressure > future risk > upgrade opportunity) —
             not a fabricated confidence score, since that ladder is a strict
@@ -1232,7 +1245,7 @@ function WatchlistAlertsSection({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   center: {
@@ -1329,8 +1342,6 @@ function createStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  assetName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -63,7 +63,7 @@ export default function LegalPageScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
     center: {

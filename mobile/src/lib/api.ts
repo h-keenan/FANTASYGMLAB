@@ -2,8 +2,9 @@ import { AppState } from 'react-native';
 
 import { supabase } from './supabase';
 import { env } from './env';
-import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
+import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap';
 import type { PercentileExplorerResponse } from './percentileExplorer';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
 import type {
@@ -67,11 +68,16 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 async function performRequest<T>(
   path: string,
-  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown } | undefined,
+  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // A caller-supplied signal (e.g. React Query cancelling on unmount) cancels this request too.
+  if (init?.signal) {
+    if (init.signal.aborted) controller.abort();
+    else init.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
 
   let response: Response;
   try {
@@ -81,7 +87,8 @@ async function performRequest<T>(
         Authorization: `Bearer ${accessToken}`,
         ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
-      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
+      // Privacy mode is display-only: masked labels never go back to the server.
+      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskShowcaseFields(init.jsonBody)) } : {}),
       signal: controller.signal,
     });
   } finally {
@@ -103,12 +110,16 @@ async function performRequest<T>(
     throw new ApiError(response.status, message);
   }
 
+  if (isFreeLeagueLockedBody(body)) {
+    throw new ApiError(200, FREE_LEAGUE_CAP_MESSAGE);
+  }
+
   return body as T;
 }
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown },
+  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal },
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
@@ -129,8 +140,8 @@ async function authorizedRequest<T>(
   return maskShowcaseFields(body as T);
 }
 
-function authorizedFetch<T>(path: string): Promise<T> {
-  return authorizedRequest<T>(path);
+function authorizedFetch<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return authorizedRequest<T>(path, signal ? { signal } : undefined);
 }
 
 function authorizedPost<T>(path: string, jsonBody: unknown): Promise<T> {
@@ -386,6 +397,124 @@ export interface PlayoffOddsResponse {
   /** Pro-only feature: false (with `upsell`) when the server withheld the data. */
   is_premium?: boolean;
   upsell?: { title: string; body: string } | null;
+}
+
+// Games (Season Simulator + Pick'em) — GET/POST .../games/*, see
+// modules/games.py. Mirrors mobile/src/lib/api.ts.
+export interface GamesOddsRow {
+  playoff_probability: number;
+  median_final_wins: number;
+  median_final_losses: number;
+  median_seed: number;
+  clinched: boolean;
+  eliminated: boolean;
+}
+
+export interface GamesSimTeam {
+  roster_id: string;
+  team_name: string;
+  avatar_url: string | null;
+  record_label: string | null;
+  playoff_probability: number;
+  median_seed: number;
+  mine: boolean;
+}
+
+export interface GamesRosterPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  injury_status: string | null;
+  tier: string | null;
+}
+
+export interface GamesSeasonSimResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: { title: string; body: string } | null;
+  my_roster_id?: string;
+  my_team: GamesOddsRow | null;
+  teams: GamesSimTeam[];
+  roster: GamesRosterPlayer[];
+  playoff_teams?: number;
+  current_week?: number;
+  weeks_remaining?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+}
+
+export interface GamesWhatIfResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: { title: string; body: string } | null;
+  baseline?: GamesOddsRow;
+  scenario?: GamesOddsRow;
+  change?: {
+    playoff_probability: number;
+    median_final_wins: number;
+    median_seed: number;
+    within_noise: boolean;
+  };
+  added?: Pick<GamesRosterPlayer, "player_id" | "name" | "position" | "team">[];
+  dropped?: Pick<GamesRosterPlayer, "player_id" | "name" | "position" | "team">[];
+  factors?: { label: string; detail: string }[];
+}
+
+export interface GamesPickemTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  points: number;
+}
+
+export interface GamesPickemMatchup {
+  matchup_id: string;
+  teams: [GamesPickemTeam, GamesPickemTeam];
+  my_pick: string | null;
+  winner_roster_id: string | null;
+  correct: boolean | null;
+}
+
+export interface GamesLeaderboardRow {
+  rank: number;
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  correct: number;
+  graded: number;
+  accuracy: number;
+  mine: boolean;
+}
+
+export interface GamesPickemResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+  season?: string;
+  current_week?: number;
+  weeks?: number[];
+  week?: number;
+  phase?: "open" | "locked" | "final";
+  matchups?: GamesPickemMatchup[];
+  picked?: number;
+  correct?: number;
+  graded?: number;
+  my_roster_id?: string;
+  season_record?: { correct: number; graded: number };
+  leaderboard?: GamesLeaderboardRow[];
+  leaderboard_scope?: "league" | "you";
+}
+
+export interface GamesPickResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
 }
 
 export interface DraftPosture {
@@ -781,6 +910,9 @@ export interface MatchupResponse {
   /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
   best_ball?: boolean;
   lineup_advice_message?: string;
+  /** Imported leagues only: starters on either side we could not match to a FantasyDesk player. */
+  platform?: string;
+  unmapped_players?: { name: string; position: string; team: string; slot?: string; fantasy_team: string }[];
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
@@ -2033,6 +2165,8 @@ export interface DashboardResponse {
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
   trade_ideas_deferred?: boolean;
+  /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
+  platform_notice?: string;
 }
 
 /**
@@ -2481,6 +2615,204 @@ export interface AllTradesResponse {
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
 
+// ---- Live Draft / Referral / Guess-the-Player leaderboard --------------
+// Mirrors web-next/src/lib/api.ts exactly: same backend routes, no new
+// endpoints. Privacy masking already runs on every parsed response.
+
+export interface PremiumUpsell {
+  title: string;
+  body: string;
+}
+
+export interface LiveDraftSummary {
+  draft_id: string;
+  season: string;
+  status: 'drafting' | 'paused' | 'pre_draft' | 'complete' | string;
+  rounds: number;
+  name: string;
+}
+
+export interface LiveDraftDiscoveryResponse {
+  ok: boolean;
+  error: string;
+  drafts: LiveDraftSummary[];
+  active_draft_id: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+}
+
+export interface LiveDraftPickRow {
+  pick_no: number;
+  round: number;
+  round_pick: string;
+  player_id: string;
+  player_name: string;
+  position: string;
+  team: string;
+  fantasy_team: string;
+  is_mine: boolean;
+}
+
+export interface LiveDraftRecommendation {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  tier: string;
+  league_adjusted_draft_score: number | null;
+  overall_rating: number | null;
+  recommendation_role: string;
+  recommendation_reason: string;
+  position_need_impact: string;
+  immediate_roster_impact: string;
+  confidence: string;
+  adp_delta: number | null;
+}
+
+export interface LiveDraftRankingRow {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  tier: string;
+  is_rookie: boolean;
+  overall_rank: number | null;
+  position_rank: number | null;
+  canonical_overall_rank: number | null;
+  canonical_position_rank: number | null;
+  rank_scoring_format: string;
+  rank_unavailable_reason: string;
+  base_value: number | null;
+  format_adjustment: number | null;
+  scarcity_score: number | null;
+  roster_fit_score: number | null;
+  age_strategy_adjustment: number | null;
+  availability_adjustment: number | null;
+  league_adjusted_draft_score: number | null;
+  overall_rating: number | null;
+  /** Always 0 off the wire; the client diffs consecutive polls (lib/liveDraft.ts). */
+  movement: number;
+  recommendation_label: string;
+  recommendation_reason: string;
+}
+
+export interface LiveDraftTeamRow {
+  roster_id: number;
+  team_name: string;
+  is_mine: boolean;
+  team_rank: number;
+  movement: number;
+  trend_label: string;
+  live_team_score: number;
+  roster_count: number;
+  pick_count: number;
+  positions: string;
+  top_player: string;
+  starter_value: number;
+  total_value: number;
+}
+
+export interface LiveDraftStateResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  pick_data_stale: boolean;
+  status: 'drafting' | 'paused' | 'pre_draft' | 'complete' | string;
+  rounds: number;
+  teams: number;
+  picks_made: number;
+  current_pick: number;
+  current_round: number;
+  current_team_name: string;
+  current_manager_name: string;
+  my_slot: number;
+  is_my_pick: boolean;
+  picks_until_mine: number | null;
+  my_upcoming_picks: number[];
+  positional_run: string;
+  last_updated: string;
+  score_label: string;
+  league_settings: { qb_format: string; scoring_format: string; league_format: string };
+  recommendations: LiveDraftRecommendation[];
+  pick_rows: LiveDraftPickRow[];
+  rankings: LiveDraftRankingRow[];
+  team_rankings: LiveDraftTeamRow[];
+}
+
+export interface LiveDraftPickOption {
+  pick_key: string;
+  label: string;
+}
+
+export interface LiveDraftTradeEvaluatorOptionsResponse {
+  ok: boolean;
+  reason: string;
+  pick_data_stale: boolean;
+  pick_options: LiveDraftPickOption[];
+}
+
+export interface LiveDraftTradeAsset {
+  asset_type: 'player' | 'pick';
+  player_id: string | null;
+  name: string | null;
+  label: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  score: number | null;
+  injury_status: string | null;
+  tier: string | null;
+  season: string | null;
+  round: string | null;
+  owner_team_name: string | null;
+}
+
+export interface LiveDraftTradeEvaluatorResponse {
+  ok: boolean;
+  reason: '' | 'stale_picks' | 'assets_not_found' | 'no_player_data';
+  stale_pick_keys: string[];
+  send_assets?: LiveDraftTradeAsset[];
+  receive_assets?: LiveDraftTradeAsset[];
+  send_total?: number;
+  receive_total?: number;
+  delta?: number;
+  verdict?: string;
+}
+
+/** GET /v1/referrals/my-code */
+export interface ReferralStatusResponse {
+  ok: boolean;
+  code: string;
+  link: string;
+  connected_count: number;
+  comp_months_granted: number;
+  comp_until: string | null;
+  comp_is_active: boolean;
+  comp_months_remaining_capacity: number;
+  referrals_per_comp_month: number;
+  max_comp_months: number;
+}
+
+export interface GuessThePlayerLeaderboardEntry {
+  member_id: string;
+  display_name: string;
+  current_streak: number;
+  best_streak: number;
+  rank: number;
+  is_viewer: boolean;
+}
+
+export interface GuessThePlayerLeaderboardResponse {
+  ok: boolean;
+  /** False only when backend service-role Supabase access isn't configured. */
+  configured: boolean;
+  stat_line: { entries: GuessThePlayerLeaderboardEntry[] };
+  name_match: { entries: GuessThePlayerLeaderboardEntry[] };
+}
+
 export const api = {
   /**
    * Arms/disarms showcase-mode masking of every response this client
@@ -2524,6 +2856,16 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds${query ? `?${query}` : ''}`,
     );
   },
+  getGamesSeasonSim: (leagueId: string) =>
+    authorizedFetch<GamesSeasonSimResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim`),
+  postGamesWhatIf: (leagueId: string, body: { add: string[]; drop: string[] }) =>
+    authorizedPost<GamesWhatIfResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim/what-if`, body),
+  getGamesPickem: (leagueId: string, week?: number) =>
+    authorizedFetch<GamesPickemResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem${week ? `?week=${week}` : ''}`,
+    ),
+  postGamesPick: (leagueId: string, body: { week: number; matchup_id: string; roster_id: string }) =>
+    authorizedPost<GamesPickResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem/pick`, body),
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
   getLeagueDraftCenter: (leagueId: string, options?: { lens?: ValuationLens }) => {
@@ -2657,11 +2999,12 @@ export const api = {
   /** Progressive Portfolio: the cheap index first, then one request per
    * saved league (fired concurrently) so each row paints as soon as its own
    * summary is ready instead of after the slowest league's. */
-  getPortfolioIndex: () => authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues'),
+  getPortfolioIndex: (signal?: AbortSignal) =>
+    authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues', signal),
   /** Player exposure across saved leagues (Pro). */
   getPortfolioExposure: () => authorizedFetch<PortfolioExposureResponse>('/v1/portfolio/exposure'),
-  getPortfolioLeague: (leagueId: string) =>
-    authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`),
+  getPortfolioLeague: (leagueId: string, signal?: AbortSignal) =>
+    authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`, signal),
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).
    * Server-cached per league for a few minutes (cache_ttl_seconds). */
   getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),
@@ -2947,5 +3290,41 @@ export const api = {
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/trade-outcomes/${encodeURIComponent(outcomeId)}/answer`,
       { outcome },
+    ),
+  getMyReferralCode: () => authorizedFetch<ReferralStatusResponse>('/v1/referrals/my-code'),
+  getGuessThePlayerLeaderboard: (leagueId: string) =>
+    authorizedFetch<GuessThePlayerLeaderboardResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/guess-the-player/leaderboard`,
+    ),
+  getLiveDraftDiscovery: (leagueId: string) =>
+    authorizedFetch<LiveDraftDiscoveryResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/live-draft`),
+  getLiveDraftState: (leagueId: string, draftId: string, lens: ValuationLens = 'Dynasty') =>
+    authorizedFetch<LiveDraftStateResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}?lens=${encodeURIComponent(lens)}`,
+    ),
+  getLiveDraftTradeEvaluatorOptions: (leagueId: string, draftId: string) =>
+    authorizedFetch<LiveDraftTradeEvaluatorOptionsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}/trade-evaluator`,
+    ),
+  postLiveDraftTradeEvaluator: (
+    leagueId: string,
+    draftId: string,
+    body: {
+      sendPickKeys?: string[];
+      receivePickKeys?: string[];
+      sendPlayerIds?: string[];
+      receivePlayerIds?: string[];
+      lens?: ValuationLens;
+    },
+  ) =>
+    authorizedPost<LiveDraftTradeEvaluatorResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}/trade-evaluator`,
+      {
+        send_pick_keys: body.sendPickKeys ?? [],
+        receive_pick_keys: body.receivePickKeys ?? [],
+        send_player_ids: body.sendPlayerIds ?? [],
+        receive_player_ids: body.receivePlayerIds ?? [],
+        lens: body.lens ?? 'Dynasty',
+      },
     ),
 };

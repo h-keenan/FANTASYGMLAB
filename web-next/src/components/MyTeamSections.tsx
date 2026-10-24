@@ -13,6 +13,7 @@ import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import type { KeeperPlayerInfo, LineupPlayer } from "@/lib/api";
 import type { CompositionSegment, TeamAnalysisRow } from "@/lib/myTeamAnalysis";
 import { lineupIneligibleTag } from "@/lib/myTeamPresentation";
+import { EmptyState } from "@/components/EmptyState";
 
 const TONE_VAR: Record<TeamAnalysisRow["tone"], string> = {
   success: "var(--color-success)",
@@ -190,9 +191,7 @@ export function RosterTabs({
       />
       {topNote}
       {!current || current.players.length === 0 ? (
-        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-muted)" }}>
-          {emptyText}
-        </p>
+        <EmptyState title={emptyText} />
       ) : (
         <div className="glass-surface flex flex-col px-3">
           {current.players.map((player) => (

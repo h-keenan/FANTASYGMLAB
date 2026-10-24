@@ -2,6 +2,8 @@ import { env } from "./env";
 import { supabase } from "./supabase";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
+import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
+import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 
 /**
  * Client for services/mobile_api_service.py. Mirrors mobile/src/lib/api.ts's
@@ -34,11 +36,16 @@ function reportApiFailure(status: number): void {
 
 async function performRequest<T>(
   path: string,
-  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown } | undefined,
+  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // A caller-supplied signal (e.g. the user left the page) cancels this request too.
+  if (init?.signal) {
+    if (init.signal.aborted) controller.abort();
+    else init.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
 
   let response: Response;
   try {
@@ -48,7 +55,8 @@ async function performRequest<T>(
         Authorization: `Bearer ${accessToken}`,
         ...(init?.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
       },
-      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
+      // Privacy mode is display-only: masked labels never go back to the server.
+      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskOutgoing(init.jsonBody)) } : {}),
       signal: controller.signal,
     });
   } catch (error) {
@@ -77,12 +85,16 @@ async function performRequest<T>(
     throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
   }
 
-  return body as T;
+  if (isFreeLeagueLockedBody(body)) {
+    throw new ApiError(200, FREE_LEAGUE_CAP_MESSAGE);
+  }
+
+  return maskIfPrivate(body) as T;
 }
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown },
+  init?: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal },
 ): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -119,8 +131,11 @@ async function authorizedBinaryRequest(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         ...(jsonBody === undefined ? {} : { "Content-Type": "application/json" }),
+        // Share cards are drawn server-side from upstream data; tell that
+        // route to mask names/avatars the same way the app does.
+        ...(baseUrl === "" && isPrivacyMode() ? { "X-Privacy-Mode": "1" } : {}),
       },
-      body: jsonBody === undefined ? undefined : JSON.stringify(jsonBody),
+      body: jsonBody === undefined ? undefined : JSON.stringify(unmaskOutgoing(jsonBody)),
       signal: controller.signal,
     });
   } catch (error) {
@@ -384,6 +399,8 @@ export interface DashboardResponse {
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
   trade_ideas_deferred?: boolean;
+  /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
+  platform_notice?: string;
 }
 
 /** GET /v1/guess-the-player's `prompt` — the hidden-identity payload for
@@ -818,6 +835,124 @@ export interface PlayoffOddsResponse {
   /** Pro-only feature: false (with `upsell`) when the server withheld the data. */
   is_premium?: boolean;
   upsell?: { title: string; body: string } | null;
+}
+
+// Games (Season Simulator + Pick'em) — GET/POST .../games/*, see
+// modules/games.py. Mirrors mobile/src/lib/api.ts.
+export interface GamesOddsRow {
+  playoff_probability: number;
+  median_final_wins: number;
+  median_final_losses: number;
+  median_seed: number;
+  clinched: boolean;
+  eliminated: boolean;
+}
+
+export interface GamesSimTeam {
+  roster_id: string;
+  team_name: string;
+  avatar_url: string | null;
+  record_label: string | null;
+  playoff_probability: number;
+  median_seed: number;
+  mine: boolean;
+}
+
+export interface GamesRosterPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  injury_status: string | null;
+  tier: string | null;
+}
+
+export interface GamesSeasonSimResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  my_roster_id?: string;
+  my_team: GamesOddsRow | null;
+  teams: GamesSimTeam[];
+  roster: GamesRosterPlayer[];
+  playoff_teams?: number;
+  current_week?: number;
+  weeks_remaining?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+}
+
+export interface GamesWhatIfResponse {
+  ok: boolean;
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  baseline?: GamesOddsRow;
+  scenario?: GamesOddsRow;
+  change?: {
+    playoff_probability: number;
+    median_final_wins: number;
+    median_seed: number;
+    within_noise: boolean;
+  };
+  added?: Pick<GamesRosterPlayer, "player_id" | "name" | "position" | "team">[];
+  dropped?: Pick<GamesRosterPlayer, "player_id" | "name" | "position" | "team">[];
+  factors?: { label: string; detail: string }[];
+}
+
+export interface GamesPickemTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  points: number;
+}
+
+export interface GamesPickemMatchup {
+  matchup_id: string;
+  teams: [GamesPickemTeam, GamesPickemTeam];
+  my_pick: string | null;
+  winner_roster_id: string | null;
+  correct: boolean | null;
+}
+
+export interface GamesLeaderboardRow {
+  rank: number;
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  correct: number;
+  graded: number;
+  accuracy: number;
+  mine: boolean;
+}
+
+export interface GamesPickemResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+  season?: string;
+  current_week?: number;
+  weeks?: number[];
+  week?: number;
+  phase?: "open" | "locked" | "final";
+  matchups?: GamesPickemMatchup[];
+  picked?: number;
+  correct?: number;
+  graded?: number;
+  my_roster_id?: string;
+  season_record?: { correct: number; graded: number };
+  leaderboard?: GamesLeaderboardRow[];
+  leaderboard_scope?: "league" | "you";
+}
+
+export interface GamesPickResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
 }
 
 /** One give/get asset inside a trade idea's package — mirrors mobile's
@@ -1288,6 +1423,9 @@ export interface MatchupResponse {
   /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
   best_ball?: boolean;
   lineup_advice_message?: string;
+  /** Imported leagues only: starters on either side we could not match to a FantasyDesk player. */
+  platform?: string;
+  unmapped_players?: { name: string; position: string; team: string; slot?: string; fantasy_team: string }[];
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
@@ -3322,6 +3460,25 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds?lens=${encodeURIComponent(lens)}`,
     ),
 
+  getGamesSeasonSim: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<GamesSeasonSimResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim?lens=${encodeURIComponent(lens)}`,
+    ),
+  postGamesWhatIf: (leagueId: string, body: { add: string[]; drop: string[] }, lens: string = "Dynasty") =>
+    authorizedRequest<GamesWhatIfResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim/what-if?lens=${encodeURIComponent(lens)}`,
+      { method: "POST", jsonBody: body },
+    ),
+  getGamesPickem: (leagueId: string, week?: number) =>
+    authorizedRequest<GamesPickemResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem${week ? `?week=${week}` : ""}`,
+    ),
+  postGamesPick: (leagueId: string, body: { week: number; matchup_id: string; roster_id: string }) =>
+    authorizedRequest<GamesPickResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem/pick`, {
+      method: "POST",
+      jsonBody: body,
+    }),
+
   // strategy/lens default to the same "retool"/"Dynasty" GET .../trade-hub
   // itself defaults to. `ad_unlocks` is a mobile-only reward mechanic (see
   // that endpoint's docstring) — web always passes 0.
@@ -3346,20 +3503,6 @@ export const api = {
       `/share-card/trade?leagueId=${encodeURIComponent(leagueId)}&rec=${encodeURIComponent(recommendationId)}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
       "",
     ),
-
-  // Branded 1080x1350 PNG for an ad-hoc Trade Analyzer trade
-  // (app/share-card/analyzer). Posts only the picked ids; the server
-  // re-runs the analyzer and resolves every asset itself.
-  getTradeAnalyzerShareCardBlob: (
-    leagueId: string,
-    body: {
-      sendPlayerIds: string[];
-      receivePlayerIds: string[];
-      sendPickIds: string[];
-      receivePickIds: string[];
-      partnerRosterId: string;
-    },
-  ) => authorizedBinaryRequest("/share-card/analyzer", "", { leagueId, ...body }),
 
   // Branded 1080x1350 player card PNG (app/share-card/player) for the
   // Player Profile page's Share button, built from the same
@@ -3431,15 +3574,16 @@ export const api = {
   // Progressive Portfolio: the cheap index first, then one request per saved
   // league (fired concurrently) so each card paints as soon as its own
   // summary is ready instead of after the slowest league's.
-  getPortfolioIndex: (lens: string = "Dynasty") =>
-    authorizedRequest<PortfolioIndexResponse>(`/v1/portfolio/leagues?lens=${encodeURIComponent(lens)}`),
+  getPortfolioIndex: (lens: string = "Dynasty", signal?: AbortSignal) =>
+    authorizedRequest<PortfolioIndexResponse>(`/v1/portfolio/leagues?lens=${encodeURIComponent(lens)}`, { signal }),
 
   getPortfolioExposure: (lens: string = "Dynasty") =>
     authorizedRequest<PortfolioExposureResponse>(`/v1/portfolio/exposure?lens=${encodeURIComponent(lens)}`),
 
-  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty") =>
+  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty", signal?: AbortSignal) =>
     authorizedRequest<PortfolioLeagueResponse>(
       `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}`,
+      { signal },
     ),
 
   getGmPlan: (leagueId: string, lens: string = "Dynasty") =>

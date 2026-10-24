@@ -150,7 +150,7 @@ describe("PlayerQuickView", () => {
 
     // Chart-height placeholder, reserving WeeklyPointsChart's own
     // CHART_HEIGHT footprint ahead of time.
-    const chartSkeleton = container.querySelector(".pqv-skeleton-chart") as HTMLElement | null;
+    const chartSkeleton = Array.from(container.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
     expect(chartSkeleton).toBeInTheDocument();
     expect(chartSkeleton?.style.height).toBe("160px");
     // Stat-tile skeletons reuse the real tile classes so the grid is
@@ -158,7 +158,7 @@ describe("PlayerQuickView", () => {
     expect(container.querySelectorAll(".pqv-stat-row.pqv-skeleton-tile").length).toBeGreaterThan(0);
     // Decorative — never double-announced to assistive tech alongside the
     // one real sr-only status line.
-    expect(container.querySelector('[aria-hidden="true"] .pqv-skeleton-chart')).toBeInTheDocument();
+    expect(container.querySelector('[aria-hidden="true"] .pqv-skeleton-line')).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt make
@@ -266,7 +266,7 @@ describe("PlayerQuickView", () => {
 
     await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
 
-    const trendsChartSkeleton = container.querySelector(".pqv-skeleton-chart") as HTMLElement | null;
+    const trendsChartSkeleton = Array.from(container.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
     expect(trendsChartSkeleton).toBeInTheDocument();
     expect(trendsChartSkeleton?.style.height).toBe("160px");
     expect(screen.getByText(/Loading weekly trends/)).toBeInTheDocument();

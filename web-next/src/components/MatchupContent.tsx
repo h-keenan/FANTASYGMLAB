@@ -42,7 +42,6 @@ import {
   type LineupPlayer,
   type VerdictTone,
 } from "@/lib/matchupPresentation";
-import { positionColorVar } from "@/lib/playerPresentation";
 import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from "@/lib/matchupPlanner";
 
 /**
@@ -529,7 +528,7 @@ function LineupComparison({
             <div
               role="row"
               key={`${row.slot}-${index}`}
-              className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] gap-1.5 sm:gap-2 items-center"
+              className="grid grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] gap-1.5 sm:gap-2 items-center"
               style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
             >
               <div role="cell" className="min-w-0">
@@ -542,10 +541,9 @@ function LineupComparison({
               </div>
               <div
                 role="cell"
-                className="self-stretch flex items-center justify-center text-xs font-bold"
-                style={{ background: "var(--color-muted-soft)", color: "var(--color-text-secondary)" }}
+                className="self-stretch flex items-center justify-center"
               >
-                {slotDisplayLabel(row.slot)}
+                <PositionBadge position={row.slot} />
               </div>
               <div role="cell" className="min-w-0">
                 <LineupCell player={row.opponent} mine={false} maxValue={maxValue} />
@@ -563,7 +561,6 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   const tone = signedTone(move.gain);
   const gainColor =
     tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
-  const slotColorVar = positionColorVar(move.slot);
   return (
     <li
       className="flex items-center gap-3 p-3"
@@ -585,7 +582,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         </span>
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="flex items-center gap-2">
-            <ToneBadge label={slotLabel} color={slotColorVar ? `var(${slotColorVar})` : "var(--color-text-secondary)"} />
+            <PositionBadge position={move.slot} label={slotLabel} />
             <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
               {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : "No projection yet"}
             </span>
@@ -647,9 +644,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
           Suggested moves appear once Sleeper has your lineup for this week.
         </p>
       ) : moves.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Your Sleeper lineup already matches our suggested lineup.
-        </p>
+        <EmptyState title="Your Sleeper lineup already matches our suggested lineup." />
       ) : (
         <ul className="flex flex-col gap-2">
           {shown.map((move) => (
@@ -745,6 +740,12 @@ export function MatchupContent({
         <BeginnerHelp term="matchupWinProbability" />
       </div>
       <Scoreboard matchup={shown} />
+      {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">
+          Not matched to a FantasyDesk player, so left out of the lineups and win odds:{" "}
+          {matchup.unmapped_players.map((p) => `${p.name} (${p.fantasy_team})`).join(", ")}.
+        </p>
+      ) : null}
       <MatchupInsights matchup={shown} />
       <LineupComparison
         matchup={matchup}

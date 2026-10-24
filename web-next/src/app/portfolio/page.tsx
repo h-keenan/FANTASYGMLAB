@@ -1,12 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { api, type PortfolioIndexResponse } from "@/lib/api";
 import { composePortfolio, type PortfolioLeagueState } from "@/lib/portfolioProgress";
-import { PortfolioContent } from "@/components/PortfolioContent";
+import { PortfolioContent, PortfolioShell } from "@/components/PortfolioContent";
+import { PORTFOLIO_SPLASH_DELAY_MS, startLeagueLoader, type LeagueLoader } from "@/lib/portfolioLoader";
+import { useDelayedFlag } from "@/lib/useDelayedFlag";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -25,6 +27,8 @@ export default function PortfolioPage() {
   const [index, setIndex] = useState<PortfolioIndexResponse | null>(null);
   const [leagueStates, setLeagueStates] = useState<Record<string, PortfolioLeagueState>>({});
   const [error, setError] = useState<string | null>(null);
+  const loaderRef = useRef<LeagueLoader | null>(null);
+  const retryLeague = useCallback((leagueId: string) => loaderRef.current?.retry(leagueId), []);
   // See ErrorState.tsx — bumped by "Try again" so a Safari-backgrounded
   // timeout has a real way back instead of a dead page.
   const [retryToken, setRetryToken] = useState(0);
@@ -36,9 +40,10 @@ export default function PortfolioPage() {
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
 
     api
-      .getPortfolioIndex()
+      .getPortfolioIndex("Dynasty", controller.signal)
       .then((result) => {
         if (cancelled) return;
         setIndex(result);
@@ -47,20 +52,15 @@ export default function PortfolioPage() {
         setLeagueStates(
           Object.fromEntries(savedLeagues.map((league) => [league.league_id, { status: "pending" } as const])),
         );
-        for (const league of savedLeagues) {
-          api
-            .getPortfolioLeague(league.league_id, result.lens)
-            .then((data) => {
-              if (!cancelled) {
-                setLeagueStates((prev) => ({ ...prev, [league.league_id]: { status: "success", data } }));
-              }
-            })
-            .catch(() => {
-              if (!cancelled) {
-                setLeagueStates((prev) => ({ ...prev, [league.league_id]: { status: "error" } }));
-              }
-            });
-        }
+        // At most PORTFOLIO_LEAGUE_CONCURRENCY rows in flight, in saved order;
+        // leaving the page aborts the in-flight ones (cleanup below).
+        loaderRef.current = startLeagueLoader({
+          leagueIds: savedLeagues.map((league) => league.league_id),
+          load: (leagueId, signal) => api.getPortfolioLeague(leagueId, result.lens, signal),
+          onState: (leagueId, state) => {
+            if (!cancelled) setLeagueStates((prev) => ({ ...prev, [leagueId]: state }));
+          },
+        });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Portfolio.");
@@ -68,11 +68,19 @@ export default function PortfolioPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
+      loaderRef.current?.abort();
+      loaderRef.current = null;
     };
   }, [authLoading, session, router, retryToken]);
 
-  if (authLoading || (!index && !error)) {
-    return <LoadingScreen status="Loading Portfolio…" />;
+  // Instant shell (header + skeleton cards); the branded splash only if the
+  // first paint is still waiting after PORTFOLIO_SPLASH_DELAY_MS, and it goes
+  // away the moment the index arrives.
+  const waiting = authLoading || (!index && !error);
+  const showSplash = useDelayedFlag(waiting, PORTFOLIO_SPLASH_DELAY_MS);
+  if (waiting) {
+    return showSplash ? <LoadingScreen status="Loading Portfolio…" /> : <PortfolioShell />;
   }
 
   if (error || !index) {
@@ -90,5 +98,12 @@ export default function PortfolioPage() {
   }
 
   const composed = composePortfolio(index, leagueStates);
-  return <PortfolioContent data={composed.response} order={composed.order} pending={composed.pending} />;
+  return (
+    <PortfolioContent
+      data={composed.response}
+      order={composed.order}
+      pending={composed.pending}
+      onRetryLeague={retryLeague}
+    />
+  );
 }

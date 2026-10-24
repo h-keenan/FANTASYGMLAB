@@ -19,6 +19,8 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
+import { SkeletonBlock } from "@/components/Skeleton";
+import { PORTFOLIO_CARD_MIN_HEIGHT, PORTFOLIO_SHELL_SKELETON_COUNT } from "@/lib/portfolioLoader";
 
 /**
  * Ports modules/portfolio_page.py's render_portfolio_page — the cross-
@@ -213,10 +215,12 @@ function FailedLeaguesNote({
   leagues,
   busyLeagueId,
   onRemove,
+  onRetry,
 }: {
   leagues: PortfolioFailedLeague[];
   busyLeagueId: string | null;
   onRemove: (leagueId: string) => void;
+  onRetry?: (leagueId: string) => void;
 }) {
   const plural = leagues.length === 1 ? "league" : "leagues";
   return (
@@ -228,6 +232,16 @@ function FailedLeaguesNote({
       {leagues.map((league) => (
         <div key={league.league_id} className="flex items-center justify-between gap-2">
           <span style={{ color: "var(--color-text-secondary)" }}>{league.league_name}</span>
+          {onRetry && league.reason === "unavailable" ? (
+            <button
+              type="button"
+              onClick={() => onRetry(league.league_id)}
+              className="text-xs font-bold whitespace-nowrap"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Retry
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => onRemove(league.league_id)}
@@ -259,7 +273,11 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
   const showHealthFlag = Boolean(league.health_flag) && league.health_flag !== "Stable";
 
   return (
-    <article className="glass-surface flex flex-col p-4">
+    <article
+      className="glass-surface flex flex-col p-4 portfolio-row-in"
+      data-portfolio-card=""
+      style={{ minHeight: PORTFOLIO_CARD_MIN_HEIGHT }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
           {/* coridian_, 2026-10-18 (screenshot): Portfolio's league cards
@@ -347,24 +365,33 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
  * loading treatment. The league name is real (it comes from the index), so
  * it's shown instead of a bar.
  */
-function PortfolioLeagueSkeleton({ league }: { league: PortfolioSavedLeague }) {
+export function PortfolioLeagueSkeleton({ league }: { league?: PortfolioSavedLeague }) {
   return (
-    <article className="glass-surface flex flex-col p-4" aria-busy="true">
-      <span className="sr-only">Loading {league.league_name}…</span>
+    <article
+      className="glass-surface flex flex-col p-4"
+      aria-busy="true"
+      data-portfolio-skeleton=""
+      style={{ minHeight: PORTFOLIO_CARD_MIN_HEIGHT }}
+    >
+      <span className="sr-only">Loading {league ? league.league_name : "your leagues"}…</span>
       <div className="flex items-start gap-2" aria-hidden="true">
-        <span className="pqv-skeleton-line" style={{ width: 32, height: 32, borderRadius: "var(--radius-pill)" }} />
+        <SkeletonBlock width={32} height={32} radius="var(--radius-pill)" />
         <div className="flex flex-col gap-2 min-w-0 flex-1">
-          <h3 style={{ font: "var(--font-card-title)", color: "var(--color-text-muted)" }}>{league.league_name}</h3>
-          <span className="pqv-skeleton-line" style={{ width: "35%", height: 12 }} />
+          {league ? (
+            <h3 style={{ font: "var(--font-card-title)", color: "var(--color-text-muted)" }}>{league.league_name}</h3>
+          ) : (
+            <SkeletonBlock width="55%" height={18} />
+          )}
+          <SkeletonBlock width="35%" height={12} />
         </div>
       </div>
       <div className="flex flex-col gap-3 mt-4" aria-hidden="true">
-        <span className="pqv-skeleton-line" style={{ width: "85%", height: 14 }} />
-        <span className="pqv-skeleton-line" style={{ width: "70%", height: 12 }} />
-        <span className="pqv-skeleton-line" style={{ width: "80%", height: 14 }} />
-        <span className="pqv-skeleton-line" style={{ width: "60%", height: 12 }} />
+        <SkeletonBlock width="85%" height={14} />
+        <SkeletonBlock width="70%" height={12} />
+        <SkeletonBlock width="80%" height={14} />
+        <SkeletonBlock width="60%" height={12} />
       </div>
-      <span className="pqv-skeleton-line mt-4" aria-hidden="true" style={{ width: "45%", height: 14 }} />
+      <SkeletonBlock width="45%" height={14} className="mt-4" />
     </article>
   );
 }
@@ -382,16 +409,49 @@ function AddLeagueLink() {
   );
 }
 
+function PortfolioHeader({ title }: { title: string }) {
+  return (
+    <header className="flex flex-col gap-1">
+      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        Portfolio
+      </span>
+      <h1 style={{ font: "var(--font-page-title)" }}>{title}</h1>
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        Standing, record, and top need per league.
+      </p>
+      <AddLeagueLink />
+    </header>
+  );
+}
+
+/** Instant page shell: the real header plus skeleton cards of the final card
+ * height, painted before the saved-leagues index arrives. */
+export function PortfolioShell() {
+  return (
+    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto" data-portfolio-shell="">
+      <PortfolioHeader title="Your leagues" />
+      <div className="flex flex-col gap-4">
+        {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, index) => (
+          <PortfolioLeagueSkeleton key={index} />
+        ))}
+      </div>
+    </main>
+  );
+}
+
 export function PortfolioContent({
   data,
   order,
   pending = [],
+  onRetryLeague,
 }: {
   data: PortfolioResponse;
   /** Saved-league order (progressive loading); defaults to data.leagues' own order. */
   order?: string[];
   /** Saved leagues whose row hasn't arrived yet — rendered as skeleton cards in place. */
   pending?: PortfolioSavedLeague[];
+  /** Re-queue one league whose row failed to load (inline Retry). */
+  onRetryLeague?: (leagueId: string) => void;
 }) {
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
@@ -443,16 +503,7 @@ export function PortfolioContent({
 
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
-      <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Portfolio
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>Your leagues</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Standing, record, and top need per league.
-        </p>
-        <AddLeagueLink />
-      </header>
+      <PortfolioHeader title="Your leagues" />
 
       <PillRow
         options={[
@@ -472,7 +523,7 @@ export function PortfolioContent({
       {espnLeagues.length > 0 ? <EspnLeaguesNote leagues={espnLeagues} /> : null}
 
       {failedLeagues.length > 0 ? (
-        <FailedLeaguesNote leagues={failedLeagues} busyLeagueId={busyLeagueId} onRemove={removeFailedLeague} />
+        <FailedLeaguesNote leagues={failedLeagues} busyLeagueId={busyLeagueId} onRemove={removeFailedLeague} onRetry={onRetryLeague} />
       ) : null}
 
       {data.leagues.length === 0 && pending.length === 0 && failedLeagues.length > 0 ? (

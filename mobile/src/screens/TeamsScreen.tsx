@@ -556,7 +556,7 @@ function TeamRowCard({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg },
   metricTabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },

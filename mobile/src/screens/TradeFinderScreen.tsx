@@ -633,7 +633,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: 'transparent' },
     center: {
       flex: 1,
       alignItems: 'center',

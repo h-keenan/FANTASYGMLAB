@@ -3,9 +3,34 @@
 Checked 2026-10-22. Imported leagues are saved as `{platform}:{league_id}:{season}` in
 `saved_leagues.league_id` and load into one Sleeper-shaped snapshot
 (`modules/external_league_common.py`, routed by `modules/external_leagues.py`).
-Pages open to every imported league: My Team, Trade Analyzer, Players, League
-Rankings. Dashboard, Matchup, Waivers, Trade Hub, Alerts, GM Plan, Drafts and
+Pages open to every imported league: Dashboard, Matchup, My Team, Trade Analyzer,
+Players, League Rankings. Waivers, Trade Hub, Alerts, GM Plan, Drafts and
 Recaps need Sleeper-only data and answer "Not available for X leagues yet."
+
+## Dashboard and Matchup for imported leagues (checked 2026-10-23)
+
+Week, pairing and lineups come from `modules/external_matchups.py` (30s cache, single
+flight per key, platform throttles unchanged), mapped through the snapshot's `id_map`
+(the same crosswalk as the roster import). Starters that do not map are listed
+(`unmapped_players`) and left out; win odds are then withheld (`unmapped_starters`).
+An imported season other than the current NFL season has no "this week" (`no_current_week`).
+
+| | Fleaflicker | MFL | ESPN (public) |
+| --- | --- | --- | --- |
+| Source | `FetchLeagueScoreboard` (1 call) + `FetchRoster` per displayed team (2) | `TYPE=liveScoring` (1 call) | none extra: the one `espn_api` load |
+| Opponent, current week | yes | yes | yes |
+| Record, power / franchise rank, snapshot tiles | yes | yes | yes |
+| Starters with slot names | yes | starters yes, slot names no | yes |
+| Bench | yes | roster minus starters | roster minus starters |
+| Live points per player / team | yes | yes | team score only once final |
+| Platform projected points | sent (league scoring), not used | not offered | not read |
+| Win probability | FantasyDesk projections (generic scoring), only if every starter maps | same | same |
+| Dashboard lineup check | yes (needs fully mapped starters) | yes | yes |
+
+Dashboard omits, with a visible notice: waiver and trade rows/tiles (an imported snapshot
+cannot tell a free agent from an unmapped player, and Trade Hub needs Sleeper pick
+ownership). Not done: Fleaflicker/ESPN live per-player points are not used for ESPN; MFL
+`projectedScores` and Fleaflicker projected points are not fed into the odds.
 
 | Platform | Status | Credentials | Module |
 | --- | --- | --- | --- |
@@ -24,8 +49,9 @@ Recaps need Sleeper-only data and answer "Not available for X leagues yet."
 - Auth, rate limits, terms: the docs state none (contact info@fleaflicker.com). We make 3 calls
   per import, space calls 0.5s, send an identifying User-Agent, cache 5 minutes, never retry.
 - Not imported: scoring values (left empty so FantasyDesk defaults apply, never assumed PPR),
-  lineup slots per player, keeper/dynasty flag, draft picks, transactions, matchups.
-  `FetchLeagueScoreboard` exists and could feed Matchup later.
+  keeper/dynasty flag, draft picks, transactions. Weekly matchup data is read lazily for
+  Dashboard/Matchup (see above): `FetchLeagueScoreboard` and `FetchRoster`, at most 3 calls
+  per page load, 0.5s apart, cached 30s.
 - Player ids map through DynastyProcess' `fleaflicker_id` column, then unambiguous
   name + position + team. Everything else is listed as unmapped.
 
@@ -42,7 +68,8 @@ Recaps need Sleeper-only data and answer "Not available for X leagues yet."
   user credentials. Such a league answers `private_league`. Needed from the owner to go further:
   a secret store design, and optionally registering FantasyDesk as an MFL client (higher limits,
   fixed User-Agent).
-- Not imported: scoring values, keeper settings, draft picks, matchups.
+- Not imported: scoring values, keeper settings, draft picks. Dashboard/Matchup read
+  `TYPE=liveScoring` lazily (1 call, 30s cache, same 1.1s spacing).
 - Player ids map through DynastyProcess' `mfl_id` column, then name + position + team.
 
 ## ESPN private leagues

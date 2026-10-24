@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TradeAnalyzerContent } from "./TradeAnalyzerContent";
 import type { DraftPickAsset, MyRosterResponse, RankedPlayer, TeamProfile, TradeVerdict } from "@/lib/api";
 import { api } from "@/lib/api";
+import { resetShareBlobCache } from "@/lib/useShareImage";
 
 /**
  * This is a jsdom/testing-library substitute for live E2E (no Supabase/
@@ -52,9 +53,15 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       postTradeAnalyzer: vi.fn(),
+      recordTradeShare: vi.fn(() => Promise.resolve({})),
     },
   };
 });
+
+const renderAnalyzerCardBlob = vi.fn();
+vi.mock("@/lib/shareCard/clientRender", () => ({
+  renderAnalyzerCardBlob: (...args: unknown[]) => renderAnalyzerCardBlob(...args),
+}));
 
 function player(overrides: Partial<RankedPlayer>): RankedPlayer {
   return {
@@ -197,7 +204,7 @@ describe("TradeAnalyzerContent", () => {
     // Single value bar — never a second meter duplicating the same number.
     expect(document.querySelectorAll(".lean-bar-track").length).toBe(1);
 
-    expect(screen.getByText(/Confidence · High confidence/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Confidence: High confidence" })).toBeInTheDocument();
     expect(screen.getByText("Minimal injury risk on either side.")).toBeInTheDocument();
     expect(screen.getByText("Ask for a sweetener too")).toBeInTheDocument();
   });
@@ -314,6 +321,102 @@ describe("TradeAnalyzerContent", () => {
       // only rendered/applied for asset_type "player") — this is the fix:
       // the exact pick the server named is gone from You send afterward.
       expect(screen.queryByRole("button", { name: "Remove 2027 Round 1" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Share (client-side template card)", () => {
+    afterEach(() => {
+      resetShareBlobCache();
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+      renderAnalyzerCardBlob.mockReset();
+      vi.mocked(api.recordTradeShare).mockClear();
+      Reflect.deleteProperty(navigator, "share");
+      Reflect.deleteProperty(navigator, "canShare");
+      Reflect.deleteProperty(navigator, "clipboard");
+    });
+
+    async function analyze() {
+      vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "" });
+      renderPage();
+      fireEvent.click(screen.getByText("My RB"));
+      fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+      fireEvent.click(screen.getByText(/Rival Team/));
+      fireEvent.click(screen.getByText("Their WR"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+      });
+      await screen.findByText("Reviewed package");
+    }
+
+    async function analyzeAndShare() {
+      renderAnalyzerCardBlob.mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      await analyze();
+      const analyzeCalls = vi.mocked(api.postTradeAnalyzer).mock.calls.length;
+      // The PNG is pre-rendered once the result is on screen.
+      await waitFor(() => expect(renderAnalyzerCardBlob).toHaveBeenCalled());
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Share" }));
+      });
+      // The card is a template of the on-screen analysis: no second analyze
+      // (no quota use), and no request to any share-card server route.
+      expect(vi.mocked(api.postTradeAnalyzer).mock.calls.length).toBe(analyzeCalls);
+      const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+      expect(urls.filter((u) => u.includes("share-card") || u.includes("trade-analyzer"))).toEqual([]);
+    }
+
+    it("draws the card from the on-screen data and shares the PNG file through the OS sheet", async () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { share, canShare: () => true });
+      await analyzeAndShare();
+      expect(renderAnalyzerCardBlob).toHaveBeenCalledTimes(1);
+      const params = renderAnalyzerCardBlob.mock.calls[0][0];
+      expect(params.partnerName).toBe("Rival Team");
+      expect(params.verdict).toEqual(expect.objectContaining({ band: "ACCEPT", value_delta: 650 }));
+      expect(params.sendAssets.map((a: { name: string }) => a.name)).toEqual(["My RB"]);
+      expect(params.receiveAssets.map((a: { name: string }) => a.name)).toEqual(["Their WR"]);
+      const arg = share.mock.calls[0][0];
+      expect(arg.files[0]).toBeInstanceOf(File);
+      expect(arg.files[0].type).toBe("image/png");
+      expect(api.recordTradeShare).toHaveBeenCalledTimes(1);
+    });
+
+    it("copies the image to the clipboard when the browser cannot share files", async () => {
+      const write = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { write } });
+      vi.stubGlobal("ClipboardItem", class { constructor(public items: unknown) {} });
+      await analyzeAndShare();
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(await screen.findByText("Copied!")).toBeInTheDocument();
+      expect(api.recordTradeShare).toHaveBeenCalledTimes(1);
+    });
+
+    it("downloads the PNG when neither share nor clipboard-image is available", async () => {
+      URL.createObjectURL = vi.fn(() => "blob:x");
+      URL.revokeObjectURL = vi.fn();
+      const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+      await analyzeAndShare();
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(api.recordTradeShare).toHaveBeenCalledTimes(1);
+    });
+
+    it("falls back to sharing text when the card cannot be drawn", async () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { share, canShare: () => true });
+      renderAnalyzerCardBlob.mockRejectedValue(new Error("no canvas"));
+      await analyze();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Share" }));
+      });
+      expect((await screen.findByRole("status")).textContent).toMatch(/Couldn't build the image on this device.*Sharing text instead/);
+      await waitFor(() => expect(share).toHaveBeenCalled());
+      expect(share.mock.calls[0][0].files).toBeUndefined();
+      expect(share.mock.calls[0][0].text).toContain("ACCEPT");
     });
   });
 });

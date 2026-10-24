@@ -69,3 +69,20 @@ def test_send_expo_push_notifications_fails_soft_on_network_error():
     assert result["ok"] is False
     assert result["sent"] == 0
     assert "boom" in result["error"]
+
+
+def test_send_expo_push_notifications_reports_device_not_registered_tokens():
+    from unittest.mock import MagicMock
+
+    response = MagicMock(status_code=200)
+    response.json.return_value = {
+        "data": [
+            {"status": "ok", "id": "a"},
+            {"status": "error", "message": "gone", "details": {"error": "DeviceNotRegistered"}},
+            {"status": "error", "message": "other", "details": {"error": "MessageRateExceeded"}},
+        ]
+    }
+    tokens = ["ExponentPushToken[a]", "ExponentPushToken[b]", "ExponentPushToken[c]"]
+    with patch("requests.post", return_value=response):
+        result = push_tokens.send_expo_push_notifications(tokens, title="Hi", body="There")
+    assert result["invalid_tokens"] == ["ExponentPushToken[b]"]

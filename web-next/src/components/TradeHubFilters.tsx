@@ -1,6 +1,7 @@
 import { trackUse } from "@/lib/analytics";
 import type { TradeIdea } from "@/lib/api";
 import { type TradeIdeaFilter, boardPositions, impactTagCounts } from "@/lib/tradeHubFilters";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 function chipStyle(active: boolean) {
   return {
@@ -89,11 +90,11 @@ export function TradeHubSkeleton() {
     <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading trade ideas" data-testid="trade-hub-skeleton">
       {[0, 1, 2].map((key) => (
         <div key={key} className="glass-surface flex flex-col gap-3 p-4" style={{ minHeight: "22rem" }}>
-          <span className="pqv-skeleton-line" style={{ width: "40%", height: 16 }} />
-          <span className="pqv-skeleton-line" style={{ width: "65%", height: 22 }} />
-          <span className="pqv-skeleton-line" style={{ width: "90%", height: 14 }} />
-          <span className="pqv-skeleton-line" style={{ width: "100%", height: 120 }} />
-          <span className="pqv-skeleton-line" style={{ width: "100%", height: 44 }} />
+          <SkeletonBlock width="40%" height={16} />
+          <SkeletonBlock width="65%" height={22} />
+          <SkeletonBlock width="90%" height={14} />
+          <SkeletonBlock width="100%" height={120} />
+          <SkeletonBlock width="100%" height={44} />
         </div>
       ))}
     </div>

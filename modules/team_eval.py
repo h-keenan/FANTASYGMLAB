@@ -1,5 +1,6 @@
 from typing import Dict, Any, Iterable, List, Mapping, Optional
 
+import numpy as np
 import pandas as pd
 
 from modules import runtime_trace
@@ -268,13 +269,25 @@ def _score_starter_weighted_roster(
     used_idx = set()
     starter_idx = []
 
+    # Positions read once into plain Python / numpy: the per-call
+    # `df["position"] == pos` and per-row `df.loc[...]` lookups were the
+    # dominant CPU cost of a cold Dashboard (pyarrow-backed string column).
+    # Same selection, same order, same scores.
+    positions = df["position"].tolist()
+    position_array = np.array(positions, dtype=object)
+    df_index = list(df.index)
+
     def pick_for_pos(pos: str, limit: int) -> None:
-        for idx in df.index[df["position"] == pos].tolist():
-            if len([i for i in starter_idx if df.loc[i, "position"] == pos]) >= limit:
+        picked = 0
+        for idx, row_pos in zip(df_index, positions):
+            if row_pos != pos:
+                continue
+            if picked >= limit:
                 break
             if idx not in used_idx:
                 used_idx.add(idx)
                 starter_idx.append(idx)
+                picked += 1
 
     pick_for_pos("QB", slots["QB"])
     pick_for_pos("RB", slots["RB"])
@@ -292,8 +305,8 @@ def _score_starter_weighted_roster(
     ):
         candidates = [
             idx
-            for idx in df.index
-            if df.loc[idx, "position"] in eligible and idx not in used_idx
+            for idx, row_pos in zip(df_index, positions)
+            if row_pos in eligible and idx not in used_idx
         ]
         for idx in candidates[: slots.get(slot_name, 0)]:
             used_idx.add(idx)
@@ -309,7 +322,7 @@ def _score_starter_weighted_roster(
     weighted_scores = df[score_field].where(starter_mask, df[score_field] * BENCH_WEIGHT)
 
     def pos_score(pos: str) -> float:
-        mask = df["position"] == pos
+        mask = position_array == pos
         if not mask.any():
             return 0.0
         return float(weighted_scores.loc[mask].sum())

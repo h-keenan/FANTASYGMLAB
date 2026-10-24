@@ -105,7 +105,7 @@ standings are deterministic and the sampled result is exact.
 from __future__ import annotations
 
 import time
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 
@@ -590,8 +590,14 @@ def build_league_playoff_odds(
     players_db_path: str,
     n_trials: int = DEFAULT_TRIALS,
     rng: np.random.Generator | None = None,
+    power_overrides: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """Assemble real league data and run the Monte Carlo simulation.
+
+    ``power_overrides`` (roster_id -> power_score) swaps in a hypothetical
+    Roster Power for specific teams (the Games what-if); nothing else about the
+    run changes, so a baseline and a scenario built with equally seeded ``rng``
+    differ only by that input.
 
     Returns ``{"ok": True, "reason": "", ...}`` with simulation output on
     success, or ``{"ok": True, "reason": <code>, ...}`` (same not-ready
@@ -633,6 +639,9 @@ def build_league_playoff_odds(
         _roster_id_str(row.get("roster_id")): float(row.get("power_score") or 0.0)
         for _, row in rankings_frame.iterrows()
     }
+    for override_rid, override_power in (power_overrides or {}).items():
+        if _roster_id_str(override_rid) in power_by_roster:
+            power_by_roster[_roster_id_str(override_rid)] = float(override_power)
 
     roster_ids: list[str] = []
     power_scores: list[float] = []
@@ -738,6 +747,7 @@ def build_league_playoff_odds(
         "slope_fitted": simulation["slope_fitted"],
         "games_used_for_fit": simulation["games_used_for_fit"],
         "season": standings_bundle.get("season"),
+        "slope": simulation["slope"],
     }
 
 

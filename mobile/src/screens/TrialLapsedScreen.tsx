@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import PremiumGlow from '../components/PremiumGlow';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -34,7 +35,7 @@ export default function TrialLapsedScreen({ navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <View style={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
-        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>
+        <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>
           <AppText style={styles.closeButtonText}>Not now</AppText>
         </TouchableOpacity>
 
@@ -46,12 +47,11 @@ export default function TrialLapsedScreen({ navigation }: Props) {
           </AppText>
         </View>
 
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.replace('Paywall')}
-        >
-          <AppText style={styles.primaryButtonText}>See the new plans</AppText>
-        </TouchableOpacity>
+        <PremiumGlow radius={radii.md} style={styles.glowWrap}>
+          <TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={() => navigation.replace('Paywall')}>
+            <AppText style={styles.primaryButtonText}>See the new plans</AppText>
+          </TouchableOpacity>
+        </PremiumGlow>
       </View>
     </View>
   );
@@ -59,7 +59,7 @@ export default function TrialLapsedScreen({ navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     content: { flex: 1, paddingHorizontal: spacing.lg, justifyContent: 'space-between' },
     closeButton: { alignSelf: 'flex-end', paddingVertical: spacing.sm },
     closeButtonText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
@@ -74,12 +74,12 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
     },
     primaryButton: {
-      backgroundColor: colors.accent,
+      backgroundColor: colors.premiumFill,
       borderRadius: radii.md,
       paddingVertical: spacing.md + 2,
       alignItems: 'center',
-      marginBottom: spacing.lg,
     },
-    primaryButtonText: { fontSize: 16, fontWeight: '600', color: colors.onAccent },
+    glowWrap: { marginBottom: spacing.lg },
+    primaryButtonText: { fontSize: 16, fontWeight: '600', color: colors.onPremium },
   });
 }

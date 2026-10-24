@@ -101,7 +101,10 @@ def test_only_the_routes_espn_can_feed_are_open():
     for path in (f"/v1/leagues/{KEY}", f"/v1/leagues/{KEY}/my-team", f"/v1/leagues/{KEY}/trade-analyzer",
                  f"/v1/leagues/{KEY}/players/9221/rank", f"/v1/leagues/{KEY}/save", f"/v1/leagues/{KEY}/draft-picks"):
         assert not espn_leagues.gated_league_path(path), path
-    for path in (f"/v1/leagues/{KEY}/dashboard", f"/v1/leagues/{KEY}/waivers", f"/v1/leagues/{KEY}/matchup",
+    # Dashboard and Matchup are open to imported leagues (modules.external_matchups).
+    for path in (f"/v1/leagues/{KEY}/dashboard", f"/v1/leagues/{KEY}/matchup", f"/v1/leagues/{KEY}/matchup/what-if"):
+        assert not espn_leagues.gated_league_path(path), path
+    for path in (f"/v1/leagues/{KEY}/waivers", f"/v1/leagues/{KEY}/alerts",
                  f"/v1/leagues/{KEY}/gm-targets/9221", f"/v1/leagues/{KEY}/trade-hub/abc/share-card.png"):
         assert espn_leagues.gated_league_path(path), path
     assert not espn_leagues.gated_league_path("/v1/leagues/123/dashboard")
@@ -311,7 +314,7 @@ def test_sleeper_only_features_answer_not_available_for_espn(api):
     from urllib.parse import quote
 
     enc = quote(KEY, safe="")
-    for route in ("dashboard", "waivers", "matchup", "trade-hub", "alerts", "gm-plan"):
+    for route in ("waivers", "trade-hub", "alerts", "gm-plan"):
         response = api.client.get(f"/v1/leagues/{enc}/{route}")
         assert response.status_code == 409, route
         assert response.json()["reason"] == "espn_not_supported"

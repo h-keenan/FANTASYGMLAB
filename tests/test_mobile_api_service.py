@@ -14,6 +14,15 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def _open_free_league_gate(monkeypatch):
+    """These contract tests stub `requests.get` wholesale, so every account
+    reads as a Free user with junk saved leagues. The Free league cap has its
+    own suite (tests/test_paywall_league_cap.py), so open the gate here."""
+
+    monkeypatch.setattr("services.mobile_api_service._league_access_allowed", lambda *a, **k: True)
+
+
 def _client(monkeypatch):
     pytest.importorskip("httpx")
     from fastapi.testclient import TestClient

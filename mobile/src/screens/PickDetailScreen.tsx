@@ -6,7 +6,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
-import CircularProgressRing from '../components/CircularProgressRing';
+import MeterRow from '../components/ConfidenceMeter';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -226,17 +226,13 @@ export default function PickDetailScreen({ route, navigation }: Props) {
             <AnimatedCard style={styles.card}>
               <SectionHeading title="Projected Range" icon="git-branch-outline" />
               <View style={styles.projectionTop}>
-                <CircularProgressRing
-                  percent={confidencePct ?? 0}
-                  size={84}
-                  color={identity.color}
-                  label="Confidence"
-                  valueLabel={confidencePct === null ? '—' : `${Math.round(confidencePct)}%`}
-                />
                 <View style={styles.projectionSummary}>
-                  <AppText style={[styles.projectionVerdict, { color: identity.color }]}>
-                    {identity.word} confidence
-                  </AppText>
+                  <MeterRow
+                    label="CONFIDENCE"
+                    value={confidencePct === null ? '—' : `${identity.word} · ${Math.round(confidencePct)}%`}
+                    level={identity.word === 'High' ? 3 : identity.word === 'Moderate' ? 2 : 1}
+                    color={identity.color}
+                  />
                   <AppText style={styles.projectionRange}>{pick.projected_pick_range ?? '—'}</AppText>
                   {projectedSlot !== null ? (
                     <AppText style={styles.projectionMeta}>
@@ -321,7 +317,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   header: { alignItems: 'center', marginBottom: spacing.lg },
@@ -372,7 +368,6 @@ function createStyles(colors: ThemeColors) {
   statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   projectionTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   projectionSummary: { flex: 1 },
-  projectionVerdict: { fontSize: 15, fontWeight: '700' },
   projectionRange: { fontSize: 13, color: colors.textPrimary, marginTop: 2 },
   projectionMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs, lineHeight: 15 },
   buckets: { marginTop: spacing.lg },

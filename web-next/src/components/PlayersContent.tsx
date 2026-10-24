@@ -1,5 +1,6 @@
 "use client";
 
+import { PositionBadge } from "@/components/PositionBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
@@ -14,7 +15,7 @@ import {
   playersPositionOptions,
 } from "@/lib/idpPresentation";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PickRow } from "@/components/PickRow";
+import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
@@ -191,14 +192,7 @@ function PlayerRow({
           <OvrGauge rating={player.overall_rating ?? null} size="sm" />
         )}
         {player.position && player.position_rank ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-bold"
-            style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-            title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league or your roster.`}
-          >
-            {player.position}
-            {player.position_rank}
-          </span>
+          <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league or your roster.`} />
         ) : null}
       </div>
       <div className="flex items-center gap-2 max-sm:w-full">
@@ -511,7 +505,7 @@ export function PlayersContent({
                 className="glass-surface"
               >
                 {seasonPicks.map((pick, index) => (
-                  <PickRow key={pick.pick_id} pick={pick} showOwner showDivider={index < seasonPicks.length - 1} />
+                  <PickRow key={pick.pick_id} {...draftPickRowProps(pick, true)} showDivider={index < seasonPicks.length - 1} />
                 ))}
               </div>
             </div>

@@ -81,6 +81,11 @@
      rather than two names that must be kept in sync by hand. */
   --color-information: var(--color-accent);
   --color-premium: var(--color-action);
+  /* Premium gold set (owner 2026-10-23: anything premium is ALWAYS gold with a glow). Fill + ink are AA (>= 9:1); the glow reuses the prestige-ring recipe. */
+  --color-premium-fill: #e0a526;
+  --color-on-premium: #1a1300;
+  --color-premium-glow: rgba(240, 170, 40, 0.85);
+  --color-premium-glow-soft: rgba(240, 170, 40, 0.45);
   --color-experimental: var(--color-diagnostic);
 
   /* Player prestige */
@@ -108,6 +113,10 @@
   --color-position-te: #fb923c;
   --color-position-k: #a78bfa;
   --color-position-dst: #d4d4d8;
+  --color-position-dl: #f472b6;
+  --color-position-lb: #2dd4bf;
+  --color-position-db: #818cf8;
+  --color-position-flex: #d4d4d8;
 
   /* Semantic soft surfaces */
   --color-success-soft: rgba(34, 197, 94, 0.15);
@@ -272,6 +281,10 @@
     --color-muted: rgba(16, 24, 32, 0.45);
     --color-information: var(--color-accent);
     --color-premium: var(--color-action);
+    --color-premium-fill: #d79a14;
+    --color-on-premium: #140e00;
+    --color-premium-glow: rgba(190, 125, 0, 0.8);
+    --color-premium-glow-soft: rgba(190, 125, 0, 0.42);
     --color-experimental: var(--color-diagnostic);
 
     --color-prestige-elite: #7d5b07;
@@ -296,6 +309,10 @@
     --color-position-te: #c2410c;
     --color-position-k: #6d28d9;
     --color-position-dst: #3f3f46;
+    --color-position-dl: #be185d;
+    --color-position-lb: #0f766e;
+    --color-position-db: #4338ca;
+    --color-position-flex: #3f3f46;
 
     --color-success-soft: rgba(34, 197, 94, 0.16);
     --color-opportunity-soft: rgba(20, 184, 166, 0.16);
@@ -334,6 +351,10 @@
   --color-position-te: var(--color-position-te);
   --color-position-k: var(--color-position-k);
   --color-position-dst: var(--color-position-dst);
+  --color-position-dl: var(--color-position-dl);
+  --color-position-lb: var(--color-position-lb);
+  --color-position-db: var(--color-position-db);
+  --color-position-flex: var(--color-position-flex);
   --font-sans: var(--font-family-sans);
 }
 
@@ -617,78 +638,20 @@ a {
 /* lib/playerPresentation.ts's overallRatingTint, which mirrors           */
 /* player_cards._overall_rating_tint_css's red->gold->green color-mix).   */
 /* ---------------------------------------------------------------------- */
-.ovr-gauge {
-  position: relative;
-  display: inline-grid;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: conic-gradient(var(--ovr-tint, var(--color-action)) calc(var(--ovr-pct, 0) * 1%), var(--color-border) 0);
-}
-.ovr-gauge::after {
-  content: "";
-  position: absolute;
-  inset: 0.3rem;
-  border-radius: 50%;
-  background: var(--color-surface-primary);
-}
-.ovr-gauge-value {
-  position: relative;
-  z-index: 1;
-  color: var(--ovr-tint, var(--color-action));
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-/* coridian_, 2026-10-18, screenshot: a row with no OVR rating (e.g. an IR
-   player) had its value/"VALUE" column shift out of alignment with rows
-   that do have a badge, since OvrGauge previously rendered nothing at all
-   instead of reserving the same space. Same width/height classes as
-   .ovr-gauge--sm/md/lg (applied alongside this one), just no visible ring
-   or number — an invisible placeholder, not a fabricated rating. */
-.ovr-gauge-placeholder {
-  display: inline-block;
-  flex: 0 0 auto;
-}
-.ovr-gauge--sm {
-  width: 1.65rem;
-  height: 1.65rem;
-}
-.ovr-gauge--sm::after {
-  inset: 0.22rem;
-}
-.ovr-gauge--sm .ovr-gauge-value {
-  font-size: 0.56rem;
-}
-.ovr-gauge--md {
-  width: 2.5rem;
-  height: 2.5rem;
-}
-.ovr-gauge--md .ovr-gauge-value {
-  font-size: 0.75rem;
-}
-.ovr-gauge--lg {
-  width: 3.25rem;
-  height: 3.25rem;
-}
-.ovr-gauge--lg .ovr-gauge-value {
-  font-size: 1rem;
-}
-
-/* Team Value ring — ports modules/my_team_ui.py's team_snapshot_html
-   (.mt-value-ring): same conic-gradient + punched-out-center ring
-   mechanism as .ovr-gauge above, a team-level percentile metric instead
-   of a per-player rating, banded red/gold/green the same way
-   modules/league_workspace_ui.py._metric_tone_band bands every other
-   ranked-row metric in this app. */
+/* The one ring: conic-gradient + punched-out center. ValueRing renders it  */
+/* for a value percentile (tone low/mid/high) and OvrGauge renders it for   */
+/* a player's overall rating (--value-ring-tone set inline from the rating  */
+/* tint). Sizes by diameter: xs 1.65rem, sm 2.5rem, md 3.25rem, lg 4.5rem.  */
+/* ---------------------------------------------------------------------- */
 .value-ring {
   position: relative;
   display: inline-grid;
+  flex: 0 0 auto;
   place-items: center;
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 50%;
-  background: conic-gradient(var(--value-ring-tone) calc(var(--value-ring-pct, 0) * 1%), var(--color-border) 0);
+  background: conic-gradient(var(--value-ring-tone, var(--color-action)) calc(var(--value-ring-pct, 0) * 1%), var(--color-border) 0);
 }
 .value-ring::after {
   content: "";
@@ -700,10 +663,11 @@ a {
 .value-ring-value {
   position: relative;
   z-index: 1;
-  color: var(--value-ring-tone);
+  color: var(--value-ring-tone, var(--color-action));
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .value-ring--low {
   --value-ring-tone: var(--color-danger);
@@ -714,17 +678,41 @@ a {
 .value-ring--high {
   --value-ring-tone: var(--color-success);
 }
-/* Smaller variant — Trade Hub's confidence/realism rings sit inline next to
-   each other on a trade card, not alone in a Team Snapshot header. */
+/* An empty slot that keeps a ring's footprint (rows with no OVR stay
+   column-aligned with rows that have one): same size classes, no ring. */
+.value-ring-placeholder {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.value-ring--xs {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+.value-ring--xs::after {
+  inset: 0.22rem;
+}
+.value-ring--xs .value-ring-value {
+  font-size: 0.56rem;
+}
 .value-ring--sm {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 .value-ring--sm::after {
   inset: 0.3rem;
 }
 .value-ring--sm .value-ring-value {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+}
+.value-ring--md {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+.value-ring--md::after {
+  inset: 0.3rem;
+}
+.value-ring--md .value-ring-value {
+  font-size: 1rem;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -871,6 +859,42 @@ a {
   color: var(--color-opportunity);
 }
 
+/* Position pill (shared PositionBadge, web + mobile + share cards): fully
+   rounded, tinted by the position's fixed semantic color. Text is the
+   position hue pulled 30% toward --color-text-primary so it clears AA on
+   the tint in both themes (contrast table in
+   docs/ui-consistency-audit-2026-10.md). min-width keeps 1-, 2- and
+   3-letter positions the same width feel. */
+.position-badge {
+  --pb: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--pb) 45%, transparent);
+  background: color-mix(in srgb, var(--pb) 14%, transparent);
+  color: color-mix(in srgb, var(--pb) 70%, var(--color-text-primary));
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.position-badge-sm {
+  font-size: 11px;
+  height: 20px;
+  min-width: 32px;
+  padding: 0 8px;
+}
+.position-badge-md {
+  font-size: 13px;
+  height: 24px;
+  min-width: 38px;
+  padding: 0 10px;
+}
+
 /* Position-colored plain text (e.g. "Biggest Need: Running Back") — ports
    modules/football_assets.py's position_text_html, reusing the exact
    --color-position-* tokens above instead of flat white (coridian_: "that
@@ -917,7 +941,7 @@ a {
 .pqv-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 6, 7, 0.72);
+  background: var(--color-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1701,6 +1725,42 @@ a {
   }
 }
 
+/* Premium glow (owner 2026-10-23): the prestige-ring glow recipe in gold.
+   box-shadow only (no layout shift). `.premium-glow` pulses gently like the
+   prestige rings; reduced-motion gets the static glow. `.premium-glow-card`
+   is the same glow, static, for a large locked card. */
+@keyframes premium-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--color-premium-glow-soft), 0 0 20px var(--color-premium-glow-soft), 0 0 36px var(--color-premium-glow-soft);
+  }
+  50% {
+    box-shadow: 0 0 10px var(--color-premium-glow), 0 0 26px var(--color-premium-glow), 0 0 52px var(--color-premium-glow-soft);
+  }
+}
+.premium-glow {
+  box-shadow: 0 0 10px var(--color-premium-glow), 0 0 22px var(--color-premium-glow), 0 0 44px var(--color-premium-glow-soft);
+  animation: premium-glow-pulse 2.5s ease-in-out infinite;
+}
+.premium-glow-card {
+  border-color: var(--color-premium);
+  box-shadow: 0 0 12px var(--color-premium-glow-soft), 0 0 30px var(--color-premium-glow-soft), 0 0 56px var(--color-premium-glow-soft);
+}
+.premium-glow:active:not(:disabled) {
+  animation: none;
+  filter: brightness(0.94);
+  box-shadow: 0 0 3px var(--color-premium-glow-soft);
+}
+.premium-glow:disabled,
+.premium-glow[aria-disabled="true"] {
+  animation: none;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .premium-glow {
+    animation: none;
+  }
+}
+
 /* Landing page forced-dark scope (src/app/page.tsx) — coridian_, 2026-10-18:
    screenshotted the real site in light mode (a real, common system
    preference, not a hypothetical) and it's completely flat — plain white
@@ -1715,7 +1775,8 @@ a {
    SleeperImportForm, OnboardingPaywall — unmodified) resolves the same
    dark var(--color-*) values those components already reference, with no
    per-component changes needed. */
-.fd-landing-dark {
+.fd-landing-dark,
+[data-onboarding-root] {
   --color-bg: #000000;
   --color-shell: #000000;
   /* Glass surfaces, matching body's own override above — this block
@@ -1742,7 +1803,11 @@ a {
   --color-diagnostic: #8b93ff;
   --color-muted: rgba(229, 231, 235, 0.52);
   --color-information: var(--color-accent);
-  --color-premium: var(--color-action);
+  --color-premium: #e5ad32;
+  --color-premium-fill: #e0a526;
+  --color-on-premium: #1a1300;
+  --color-premium-glow: rgba(240, 170, 40, 0.85);
+  --color-premium-glow-soft: rgba(240, 170, 40, 0.45);
   --color-experimental: var(--color-diagnostic);
   --color-prestige-elite: #d8b85a;
   --color-prestige-starter: #d7dbe2;
@@ -1763,6 +1828,10 @@ a {
   --color-position-te: #fb923c;
   --color-position-k: #a78bfa;
   --color-position-dst: #d4d4d8;
+  --color-position-dl: #f472b6;
+  --color-position-lb: #2dd4bf;
+  --color-position-db: #818cf8;
+  --color-position-flex: #d4d4d8;
   --color-success-soft: rgba(34, 197, 94, 0.15);
   --color-opportunity-soft: rgba(20, 184, 166, 0.14);
   --color-action-soft: rgba(250, 204, 21, 0.14);
@@ -1869,6 +1938,10 @@ a {
 .onboarding-shell {
   position: fixed;
   inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  isolation: isolate;
+  transform: translateZ(0);
   /* Zach, 2026-10-18 (screenshot): the GM orb's floating trigger button
      (fixed, z-index:40, always rendered app-wide whenever a user is
      signed in — see GmOrb.tsx's `if (!session) return null`) was tying/
@@ -1949,7 +2022,10 @@ a {
   max-width: 28rem;
   margin: 0 auto;
   box-sizing: border-box;
-  padding: var(--space-lg) var(--space-lg) 0;
+  min-height: 0;
+  touch-action: pan-y;
+  padding: max(var(--space-lg), env(safe-area-inset-top)) max(var(--space-lg), env(safe-area-inset-right)) 0
+    max(var(--space-lg), env(safe-area-inset-left));
 }
 /* coridian_, 2026-10-18: "the onboarding like slideshow after you make an
    account needs some scaling work, specifically on mobile, but I'm sure
@@ -1990,9 +2066,47 @@ a {
    rules themselves, which were already correct. */
 .onboarding-footer {
   margin-top: auto;
-  padding: var(--space-lg) 0 var(--space-xl);
+  padding: var(--space-md) 0 max(var(--space-lg), env(safe-area-inset-bottom));
   display: flex;
   gap: var(--space-sm);
+  flex: 0 0 auto;
+}
+.onboarding-footer > * {
+  min-height: 3rem;
+}
+.onboarding-skip {
+  min-height: 2.75rem;
+  padding: 0 var(--space-sm);
+}
+.onboarding-preload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+/* Slide-in: opacity + transform only (no layout), and only on slides with no
+   backdrop-filter children so iOS Safari never flickers the blur. */
+@keyframes onboarding-slide-next {
+  from { opacity: 0; transform: translate3d(24px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes onboarding-slide-back {
+  from { opacity: 0; transform: translate3d(-24px, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+.onboarding-slide--next {
+  animation: onboarding-slide-next 0.28s ease-out both;
+}
+.onboarding-slide--back {
+  animation: onboarding-slide-back 0.28s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-slide--next,
+  .onboarding-slide--back {
+    animation: none;
+  }
 }
 .onboarding-back {
   padding: var(--space-md) var(--space-lg);
@@ -2071,7 +2185,9 @@ a {
   text-align: center;
 }
 .onboarding-section {
-  padding-top: var(--space-xl);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -2107,7 +2223,8 @@ a {
   gap: var(--space-sm);
 }
 .onboarding-phone {
-  height: clamp(17rem, 64vh, 36rem);
+  height: clamp(12rem, calc(100vh - 19rem), 36rem);
+  height: clamp(12rem, calc(100dvh - 19rem), 36rem);
   aspect-ratio: 600 / 1298;
   max-width: 100%;
   margin-top: var(--space-sm);
@@ -2428,5 +2545,188 @@ a {
   select,
   textarea {
     font-size: 16px;
+  }
+}
+
+/* Signed-out landing (app/page.tsx): phone-first single column; at >=768px
+   the product strip moves to a right-hand column beside hero + form. */
+.landing-grid {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.landing-hero {
+  text-align: center;
+}
+.landing-showcase {
+  margin: 0 calc(-1 * var(--space-md));
+}
+.landing-showcase-track {
+  display: flex;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0 var(--space-md);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--space-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.landing-showcase-track::-webkit-scrollbar {
+  display: none;
+}
+.landing-shot {
+  flex: 0 0 auto;
+  width: 6.75rem;
+  scroll-snap-align: start;
+  text-align: center;
+}
+.landing-phone {
+  height: auto;
+  width: 100%;
+  margin-top: 0;
+}
+.landing-shot-title {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.landing-shot-benefit {
+  margin: 2px 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: var(--color-text-secondary);
+}
+/* Autoplay motion: transform/opacity only, gated on data-playing so SSR,
+   reduced-motion and paused states are static. */
+.landing-shot-img {
+  transform-origin: 50% 18%;
+}
+.landing-showcase[data-playing="true"] .landing-shot-img {
+  transition: transform 0.8s ease-in-out;
+}
+.landing-showcase[data-playing="true"] .landing-shot[data-active="true"] .landing-shot-img {
+  transform: scale(1.1);
+  transition: transform 2.5s ease-out;
+  will-change: transform;
+}
+.landing-shot-caption {
+  transition: opacity 0.6s ease;
+}
+.landing-showcase[data-playing="true"] .landing-shot[data-active="false"] .landing-shot-caption {
+  opacity: 0.45;
+}
+.landing-showcase-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.landing-showcase-pause {
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.5625rem;
+  cursor: pointer;
+}
+.landing-showcase-dots {
+  display: flex;
+  align-items: center;
+}
+.landing-showcase-dot {
+  position: relative;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.landing-showcase-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+  opacity: 0.4;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+.landing-showcase-dot[aria-current="true"]::after {
+  opacity: 1;
+  background: var(--color-accent);
+  transform: scale(1.4);
+}
+.landing-showcase-pause:focus-visible,
+.landing-showcase-dot:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-shot-img,
+  .landing-shot-caption {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
+@media (min-width: 768px) {
+  .landing-grid {
+    max-width: 62rem;
+    display: grid;
+    grid-template-columns: 26rem 1fr;
+    column-gap: 2.5rem;
+    align-content: center;
+  }
+  .landing-hero {
+    text-align: left;
+    grid-column: 1;
+  }
+  .landing-form,
+  .landing-extra {
+    grid-column: 1;
+  }
+  .landing-showcase {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    margin: 0;
+    align-self: center;
+    min-width: 0;
+  }
+  .landing-shot {
+    width: 10rem;
+  }
+}
+
+/* Portfolio rows fade in when their data arrives (opacity/transform only, so
+   the reserved row height never changes). */
+@keyframes portfolio-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.portfolio-row-in {
+  animation: portfolio-row-in 150ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-row-in {
+    animation: none;
   }
 }

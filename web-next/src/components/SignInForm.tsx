@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
 import { Button } from "@/components/Button";
+import { Input } from "@/components/Input";
 
 /**
  * Ports modules/account_ui.py's render_mobile_auth_entry sign-in/create-
@@ -91,6 +92,25 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     // to do here.
   };
 
+  // Cancelling at Apple/Google (or pressing Back) returns here from the
+  // browser's back/forward cache with oauthBusy still set, which left both
+  // buttons disabled and grayed out. Clear it whenever the page comes back.
+  useEffect(() => {
+    const reset = () => setOauthBusy(null);
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reset();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reset();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
   const handleEmailContinue = (event: React.FormEvent) => {
     event.preventDefault();
     if (!email) return;
@@ -174,26 +194,24 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (step === "email") {
     return (
-      <div className="glass-surface flex flex-col gap-4 p-6">
-        <form onSubmit={handleEmailContinue} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
+      <div id="get-started" className="glass-surface flex flex-col gap-3 p-4">
+        <form onSubmit={handleEmailContinue} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-0.5">
             <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
               Get started
             </h2>
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            <p className="hidden sm:block text-sm" style={{ color: "var(--color-text-secondary)" }}>
               Enter your email to sign in or create an account.
             </p>
           </div>
           <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Email
-            <input
+            <Input
               type="email"
               required
-              autoFocus
+              autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="glass-input px-3 py-2.5"
-              style={{ color: "var(--color-text-primary)" }}
             />
           </label>
           {error ? (
@@ -211,37 +229,41 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
         <div className="flex items-center gap-3">
           <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            or
+          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            or continue with
           </span>
           <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
         </div>
+        <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
+          aria-label={oauthBusy === "google" ? undefined : "Continue with Google"}
           onClick={() => handleOAuth("google")}
           disabled={oauthBusy !== null}
-          className="glass-input px-4 py-2.5 text-sm font-bold"
+          className="glass-input px-4 py-2.5 text-sm font-bold min-h-[var(--touch-target-min)]"
           style={{
             color: "var(--color-text-primary)",
             borderRadius: "var(--radius-control)",
             opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
-          {oauthBusy === "google" ? "Redirecting to Google…" : "Continue with Google"}
+          {oauthBusy === "google" ? "Redirecting to Google…" : "Google"}
         </button>
         <button
           type="button"
+          aria-label={oauthBusy === "apple" ? undefined : "Continue with Apple"}
           onClick={() => handleOAuth("apple")}
           disabled={oauthBusy !== null}
-          className="glass-input px-4 py-2.5 text-sm font-bold"
+          className="glass-input px-4 py-2.5 text-sm font-bold min-h-[var(--touch-target-min)]"
           style={{
             color: "var(--color-text-primary)",
             borderRadius: "var(--radius-control)",
             opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
-          {oauthBusy === "apple" ? "Redirecting to Apple…" : "Continue with Apple"}
+          {oauthBusy === "apple" ? "Redirecting to Apple…" : "Apple"}
         </button>
+        </div>
       </div>
     );
   }
@@ -254,14 +276,17 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           setStep("email");
           setError(null);
         }}
-        className="self-start text-xs"
-        style={{ color: "var(--color-text-muted)" }}
+        className="self-start text-xs inline-flex items-center min-h-[var(--touch-target-min)] max-w-full truncate"
+        style={{ color: "var(--color-text-secondary)" }}
       >
         ← {email}
       </button>
 
+      <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+        Create your account or sign in
+      </h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        Enter your password to continue — we&apos;ll sign you in, or set up your account if this is your first time.
+        New here? Choose a password (6+ characters) to create your account. Already have one? Enter it to sign in.
       </p>
 
       {needsAgeGate && !ageConfirmed ? (
@@ -277,15 +302,13 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Password
-            <input
+            <Input
               type="password"
               required
               autoFocus
               minLength={6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="glass-input px-3 py-2.5"
-              style={{ color: "var(--color-text-primary)" }}
             />
           </label>
 
@@ -296,7 +319,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           ) : null}
           <Button
             type="submit"
-            disabled={busy}
+            loading={busy}
           >
             {busy ? "Continuing…" : "Continue"}
           </Button>

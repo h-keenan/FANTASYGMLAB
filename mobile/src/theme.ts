@@ -92,8 +92,13 @@ const darkColors = {
   success: '#22C55E',
   successBright: '#4ADE80',
   successMuted: 'rgba(34,197,94,0.14)',
-  premium: '#FFC43D',
+  premium: '#E8B13A',
   premiumMuted: 'rgba(255,196,61,0.14)',
+  // Premium gold button set (owner 2026-10-23: anything premium is ALWAYS gold with a glow).
+  // onPremium on premiumFill is ~12:1; premiumGlow is the halo color (see PremiumGlow).
+  premiumFill: '#E0A526',
+  onPremium: '#1A1300',
+  premiumGlow: '#F0AA28',
   badgeBackground: 'rgba(103,232,249,0.14)',
   badgeText: '#9FF3FC',
   violet: '#8B93FF',
@@ -175,6 +180,10 @@ const lightColors = {
   // as plain text (4.81:1 / 4.42:1) without drifting the hue toward brown.
   premium: '#8A6508',
   premiumMuted: 'rgba(184,134,11,0.12)',
+  // onPremium on premiumFill is ~9.8:1 (AA). The glow is a deeper amber so it reads on white.
+  premiumFill: '#D79A14',
+  onPremium: '#140E00',
+  premiumGlow: '#BE7D00',
   badgeBackground: 'rgba(5,110,124,0.12)',
   badgeText: '#056e7c',
   violet: '#6B5FCC',
@@ -235,6 +244,11 @@ export const positionColors: Record<string, string> = {
   K: '#A78BFA',
   DEF: '#D4D4D8',
   DST: '#D4D4D8',
+  // IDP lanes + the neutral lane for flex-type slots (pill redesign, 2026-10-22).
+  DL: '#F472B6',
+  LB: '#2DD4BF',
+  DB: '#818CF8',
+  FLEX: '#D4D4D8',
 };
 
 // coridian_ (2026-09-22): "a lot of the colored aspects blend in" on light
@@ -251,6 +265,10 @@ export const positionColorsLight: Record<string, string> = {
   K: '#6D28D9',
   DEF: '#3F3F46',
   DST: '#3F3F46',
+  DL: '#BE185D',
+  LB: '#0F766E',
+  DB: '#4338CA',
+  FLEX: '#3F3F46',
 };
 
 export function positionColor(
@@ -259,7 +277,82 @@ export function positionColor(
   fallback: string = colors.textSecondary,
 ): string {
   const table = isDark ? positionColors : positionColorsLight;
-  return table[(position ?? '').toUpperCase()] ?? fallback;
+  return table[positionLane(position)] ?? fallback;
+}
+
+// Lane aliases: finer positions / lineup slots share the lane of their group.
+// Mirrors web-next/src/lib/playerPresentation.ts POSITION_COLOR_VAR.
+const POSITION_LANE: Record<string, string> = {
+  'D/ST': 'DST',
+  DE: 'DL',
+  DT: 'DL',
+  OLB: 'LB',
+  ILB: 'LB',
+  CB: 'DB',
+  S: 'DB',
+  SUPER_FLEX: 'FLEX',
+  SUPERFLEX: 'FLEX',
+  REC_FLEX: 'FLEX',
+  'WR/RB': 'FLEX',
+  'WR/TE': 'FLEX',
+  'RB/WR/TE': 'FLEX',
+  IDP_FLEX: 'FLEX',
+  BN: 'FLEX',
+  IR: 'FLEX',
+  TAXI: 'FLEX',
+};
+
+function positionLane(position: string | null | undefined): string {
+  const key = (position ?? '').trim().toUpperCase();
+  return POSITION_LANE[key] ?? key;
+}
+
+/** Short pill text so every position/slot fits the same pill width.
+ * Mirrors web-next playerPresentation.positionBadgeLabel. */
+export function positionBadgeLabel(position: string): string {
+  const label = position.trim().toUpperCase();
+  if (label === 'SUPER_FLEX' || label === 'SUPERFLEX') return 'SF';
+  if (label === 'WR/RB') return 'W/R';
+  if (label === 'REC_FLEX') return 'W/T';
+  if (label === 'IDP_FLEX') return 'IDP';
+  if (label === 'DST' || label === 'D/ST') return 'DEF';
+  return label;
+}
+
+function hexChannels(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/** a*pct + b*(1-pct), literal hex (RN has no color-mix). */
+function mixHex(a: string, b: string, pct: number): string {
+  const ca = hexChannels(a);
+  const cb = hexChannels(b);
+  return `#${[0, 1, 2]
+    .map((i) =>
+      Math.round(ca[i] * pct + cb[i] * (1 - pct))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}
+
+/** Pill colors for PositionBadge: 14% tint fill, 45% hue border, text pulled
+ * 30% toward text-primary. Same recipe as web's `.position-badge` CSS, so
+ * both clients clear AA (>= 6:1 on the page surfaces) in both themes. */
+export function positionBadgeColors(
+  position: string | null | undefined,
+  isDark: boolean,
+  textPrimary: string,
+  fallback: string,
+): { fill: string; border: string; text: string } {
+  const hue = positionColor(position, isDark, fallback);
+  const rgb = hexChannels(hue);
+  return {
+    fill: `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.14)`,
+    border: `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.45)`,
+    text: mixHex(hue, textPrimary, 0.7),
+  };
 }
 
 /**

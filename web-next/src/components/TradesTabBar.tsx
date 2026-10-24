@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PillRow } from "@/components/PillRow";
 
 /**
  * The Trade Hub / Trade Finder / Trade Analyzer tri-tab switcher — mirrors
@@ -34,37 +35,13 @@ export function TradesTabBar({
 
   return (
     <div className="flex flex-col gap-2">
-      <div
-        role="tablist"
-        aria-label="Trades section"
-        className="flex w-full"
-        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
-      >
-        {tabs.map((tab) => {
-          const isActive = tab.key === active;
-          const style = {
-            letterSpacing: "0.03em",
-            background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
-            color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-            boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
-            border: "var(--border-width-default) solid var(--color-border)",
-            marginLeft: "-1px",
-          } as const;
-          return (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              role="tab"
-              aria-selected={isActive}
-              className="flex-1 py-2.5 text-center text-xs font-bold uppercase"
-              style={style}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </div>
-      <Link href="/trade-history" className="text-xs font-bold uppercase self-end" style={{ color: "var(--color-accent)" }}>
+      <PillRow
+        fullWidth
+        ariaLabel="Trades section"
+        options={tabs.map((tab) => ({ label: tab.label, value: tab.key, href: tab.href }))}
+        active={active}
+      />
+      <Link href="/trade-history" className="text-xs font-bold uppercase self-end inline-flex items-center min-h-[var(--touch-target-min)]" style={{ color: "var(--color-accent)" }}>
         Trade History →
       </Link>
     </div>

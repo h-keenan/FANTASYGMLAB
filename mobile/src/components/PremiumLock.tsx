@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo } from 'react';
-import { trackUse } from '../lib/analytics';
 import { StyleSheet, View } from 'react-native';
-import AppText from './AppText';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import AnimatedCard from './AnimatedCard';
+import { trackUse } from '../lib/analytics';
+import AccentCard from './AccentCard';
+import PremiumGlow from './PremiumGlow';
+import AppText from './AppText';
+import Button from './Button';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -19,11 +21,10 @@ interface Props {
 }
 
 /**
- * The mobile equivalent of web's render_premium_lock — shown wherever a
- * Free account has content actually withheld server-side (not just a
- * decorative upsell), so seeing this card always means there's real content
- * behind it. Tapping goes straight to Paywall, matching web's direct
- * begin_upgrade_flow behavior (no intermediate explanation screen).
+ * The locked card shown wherever a Free account has content withheld
+ * server-side: the shared AccentCard (premium edge) with the upsell copy and
+ * a primary Upgrade button that goes straight to Paywall. Mirrors web-next's
+ * PremiumUpsellCard.
  */
 export default function PremiumLock({ title, description, feature }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -37,51 +38,33 @@ export default function PremiumLock({ title, description, feature }: Props) {
   }, [gateFeature]);
 
   return (
-    <AnimatedCard
-      style={styles.card}
-      onPress={() => {
-        trackUse(gateFeature, 'upsell_tapped', { tier: 'free' });
-        navigation.navigate('Paywall');
-      }}
-    >
-      <View style={styles.iconWrap}>
-        <Ionicons name="lock-closed" size={18} color={colors.premium} />
-      </View>
-      <View style={styles.textGroup}>
+    <PremiumGlow radius={radii.md} pulse={false} strength={0.6}>
+    <AccentCard accent={colors.premium} style={styles.card}>
+      <View style={styles.titleRow}>
+        <Ionicons name="lock-closed" size={16} color={colors.premium} />
         <AppText style={styles.title}>{title}</AppText>
-        <AppText style={styles.description}>{description}</AppText>
       </View>
-      <View style={styles.cta}>
-        <AppText style={styles.ctaText}>Upgrade</AppText>
-        <Ionicons name="chevron-forward" size={14} color={colors.premium} />
-      </View>
-    </AnimatedCard>
+      <AppText style={styles.description}>{description}</AppText>
+      <Button
+        label="Upgrade"
+        variant="premium"
+        onPress={() => {
+          trackUse(gateFeature, 'upsell_tapped', { tier: 'free' });
+          navigation.navigate('Paywall');
+        }}
+        style={styles.button}
+      />
+    </AccentCard>
+    </PremiumGlow>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    card: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: `${colors.premium}40`,
-      backgroundColor: `${colors.premium}14`,
-    },
-    iconWrap: {
-      width: 32,
-      height: 32,
-      borderRadius: radii.sm,
-      backgroundColor: `${colors.premium}26`,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.sm,
-    },
-    textGroup: { flex: 1, marginRight: spacing.sm },
-    title: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    description: { fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
-    cta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    ctaText: { fontSize: 13, fontWeight: '700', color: colors.premium },
+    card: { borderWidth: 1, borderColor: colors.premium },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    title: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    description: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    button: { alignSelf: 'flex-start' },
   });
 }

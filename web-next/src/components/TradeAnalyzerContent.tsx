@@ -12,20 +12,23 @@ import {
   type TradeVerdict,
 } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
-import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
+import { isCompletedShare } from "@/lib/shareImage";
+import { useShareImage } from "@/lib/useShareImage";
+import { isPrivacyMode } from "@/lib/privacy";
+import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
-import { ValueRing } from "@/components/ValueRing";
+import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import {
   confidenceLevel,
-  confidenceRingPercent,
   formatTradeGain,
-  levelToRingTone,
+  LEVEL_SEGMENTS,
+  levelColor,
   tradeShareRecord,
 } from "@/lib/tradeHubPresentation";
 import { tradePositionOptions } from "@/lib/idpPresentation";
@@ -207,13 +210,11 @@ function TradeSidePanel({
   );
 }
 
-/** What the share card route needs to re-derive this trade server-side. */
-export interface AnalyzerShareIds {
-  sendPlayerIds: string[];
-  receivePlayerIds: string[];
-  sendPickIds: string[];
-  receivePickIds: string[];
-  partnerRosterId: string;
+/** Team identity for the share card, all from data already on the page. */
+export interface AnalyzerCardTeams {
+  partnerAvatarUrl?: string | null;
+  myTeamName?: string | null;
+  myAvatarUrl?: string | null;
 }
 
 /** Shares the reviewed package as a branded PNG (falling back to text)
@@ -226,7 +227,7 @@ function ShareVerdictButton({
   verdict,
   sendAssets,
   receiveAssets,
-  shareIds,
+  cardTeams,
 }: {
   leagueId: string;
   partnerTeamName: string;
@@ -234,9 +235,8 @@ function ShareVerdictButton({
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
   receiveAssets: TradeAsset[];
-  shareIds: AnalyzerShareIds;
+  cardTeams: AnalyzerCardTeams;
 }) {
-  const [preparing, setPreparing] = useState(false);
   const [copied, setCopied] = useState(false);
   const label = (assets: TradeAsset[]) => assets.map((a) => a.name).join(", ") || "nothing";
 
@@ -256,38 +256,54 @@ function ShareVerdictButton({
       .catch(() => {});
   };
 
-  const onShare = async () => {
-    const title = partnerTeamName ? `Trade vs. ${partnerTeamName}` : "Trade analysis";
-    const text =
-      `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
-      `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
-      `Balance: ${formatTradeGain(verdict.value_delta)}`;
-    // Branded PNG (QR + "For <partner>") through the OS share sheet, so the
-    // user can pick the partner's messaging app; text/clipboard fallbacks.
-    const outcome = await shareImageOrText({
-      fetchImage: () => api.getTradeAnalyzerShareCardBlob(leagueId, shareIds),
-      filename: "fantasydesk-trade.png",
-      text,
-      title,
-      onPreparingImage: setPreparing,
-    });
-    if (isCompletedShare(outcome)) recordShare();
-    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const title = partnerTeamName ? `Trade vs. ${partnerTeamName}` : "Trade analysis";
+  const text =
+    `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
+    `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
+    `Balance: ${formatTradeGain(verdict.value_delta)}`;
+
+  // Branded PNG (QR + "For <partner>") drawn in the browser from the
+  // analysis already on screen (no server call, no quota use). It is built
+  // as soon as the result is on screen, so the Share tap calls
+  // navigator.share({files}) inside the user gesture (iOS Safari).
+  const params = { sendAssets, receiveAssets, verdict, lens, partnerName: partnerTeamName, ...cardTeams };
+  const share = useShareImage({
+    cacheKey: shareCardCacheKey({ params, privacy: isPrivacyMode() }),
+    build: async () => {
+      const { renderAnalyzerCardBlob } = await import("@/lib/shareCard/clientRender");
+      return renderAnalyzerCardBlob(params);
+    },
+    filename: "fantasydesk-trade.png",
+    text,
+    title,
+    itemKind: "trade_analyzer",
+    leagueId,
+    onOutcome: (outcome) => {
+      if (isCompletedShare(outcome)) recordShare();
+      if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    },
+  });
 
   return (
-    <button
-      type="button"
-      onClick={onShare}
-      disabled={preparing}
-      className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
-      style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
-    >
-      {copied ? "Copied!" : preparing ? "Preparing..." : "Share"}
-    </button>
+    <span className="inline-flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={share.onClick}
+        disabled={share.busy}
+        className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
+        style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
+      >
+        {copied ? "Copied!" : share.label("Share")}
+      </button>
+      {share.status ? (
+        <span role="status" className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
+          {share.status}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -299,7 +315,7 @@ function VerdictCard({
   leagueId,
   partnerTeamName,
   lens,
-  shareIds,
+  cardTeams,
 }: {
   verdict: TradeVerdict;
   sendAssets: TradeAsset[];
@@ -308,12 +324,11 @@ function VerdictCard({
   leagueId: string;
   partnerTeamName: string;
   lens: string;
-  shareIds: AnalyzerShareIds;
+  cardTeams: AnalyzerCardTeams;
 }) {
   const toneColor = TONE_COLOR[verdict.tone];
   const deltaText = formatTradeGain(verdict.value_delta);
   const confidenceLvl = confidenceLevel(verdict.confidence);
-  const confidencePercent = confidenceRingPercent(verdict.confidence);
   const sendTotal = sendAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const receiveTotal = receiveAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const alternatePackages = verdict.alternate_packages ?? [];
@@ -339,7 +354,7 @@ function VerdictCard({
             verdict={verdict}
             sendAssets={sendAssets}
             receiveAssets={receiveAssets}
-            shareIds={shareIds}
+            cardTeams={cardTeams}
           />
         </span>
       </div>
@@ -438,23 +453,12 @@ function VerdictCard({
         </div>
       ) : null}
 
-      {/* Confidence then Risk — the same order (and the same ring primitive
-          Trade Hub's confidence/realism rows use) as
-          build_offer_result_card_html's own documented hierarchy. */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex flex-col items-center gap-1">
-          <ValueRing
-            percent={confidencePercent}
-            tone={levelToRingTone(confidenceLvl)}
-            display={`${confidencePercent}%`}
-            ariaLabel={`Confidence: ${verdict.confidence}`}
-            size="sm"
-          />
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-            Confidence · {verdict.confidence}
-          </span>
-        </div>
-      </div>
+      <ConfidenceMeter
+        label="Confidence"
+        value={verdict.confidence}
+        level={LEVEL_SEGMENTS[confidenceLvl]}
+        color={levelColor(confidenceLvl)}
+      />
       <BeginnerHelp term="analyzerConfidence" />
 
       {verdict.risk_summary ? (
@@ -888,7 +892,7 @@ export function TradeAnalyzerContent({
             Queue send and receive assets, then Analyze.
           </p>
         ) : null}
-        <Button onClick={analyze} disabled={!hasAnyAssets || analyzing}>
+        <Button onClick={analyze} disabled={!hasAnyAssets} loading={analyzing}>
           {analyzing ? "Analyzing…" : "Analyze Trade"}
         </Button>
         {analyzeError ? (
@@ -913,12 +917,10 @@ export function TradeAnalyzerContent({
           leagueId={leagueId}
           partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
           lens={lens}
-          shareIds={{
-            sendPlayerIds: sendPlayers.map((p) => p.player_id),
-            receivePlayerIds: receivePlayers.map((p) => p.player_id),
-            sendPickIds: sendPicks.map((p) => p.pick_id),
-            receivePickIds: receivePicks.map((p) => p.pick_id),
-            partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
+          cardTeams={{
+            partnerAvatarUrl: selectedTeamId === ALL_TEAMS_ID ? null : (teamProfiles[selectedTeamId]?.avatar_url ?? null),
+            myTeamName: teamProfiles[myRosterId]?.team_name ?? null,
+            myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
           }}
         />
       ) : hasAnyAssets ? (

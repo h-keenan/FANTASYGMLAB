@@ -20,6 +20,7 @@ import { TradesTabBar } from "@/components/TradesTabBar";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { TRADE_DEADLINE_PASSED_MESSAGE, tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { Button } from "@/components/Button";
 
 /** Mirrors modules.trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS — the server
  * ignores any selected pick past this many, so the picker stops there too. */
@@ -438,18 +439,9 @@ export function TradeFinderContent({
             />
           </section>
 
-          <button
-            type="button"
-            onClick={search}
-            disabled={selectionCount === 0 || searching}
-            className="self-start px-4 py-2 text-sm font-bold"
-            style={{
-              background: selectionCount > 0 ? "var(--color-accent)" : "var(--color-surface-muted)",
-              color: selectionCount > 0 ? "var(--color-bg)" : "var(--color-text-muted)",
-            }}
-          >
+          <Button onClick={search} disabled={selectionCount === 0} loading={searching}>
             {searching ? "Searching…" : `Find Realistic Trades${selectionCount > 0 ? ` (${selectionCount})` : ""}`}
-          </button>
+          </Button>
 
           {selectionCount === 0 ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

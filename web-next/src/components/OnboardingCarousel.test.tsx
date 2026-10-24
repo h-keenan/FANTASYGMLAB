@@ -22,6 +22,22 @@ function clickNext(times: number) {
 }
 
 describe("OnboardingCarousel", () => {
+  it("portals to body and makes the page behind inert while open, restoring it on unmount", () => {
+    const page = document.createElement("div");
+    document.body.appendChild(page);
+    const { unmount } = render(<OnboardingCarousel onDone={vi.fn()} />);
+    expect(page).toHaveAttribute("inert");
+    expect(page).toHaveAttribute("aria-hidden", "true");
+    const root = document.querySelector("[data-onboarding-root]");
+    expect(root?.parentElement).toBe(document.body);
+    expect(root).not.toHaveAttribute("inert");
+    unmount();
+    expect(page).not.toHaveAttribute("inert");
+    expect(page).not.toHaveAttribute("aria-hidden");
+    expect(document.querySelector("[data-onboarding-root]")).toBeNull();
+    page.remove();
+  });
+
   it("walks every feature slide, then Connect, then the experience picker, and calls onDone after a pick", async () => {
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
@@ -90,5 +106,18 @@ describe("OnboardingCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("OnboardingCarousel replay", () => {
+  it("shows only the feature slides, ends with Done, and never saves a preference", () => {
+    const onDone = vi.fn();
+    render(<OnboardingCarousel replay onDone={onDone} />);
+    clickNext(FEATURE_COUNT - 1);
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByText("Connect Sleeper or ESPN")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(api.setExperienceLevel).not.toHaveBeenCalled();
   });
 });

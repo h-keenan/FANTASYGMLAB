@@ -271,29 +271,14 @@ def _exhaust_analyzer_quota():
         assert free_tier_ledger.consume_weekly_trade_eval("user-123", limit)
 
 
-def test_share_card_token_skips_analyzer_quota_gate_and_counter(free_env, monkeypatch):
-    client, _ = free_env
-    monkeypatch.setenv("SHARE_CARD_INTERNAL_SECRET", "s3cret")
-    _exhaust_analyzer_quota()
-    with patch("services.mobile_api_service.free_tier_ledger.consume_weekly_trade_eval") as consume:
-        response = client.post(
-            "/v1/leagues/abc/trade-analyzer",
-            headers={**AUTH, "X-Share-Card-Token": "s3cret"},
-            json={"send_player_ids": ["my1"], "receive_player_ids": ["x"]},
-        )
-    assert response.status_code == 200
-    assert response.json().get("reason") != "weekly_limit_reached"
-    consume.assert_not_called()
-
-
-def test_client_cannot_bypass_analyzer_quota_with_share_header(free_env, monkeypatch):
+def test_free_analyzer_quota_gate_is_enforced_server_side(free_env):
     client, _ = free_env
     _exhaust_analyzer_quota()
     body = {"send_player_ids": ["my1"], "receive_player_ids": ["x"]}
-    # Secret not configured: any header value is ignored (including empty).
-    monkeypatch.delenv("SHARE_CARD_INTERNAL_SECRET", raising=False)
-    for token in ("", "anything"):
-        r = client.post("/v1/leagues/abc/trade-analyzer", headers={**AUTH, "X-Share-Card-Token": token}, json=body)
+    # No header (or any bogus bypass header) changes anything: the exhausted
+    # Free account is gated, so the web share card can never be a quota bypass.
+    for headers in ({}, {"X-Share-Card-Token": "anything"}):
+        r = client.post("/v1/leagues/abc/trade-analyzer", headers={**AUTH, **headers}, json=body)
         assert r.json() == {"ok": True, "verdict": None, "reason": "weekly_limit_reached"}
     # Secret configured: a wrong guess is still gated.
     monkeypatch.setenv("SHARE_CARD_INTERNAL_SECRET", "s3cret")

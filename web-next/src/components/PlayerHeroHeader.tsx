@@ -8,6 +8,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from "@/lib/playerQuickViewPresentation";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 type ArchetypeStyle = CSSProperties & { "--archetype-color"?: string };
 
@@ -161,7 +162,7 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
     return (
       <div className="pqv-stat-tile" aria-busy={loading || undefined}>
         {loading ? (
-          <span className="pqv-skeleton-line pqv-skeleton-line--short" aria-hidden="true" />
+          <SkeletonBlock width="45%" height="0.7rem" />
         ) : (
           <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
         )}

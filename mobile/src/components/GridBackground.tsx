@@ -1,54 +1,11 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
-
-import { gradients, lightGradients } from '../theme';
-import { useThemeMode } from '../context/ThemeModeContext';
-
 /**
- * The app's shared screen backdrop: two layers, back to front.
- *
- * 1. A navy-to-black wash in dark mode (the same `gradients.hero` pair
- *    Login/Home use) or a pale-blue-to-glacier wash in light mode (its own
- *    `lightGradients.headerWash` — see that token's comment for why this
- *    isn't just the light half of `hero`: that pairing used to run the
- *    light wash backwards, whiter at the header than at the base
- *    background, which is why coridian_ saw the header go flat/invisible
- *    in light mode) — before the dark version, only the pre-login screens
- *    had any depth to their background and every in-league screen behind
- *    it read as flat near-black, the single biggest gap against the
- *    concept sheet's atmospheric navy-glow look.
- * 2. A soft accent glow bloom anchored top-center, echoing the concept
- *    sheet's corner-glow treatment — kept faint on purpose (this app's
- *    established rule is distinct accents, not overdone ones).
- *
- * Theme-reactive (via useThemeMode) rather than the static `colors`/
- * `gradients` exports — used on every screen, so this alone is what makes
- * the Day/Night/Auto toggle visibly do something even on a screen whose
- * own cards/text haven't been migrated yet.
- *
- * A hairline ops-grid pattern used to sit on top of this (ported from the
- * web app's `.stApp` rule) — removed per direct feedback on Build 32, it
- * just read as unwanted grey noise over the new navy wash rather than a
- * texture worth keeping.
+ * Retired as a painter: the wash, accent bloom and the animated field/sweep
+ * now live in ONE root-level AppBackground (mounted by RootNavigator behind
+ * every screen), and screens' root backgrounds are transparent to let it
+ * show. Kept as a no-op component only so existing screens (and screens
+ * being added concurrently) that still render `<GridBackground />` keep
+ * compiling and simply render nothing.
  */
 export default function GridBackground() {
-  const { colors, isDark } = useThemeMode();
-  const wash = isDark ? gradients.hero : lightGradients.headerWash;
-  return (
-    <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-      <Defs>
-        <LinearGradient id="screenWash" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={wash[0]} stopOpacity={1} />
-          <Stop offset="1" stopColor={wash[1]} stopOpacity={1} />
-        </LinearGradient>
-        <RadialGradient id="glowBloom" cx="0.5" cy="0" r="0.65">
-          <Stop offset="0" stopColor={colors.accent} stopOpacity={isDark ? 0.12 : 0.1} />
-          <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Rect x={0} y={0} width="100%" height="100%" fill="url(#screenWash)" />
-      <Rect x={0} y={0} width="100%" height="100%" fill="url(#glowBloom)" />
-    </Svg>
-  );
+  return null;
 }

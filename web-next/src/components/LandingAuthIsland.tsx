@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useSearchParams } from "@/lib/useSearchParams";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +13,7 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { setLandingPending } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 import { supabase } from "@/lib/supabase";
+import { maskSavedLeagueRows } from "@/lib/privacy";
 
 /**
  * Reserves the sign-in card's slot while auth is still resolving (and as
@@ -21,7 +23,10 @@ import { supabase } from "@/lib/supabase";
  * marketing copy, not a loading state.
  */
 export function LandingAuthSlotPlaceholder() {
-  return <div aria-busy="true" className="w-full" style={{ minHeight: "22rem" }} />;
+  // 8.25rem = the measured height of the signed-out sign-in card at phone
+  // width (131px). The old 15rem slot collapsed by ~110px when the real form
+  // arrived and shoved the content below it up (landing CLS 0.11, 2026-10 audit).
+  return <div aria-busy="true" className="w-full" style={{ minHeight: "8.25rem" }} />;
 }
 
 /**
@@ -107,7 +112,7 @@ export function LandingAuthIsland() {
     (async () => {
       try {
         const { data } = await supabase.from("saved_leagues").select("league_id, league_name");
-        const leagues = data ?? [];
+        const leagues = maskSavedLeagueRows(data ?? []);
         if (leagues.length === 1) {
           const only = leagues[0];
           router.replace(leagueHomePath(only.league_id, only.league_name || only.league_id));

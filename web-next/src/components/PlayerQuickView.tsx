@@ -26,6 +26,7 @@ import {
   tierOpportunityMismatchCaption,
 } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 /**
  * Player Quick View (Revision 22) — the web port of app.py's Player Quick
@@ -338,36 +339,36 @@ export function PlayerQuickView({
  * the real status text stays as an sr-only live region right below it so
  * assistive tech and existing "Loading player detail" assertions both
  * still see it. */
-function PqvBodySkeleton() {
+export function PqvBodySkeleton() {
   return (
     <>
       <div aria-hidden="true">
         <div className="pqv-skeleton-section">
-          <div className="pqv-skeleton-line pqv-skeleton-line--wide" />
-          <div className="pqv-skeleton-line pqv-skeleton-line--mid" />
+          <SkeletonBlock height="0.7rem" />
+          <SkeletonBlock width="70%" height="0.7rem" />
         </div>
         <div className="pqv-skeleton-section">
-          <div className="pqv-skeleton-line pqv-skeleton-line--label" />
-          <div className="pqv-skeleton-chart" style={{ height: CHART_HEIGHT }} />
+          <SkeletonBlock width="35%" height="0.6rem" />
+          <SkeletonBlock height={CHART_HEIGHT} />
         </div>
         {["Production", "Fantasy", "Usage"].map((group) => (
           <div className="pqv-skeleton-section" key={group}>
-            <div className="pqv-skeleton-line pqv-skeleton-line--label" />
+            <SkeletonBlock width="35%" height="0.6rem" />
             <div className="pqv-stat-grid">
               {Array.from({ length: 6 }, (_, index) => (
                 <div key={index} className="pqv-stat-row pqv-skeleton-tile">
-                  <div className="pqv-skeleton-line pqv-skeleton-line--short" />
-                  <div className="pqv-skeleton-line pqv-skeleton-line--mid" />
+                  <SkeletonBlock width="45%" height="0.65rem" />
+                  <SkeletonBlock width="70%" height="0.65rem" />
                 </div>
               ))}
             </div>
           </div>
         ))}
         <div className="pqv-skeleton-section">
-          <div className="pqv-skeleton-line pqv-skeleton-line--label" />
+          <SkeletonBlock width="35%" height="0.6rem" />
           <div className="pqv-skeleton-chip-row">
             {Array.from({ length: 5 }, (_, index) => (
-              <div key={index} className="pqv-skeleton-chip" />
+              <SkeletonBlock key={index} width="4.5rem" height="1.6rem" />
             ))}
           </div>
         </div>

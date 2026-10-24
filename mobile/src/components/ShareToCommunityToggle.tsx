@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Switch, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import Button from './Button';
@@ -8,6 +8,8 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { buildShareBody, isShareableGrade, SHARE_NAME_MAX, type ShareableVerdict, type SharedTradeAssetInput } from '../lib/sharedTrades';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import Input from './Input';
+import Toggle from './Toggle';
 
 /**
  * Opt-in "Share to community" for a Trade Analyzer result (mirrors web-next
@@ -77,23 +79,15 @@ export default function ShareToCommunityToggle({
     <View style={styles.box}>
       <View style={styles.row}>
         <AppText style={styles.label}>Share to community</AppText>
-        <Switch
-          value={on}
-          onValueChange={onToggle}
-          disabled={busy}
-          accessibilityLabel="Share to community"
-          trackColor={{ true: colors.accent }}
-        />
+        <Toggle value={on} onValueChange={onToggle} disabled={busy} label="Share to community" />
       </View>
       {on && !sharedId ? (
         <View style={styles.form}>
-          <TextInput
-            style={styles.input}
+          <Input
             value={name}
             onChangeText={setName}
             maxLength={SHARE_NAME_MAX}
             placeholder="Display name (optional)"
-            placeholderTextColor={colors.textTertiary}
             accessibilityLabel="Display name (optional)"
           />
           <AppText style={styles.hint}>Shows the assets, grade and reason. Blank is Anonymous.</AppText>

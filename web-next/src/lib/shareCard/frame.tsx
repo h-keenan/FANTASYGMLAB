@@ -14,8 +14,9 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { BRAND_DOMAIN, BRAND_NAME } from "@/lib/brand";
+import { positionBadgeLabel } from "@/lib/playerPresentation";
 
-import { SHARE_TOKEN_HEX as T, overallRatingTintHex, positionHex, shareRadius, tierHex, withAlpha } from "./tokens";
+import { SHARE_TOKEN_HEX as T, mixHex, overallRatingTintHex, positionHex, shareRadius, tierHex, withAlpha } from "./tokens";
 
 export const SHARE_FONT_FAMILY = "Inter";
 
@@ -160,24 +161,34 @@ function ShareFooter({ brand }: { brand: ShareBrandAssets }) {
   );
 }
 
-/** PositionBadge.tsx, squared off like the web badge. */
+/** PositionBadge.tsx's pill, in literal hex (Satori has no color-mix):
+ * 14% tint fill, 45% hue border, text pulled 30% toward text-primary; same
+ * proportions as `.position-badge-sm` scaled to `size` px font. */
 export function SharePositionBadge({ position, size = 22 }: { position: string | null | undefined; size?: number }) {
   if (!position) return null;
-  const color = positionHex(position);
+  const color = positionHex(position) ?? T["--color-text-secondary"];
   return (
     <div
       style={{
         display: "flex",
-        padding: `${Math.round(size * 0.2)}px ${Math.round(size * 0.4)}px`,
+        alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box",
+        height: Math.round(size * 1.8),
+        minWidth: Math.round(size * 2.9),
+        padding: `0 ${Math.round(size * 0.75)}px`,
         fontSize: size,
         fontWeight: 800,
         lineHeight: 1,
-        borderRadius: 0,
-        backgroundColor: color ?? T["--color-surface-raised"],
-        color: color ? T["--color-brand-mark-ink"] : T["--color-text-secondary"],
+        letterSpacing: "0.04em",
+        whiteSpace: "nowrap",
+        borderRadius: 9999,
+        border: `${Math.max(1, Math.round(size / 11))}px solid ${withAlpha(color, 0.45)}`,
+        backgroundColor: withAlpha(color, 0.14),
+        color: mixHex(color, T["--color-text-primary"], 70),
       }}
     >
-      {position.toUpperCase()}
+      {positionBadgeLabel(position)}
     </div>
   );
 }

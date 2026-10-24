@@ -1,6 +1,7 @@
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
@@ -34,6 +35,7 @@ import {
 } from "@/lib/waiversPresentation";
 import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { EmptyState } from "@/components/EmptyState";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -285,14 +287,7 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
         <ValueStat value={formatWaiverScore(player.score)} align="left" />
         <OvrGauge rating={player.overall_rating} size="sm" />
         {player.position_rank ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-bold"
-            style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-            title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just free agents.`}
-          >
-            {player.position}
-            {player.position_rank}
-          </span>
+          <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just free agents.`} />
         ) : null}
       </div>
     </div>
@@ -524,9 +519,7 @@ export function WaiversContent({
                 />
               </div>
               {visibleSecondary.length === 0 ? (
-                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                  None in this group.
-                </p>
+                <EmptyState title="None in this group." />
               ) : (
                 <div className="glass-surface flex flex-col px-3">
                   {visibleSecondary.map((player, index) => (
@@ -555,15 +548,15 @@ export function WaiversContent({
           {!data.entitlement.is_premium ? (
             <div
               className="p-4 flex flex-col gap-2"
-              style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
+              style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
             >
               <p className="text-sm font-bold">Full waiver board and FAAB shortlist</p>
               <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 Priority Adds stay free. Premium adds stashes, depth and FAAB.
               </p>
-              <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+              <ButtonLink href="/premium" variant="premium" size="sm">
                 Upgrade →
-              </Link>
+              </ButtonLink>
             </div>
           ) : (
             <>
@@ -609,9 +602,7 @@ export function WaiversContent({
             </select>
           </div>
           {visibleFreeAgents.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              No free agents match.
-            </p>
+            <EmptyState title="No free agents match." />
           ) : (
             <>
               <div className="glass-surface flex flex-col px-3">
@@ -645,9 +636,7 @@ export function WaiversContent({
               Loading…
             </p>
           ) : watchlistPlayers.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              None of your GM Targets are free agents right now.
-            </p>
+            <EmptyState title="None of your GM Targets are free agents right now." />
           ) : (
             <div className="glass-surface flex flex-col px-3">
               {watchlistPlayers.map((player) => (

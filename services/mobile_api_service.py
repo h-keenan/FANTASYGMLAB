@@ -158,6 +158,8 @@ from modules import (
     draft_center_cards,
     espn_leagues,
     external_leagues,
+    games,
+    external_matchups,
     faab,
     founder_analytics,
     gm_plan,
@@ -1871,10 +1873,12 @@ def save_league(
     )
     if not ok:
         return {"ok": False, "reason": "not_available", "cap": cap}
-    if is_espn:
-        # ESPN roster resolution reads roster_id from this row, so the very
-        # next My Team request must not see a pre-save cached copy.
-        _forget_saved_leagues_cache(user_id)
+    # The saved set just changed: drop the cached list (ESPN roster resolution
+    # reads roster_id from this row, and the Free league cap counts saved
+    # rows) and release any unsaved-league claim so the saved league REPLACES
+    # it rather than adding a second allowed league.
+    _forget_saved_leagues_cache(user_id)
+    free_tier_ledger.release_league_claims(user_id)
     warming = False
     if not is_espn:
         warming = _start_league_warmup(user_id, league_id, roster_id)
@@ -2099,6 +2103,89 @@ def resolve_league_path_id(
         return league_id_clean
 
 
+FREE_LEAGUE_CAP_REASON = "free_league_cap"
+
+_FREE_LEAGUE_CAP_UPSELL = {
+    "title": "Your Free plan includes one league",
+    "body": (
+        "Free accounts keep one league. This one isn't it, so its data is "
+        "locked. Upgrade to Premium to use all of your leagues."
+    ),
+}
+
+
+class FreeLeagueLocked(Exception):
+    """Raised by `require_league_access`; the handler below turns it into the
+    standard locked payload (HTTP 200, like every other soft gate)."""
+
+    def __init__(self, league_id: str) -> None:
+        super().__init__(league_id)
+        self.league_id = league_id
+
+
+def free_league_locked_payload(league_id: str = "") -> dict[str, Any]:
+    return {
+        "ok": True,
+        "reason": FREE_LEAGUE_CAP_REASON,
+        "league_locked": True,
+        "league_id": league_id,
+        "is_premium": False,
+        "upsell": dict(_FREE_LEAGUE_CAP_UPSELL),
+    }
+
+
+@app.exception_handler(FreeLeagueLocked)
+async def _free_league_locked_handler(_request: Request, exc: FreeLeagueLocked):
+    return JSONResponse(status_code=200, content=free_league_locked_payload(exc.league_id))
+
+
+def _league_access_allowed(user: dict[str, Any], league_id: str) -> bool:
+    """Free-tier league cap, ONE authority for every league-scoped endpoint
+    (see `require_league_access`). Cheap: the profile and saved-leagues reads
+    are the same per-user Redis single-flight caches the rest of the request
+    uses; Pro/Front Office/trialing (entitlement is already PRO while a trial
+    runs) needs only the profile. Fails open only on a transport error."""
+
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return True
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token)
+    if profile.get("status") == "error" or premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return True
+    saved_rows, saved_error = _fetch_saved_leagues_cached(config, access_token, user_id)
+    if saved_error:
+        return True
+    return _free_league_allowed(user_id, profile, league_id, list(saved_rows or []))
+
+
+def require_league_access(
+    request: Request,
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> str:
+    """Shared FastAPI dependency for every league-scoped `/v1/leagues/{id}`
+    endpoint that does not already resolve "my roster" (which applies the same
+    check via `_resolve_my_roster`). Runs before the route body, so a Free
+    account asking for a league that is neither one of its saved leagues nor
+    its single unsaved-league claim gets the locked payload with no data and
+    no compute. Memoised per request. Returns the resolved league id, so it
+    is a drop-in for `Depends(resolve_league_path_id)`."""
+
+    memo = getattr(request.state, "league_access", None)
+    if memo is None:
+        memo = {}
+        request.state.league_access = memo
+    allowed = memo.get(league_id)
+    if allowed is None:
+        allowed = _league_access_allowed(user, league_id)
+        memo[league_id] = allowed
+    if not allowed:
+        raise FreeLeagueLocked(league_id)
+    return league_id
+
+
 @app.delete("/v1/leagues/{league_id}/save")
 def remove_saved_league(
     league_id: str,
@@ -2149,6 +2236,8 @@ def remove_saved_league(
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}
+    _forget_saved_leagues_cache(user_id)
+    free_tier_ledger.release_league_claims(user_id)
 
     # The removed league was the account's default — promote the next
     # remaining one so Home/Portfolio still has somewhere to land, instead
@@ -2185,17 +2274,17 @@ def get_league(league_id: str = Depends(resolve_league_path_id), _user: dict[str
 
 
 @app.get("/v1/leagues/{league_id}/users")
-def get_league_users(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league_users(league_id: str = Depends(require_league_access), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "users": sleeper.get_users(league_id)}
 
 
 @app.get("/v1/leagues/{league_id}/rosters")
-def get_league_rosters(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league_rosters(league_id: str = Depends(require_league_access), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "rosters": sleeper.get_rosters(league_id)}
 
 
 @app.get("/v1/leagues/{league_id}/team-profiles")
-def get_league_team_profiles(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def get_league_team_profiles(league_id: str = Depends(require_league_access), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Team identity per roster (name/owner/avatar), keyed by roster_id.
 
     Reuses modules.sleeper.get_league_roster_profiles verbatim — the same
@@ -2208,7 +2297,7 @@ def get_league_team_profiles(league_id: str = Depends(resolve_league_path_id), _
 
 @app.get("/v1/leagues/{league_id}/team-rankings")
 def get_league_team_rankings(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2537,7 +2626,7 @@ def get_league_team_rankings(
 @app.get("/v1/leagues/{league_id}/playoff-odds")
 @_with_sleeper_as_of
 def get_league_playoff_odds(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2590,9 +2679,384 @@ def get_league_playoff_odds(
     return {**result, "is_premium": True, "upsell": None}
 
 
+# ---------------------------------------------------------------------------
+# Games: Season Simulator (what-if) and league Pick'em. See modules/games.py.
+# The simulator reuses modules.playoff_simulator; Pick'em storage is optional
+# (docs/supabase_games.sql) and answers `available: false` until applied.
+# ---------------------------------------------------------------------------
+
+_GAMES_WHAT_IF_UPSELL = {
+    "title": "See how a move changes your season",
+    "body": (
+        "What-if is a Premium feature: add or drop players and see the change "
+        "in your playoff odds, seed and wins before you make the move."
+    ),
+}
+
+
+def _games_odds_row(team: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "playoff_probability": team.get("playoff_probability"),
+        "median_final_wins": team.get("median_final_wins"),
+        "median_final_losses": team.get("median_final_losses"),
+        "median_seed": team.get("median_seed"),
+        "clinched": bool(team.get("clinched")),
+        "eliminated": bool(team.get("eliminated")),
+    }
+
+
+def _games_check_lens(lens: str) -> None:
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+
+@app.get("/v1/leagues/{league_id}/games/season-sim")
+@_with_sleeper_as_of
+def get_games_season_sim(
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Season Simulator baseline: the caller's own rest-of-season odds from the
+    shared playoff-odds simulation plus the roster the what-if can drop from.
+    Free for everyone; the what-if (POST) is Premium."""
+
+    _games_check_lens(lens)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    base = {"ok": True, "is_premium": is_premium, "upsell": None if is_premium else _GAMES_WHAT_IF_UPSELL}
+
+    odds = playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if odds.get("reason"):
+        return {**base, "reason": odds["reason"], "teams": [], "my_team": None, "roster": []}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return {**base, "reason": roster_reason or "no_roster", "teams": [], "my_team": None, "roster": []}
+
+    my_rid = str(my_roster.get("roster_id"))
+    teams = [
+        {
+            "roster_id": t["roster_id"],
+            "team_name": t["team_name"],
+            "avatar_url": t.get("avatar_url"),
+            "record_label": t.get("record_label"),
+            "playoff_probability": t["playoff_probability"],
+            "median_seed": t["median_seed"],
+            "mine": t["roster_id"] == my_rid,
+        }
+        for t in odds.get("teams") or []
+    ]
+    my_team = next((t for t in odds.get("teams") or [] if t["roster_id"] == my_rid), None)
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    roster: list[dict[str, Any]] = []
+    my_ids = {str(pid) for pid in (my_roster.get("players") or []) if pid is not None}
+    if my_ids and not players_df.empty and "player_id" in players_df.columns:
+        score_field = league_value_settings.valuation_score_field(lens)
+        mine_df = players_df[players_df["player_id"].astype(str).isin(my_ids)]
+        if score_field in mine_df.columns:
+            mine_df = mine_df.sort_values(score_field, ascending=False)
+        for _, row in mine_df.iterrows():
+            roster.append(
+                {
+                    "player_id": str(row.get("player_id")),
+                    "name": _clean_json_value(row.get("name")),
+                    "position": _clean_json_value(row.get("position")),
+                    "team": _clean_json_value(row.get("team")),
+                    "injury_status": _clean_json_value(row.get("injury_status")),
+                    "tier": _clean_json_value(row.get("tier")),
+                }
+            )
+
+    return {
+        **base,
+        "reason": "",
+        "my_roster_id": my_rid,
+        "my_team": _games_odds_row(my_team) if my_team else None,
+        "teams": teams,
+        "roster": roster,
+        "playoff_teams": odds.get("playoff_teams"),
+        "current_week": odds.get("current_week"),
+        "weeks_remaining": odds.get("weeks_remaining"),
+        "trials": odds.get("trials"),
+        "slope_fitted": odds.get("slope_fitted"),
+        "games_used_for_fit": odds.get("games_used_for_fit"),
+    }
+
+
+class GamesWhatIfRequest(BaseModel):
+    add: list[str] = Field(default_factory=list, max_length=games.WHAT_IF_MAX_PLAYERS)
+    drop: list[str] = Field(default_factory=list, max_length=games.WHAT_IF_MAX_PLAYERS)
+
+
+@app.post("/v1/leagues/{league_id}/games/season-sim/what-if")
+@_with_sleeper_as_of
+def post_games_what_if(
+    body: GamesWhatIfRequest,
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Premium. Re-runs the shared playoff simulation with the caller's Roster
+    Power recomputed for the add/drop, against an equally seeded baseline."""
+
+    import zlib
+
+    import numpy as np
+
+    _games_check_lens(lens)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {"ok": True, "reason": "", "is_premium": False, "upsell": _GAMES_WHAT_IF_UPSELL}
+
+    def not_ready(reason: str) -> dict[str, Any]:
+        return {"ok": True, "reason": reason, "is_premium": True, "upsell": None}
+
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return not_ready(roster_reason or "no_roster")
+    my_rid = str(my_roster.get("roster_id"))
+    current_ids = [str(pid) for pid in (my_roster.get("players") or []) if pid is not None]
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if players_df.empty or "player_id" not in players_df.columns:
+        return not_ready("no_rankings_data")
+    known = {str(pid) for pid in players_df["player_id"]}
+    problem = games.validate_roster_change(current_ids, body.add, body.drop, known)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return not_ready("unavailable")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(lens)
+    before = games.score_roster(players_df, current_ids, score_field, settings)
+    after = games.score_roster(
+        players_df, games.apply_roster_change(current_ids, body.add, body.drop), score_field, settings
+    )
+
+    frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    my_power = None
+    if not frame.empty:
+        match = frame[frame["roster_id"].astype(str) == my_rid]
+        if not match.empty:
+            my_power = float(match.iloc[0].get("power_score") or 0.0)
+    if my_power is None:
+        return not_ready("no_rankings_data")
+    scenario_power = my_power + (after["total_score"] - before["total_score"])
+
+    seed = zlib.crc32(f"{league_id}:{lens}".encode()) & 0xFFFFFFFF
+    base_run = playoff_simulator.build_league_playoff_odds(
+        league_id, lens=lens, players_db_path=PLAYERS_DB_PATH, rng=np.random.default_rng(seed)
+    )
+    if base_run.get("reason"):
+        return not_ready(base_run["reason"])
+    scenario_run = playoff_simulator.build_league_playoff_odds(
+        league_id,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        rng=np.random.default_rng(seed),
+        power_overrides={my_rid: scenario_power},
+    )
+    base_team = next((t for t in base_run["teams"] if t["roster_id"] == my_rid), None)
+    scenario_team = next((t for t in scenario_run["teams"] if t["roster_id"] == my_rid), None)
+    if not base_team or not scenario_team:
+        return not_ready("unavailable")
+
+    touched = set(body.add) | set(body.drop)
+    names = {
+        str(row.get("player_id")): {
+            "player_id": str(row.get("player_id")),
+            "name": _clean_json_value(row.get("name")),
+            "position": _clean_json_value(row.get("position")),
+            "team": _clean_json_value(row.get("team")),
+        }
+        for _, row in players_df[players_df["player_id"].astype(str).isin(touched)].iterrows()
+    }
+    return {
+        "ok": True,
+        "reason": "",
+        "is_premium": True,
+        "upsell": None,
+        "baseline": _games_odds_row(base_team),
+        "scenario": _games_odds_row(scenario_team),
+        "change": games.compare_odds(base_team, scenario_team),
+        "added": [names[pid] for pid in body.add if pid in names],
+        "dropped": [names[pid] for pid in body.drop if pid in names],
+        "factors": games.what_if_factors(
+            before,
+            after,
+            remaining_games=int(base_team.get("remaining_games") or 0),
+            weeks_remaining=int(base_run.get("weeks_remaining") or 0),
+            slope_fitted=bool(base_run.get("slope_fitted")),
+            games_used_for_fit=int(base_run.get("games_used_for_fit") or 0),
+        ),
+    }
+
+
+def _pickem_context(league_id: str) -> tuple[dict[str, Any] | None, str, int, dict[str, Any]]:
+    """(league, season, current_week, roster profiles); league None if unknown."""
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return None, "", 0, {}
+    current_week, _end, _max = league_recaps.league_history_window(league)
+    return league, str(league.get("season") or ""), int(current_week or 0), sleeper.get_league_roster_profiles(league_id)
+
+
+def _pickem_winners(league_id: str, weeks: list[int], profiles: dict[str, Any]) -> dict[int, dict[str, str | None]]:
+    """matchup_id -> winning roster id for finished weeks (from real scores)."""
+
+    import concurrent.futures
+
+    if not weeks:
+        return {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(weeks))) as pool:
+        fetched = list(pool.map(lambda w: sleeper.get_matchups(league_id, w) or [], weeks))
+    out: dict[int, dict[str, str | None]] = {}
+    for week, matchups in zip(weeks, fetched):
+        out[week] = {
+            m["matchup_id"]: games.matchup_winner(m) for m in games.group_week_matchups(matchups, profiles)
+        }
+    return out
+
+
+@app.get("/v1/leagues/{league_id}/games/pickem")
+@_with_sleeper_as_of
+def get_games_pickem(
+    league_id: str = Depends(require_league_access),
+    week: int | None = None,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Weekly pick'em inside the caller's own league: the week's matchups, the
+    caller's picks, results once a week is final, and a season leaderboard
+    among league members who played. available=false until the tables exist."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    token = str(user.get("_access_token") or "")
+    league, season, current_week, profiles = _pickem_context(league_id)
+    if not league:
+        return {"ok": True, "available": False, "reason": "unavailable"}
+    if current_week <= 0 or not season:
+        return {"ok": True, "available": True, "reason": "offseason"}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id)
+    if not my_roster:
+        return {"ok": True, "available": True, "reason": roster_reason or "no_roster"}
+    if not auth_supabase.is_configured(config) or not user_id:
+        return {"ok": True, "available": False, "reason": ""}
+
+    try:
+        my_rows = games.fetch_my_picks(config, token, user_id, league_id, season)
+        try:
+            league_rows = games.fetch_league_picks(league_id, season)
+        except games.Unavailable:
+            league_rows = None
+    except games.Unavailable:
+        return {"ok": True, "available": False, "reason": ""}
+
+    selected = max(1, min(int(week or current_week), current_week))
+    grouped = games.group_week_matchups(sleeper.get_matchups(league_id, selected), profiles)
+    my_week_picks = {
+        str(r.get("matchup_id")): str(r.get("picked_roster_id"))
+        for r in my_rows
+        if str(r.get("week")) == str(selected)
+    }
+    view = games.build_week_view(selected, current_week, grouped, my_week_picks)
+
+    rows = league_rows if league_rows is not None else [{**r, "user_id": user_id} for r in my_rows]
+    final_weeks = sorted(
+        {int(r["week"]) for r in rows if str(r.get("week", "")).isdigit() and int(r["week"]) < current_week}
+    )
+    winners = _pickem_winners(league_id, final_weeks, profiles)
+    board = games.build_leaderboard(rows, winners, profiles, user_id)
+    mine = next((row for row in board if row["mine"]), None)
+    return {
+        "ok": True,
+        "available": True,
+        "reason": "",
+        "season": season,
+        "current_week": current_week,
+        "weeks": list(range(1, current_week + 1)),
+        "my_roster_id": str(my_roster.get("roster_id")),
+        **view,
+        "season_record": {"correct": mine["correct"], "graded": mine["graded"]} if mine else {"correct": 0, "graded": 0},
+        "leaderboard": board,
+        "leaderboard_scope": "league" if league_rows is not None else "you",
+    }
+
+
+class GamesPickRequest(BaseModel):
+    week: int = Field(ge=1, le=30)
+    matchup_id: str = Field(min_length=1, max_length=16)
+    roster_id: str = Field(min_length=1, max_length=16)
+
+
+@app.post("/v1/leagues/{league_id}/games/pickem/pick")
+@_with_sleeper_as_of
+def post_games_pickem_pick(
+    body: GamesPickRequest,
+    league_id: str = Depends(require_league_access),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Save or change a pick. Only league members, only the current week, and
+    only before the week's first score lands (server-checked, not just hidden
+    in the UI)."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    league, season, current_week, profiles = _pickem_context(league_id)
+    if not league or not user_id or not auth_supabase.is_configured(config):
+        return {"ok": False, "available": False, "reason": "not_available"}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id)
+    if not my_roster:
+        return {"ok": False, "available": True, "reason": roster_reason or "no_roster"}
+    if body.week != current_week:
+        return {"ok": False, "available": True, "reason": "locked"}
+    grouped = games.group_week_matchups(sleeper.get_matchups(league_id, body.week), profiles)
+    if games.week_phase(body.week, current_week, grouped) != "open":
+        return {"ok": False, "available": True, "reason": "locked"}
+    problem = games.pick_error(grouped, body.matchup_id, body.roster_id)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    try:
+        games.upsert_pick(
+            config,
+            str(user.get("_access_token") or ""),
+            {
+                "user_id": user_id,
+                "league_id": league_id,
+                "season": season,
+                "week": body.week,
+                "matchup_id": body.matchup_id,
+                "picked_roster_id": body.roster_id,
+                "picker_roster_id": str(my_roster.get("roster_id")),
+            },
+        )
+    except games.Unavailable:
+        return {"ok": False, "available": False, "reason": "not_available"}
+    return {"ok": True, "available": True, "reason": ""}
+
+
 @app.get("/v1/leagues/{league_id}/draft-center")
 def get_league_draft_center(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -2754,7 +3218,7 @@ def get_league_draft_center(
 
 @app.get("/v1/leagues/{league_id}/draft-picks")
 def get_league_draft_picks(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -3050,9 +3514,6 @@ def _fetch_saved_leagues_cached(config: dict, access_token: str, user_id: str) -
     return _apply_league_rollover_resolution(config, access_token, user_id, rows), error
 
 
-FREE_LEAGUE_CAP_REASON = "free_league_cap"
-
-
 def _free_league_allowed(
     user_id: str,
     profile: dict[str, Any],
@@ -3184,7 +3645,7 @@ def _resolve_my_espn_roster(
 
 @app.get("/v1/leagues/{league_id}/live-draft")
 def get_league_live_draft_discovery(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Discover this league's Sleeper drafts so the client can gate the
@@ -3346,7 +3807,7 @@ LIVE_DRAFT_MAX_PICK_ROWS = 60
 @app.get("/v1/leagues/{league_id}/live-draft/{draft_id}")
 def get_league_live_draft_state(
     draft_id: str,
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -3552,7 +4013,7 @@ def _load_active_live_draft(league_id: str, draft_id: str) -> tuple[dict[str, An
 @app.get("/v1/leagues/{league_id}/live-draft/{draft_id}/trade-evaluator")
 def get_live_draft_trade_evaluator_options(
     draft_id: str,
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """The one piece of data the hypothetical mid-draft Trade Evaluator
@@ -3638,7 +4099,7 @@ def _project_live_draft_trade_asset(asset: dict[str, Any]) -> dict[str, Any]:
 def post_live_draft_trade_evaluator(
     draft_id: str,
     body: LiveDraftTradeEvaluatorRequest,
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Hypothetical mid-draft trade evaluator: totals + a Favorable / Fair /
@@ -4046,7 +4507,7 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
 
 @app.get("/v1/leagues/{league_id}/rankings")
 def get_league_rankings(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     limit: int = 100,
     _user: dict[str, Any] = Depends(require_user),
@@ -4116,7 +4577,7 @@ def get_league_rankings(
 
 @app.get("/v1/leagues/{league_id}/idp/values")
 def get_league_idp_values(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     limit: int = 300,
     include_below: bool = False,
     _user: dict[str, Any] = Depends(require_user),
@@ -4148,7 +4609,7 @@ def get_league_idp_values(
 @app.get("/v1/leagues/{league_id}/players/{player_id}/rank")
 def get_player_rank_in_league(
     player_id: str,
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -4418,16 +4879,8 @@ def post_trade_analyzer(
     body: TradeAnalyzerRequest,
     league_id: str = Depends(resolve_league_path_id),
     user: dict[str, Any] = Depends(require_user),
-    x_share_card_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
     """Real accept/decline/counter verdict for a proposed trade package.
-
-    The web share-card route re-runs this call server-to-server to re-derive
-    the grade for an analysis the user already ran. It authenticates with the
-    shared secret SHARE_CARD_INTERNAL_SECRET (header X-Share-Card-Token) and
-    is then exempt from the free-tier weekly gate/counter. With the secret
-    unset or the header wrong/absent, the normal gate applies: a client can't
-    bypass the quota with this header.
 
     Shares the exact same fit engine as the web app's Trade Analyzer
     (modules.trade_analyzer_fit, extracted from app.py) and the same
@@ -4472,9 +4925,7 @@ def post_trade_analyzer(
     # (modules.trade_eval_usage); web enforced it, this API did not. The
     # counter is server-side (Redis), not the user-writable user_settings.
     analyzer_user_id = str(user.get("id") or "")
-    secret = os.environ.get("SHARE_CARD_INTERNAL_SECRET", "")
-    share_card_call = bool(secret) and secrets.compare_digest(str(x_share_card_token or ""), secret)
-    if not share_card_call and not _manager_tendencies_gate(user):
+    if not _manager_tendencies_gate(user):
         if not free_tier_ledger.consume_weekly_trade_eval(
             analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
         ):
@@ -4729,7 +5180,7 @@ def post_trade_analyzer(
 
 @app.get("/v1/leagues/{league_id}/recap")
 def get_league_recap(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     week: int | None = None,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -4811,7 +5262,7 @@ def get_league_recap(
 
 @app.get("/v1/leagues/{league_id}/history")
 def get_league_history(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     season_league_id: str | None = None,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
@@ -4911,7 +5362,7 @@ def get_league_history(
 
 @app.get("/v1/leagues/{league_id}/storylines")
 def get_league_storylines(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Season-long storyline awards — shares the exact same builder as the
@@ -5019,7 +5470,7 @@ def _is_pro_caller(user: dict[str, Any]) -> bool:
 
 @app.get("/v1/leagues/{league_id}/managers/tendencies")
 def get_league_manager_tendencies(
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """League-wide Manager Tendencies summary: one short, evidence-backed
@@ -5055,7 +5506,7 @@ def get_league_manager_tendencies(
 @app.get("/v1/leagues/{league_id}/managers/{roster_id}/tendencies")
 def get_manager_tendencies(
     roster_id: int,
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """One manager's full Manager Tendencies profile: every signal with its
@@ -5898,7 +6349,7 @@ def _guess_the_player_leaderboard_entries(
 
 @app.get("/v1/leagues/{league_id}/guess-the-player/leaderboard")
 def get_guess_the_player_leaderboard(
-    league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)
+    league_id: str = Depends(require_league_access), user: dict[str, Any] = Depends(require_user)
 ) -> dict[str, Any]:
     """Both mini-games' real streaks, ranked among the other FantasyDesk
     accounts that have THIS league saved (see modules.guess_the_player_
@@ -9064,6 +9515,12 @@ def get_league_dashboard(
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    # Imported (ESPN / Fleaflicker / MFL) leagues: the platform's current week and
+    # this team's real lineup, fail-soft; no waiver or trade engine (see
+    # _external_dashboard_context).
+    is_external = external_leagues.is_external_league_key(league_id)
+    if is_external:
+        league, my_roster = _external_dashboard_context(league_id, league, my_roster)
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.
@@ -9101,7 +9558,10 @@ def get_league_dashboard(
     # moments earlier by opening Trade Hub.
     trade_idea_records = None
     trade_ideas_deferred = False
-    if league_calendar.trade_deadline_passed(league):
+    if is_external:
+        # Trade Hub needs Sleeper-only pick ownership: no idea search, no trade row.
+        trade_idea_records = []
+    elif league_calendar.trade_deadline_passed(league):
         # Past the trade deadline: no Top Trade Opportunity tile — an empty
         # (not None) list keeps compose_next_move_briefing from regenerating.
         trade_idea_records = []
@@ -9199,6 +9659,7 @@ def get_league_dashboard(
         auto_strategy=auto_strategy,
         auto_strategy_label=auto_strategy_label,
         season_progress=record_signal.season_progress_fraction(league),
+        include_trade_and_waiver=not is_external,
     )
 
     # Team Snapshot: record comes straight off the roster we already
@@ -9289,13 +9750,59 @@ def get_league_dashboard(
             items=projected_items,
             # Deferred pass: the search has not run, so there is no "Hold"
             # verdict to give. None = omit the trade row; the full pass fills it.
-            trade_idea_records=None if trade_ideas_deferred else trade_idea_records,
+            trade_idea_records=None if (trade_ideas_deferred or is_external) else trade_idea_records,
             stance=declared_team_stance,
         ),
     }
     if trade_ideas_deferred:
         response["trade_ideas_deferred"] = True
+    if is_external:
+        response["platform_notice"] = (
+            f"Waiver and trade suggestions aren't available for {external_leagues.label_for(league_id)} "
+            "leagues yet, so this page only shows what your imported roster can support."
+        )
     return response
+
+
+def _external_week_state(league_id: str, league: dict[str, Any]) -> dict[str, Any] | None:
+    """The platform's current-week state for an imported league, or None.
+
+    None when the platform can't be read or the league's season is not the NFL
+    season we have schedules, stats and projections for (an older imported
+    season has no "this week" to speak of)."""
+
+    try:
+        season = int(league.get("season") or 0)
+        if not season or season != sleeper.default_player_stats_season():
+            return None
+        state = external_matchups.week_state(league_id)
+        return state if state and int(state.get("week") or 0) > 0 else None
+    except Exception:
+        return None
+
+
+def _external_dashboard_context(
+    league_id: str, league: dict[str, Any], my_roster: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """League + roster for the Dashboard of an imported league.
+
+    Adds the platform's current week (`settings.leg`) and, when every starter
+    maps to a FantasyDesk player, this team's real starters, which is what the
+    "lineup check" row reads. A lineup with an unmapped starter is left out
+    entirely: the row would otherwise claim a lineup is set that we only half
+    know. Never raises."""
+
+    state = _external_week_state(league_id, league)
+    if state is None:
+        return league, my_roster
+    league = {**league, "settings": {**(league.get("settings") or {}), "leg": int(state["week"])}}
+    try:
+        lineup = external_matchups.lineup_for(league_id, int(my_roster.get("roster_id")), state)
+    except Exception:
+        lineup = None
+    if lineup and lineup["starters"] and not lineup["unmapped"]:
+        my_roster = {**my_roster, "starters": list(lineup["starters"]) + ["0"] * len(lineup["empty_slots"])}
+    return league, my_roster
 
 
 def _dashboard_this_week(
@@ -12528,40 +13035,53 @@ def _build_matchup(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
-    try:
-        current_week = int((league_settings or {}).get("leg") or 0)
-    except (TypeError, ValueError):
-        current_week = 0
-    if current_week <= 0:
-        return _empty_matchup("no_current_week")
-
-    matchups = sleeper.get_matchups(league_id, current_week)
-    if not matchups:
-        return _empty_matchup("no_matchup_data", week=current_week)
-
+    is_external = external_leagues.is_external_league_key(league_id)
     my_roster_id = str(my_roster.get("roster_id") or "")
-    my_entry = next((m for m in matchups if str(m.get("roster_id") or "") == my_roster_id), None)
-    if my_entry is None:
-        return _empty_matchup("roster_not_in_matchups", week=current_week)
+    if is_external:
+        # Imported league: the platform's own week and pairing, in Sleeper's shape
+        # (modules.external_matchups). An older imported season has no "this week".
+        external_state = _external_week_state(league_id, league)
+        if external_state is None:
+            return _empty_matchup("no_current_week")
+        current_week = int(external_state["week"])
+        pair = external_matchups.matchup_entries(league_id, int(my_roster_id), external_state)
+        if pair is None:
+            return _empty_matchup("bye_week", week=current_week)
+        my_entry, opponent_entry = pair
+    else:
+        league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+        try:
+            current_week = int((league_settings or {}).get("leg") or 0)
+        except (TypeError, ValueError):
+            current_week = 0
+        if current_week <= 0:
+            return _empty_matchup("no_current_week")
 
-    # A null matchup_id is Sleeper's own "this roster isn't paired this
-    # week" (bye / odd team count), not a missing-data error.
-    matchup_id = my_entry.get("matchup_id")
-    opponent_entry = (
-        next(
-            (
-                m
-                for m in matchups
-                if m.get("matchup_id") == matchup_id and str(m.get("roster_id") or "") != my_roster_id
-            ),
-            None,
+        matchups = sleeper.get_matchups(league_id, current_week)
+        if not matchups:
+            return _empty_matchup("no_matchup_data", week=current_week)
+
+        my_entry = next((m for m in matchups if str(m.get("roster_id") or "") == my_roster_id), None)
+        if my_entry is None:
+            return _empty_matchup("roster_not_in_matchups", week=current_week)
+
+        # A null matchup_id is Sleeper's own "this roster isn't paired this
+        # week" (bye / odd team count), not a missing-data error.
+        matchup_id = my_entry.get("matchup_id")
+        opponent_entry = (
+            next(
+                (
+                    m
+                    for m in matchups
+                    if m.get("matchup_id") == matchup_id and str(m.get("roster_id") or "") != my_roster_id
+                ),
+                None,
+            )
+            if matchup_id is not None
+            else None
         )
-        if matchup_id is not None
-        else None
-    )
-    if opponent_entry is None:
-        return _empty_matchup("bye_week", week=current_week)
+        if opponent_entry is None:
+            return _empty_matchup("bye_week", week=current_week)
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.
@@ -12644,7 +13164,9 @@ def _build_matchup(
             score_field,
             projection_context=projection_context,
             settings=settings,
-            roster_positions=roster_positions,
+            # Imported leagues label each starter with the platform's own slot
+            # (MFL sends none: no label, never a guessed one).
+            roster_positions=my_entry["slot_labels"] if is_external else roster_positions,
             idp_result=idp_result,
         )
     )
@@ -12655,10 +13177,15 @@ def _build_matchup(
             score_field,
             projection_context=projection_context,
             settings=settings,
-            roster_positions=roster_positions,
+            roster_positions=opponent_entry["slot_labels"] if is_external else roster_positions,
             idp_result=idp_result,
         )
     )
+    unmapped_players: list[dict[str, Any]] = []
+    if is_external:
+        for side, entry in ((my_side, my_entry), (opponent_side, opponent_entry)):
+            side["real_empty_slots"] = list(entry.get("empty_slots") or [])
+            unmapped_players.extend(entry.get("unmapped") or [])
 
     # Live, single-week win probability — built from each side's REAL
     # current-week starters (real points once a game's started, this
@@ -12671,10 +13198,14 @@ def _build_matchup(
     win_probability = matchup_win_probability.compute_live_win_probability(
         my_side.get("real_starters") or [], opponent_side.get("real_starters") or []
     )
+    if unmapped_players:
+        # A starter we could not match to a FantasyDesk player has no projection, so
+        # any odds would silently leave a real scorer out. Say so instead.
+        win_probability = {"available": False, "reason": "unmapped_starters"}
     if state is not None:
         state.update(my_side=my_side, opponent_side=opponent_side, my_bench=my_bench, league=league)
 
-    return {
+    response = {
         "ok": True,
         "week": current_week,
         "my_team": my_side,
@@ -12706,6 +13237,10 @@ def _build_matchup(
             league_calendar.BEST_BALL_LINEUP_MESSAGE if league_calendar.is_best_ball(league) else ""
         ),
     }
+    if is_external:
+        response["platform"] = external_leagues.league_platform(league_id)
+        response["unmapped_players"] = unmapped_players
+    return response
 
 
 class MatchupWhatIfLineupSlot(BaseModel):
@@ -12726,7 +13261,7 @@ class MatchupWhatIfRequest(BaseModel):
 @app.post("/v1/leagues/{league_id}/matchup/what-if")
 def post_league_matchup_what_if(
     request: MatchupWhatIfRequest,
-    league_id: str = Depends(resolve_league_path_id),
+    league_id: str = Depends(require_league_access),
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Lineup planner: re-score an edited lineup against this week's opponent.

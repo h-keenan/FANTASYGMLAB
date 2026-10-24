@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useParams, useSearchParams } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
+import { useSearchParams } from "@/lib/useSearchParams";
 
 import { useAuth } from "@/context/AuthContext";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
-import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 
 /**
  * Desktop-width persistent left nav — coridian_, 2026-10-17: "desktop side
@@ -29,6 +30,9 @@ export function DesktopSidebar() {
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations } = useNavDestinations(leagueId, leagueName);
 
   if (!session) return null;
+  // Founder-only (app_metadata.founder_ops); session is already resolved
+  // here so non-founders never see a flash.
+  const founderCapable = isFounderSession(session);
 
   return (
     <nav
@@ -62,6 +66,10 @@ export function DesktopSidebar() {
       ) : null}
 
       <SidebarSection label="General" destinations={generalDestinations} pathname={pathname} />
+
+      {founderCapable ? (
+        <SidebarSection label="Founder" destinations={[FOUNDER_DESTINATION]} pathname={pathname} />
+      ) : null}
     </nav>
   );
 }

@@ -9,7 +9,7 @@ import PlayerIdentityRow from './PlayerIdentityRow';
 import PremiumLock from './PremiumLock';
 import SegmentedTabBar from './SegmentedTabBar';
 import SkeletonBlock from './SkeletonBlock';
-import StatStrip from './StatStrip';
+import DashboardStatRow from './DashboardStatRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { trackUse } from '../lib/analytics';
@@ -83,8 +83,8 @@ export default function PortfolioExposurePanel() {
 
   return (
     <View style={styles.gap}>
-      <StatStrip
-        fullWidth
+      <DashboardStatRow
+        style={{ marginBottom: 0 }}
         items={[
           { label: 'Leagues', value: String(exposure.league_count) },
           { label: 'Players', value: String(exposure.player_count) },

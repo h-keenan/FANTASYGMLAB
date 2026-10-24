@@ -437,7 +437,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+  container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
   discoveryCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -531,7 +531,7 @@ function createStyles(colors: ThemeColors) {
   },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: spacing.xs },
   // 40pt tap target (phone layout audit).
-  rowActionButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  rowActionButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   idpNote: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.md },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });

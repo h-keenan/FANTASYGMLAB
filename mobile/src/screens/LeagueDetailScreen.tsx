@@ -399,7 +399,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       {/* Entry point to the full Next Move briefing — demoted from its old
           "first card on the page" position now that the matchup leads, but
           still present (feature parity) one tap away. */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
       >
@@ -565,7 +565,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.md },
   center: {

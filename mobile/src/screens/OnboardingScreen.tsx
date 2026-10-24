@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,12 +12,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppText from '../components/AppText';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
-import GridBackground from '../components/GridBackground';
 import type { ExperienceLevelValue } from '../lib/api';
 import { PLAIN_COPY } from '../lib/experienceCopy';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
@@ -55,6 +61,45 @@ const STEP_KEYS = [...FEATURES.map((f) => f.key), 'connect', 'level'] as const;
 type StepKey = (typeof STEP_KEYS)[number];
 const PHONE_ASPECT = 600 / 1298;
 
+// Web parity (globals.css onboarding-slide-next/back): 0.28s ease-out,
+// opacity 0 -> 1 and a 24px horizontal nudge toward the final position.
+// Opacity/transform only, on the UI thread; skipped under reduced motion.
+const SLIDE_NUDGE_PX = 24;
+const SLIDE_MS = 280;
+
+function SlideIn({ active, direction, children }: { active: boolean; direction: 'next' | 'back'; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(1);
+  const sign = direction === 'next' ? 1 : -1;
+  useLayoutEffect(() => {
+    // Inactive slides stay fully visible so a swipe in progress never shows
+    // a blank incoming page; only the slide that becomes active nudges in.
+    if (reduceMotion || !active) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = 0;
+    progress.value = withTiming(1, { duration: SLIDE_MS, easing: Easing.out(Easing.ease) });
+  }, [active, reduceMotion, progress]);
+  const style = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateX: (1 - progress.value) * SLIDE_NUDGE_PX * sign }],
+  }));
+  return <Animated.View style={[styles_slideFill, style]}>{children}</Animated.View>;
+}
+const styles_slideFill = { alignItems: 'center' as const, alignSelf: 'stretch' as const };
+
+// web: .onboarding-dot transition width/background 0.2s; active = 20px accent.
+function ProgressDot({ active, color, activeColor }: { active: boolean; color: string; activeColor: string }) {
+  const reduceMotion = useReducedMotion();
+  const w = useSharedValue(active ? 20 : 7);
+  useEffect(() => {
+    w.value = reduceMotion ? (active ? 20 : 7) : withTiming(active ? 20 : 7, { duration: 200 });
+  }, [active, reduceMotion, w]);
+  const style = useAnimatedStyle(() => ({ width: w.value }));
+  return <Animated.View style={[{ height: 7, borderRadius: 999, backgroundColor: active ? activeColor : color }, style]} />;
+}
+
 const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: ColorKey; title: string; body: string }[] = [
   {
     value: 'beginner',
@@ -81,7 +126,7 @@ const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: Color
  * the Paywall finishes onboarding when it is dismissed. A replay just
  * returns to wherever it was opened from.
  */
-export default function OnboardingScreen({ navigation }: Props) {
+export default function OnboardingScreen({ navigation, route }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
@@ -93,26 +138,41 @@ export default function OnboardingScreen({ navigation }: Props) {
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
+  const prevIndex = useRef(0);
+  const direction: 'next' | 'back' = index >= prevIndex.current ? 'next' : 'back';
+  useEffect(() => {
+    prevIndex.current = index;
+  }, [index]);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
   const [saving, setSaving] = useState(false);
-  const isLast = index === STEP_KEYS.length - 1;
+  // Replay (More > "Replay the tour"): feature slides only. No connect or
+  // experience step, so no preference is written, no funnel events fire and
+  // the onboarding-completed flag is never touched.
+  const isReplay = route?.params?.replay === true;
+  const stepKeys: readonly StepKey[] = isReplay ? STEP_KEYS.filter((k) => k !== 'connect' && k !== 'level') : STEP_KEYS;
+  const isLast = index === stepKeys.length - 1;
   // A replay from More starts with the flag already true; only a real
   // first run gets the trial-offer step.
   const isFirstRun = onboardingComplete === false;
 
   // One step_viewed per step per session (deduped in the helper).
   useEffect(() => {
+    if (isReplay) return;
     trackOnboardingStepViewed(STEP_KEYS[index], index);
-  }, [index]);
+  }, [index, isReplay]);
 
   const goTo = (next: number) => {
-    const clamped = Math.max(0, Math.min(STEP_KEYS.length - 1, next));
-    if (clamped < index) trackOnboarding('back', { step: STEP_KEYS[index], step_index: index });
+    const clamped = Math.max(0, Math.min(stepKeys.length - 1, next));
+    if (clamped < index && !isReplay) trackOnboarding('back', { step: STEP_KEYS[index], step_index: index });
     setIndex(clamped);
     scrollRef.current?.scrollTo({ x: clamped * width, animated: true });
   };
 
   const onSkip = () => {
+    if (isReplay) {
+      if (navigation.canGoBack()) navigation.goBack();
+      return;
+    }
     trackOnboarding('skipped', { step: STEP_KEYS[index], step_index: index });
     if (isFirstRun) {
       navigation.navigate('Paywall', { fromOnboarding: 'skip' });
@@ -123,6 +183,10 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   const onFinish = async () => {
+    if (isReplay) {
+      if (navigation.canGoBack()) navigation.goBack();
+      return;
+    }
     if (!level) return;
     trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(level) });
     setSaving(true);
@@ -141,7 +205,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = width > 0 ? Math.round(e.nativeEvent.contentOffset.x / width) : 0;
-    setIndex(Math.max(0, Math.min(STEP_KEYS.length - 1, next)));
+    setIndex(Math.max(0, Math.min(stepKeys.length - 1, next)));
   };
 
   const renderStep = (key: StepKey) => {
@@ -212,16 +276,14 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   const primaryLabel = !isLast ? 'Next' : isFirstRun ? 'Continue' : 'Done';
-  const primaryDisabled = isLast && (!level || saving);
+  const primaryDisabled = isLast && !isReplay && (!level || saving);
 
   return (
     <View style={styles.root}>
-      <GridBackground />
-
       <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.dotsRow}>
-          {STEP_KEYS.map((key, i) => (
-            <View key={key} style={[styles.dot, i === index && styles.dotActive]} />
+          {stepKeys.map((key, i) => (
+            <ProgressDot key={key} active={i === index} color={colors.border} activeColor={colors.accent} />
           ))}
         </View>
         <TouchableOpacity onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel="Skip tutorial">
@@ -237,14 +299,16 @@ export default function OnboardingScreen({ navigation }: Props) {
         onMomentumScrollEnd={onMomentumScrollEnd}
         style={styles.scroll}
       >
-        {STEP_KEYS.map((key) => (
+        {stepKeys.map((key) => (
           <ScrollView
             key={key}
             style={{ width }}
             contentContainerStyle={styles.slide}
             showsVerticalScrollIndicator={false}
           >
-            {renderStep(key)}
+            <SlideIn active={stepKeys[index] === key} direction={direction}>
+              {renderStep(key)}
+            </SlideIn>
           </ScrollView>
         ))}
       </ScrollView>
@@ -282,7 +346,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: 'transparent' },
     topRow: {
       flexDirection: 'row',
       alignItems: 'center',

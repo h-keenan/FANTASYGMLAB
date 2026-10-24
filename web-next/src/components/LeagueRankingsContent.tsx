@@ -24,6 +24,7 @@ import { TeamAvatar } from "@/components/TeamAvatar";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { EmptyState } from "@/components/EmptyState";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -50,7 +51,7 @@ function rankBadgeColor(tone: "positive" | "negative" | "neutral" = "neutral"): 
   return tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
 }
 
-function RankingRow({
+export function RankingRow({
   rankLabel,
   teamName,
   avatarUrl,
@@ -286,9 +287,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
       ) : null}
       {state === "ready" && result && result.is_premium !== false ? (
         result.reason || result.teams.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            {playoffOddsReasonMessage(result.reason)}
-          </p>
+          <EmptyState title={playoffOddsReasonMessage(result.reason)} />
         ) : (
           <div className="glass-surface flex flex-col">
             {result.teams.map((team, index) => (

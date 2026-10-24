@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import ErrorState from '../components/ErrorState';
 import Button from '../components/Button';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -25,7 +26,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import CircularProgressRing from '../components/CircularProgressRing';
+import MeterRow from '../components/ConfidenceMeter';
 import TeamAvatar from '../components/TeamAvatar';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -446,7 +447,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load the trade analyzer" message={error} />
       </View>
     );
   }
@@ -509,13 +510,13 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
       {!quickMode ? (
         <View style={styles.assetTypeRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, assetType === 'players' && styles.pillActive]}
             onPress={() => setAssetType('players')}
           >
             <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, assetType === 'picks' && styles.pillActive]}
             onPress={() => setAssetType('picks')}
           >
@@ -537,7 +538,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
       {activeSide === 'receive' && otherTeams.length > 0 ? (
         <View style={styles.teamRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, selectedTeamId === ALL_TEAMS_ID && styles.pillActive]}
             onPress={() => setSelectedTeamId(ALL_TEAMS_ID)}
           >
@@ -546,7 +547,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             </AppText>
           </TouchableOpacity>
           {otherTeams.map((team) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={team.rosterId}
               style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
               onPress={() => setSelectedTeamId(team.rosterId)}
@@ -670,6 +671,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             <TouchableOpacity
               style={styles.pickInfoButton}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Pick details"
               onPress={() =>
                 navigation.navigate('PickDetail', { pick: item.pick, leagueId, leagueName })
               }
@@ -799,7 +802,7 @@ function VerdictCard({
         <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
           {verdict.band}
         </AppText>
-        <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+        <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <AppText style={styles.shareButtonText}>Share</AppText>
         </TouchableOpacity>
@@ -812,16 +815,13 @@ function VerdictCard({
           remaining width beside the ring before. */}
       <View style={styles.verdictHeroRow}>
         <TradeValueHero delta={verdict.value_delta} size="lg" style={styles.verdictValueHero} />
-        <View style={styles.verdictRingGroup}>
-          <CircularProgressRing
-            percent={confidencePercent(verdict.confidence)}
-            size={64}
-            strokeWidth={6}
+        <View style={styles.verdictMeter}>
+          <MeterRow
+            label="CONFIDENCE"
+            value={verdict.confidence}
+            level={confidencePercent(verdict.confidence) >= 80 ? 3 : confidencePercent(verdict.confidence) >= 50 ? 2 : 1}
             color={toneColor}
           />
-          <AppText style={styles.verdictRingCaption} numberOfLines={1}>
-            {verdict.confidence}
-          </AppText>
         </View>
       </View>
       {/* Same "who's winning" shape-reinforcement TradeValueBar gives Trade
@@ -855,7 +855,7 @@ function VerdictCard({
         </>
       ) : null}
       {verdict.counter_action ? (
-        <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
+        <TouchableOpacity accessibilityRole="button" style={styles.counterButton} onPress={onBuildCounter}>
           <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
           <AppText style={styles.counterButtonText}>Build the counter</AppText>
         </TouchableOpacity>
@@ -914,7 +914,7 @@ function TradeSide({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.side, active && styles.sideActive]}
       onPress={onPressHeader}
       activeOpacity={0.85}
@@ -967,7 +967,7 @@ function TradeSide({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     beginnerHelp: { marginBottom: spacing.xs },
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {
     flex: 1,
@@ -1103,13 +1103,7 @@ function createStyles(colors: ThemeColors) {
   },
   verdictValueHero: { flex: 1 },
   verdictValueBar: { marginBottom: spacing.md },
-  verdictRingGroup: { alignItems: 'center', gap: 4 },
-  verdictRingCaption: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'capitalize',
-  },
+  verdictMeter: { flexShrink: 0 },
   verdictSection: { marginTop: spacing.sm },
   verdictSectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
   verdictLabel: {

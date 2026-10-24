@@ -20,7 +20,7 @@ import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { BRAND_NAME } from "@/lib/brand";
-import { isCompletedShare, shareImageOrText } from "@/lib/shareImage";
+import { useShareImage } from "@/lib/useShareImage";
 import { trackUse } from "@/lib/analytics";
 
 /**
@@ -86,34 +86,39 @@ function StatsTab({ stats, playerId }: { stats: QuickViewStats | null; playerId:
 /** Shares the branded player card PNG (app/share-card/player) through the
  * same image -> text -> clipboard flow as Trade Hub's Share button. */
 function SharePlayerButton({ player, leagueId, lens }: { player: RankedPlayer; leagueId: string; lens: string }) {
-  const [preparing, setPreparing] = useState(false);
   const [copied, setCopied] = useState(false);
   const name = player.name || `Player ${player.player_id}`;
+  const facts = [
+    player.position && player.position_rank ? `${player.position}${player.position_rank}` : player.position,
+    player.overall_rank ? `#${player.overall_rank} overall` : null,
+    player.score != null ? `${Math.round(player.score).toLocaleString("en-US")} value` : null,
+  ].filter(Boolean);
 
-  const onShare = async () => {
-    const facts = [
-      player.position && player.position_rank ? `${player.position}${player.position_rank}` : player.position,
-      player.overall_rank ? `#${player.overall_rank} overall` : null,
-      player.score != null ? `${Math.round(player.score).toLocaleString("en-US")} value` : null,
-    ].filter(Boolean);
-    const outcome = await shareImageOrText({
-      fetchImage: () => api.getPlayerShareCardBlob(leagueId, player.player_id, lens),
-      filename: `fantasydesk-player-${player.player_id}.png`,
-      text: `${name}${facts.length ? ` · ${facts.join(" · ")}` : ""} on ${BRAND_NAME}`,
-      title: `${name} on ${BRAND_NAME}`,
-      onPreparingImage: setPreparing,
-    });
-    trackUse("share_card", "shared", { leagueId, props: { item_kind: "player", result: String(outcome ?? "") } });
-    if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const share = useShareImage({
+    cacheKey: `player:${leagueId}:${player.player_id}:${lens}`,
+    build: () => api.getPlayerShareCardBlob(leagueId, player.player_id, lens),
+    filename: `fantasydesk-player-${player.player_id}.png`,
+    text: `${name}${facts.length ? ` · ${facts.join(" · ")}` : ""} on ${BRAND_NAME}`,
+    title: `${name} on ${BRAND_NAME}`,
+    itemKind: "player",
+    leagueId,
+    lazy: true,
+    onOutcome: (outcome) => {
+      trackUse("share_card", "shared", { leagueId, props: { item_kind: "player", result: String(outcome ?? "") } });
+      if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    },
+  });
 
   return (
-    <button type="button" className="pqv-action-link" onClick={onShare} disabled={preparing}>
-      {preparing ? "Preparing…" : copied ? "Copied!" : "Share card"}
-    </button>
+    <>
+      <button ref={share.observe} type="button" className="pqv-action-link" onClick={share.onClick} disabled={share.busy}>
+        {copied ? "Copied!" : share.label("Share card")}
+      </button>
+      {share.status ? <span role="status" className="text-xs">{share.status}</span> : null}
+    </>
   );
 }
 

@@ -318,7 +318,7 @@ export function LiveDraftTradeEvaluator({
               </p>
             ) : null}
 
-            <Button onClick={evaluate} disabled={!canEvaluate || evaluating}>
+            <Button onClick={evaluate} disabled={!canEvaluate} loading={evaluating}>
               {evaluating ? "Evaluating…" : "Evaluate Trade"}
             </Button>
 

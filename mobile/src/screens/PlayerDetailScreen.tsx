@@ -139,7 +139,7 @@ function NewsImpactModal({
         <SwipeDismissCard style={styles.modalCard} onDismiss={onClose}>
           <View style={styles.modalHeaderRow}>
             <AppText style={styles.modalTitle}>In The News</AppText>
-            <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -2091,7 +2091,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   // The injury/news pill used to live inside actionRow (flexWrap, sharing a
   // line with the buttons) — now its own row, positioned above actionRow, so

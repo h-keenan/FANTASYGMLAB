@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { api, type TradeAsset, type TradeVerdict } from "@/lib/api";
+import { Toggle } from "@/components/Toggle";
+import { Input } from "@/components/Input";
 
 function slimAssets(assets: TradeAsset[]): TradeAsset[] {
   return assets.map((asset) => ({
@@ -85,37 +87,29 @@ export function ShareToCommunityToggle({
       className="flex flex-col gap-2 p-3"
       style={{ border: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <label className="flex items-center justify-between gap-3 text-sm">
+      <div className="flex items-center justify-between gap-3 text-sm">
         <span style={{ color: "var(--color-text-secondary)" }}>Share to community</span>
-        <input
-          type="checkbox"
-          role="switch"
-          aria-checked={on}
+        <Toggle
+          label="Share to community"
           checked={on}
           disabled={busy}
-          onChange={(event) => (event.target.checked ? setOn(true) : void turnOff())}
+          onChange={(next) => (next ? setOn(true) : void turnOff())}
         />
-      </label>
+      </div>
       {on && !sharedId ? (
         <div className="flex flex-col gap-2">
-          <input
+          <Input
             type="text"
             value={name}
             maxLength={24}
             onChange={(event) => setName(event.target.value)}
             placeholder="Display name (optional)"
             aria-label="Display name (optional)"
-            className="px-2 py-1 text-sm"
-            style={{
-              background: "var(--color-surface-muted)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
           />
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Shows the assets, grade and reason. Blank is Anonymous.
           </span>
-          <Button size="sm" disabled={busy} onClick={() => void share()}>
+          <Button size="sm" loading={busy} onClick={() => void share()}>
             {busy ? "Sharing…" : "Share"}
           </Button>
         </div>

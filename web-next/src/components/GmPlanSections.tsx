@@ -8,6 +8,7 @@ import { ValueRing } from "@/components/ValueRing";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
 import { TEAM_STANCE_OPTIONS, type TeamStance } from "@/lib/api";
 import type { DeadlineBanner, PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 export const GM_PLAN_TABS = [
   { label: "Overview", value: "overview" },
@@ -176,7 +177,7 @@ export function PlanSnapshotGrid({ tiles, analysisHref }: { tiles: PlanSnapshotT
 /** Loading skeleton that reserves the final page's block heights. */
 export function GmPlanSkeleton({ leagueName }: { leagueName: string }) {
   const block = (height: number, key: string) => (
-    <div key={key} className="pqv-skeleton-chart w-full" style={{ height }} aria-hidden="true" />
+    <SkeletonBlock key={key} height={height} />
   );
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto" aria-busy="true">

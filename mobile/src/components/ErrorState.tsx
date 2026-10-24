@@ -3,6 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
+import PremiumLock from './PremiumLock';
+import { FREE_LEAGUE_CAP_MESSAGE } from '../lib/freeLeagueCap';
 import Button from './Button';
 import IconCircle from './IconCircle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -34,12 +36,15 @@ export default function ErrorState({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  if (message === FREE_LEAGUE_CAP_MESSAGE) {
+    return <PremiumLock title="Your Free plan includes one league" description={message} feature="free_league_cap" />;
+  }
   return (
     <View style={[styles.container, compact && styles.compact]} accessibilityRole="alert">
       <IconCircle name={icon} color={colors.danger} size={compact ? 40 : 56} iconSize={compact ? 20 : 26} />
       <AppText style={styles.title}>{title}</AppText>
       {message ? <AppText style={styles.message}>{message}</AppText> : null}
-      {onRetry ? <Button label={retryLabel} variant="secondary" onPress={onRetry} style={styles.button} /> : null}
+      {onRetry ? <Button label={retryLabel} onPress={onRetry} style={styles.button} /> : null}
     </View>
   );
 }

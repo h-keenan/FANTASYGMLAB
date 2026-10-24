@@ -31,3 +31,11 @@ const TONE_COLOR: Record<ThisWeekRow["tone"], string> = {
 export function thisWeekToneColor(tone: ThisWeekRow["tone"]): string {
   return TONE_COLOR[tone] ?? TONE_COLOR.neutral;
 }
+
+/** Headline of the trade idea the "This week" trade row already shows (an
+ * 'Idea' row, not a hold), so the Today list can skip the same idea instead of
+ * showing it twice. Empty when there is none. */
+export function thisWeekTradeIdeaHeadline(data: ThisWeek | null | undefined): string {
+  const row = data?.rows?.find((candidate) => candidate.key === "trade" && candidate.status === "Idea");
+  return row?.headline?.trim() ?? "";
+}

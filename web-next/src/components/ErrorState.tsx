@@ -4,6 +4,8 @@ import { useEffect } from "react";
 
 import { Button } from "@/components/Button";
 import { trackClientError } from "@/lib/analytics";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
+import { FREE_LEAGUE_CAP_MESSAGE } from "@/lib/freeLeagueCap";
 
 /**
  * Shared "couldn't load" state with a real way back — coridian_, 2026-10-18,
@@ -21,19 +23,37 @@ import { trackClientError } from "@/lib/analytics";
  * fetch effect has no retry token can pass `reloadPage`.
  */
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const leagueLocked = message === FREE_LEAGUE_CAP_MESSAGE;
   // Team-visible error signal (route_error): only a coarse class derived from
   // the message, never the message itself. Rate limited in trackClientError.
   useEffect(() => {
     trackClientError("route_error", null, { status: /timed out|could not reach/i.test(message) ? 0 : undefined });
   }, [message]);
+  if (leagueLocked) {
+    return (
+      <PremiumUpsellCard
+        kicker="Free plan"
+        upsell={null}
+        fallbackTitle="Your Free plan includes one league"
+        fallbackBody={message}
+      />
+    );
+  }
   return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
-      <p role="alert" style={{ color: "var(--color-danger)" }}>
-        {message}
-      </p>
-      {onRetry ? (
-        <Button onClick={onRetry}>Try again</Button>
-      ) : null}
+    <main className="flex-1 flex flex-col justify-center px-4 py-8 max-w-3xl w-full mx-auto">
+      <div className="glass-surface flex flex-col gap-1 items-start px-4 py-6" data-testid="error-state">
+        <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+          Something went wrong
+        </p>
+        <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+          {message}
+        </p>
+        {onRetry ? (
+          <Button size="sm" onClick={onRetry} className="mt-2">
+            Try again
+          </Button>
+        ) : null}
+      </div>
     </main>
   );
 }
