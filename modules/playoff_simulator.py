@@ -270,6 +270,104 @@ def _certified_clinch_elimination(
     return clinched, eliminated
 
 
+def _bracket_slots(size: int) -> list[int]:
+    """Standard single-elimination seed order for a power-of-two bracket:
+    adjacent entries meet in round one (8 -> 1,8,4,5,2,7,3,6)."""
+
+    slots = [1]
+    while len(slots) < size:
+        total = len(slots) * 2 + 1
+        slots = [x for seed in slots for x in (seed, total - seed)]
+    return slots
+
+
+def playoff_bracket_format(
+    settings: Mapping[str, Any] | None, playoff_teams: int, *, playoffs_started: bool = False
+) -> dict[str, Any]:
+    """Whether this league's playoff format is known well enough to simulate a
+    title run, from the real Sleeper settings only.
+
+    Supported: single-elimination, one week per round, fixed or re-seeded
+    bracket (``playoff_seed_type`` 0/1), top seeds getting byes when
+    ``playoff_teams`` is not a power of two. Anything else (two-week rounds, a
+    non-standard ``playoff_type``) is reported unavailable with a reason code
+    rather than approximated. Returns ``{"available", "reason", "reseed"}``.
+    """
+
+    settings = settings or {}
+
+    def unavailable(reason: str) -> dict[str, Any]:
+        return {"available": False, "reason": reason, "reseed": False}
+
+    if playoff_teams < 2:
+        return unavailable("no_playoff_format")
+    if playoffs_started:
+        return unavailable("playoffs_underway")
+    if _safe_int(settings.get("playoff_type")) != 0 or _safe_int(settings.get("playoff_round_type")) != 0:
+        return unavailable("unsupported_playoff_format")
+    seed_type = _safe_int(settings.get("playoff_seed_type"))
+    if seed_type not in (0, 1):
+        return unavailable("unsupported_playoff_format")
+    return {"available": True, "reason": "", "reseed": seed_type == 1}
+
+
+def simulate_title_odds(
+    *,
+    seed_order: np.ndarray,
+    z: np.ndarray,
+    slope: float,
+    playoff_teams: int,
+    reseed: bool,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Per-team championship probability (0-100) from the simulated seeds.
+
+    ``seed_order[t, k]`` is the team index holding seed ``k + 1`` in trial
+    ``t`` (the same standings the playoff odds use). Each playoff game is won
+    with the same logistic Roster-Power model as the regular season. Byes go
+    to the top seeds when the field is not a power of two.
+    """
+
+    n_trials, n = seed_order.shape
+    field = min(playoff_teams, n)
+    titles = np.zeros(n, dtype=float)
+    if field < 2:
+        return titles
+    size = 1
+    while size < field:
+        size *= 2
+    slots = _bracket_slots(size)
+    draws = rng.random(size=(n_trials, field - 1))
+    diff = z[:, None] - z[None, :]
+    win_prob = 1.0 / (1.0 + np.exp(-slope * diff))
+    for t in range(n_trials):
+        team_of = seed_order[t]
+        current: list[tuple[int, int] | None] = [
+            (seed, int(team_of[seed - 1])) if seed <= field else None for seed in slots
+        ]
+        game = 0
+        first_round = True
+        while len(current) > 1:
+            if reseed and not first_round:
+                live = sorted(x for x in current if x is not None)
+                current = [live[i // 2] if i % 2 == 0 else live[-(i // 2) - 1] for i in range(len(live))]
+            first_round = False
+            nxt: list[tuple[int, int] | None] = []
+            for i in range(0, len(current), 2):
+                a, b = current[i], current[i + 1]
+                if a is None or b is None:
+                    nxt.append(a if b is None else b)
+                    continue
+                a_wins = draws[t, game] < win_prob[a[1], b[1]]
+                game += 1
+                nxt.append(a if a_wins else b)
+            current = nxt
+        champion = current[0]
+        if champion is not None:
+            titles[champion[1]] += 1.0
+    return titles / n_trials * 100.0
+
+
 def simulate_playoff_odds(
     *,
     roster_ids: Sequence[str],
@@ -288,6 +386,7 @@ def simulate_playoff_odds(
     remaining_weeks: Sequence[Sequence[tuple[str, str]]] | None = None,
     league_median: bool = False,
     divisions: Sequence[int | None] | None = None,
+    title_bracket: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pure Monte Carlo simulation — no network/IO, fully unit-testable.
 
@@ -435,6 +534,19 @@ def simulate_playoff_odds(
 
     made_playoffs = ranks <= playoff_teams
 
+    # Title odds run after every other draw so enabling them never shifts the
+    # random numbers the playoff odds use (baseline/scenario stay comparable).
+    title_odds: np.ndarray | None = None
+    if title_bracket and title_bracket.get("available") and n >= 2:
+        title_odds = simulate_title_odds(
+            seed_order=order,
+            z=z,
+            slope=slope,
+            playoff_teams=playoff_teams,
+            reseed=bool(title_bracket.get("reseed")),
+            rng=rng,
+        )
+
     # With nothing left to play every trial is identical, so the simulated
     # standings (including the points tiebreak and division seeding) are
     # exact. Otherwise only the conservative bound may claim certainty.
@@ -476,6 +588,10 @@ def simulate_playoff_odds(
             "clinched": bool(clinched_flags[i]),
             "eliminated": bool(eliminated_flags[i]),
         }
+        if title_odds is not None:
+            # A team that cannot make the field cannot win the title: exact,
+            # not sampled, so an eliminated team reads 0 rather than noise.
+            results[rid]["title_probability"] = 0.0 if bool(eliminated_flags[i]) else float(title_odds[i])
 
     return {
         "teams": results,
@@ -692,6 +808,10 @@ def build_league_playoff_odds(
         if not any(divisions):
             divisions = None
 
+    title_format = playoff_bracket_format(
+        league_settings, int(playoff_teams), playoffs_started=current_week > regular_season_end
+    )
+
     simulation = simulate_playoff_odds(
         roster_ids=roster_ids,
         power_scores=power_scores,
@@ -709,6 +829,7 @@ def build_league_playoff_odds(
         remaining_weeks=remaining_weeks,
         league_median=league_median,
         divisions=divisions,
+        title_bracket=title_format,
     )
 
     teams: list[dict[str, Any]] = []
@@ -731,6 +852,9 @@ def build_league_playoff_odds(
                 "remaining_games": sim["remaining_games"],
                 "clinched": sim["clinched"],
                 "eliminated": sim["eliminated"],
+                "title_probability": (
+                    round(sim["title_probability"], 1) if sim.get("title_probability") is not None else None
+                ),
             }
         )
     teams.sort(key=lambda t: (-t["playoff_probability"], t["median_seed"]))
@@ -748,6 +872,7 @@ def build_league_playoff_odds(
         "games_used_for_fit": simulation["games_used_for_fit"],
         "season": standings_bundle.get("season"),
         "slope": simulation["slope"],
+        "title_odds": {"available": title_format["available"], "reason": title_format["reason"]},
     }
 
 

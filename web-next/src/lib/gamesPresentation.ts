@@ -30,6 +30,28 @@ export function formatOdds(value: number | null | undefined): string {
   return `${Math.round(value)}%`;
 }
 
+/** Why championship odds are not shown (answers modules/playoff_simulator.py
+ * `title_odds.reason`). */
+export const TITLE_ODDS_REASON_MESSAGES: Record<string, string> = {
+  unsupported_playoff_format:
+    "Title odds are unavailable: this league's playoffs use a format we do not simulate yet (for example two-week rounds).",
+  playoffs_underway: "Title odds are unavailable: the playoffs have already started.",
+  no_playoff_format: "Title odds are unavailable: this league has no playoff format set.",
+  unavailable: "Title odds are unavailable right now.",
+};
+
+export function titleOddsUnavailableMessage(reason: string | undefined): string {
+  return TITLE_ODDS_REASON_MESSAGES[reason ?? ""] ?? TITLE_ODDS_REASON_MESSAGES.unavailable;
+}
+
+/** Championship odds: a real but tiny chance reads "<1%", never "0%". */
+export function formatTitleOdds(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "-";
+  if (value <= 0) return "0%";
+  if (value < 1) return "<1%";
+  return `${Math.round(value)}%`;
+}
+
 /** "+4.2" / "-1.0" / "0.0" for a points change. */
 export function formatDelta(value: number, digits = 1): string {
   const fixed = value.toFixed(digits);

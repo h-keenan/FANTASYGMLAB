@@ -26,12 +26,14 @@ import {
 import {
   formatDelta,
   formatOdds,
+  formatTitleOdds,
   gamesReasonAction,
   gamesReasonMessage,
   PICKEM_PHASE_LABEL,
   pickemPhaseColor,
   recordLabel,
   seedChangeLabel,
+  titleOddsUnavailableMessage,
   whatIfSummary,
   whatIfTone,
   withPick,
@@ -125,6 +127,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
 
   const mine = data.my_team;
   const status = mine.clinched ? "Clinched" : mine.eliminated ? "Eliminated" : null;
+  const titleAvailable = data.title_odds?.available === true && mine.title_probability != null;
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
@@ -147,6 +150,16 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
               Playoff odds
             </span>
           </div>
+          {titleAvailable ? (
+            <div className="flex flex-col" data-testid="title-odds-mine">
+              <span className="text-2xl font-extrabold" style={{ color: metricToneColor(mine.title_probability!) }}>
+                {formatTitleOdds(mine.title_probability)}
+              </span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Title odds
+              </span>
+            </div>
+          ) : null}
           <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--color-text-secondary)" }}>
             <span>
               Proj {mine.median_final_wins}-{mine.median_final_losses}
@@ -155,6 +168,11 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
             {status ? <ToneBadge label={status} color={mine.clinched ? "var(--color-success)" : "var(--color-danger)"} /> : null}
           </div>
         </div>
+        {!titleAvailable ? (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="title-odds-unavailable">
+            {titleOddsUnavailableMessage(data.title_odds?.reason)}
+          </p>
+        ) : null}
       </section>
 
       <WhatIfSection leagueId={leagueId} data={data} />
@@ -176,7 +194,12 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
               toneColor={metricToneColor(team.playoff_probability)}
               isCurrent={team.mine}
               firstPlace={index === 0}
-              secondary={[`Seed #${team.median_seed}`]}
+              secondary={[
+                `Seed #${team.median_seed}`,
+                ...(titleAvailable && team.title_probability != null
+                  ? [`Title ${formatTitleOdds(team.title_probability)}`]
+                  : []),
+              ]}
             />
           ))}
         </div>
