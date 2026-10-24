@@ -7,7 +7,8 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/Button";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
-import { ONBOARDING_FEATURES } from "@/lib/onboardingFeatures";
+import { ONBOARDING_FEATURES, ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
+import { OnboardingValueSlides } from "@/components/OnboardingValueSlides";
 import { PLAIN_COPY, type ExperienceLevel } from "@/lib/experienceCopy";
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 
@@ -15,11 +16,11 @@ import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
  * onboarding. We need at least 3 pgs on sign up abt who we are and what we
  * solve and how it works and ask if the user is a beginner or advanced."
- * Reworked 2026-10-22 (owner: the sample-card slide was "too basic"): one
- * swipeable slide per feature, each led by a real screenshot of that page
- * in a phone frame with a one-line benefit below, then Connect, then the
- * experience picker. Shown once, right after a brand-new account's first
- * sign-in, before OnboardingPaywall.
+ * Cut from 10 steps to 3 on 2026-10-23 (coridian_: "10 is insane"):
+ * (1) a value line over auto-advancing real screenshots (one step), (2)
+ * Connect, (3) the experience picker. The full 8-screen feature tour lives
+ * on in replay mode (Account > Replay the tour). Shown once, right after a
+ * brand-new account's first sign-in, before OnboardingPaywall.
  *
  * The screenshots (public/onboarding/*.webp, mirrored in mobile/assets/
  * onboarding/) are captured from this app's real UI against a generic
@@ -70,15 +71,16 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
 
   const featureCount = ONBOARDING_FEATURES.length;
-  // Replay (Account > "Replay the tour"): feature slides only. No connect or
-  // experience step, so nothing is saved, no step_viewed/completed events
-  // (the signup funnel stays clean) and onboarding-completed is untouched.
-  const connectStep = replay ? -1 : featureCount;
-  const levelStep = replay ? -1 : featureCount + 1;
+  // Replay (Account > "Replay the tour"): all feature slides, nothing else.
+  // No connect or experience step, so nothing is saved, no step_viewed/
+  // completed events (the signup funnel stays clean) and onboarding-completed
+  // is untouched. Signup is 3 steps: value, connect, level.
+  const connectStep = replay ? -1 : 1;
+  const levelStep = replay ? -1 : 2;
   const lastStep = replay ? featureCount - 1 : levelStep;
-  const totalSteps = replay ? featureCount : featureCount + 2;
+  const totalSteps = replay ? featureCount : ONBOARDING_STEP_KEYS.length;
 
-  const stepName = (i: number) => (i < featureCount ? ONBOARDING_FEATURES[i].key : i === connectStep ? "connect" : "level");
+  const stepName = (i: number): string => (replay ? ONBOARDING_FEATURES[i].key : ONBOARDING_STEP_KEYS[i]);
 
   // One step_viewed per step per session (deduped in the helper), so a
   // re-render or a Back/Next revisit never double counts.
@@ -153,9 +155,10 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
     else if (dx >= SWIPE_THRESHOLD_PX) back();
   };
 
-  const feature = step < featureCount ? ONBOARDING_FEATURES[step] : null;
+  const feature = replay ? ONBOARDING_FEATURES[step] : null;
+  const showValue = !replay && step === 0;
 
-  const nextFeature = step + 1 < featureCount ? ONBOARDING_FEATURES[step + 1] : null;
+  const nextFeature = replay && step + 1 < featureCount ? ONBOARDING_FEATURES[step + 1] : null;
 
   if (!portalRoot) return null;
   return createPortal(
@@ -198,6 +201,8 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
             <p className="onboarding-benefit">{feature.benefit}</p>
           </div>
         ) : null}
+
+        {showValue ? <OnboardingValueSlides direction={direction} /> : null}
 
         {step === connectStep ? (
           <div key={step} className={`onboarding-hero onboarding-slide onboarding-slide--${direction}`}>

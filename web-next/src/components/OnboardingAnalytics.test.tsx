@@ -29,7 +29,7 @@ describe("onboarding funnel analytics", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     const viewed = calls().filter((c) => c.action === "step_viewed");
-    expect(viewed.map((c) => c.step)).toEqual(["gameplan", "tradehub"]);
+    expect(viewed.map((c) => c.step)).toEqual(["value", "connect"]);
     expect(viewed.map((c) => c.step_index)).toEqual([0, 1]);
     expect(calls().filter((c) => c.action === "back")).toHaveLength(1);
   });
@@ -37,17 +37,17 @@ describe("onboarding funnel analytics", () => {
   it("tracks skipped with the current step", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(calls().find((c) => c.action === "skipped")).toMatchObject({ feature: "onboarding", step: "gameplan" });
+    expect(calls().find((c) => c.action === "skipped")).toMatchObject({ feature: "onboarding", step: "value", step_index: 0 });
   });
 
   it("tracks experience_selected (new|expert) and completed with only allowlisted fixed props", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
-    for (let i = 0; i < 9; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    for (let i = 0; i < 2; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
     const all = calls();
     expect(all.find((c) => c.action === "experience_selected")).toMatchObject({ experience: "expert" });
-    expect(all.find((c) => c.action === "completed")).toMatchObject({ experience: "expert", step: "level" });
+    expect(all.find((c) => c.action === "completed")).toMatchObject({ experience: "expert", step: "level", step_index: 2 });
     for (const c of all) {
       expect(Object.keys(c).every((k) => ["feature", "action", "step", "step_index", "experience"].includes(k))).toBe(true);
     }

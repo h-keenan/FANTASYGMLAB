@@ -2222,6 +2222,41 @@ a {
 .onboarding-feature {
   gap: var(--space-sm);
 }
+/* Value step adds a headline + preview controls, so the phone is shorter. */
+.onboarding-feature--value .onboarding-phone {
+  height: clamp(11rem, calc(100vh - 27rem), 32rem);
+  height: clamp(11rem, calc(100dvh - 27rem), 32rem);
+}
+.onboarding-value-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+.onboarding-value-dots {
+  display: flex;
+  gap: 2px;
+}
+/* 24px hit area around a 7px visual dot. */
+.onboarding-value-dot {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.onboarding-value-dot::after {
+  content: "";
+  position: absolute;
+  inset: 8.5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  transition: background 0.2s;
+}
+.onboarding-value-dot--active::after {
+  background: var(--color-accent, #fff);
+}
 .onboarding-phone {
   height: clamp(12rem, calc(100vh - 19rem), 36rem);
   height: clamp(12rem, calc(100dvh - 19rem), 36rem);

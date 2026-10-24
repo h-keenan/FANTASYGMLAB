@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ONBOARDING_FEATURES, OnboardingCarousel } from "./OnboardingCarousel";
+import { ONBOARDING_VALUE_HEADLINE, ONBOARDING_VALUE_SLIDE_MS } from "@/lib/onboardingFeatures";
 import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", async () => {
@@ -38,17 +39,15 @@ describe("OnboardingCarousel", () => {
     page.remove();
   });
 
-  it("walks every feature slide, then Connect, then the experience picker, and calls onDone after a pick", async () => {
+  it("walks value, then Connect, then the experience picker, and calls onDone after a pick", async () => {
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
 
-    // One screenshot-led slide per feature, each with its one-line benefit.
-    for (const [index, feature] of ONBOARDING_FEATURES.entries()) {
-      expect(screen.getByText(feature.title)).toBeInTheDocument();
-      expect(screen.getByText(feature.benefit)).toBeInTheDocument();
-      expect(screen.getByRole("img", { name: new RegExp(`${feature.title} screen`) })).toBeInTheDocument();
-      if (index < FEATURE_COUNT - 1) clickNext(1);
-    }
+    // Step 1: one value line over a screenshot with its benefit.
+    expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
+    expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+    expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(3);
 
     clickNext(1); // -> connect
     expect(screen.getByText("Connect Sleeper or ESPN")).toBeInTheDocument();
@@ -73,17 +72,17 @@ describe("OnboardingCarousel", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
 
     clickNext(1);
-    expect(screen.getByText(ONBOARDING_FEATURES[1].benefit)).toBeInTheDocument();
+    expect(screen.getByText("Connect Sleeper or ESPN")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
+    expect(screen.getByText(ONBOARDING_VALUE_HEADLINE)).toBeInTheDocument();
 
     const content = document.querySelector(".onboarding-content") as HTMLElement;
     fireEvent.touchStart(content, { touches: [{ clientX: 300 }] });
     fireEvent.touchEnd(content, { changedTouches: [{ clientX: 100 }] });
-    expect(screen.getByText(ONBOARDING_FEATURES[1].benefit)).toBeInTheDocument();
+    expect(screen.getByText("Connect Sleeper or ESPN")).toBeInTheDocument();
     fireEvent.touchStart(content, { touches: [{ clientX: 100 }] });
     fireEvent.touchEnd(content, { changedTouches: [{ clientX: 300 }] });
-    expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
+    expect(screen.getByText(ONBOARDING_VALUE_HEADLINE)).toBeInTheDocument();
   });
 
   it("calls onDone immediately on Skip, without saving an experience level", () => {
@@ -101,11 +100,36 @@ describe("OnboardingCarousel", () => {
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
 
-    clickNext(FEATURE_COUNT + 1);
+    clickNext(2);
     fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("OnboardingCarousel value step previews", () => {
+  it("auto-advances screenshots inside step 1 without adding steps, and pauses on request", () => {
+    vi.useFakeTimers();
+    try {
+      render(<OnboardingCarousel onDone={vi.fn()} />);
+      expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(ONBOARDING_VALUE_SLIDE_MS + 50);
+      });
+      expect(screen.getByRole("img", { name: /Trade Hub screen/ })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Pause previews" }));
+      act(() => {
+        vi.advanceTimersByTime(ONBOARDING_VALUE_SLIDE_MS * 3);
+      });
+      expect(screen.getByRole("img", { name: /Trade Hub screen/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Show Waivers" }));
+      expect(screen.getByRole("img", { name: /Waivers screen/ })).toBeInTheDocument();
+      expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

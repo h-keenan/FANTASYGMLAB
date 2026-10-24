@@ -1,0 +1,88 @@
+"use client";
+
+import Image from "next/image";
+import { useEffect, useState } from "react";
+
+import {
+  ONBOARDING_FEATURES,
+  ONBOARDING_VALUE_HEADLINE,
+  ONBOARDING_VALUE_SLIDE_KEYS,
+  ONBOARDING_VALUE_SLIDE_MS,
+} from "@/lib/onboardingFeatures";
+
+const SLIDES = ONBOARDING_VALUE_SLIDE_KEYS.map((key) => ONBOARDING_FEATURES.find((f) => f.key === key)!);
+
+/**
+ * Step 1 of onboarding: one value line over a phone frame that auto-advances
+ * through a few real screenshots. The slides are inside one step (no extra
+ * funnel steps). Auto-advance is off under prefers-reduced-motion and can be
+ * paused; tapping a dot jumps and stops the timer.
+ */
+export function OnboardingValueSlides({ direction }: { direction: "next" | "back" }) {
+  const [slide, setSlide] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
+  const auto = !paused && !reduced;
+  useEffect(() => {
+    if (!auto) return;
+    const id = window.setInterval(() => setSlide((s) => (s + 1) % SLIDES.length), ONBOARDING_VALUE_SLIDE_MS);
+    return () => window.clearInterval(id);
+  }, [auto]);
+
+  const current = SLIDES[slide];
+  const upcoming = SLIDES[(slide + 1) % SLIDES.length];
+
+  return (
+    <div className={`onboarding-section onboarding-section--center onboarding-feature onboarding-feature--value onboarding-slideonboarding-slide--${direction}`}>
+      <span className="onboarding-eyebrow">{current.title}</span>
+      <h1 className="onboarding-headline onboarding-headline--sm">{ONBOARDING_VALUE_HEADLINE}</h1>
+      <div className="onboarding-phone">
+        <Image
+          key={current.key}
+          src={`/onboarding/onboarding-${current.key}.webp`}
+          alt={`${current.title} screen, shown with sample league data`}
+          width={600}
+          height={1298}
+          priority={slide === 0}
+          className="onboarding-phone-img onboarding-slide--next"
+        />
+      </div>
+      <p className="onboarding-benefit">{current.benefit}</p>
+      <div className="onboarding-value-controls">
+        <div className="onboarding-value-dots" role="group" aria-label="Preview screens">
+          {SLIDES.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              className={`onboarding-value-dot${i === slide ? " onboarding-value-dot--active" : ""}`}
+              aria-label={`Show ${s.title}`}
+              aria-current={i === slide ? "true" : undefined}
+              onClick={() => {
+                setSlide(i);
+                setPaused(true);
+              }}
+            />
+          ))}
+        </div>
+        {!reduced ? (
+          <button type="button" className="onboarding-back" onClick={() => setPaused((p) => !p)}>
+            {paused ? "Play previews" : "Pause previews"}
+          </button>
+        ) : null}
+      </div>
+      <div aria-hidden="true" className="onboarding-preload">
+        <Image src={`/onboarding/onboarding-${upcoming.key}.webp`} alt="" width={600} height={1298} loading="eager" />
+      </div>
+    </div>
+  );
+}
