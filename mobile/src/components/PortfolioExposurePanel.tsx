@@ -147,7 +147,7 @@ export default function PortfolioExposurePanel() {
                   accessibilityLabel={`${player.name} is in ${player.leagues_owned} of ${exposure.league_count} leagues`}
                   style={styles.countPill}
                 >
-                  <AppText style={styles.countText}>{`${player.leagues_owned}/${exposure.league_count}`}</AppText>
+                  <AppText style={styles.countText}>{`${player.leagues_owned}/${exposure.league_count} ${open ? '▴' : '▾'}`}</AppText>
                 </TouchableOpacity>
               </View>
               {open ? (

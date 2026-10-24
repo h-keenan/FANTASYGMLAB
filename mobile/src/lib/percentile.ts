@@ -62,6 +62,19 @@ export function percentileColor(percentile: number | null | undefined, colors: T
   return mixHex(colors.premium, colors.successBright, (clamped - 50) / 50);
 }
 
+/** The OVR ring/badge tint: the web's `overallRatingTint`
+ * (web-next/src/lib/playerPresentation.ts): danger at 0 -> premium at 50 ->
+ * success at 100, all three read from the active theme so dark AND light
+ * values apply. Differs from `percentileColor` only at the top end (web uses
+ * `success`, percentile bars use `successBright`), so OVR looks the same on
+ * both surfaces. */
+export function overallRatingColor(rating: number | null | undefined, colors: ThemeColors): string {
+  if (rating === null || rating === undefined || !Number.isFinite(rating)) return colors.accent;
+  const clamped = Math.max(0, Math.min(100, Math.round(rating)));
+  if (clamped <= 50) return mixHex(colors.danger, colors.premium, clamped / 50);
+  return mixHex(colors.premium, colors.success, (clamped - 50) / 50);
+}
+
 /** Best team in a group -> 100, worst -> 0. Several backend rank fields
  * (league_rankings.py's power_rank/draft_capital_rank/starter_rank/etc.)
  * only expose a dense rank (1 = best), never a raw 0-100 score, so this is

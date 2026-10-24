@@ -145,3 +145,16 @@ Size: S = under half a day, M = about a day, L = multi-day or needs API work.
   and `components/TradeAssetRow.tsx` (extracted from `DashboardScreen`; `GmPlanScreen` now imports it from there).
 - API types: `PortfolioLeague.team_avatar_url`, `DashboardItem.mentioned_players`, `route_player_injury_status`.
 - Headshots use the existing `PlayerAvatar` (sleepercdn.com), team logos the existing `TeamAvatar`. No new hosts.
+
+## Follow-up 2026-10-24 (gaps 7, 9, 10)
+
+- 7 DONE: new shared `OvrGauge` (mobile) mirrors web `OvrGauge`/`ValueRing` sizes and tint
+  (`overallRatingColor` = web `overallRatingTint`, theme danger/premium/success, dark and light).
+  `OverallRatingBadge` (label "OVR") now renders it; PlayerHero and Compare use it; share cards and
+  Player Detail use the same tint. MKT/DUR sub-rating pills stay pills (tint now matches).
+- 9 DONE: More gains the web Identity card (email, Sleeper username, plan from `/v1/me`). Exposure
+  panel already matched web structure; added the expand chevron on the count pill. Left: web wraps
+  Preferences in a card (app uses option cards), and the app has no valuation-lens param for Exposure.
+- 10: Player Detail tab set matches web (Stats/Trends/Schedule/Career/Model, Awards+Bio below).
+  Waivers `?playerId=` highlight is NOT implemented on the app: Waivers has no `playerId` route
+  param and no in-app screen produces the link (Dashboard rows open the player sheet). Left.

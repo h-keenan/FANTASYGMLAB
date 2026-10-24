@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import BrandedSpinner from '../components/BrandedSpinner';
-import CircularProgressRing from '../components/CircularProgressRing';
+import OvrGauge from '../components/OvrGauge';
 import CompareSharePreviewModal from '../components/CompareSharePreviewModal';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -21,7 +21,6 @@ import ValuesCredit from '../components/ValuesCredit';
 import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { injuryTone } from '../lib/injuryDisplay';
-import { percentileColor } from '../lib/percentile';
 import {
   buildModelRows,
   buildNarrativePair,
@@ -111,7 +110,7 @@ function CompareTextRowView({ row, isLast }: { row: CompareTextRow; isLast: bool
 // Compact identity header for one side of the head-to-head — same portrait +
 // "N OVR" ring language PlayerHero uses on Player Detail (§22-23), just sized
 // down to sit two-up on one screen instead of PlayerHero's full-width layout.
-// Reuses CircularProgressRing/percentileColor directly rather than inventing
+// Uses the shared OvrGauge directly rather than inventing
 // a second ring style for this screen.
 function IdentityHeader({ side }: { side: CompareSide }) {
   const { colors } = useThemeMode();
@@ -121,15 +120,7 @@ function IdentityHeader({ side }: { side: CompareSide }) {
     <View style={styles.identity}>
       <PlayerAvatar playerId={side.player.player_id} size={56} tier={side.player.tier} />
       {rating !== null ? (
-        <CircularProgressRing
-          percent={rating}
-          size={44}
-          strokeWidth={5}
-          valueLabel={String(rating)}
-          valueFontScale={0.34}
-          color={percentileColor(rating, colors)}
-          label="OVR"
-        />
+        <OvrGauge rating={rating} size="md" label="OVR" />
       ) : null}
       <AppText style={styles.identityName} numberOfLines={2}>
         {side.player.name ?? 'Unknown'}

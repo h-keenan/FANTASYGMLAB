@@ -19,7 +19,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import IconCircle from '../components/IconCircle';
-import { api, type PushCategory } from '../lib/api';
+import { api, type MeResponse, type PushCategory } from '../lib/api';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { activeTrialEnd } from '../lib/revenuecat';
 import { trialEndLabel } from '../lib/freeTrial';
@@ -104,6 +104,22 @@ export default function MoreScreen({ navigation }: Props) {
       cancelled = true;
     };
   }, []);
+  // Web Account "Identity" card parity (email / Sleeper username / plan),
+  // from the same /v1/me the web card reads. Failure just hides the values.
+  const [me, setMe] = useState<MeResponse['user'] | null>(null);
+  useEffect(() => {
+    if (isGuest) return;
+    let cancelled = false;
+    api
+      .getMe()
+      .then((res) => {
+        if (!cancelled) setMe(res.user);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest]);
   const [deleting, setDeleting] = useState(false);
   const [guestUpgradeOpen, setGuestUpgradeOpen] = useState(false);
   const [guestUpgradeEmail, setGuestUpgradeEmail] = useState('');
@@ -292,7 +308,39 @@ export default function MoreScreen({ navigation }: Props) {
         style={styles.container}
         contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}
       >
-        <SectionHeading title="Preferences" />
+        {isGuest ? null : (
+          <>
+            <SectionHeading title="Identity" />
+            <AnimatedCard style={styles.groupCard}>
+              <SettingsRow
+                label="Email"
+                right={<AppText style={styles.identityValue}>{me?.email || session?.user?.email || '—'}</AppText>}
+                showDivider
+              />
+              <SettingsRow
+                label="Sleeper username"
+                right={<AppText style={styles.identityValue}>{me ? me.sleeper_username || 'Not linked' : '—'}</AppText>}
+                showDivider
+              />
+              <SettingsRow
+                label="Plan"
+                right={
+                  <AppText
+                    style={[
+                      styles.identityValue,
+                      me?.entitlement === 'premium' && { color: colors.premium },
+                    ]}
+                  >
+                    {me ? (me.entitlement === 'premium' ? 'Premium' : 'Free') : '—'}
+                  </AppText>
+                }
+                showDivider={false}
+              />
+            </AnimatedCard>
+          </>
+        )}
+
+        <SectionHeading title="Preferences" topGap={isGuest ? 0 : 16} />
         <AppText style={styles.groupCaption}>Density</AppText>
         <View style={styles.optionRow}>
           {DENSITY_OPTIONS.map((option) => (
@@ -709,6 +757,7 @@ function createStyles(colors: ThemeColors) {
     // One grouped surface per section with hairline dividers between rows,
     // instead of a separately bordered/backgrounded row per item — Magna
     // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
+    identityValue: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
     groupCard: { padding: spacing.md, paddingVertical: 0 },
     referralWrap: { marginTop: 16 },
     dangerCard: {

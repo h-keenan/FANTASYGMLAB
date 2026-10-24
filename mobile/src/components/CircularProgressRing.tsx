@@ -62,7 +62,7 @@ export default function CircularProgressRing({
             stroke={resolvedColor}
             strokeWidth={strokeWidth}
             fill="none"
-            strokeLinecap="round"
+            strokeLinecap="butt"
             strokeDasharray={`${circumference} ${circumference}`}
             strokeDashoffset={dashOffset}
             // Start at 12 o'clock, not 3 o'clock (SVG circles default to 0deg = right).
