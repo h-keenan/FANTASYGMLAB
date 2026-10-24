@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -45,6 +47,8 @@ import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isIdpPositionFilter, withIdpPositionOptions } from '../lib/idpPresentation';
 import { filterByRecommendation, type WaiverRecFilter } from '../lib/waiverChips';
+import { listRowIndex, locateWaiverPlayer, WAIVER_HIGHLIGHT_MS } from '../lib/waiverHighlight';
+import HighlightFrame from '../components/HighlightFrame';
 import { useOrbClearance } from '../lib/orbLayout';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
 import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
@@ -109,7 +113,13 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
+  const { leagueId, leagueName, playerId: deepLinkPlayerId } = route.params;
+  const listRef = useRef<FlatList<WaiverPlayer>>(null);
+  const listWrapRef = useRef<View>(null);
+  const scrollY = useRef(0);
+  const handledDeepLink = useRef<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [deepLinkMissing, setDeepLinkMissing] = useState(false);
   const { lens } = useValuationLens(leagueId);
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
   // IDP leagues only; empty otherwise.
@@ -236,6 +246,64 @@ export default function WaiversScreen({ route, navigation }: Props) {
     return freeAgents.filter((p) => ids.has(p.player_id));
   }, [freeAgents, targetIds]);
 
+  // `playerId` route param (web: ?playerId=): pick the tab that holds the
+  // player, highlight their card briefly, scroll to it. Runs once per id, after
+  // the first successful load; a player not on the list shows a short notice.
+  useEffect(() => {
+    const id = (deepLinkPlayerId ?? '').trim();
+    if (!id || !freeAgents || handledDeepLink.current === id) return;
+    handledDeepLink.current = id;
+    const target = locateWaiverPlayer(id, {
+      priorityAdds,
+      stashCandidates,
+      watchlistCandidates,
+      faabTargets,
+      players: freeAgents,
+      idpPlayers: idpAgents,
+      isPremium,
+    });
+    if (!target.found) {
+      setDeepLinkMissing(true);
+      return;
+    }
+    setDeepLinkMissing(false);
+    setTab(target.tab);
+    setSearch('');
+    setPosition(target.position);
+    setHighlightId(id);
+  }, [deepLinkPlayerId, freeAgents, idpAgents, priorityAdds, stashCandidates, watchlistCandidates, faabTargets, isPremium]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const clear = setTimeout(() => setHighlightId(null), WAIVER_HIGHLIGHT_MS);
+    return () => clearTimeout(clear);
+  }, [highlightId]);
+
+  // Explore rows are virtualized, so scroll by index once the filtered list
+  // reflects the deep link. Recommended cards scroll via HighlightFrame.
+  useEffect(() => {
+    if (!highlightId || tab !== 'explore') return;
+    const index = filtered.findIndex((p) => p.player_id === highlightId);
+    if (index < 0) return;
+    const t = setTimeout(() => {
+      listRef.current?.scrollToIndex({
+        index: listRowIndex(index, viewMode === 'grid' ? 2 : 1),
+        viewPosition: 0.3,
+        animated: true,
+      });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [highlightId, tab, filtered, viewMode]);
+
+  const revealFrame = useCallback((windowY: number) => {
+    listWrapRef.current?.measureInWindow((_x, wrapY) => {
+      listRef.current?.scrollToOffset({
+        offset: Math.max(0, scrollY.current + windowY - wrapY - 120),
+        animated: true,
+      });
+    });
+  }, []);
+
   const openPlayer = useCallback(
     (player: WaiverPlayer) =>
       openQuickView(rankedPlayerFromWaiverPlayer(player), { leagueId, leagueName }),
@@ -282,6 +350,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
       />
       <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
 
+      {deepLinkMissing ? (
+        <AppText style={styles.notice}>That player isn&apos;t on your waiver list right now.</AppText>
+      ) : null}
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
 
       <View style={styles.tabWrap}>
@@ -300,7 +371,22 @@ export default function WaiversScreen({ route, navigation }: Props) {
           }}
         />
       ) : (
+        <View ref={listWrapRef} collapsable={false} style={styles.listWrap}>
         <FlatList
+          ref={listRef}
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            scrollY.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={32}
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({
+              offset: info.averageItemLength * info.index,
+              animated: true,
+            });
+            setTimeout(() => {
+              listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true });
+            }, 300);
+          }}
           ListFooterComponent={<ValuesCredit />}
           key={`${tab}-${viewMode}`}
           data={tab === 'explore' ? filtered : tab === 'watchlist' ? watchlistPlayers : []}
@@ -313,11 +399,13 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 {topPriority ? (
                   <View style={styles.sectionBlock}>
                     <SectionHeading title="Top Waiver Target" caption={priorityCaption} />
-                    <WaiverRecommendationCard
-                      player={topPriority}
-                      variant="primary"
-                      onPress={() => openPlayer(topPriority)}
-                    />
+                    <HighlightFrame active={topPriority.player_id === highlightId} onReveal={revealFrame}>
+                      <WaiverRecommendationCard
+                        player={topPriority}
+                        variant="primary"
+                        onPress={() => openPlayer(topPriority)}
+                      />
+                    </HighlightFrame>
                   </View>
                 ) : (
                   <AppText style={styles.secondaryCaption}>No waiver option clearly helps right now.</AppText>
@@ -333,14 +421,19 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     ) : (
                       <AnimatedCard style={styles.compactGroupCard}>
                         {visibleSecondary.map((player, index) => (
-                          <WaiverRecommendationCard
+                          <HighlightFrame
                             key={player.player_id}
-                            player={player}
-                            variant="compact"
-                            rank={index + 2}
-                            showDivider={index < visibleSecondary.length - 1}
-                            onPress={() => openPlayer(player)}
-                          />
+                            active={player.player_id === highlightId}
+                            onReveal={revealFrame}
+                          >
+                            <WaiverRecommendationCard
+                              player={player}
+                              variant="compact"
+                              rank={index + 2}
+                              showDivider={index < visibleSecondary.length - 1}
+                              onPress={() => openPlayer(player)}
+                            />
+                          </HighlightFrame>
                         ))}
                       </AnimatedCard>
                     )}
@@ -368,6 +461,8 @@ export default function WaiversScreen({ route, navigation }: Props) {
                   watchlistCandidates={watchlistCandidates}
                   faabTargets={faabTargets}
                   onPressPlayer={openPlayer}
+                  highlightId={highlightId}
+                  onReveal={revealFrame}
                 />
               </View>
             ) : tab === 'explore' ? (
@@ -398,14 +493,16 @@ export default function WaiversScreen({ route, navigation }: Props) {
           }
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
           renderItem={({ item, index }) => (
-            <FreeAgentRow
-              player={item}
-              rank={index + 1}
-              isFirst={index === 0}
-              isLast={index === filtered.length - 1}
-              grid={viewMode === 'grid'}
-              onPress={() => openPlayer(item)}
-            />
+            <HighlightFrame active={item.player_id === highlightId}>
+              <FreeAgentRow
+                player={item}
+                rank={index + 1}
+                isFirst={index === 0}
+                isLast={index === filtered.length - 1}
+                grid={viewMode === 'grid'}
+                onPress={() => openPlayer(item)}
+              />
+            </HighlightFrame>
           )}
           ListEmptyComponent={
             tab === 'explore' ? (
@@ -423,6 +520,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             ) : null
           }
         />
+        </View>
       )}
     </View>
   );
@@ -442,7 +540,11 @@ function SecondaryWaiverBoard({
   watchlistCandidates,
   faabTargets,
   onPressPlayer,
+  highlightId,
+  onReveal,
 }: {
+  highlightId: string | null;
+  onReveal: (windowY: number) => void;
   isPremium: boolean;
   stashCandidates: WaiverPlayer[];
   watchlistCandidates: WaiverPlayer[];
@@ -480,13 +582,14 @@ function SecondaryWaiverBoard({
           <SectionHeading title={group.label} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
             {group.players.map((player) => (
-              <BestAvailableCard
-                key={player.player_id}
-                position={player.position ?? ''}
-                player={player}
-                note={player.team ?? undefined}
-                onPress={() => onPressPlayer(player)}
-              />
+              <HighlightFrame key={player.player_id} active={player.player_id === highlightId} onReveal={onReveal}>
+                <BestAvailableCard
+                  position={player.position ?? ''}
+                  player={player}
+                  note={player.team ?? undefined}
+                  onPress={() => onPressPlayer(player)}
+                />
+              </HighlightFrame>
             ))}
           </ScrollView>
         </View>
@@ -702,6 +805,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
+  listWrap: { flex: 1 },
   notice: {
     fontSize: 13,
     color: colors.textSecondary,

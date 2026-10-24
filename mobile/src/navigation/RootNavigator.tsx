@@ -87,7 +87,7 @@ export type RootStackParamList = {
   TeamStance: { leagueId: string; leagueName: string };
   GmPlan: { leagueId: string; leagueName: string; initialTab?: 'overview' | 'trades' | 'core' | 'watching' };
   TradeHistory: undefined;
-  Waivers: { leagueId: string; leagueName: string };
+  Waivers: { leagueId: string; leagueName: string; playerId?: string };
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
   // Single consolidated host for Trade Hub ("Trade Block"), Trade Finder

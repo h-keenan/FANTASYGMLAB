@@ -153,8 +153,12 @@ Size: S = under half a day, M = about a day, L = multi-day or needs API work.
   `OverallRatingBadge` (label "OVR") now renders it; PlayerHero and Compare use it; share cards and
   Player Detail use the same tint. MKT/DUR sub-rating pills stay pills (tint now matches).
 - 9 DONE: More gains the web Identity card (email, Sleeper username, plan from `/v1/me`). Exposure
-  panel already matched web structure; added the expand chevron on the count pill. Left: web wraps
-  Preferences in a card (app uses option cards), and the app has no valuation-lens param for Exposure.
+  panel already matched web structure; added the expand chevron on the count pill. DONE (follow-up 2): Preferences
+  now sits in one AnimatedCard (glass tokens, option tiles use glassInset), all options unchanged.
+  Left: the app has no valuation-lens param for Exposure.
 - 10: Player Detail tab set matches web (Stats/Trends/Schedule/Career/Model, Awards+Bio below).
-  Waivers `?playerId=` highlight is NOT implemented on the app: Waivers has no `playerId` route
-  param and no in-app screen produces the link (Dashboard rows open the player sheet). Left.
+  Waivers `playerId` highlight DONE (follow-up 2): Waivers accepts a `playerId` route param,
+  picks the tab (`lib/waiverHighlight.ts`, mirrors web), scrolls to the card, highlights it for ~2.8s
+  via shared `HighlightFrame`, and shows a notice if the player is not on the list. The player quick
+  view shows "View on Waivers" only when the player is on that league's waiver list. Unverified on
+  device: scroll offset accuracy for Recommended cards and Explore grid mode.
