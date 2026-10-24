@@ -12,7 +12,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
-import { ExchangeAssetList } from '../components/TradeIdeaCard';
+import { TradeAssetList } from '../components/TradeAssetRow';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -339,7 +339,7 @@ function ResultCard({
             <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
             <AppText style={styles.exchangeLabel}>You Send</AppText>
           </View>
-          <ExchangeAssetList assets={idea.package.send} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
+          <TradeAssetList assets={idea.package.send} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
         </View>
         <View style={styles.exchangeGutter}>
           <View style={styles.swapDisc}>
@@ -351,7 +351,7 @@ function ResultCard({
             <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
             <AppText style={styles.exchangeLabel}>You Receive</AppText>
           </View>
-          <ExchangeAssetList assets={idea.package.receive} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
+          <TradeAssetList assets={idea.package.receive} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
         </View>
       </View>
 
