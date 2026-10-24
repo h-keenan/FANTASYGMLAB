@@ -13,7 +13,7 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { PositionBadge } from "@/components/PositionBadge";
-import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -96,7 +96,7 @@ export function GmOrb() {
   // Auth API can set it), unlike user_metadata. Deliberately NOT added to
   // useNavDestinations/navDestinations.ts, since that hook is shared with
   // DesktopSidebar.tsx and has no notion of this per-account gate.
-  const founderCapable = session?.user?.app_metadata?.founder_ops === true;
+  const founderCapable = isFounderSession(session);
 
   const { openPlayer } = usePlayerQuickView();
   const [query, setQuery] = useState("");
@@ -323,13 +323,7 @@ export function GmOrb() {
               {founderCapable ? (
                 <NavSection label="Founder">
                   <NavRow
-                    destination={{
-                      label: "Founder Analytics",
-                      path: "/founder-analytics",
-                      subtitle: "Internal product analytics",
-                      glyph: "founderAnalytics",
-                      color: "var(--color-diagnostic)",
-                    }}
+                    destination={FOUNDER_DESTINATION}
                     onNavigate={() => setOpen(false)}
                   />
                 </NavSection>
