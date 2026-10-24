@@ -43,9 +43,10 @@ type ColorKey = 'accent' | 'premium' | 'success';
 // web UI against a generic sample league (no real users' data) and shared
 // with web-next (public/onboarding/*.webp mirrors assets/onboarding/).
 // Keep this list, its order and its copy in lockstep with web-next's
-// OnboardingCarousel.tsx ONBOARDING_FEATURES. Flow: features -> connect ->
-// experience level. (The mobile-only GM orb intro slide was dropped to match
-// that flow.)
+// onboardingFeatures.ts ONBOARDING_FEATURES. Signup flow is 3 steps
+// (coridian_, 2026-10-23: "10 is insane"): value -> connect -> level. The
+// value step auto-advances through VALUE_SLIDE_KEYS inside one step; the full
+// 8-screen list is only used by the replay tour (More > Replay the tour).
 const FEATURES = [
   { key: 'gameplan', title: 'Game Plan', benefit: 'One clear top priority every time you open the app.', image: require('../../assets/onboarding/onboarding-gameplan.webp') },
   { key: 'tradehub', title: 'Trade Hub', benefit: 'Trade ideas your league partners would actually accept.', image: require('../../assets/onboarding/onboarding-tradehub.webp') },
@@ -57,8 +58,12 @@ const FEATURES = [
   { key: 'waivers', title: 'Waivers', benefit: 'Priority Adds ranked for your roster, with FAAB ranges.', image: require('../../assets/onboarding/onboarding-waivers.webp') },
 ] as const;
 
-const STEP_KEYS = [...FEATURES.map((f) => f.key), 'connect', 'level'] as const;
-type StepKey = (typeof STEP_KEYS)[number];
+const STEP_KEYS = ['value', 'connect', 'level'] as const;
+type StepKey = (typeof STEP_KEYS)[number] | (typeof FEATURES)[number]['key'];
+const VALUE_SLIDE_KEYS = ['gameplan', 'tradehub', 'matchup', 'waivers'] as const;
+const VALUE_HEADLINE = 'Know your best move every week.';
+const VALUE_SLIDE_MS = 3600;
+const VALUE_SLIDES = VALUE_SLIDE_KEYS.map((k) => FEATURES.find((f) => f.key === k)!);
 const PHONE_ASPECT = 600 / 1298;
 
 // Web parity (globals.css onboarding-slide-next/back): 0.28s ease-out,
@@ -126,6 +131,10 @@ const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: Color
  * the Paywall finishes onboarding when it is dismissed. A replay just
  * returns to wherever it was opened from.
  */
+function isReplayRoute(route: Props['route'] | undefined): boolean {
+  return route?.params?.replay === true;
+}
+
 export default function OnboardingScreen({ navigation, route }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -134,6 +143,8 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   // Phone frame fills most of the slide but leaves room for the header,
   // eyebrow, one-line benefit and footer buttons.
   const phoneHeight = Math.max(240, Math.min(height * 0.56, 460));
+  // The value step adds a headline and preview controls above/below.
+  const valuePhoneHeight = Math.max(200, Math.min(height * 0.44, 380));
   const { onboardingComplete, completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
@@ -144,12 +155,21 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     prevIndex.current = index;
   }, [index]);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
+  const [valueSlide, setValueSlide] = useState(0);
+  const [valuePaused, setValuePaused] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const valueAuto = !isReplayRoute(route) && index === 0 && !valuePaused && !reduceMotion;
+  useEffect(() => {
+    if (!valueAuto) return;
+    const id = setInterval(() => setValueSlide((s) => (s + 1) % VALUE_SLIDES.length), VALUE_SLIDE_MS);
+    return () => clearInterval(id);
+  }, [valueAuto]);
   const [saving, setSaving] = useState(false);
   // Replay (More > "Replay the tour"): feature slides only. No connect or
   // experience step, so no preference is written, no funnel events fire and
   // the onboarding-completed flag is never touched.
-  const isReplay = route?.params?.replay === true;
-  const stepKeys: readonly StepKey[] = isReplay ? STEP_KEYS.filter((k) => k !== 'connect' && k !== 'level') : STEP_KEYS;
+  const isReplay = isReplayRoute(route);
+  const stepKeys: readonly StepKey[] = isReplay ? FEATURES.map((f) => f.key) : STEP_KEYS;
   const isLast = index === stepKeys.length - 1;
   // A replay from More starts with the flag already true; only a real
   // first run gets the trial-offer step.
@@ -209,6 +229,56 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   };
 
   const renderStep = (key: StepKey) => {
+    if (key === 'value') {
+      const current = VALUE_SLIDES[valueSlide];
+      return (
+        <>
+          <AppText style={styles.eyebrow}>{current.title}</AppText>
+          <AppText style={styles.headlineSm} accessibilityRole="header">
+            {VALUE_HEADLINE}
+          </AppText>
+          <View style={[styles.phoneFrame, { height: valuePhoneHeight, width: valuePhoneHeight * PHONE_ASPECT }]}>
+            <Image
+              source={current.image}
+              style={styles.phoneImage}
+              resizeMode="cover"
+              accessibilityLabel={`${current.title} screen, shown with sample league data`}
+            />
+          </View>
+          <AppText style={styles.benefit}>{current.benefit}</AppText>
+          <View style={styles.valueControls}>
+            <View style={styles.dotsRow} accessibilityLabel="Preview screens">
+              {VALUE_SLIDES.map((s, i) => (
+                <TouchableOpacity
+                  key={s.key}
+                  onPress={() => {
+                    setValueSlide(i);
+                    setValuePaused(true);
+                  }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show ${s.title}`}
+                  accessibilityState={{ selected: i === valueSlide }}
+                  style={styles.valueDotHit}
+                >
+                  <View style={[styles.dot, i === valueSlide && styles.dotActive]} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            {!reduceMotion ? (
+              <TouchableOpacity
+                onPress={() => setValuePaused((p) => !p)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={valuePaused ? 'Play previews' : 'Pause previews'}
+              >
+                <AppText style={styles.backText}>{valuePaused ? 'Play previews' : 'Pause previews'}</AppText>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </>
+      );
+    }
     const feature = FEATURES.find((f) => f.key === key);
     if (feature) {
       return (
@@ -420,6 +490,8 @@ function createStyles(colors: ThemeColors) {
     pickCard: { padding: spacing.md, borderWidth: 1.5, borderColor: 'transparent' },
     pickCardSelected: { borderColor: colors.accent },
     pickHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+    valueControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
+    valueDotHit: { paddingVertical: 8, paddingHorizontal: 3 },
     footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
     dotsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     dot: { width: 7, height: 7, borderRadius: radii.pill, backgroundColor: colors.border },
