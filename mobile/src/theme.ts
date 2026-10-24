@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import { darkGlass, lightGlass } from './lib/glass';
+
 /**
  * Shared design tokens — colors, spacing, radii, shadows, and motion
  * constants. Kept deliberately small: this is a client-side presentation
@@ -46,6 +48,8 @@ const darkColors = {
   // unrelated UI that was never meant to look "branded."
   cardBorder: 'rgba(103,232,249,0.28)',
   hairline: 'rgba(255,255,255,0.08)',
+  // Shared liquid-glass surface (lib/glass.ts): translucent card fill, nested-tile tint, rim.
+  ...darkGlass,
   textPrimary: '#F2F4F7',
   textSecondary: '#A6B0BB',
   // Color-system audit (2026-09-25): raised from #6F7A87 — that value only
@@ -133,6 +137,7 @@ const lightColors = {
   borderStrong: '#AFC7D5',
   cardBorder: 'rgba(5,110,124,0.25)',
   hairline: 'rgba(10,30,45,0.08)',
+  ...lightGlass,
   textPrimary: '#0B1D26',
   textSecondary: '#3E5867',
   // Color-system audit (2026-09-25): darkened from #6B8494 — that value hit

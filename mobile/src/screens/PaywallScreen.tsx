@@ -557,7 +557,7 @@ function createStyles(colors: ThemeColors) {
   title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.xl, lineHeight: 20 },
   featuresCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth * 1.5,
     borderColor: colors.hairline,

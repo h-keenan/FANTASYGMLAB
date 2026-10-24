@@ -441,10 +441,10 @@ function createStyles(colors: ThemeColors) {
   discoveryCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -473,11 +473,11 @@ function createStyles(colors: ThemeColors) {
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     paddingHorizontal: spacing.md,
     borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
     borderRightWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
   },
   playerRowFirst: {
     borderTopWidth: StyleSheet.hairlineWidth * 1.5,
@@ -509,10 +509,10 @@ function createStyles(colors: ThemeColors) {
   gridRow: { justifyContent: 'space-between', marginBottom: spacing.sm },
   gridCell: {
     width: '48%',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
     padding: spacing.sm,
   },
   gridFooterRow: {

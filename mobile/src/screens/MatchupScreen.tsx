@@ -828,7 +828,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.md,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
     },
     moveSlot: { minWidth: 40, alignItems: 'center' },
     moveBody: { flex: 1, gap: 1, minWidth: 0 },

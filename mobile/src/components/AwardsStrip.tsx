@@ -181,10 +181,10 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       borderRadius: radii.md,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       padding: spacing.lg,
       marginTop: spacing.lg,
     },
@@ -197,7 +197,7 @@ function createStyles(colors: ThemeColors) {
     scrollRow: { gap: spacing.sm, paddingRight: spacing.sm },
     chip: {
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       borderLeftWidth: 3,
       borderRadius: radii.sm,
       paddingHorizontal: spacing.sm,

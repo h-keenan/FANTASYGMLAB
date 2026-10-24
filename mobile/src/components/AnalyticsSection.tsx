@@ -47,10 +47,10 @@ export default function AnalyticsSection({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       borderRadius: radii.md,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       padding: spacing.md,
       marginTop: spacing.sm,
     },

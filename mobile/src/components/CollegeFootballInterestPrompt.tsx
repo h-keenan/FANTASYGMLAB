@@ -69,10 +69,10 @@ export default function CollegeFootballInterestPrompt() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.glass,
       borderRadius: radii.md,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       padding: spacing.md,
       marginBottom: spacing.md,
     },

@@ -905,7 +905,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
   },
   noLeagueText: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
   noLeagueButton: {
@@ -955,12 +955,12 @@ function createStyles(colors: ThemeColors) {
   leagueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
     borderRightWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
   },
   leagueRowFirst: {
     borderTopWidth: StyleSheet.hairlineWidth * 1.5,

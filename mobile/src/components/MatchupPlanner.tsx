@@ -318,10 +318,10 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: scrim, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
     sheet: {
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glass,
       borderRadius: radii.lg,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: colors.glassBorder,
       padding: spacing.lg,
       width: '100%',
       maxWidth: 420,

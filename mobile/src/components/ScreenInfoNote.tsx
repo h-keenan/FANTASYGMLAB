@@ -87,7 +87,7 @@ function createStyles(colors: ThemeColors) {
       padding: spacing.xl,
     },
     sheet: {
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.glass,
       borderRadius: radii.lg,
       padding: spacing.lg,
       borderWidth: StyleSheet.hairlineWidth,

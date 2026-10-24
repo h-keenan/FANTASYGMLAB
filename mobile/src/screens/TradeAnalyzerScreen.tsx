@@ -15,7 +15,6 @@ import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
 import Button from '../components/Button';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -133,7 +132,7 @@ interface OtherTeam {
 const ALL_TEAMS_ID = '__all__';
 
 export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, quickAddPlayer }: Props) {
-  const headerHeight = useHeaderHeight();
+
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [loading, setLoading] = useState(true);
@@ -441,12 +440,12 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   };
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={styles.center}>
         <ErrorState title="Couldn't load the trade analyzer" message={error} />
       </View>
     );
@@ -454,7 +453,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
   if (notReadyReason) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={styles.center}>
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't verify your roster in this league."}
         </AppText>
@@ -631,7 +630,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       style={styles.container}
       data={searchResults}
       keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : item.pick.pick_id)}
-      contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+      contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={header}
       renderItem={({ item, index }) => {
@@ -973,7 +972,7 @@ function createStyles(colors: ThemeColors) {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
@@ -985,10 +984,10 @@ function createStyles(colors: ThemeColors) {
   // The 2pt width is unchanged between states; only the color swaps.
   side: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderRadius: radii.md,
     borderWidth: 2,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
     padding: spacing.md,
     minHeight: 80,
   },
@@ -1013,9 +1012,9 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
   },
   // Same pill as above, plus the leading TeamAvatar other-team filter pills
   // show next to the owner name — "All Teams" keeps the plain `pill` style
@@ -1027,9 +1026,9 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
   },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
@@ -1080,7 +1079,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 4,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
   },
   shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   counterButton: {
@@ -1117,12 +1116,12 @@ function createStyles(colors: ThemeColors) {
   verdictRationale: { flex: 0 },
   searchInput: {
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.glassBorder,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     fontSize: 15,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
