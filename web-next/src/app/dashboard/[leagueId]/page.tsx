@@ -126,5 +126,14 @@ export default function DashboardPage() {
     );
   }
 
-  return <DashboardContent leagueId={leagueId} leagueName={leagueName} data={data} teamRankings={teamRankings ?? undefined} />;
+  return (
+    <DashboardContent
+      leagueId={leagueId}
+      leagueName={leagueName}
+      data={data}
+      teamRankings={teamRankings ?? undefined}
+      userId={session?.user?.id}
+      accountCreatedAt={session?.user?.created_at}
+    />
+  );
 }

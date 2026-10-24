@@ -46,6 +46,8 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import ThisWeekSection from '../components/ThisWeekSection';
+import StartHereCard from '../components/StartHereCard';
+import { useAuth } from '../context/AuthContext';
 import { thisWeekTradeIdeaHeadline } from '../lib/thisWeek';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
@@ -231,6 +233,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { session } = useAuth();
   const { leagueId, leagueName } = route.params;
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
@@ -476,6 +479,16 @@ export default function DashboardScreen({ route, navigation }: Props) {
             {newRecommendationIds.size === 1 ? 'item' : 'items'} below
           </AppText>
         </View>
+      ) : null}
+
+      {session?.user?.id ? (
+        <StartHereCard
+          userId={session.user.id}
+          accountCreatedAt={session.user.created_at}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+        />
       ) : null}
 
       {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}

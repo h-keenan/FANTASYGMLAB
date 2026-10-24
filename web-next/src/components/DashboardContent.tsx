@@ -4,6 +4,7 @@ import { ButtonLink } from "@/components/Button";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { StartHereCard } from "@/components/StartHereCard";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
@@ -44,6 +45,8 @@ export function DashboardContent({
   leagueName,
   data,
   teamRankings,
+  userId,
+  accountCreatedAt,
 }: {
   leagueId: string;
   leagueName: string;
@@ -51,6 +54,9 @@ export function DashboardContent({
   /** League Pulse's source, already in flight (the page starts it alongside
    * the Dashboard request). Omitted: the tile fetches it itself. */
   teamRankings?: Promise<LeagueTeamRankingsResponse>;
+  /** Signed-in user, for the first-run Start here card (omitted: no card). */
+  userId?: string;
+  accountCreatedAt?: string | null;
 }) {
   const snapshot = data.team_snapshot;
   const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(leagueId);
@@ -79,6 +85,8 @@ export function DashboardContent({
           alerts); the league name stays here as the page's <h1> for screen
           readers and is already in the header's league switcher. */}
       <h1 className="sr-only">{leagueName}</h1>
+
+      {userId ? <StartHereCard userId={userId} accountCreatedAt={accountCreatedAt} leagueId={leagueId} leagueName={leagueName} /> : null}
 
       <GuillotineCard data={guillotine} />
 
