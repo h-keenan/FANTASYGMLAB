@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 
@@ -41,6 +42,7 @@ export default function ConnectLeaguePage() {
       </div>
       <div className="w-full max-w-sm">
         <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(leagueHomePath(leagueId, leagueName))} />
+        <SampleLeagueLink />
       </div>
     </main>
   );

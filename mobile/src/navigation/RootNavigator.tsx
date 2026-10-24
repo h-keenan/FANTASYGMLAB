@@ -25,6 +25,7 @@ import PaywallScreen from '../screens/PaywallScreen';
 import TrialLapsedScreen from '../screens/TrialLapsedScreen';
 import NewsScreen from '../screens/NewsScreen';
 import DesignScreen from '../screens/DesignScreen';
+import SampleLeagueScreen from '../screens/SampleLeagueScreen';
 import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
 import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
@@ -73,6 +74,8 @@ export type RootStackParamList = {
   More: undefined;
   /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
   Design: undefined;
+  /** Static fictional demo league for users with no league connected yet. */
+  SampleLeague: undefined;
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string };
@@ -185,7 +188,8 @@ export default function RootNavigator() {
     // Redirect-only legacy routes are not real views; the destination is tracked.
     if (name && name !== lastTrackedRoute.current && !isLegacyRedirectRoute(name)) {
       lastTrackedRoute.current = name;
-      trackScreen(name);
+      // The fictional sample league is never tracked (no analytics pollution).
+      if (name !== 'SampleLeague') trackScreen(name);
     }
   };
 
@@ -295,6 +299,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
           <AppStack.Screen name="Design" component={DesignScreen} options={{ title: 'Design' }} />
+          <AppStack.Screen name="SampleLeague" component={SampleLeagueScreen} options={{ title: 'Sample league' }} />
           <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
           <AppStack.Screen
             name="HowWeEvaluate"
