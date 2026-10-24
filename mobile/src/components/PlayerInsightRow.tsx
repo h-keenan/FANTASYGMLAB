@@ -44,6 +44,7 @@ export default function PlayerInsightRow({
   valueLabel,
   detail,
   trailing,
+  children,
 }: {
   icon: IconName;
   color: string;
@@ -71,6 +72,8 @@ export default function PlayerInsightRow({
   detail?: string | null;
   /** Optional right-side indicator (e.g. a real trend figure), before the chevron. */
   trailing?: React.ReactNode;
+  /** Extra content under the player module (other mentioned players). */
+  children?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -106,6 +109,7 @@ export default function PlayerInsightRow({
           valueLabel={valueLabel}
           contextLine={detail}
         />
+        {children}
       </View>
       {trailing}
       {actionLabel && onActionPress ? (

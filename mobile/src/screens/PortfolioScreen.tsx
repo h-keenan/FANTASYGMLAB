@@ -32,7 +32,7 @@ import {
 import { useDelayedFlag } from '../lib/useDelayedFlag';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
-import { ESPN_NOT_SUPPORTED, glanceEspnNote } from '../lib/leaguesGlance';
+import { ESPN_NOT_SUPPORTED } from '../lib/leaguesGlance';
 import { queryKeys } from '../lib/queryKeys';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -258,7 +258,7 @@ export default function PortfolioScreen() {
   const draftingLeagues = composed.failedLeagues.filter((league) => league.reason === 'empty_roster');
   // ESPN leagues have no Portfolio summary yet (modules/espn_leagues.py) —
   // informational, not a failure.
-  const espnNote = glanceEspnNote(composed.failedLeagues);
+  const espnLeagues = composed.failedLeagues.filter((league) => league.reason === ESPN_NOT_SUPPORTED);
   const realFailedLeagues = composed.failedLeagues.filter(
     (league) => league.reason !== 'empty_roster' && league.reason !== ESPN_NOT_SUPPORTED,
   );
@@ -321,11 +321,8 @@ export default function PortfolioScreen() {
             {draftingLeagues.length > 0 ? (
               <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('LiveDraft', { leagueId: league.league_id, leagueName: league.league_name })} />
             ) : null}
-            {espnNote ? (
-              <View style={styles.failedNote}>
-                <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} style={styles.failedNoteIcon} />
-                <AppText style={styles.failedNoteText}>{espnNote}</AppText>
-              </View>
+            {espnLeagues.length > 0 ? (
+              <EspnLeaguesNote leagues={espnLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('MyTeam', { leagueId: league.league_id, leagueName: league.league_name })} />
             ) : null}
             {realFailedLeagues.length > 0 ? (
               <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} onRetry={retryLeague} />
@@ -390,6 +387,41 @@ function DraftingLeaguesNote({
             </AppText>
             <TouchableOpacity onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
               <AppText style={styles.linkTextSmall}>Watch live draft →</AppText>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** ESPN leagues have no Portfolio summary yet; same copy and per-league
+ * "Open My Team" link as web-next's EspnLeaguesNote. Informational, not a failure. */
+function EspnLeaguesNote({
+  leagues,
+  colors,
+  styles,
+  onOpen,
+}: {
+  leagues: PortfolioFailedLeague[];
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+  onOpen: (league: PortfolioFailedLeague) => void;
+}) {
+  return (
+    <View style={styles.failedNote}>
+      <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} style={styles.failedNoteIcon} />
+      <View style={styles.noteBody}>
+        <AppText style={styles.failedNoteText}>
+          Portfolio isn&apos;t available for ESPN leagues yet. Open them from My Team instead.
+        </AppText>
+        {leagues.map((league) => (
+          <View key={league.league_id} style={styles.noteLeagueRow}>
+            <AppText style={styles.failedNoteText} numberOfLines={1}>
+              {league.league_name}
+            </AppText>
+            <TouchableOpacity onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
+              <AppText style={styles.linkTextSmall}>Open My Team →</AppText>
             </TouchableOpacity>
           </View>
         ))}
