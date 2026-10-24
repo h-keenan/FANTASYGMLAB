@@ -1193,6 +1193,21 @@ export interface NewsItem {
   published_ts: number | null;
   event_type: string | null;
   speculative: boolean;
+  // GET /v1/news only sends these when the backend resolved a player
+  // (absent otherwise — never guessed client-side). matched_players is the
+  // two-player case (e.g. a trade), exactly two entries.
+  matched_player?: string | null;
+  matched_player_id?: string | null;
+  matched_player_position?: string | null;
+  matched_player_team?: string | null;
+  matched_players?: NewsMatchedPlayer[] | null;
+}
+
+export interface NewsMatchedPlayer {
+  matched_player: string | null;
+  matched_player_id: string | null;
+  matched_player_position: string | null;
+  matched_player_team: string | null;
 }
 
 export interface NewsResponse {
