@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 // TestFlight build 56 was archived from a fresh worktree with no gitignored
 // mobile/.env: Expo inlined EXPO_PUBLIC_* as `undefined`, src/lib/env.ts threw
 // at module load, and the app never got past the native splash. Every release
 // lane must run the env guard before building.
-const fastfile = readFileSync(new URL('../../fastlane/Fastfile', import.meta.url), 'utf8');
+const here = dirname(fileURLToPath(import.meta.url));
+const fastfile = readFileSync(join(here, '../../fastlane/Fastfile'), 'utf8');
 
 function laneBody(platform: 'ios' | 'android', lane: string): string {
   const start = fastfile.indexOf(`platform :${platform} do`);
@@ -28,7 +31,7 @@ test('every build lane checks release env before building', () => {
 });
 
 test('guard requires the vars env.ts throws on', () => {
-  const env = readFileSync(new URL('./env.ts', import.meta.url), 'utf8');
+  const env = readFileSync(join(here, 'env.ts'), 'utf8');
   const required = [...env.matchAll(/requireEnv\(\s*'(EXPO_PUBLIC_[A-Z_]+)'/g)].map((m) => m[1]);
   assert.ok(required.length >= 3);
   for (const name of required) {
