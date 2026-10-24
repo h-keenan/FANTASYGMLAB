@@ -89,11 +89,21 @@ export function profilePatcher(
         );
         const exists = probe.status === 200 ? await probe.json() : null;
         if (Array.isArray(exists) && exists.length === 0) {
-          const ins = await fetchFn(`${cfg.url}/rest/v1/profiles?on_conflict=user_id`, {
-            method: "POST",
-            headers: serviceHeaders(cfg, { Prefer: "resolution=merge-duplicates,return=minimal" }),
-            body: JSON.stringify({ user_id: userId, ...payload }),
-          });
+          const insert = (body: ProfilePayload) =>
+            fetchFn(`${cfg.url}/rest/v1/profiles?on_conflict=user_id`, {
+              method: "POST",
+              headers: serviceHeaders(cfg, { Prefer: "resolution=merge-duplicates,return=minimal" }),
+              body: JSON.stringify({ user_id: userId, ...body }),
+            });
+          let ins = await insert(payload);
+          if (ins.status >= 400 && "trial_ends_at" in payload) {
+            // Same older-schema fallback as the PATCH above (docs/supabase_free_trial.sql not applied).
+            const msg = (await errorMessage(ins.clone())).toLowerCase();
+            if (msg.includes("trial_ends_at")) {
+              const { trial_ends_at: _drop, ...rest } = payload;
+              ins = await insert(rest);
+            }
+          }
           if (ins.status >= 400) return { ok: false, error: "Supabase entitlement profile create failed." };
         }
       }

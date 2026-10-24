@@ -525,3 +525,23 @@ Deno.test("stripe-webhook: PATCH matching zero rows because of the ordering guar
   assertEquals(res.status, 200);
   assert(!f.calls.some((c) => c.init.method === "POST" && c.url.includes("/rest/v1/profiles")));
 });
+
+Deno.test("stripe-webhook: profile create retries without trial_ends_at on an older schema", async () => {
+  let posts = 0;
+  const f = fakeFetch({
+    "GET /rest/v1/billing_webhook_events": () => j([]),
+    "POST /rest/v1/billing_webhook_events": () => new Response(null, { status: 201 }),
+    "PATCH /rest/v1/profiles": () => j([]),
+    "GET /rest/v1/profiles": () => j([]),
+    "POST /rest/v1/profiles": (c) => {
+      posts++;
+      return "trial_ends_at" in JSON.parse(c.init.body as string)
+        ? j({ message: "column profiles.trial_ends_at does not exist" }, 400)
+        : new Response(null, { status: 201 });
+    },
+  });
+  const deps = { env: envOf(BASE_ENV), fetch: f.fn, now: () => NOW };
+  const res = await stripeWebhook(await signedRequest(subscriptionEvent("customer.subscription.created")), deps);
+  assertEquals(res.status, 200);
+  assertEquals(posts, 2);
+});
