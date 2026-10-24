@@ -23,6 +23,8 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
   { value: "injury", label: "Injury updates", description: "A status change on your own roster (Questionable, Out, etc.)" },
   { value: "team_situation", label: "Team Situation reminder", description: "A one-time nudge to set rebuilding, competing, or balanced" },
   { value: "trade_followup", label: "Trade follow-ups", description: "Asking whether a trade you shared actually happened" },
+  { value: "lineup_lock", label: "Lineup lock reminders", description: "An empty slot or an injured starter shortly before kickoff" },
+  { value: "waiver_reminder", label: "Waiver reminders", description: "Before waivers process, only when you have a clear need" },
 ];
 
 function SectionHeading({ id, children, color }: { id: string; children: React.ReactNode; color?: string }) {

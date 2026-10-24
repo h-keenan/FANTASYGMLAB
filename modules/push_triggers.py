@@ -31,7 +31,7 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
-from modules import alert_presentation, app_config, dashboard_engine, gm_targets, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
+from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -46,7 +46,7 @@ TRADE_OUTCOMES_TABLE = "trade_outcomes"
 TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
 # Every push category a user can individually toggle off — the Notification
 # Settings screen (mobile) reads/writes exactly this key set.
-TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup")
+TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder")
 # push item category -> the preference key that gates it. Only the two
 # one-off pushes differ from their category name.
 PREFERENCE_KEY_BY_CATEGORY = {
@@ -55,7 +55,25 @@ PREFERENCE_KEY_BY_CATEGORY = {
 }
 # Highest priority first. Used for ordering a batch and for deciding which
 # items survive the weekly cap.
-PUSH_PRIORITY_ORDER = ("injury", "top_priority", "watch", "trade_followup", "recap", "gm_stance_reminder")
+PUSH_PRIORITY_ORDER = (
+    "injury",
+    "lineup_lock",
+    "top_priority",
+    "watch",
+    "waiver_reminder",
+    "trade_followup",
+    "recap",
+    "gm_stance_reminder",
+)
+# Time-critical categories that may use the last weekly-cap slot.
+CAP_RESERVED_CATEGORIES = frozenset({"injury", "lineup_lock"})
+# Lineup-lock reminder fires when a flagged player's (or the next slate's)
+# kickoff is inside this window; the sweep runs every 30 minutes.
+LINEUP_LOCK_WINDOW = timedelta(hours=2)
+# Waiver reminder: the evening before the league's waiver day, from this
+# America/New_York hour on (see waiver_reminder_push_item).
+WAIVER_REMINDER_START_HOUR_ET = 12
+_ET = "America/New_York"
 DEFAULT_WEEKLY_PUSH_CAP = 4
 WEEKLY_CAP_WINDOW = timedelta(days=7)
 QUIET_HOURS_START = 22  # local hour, inclusive
@@ -78,6 +96,8 @@ PUSH_TITLE_BY_CATEGORY = {
     # firing the one-time nudge a second time after a rename.
     "gm_stance_reminder": "Set Your Team Situation",
     "trade_followup": "Did this trade happen?",
+    "lineup_lock": "Lineup Lock",
+    "waiver_reminder": "Waivers Process Soon",
 }
 DEFAULT_LENS = "Dynasty"
 
@@ -541,14 +561,14 @@ def _priority(item: Mapping[str, Any]) -> int:
 def apply_weekly_cap(items: list[dict[str, Any]], *, sent_this_week: int, cap: int) -> list[dict[str, Any]]:
     """Items allowed to push given the user's rolling-7-day count.
 
-    One slot is reserved for injury: non-injury items stop at cap-1 sent,
-    injury items at cap, so injury is the last category dropped.
+    One slot is reserved for time-critical categories (injury, lineup_lock):
+    other items stop at cap-1 sent, reserved ones at cap.
     """
 
     if sent_this_week >= cap:
         return []
     if sent_this_week >= cap - 1:
-        return [item for item in items if item.get("category") == "injury"]
+        return [item for item in items if item.get("category") in CAP_RESERVED_CATEGORIES]
     return list(items)
 
 
@@ -769,6 +789,196 @@ def injury_status_push_items(
     return items
 
 
+_EMPTY_SLOT_IDS = frozenset({"", "0", "none", "null"})
+
+
+def _parse_dt(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def lineup_lock_push_items(
+    *,
+    league_id: str,
+    league_name: str,
+    league: Mapping[str, Any],
+    my_roster: Mapping[str, Any],
+    players_df: pd.DataFrame,
+    games: pd.DataFrame | None,
+    now: datetime,
+) -> list[dict[str, Any]]:
+    """Lineup-lock reminders for one league, from real data only.
+
+    Flags (a) a starter carrying an unavailable status (Out/IR/...) whose own
+    game kicks off inside LINEUP_LOCK_WINDOW and has not started, and (b) an
+    empty slot, a starter no longer on the roster, or a starter on bye, when
+    the next NFL kickoff of the week is inside the window. Returns [] (never
+    a guess) for off-season / best-ball leagues, a missing starters list, or
+    a missing schedule.
+    """
+
+    if games is None or not league_calendar.is_in_season(league) or league_calendar.is_best_ball(league):
+        return []
+    week = league_calendar.current_league_week(league)
+    try:
+        season = int(league.get("season"))
+    except (TypeError, ValueError):
+        return []
+    starters = my_roster.get("starters")
+    if not week or not isinstance(starters, list) or not starters:
+        return []
+    roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    horizon = now + LINEUP_LOCK_WINDOW
+
+    def in_window(kickoff: datetime | None) -> bool:
+        return kickoff is not None and now < kickoff <= horizon
+
+    players_by_id: dict[str, Any] = {}
+    if players_df is not None and not players_df.empty and "player_id" in players_df.columns:
+        wanted = {str(pid) for pid in starters if pid is not None}
+        for _, row in players_df[players_df["player_id"].astype(str).isin(wanted)].iterrows():
+            players_by_id[str(row.get("player_id"))] = row
+
+    items: list[dict[str, Any]] = []
+    bad_slots = 0
+    for raw in starters:
+        pid = _safe_text(raw)
+        if pid.casefold() in _EMPTY_SLOT_IDS or (roster_ids and pid not in roster_ids):
+            bad_slots += 1
+            continue
+        row = players_by_id.get(pid)
+        if row is None:
+            continue
+        team = _safe_text(row.get("team"))
+        if not team:
+            continue
+        game = nfl_schedule.team_matchup_for_week(team, week, season, games=games)
+        if game is None:
+            if nfl_schedule.team_bye_week(team, season, games=games) == week:
+                bad_slots += 1  # a bye-week starter scores zero
+            continue
+        status_raw = _safe_text(row.get("injury_status"))
+        status_norm = status_raw.casefold()
+        if status_norm in alert_presentation.UNAVAILABLE_INJURY_STATUSES and in_window(
+            _parse_dt(game.get("kickoff_at"))
+        ):
+            name = _safe_text(row.get("name"), "A starter")
+            items.append(
+                {
+                    "league_id": league_id,
+                    "league_name": league_name,
+                    "category": "lineup_lock",
+                    "headline": f"{name} is {status_raw} and still in your lineup. Kickoff is soon.",
+                    "recommendation_id": f"lineup_lock:{league_id}:{week}:out:{pid}:{status_norm}",
+                }
+            )
+    if bad_slots:
+        upcoming = [k for k in nfl_schedule.week_kickoffs(season, week, games=games) if k > now]
+        next_kickoff = upcoming[0] if upcoming else None
+        if in_window(next_kickoff):
+            day = next_kickoff.astimezone(_resolve_tzinfo(_ET)).date().isoformat()
+            plural = "s" if bad_slots > 1 else ""
+            items.append(
+                {
+                    "league_id": league_id,
+                    "league_name": league_name,
+                    "category": "lineup_lock",
+                    "headline": f"You have {bad_slots} empty or invalid starter slot{plural}. Kickoff is soon.",
+                    "recommendation_id": f"lineup_lock:{league_id}:{week}:slots:{day}",
+                }
+            )
+    return items
+
+
+def waiver_reminder_push_item(
+    *,
+    league_id: str,
+    league_name: str,
+    league: Mapping[str, Any],
+    my_roster: Mapping[str, Any],
+    rosters: list[Mapping[str, Any]],
+    players_df: pd.DataFrame,
+    score_field: str,
+    now: datetime,
+) -> dict[str, Any] | None:
+    """A waiver reminder only when both signals are real; otherwise None.
+
+    1. Timing: the league has a known waiver system, is in season, is not
+       daily-waiver, and tomorrow (America/New_York) is its
+       settings.waiver_day_of_week (Sleeper numbers days Monday=0, matching
+       its Wednesday default of 2). Sleeper does not expose the processing
+       time of day, so the reminder goes out from midday the day BEFORE,
+       never claiming an exact deadline. FAAB leagues with no budget left
+       are skipped.
+    2. Need: the same need-fit check the Dashboard waiver tile uses
+       (select_top_waiver_opportunity flags priority_need_fit /
+       injury_replacement_fit), recomputed only on the one eligible day.
+    """
+
+    if not league_calendar.is_in_season(league):
+        return None
+    settings = league.get("settings") if isinstance(league.get("settings"), Mapping) else {}
+    mode = faab.sleeper_waiver_mode(league)
+    if mode == faab.WAIVER_MODE_UNKNOWN or settings.get("daily_waivers"):
+        return None
+    try:
+        waiver_day = int(settings.get("waiver_day_of_week"))
+    except (TypeError, ValueError):
+        return None
+    if not 0 <= waiver_day <= 6:
+        return None
+    local = now.astimezone(_resolve_tzinfo(_ET))
+    if local.weekday() != (waiver_day - 1) % 7 or local.hour < WAIVER_REMINDER_START_HOUR_ET:
+        return None
+    if mode == faab.WAIVER_MODE_FAAB:
+        try:
+            total = int(settings.get("waiver_budget"))
+            used = int((my_roster.get("settings") or {}).get("waiver_budget_used"))
+        except (TypeError, ValueError):
+            return None
+        if total - used <= 0:
+            return None
+    roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    if not roster_ids or players_df is None or players_df.empty:
+        return None
+    all_rostered: set[str] = set()
+    for roster in rosters or ():
+        all_rostered.update(str(pid) for pid in (roster.get("players") or []))
+    league_settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    roster_df = players_df[players_df["player_id"].astype(str).isin(roster_ids)].copy()
+    lineup_df = dashboard_engine.suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
+    assessment = dashboard_engine.build_team_needs_assessment(
+        roster_df, None, league_settings, lineup_df=lineup_df, score_field=score_field
+    )
+    needed = dashboard_engine.get_needed_positions(
+        roster_df, None, league_settings, assessment=assessment, lineup_df=lineup_df
+    )
+    if not needed:
+        return None
+    free_agents = players_df[~players_df["player_id"].astype(str).isin(all_rostered)]
+    top = dashboard_engine.select_top_waiver_opportunity(
+        free_agents, roster_df, league_settings, score_field, needed_positions=needed
+    )
+    if top is None or getattr(top, "empty", True):
+        return None
+    if not (bool(top.get("priority_need_fit")) or bool(top.get("injury_replacement_fit"))):
+        return None
+    position = _safe_text(top.get("position"))
+    where = f" at {position}" if position else ""
+    return {
+        "league_id": league_id,
+        "league_name": league_name,
+        "category": "waiver_reminder",
+        "headline": f"Waivers process soon and you have a clear need{where}. Check the best available add.",
+        "recommendation_id": f"waiver_reminder:{league_id}:{(local.date() + timedelta(days=1)).isoformat()}",
+    }
+
+
 def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
     """One sweep: check every registered account's leagues, push what's new.
 
@@ -808,6 +1018,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
     gm_stance_leagues = fetch_gm_stance_leagues(config, list(recipients.keys()))
     gm_untouchable_ids = fetch_gm_targets_untouchable_ids(config, list(recipients.keys()))
     players_cache: dict[str, tuple[pd.DataFrame, str]] = {}
+    games_holder: dict[str, pd.DataFrame | None] = {}
 
     for user_id, tokens in recipients.items():
         stats["accounts_checked"] += 1
@@ -879,6 +1090,47 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     )
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: injury status check failed ({exc})")
+
+            try:
+                rosters_for_reminders = sleeper.get_rosters(league_id)
+                reminder_roster = resolve_roster_for_sleeper_user(rosters_for_reminders, sleeper_user_id)
+                if reminder_roster is not None and league_payload:
+                    reminder_league_name = _safe_text(league_payload.get("name"), "Your league")
+                    now = _utcnow()
+                    if league_calendar.is_in_season(league_payload) and push_item_allowed(
+                        preferences, user_id=user_id, category="lineup_lock"
+                    ):
+                        if "games" not in games_holder:
+                            try:
+                                games_holder["games"] = nfl_schedule.load_games()
+                            except Exception:
+                                games_holder["games"] = None
+                        push_items.extend(
+                            lineup_lock_push_items(
+                                league_id=league_id,
+                                league_name=reminder_league_name,
+                                league=league_payload,
+                                my_roster=reminder_roster,
+                                players_df=players_df,
+                                games=games_holder["games"],
+                                now=now,
+                            )
+                        )
+                    if push_item_allowed(preferences, user_id=user_id, category="waiver_reminder"):
+                        waiver_item = waiver_reminder_push_item(
+                            league_id=league_id,
+                            league_name=reminder_league_name,
+                            league=league_payload,
+                            my_roster=reminder_roster,
+                            rosters=rosters_for_reminders,
+                            players_df=players_df,
+                            score_field=score_field,
+                            now=now,
+                        )
+                        if waiver_item:
+                            push_items.append(waiver_item)
+            except Exception as exc:
+                stats["errors"].append(f"{user_id}/{league_id}: lineup/waiver reminder check failed ({exc})")
 
             try:
                 stance_item = gm_stance_reminder_push_item(

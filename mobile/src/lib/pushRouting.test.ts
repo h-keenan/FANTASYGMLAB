@@ -43,6 +43,21 @@ test('league-level pushes route to the Dashboard landing', () => {
   });
 });
 
+test('lineup lock push routes to Matchup', () => {
+  assert.deepEqual(
+    resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'lineup_lock', player_id: 'p1' }),
+    { screen: 'Matchup', leagueId: 'L1', leagueName: 'X' },
+  );
+});
+
+test('waiver reminder push routes to Waivers', () => {
+  assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'waiver_reminder' }), {
+    screen: 'Waivers',
+    leagueId: 'L1',
+    leagueName: 'X',
+  });
+});
+
 test('payloads with no usable target return null', () => {
   assert.equal(resolvePushTapTarget(null), null);
   assert.equal(resolvePushTapTarget('nope'), null);

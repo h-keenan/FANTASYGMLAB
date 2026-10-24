@@ -183,6 +183,28 @@ def _kickoff_at_utc(game: pd.Series) -> str | None:
         return None
 
 
+def week_kickoffs(season: int, week: int, *, games: pd.DataFrame | None = None) -> list[datetime]:
+    """Every real regular-season kickoff instant (UTC) in one NFL week,
+    sorted. Games with no computable kickoff are left out, never guessed."""
+
+    df = games if games is not None else load_games()
+    if df is None or df.empty or "season" not in df.columns or "week" not in df.columns:
+        return []
+    rows = df[(df["season"] == season) & (df["week"] == week)]
+    if "game_type" in rows.columns:
+        rows = rows[rows["game_type"] == "REG"]
+    out: list[datetime] = []
+    for _, game in rows.iterrows():
+        iso = _kickoff_at_utc(game)
+        if not iso:
+            continue
+        try:
+            out.append(datetime.fromisoformat(iso))
+        except ValueError:
+            continue
+    return sorted(out)
+
+
 def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
     opponent = game["away_team"] if team_is_home else game["home_team"]
     team_score = game["home_score"] if team_is_home else game["away_score"]

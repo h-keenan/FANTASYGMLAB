@@ -21,6 +21,8 @@ export interface PushNotificationData {
 export type PushTapTarget =
   | { screen: 'PlayerDetail'; leagueId: string; leagueName: string; playerId: string; playerName: string }
   | { screen: 'Dashboard'; leagueId: string; leagueName: string }
+  | { screen: 'Matchup'; leagueId: string; leagueName: string }
+  | { screen: 'Waivers'; leagueId: string; leagueName: string }
   | { screen: 'TradeHistory' }
   | null;
 
@@ -41,6 +43,13 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
   }
 
   if (!leagueId) return null;
+
+  // Lineup-lock reminders open Matchup (starters + kickoff state); waiver
+  // reminders open Waivers. Checked before the player branch so neither is
+  // hijacked by a player_id in the payload.
+  const category = str(payload.category);
+  if (category === 'lineup_lock') return { screen: 'Matchup', leagueId, leagueName };
+  if (category === 'waiver_reminder') return { screen: 'Waivers', leagueId, leagueName };
 
   const playerId = str(payload.player_id);
   if (playerId) {

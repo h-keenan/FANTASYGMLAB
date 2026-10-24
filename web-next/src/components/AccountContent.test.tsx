@@ -23,6 +23,8 @@ const ALL_CATEGORIES_ON: Record<PushCategory, boolean> = {
   injury: true,
   team_situation: true,
   trade_followup: true,
+  lineup_lock: true,
+  waiver_reminder: true,
 };
 
 function renderContent(overrides: Partial<Parameters<typeof AccountContent>[0]> = {}) {
