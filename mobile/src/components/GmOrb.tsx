@@ -89,7 +89,9 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       subtitle: 'Standings, settings, and league context',
     },
     {
-      label: 'Next Move',
+      // Named "Dashboard" everywhere else (web nav, this screen's own header,
+      // landing copy retired "Next Move"); org audit 2026-10.
+      label: 'Dashboard',
       route: 'Dashboard',
       icon: 'flash-outline',
       needsLeague: true,
@@ -219,6 +221,16 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.premium,
       subtitle: 'Picks, order, and draft tools',
     },
+    // Was only reachable via More -> Your Team; web-next lists it in GM Tools
+    // next to Draft Center (org audit 2026-10, parity).
+    {
+      label: 'Live Draft',
+      route: 'LiveDraft',
+      icon: 'timer-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Real-time draft room',
+    },
     // Trails GM Tools, not the League group — both the brief's own written
     // §4 IA list and all three concept screenshots (Recap sits immediately
     // after Draft Center, right before "SWITCH LEAGUE") show it here. An
@@ -226,7 +238,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
     // re-checking the concept images directly (not from memory) during the
     // V2 restructure pass showed that was a mistake, so it's restored here.
     {
-      label: 'Recap',
+      label: 'League Recaps',
       route: 'Recap',
       icon: 'newspaper-outline',
       needsLeague: true,

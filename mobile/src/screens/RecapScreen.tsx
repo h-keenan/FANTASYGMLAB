@@ -158,7 +158,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const error =
     recapQuery.isError && !recapData ? toUserErrorMessage(recapQuery.error, 'Failed to load recap.') : null;
 
-  useScreenHeaderTitle(navigation, 'Recap', leagueName);
+  useScreenHeaderTitle(navigation, 'League Recaps', leagueName);
 
   useEffect(() => {
     navigation.setOptions({
