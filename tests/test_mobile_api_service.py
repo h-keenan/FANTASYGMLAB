@@ -2326,7 +2326,7 @@ def test_draft_center_and_draft_picks_share_one_cached_league_summary(monkeypatc
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     fake_rosters, fake_users = _draft_center_rosters_and_users()
 
@@ -6729,6 +6729,10 @@ def test_get_scouting_prospects_returns_empty_not_fabricated_when_table_unreacha
     subjects."""
 
     client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields",
+        lambda *a, **k: {"entitlement": "premium", "sleeper_username": "gm_dynasty", "status": "ok"},
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -6747,6 +6751,10 @@ def test_get_scouting_prospects_returns_empty_not_fabricated_when_table_unreacha
 
 def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields",
+        lambda *a, **k: {"entitlement": "premium", "sleeper_username": "gm_dynasty", "status": "ok"},
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -6795,6 +6803,10 @@ def test_submit_scouting_report_rejects_invalid_grade(monkeypatch):
 
 def test_submit_scouting_report_upserts_my_grade(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields",
+        lambda *a, **k: {"entitlement": "premium", "sleeper_username": "gm_dynasty", "status": "ok"},
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -6821,6 +6833,10 @@ def test_submit_scouting_report_upserts_my_grade(monkeypatch):
 
 def test_add_and_remove_prospect_watchlist(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields",
+        lambda *a, **k: {"entitlement": "premium", "sleeper_username": "gm_dynasty", "status": "ok"},
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -10930,6 +10946,10 @@ def test_playoff_odds_requires_auth(monkeypatch):
 
 def test_playoff_odds_returns_real_standings_based_simulation(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields",
+        lambda *a, **k: {"entitlement": "premium", "sleeper_username": "gm_dynasty", "status": "ok"},
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -11032,7 +11052,7 @@ def test_draft_center_returns_league_wide_cards_and_resolved_posture(monkeypatch
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     fake_rosters, fake_users = _draft_center_rosters_and_users()
 
@@ -11088,7 +11108,7 @@ def test_draft_center_posture_is_null_without_a_resolved_roster(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": ""}]
 
     fake_rosters, fake_users = _draft_center_rosters_and_users()
 

@@ -394,6 +394,9 @@ export interface PlayoffOddsResponse {
   slope_fitted?: boolean;
   games_used_for_fit?: number;
   season?: string;
+  /** Pro-only feature: false (with `upsell`) when the server withheld the data. */
+  is_premium?: boolean;
+  upsell?: { title: string; body: string } | null;
 }
 
 // Games (Season Simulator + Pick'em) — GET/POST .../games/*, see
@@ -547,6 +550,9 @@ export interface DraftCenterResponse {
   posture_reason: string;
   decision_cards: DraftCard[];
   partner_cards: DraftCard[];
+  /** Pro-only feature: false (with `upsell`) when the server withheld the data. */
+  is_premium?: boolean;
+  upsell?: { title: string; body: string } | null;
 }
 
 export interface LineupPlayer {
@@ -1992,6 +1998,9 @@ export interface CollegeProspectsResponse {
   // yet" empty state covers it.
   catalog_available: boolean;
   reason: string;
+  /** Pro-only feature: false (with `upsell`) when the server withheld the data. */
+  is_premium?: boolean;
+  upsell?: { title: string; body: string } | null;
 }
 
 export interface ScoutingMutationResponse {

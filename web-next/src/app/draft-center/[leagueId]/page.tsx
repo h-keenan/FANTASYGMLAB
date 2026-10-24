@@ -9,6 +9,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type DraftCenterResponse, type DraftPickAsset } from "@/lib/api";
 import { DraftCenterContent } from "@/components/DraftCenterContent";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -87,6 +88,19 @@ export default function DraftCenterPage() {
   if (error || !draftCenter) {
     return (
       <ErrorState message={error || "Could not load Draft Center."} onRetry={reloadPage} />
+    );
+  }
+
+  // Pro-only: the server returns a locked payload (no cards, no posture) for
+  // Free callers; show the standard locked card instead of empty sections.
+  if (draftCenter.is_premium === false) {
+    return (
+      <PremiumUpsellCard
+        kicker="Draft Center"
+        upsell={draftCenter.upsell ?? null}
+        fallbackTitle="Know where you stand on draft capital"
+        fallbackBody="Draft Center is a Pro feature: your draft posture, league-wide pick decision signals and the best trade partners for your picks. Start your free trial to unlock it."
+      />
     );
   }
 

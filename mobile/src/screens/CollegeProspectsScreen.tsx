@@ -20,6 +20,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
+import PremiumLock from '../components/PremiumLock';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -141,6 +142,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [prospects, setProspects] = useState<CollegeProspect[]>([]);
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { viewMode, setViewMode } = usePlayerListViewMode('college-prospects');
@@ -151,6 +153,12 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
     setError(null);
     try {
       const result = await api.getCollegeProspects();
+      if (result.is_premium === false) {
+        setLocked(result.upsell ?? { title: '', body: '' });
+        setProspects([]);
+        return;
+      }
+      setLocked(null);
       setProspects(result.prospects);
     } catch (err) {
       setError(toUserErrorMessage(err, 'Failed to load prospects.'));
@@ -200,6 +208,25 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
 
   if (loading) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+  }
+
+  if (locked) {
+    return (
+      <View style={[styles.container, { paddingTop: headerHeight }]}>
+        <GridBackground />
+        <BrandHeaderBar />
+        <View style={{ paddingHorizontal: spacing.lg }}>
+          <PremiumLock
+            feature="college_scouting"
+            title={locked.title || 'Scout the next rookie class'}
+            description={
+              locked.body ||
+              'College Scouting is a Pro feature: the shared prospect board, community grades, your own scouting reports and watchlist. Start your free trial to unlock it.'
+            }
+          />
+        </View>
+      </View>
+    );
   }
 
   return (

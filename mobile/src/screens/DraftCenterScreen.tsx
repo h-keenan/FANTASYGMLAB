@@ -25,6 +25,7 @@ import { formatRank } from '../lib/percentile';
 import { contrastTextColor } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
+import PremiumLock from '../components/PremiumLock';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -61,6 +62,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const [decisionCards, setDecisionCards] = useState<DraftCard[]>([]);
   const [partnerCards, setPartnerCards] = useState<DraftCard[]>([]);
   const [reason, setReason] = useState('');
+  const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [picks, setPicks] = useState<DraftPickAsset[]>([]);
@@ -98,6 +100,10 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             api.getMyRoster(leagueId).catch(() => null),
           ]);
           if (cancelled) return;
+          if (result.is_premium === false) {
+            setLocked(result.upsell ?? { title: '', body: '' });
+            return;
+          }
           setPosture(result.posture);
           setPostureReason(result.posture_reason);
           setDecisionCards(result.decision_cards);
@@ -153,6 +159,25 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
         <ErrorState title="Couldn't load the draft center" message={error} />
+      </View>
+    );
+  }
+
+  if (locked) {
+    return (
+      <View style={styles.root}>
+        <GridBackground />
+        <View style={{ paddingTop: headerHeight, paddingHorizontal: spacing.lg }}>
+          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+          <PremiumLock
+            feature="draft_center"
+            title={locked.title || 'Know where you stand on draft capital'}
+            description={
+              locked.body ||
+              'Draft Center is a Pro feature: your draft posture, league-wide pick decision signals and the best trade partners for your picks. Start your free trial to unlock it.'
+            }
+          />
+        </View>
       </View>
     );
   }

@@ -2628,9 +2628,12 @@ def get_league_team_rankings(
 def get_league_playoff_odds(
     league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Rest-of-season Monte Carlo playoff-odds simulation for every team.
+
+    Pro-only (2026-10-23): a Free caller gets reason "premium_required" plus
+    an upsell and no teams; the simulation never runs for them.
 
     Real inputs only — see modules.playoff_simulator's module docstring for
     the full methodology: real remaining matchup schedule (Sleeper), real
@@ -2661,10 +2664,19 @@ def get_league_playoff_odds(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
+    if not _is_pro_caller(user):
+        return {
+            "ok": True,
+            "reason": "premium_required",
+            "teams": [],
+            "is_premium": False,
+            "upsell": _PLAYOFF_ODDS_UPSELL,
+        }
+
     result = playoff_simulator.build_league_playoff_odds_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    return result
+    return {**result, "is_premium": True, "upsell": None}
 
 
 # ---------------------------------------------------------------------------
@@ -3089,6 +3101,23 @@ def get_league_draft_center(
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
 
+    # Pro-only (2026-10-23), checked before any valuation work. The profile
+    # is fetched once and reused for roster resolution below.
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {
+            "ok": True,
+            "reason": "premium_required",
+            "posture": None,
+            "posture_reason": "",
+            "decision_cards": [],
+            "partner_cards": [],
+            "is_premium": False,
+            "upsell": _DRAFT_CENTER_UPSELL,
+        }
+
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
@@ -3143,9 +3172,6 @@ def get_league_draft_center(
     decision_cards = draft_center_cards.build_draft_decision_cards(draft_workspace)
     partner_cards = draft_center_cards.build_draft_partner_cards(draft_workspace)
 
-    config = auth_supabase.get_supabase_config()
-    user_id = str(user.get("id") or "")
-    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
     my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
 
     posture: dict[str, Any] | None = None
@@ -3185,6 +3211,8 @@ def get_league_draft_center(
         "posture_reason": posture_reason,
         "decision_cards": decision_cards,
         "partner_cards": partner_cards,
+        "is_premium": True,
+        "upsell": None,
     }
 
 
@@ -5404,6 +5432,40 @@ def _manager_tendencies_gate(user: dict[str, Any]) -> bool:
     config = auth_supabase.get_supabase_config()
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
     return premium.is_at_least(profile.get("entitlement"), premium.PRO)
+
+
+_PLAYOFF_ODDS_UPSELL = {
+    "title": "Your real shot at the playoffs",
+    "body": (
+        "Playoff Odds is a Pro feature: a rest-of-season simulation of your "
+        "league's real schedule, every team's playoff chance and projected "
+        "seed. Start your free trial to unlock it."
+    ),
+}
+_DRAFT_CENTER_UPSELL = {
+    "title": "Know where you stand on draft capital",
+    "body": (
+        "Draft Center is a Pro feature: your draft posture, league-wide "
+        "pick decision signals and the best trade partners for your picks. "
+        "Start your free trial to unlock it."
+    ),
+}
+_COLLEGE_SCOUTING_UPSELL = {
+    "title": "Scout the next rookie class",
+    "body": (
+        "College Scouting is a Pro feature: the shared prospect board, "
+        "community grades, your own scouting reports and watchlist. "
+        "Start your free trial to unlock it."
+    ),
+}
+
+
+def _is_pro_caller(user: dict[str, Any]) -> bool:
+    """Server-side Pro check for Playoff Odds / Draft Center / College
+    Scouting (owner decision 2026-10-23). Trialing accounts are stored as
+    Pro, so they pass. Checked before any computation or catalog read."""
+
+    return _manager_tendencies_gate(user)
 
 
 @app.get("/v1/leagues/{league_id}/managers/tendencies")
@@ -8593,6 +8655,16 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
     that honestly rather than inventing players.
     """
 
+    if not _is_pro_caller(user):
+        return {
+            "ok": True,
+            "prospects": [],
+            "catalog_available": True,
+            "reason": "premium_required",
+            "is_premium": False,
+            "upsell": _COLLEGE_SCOUTING_UPSELL,
+        }
+
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
@@ -8614,6 +8686,8 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
         "prospects": rows,
         "catalog_available": not bool(prospects_error),
         "reason": "scouting_reports_not_available" if reports_error else "",
+        "is_premium": True,
+        "upsell": None,
     }
 
 
@@ -8653,6 +8727,9 @@ def submit_scouting_report(
                 f"{college_scouting.MIN_ROUND_PROJECTION}-{college_scouting.MAX_ROUND_PROJECTION} or omitted."
             ),
         )
+
+    if not _is_pro_caller(user):
+        return {"ok": False, "reason": "premium_required", "is_premium": False, "upsell": _COLLEGE_SCOUTING_UPSELL}
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
@@ -8711,6 +8788,9 @@ def add_prospect_to_watchlist(
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Follow a prospect on the caller's personal watchlist. Idempotent."""
+
+    if not _is_pro_caller(user):
+        return {"ok": False, "reason": "premium_required", "is_premium": False, "upsell": _COLLEGE_SCOUTING_UPSELL}
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")

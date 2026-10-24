@@ -25,7 +25,10 @@ Tiers: Free, Pro (`premium.PRO`, stored as raw `premium`), Front Office. Pro and
 | Saved leagues | `POST /leagues/save` | 1 league (`MAX_LEAGUES_FREE`) | `saved_leagues.is_at_cap` |
 | Trade Analyzer | `POST .../trade-analyzer` | 3 evaluations/week | web only before; now server-side (fixed) |
 | Player exposure | not present in the API yet | n/a | n/a |
-| Playoff Odds, Team Rankings, Draft Center, My Team Needs, Team Situation, College Scouting | various | full data (ungated) | none, see Recommended |
+| Playoff Odds | `GET .../playoff-odds` | nothing (locked payload: `reason: premium_required`, `is_premium: false`, `upsell`, no teams) | `_is_pro_caller` before the simulation (fixed 2026-10-23) |
+| Draft Center | `GET .../draft-center` | nothing (locked payload, no posture/cards) | profile entitlement check before any valuation work (fixed 2026-10-23) |
+| College Scouting | `GET /scouting/prospects`, `POST /scouting/prospects/{id}/report`, `POST /scouting/watchlist/{id}` | nothing (locked payload; writes return `ok:false, premium_required`). Deleting your own report/follow stays open so a lapsed account can clean up | `_is_pro_caller` (fixed 2026-10-23) |
+| Team Rankings, My Team Needs, Team Situation | various | full data | intentionally Free (owner 2026-10-23) |
 
 ## Leaks found and fixed (all server-side)
 
@@ -39,6 +42,14 @@ Tiers: Free, Pro (`premium.PRO`, stored as raw `premium`), Front Office. Pro and
 8. **Weekly Trade Analyzer limit** (3/week) existed only in the Streamlit app. Now enforced on `POST .../trade-analyzer` (reason `weekly_limit_reached`, HTTP 200, same shape as other not-ready states).
 
 Checked and not leaking: ESPN import and `/leagues/save` use the same `is_at_cap`; the rollover migration (`migrate_saved_league`) moves one row (upsert then delete), it never adds a league; cache keys: trade-idea records are cached unfiltered and gated after the cache, profile and saved-league caches are keyed by user id, and the web share-card cache is keyed by the caller's bearer token.
+
+## Pro gating of Playoff Odds, Draft Center, College Scouting (2026-10-23)
+
+Owner decision: these three are Pro; Team Rankings, My Team Needs and Team Situation stay Free. Enforced server-side (tiers: Pro, Front Office and trialing accounts, which are stored as Pro, pass; Free gets the locked payload and the work never runs). Web uses `PremiumUpsellCard`, mobile `PremiumLock`, both from `upsell`/`is_premium` on the response. No preview is shown: no free-field summary of these numbers exists that is not itself the gated data, so the card lists benefits only. The CTA is the existing Upgrade link that opens the paywall, which carries the "Start N-day free trial" button when the account is eligible.
+
+Other places checked: Dashboard and share cards do not carry playoff odds, draft-center cards or scouting data; GM Plan embeds the user's playoff odds but is already Pro-only; `/v1/external/*` and `/v1/content/feed` serve none of the three, so external bot endpoints are unchanged. Left open on purpose: `GET .../draft-picks` (pick values) is shared with the Trade Analyzer so stays Free; the crowd scouting class-strength signal only feeds pick valuations as an aggregate, no raw grades or prospect data.
+
+Degradation for shipped builds: older clients ignore `is_premium` and render the empty lists/`reason` (Playoff Odds shows the generic "not available" message), so Free users see an empty state rather than data until they update.
 
 ## Free league cap closed on every league-scoped endpoint (follow-up)
 
@@ -69,7 +80,6 @@ Response shapes are unchanged. Free responses carry fewer or zero ideas, `ad_unl
 ## Recommended, not changed (product intent unclear)
 
 - **Ad unlock verification.** Without rewarded-ad server-side verification (AdMob SSV) a determined client can still earn 3 unlocks per day by claiming them. Real fix: a signed ad-callback endpoint.
-- **College Scouting** is Pro on web but ungated on the API (`/scouting/*`). Playoff Odds, Team Rankings detail, Draft Center, My Team strategy/needs are ungated; decide which are meant to be Pro.
 - **Database-level cap.** `saved_leagues` and `user_settings` are writable by the user's own token under RLS, so a direct Supabase client can bypass the app-level 1-league cap. Add a Postgres trigger enforcing the cap by entitlement.
 - Pool/ad counters degrade to a per-process memory ledger if Redis is down (cap still holds per worker).
 
