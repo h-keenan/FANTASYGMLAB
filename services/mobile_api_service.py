@@ -1421,6 +1421,12 @@ def get_my_referral_code(user: dict[str, Any] = Depends(require_user)) -> dict[s
     }
 
 
+# DEPRECATED (billing Phase 2, 2026-10-24): web-next now calls the Supabase
+# Edge Functions billing-plans / create-checkout-session / billing-portal-session
+# (docs/billing-on-supabase.md). These three routes are kept ONLY as the
+# rollback path (web-next: NEXT_PUBLIC_BILLING_BACKEND=fastapi). Do not add
+# features here; do not delete until the box no longer needs a Stripe key.
+#
 # All three billing endpoints below are thin wrappers around
 # modules.stripe_billing's already-correct, already-unit-tested functions —
 # the same ones modules/premium_benefits.py (Streamlit) has used all along.
@@ -1478,7 +1484,7 @@ def _fetch_trial_profile(user: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     return {}, False
 
 
-@app.get("/v1/billing/plans")
+@app.get("/v1/billing/plans", deprecated=True)
 def get_billing_plans(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Live Stripe pricing for the Premium page — never hardcoded here.
 
@@ -1568,7 +1574,7 @@ def _verified_checkout_email(user: dict[str, Any]) -> str:
     return email
 
 
-@app.post("/v1/billing/checkout")
+@app.post("/v1/billing/checkout", deprecated=True)
 def create_billing_checkout(
     body: CheckoutRequest,
     user: dict[str, Any] = Depends(require_user),
@@ -1635,7 +1641,7 @@ def create_billing_checkout(
     return {"ok": True, "checkout_url": checkout_url}
 
 
-@app.post("/v1/billing/portal")
+@app.post("/v1/billing/portal", deprecated=True)
 def create_billing_portal(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """Open the Stripe customer portal for an existing subscriber to manage
     or cancel. Needs `profiles.stripe_customer_id` — the same column

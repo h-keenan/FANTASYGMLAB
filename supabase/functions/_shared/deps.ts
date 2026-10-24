@@ -19,7 +19,7 @@ export function corsHeaders(env: Env, origin: string | null): Record<string, str
   }
   const headers: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     Vary: "Origin",
   };
   if (origin && allowed.has(origin)) headers["Access-Control-Allow-Origin"] = origin;

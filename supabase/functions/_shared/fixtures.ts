@@ -14,6 +14,7 @@ export function stripeConfig(over: Partial<StripeConfig> = {}): StripeConfig {
   return {
     billingMode: "test",
     secretKey: "sk_test_fixture",
+    publishableKey: "pk_test_fixture",
     webhookSecret: WEBHOOK_SECRET,
     priceMonthly: PRICE_PRO_MONTHLY,
     priceAnnual: PRICE_PRO_ANNUAL,
@@ -105,6 +106,7 @@ export const BASE_ENV = {
   SUPABASE_ANON_KEY: "anon-fixture",
   STRIPE_BILLING_MODE: "test",
   STRIPE_SECRET_KEY: "sk_test_fixture",
+  STRIPE_PUBLISHABLE_KEY: "pk_test_fixture",
   STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
   STRIPE_PRICE_PRO_MONTHLY: PRICE_PRO_MONTHLY,
   STRIPE_PRICE_PRO_ANNUAL: PRICE_PRO_ANNUAL,

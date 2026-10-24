@@ -29,6 +29,8 @@ export function parseTrialDays(raw: unknown): number {
 export interface StripeConfig {
   billingMode: string;
   secretKey: string;
+  /** Intentionally public; served to the browser by billing-plans. */
+  publishableKey: string;
   webhookSecret: string;
   priceMonthly: string;
   priceAnnual: string;
@@ -43,6 +45,7 @@ export function loadStripeConfig(env: Env): StripeConfig {
   return {
     billingMode: v("STRIPE_BILLING_MODE").toLowerCase() || "test",
     secretKey: v("STRIPE_SECRET_KEY"),
+    publishableKey: v("STRIPE_PUBLISHABLE_KEY"),
     webhookSecret: v("STRIPE_WEBHOOK_SECRET"),
     // PRO_* canonical, legacy MONTHLY/ANNUAL fallback (same as Python).
     priceMonthly: v("STRIPE_PRICE_PRO_MONTHLY") || v("STRIPE_PRICE_MONTHLY"),
