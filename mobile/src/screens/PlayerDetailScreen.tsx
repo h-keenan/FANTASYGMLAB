@@ -36,7 +36,7 @@ import SubRatingRow from '../components/SubRatingRow';
 import ValuesCredit from '../components/ValuesCredit';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import { injuryTone } from '../lib/injuryDisplay';
-import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
+import { percentileColor, overallRatingColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import { playerSubRatings } from '../lib/subRatings';
 import {
   api,
@@ -1659,7 +1659,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       byeWeek={quickViewQuery.data?.identity?.bye_week ?? null}
       onByeThisWeek={quickViewQuery.data?.identity?.on_bye_this_week ?? false}
       overallRating={overallRating}
-      ringColor={overallRating !== null ? percentileColor(overallRating, colors) : colors.accent}
+      ringColor={overallRating !== null ? overallRatingColor(overallRating, colors) : colors.accent}
       usageTrend={model?.usage_trend ?? null}
       usageLoading={loading}
       expanded={snapshotExpanded}

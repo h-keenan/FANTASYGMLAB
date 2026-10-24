@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
-import CircularProgressRing from './CircularProgressRing';
+import OvrGauge from './OvrGauge';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import ToneBadge from './ToneBadge';
@@ -89,14 +89,7 @@ export default function PlayerHero({
   const scoreTileBody = (
     <>
       {overallRating !== null ? (
-        <CircularProgressRing
-          percent={overallRating}
-          size={52}
-          strokeWidth={5}
-          valueLabel={String(overallRating)}
-          valueFontScale={0.36}
-          color={ringColor}
-        />
+        <OvrGauge rating={overallRating} size="md" color={ringColor} />
       ) : (
         <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
       )}

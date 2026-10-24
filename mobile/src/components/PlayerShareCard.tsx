@@ -11,7 +11,7 @@ import TierBadge from './TierBadge';
 import type { SubRating } from '../lib/subRatings';
 import { colors, radii, spacing } from '../theme';
 import { resolvePlayerTier } from '../lib/playerTier';
-import { percentileColor } from '../lib/percentile';
+import { overallRatingColor } from '../lib/percentile';
 import CircularProgressRing from './CircularProgressRing';
 
 // Same safety net as TradeShareCard's AVATAR_READY_TIMEOUT_MS — not the
@@ -53,7 +53,7 @@ const PlayerShareCard = forwardRef<View, {
   onReadyChange?: (ready: boolean) => void;
 }>(({ playerId, tier, name, position, team, overallRating, subRatings, value, usageTrend, onReadyChange }, ref) => {
   const tierIdentity = resolvePlayerTier(tier, true);
-  const ringColor = overallRating !== null ? percentileColor(overallRating, colors) : colors.accent;
+  const ringColor = overallRating !== null ? overallRatingColor(overallRating, colors) : colors.accent;
 
   const [avatarSettled, setAvatarSettled] = useState(false);
   useEffect(() => {

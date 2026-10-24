@@ -7,7 +7,7 @@ import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import ShareCardChrome, { CARD_HEIGHT, CARD_WIDTH } from './ShareCardChrome';
 import { compareRowWinner, type CompareRow } from '../lib/playerCompare';
-import { percentileColor } from '../lib/percentile';
+import { overallRatingColor } from '../lib/percentile';
 import { colors, spacing } from '../theme';
 
 // Same safety net as TradeShareCard/PlayerShareCard's AVATAR_READY_TIMEOUT_MS
@@ -37,7 +37,7 @@ function IdentityColumn({
   trackKey: string;
   onAvatarSettle: (key: string) => void;
 }) {
-  const ringColor = side.overallRating !== null ? percentileColor(side.overallRating, colors) : colors.accent;
+  const ringColor = side.overallRating !== null ? overallRatingColor(side.overallRating, colors) : colors.accent;
   return (
     <View style={styles.identityColumn}>
       <PlayerAvatar

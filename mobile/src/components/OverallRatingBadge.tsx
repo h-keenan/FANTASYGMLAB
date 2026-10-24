@@ -4,12 +4,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppText from './AppText';
 
 import { useThemeMode } from '../context/ThemeModeContext';
-import { percentileColor } from '../lib/percentile';
+import { overallRatingColor } from '../lib/percentile';
+import OvrGauge from './OvrGauge';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
 import { radii, spacing } from '../theme';
 
 /**
- * Small "94 OVR" pill — the 0-99 headline rating (see
+ * "94 OVR" circular gauge (OvrGauge) for the headline rating; other labels
+ * (MKT/DUR) stay a small pill. Formerly the "94 OVR" pill — the 0-99 headline rating (see
  * modules.player_quick_view._overall_rating_from_percentile) shown as a
  * secondary badge next to a row's primary raw value_score, never in place
  * of it. Tinted by the rating itself via the shared red->gold->green
@@ -54,7 +56,25 @@ export default function OverallRatingBadge({
   const { colors, isDark } = useThemeMode();
   if (rating === null || rating === undefined || !Number.isFinite(rating)) return null;
   const prestige = positionRankPrestige(positionRank, isDark);
-  const tint = prestige.color ?? percentileColor(rating, colors);
+  const tint = prestige.color ?? overallRatingColor(rating, colors);
+  // The headline OVR is a circular gauge everywhere (web OvrGauge parity).
+  // Other 0-99 sub-ratings (MKT, DUR...) keep the compact labeled pill.
+  if (label === 'OVR') {
+    return (
+      <View style={styles.gaugeWrap}>
+        <OvrGauge rating={rating} size={size === 'md' ? 'sm' : 'xs'} color={tint} />
+        {prestige.tier ? (
+          <MaterialCommunityIcons
+            name="crown"
+            size={size === 'md' ? 12 : 10}
+            color={tint}
+            style={styles.gaugeCrown}
+            accessibilityElementsHidden
+          />
+        ) : null}
+      </View>
+    );
+  }
   return (
     <View
       style={[
@@ -85,6 +105,8 @@ export default function OverallRatingBadge({
 }
 
 const styles = StyleSheet.create({
+  gaugeWrap: { flexShrink: 0 },
+  gaugeCrown: { position: 'absolute', top: -7, right: -3 },
   badge: {
     // No alignSelf override: every call site places this inside a column
     // whose own alignItems (flex-end next to a right-aligned value score,
