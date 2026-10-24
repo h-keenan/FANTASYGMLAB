@@ -12337,7 +12337,9 @@ def test_matchup_real_lineup_handles_a_starter_missing_from_the_valued_pool(monk
     by_id = {p["player_id"]: p for p in mine["real_starters"]}
     assert by_id["mine1"]["name"] == "Mine Player 1"
     assert by_id["mine1"]["actual_points"] == 20.5
-    assert by_id["DEN"]["name"] is None
+    assert by_id["DEN"]["name"] == "Broncos D/ST"
+    assert by_id["DEN"]["position"] == "DEF"
+    assert by_id["DEN"]["team"] == "DEN"
     assert by_id["DEN"]["actual_points"] == 6.0
 
 

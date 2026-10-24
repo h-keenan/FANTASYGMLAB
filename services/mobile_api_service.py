@@ -236,6 +236,7 @@ from modules import (
 )
 from modules import external_news_contract
 from modules import this_week
+from modules import team_defense
 from modules import idp_scoring
 from modules import guillotine as guillotine_module
 from modules import keepers as keepers_module
@@ -12535,12 +12536,16 @@ def _real_current_lineup(
             # `unknown_player` for an id it can't resolve, so this still
             # gets an honest projection status rather than a bare None
             # field.
+            # Team defenses (player_id = NFL team abbreviation) get a real
+            # label/position/team from the NFL team table; anything else
+            # stays unresolved rather than invented.
+            defense = team_defense.team_defense_identity(player_id) or {}
             rows.append(
                 {
                     "player_id": player_id,
-                    "name": None,
-                    "position": None,
-                    "team": None,
+                    "name": defense.get("name"),
+                    "position": defense.get("position"),
+                    "team": defense.get("team"),
                     "age": None,
                     "status": None,
                     "injury_status": None,
@@ -12573,6 +12578,8 @@ def _real_current_lineup(
                     "slot": slot,
                 }
             )
+            if defense:
+                rows[-1].update(_player_game_state(defense.get("team"), projection_context))
 
     team_points = matchup_entry.get("points")
     return {
