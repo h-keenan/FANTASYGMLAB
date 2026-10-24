@@ -29,6 +29,7 @@ import {
   type QuickViewRequest,
 } from '../lib/playerQuickView';
 import { queryKeys } from '../lib/queryKeys';
+import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
 import { navigationRef } from '../navigation/navigationRef';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
@@ -95,6 +96,29 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
     staleTime: 5 * 60 * 1000,
   });
 
+  // "View on Waivers" only when this player really is on the league's waiver
+  // list. Same query key/fn Dashboard uses, so the cache is shared.
+  const waiverLeagueId = request.league?.leagueId ?? null;
+  const waiversQuery = useQuery({
+    queryKey: queryKeys.waivers(waiverLeagueId ?? ''),
+    queryFn: () => api.getLeagueWaivers(waiverLeagueId as string),
+    enabled: !!waiverLeagueId && request.sourceLabel !== 'Waivers',
+    staleTime: 2 * 60 * 1000,
+  });
+  const waiversData = waiversQuery.data ?? null;
+  const onWaivers =
+    !!request.league &&
+    !!waiversData &&
+    isOnWaiverList(player.player_id, {
+      priorityAdds: waiversData.priority_adds ?? [],
+      stashCandidates: waiversData.stash_candidates ?? [],
+      watchlistCandidates: waiversData.watchlist_candidates ?? [],
+      faabTargets: waiversData.faab_targets ?? [],
+      players: waiversData.players ?? [],
+      idpPlayers: waiversData.idp_players ?? [],
+      isPremium: waiversData.entitlement?.is_premium ?? true,
+    });
+
   const [fallback, setFallback] = useState<QuickViewLeague | null>(null);
   useEffect(() => {
     if (request.league) return;
@@ -123,6 +147,18 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
   const injury = injuryAbbreviation(player.injury_status);
   const target = fullProfileTarget(request, fallback);
   const loading = detailQuery.isPending;
+
+  const openWaivers = () => {
+    if (!request.league) return;
+    onClose();
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('Waivers', {
+        leagueId: request.league.leagueId,
+        leagueName: request.league.leagueName,
+        playerId: player.player_id,
+      });
+    }
+  };
 
   const openFullProfile = () => {
     if (!target) return;
@@ -224,6 +260,9 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
               </>
             )}
 
+            {onWaivers ? (
+              <Button label="View on Waivers" variant="secondary" onPress={openWaivers} style={styles.cta} />
+            ) : null}
             {target ? (
               <Button label="Full profile" onPress={openFullProfile} style={styles.cta} />
             ) : null}

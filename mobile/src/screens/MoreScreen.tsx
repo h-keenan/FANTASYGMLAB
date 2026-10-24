@@ -341,6 +341,7 @@ export default function MoreScreen({ navigation }: Props) {
         )}
 
         <SectionHeading title="Preferences" topGap={isGuest ? 0 : 16} />
+        <AnimatedCard style={styles.prefsCard}>
         <AppText style={styles.groupCaption}>Density</AppText>
         <View style={styles.optionRow}>
           {DENSITY_OPTIONS.map((option) => (
@@ -377,6 +378,7 @@ export default function MoreScreen({ navigation }: Props) {
             />
           ))}
         </View>
+        </AnimatedCard>
 
         <SectionHeading title="Your Team" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
@@ -759,6 +761,8 @@ function createStyles(colors: ThemeColors) {
     // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
     identityValue: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
     groupCard: { padding: spacing.md, paddingVertical: 0 },
+    // Web wraps Preferences in one glass card; the option tiles nest as glassInset.
+    prefsCard: { padding: spacing.md, paddingBottom: 0 },
     referralWrap: { marginTop: 16 },
     dangerCard: {
       padding: spacing.md,
@@ -793,7 +797,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.md,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
       borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
+      backgroundColor: colors.glassInset,
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.sm,
     },
