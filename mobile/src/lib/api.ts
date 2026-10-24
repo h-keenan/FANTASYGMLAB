@@ -406,6 +406,7 @@ export interface GamesOddsRow {
   median_final_wins: number;
   median_final_losses: number;
   median_seed: number;
+  title_probability?: number | null;
   clinched: boolean;
   eliminated: boolean;
 }
@@ -416,6 +417,7 @@ export interface GamesSimTeam {
   avatar_url: string | null;
   record_label: string | null;
   playoff_probability: number;
+  title_probability?: number | null;
   median_seed: number;
   mine: boolean;
 }
@@ -439,6 +441,8 @@ export interface GamesSeasonSimResponse {
   teams: GamesSimTeam[];
   roster: GamesRosterPlayer[];
   playoff_teams?: number;
+  /** Championship odds availability; `reason` explains an unavailable one. */
+  title_odds?: { available: boolean; reason: string };
   current_week?: number;
   weeks_remaining?: number;
   trials?: number;

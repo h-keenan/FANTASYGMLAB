@@ -2700,6 +2700,7 @@ def _games_odds_row(team: dict[str, Any]) -> dict[str, Any]:
         "median_final_wins": team.get("median_final_wins"),
         "median_final_losses": team.get("median_final_losses"),
         "median_seed": team.get("median_seed"),
+        "title_probability": team.get("title_probability"),
         "clinched": bool(team.get("clinched")),
         "eliminated": bool(team.get("eliminated")),
     }
@@ -2748,6 +2749,7 @@ def get_games_season_sim(
             "avatar_url": t.get("avatar_url"),
             "record_label": t.get("record_label"),
             "playoff_probability": t["playoff_probability"],
+            "title_probability": t.get("title_probability"),
             "median_seed": t["median_seed"],
             "mine": t["roster_id"] == my_rid,
         }
@@ -2785,6 +2787,8 @@ def get_games_season_sim(
         "teams": teams,
         "roster": roster,
         "playoff_teams": odds.get("playoff_teams"),
+        # Older cached runs predate title odds: report them unavailable, not 0.
+        "title_odds": odds.get("title_odds") or {"available": False, "reason": "unavailable"},
         "current_week": odds.get("current_week"),
         "weeks_remaining": odds.get("weeks_remaining"),
         "trials": odds.get("trials"),

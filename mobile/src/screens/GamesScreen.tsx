@@ -30,12 +30,14 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import {
   formatDelta,
   formatOdds,
+  formatTitleOdds,
   gamesReasonAction,
   gamesReasonMessage,
   matchPlayersByName,
   PICKEM_PHASE_LABEL,
   recordLabel,
   seedChangeLabel,
+  titleOddsUnavailableMessage,
   whatIfSummary,
   whatIfTone,
   withPick,
@@ -133,6 +135,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
 
   const mine = data.my_team;
   const status = mine.clinched ? 'Clinched' : mine.eliminated ? 'Eliminated' : null;
+  const titleAvailable = data.title_odds?.available === true && mine.title_probability != null;
   return (
     <View style={styles.section}>
       <SectionHeading
@@ -150,6 +153,14 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
           </AppText>
           <AppText style={styles.muted}>Playoff odds</AppText>
         </View>
+        {titleAvailable ? (
+          <View>
+            <AppText style={[styles.metric, { color: percentileColor(mine.title_probability!, colors) }]}>
+              {formatTitleOdds(mine.title_probability)}
+            </AppText>
+            <AppText style={styles.muted}>Title odds</AppText>
+          </View>
+        ) : null}
         <View style={styles.alignEnd}>
           <AppText style={styles.muted}>
             Proj {mine.median_final_wins}-{mine.median_final_losses}
@@ -158,6 +169,9 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
           {status ? <ToneBadge label={status} color={mine.clinched ? colors.success : colors.danger} /> : null}
         </View>
       </View>
+      {!titleAvailable ? (
+        <AppText style={styles.muted}>{titleOddsUnavailableMessage(data.title_odds?.reason)}</AppText>
+      ) : null}
 
       <WhatIf leagueId={leagueId} data={data} colors={colors} styles={styles} navigation={navigation} />
 
@@ -173,6 +187,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
               </AppText>
               <AppText style={styles.muted}>
                 {team.record_label ? `${team.record_label} · ` : ''}Seed #{team.median_seed}
+                {titleAvailable && team.title_probability != null ? ` · Title ${formatTitleOdds(team.title_probability)}` : ''}
               </AppText>
             </View>
             <AppText style={[styles.metric, { color: percentileColor(team.playoff_probability, colors) }]}>
