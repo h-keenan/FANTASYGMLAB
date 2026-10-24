@@ -53,6 +53,7 @@ export function ModalFormHint({ children }: { children: string }) {
 /** Cancel (ghost) + confirm (primary, spinner while `loading`) row. */
 export function ModalFormActions({
   onCancel,
+  cancelLabel = 'Cancel',
   cancelDisabled = false,
   confirmLabel,
   onConfirm,
@@ -60,6 +61,7 @@ export function ModalFormActions({
   confirmLoading = false,
 }: {
   onCancel: () => void;
+  cancelLabel?: string;
   cancelDisabled?: boolean;
   confirmLabel: string;
   onConfirm: () => void;
@@ -70,7 +72,7 @@ export function ModalFormActions({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.actions}>
-      <Button label="Cancel" variant="ghost" onPress={onCancel} disabled={cancelDisabled} />
+      <Button label={cancelLabel} variant="ghost" onPress={onCancel} disabled={cancelDisabled} />
       <Button label={confirmLabel} onPress={onConfirm} disabled={confirmDisabled} loading={confirmLoading} />
     </View>
   );

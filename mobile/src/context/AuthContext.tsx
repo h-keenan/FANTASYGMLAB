@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       if (data.session) {
         void identifyRevenueCatUser(data.session.user.id);
-        void syncPushToken();
+        void syncPushToken({ requestPermission: false });
         void syncDevicePreferences();
       }
     })();
@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!nextSession) syncLevelFromServer(null);
           if (nextSession) {
             void identifyRevenueCatUser(nextSession.user.id);
-            void syncPushToken();
+            void syncPushToken({ requestPermission: false });
             // Only re-pull device preferences (density/theme/last-league)
             // on a session actually being established (a real sign-in, or
             // this listener's own initial emission) — never on a plain

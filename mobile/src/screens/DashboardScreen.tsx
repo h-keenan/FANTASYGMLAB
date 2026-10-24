@@ -12,6 +12,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import Button from '../components/Button';
 import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import ErrorState from '../components/ErrorState';
+import PushPermissionPrompt from '../components/PushPermissionPrompt';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -404,6 +405,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
         text={`Home base for ${leagueName}: today's game plan, your matchup, storylines and waiver suggestions, plus quick access to everything else.`}
       />
       <CollegeFootballInterestPrompt />
+      <PushPermissionPrompt leagueLoaded={!!session?.user?.id && !!dashboardData} />
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
         <View style={styles.checkInBanner}>
           <Ionicons name="sparkles-outline" size={14} color={colors.accent} />

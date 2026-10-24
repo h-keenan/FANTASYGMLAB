@@ -7,6 +7,7 @@ import { StackActions } from '@react-navigation/routers';
 import { api, type RankedPlayer } from './api';
 import { navigationRef } from '../navigation/navigationRef';
 import { resolvePushTapTarget } from './pushRouting';
+import type { PushPermissionState } from './pushPermissionPrompt';
 
 /**
  * Expo's managed push service (not raw APNs/FCM handling) — idiomatic for an
@@ -78,11 +79,32 @@ function deviceTimezone(): string {
   }
 }
 
-/** Request permission, mint an Expo push token, and register it with our backend. */
-export async function syncPushToken(): Promise<void> {
+/** Current OS notification permission without ever prompting. */
+export async function getPushPermissionState(): Promise<PushPermissionState> {
+  try {
+    if (!Device.isDevice) return 'unsupported';
+    const p = await Notifications.getPermissionsAsync();
+    if (p.granted) return 'granted';
+    return p.status === 'undetermined' ? 'undetermined' : 'denied';
+  } catch {
+    return 'unsupported';
+  }
+}
+
+/**
+ * Mint an Expo push token and register it with our backend. By default this
+ * also requests OS permission when not yet granted (Settings "test push"
+ * path and the pre-prompt's "Turn on"). Pass `{ requestPermission: false }`
+ * at session start: it then only syncs if permission was already granted and
+ * never prompts - the first-run ask lives in the post-league pre-prompt.
+ */
+export async function syncPushToken(opts: { requestPermission?: boolean } = {}): Promise<void> {
   try {
     await ensureAndroidChannel();
-    const granted = await ensurePermission();
+    const granted =
+      opts.requestPermission === false
+        ? (await Notifications.getPermissionsAsync()).granted
+        : await ensurePermission();
     if (!granted) return;
     const token = await getExpoPushToken();
     if (!token) return;
