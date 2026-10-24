@@ -494,3 +494,34 @@ Deno.test("billing-plans: OPTIONS preflight allows GET; POST rejected; amount fo
   assertEquals(formatPriceAmount(399, "eur"), "EUR 3.99");
   assertEquals(formatPriceAmount(null, "usd"), "");
 });
+
+Deno.test("stripe-webhook: user with no profile row (guest account) gets the row created, not a silent no-op", async () => {
+  const f = fakeFetch({
+    "GET /rest/v1/billing_webhook_events": () => j([]),
+    "POST /rest/v1/billing_webhook_events": () => new Response(null, { status: 201 }),
+    "PATCH /rest/v1/profiles": () => j([]),
+    "GET /rest/v1/profiles": () => j([]),
+    "POST /rest/v1/profiles": () => new Response(null, { status: 201 }),
+  });
+  const deps = { env: envOf(BASE_ENV), fetch: f.fn, now: () => NOW };
+  const res = await stripeWebhook(await signedRequest(subscriptionEvent("customer.subscription.created")), deps);
+  assertEquals(res.status, 200);
+  const ins = f.calls.find((c) => c.init.method === "POST" && c.url.includes("/rest/v1/profiles"))!;
+  assert(ins !== undefined, "profile row must be created");
+  const body = JSON.parse(ins.init.body as string);
+  assertEquals(body.user_id, USER_ID);
+  assertEquals(body.entitlement, "premium");
+});
+
+Deno.test("stripe-webhook: PATCH matching zero rows because of the ordering guard does not create a row", async () => {
+  const f = fakeFetch({
+    "GET /rest/v1/billing_webhook_events": () => j([]),
+    "POST /rest/v1/billing_webhook_events": () => new Response(null, { status: 201 }),
+    "PATCH /rest/v1/profiles": () => j([]),
+    "GET /rest/v1/profiles": () => j([{ user_id: USER_ID }]),
+  });
+  const deps = { env: envOf(BASE_ENV), fetch: f.fn, now: () => NOW };
+  const res = await stripeWebhook(await signedRequest(subscriptionEvent("customer.subscription.updated")), deps);
+  assertEquals(res.status, 200);
+  assert(!f.calls.some((c) => c.init.method === "POST" && c.url.includes("/rest/v1/profiles")));
+});

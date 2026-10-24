@@ -49,7 +49,7 @@ export function profilePatcher(
     const patch = (body: ProfilePayload) =>
       fetchFn(url(body), {
         method: "PATCH",
-        headers: serviceHeaders(cfg, { Prefer: "return=minimal" }),
+        headers: serviceHeaders(cfg, { Prefer: "return=representation" }),
         body: JSON.stringify(body),
       });
     let res: Response;
@@ -76,6 +76,28 @@ export function profilePatcher(
       }
       return { ok: false, error: "Supabase entitlement update failed." };
     }
+    // PATCH matches zero rows both when the ordering guard rejects a stale event
+    // (row exists) and when the user has no profile row yet (e.g. a guest/anonymous
+    // account that never created one). The second case must not be silently
+    // "applied": create the row so the paid entitlement actually lands.
+    try {
+      const updated = await res.clone().json();
+      if (Array.isArray(updated) && updated.length === 0) {
+        const probe = await fetchFn(
+          `${cfg.url}/rest/v1/profiles?${new URLSearchParams({ user_id: `eq.${userId}`, select: "user_id", limit: "1" })}`,
+          { headers: serviceHeaders(cfg) },
+        );
+        const exists = probe.status === 200 ? await probe.json() : null;
+        if (Array.isArray(exists) && exists.length === 0) {
+          const ins = await fetchFn(`${cfg.url}/rest/v1/profiles?on_conflict=user_id`, {
+            method: "POST",
+            headers: serviceHeaders(cfg, { Prefer: "resolution=merge-duplicates,return=minimal" }),
+            body: JSON.stringify({ user_id: userId, ...payload }),
+          });
+          if (ins.status >= 400) return { ok: false, error: "Supabase entitlement profile create failed." };
+        }
+      }
+    } catch { /* a non-JSON success body (older stubs) is treated as applied */ }
     return { ok: true, error: "" };
   };
 }
