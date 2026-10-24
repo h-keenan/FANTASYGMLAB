@@ -1,3 +1,5 @@
+> **DEPRECATED (2026-10-24):** payment and entitlement processing is moving off the self-hosted box onto Supabase Edge Functions. See [billing-on-supabase.md](billing-on-supabase.md). The Python services/modules described here (`services/stripe_webhook_service.py`, `services/revenuecat_webhook_service.py`, `modules/stripe_webhook.py`, `modules/revenuecat_webhook.py`) stay in the repo only as the rollback path until the cutover checklist is complete; do not extend them.
+
 > **Historical / partly obsolete (2026-10):** this document describes the retired Streamlit web app (`app.py`, `streamlit run`, `/_stcore/health`, `st.session_state`), which has been removed. The production web app is `web-next/` (Next.js) on the FastAPI services. See [`streamlit-removal-2026-10.md`](streamlit-removal-2026-10.md). Streamlit-specific details below are no longer current.
 
 # Runtime environment contract

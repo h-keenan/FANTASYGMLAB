@@ -1,0 +1,19 @@
+# Supabase CLI config for the billing Edge Functions only (nothing else in this
+# repo is managed by the CLI; schema is applied by hand, see docs/supabase_*.sql).
+# Replace project_id with the real project ref at deploy time (not a secret).
+project_id = "REPLACE_WITH_PROJECT_REF"
+
+# Providers cannot send a Supabase JWT; their own signature/token is the auth.
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+# Called by signed-in users; the gateway verifies the JWT, and the function
+# re-verifies it to obtain the trusted user id + email.
+[functions.create-checkout-session]
+verify_jwt = true
+
+[functions.billing-portal-session]
+verify_jwt = true
