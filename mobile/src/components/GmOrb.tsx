@@ -81,14 +81,6 @@ interface Destination {
 function coreLeagueDestinations(colors: ThemeColors): Destination[] {
   return [
     {
-      label: 'League Overview',
-      route: 'LeagueDetail',
-      icon: 'grid-outline',
-      needsLeague: true,
-      color: colors.accent,
-      subtitle: 'Standings, settings, and league context',
-    },
-    {
       // Named "Dashboard" everywhere else (web nav, this screen's own header,
       // landing copy retired "Next Move"); org audit 2026-10.
       label: 'Dashboard',
@@ -96,7 +88,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       icon: 'flash-outline',
       needsLeague: true,
       color: colors.accent,
-      subtitle: 'Personalized insights and recommendations',
+      subtitle: 'Game plan, matchup, storylines and league context',
     },
     // Alerts was buried last in the list despite being time-sensitive —
     // moved up next to the other "check this now" destinations.
@@ -178,28 +170,6 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.premium,
       subtitle: 'Trade ideas, search, and build a trade',
     },
-    {
-      label: 'GM Targets',
-      route: 'GmTargets',
-      icon: 'bookmark-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Your saved watchlist',
-    },
-    // Discoverability audit (2026-09-26) found this had no path here at
-    // all — only a settings row under More → Your Team — even though it
-    // actively changes trade-recommendation framing app-wide (PR #753), not
-    // a preference like Theme/Density. Every other feature this consequential
-    // gets a one-tap orb entry; this now does too. More's row stays as a
-    // secondary path, not removed.
-    {
-      label: 'Team Situation',
-      route: 'TeamStance',
-      icon: 'compass-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Declare your rebuild/compete stance',
-    },
     // Season-arc complement to Dashboard's one-off "Next Move" tile: a
     // roadmap conditioned on the Team Situation stance declared just above,
     // aggregating real signals (trade ideas, power/draft-capital rank,
@@ -211,7 +181,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       icon: 'map-outline',
       needsLeague: true,
       color: colors.premium,
-      subtitle: 'Your season-long roadmap',
+      subtitle: 'Roadmap, team situation, protected core and targets',
     },
     {
       label: 'Draft Center',

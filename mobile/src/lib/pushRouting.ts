@@ -20,7 +20,7 @@ export interface PushNotificationData {
 
 export type PushTapTarget =
   | { screen: 'PlayerDetail'; leagueId: string; leagueName: string; playerId: string; playerName: string }
-  | { screen: 'LeagueDetail'; leagueId: string; leagueName: string }
+  | { screen: 'Dashboard'; leagueId: string; leagueName: string }
   | { screen: 'Matchup'; leagueId: string; leagueName: string }
   | { screen: 'Waivers'; leagueId: string; leagueName: string }
   | { screen: 'TradeHistory' }
@@ -55,5 +55,5 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
   if (playerId) {
     return { screen: 'PlayerDetail', leagueId, leagueName, playerId, playerName: str(payload.player_name) };
   }
-  return { screen: 'LeagueDetail', leagueId, leagueName };
+  return { screen: 'Dashboard', leagueId, leagueName };
 }

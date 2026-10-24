@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
+import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse } from "@/lib/analytics";
@@ -184,7 +185,10 @@ export function LandingAuthIsland() {
     !carouselDone ? (
       <OnboardingCarousel onDone={() => setCarouselDone(true)} />
     ) : paywallDismissed ? (
-      <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+      <>
+        <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+        <SampleLeagueLink />
+      </>
     ) : (
       <OnboardingPaywall onSkip={() => setPaywallDismissed(true)} />
     )

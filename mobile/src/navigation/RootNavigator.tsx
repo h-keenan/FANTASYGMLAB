@@ -19,12 +19,13 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import HomeScreen from '../screens/HomeScreen';
-import LeagueDetailScreen from '../screens/LeagueDetailScreen';
+import { createLegacyRedirectScreen } from '../components/LegacyRouteRedirect';
 import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import TrialLapsedScreen from '../screens/TrialLapsedScreen';
 import NewsScreen from '../screens/NewsScreen';
 import DesignScreen from '../screens/DesignScreen';
+import SampleLeagueScreen from '../screens/SampleLeagueScreen';
 import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
 import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
@@ -35,8 +36,6 @@ import WaiversScreen from '../screens/WaiversScreen';
 import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import GmPlanScreen from '../screens/GmPlanScreen';
-import GmTargetsScreen from '../screens/GmTargetsScreen';
-import TeamStanceScreen from '../screens/TeamStanceScreen';
 import TradeHistoryScreen from '../screens/TradeHistoryScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradesScreen from '../screens/TradesScreen';
@@ -56,6 +55,7 @@ import GuessThePlayerLeaderboardScreen from '../screens/GuessThePlayerLeaderboar
 import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { trackScreen } from '../lib/analytics';
+import { isLegacyRedirectRoute } from '../lib/homeRedirects';
 
 export type RootStackParamList = {
   /** `openAddLeague`: opens Home's Add League sheet on arrival (the header
@@ -74,6 +74,8 @@ export type RootStackParamList = {
   More: undefined;
   /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
   Design: undefined;
+  /** Static fictional demo league for users with no league connected yet. */
+  SampleLeague: undefined;
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string };
@@ -81,7 +83,7 @@ export type RootStackParamList = {
   PlayerCompare: { player: RankedPlayer; leagueId: string; leagueName: string };
   GmTargets: { leagueId: string; leagueName: string };
   TeamStance: { leagueId: string; leagueName: string };
-  GmPlan: { leagueId: string; leagueName: string };
+  GmPlan: { leagueId: string; leagueName: string; initialTab?: 'overview' | 'trades' | 'core' | 'watching' };
   TradeHistory: undefined;
   Waivers: { leagueId: string; leagueName: string };
   Recap: { leagueId: string; leagueName: string };
@@ -148,7 +150,11 @@ function withEspnGate(Screen: React.ComponentType<any>): React.ComponentType<any
   return EspnGatedScreen;
 }
 
-const EspnLeagueDetailScreen = withEspnGate(LeagueDetailScreen);
+// Retired routes kept as redirects (deep links, push taps, stale nav state):
+// League Overview -> Dashboard, GM Targets / Team Situation -> GM Plan tabs.
+const LeagueDetailRedirect = createLegacyRedirectScreen('LeagueDetail');
+const GmTargetsRedirect = createLegacyRedirectScreen('GmTargets');
+const TeamStanceRedirect = createLegacyRedirectScreen('TeamStance');
 const EspnWaiversScreen = withEspnGate(WaiversScreen);
 const EspnRecapScreen = withEspnGate(RecapScreen);
 const EspnDashboardScreen = withEspnGate(DashboardScreen);
@@ -158,8 +164,6 @@ const EspnDraftCenterScreen = withEspnGate(DraftCenterScreen);
 const EspnPickDetailScreen = withEspnGate(PickDetailScreen);
 const EspnMatchupScreen = withEspnGate(MatchupScreen);
 const EspnAlertsScreen = withEspnGate(AlertsScreen);
-const EspnGmTargetsScreen = withEspnGate(GmTargetsScreen);
-const EspnTeamStanceScreen = withEspnGate(TeamStanceScreen);
 const EspnGmPlanScreen = withEspnGate(GmPlanScreen);
 const EspnLiveDraftScreen = withEspnGate(LiveDraftScreen);
 const EspnGuessLeaderboardScreen = withEspnGate(GuessThePlayerLeaderboardScreen);
@@ -181,9 +185,11 @@ export default function RootNavigator() {
     const name = navigationRef.getCurrentRoute()?.name;
     setCurrentRouteName(name);
     // Screen NAME only (never params, which carry league ids).
-    if (name && name !== lastTrackedRoute.current) {
+    // Redirect-only legacy routes are not real views; the destination is tracked.
+    if (name && name !== lastTrackedRoute.current && !isLegacyRedirectRoute(name)) {
       lastTrackedRoute.current = name;
-      trackScreen(name);
+      // The fictional sample league is never tracked (no analytics pollution).
+      if (name !== 'SampleLeague') trackScreen(name);
     }
   };
 
@@ -288,11 +294,12 @@ export default function RootNavigator() {
               ),
             })}
           />
-          <AppStack.Screen name="LeagueDetail" component={EspnLeagueDetailScreen} />
+          <AppStack.Screen name="LeagueDetail" component={LeagueDetailRedirect} />
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
           <AppStack.Screen name="Design" component={DesignScreen} options={{ title: 'Design' }} />
+          <AppStack.Screen name="SampleLeague" component={SampleLeagueScreen} options={{ title: 'Sample league' }} />
           <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
           <AppStack.Screen
             name="HowWeEvaluate"
@@ -314,10 +321,10 @@ export default function RootNavigator() {
           <AppStack.Screen name="MyTeam" component={MyTeamScreen} />
           <AppStack.Screen name="Matchup" component={EspnMatchupScreen} />
           <AppStack.Screen name="Alerts" component={EspnAlertsScreen} />
-          <AppStack.Screen name="GmTargets" component={EspnGmTargetsScreen} />
+          <AppStack.Screen name="GmTargets" component={GmTargetsRedirect} />
           <AppStack.Screen name="CollegeProspects" component={CollegeProspectsScreen} />
           <AppStack.Screen name="CollegeProspectDetail" component={ProspectScoutingDetailScreen} />
-          <AppStack.Screen name="TeamStance" component={EspnTeamStanceScreen} />
+          <AppStack.Screen name="TeamStance" component={TeamStanceRedirect} />
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />

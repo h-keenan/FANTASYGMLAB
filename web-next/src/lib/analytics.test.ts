@@ -207,4 +207,18 @@ describe("lib/analytics", () => {
 
     expect(() => trackPageView("/news")).not.toThrow();
   });
+
+  it("sends no analytics from the static /sample-league demo", async () => {
+    const mockFetch = mockFetchOk();
+    window.history.pushState({}, "", "/sample-league");
+    try {
+      const { trackPageView, trackFeatureUse } = await import("./analytics");
+      trackPageView("/sample-league");
+      trackFeatureUse("landing_viewed");
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
 });

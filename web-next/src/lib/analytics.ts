@@ -91,6 +91,9 @@ function postEvent(input: AnalyticsEventBody): void {
   // The hidden /design reference page renders real components with static
   // sample data and must make no API calls (analytics included).
   if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/design")) return;
+  // The static /sample-league demo is fictional data: no analytics at all,
+  // so it can never pollute real usage metrics.
+  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/sample-league")) return;
   // `platform` lets the founder dashboard split web vs mobile; the backend
   // also defaults a missing platform to "web".
   const body: AnalyticsEventBody = { ...input, props: { platform: "web", ...(input.props || {}) } };

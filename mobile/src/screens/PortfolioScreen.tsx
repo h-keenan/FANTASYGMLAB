@@ -562,22 +562,23 @@ function createStyles(colors: ThemeColors) {
     },
     failedNoteIcon: { marginTop: 1 },
     failedNoteText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
-    // Continuous grouped surface with internal dividers (Magna Carta §12) —
-    // every saved league is a peer row in one portfolio, not N independently
-    // bordered/shadowed cards.
     row: {
       backgroundColor: colors.surface,
       paddingHorizontal: spacing.md,
       paddingTop: spacing.md,
       // Same reserved height for the real row and its skeleton: no jump on fill-in.
       minHeight: PORTFOLIO_ROW_MIN_HEIGHT,
-      borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
-      borderRightWidth: StyleSheet.hairlineWidth * 1.5,
+      paddingBottom: spacing.xs,
+      marginBottom: spacing.md,
+      borderWidth: StyleSheet.hairlineWidth * 1.5,
+      borderRadius: radii.md,
       borderColor: colors.cardBorder,
     },
-    rowFirst: { borderTopWidth: StyleSheet.hairlineWidth * 1.5, borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },
-    rowLast: { borderBottomWidth: StyleSheet.hairlineWidth * 1.5, borderBottomLeftRadius: radii.md, borderBottomRightRadius: radii.md, paddingBottom: spacing.xs },
-    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    // Each league is its own module with a gap between, like the website
+    // (coridian_, 2026-10-24); kept as no-ops so the call sites stay simple.
+    rowFirst: {},
+    rowLast: { marginBottom: 0 },
+    rowDivider: {},
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', paddingBottom: spacing.sm },
     identityGroup: { flex: 1, marginRight: spacing.sm },
     teamName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },

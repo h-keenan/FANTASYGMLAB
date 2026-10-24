@@ -43,6 +43,7 @@ import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
+import { SAMPLE_ENTRY_LABEL } from '../lib/sampleLeague';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { leagueCapMessage } from '../lib/leagueCap';
 import Input from '../components/Input';
@@ -230,7 +231,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     closeAddLeague();
     await load();
     if (routeToTeamStance) {
-      navigation.navigate('TeamStance', { leagueId, leagueName: leagueName || 'League' });
+      navigation.navigate('GmPlan', { leagueId, leagueName: leagueName || 'League', initialTab: 'overview' });
     }
   };
 
@@ -521,6 +522,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           ) : null
         }
         ListEmptyComponent={
+          <View>
           <EmptyState
             icon={leaguesError ? 'cloud-offline-outline' : 'shield-outline'}
             title={leaguesError ? "Couldn't load your leagues" : 'No leagues yet'}
@@ -553,6 +555,16 @@ export default function HomeScreen({ navigation, route }: Props) {
                 : undefined
             }
           />
+          {!leaguesError ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('SampleLeague')}
+              style={styles.sampleLeagueLink}
+            >
+              <AppText style={styles.sampleLeagueLinkText}>{SAMPLE_ENTRY_LABEL}</AppText>
+            </TouchableOpacity>
+          ) : null}
+          </View>
         }
         renderItem={({ item, index }) => {
           const isFirst = index === 0;
@@ -884,6 +896,8 @@ function createStyles(colors: ThemeColors) {
     gap: 4,
     marginTop: spacing.md,
   },
+  sampleLeagueLink: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  sampleLeagueLinkText: { fontSize: 14, fontWeight: '700', color: colors.accent },
   noLeagueToggleText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   noLeagueCard: {
     marginTop: spacing.sm,
