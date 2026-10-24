@@ -30,6 +30,7 @@ import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeamRoster'>;
 
@@ -110,6 +111,7 @@ function buildRankMetrics(ranking: TeamRanking): RankMetric[] {
 type RosterSection = { title: string; data: RankedPlayer[] };
 
 export default function TeamRosterScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -237,7 +239,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
                       key={player.player_id}
                       player={player}
                       showDivider={index < section.data.length - 1}
-                      onPress={() => navigation.navigate('PlayerDetail', { player, leagueId, leagueName })}
+                      onPress={() => openQuickView(player, { leagueId, leagueName })}
                     />
                   ))}
                 </AnimatedCard>

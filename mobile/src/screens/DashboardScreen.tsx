@@ -76,6 +76,7 @@ import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 type DashboardNavigation = Props['navigation'];
@@ -156,6 +157,7 @@ function groupDashboardItems(items: DashboardItem[]): {
 }
 
 export default function DashboardScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -505,11 +507,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       <WaiverSuggestionsStrip
         adds={priorityAdds}
         onPressPlayer={(player) =>
-          navigation.navigate('PlayerDetail', {
-            player: rankedPlayerFromWaiverPlayer(player),
-            leagueId,
-            leagueName,
-          })
+          openQuickView(rankedPlayerFromWaiverPlayer(player), { leagueId, leagueName })
         }
       />
       {showRecapModule && readyRecap ? (
@@ -908,6 +906,7 @@ function BriefingCard({
   isNew: boolean;
   showExplanations: boolean;
 }) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (item.presentation?.trade_package) {
@@ -928,7 +927,7 @@ function BriefingCard({
   // pattern AlertsScreen already uses for its own matched-player taps, since
   // Player Detail fetches everything else itself from player_id.
   const openPlayer = item.route_player_id
-    ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
+    ? () => openQuickView(playerStubFromItem(item), { leagueId, leagueName })
     : undefined;
   return (
     <AccentCard glow accent={meta.color} style={styles.card} onPress={openPlayer}>
@@ -951,7 +950,7 @@ function BriefingCard({
       <BriefingItemPlayers
         item={item}
         onPressPlayer={(player) =>
-          navigation.navigate('PlayerDetail', { player: playerStubFromSignal(player), leagueId, leagueName })
+          openQuickView(playerStubFromSignal(player), { leagueId, leagueName })
         }
       />
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
@@ -981,6 +980,7 @@ function DashboardInsightRow({
   showExplanations: boolean;
   last: boolean;
 }) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const baseMeta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
   const tagKind = watchTagKind(item);
@@ -993,7 +993,7 @@ function DashboardInsightRow({
     ? () => (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName })
     : undefined;
   const onPress = item.route_player_id
-    ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
+    ? () => openQuickView(playerStubFromItem(item), { leagueId, leagueName })
     : undefined;
 
   // Every other player the item names (web shows all of them, not just the
@@ -1003,7 +1003,7 @@ function DashboardInsightRow({
       item={item}
       excludePlayerId={excludePlayerId}
       onPressPlayer={(player) =>
-        navigation.navigate('PlayerDetail', { player: playerStubFromSignal(player), leagueId, leagueName })
+        openQuickView(playerStubFromSignal(player), { leagueId, leagueName })
       }
     />
   );
@@ -1083,6 +1083,7 @@ function WatchlistAlertsSection({
   newRecommendationIds: Set<string>;
   showExplanations: boolean;
 }) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const showHealth = hasHealthContext(snapshot);
@@ -1121,8 +1122,7 @@ function WatchlistAlertsSection({
               snapshot={snapshot!}
               last={rowItems.length === 0}
               onPlayerPress={(player) =>
-                navigation.navigate('PlayerDetail', {
-                  player: {
+                openQuickView({
                     player_id: player.player_id,
                     name: player.name || null,
                     position: player.position || null,
@@ -1136,10 +1136,7 @@ function WatchlistAlertsSection({
                     position_rank: null,
                     rank_unavailable_reason: null,
                     opportunity_label: null,
-                  },
-                  leagueId,
-                  leagueName,
-                })
+                  }, { leagueId, leagueName })
               }
             />
           ) : null}

@@ -24,6 +24,7 @@ import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeV
 import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type TradeHubNavigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -335,6 +336,7 @@ export default function TradeIdeaCard({
   leagueName: string;
   navigation: TradeHubNavigation;
 }) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { showExplanations } = useDensity();
@@ -347,7 +349,7 @@ export default function TradeIdeaCard({
   const { lens } = useValuationLens(leagueId);
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const openPlayer = (asset: PresentationAsset) =>
-    navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
+    openQuickView(assetToRankedPlayer(asset), { leagueId, leagueName });
   const openPick = (asset: PresentationAsset) =>
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 

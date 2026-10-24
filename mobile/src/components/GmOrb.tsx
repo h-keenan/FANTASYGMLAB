@@ -30,6 +30,7 @@ import IconCircle from './IconCircle';
 import BrandMark from './BrandMark';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { SheetModal, SheetScrollProvider, SheetScrollView, useSheetDismissGesture } from './SwipeDismissSheet';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { currentLeagueContext, navigationRef, switchLeagueKeepingScreen } from '../navigation/navigationRef';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { api, type RankedPlayer } from '../lib/api';
@@ -522,6 +523,7 @@ function LeagueSwitcher({
 }
 
 export default function GmOrb() {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [visible, setVisible] = useState(false);
@@ -802,8 +804,8 @@ export default function GmOrb() {
 
   const openPlayer = (player: RankedPlayer) => {
     closeSheet();
-    if (!league || !navigationRef.isReady()) return;
-    navigationRef.navigate('PlayerDetail', { player, leagueId: league.leagueId, leagueName: league.leagueName });
+    if (!league) return;
+    openQuickView(player, { leagueId: league.leagueId, leagueName: league.leagueName, sourceLabel: 'GM search' });
   };
 
   const switchToLeague = (row: SavedLeagueRow) => {

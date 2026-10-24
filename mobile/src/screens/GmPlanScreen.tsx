@@ -47,6 +47,7 @@ import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -86,6 +87,7 @@ const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
  * GmPlanContent.
  */
 export default function GmPlanScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -514,7 +516,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         team={player?.team}
                         tier={player?.tier}
                         showDivider={false}
-                        onPress={player ? () => navigation.navigate('PlayerDetail', { player, leagueId, leagueName }) : undefined}
+                        onPress={player ? () => openQuickView(player, { leagueId, leagueName }) : undefined}
                       />
                       <View style={styles.watchMeta}>
                         {player?.score != null ? (

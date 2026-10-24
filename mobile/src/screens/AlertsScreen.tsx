@@ -25,6 +25,7 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Alerts'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -131,6 +132,7 @@ function groupAlertsByType(items: AlertItem[]): AlertGroup[] {
 }
 
 export default function AlertsScreen({ route, navigation }: Props) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -228,7 +230,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
       rank_unavailable_reason: null,
       opportunity_label: null,
     };
-    navigation.navigate('PlayerDetail', { player, leagueId, leagueName });
+    openQuickView(player, { leagueId, leagueName });
   };
 
   if (notReadyReason) {

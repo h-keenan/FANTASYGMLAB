@@ -17,6 +17,7 @@ import { sortExposurePlayers, type ExposureSortKey } from '../lib/portfolioExpos
 import { queryKeys } from '../lib/queryKeys';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type SortKey = ExposureSortKey;
 
@@ -35,6 +36,7 @@ const percent = (share: number) => `${Math.round(share * 100)}%`;
  * leagues.
  */
 export default function PortfolioExposurePanel() {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -118,8 +120,7 @@ export default function PortfolioExposurePanel() {
                     onPress={
                       firstLeague
                         ? () =>
-                            navigation.navigate('PlayerDetail', {
-                              player: {
+                            openQuickView({
                                 player_id: player.player_id,
                                 name: player.name,
                                 position: player.position,
@@ -133,10 +134,7 @@ export default function PortfolioExposurePanel() {
                                 position_rank: null,
                                 rank_unavailable_reason: null,
                                 opportunity_label: null,
-                              },
-                              leagueId: firstLeague.league_id,
-                              leagueName: firstLeague.league_name,
-                            })
+                              }, { leagueId: firstLeague.league_id, leagueName: firstLeague.league_name })
                         : undefined
                     }
                   />
