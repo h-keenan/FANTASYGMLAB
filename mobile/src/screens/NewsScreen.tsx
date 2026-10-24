@@ -5,11 +5,13 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { newsPlayerIdentities } from '../lib/newsIdentity';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -210,6 +212,9 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
     item.speculative ? 'Unconfirmed / speculative' : null,
     item.source ? `Source: ${item.source}` : null,
   ].filter((bit): bit is string => Boolean(bit));
+  // Backend-resolved identities only. Not tappable: News has no league
+  // context, and PlayerDetail requires one.
+  const identities = newsPlayerIdentities(item);
 
   return (
     <TouchableOpacity accessibilityRole="button"
@@ -221,6 +226,16 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
       disabled={!item.link}
     >
       <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
+      {identities.map((identity, index) => (
+        <CompactPlayerModule
+          key={identity.matched_player_id ?? `${identity.matched_player}-${index}`}
+          playerId={identity.matched_player_id}
+          name={identity.matched_player}
+          position={identity.matched_player_position}
+          team={identity.matched_player_team}
+          style={styles.identity}
+        />
+      ))}
       <AppText style={styles.title} numberOfLines={2}>
         {item.title}
       </AppText>
@@ -239,6 +254,7 @@ function createRowStyles(colors: ThemeColors) {
     row: { paddingVertical: spacing.sm + 2 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     time: { fontSize: 11, color: colors.textTertiary, marginBottom: 3 },
+    identity: { marginBottom: spacing.xs },
     title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },
     summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
     footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
