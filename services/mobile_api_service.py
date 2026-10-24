@@ -1552,6 +1552,22 @@ def _safe_return_path(path: str) -> str:
     return clean
 
 
+def _verified_checkout_email(user: dict[str, Any]) -> str:
+    """The signed-in account's own email, only when Supabase has verified it.
+
+    Read from the GoTrue user the bearer token resolved to (never from the
+    request body), so a client can't choose whose email Stripe prefills.
+    Returns "" (no prefill) for a missing, malformed or unconfirmed email.
+    """
+
+    email = str(user.get("email") or "").strip()
+    if not email or "@" not in email or len(email) > 254:
+        return ""
+    if not (user.get("email_confirmed_at") or user.get("confirmed_at")):
+        return ""
+    return email
+
+
 @app.post("/v1/billing/checkout")
 def create_billing_checkout(
     body: CheckoutRequest,
@@ -1566,11 +1582,14 @@ def create_billing_checkout(
     """
 
     user_id = str(user.get("id") or "")
-    email = str(user.get("email") or "")
+    email = _verified_checkout_email(user)
     if not user_id:
         raise HTTPException(status_code=401, detail="Checkout requires a signed-in account.")
     config = stripe_billing.load_stripe_config()
     profile, profile_ok = _fetch_trial_profile(user)
+    # An existing Stripe customer (from our own profile row, never the
+    # client) is reused so Checkout shows its email; else customer_email.
+    stripe_customer_id = str(profile.get("stripe_customer_id") or "").strip()
     trial_ok = profile_ok and stripe_billing.trial_eligible(
         config, tier=body.tier, email=email, profile=profile
     )
@@ -1581,11 +1600,12 @@ def create_billing_checkout(
             config=config,
             user_id=user_id,
             email=email,
+            customer_id=stripe_customer_id,
             interval=body.interval,
             tier=body.tier,
             trial_eligible=trial_ok,
             ui_mode="embedded" if embedded else "hosted",
-            return_url=app_config.stripe_return_url(f"{return_path}?billing=complete", base_url=config.app_base_url)
+            return_url=app_config.stripe_return_url(f"{return_path}?billing=success", base_url=config.app_base_url)
             if embedded
             else "",
             success_url=app_config.stripe_return_url(f"{return_path}?billing=success", base_url=config.app_base_url),

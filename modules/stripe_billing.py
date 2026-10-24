@@ -542,6 +542,7 @@ def create_checkout_session(
     now: datetime | None = None,
     ui_mode: str = "hosted",
     return_url: str = "",
+    customer_id: str = "",
 ):
     """Start a Stripe Checkout session for the given (tier, interval).
 
@@ -564,14 +565,20 @@ def create_checkout_session(
     Zach, 2026-10-19: "We need to try to embed stripe so theres not a
     million redirectes" — `ui_mode="embedded"` returns a session carrying
     `client_secret` (mounted client-side via Stripe.js's EmbeddedCheckout,
-    which also surfaces Apple Pay/Google Pay automatically — no separate
-    Payment Element build or manual Apple Pay domain registration needed,
-    both are already handled by the Checkout product itself) instead of a
+    which surfaces Apple Pay/Google Pay too -- but Apple Pay on our own
+    domains only appears once each domain is registered with Stripe as a
+    payment method domain and serves the Apple association file; see
+    docs/apple-pay-domain-setup.md) instead of a
     hosted `url` to redirect to. Stripe requires exactly one of
     (success_url + cancel_url) XOR return_url depending on ui_mode — never
     both — so this branches the kwargs rather than always building the
     same dict. Default stays "hosted" (the redirect flow) so every
     existing caller (the removed Streamlit premium page) is unaffected.
+
+    Email prefill: `customer_id` (an existing Stripe customer for this
+    account) is passed as `customer=`; otherwise a non-empty `email` is
+    passed as `customer_email=`. Stripe rejects both together, so exactly
+    one is ever sent. Callers must pass only a server-verified email.
     """
 
     _require_checkout_runtime(config)
@@ -608,16 +615,26 @@ def create_checkout_session(
         }
     )
 
+    clean_customer = _safe_text(customer_id)
+    clean_email = _safe_text(email)
+    if clean_customer:
+        identity_kwargs: dict[str, Any] = {"customer": clean_customer}
+    elif clean_email:
+        identity_kwargs = {"customer_email": clean_email}
+    else:
+        identity_kwargs = {}
+    identity_tag = hashlib.sha256((clean_customer or clean_email).encode()).hexdigest()[:10]
+
     return stripe.checkout.Session.create(
         mode="subscription",
-        customer_email=_safe_text(email) or None,
+        **identity_kwargs,
         line_items=[{"price": price_id, "quantity": 1}],
         allow_promotion_codes=True,
         client_reference_id=clean_user_id,
         # Reduce duplicate checkouts for the same user+interval+price.
         idempotency_key=(
             f"fgl-checkout-{clean_user_id}-{_safe_text(interval).casefold()}-{price_id}-{ui_mode}"
-            f"-t{int(resolved_trial_days or 0)}"
+            f"-t{int(resolved_trial_days or 0)}-{identity_tag}"
         )[:255],
         payment_method_collection="always",
         metadata={

@@ -989,7 +989,7 @@ def test_billing_checkout_returns_the_real_checkout_url(monkeypatch):
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com", "email_confirmed_at": "2026-10-01T00:00:00Z"}
 
     fake_session = SimpleNamespace(url="https://checkout.stripe.com/pay/cs_test_123")
 
@@ -1038,7 +1038,58 @@ def test_billing_checkout_embedded_mode_returns_a_client_secret(monkeypatch):
     assert response.json() == {"ok": True, "client_secret": "cs_test_embedded_secret_123"}
     kwargs = create_session.call_args.kwargs
     assert kwargs["ui_mode"] == "embedded"
-    assert "/premium?billing=complete" in kwargs["return_url"]
+    assert "/premium?billing=success" in kwargs["return_url"]
+
+
+def _checkout_email_kwargs(monkeypatch, auth_json, profile=None, body_extra=None):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = auth_json
+    fake_session = SimpleNamespace(client_secret="cs_test_x", url=None)
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("services.mobile_api_service._fetch_trial_profile", return_value=(profile or {}, True)),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session) as create_session,
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "annual", "ui_mode": "embedded", **(body_extra or {})},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 200
+    return create_session.call_args.kwargs
+
+
+def test_billing_checkout_prefills_the_verified_account_email(monkeypatch):
+    kwargs = _checkout_email_kwargs(
+        monkeypatch,
+        {"id": "user-123", "email": "gm@example.com", "email_confirmed_at": "2026-10-01T00:00:00Z"},
+    )
+    assert kwargs["email"] == "gm@example.com"
+    assert kwargs["customer_id"] == ""
+
+
+def test_billing_checkout_ignores_a_client_supplied_email(monkeypatch):
+    kwargs = _checkout_email_kwargs(
+        monkeypatch,
+        {"id": "user-123", "email": "gm@example.com", "email_confirmed_at": "2026-10-01T00:00:00Z"},
+        body_extra={"email": "attacker@example.com", "customer_email": "attacker@example.com"},
+    )
+    assert kwargs["email"] == "gm@example.com"
+
+
+def test_billing_checkout_skips_prefill_for_an_unverified_email(monkeypatch):
+    kwargs = _checkout_email_kwargs(monkeypatch, {"id": "user-123", "email": "gm@example.com"})
+    assert kwargs["email"] == ""
+
+
+def test_billing_checkout_reuses_the_profile_stripe_customer(monkeypatch):
+    kwargs = _checkout_email_kwargs(
+        monkeypatch,
+        {"id": "user-123", "email": "gm@example.com", "email_confirmed_at": "2026-10-01T00:00:00Z"},
+        profile={"stripe_customer_id": "cus_123"},
+    )
+    assert kwargs["customer_id"] == "cus_123"
 
 
 def test_billing_checkout_embedded_mode_fails_closed_without_a_client_secret(monkeypatch):
