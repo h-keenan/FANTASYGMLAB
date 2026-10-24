@@ -46,6 +46,7 @@ export default function InsightRow({
   onActionPress,
   onPress,
   last,
+  children,
 }: {
   icon: IconName;
   /** Semantic accent for the icon/label — never a one-off hue per screen. */
@@ -68,6 +69,8 @@ export default function InsightRow({
   onPress?: () => void;
   /** Suppresses the bottom divider — pass for the final row in a group. */
   last?: boolean;
+  /** Extra content under the text (e.g. BriefingItemPlayers). */
+  children?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -96,6 +99,7 @@ export default function InsightRow({
             {detail}
           </AppText>
         ) : null}
+        {children}
       </View>
       {actionLabel && onActionPress ? (
         <TouchableOpacity style={styles.actionChip} onPress={onActionPress} hitSlop={6}>

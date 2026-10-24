@@ -41,12 +41,16 @@ import {
   type TeamRanking,
   type TeamSnapshot,
 } from '../lib/api';
+import type { SignalPlayer } from '../lib/portfolioSignals';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
+import BriefingItemPlayers from '../components/BriefingItemPlayers';
+import LeaguePulseCard from '../components/LeaguePulseCard';
+import { leaguePulseHighlights } from '../lib/leaguePulse';
 import TodayHero from '../components/TodayHero';
 import StartHereCard from '../components/StartHereCard';
 import { useAuth } from '../context/AuthContext';
@@ -89,101 +93,24 @@ const DESTINATION_ROUTE: Record<string, string> = {
   waivers: 'Waivers',
 };
 
-interface LeaguePulseTile {
-  label: string;
-  value: string;
-  note: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  color: string;
-  /** The tile's team's Sleeper avatar (`TeamRanking.avatar_url`) — null
-   * when no team currently qualifies for the tile (e.g. "No clear leader"),
-   * in which case TeamAvatar's own fallback circle renders instead. */
-  avatarUrl: string | null;
-}
-
-function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital_rank'): TeamRanking | null {
-  let best: TeamRanking | null = null;
-  for (const team of teams) {
-    const rank = team[rankKey];
-    if (rank == null) continue;
-    if (best == null || (best[rankKey] ?? Infinity) > rank) best = team;
-  }
-  return best;
-}
-
-function bestByActivity(teams: TeamRanking[]): TeamRanking | null {
-  let best: TeamRanking | null = null;
-  for (const team of teams) {
-    const count = team.transaction_activity_count ?? 0;
-    if (count <= 0) continue;
-    if (best == null || count > (best.transaction_activity_count ?? 0)) best = team;
-  }
-  return best;
-}
-
-/**
- * A lighter-weight adaptation of the web app's League Pulse
- * (app.py's build_home_league_pulse_items) using only what mobile's
- * /team-rankings endpoint already computes — not a byte-for-byte port.
- * "Most Active Manager" reuses modules.manager_activity's real
- * season-to-date Sleeper transaction scan (trades + waiver claims +
- * free-agent moves), surfaced on /team-rankings as
- * `transaction_activity_count` per roster — see that module's docstring
- * for why this is a pure move count rather than a value read. Web's own
- * Home "Most Active Manager" tile still reads a narrower trade-only count
- * (df_intel's trade_count); unifying the two touches a broadly-shared
- * intelligence frame used across many web features and is a deliberate,
- * separate follow-up rather than something bundled into this mobile-only
- * rebuild (see this PR's description).
- */
-function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): LeaguePulseTile[] {
-  const contenders = teams.filter((t) => t.strategy === 'contender');
-  const rebuilders = teams.filter((t) => t.strategy === 'rebuild' || t.strategy === 'tank');
-  const contender = bestByRank(contenders, 'power_rank');
-  const rebuilder = bestByRank(rebuilders, 'draft_capital_rank');
-  const draftLeader = bestByRank(teams, 'draft_capital_rank');
-  const mostActive = bestByActivity(teams);
-
-  const tiles: LeaguePulseTile[] = [
-    {
-      label: 'Biggest Contender',
-      value: contender?.team_name ?? 'No clear leader',
-      note: contender ? `Roster Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
-      icon: 'flame',
-      color: colors.accent,
-      avatarUrl: contender?.avatar_url ?? null,
-    },
-    {
-      label: 'Biggest Rebuilder',
-      value: rebuilder?.team_name ?? 'No clear leader',
-      note: rebuilder
-        ? `Draft Capital ${formatRank(rebuilder.draft_capital_rank, rebuilder.draft_capital_rank_tied)} · ${rebuilder.strategy_label ?? 'Rebuild'}`
-        : 'No rebuild read available yet.',
-      icon: 'construct',
-      color: colors.premium,
-      avatarUrl: rebuilder?.avatar_url ?? null,
-    },
-    {
-      label: 'Draft Capital Leader',
-      value: draftLeader?.team_name ?? 'No clear leader',
-      note: draftLeader ? `Draft Capital ${formatRank(draftLeader.draft_capital_rank, draftLeader.draft_capital_rank_tied)}` : 'No draft-capital read available yet.',
-      icon: 'layers',
-      color: colors.success,
-      avatarUrl: draftLeader?.avatar_url ?? null,
-    },
-    {
-      label: 'Most Active Manager',
-      value: mostActive?.team_name ?? 'Quiet market',
-      note:
-        mostActive && mostActive.transaction_activity_count > 0
-          ? `${mostActive.transaction_activity_count} move${mostActive.transaction_activity_count === 1 ? '' : 's'} this season`
-          : 'No transaction activity tracked yet.',
-      icon: 'repeat',
-      color: colors.violet,
-      avatarUrl: mostActive?.avatar_url ?? null,
-    },
-  ];
-  return tiles;
+/** Player Detail stub for any player a briefing item mentions (web's
+ * BriefingItemPlayers chips open that player). */
+function playerStubFromSignal(player: SignalPlayer): RankedPlayer {
+  return {
+    player_id: player.player_id,
+    name: player.name || null,
+    position: player.position || null,
+    team: player.team || null,
+    age: null,
+    status: null,
+    injury_status: player.injury_status || null,
+    tier: player.tier || null,
+    score: player.score,
+    overall_rank: null,
+    position_rank: null,
+    rank_unavailable_reason: null,
+    opportunity_label: null,
+  };
 }
 
 /** Partitions a dashboard item's route_player_id into the same
@@ -615,7 +542,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
         onChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.guillotine(leagueId) })}
       />
       <View style={styles.activityRow}>
-        {teamRankings && teamRankings.length > 0 ? (
+        {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
           entitlement && !entitlement.is_premium ? (
             <View style={styles.activityCell}>
               <PremiumLock
@@ -625,7 +552,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             </View>
           ) : (
             <View style={styles.activityCell}>
-              <LeaguePulseSection teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+              <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
             </View>
           )
         ) : null}
@@ -644,38 +571,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
       </View>
       </ScrollView>
     </View>
-  );
-}
-
-function LeaguePulseSection({ teams, onPress }: { teams: TeamRanking[]; onPress: () => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const tiles = buildLeaguePulseTiles(teams, colors).slice(0, 2);
-  if (tiles.length === 0) return null;
-  return (
-    <AnimatedCard style={styles.pulseCard} onPress={onPress}>
-      <View style={styles.pulseHeaderRow}>
-        <AppText style={styles.pulseTitle}>League Activity</AppText>
-        <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-      </View>
-      {tiles.map((tile) => (
-        <View key={tile.label} style={styles.pulseItem}>
-          <View style={styles.pulseLabelRow}>
-            <Ionicons name={tile.icon} size={12} color={tile.color} />
-            <AppText style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</AppText>
-          </View>
-          <View style={styles.pulseValueRow}>
-            <TeamAvatar avatarId={tile.avatarUrl} size={20} />
-            <AppText style={styles.pulseValue} numberOfLines={1}>
-              {tile.value}
-            </AppText>
-          </View>
-          <AppText style={styles.pulseNote} numberOfLines={1}>
-            {tile.note}
-          </AppText>
-        </View>
-      ))}
-    </AnimatedCard>
   );
 }
 
@@ -1053,6 +948,12 @@ function BriefingCard({
       </View>
       <AppText style={styles.cardHeadline}>{item.headline}</AppText>
       {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
+      <BriefingItemPlayers
+        item={item}
+        onPressPlayer={(player) =>
+          navigation.navigate('PlayerDetail', { player: playerStubFromSignal(player), leagueId, leagueName })
+        }
+      />
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AccentCard>
   );
@@ -1095,6 +996,18 @@ function DashboardInsightRow({
     ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
     : undefined;
 
+  // Every other player the item names (web shows all of them, not just the
+  // route player) via the shared BriefingItemPlayers.
+  const playersBlock = (excludePlayerId: string | null) => (
+    <BriefingItemPlayers
+      item={item}
+      excludePlayerId={excludePlayerId}
+      onPressPlayer={(player) =>
+        navigation.navigate('PlayerDetail', { player: playerStubFromSignal(player), leagueId, leagueName })
+      }
+    />
+  );
+
   if (item.route_player_id) {
     // Some tiles' headline text IS just the player's own name (e.g. a
     // waiver/trade target) — CompactPlayerModule already renders that
@@ -1123,7 +1036,9 @@ function DashboardInsightRow({
         valueLabel="VALUE"
         detail={showExplanations ? item.reason : null}
         trailing={trendPct !== null ? <ToneBadge label={`↓ ${trendPct}%`} color={colors.danger} /> : null}
-      />
+      >
+        {playersBlock(item.route_player_id)}
+      </PlayerInsightRow>
     );
   }
 
@@ -1139,7 +1054,9 @@ function DashboardInsightRow({
       onActionPress={onActionPress}
       onPress={onPress}
       last={last}
-    />
+    >
+      {playersBlock(null)}
+    </InsightRow>
   );
 }
 
@@ -1272,23 +1189,6 @@ function createStyles(colors: ThemeColors) {
   // dividers, per Magna Carta §12, instead of a full card per item.
   groupSection: { marginBottom: spacing.md },
   groupCard: { padding: spacing.lg, paddingVertical: spacing.xs },
-  pulseSection: { marginTop: spacing.lg },
-  pulseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  pulseTile: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    backgroundColor: colors.surfaceSolid,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderLeftWidth: 3,
-    padding: spacing.md,
-  },
-  pulseLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pulseLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  pulseValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
-  pulseNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   checkInBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1304,10 +1204,6 @@ function createStyles(colors: ThemeColors) {
   viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
   activityRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch', marginBottom: spacing.md },
   activityCell: { flex: 1, minWidth: 0 },
-  pulseCard: { flex: 1, padding: spacing.md, gap: spacing.sm },
-  pulseHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pulseTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 },
-  pulseItem: { gap: 2 },
   snapshotHelp: { marginTop: spacing.xs },
   snapshotRow: {
     flexDirection: 'row',

@@ -20,9 +20,13 @@ import { spacing, type ThemeColors } from '../theme';
 export default function BriefingItemPlayers({
   item,
   onPressPlayer,
+  excludePlayerId,
 }: {
   item: DashboardItem;
   onPressPlayer?: (player: SignalPlayer) => void;
+  /** Skip this player (a row that already renders the route player itself
+   * passes its id so only the other mentioned players are added). */
+  excludePlayerId?: string | null;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -43,7 +47,7 @@ export default function BriefingItemPlayers({
     );
   }
 
-  const players = signalPlayers(item);
+  const players = signalPlayers(item).filter((p) => !excludePlayerId || p.player_id !== excludePlayerId);
   if (players.length === 0) return null;
   return (
     <View style={styles.stack}>
