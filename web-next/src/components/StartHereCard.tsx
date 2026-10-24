@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -19,20 +19,42 @@ import {
 } from "@/lib/startHere";
 import { thisWeekHref } from "@/lib/thisWeek";
 
-function readState(userId: string): StartHereState {
+const startHereListeners = new Set<() => void>();
+// Only populated when a localStorage write fails, so the card still reflects
+// the change for this page view.
+const startHereUnsaved = new Map<string, string>();
+
+function subscribeStartHere(onChange: () => void) {
+  startHereListeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    startHereListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function readRaw(userId: string): string | null {
+  const key = startHereStorageKey(userId);
+  const unsaved = startHereUnsaved.get(key);
+  if (unsaved !== undefined) return unsaved;
   try {
-    return parseStartHereState(window.localStorage.getItem(startHereStorageKey(userId)));
+    return window.localStorage.getItem(key);
   } catch {
-    return EMPTY_START_HERE_STATE;
+    return null;
   }
 }
 
 function writeState(userId: string, state: StartHereState) {
+  const key = startHereStorageKey(userId);
+  const raw = JSON.stringify(state);
   try {
-    window.localStorage.setItem(startHereStorageKey(userId), JSON.stringify(state));
+    window.localStorage.setItem(key, raw);
+    startHereUnsaved.delete(key);
   } catch {
     // Best-effort: worst case the card shows again.
+    startHereUnsaved.set(key, raw);
   }
+  startHereListeners.forEach((listener) => listener());
 }
 
 /**
@@ -53,15 +75,16 @@ export function StartHereCard({
   leagueName: string;
 }) {
   // null until read on the client, so server and first client render match.
-  const [state, setState] = useState<StartHereState | null>(null);
-  useEffect(() => {
-    setState(readState(userId));
-  }, [userId]);
+  const getSnapshot = useCallback(() => readRaw(userId), [userId]);
+  const raw = useSyncExternalStore(subscribeStartHere, getSnapshot, () => undefined);
+  const state = useMemo<StartHereState | null>(
+    () => (raw === undefined ? null : parseStartHereState(raw)),
+    [raw],
+  );
 
   if (!state || !shouldShowStartHere(state, accountCreatedAt)) return null;
 
   const update = (next: StartHereState) => {
-    setState(next);
     writeState(userId, next);
   };
 

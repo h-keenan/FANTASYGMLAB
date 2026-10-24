@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "@/components/Button";
@@ -35,6 +35,50 @@ export { ONBOARDING_FEATURES };
 
 const SWIPE_THRESHOLD_PX = 50;
 
+/**
+ * Creates the <body>-level portal root while mounted and makes every other
+ * <body> child inert + aria-hidden. Null on the server and first render; the
+ * root appears once the subscription is live.
+ */
+function usePortalRoot(): HTMLElement | null {
+  const [store] = useState(() => {
+    let root: HTMLElement | null = null;
+    const listeners = new Set<() => void>();
+    const emit = () => listeners.forEach((l) => l());
+    return {
+      subscribe(listener: () => void) {
+        listeners.add(listener);
+        if (listeners.size > 1) return () => void listeners.delete(listener);
+        const created = document.createElement("div");
+        created.setAttribute("data-onboarding-root", "");
+        document.body.appendChild(created);
+        const hidden: Array<{ el: Element; inert: boolean; aria: string | null }> = [];
+        for (const el of Array.from(document.body.children)) {
+          if (el === created) continue;
+          hidden.push({ el, inert: el.hasAttribute("inert"), aria: el.getAttribute("aria-hidden") });
+          el.setAttribute("inert", "");
+          el.setAttribute("aria-hidden", "true");
+        }
+        root = created;
+        emit();
+        return () => {
+          listeners.delete(listener);
+          if (listeners.size > 0) return;
+          for (const { el, inert, aria } of hidden) {
+            if (!inert) el.removeAttribute("inert");
+            if (aria === null) el.removeAttribute("aria-hidden");
+            else el.setAttribute("aria-hidden", aria);
+          }
+          created.remove();
+          root = null;
+        };
+      },
+      getSnapshot: () => root,
+    };
+  });
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, () => null);
+}
+
 export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => void; replay?: boolean }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
@@ -45,28 +89,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   // landing page's z-index:1 stacking context, so the site Header and the
   // backdrop-filter store badges painted over it on iOS Safari. While it is
   // open every other <body> child is made inert + aria-hidden.
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    const root = document.createElement("div");
-    root.setAttribute("data-onboarding-root", "");
-    document.body.appendChild(root);
-    const hidden: Array<{ el: Element; inert: boolean; aria: string | null }> = [];
-    for (const el of Array.from(document.body.children)) {
-      if (el === root) continue;
-      hidden.push({ el, inert: el.hasAttribute("inert"), aria: el.getAttribute("aria-hidden") });
-      el.setAttribute("inert", "");
-      el.setAttribute("aria-hidden", "true");
-    }
-    setPortalRoot(root);
-    return () => {
-      for (const { el, inert, aria } of hidden) {
-        if (!inert) el.removeAttribute("inert");
-        if (aria === null) el.removeAttribute("aria-hidden");
-        else el.setAttribute("aria-hidden", aria);
-      }
-      root.remove();
-    };
-  }, []);
+  const portalRoot = usePortalRoot();
   const [direction, setDirection] = useState<"next" | "back">("next");
   const { setLevel: saveExperienceLevel } = useExperienceLevel();
 

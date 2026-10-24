@@ -62,7 +62,7 @@ export function ShareTradeButton({
 
   // The PNG is pre-rendered once the card is on screen so the tap can call
   // navigator.share({files}) inside the user gesture (iOS Safari).
-  const share = useShareImage({
+  const { observe, onClick: onShare, busy: preparingImage, label, status } = useShareImage({
     cacheKey: canBuild ? `trade:${leagueId}:${recommendationId}:${strategy}:${lens}` : null,
     build: canBuild ? () => api.getTradeHubIdeaShareCardBlob(leagueId!, recommendationId!, strategy, lens) : undefined,
     filename: `fantasydesk-trade-${recommendationId ?? "idea"}.png`,
@@ -79,13 +79,11 @@ export function ShareTradeButton({
       }
     },
   });
-  const onShare = share.onClick;
-  const preparingImage = share.busy;
 
   return (
     <>
     <button
-      ref={share.observe}
+      ref={observe}
       type="button"
       onClick={onShare}
       disabled={preparingImage}
@@ -107,11 +105,11 @@ export function ShareTradeButton({
         <path d="M16 6l-4-4-4 4" />
         <path d="M12 2v13" />
       </svg>
-      {copied ? "Copied!" : share.label("Share Trade")}
+      {copied ? "Copied!" : label("Share Trade")}
     </button>
-    {share.status ? (
+    {status ? (
       <p role="status" className="basis-full w-full text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {share.status}
+        {status}
       </p>
     ) : null}
     </>

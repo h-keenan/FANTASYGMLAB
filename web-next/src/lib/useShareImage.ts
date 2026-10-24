@@ -118,10 +118,14 @@ export function useShareImage(options: UseShareImageOptions) {
   const hasBuild = Boolean(options.build);
   const [stage, setStage] = useState<ShareStage>("idle");
   const [status, setStatus] = useState<string | null>(null);
-  const [visible, setVisible] = useState(!lazy);
+  const [seen, setSeen] = useState(!lazy);
+  // Without IntersectionObserver there is nothing to wait for.
+  const visible = seen || typeof IntersectionObserver === "undefined";
   const [element, setElement] = useState<Element | null>(null);
   const latest = useRef(options);
-  latest.current = options;
+  useEffect(() => {
+    latest.current = options;
+  });
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -134,15 +138,11 @@ export function useShareImage(options: UseShareImageOptions) {
   // Lazy: flip `visible` once the element is on screen.
   useEffect(() => {
     if (!lazy || visible) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
-    }
     if (!element) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
-          setVisible(true);
+          setSeen(true);
           observer.disconnect();
         }
       },

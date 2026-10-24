@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import {
   ONBOARDING_FEATURES,
@@ -18,19 +18,24 @@ const SLIDES = ONBOARDING_VALUE_SLIDE_KEYS.map((key) => ONBOARDING_FEATURES.find
  * funnel steps). Auto-advance is off under prefers-reduced-motion and can be
  * paused; tapping a dot jumps and stops the timer.
  */
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void) {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener?.("change", onChange);
+  return () => mq.removeEventListener?.("change", onChange);
+}
+
+function getReducedMotion() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
 export function OnboardingValueSlides({ direction }: { direction: "next" | "back" }) {
   const [slide, setSlide] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = () => setReduced(mq.matches);
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
+  const reduced = useSyncExternalStore(subscribeReducedMotion, getReducedMotion, () => false);
 
   const auto = !paused && !reduced;
   useEffect(() => {
