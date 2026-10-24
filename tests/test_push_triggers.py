@@ -7,7 +7,7 @@ across the mobile API tests.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -544,11 +544,11 @@ def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
         preferences = push_triggers.fetch_push_preferences(_config(), ["u1", "u2"])
     assert preferences["u1"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": False,
-        "team_situation": True, "trade_followup": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True,
     }
     assert preferences["u2"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": True,
-        "team_situation": True, "trade_followup": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True,
     }
 
 
@@ -1101,3 +1101,144 @@ def test_trade_followup_fails_closed_when_preferences_unreadable():
     assert stats["ok"] is False
     mock_post.assert_not_called()
     mock_patch.assert_not_called()
+
+
+# --- lineup lock + waiver reminder -----------------------------------------
+
+_NOW = datetime(2026, 10, 25, 16, 0, tzinfo=timezone.utc)  # Sunday 12:00 ET
+
+
+def _games_frame():
+    # Week 7: KC hosts DEN at 13:00 ET (17:00 UTC, one hour after _NOW);
+    # BUF hosts MIA at 16:25 ET (outside the 2h window). Week 8 gives KC a game
+    # so week 7 is not KC's bye.
+    rows = [
+        ("2026_07_DEN_KC", 7, "DEN", "KC", "2026-10-25", "13:00"),
+        ("2026_07_MIA_BUF", 7, "MIA", "BUF", "2026-10-25", "16:25"),
+        ("2026_08_KC_BUF", 8, "KC", "BUF", "2026-11-01", "13:00"),
+    ]
+    return pd.DataFrame(
+        [
+            {
+                "game_id": gid, "season": 2026, "week": wk, "game_type": "REG",
+                "away_team": away, "home_team": home, "gameday": day, "gametime": tm,
+                "away_score": None, "home_score": None, "spread_line": None, "total_line": None,
+            }
+            for gid, wk, away, home, day, tm in rows
+        ]
+    )
+
+
+def _league(**settings):
+    return {"season": "2026", "status": "in_season", "settings": {"leg": 7, **settings}}
+
+
+def _lineup_players():
+    return pd.DataFrame(
+        [
+            {"player_id": "p1", "name": "Hurt Guy", "team": "KC", "injury_status": "Out"},
+            {"player_id": "p2", "name": "Late Game", "team": "BUF", "injury_status": "Out"},
+            {"player_id": "p3", "name": "Healthy", "team": "KC", "injury_status": ""},
+        ]
+    )
+
+
+def _lineup_items(starters, **kwargs):
+    return push_triggers.lineup_lock_push_items(
+        league_id="L1", league_name="Secret League", league=kwargs.pop("league", _league()),
+        my_roster={"players": ["p1", "p2", "p3"], "starters": starters},
+        players_df=_lineup_players(), games=kwargs.pop("games", _games_frame()),
+        now=kwargs.pop("now", _NOW),
+    )
+
+
+def test_lineup_lock_flags_out_starter_inside_window_only():
+    items = _lineup_items(["p1", "p2", "p3"])
+    assert [i["recommendation_id"] for i in items] == ["lineup_lock:L1:7:out:p1:out"]
+    assert items[0]["category"] == "lineup_lock"
+    assert "Hurt Guy" in items[0]["headline"]
+    assert "Secret League" not in items[0]["headline"]
+
+
+def test_lineup_lock_flags_empty_and_invalid_slots_before_next_kickoff():
+    items = _lineup_items(["p3", "0", "zzz"])
+    assert len(items) == 1
+    assert items[0]["recommendation_id"] == "lineup_lock:L1:7:slots:2026-10-25"
+    assert "2 empty or invalid" in items[0]["headline"]
+
+
+def test_lineup_lock_skips_when_no_real_signal():
+    assert _lineup_items(["p3"]) == []  # healthy full lineup
+    assert _lineup_items(["p1"], now=_NOW - timedelta(hours=3)) == []  # kickoff too far away
+    assert _lineup_items(["p1"], now=_NOW + timedelta(hours=2)) == []  # already kicked off
+    assert _lineup_items(["p1"], games=None) == []  # no schedule: do not guess
+    assert _lineup_items(["p1"], league=_league(best_ball=1)) == []
+    assert _lineup_items(["p1"], league={**_league(), "status": "pre_draft"}) == []
+
+
+def test_lineup_lock_uses_the_reserved_cap_slot():
+    items = [{"category": "lineup_lock"}, {"category": "watch"}]
+    assert push_triggers.apply_weekly_cap(items, sent_this_week=3, cap=4) == [{"category": "lineup_lock"}]
+    assert push_triggers.apply_weekly_cap(items, sent_this_week=4, cap=4) == []
+
+
+def test_new_categories_are_toggleable_and_titled():
+    for key in ("lineup_lock", "waiver_reminder"):
+        assert key in push_triggers.TOGGLEABLE_PUSH_CATEGORIES
+        assert key in push_triggers.PUSH_TITLE_BY_CATEGORY
+    prefs = {"u1": {"lineup_lock": False, "waiver_reminder": True}}
+    assert not push_triggers.push_item_allowed(prefs, user_id="u1", category="lineup_lock")
+    assert push_triggers.push_item_allowed(prefs, user_id="u1", category="waiver_reminder")
+
+
+def _waiver_item(monkeypatch, *, now, league=None, need_fit=True, needed=("RB",), roster_settings=None):
+    players = pd.DataFrame(
+        [
+            {"player_id": "p1", "name": "Mine", "position": "WR", "team": "KC"},
+            {"player_id": "fa1", "name": "Free", "position": "RB", "team": "BUF"},
+        ]
+    )
+    monkeypatch.setattr(push_triggers.league_value_settings, "detect_league_value_settings_from_payload", lambda lg: {})
+    monkeypatch.setattr(push_triggers.dashboard_engine, "suggest_optimal_lineup", lambda *a, **k: pd.DataFrame())
+    monkeypatch.setattr(push_triggers.dashboard_engine, "build_team_needs_assessment", lambda *a, **k: object())
+    monkeypatch.setattr(push_triggers.dashboard_engine, "get_needed_positions", lambda *a, **k: list(needed))
+    monkeypatch.setattr(
+        push_triggers.dashboard_engine,
+        "select_top_waiver_opportunity",
+        lambda *a, **k: pd.Series({"position": "RB", "priority_need_fit": need_fit}),
+    )
+    return push_triggers.waiver_reminder_push_item(
+        league_id="L1", league_name="Secret League",
+        league=league or _league(waiver_type=0, waiver_day_of_week=2),
+        my_roster={"players": ["p1"], "settings": roster_settings or {}},
+        rosters=[{"players": ["p1"]}], players_df=players, score_field="dynasty_score", now=now,
+    )
+
+
+_TUESDAY_3PM_ET = datetime(2026, 10, 27, 19, 0, tzinfo=timezone.utc)  # day before Wednesday waivers
+
+
+def test_waiver_reminder_fires_evening_before_with_real_need(monkeypatch):
+    item = _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET)
+    assert item["category"] == "waiver_reminder"
+    assert item["recommendation_id"] == "waiver_reminder:L1:2026-10-28"
+    assert "Secret League" not in item["headline"]
+
+
+def test_waiver_reminder_skips_without_timing_or_need(monkeypatch):
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET - timedelta(days=1)) is None  # wrong day
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET - timedelta(hours=9)) is None  # before noon ET
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, need_fit=False) is None
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, needed=()) is None
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=_league(waiver_type=0)) is None
+    daily = _league(waiver_type=0, waiver_day_of_week=2, daily_waivers=1)
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=daily) is None
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=_league(waiver_day_of_week=2)) is None
+
+
+def test_waiver_reminder_skips_faab_league_with_no_budget(monkeypatch):
+    faab_league = _league(waiver_type=2, waiver_day_of_week=2, waiver_budget=100)
+    spent = {"waiver_budget_used": 100}
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=faab_league, roster_settings=spent) is None
+    left = {"waiver_budget_used": 40}
+    assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=faab_league, roster_settings=left) is not None

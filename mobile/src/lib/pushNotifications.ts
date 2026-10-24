@@ -116,6 +116,11 @@ function routeNotificationTap(data: unknown): void {
     return;
   }
 
+  if (target.screen === 'Matchup' || target.screen === 'Waivers') {
+    navigationRef.navigate(target.screen, { leagueId: target.leagueId, leagueName: target.leagueName });
+    return;
+  }
+
   if (target.screen === 'PlayerDetail') {
     // Same lean hand-built player pattern AlertsScreen/DashboardScreen use
     // for their own player taps - Player Detail fetches everything else

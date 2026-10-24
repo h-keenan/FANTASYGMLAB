@@ -2974,7 +2974,9 @@ export type PushCategory =
   | "recap"
   | "injury"
   | "team_situation"
-  | "trade_followup";
+  | "trade_followup"
+  | "lineup_lock"
+  | "waiver_reminder";
 
 export interface PushPreferencesResponse {
   ok: boolean;
