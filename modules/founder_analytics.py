@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import time
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
+
+import requests
 
 from modules import launch_analytics as la
 
@@ -44,6 +47,12 @@ PREMIUM_EVENTS: dict[str, str] = {
     "checkout_completed": "Checkout completed (recorded)",
     "premium_entitlement_activated": "Entitlement activated (recorded)",
     "portal_opened": "Billing portal opens",
+    # Webhook-derived (Python webhooks emitted these via track_event; the
+    # Supabase edge webhooks only write billing_webhook_events, so build_report
+    # derives them from that table -- see _billing_lifecycle_rows).
+    "trial_started": "Trials started (webhook)",
+    "subscribed": "Subscribed (webhook)",
+    "churned": "Churned (webhook)",
 }
 
 
@@ -133,16 +142,53 @@ def _feature_use_table(rows: list[dict[str, Any]], *, limit: int = 40) -> list[d
     return ordered[:limit]
 
 
-def _row_user_id(row: Mapping[str, Any]) -> str:
-    for field in ("user_key", "account_hash", "anon_id"):
+def _row_user_id(row: Mapping[str, Any], identity: Mapping[str, str] | None = None) -> str:
+    """Distinct-person id for a row: account key when present, else the anon
+    id -- resolved through ``identity`` (anon_id -> account key) so a person's
+    pre-sign-in (anon-only) rows and post-sign-in rows count as ONE user."""
+
+    for field in ("user_key", "account_hash"):
         value = str(row.get(field) or "").strip()
         if value:
             return value
-    return ""
+    anon = str(row.get("anon_id") or "").strip()
+    if anon and identity:
+        return identity.get(anon) or anon
+    return anon
+
+
+def _identity_map(rows: list[dict[str, Any]]) -> dict[str, str]:
+    """anon_id -> account key, from every row that carries both. An anon id
+    seen with several accounts (shared browser) is left unstitched."""
+
+    seen: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for row in rows:
+        anon = str(row.get("anon_id") or "").strip()
+        acct = str(row.get("user_key") or row.get("account_hash") or "").strip()
+        if not anon or not acct:
+            continue
+        if seen.setdefault(anon, acct) != acct:
+            ambiguous.add(anon)
+    return {a: u for a, u in seen.items() if a not in ambiguous}
 
 
 def _pct(part: int, whole: int) -> float:
     return round(100.0 * part / whole, 1) if whole > 0 else 0.0
+
+
+# Signup onboarding was 10 steps (8 feature slides, connect 8, level 9) until
+# 2026-10-23, then 3 (value 0, connect 1, level 2, web-only paywall 3). Old
+# rows share the connect/level names but with indexes 8/9; they must not be
+# merged into the new funnel (ordering and drop-off would be garbage).
+LEGACY_ONBOARDING_STEPS = frozenset(
+    {"gameplan", "tradehub", "matchup", "planner", "pqv", "playoff", "tendencies", "waivers"}
+)
+_LEGACY_INDEX_BY_STEP = {"connect": 8, "level": 9}
+
+
+def _is_legacy_onboarding_step(step: str, idx: int) -> bool:
+    return step in LEGACY_ONBOARDING_STEPS or _LEGACY_INDEX_BY_STEP.get(step) == idx
 
 
 def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -151,8 +197,11 @@ def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     Users are distinct anon/account ids. Returns None (the UI shows nothing)
     when no onboarding event was actually stored -- never zeros."""
 
+    identity = _identity_map(rows)
     viewed: dict[str, set[str]] = {}
     step_index: dict[str, int] = {}
+    legacy_viewed: dict[str, set[str]] = {}
+    legacy_index: dict[str, int] = {}
     skipped: dict[str, set[str]] = {}
     skipped_any: set[str] = set()
     completed: set[str] = set()
@@ -165,23 +214,31 @@ def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
         if str(props.get("feature") or "").strip() != "onboarding":
             continue
-        user = _row_user_id(row)
+        user = _row_user_id(row, identity)
         if not user:
             continue
         action = str(props.get("action") or "").strip()
         step = str(props.get("step") or "").strip()[:40]
         seen = True
         if action == "step_viewed" and step:
-            viewed.setdefault(step, set()).add(user)
-            started.add(user)
             try:
                 idx = int(props.get("step_index"))
             except (TypeError, ValueError):
                 idx = 999
+            started.add(user)
+            if _is_legacy_onboarding_step(step, idx):
+                legacy_viewed.setdefault(step, set()).add(user)
+                legacy_index[step] = min(legacy_index.get(step, idx), idx)
+                continue
+            viewed.setdefault(step, set()).add(user)
             step_index[step] = min(step_index.get(step, idx), idx)
         elif action == "skipped":
             skipped_any.add(user)
-            if step:
+            try:
+                skip_idx = int(props.get("step_index"))
+            except (TypeError, ValueError):
+                skip_idx = 999
+            if step and not _is_legacy_onboarding_step(step, skip_idx):
                 skipped.setdefault(step, set()).add(user)
         elif action == "completed":
             completed.add(user)
@@ -191,21 +248,31 @@ def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
                 experience.setdefault(choice, set()).add(user)
     if not seen:
         return None
-    order = sorted(viewed, key=lambda name: (step_index.get(name, 999), name))
-    steps: list[dict[str, Any]] = []
-    prev: int | None = None
-    for name in order:
-        users = len(viewed[name])
-        steps.append(
-            {
-                "step": name,
-                "step_index": step_index.get(name, 999),
-                "users": users,
-                "drop_off_pct": _pct(max(prev - users, 0), prev) if prev else None,
-                "skipped_users": len(skipped.get(name, set())),
-            }
-        )
-        prev = users
+    def _build_steps(
+        views: dict[str, set[str]], index: dict[str, int]
+    ) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        prev: int | None = None
+        for name in sorted(views, key=lambda n: (index.get(n, 999), n)):
+            users = len(views[name])
+            out.append(
+                {
+                    "step": name,
+                    "step_index": index.get(name, 999),
+                    "users": users,
+                    "drop_off_pct": _pct(max(prev - users, 0), prev) if prev else None,
+                    "skipped_users": len(skipped.get(name, set())),
+                }
+            )
+            prev = users
+        return out
+
+    steps = _build_steps(viewed, step_index)
+    legacy_steps = _build_steps(legacy_viewed, legacy_index)
+    # A user can complete/skip without a stored step_viewed (dropped event,
+    # tab opened mid-flow); they still entered the funnel, and the rate
+    # denominator must contain every numerator or rates exceed 100%.
+    started |= completed | skipped_any
     base = len(started)
     exp_total = sum(len(v) for v in experience.values())
     return {
@@ -215,6 +282,7 @@ def _onboarding_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         "skipped_users": len(skipped_any),
         "skip_rate_pct": _pct(len(skipped_any), base) if base else None,
         "steps": steps,
+        "legacy_steps": legacy_steps,
         "experience": {
             key: {"users": len(experience[key]), "pct": _pct(len(experience[key]), exp_total)}
             for key in sorted(experience)
@@ -253,6 +321,138 @@ def _unique_ids(rows: list[dict[str, Any]], *, field: str) -> int:
     values = {str(row.get(field) or "").strip() for row in rows}
     values.discard("")
     return len(values)
+
+
+BILLING_WEBHOOK_TABLE = "billing_webhook_events"
+_BILLING_DEDUPE_WINDOW_S = 300.0
+_PAID_ENTITLEMENTS = frozenset({"premium", "front_office"})
+_BILLING_START_EVENTS = frozenset({"checkout.session.completed", "customer.subscription.created"})
+
+
+def _fetch_billing_webhook_events(
+    *, since_ts: float | None, limit: int = 20_000
+) -> list[dict[str, Any]]:
+    """Processed Stripe/RevenueCat webhooks (service_role read). Fail-soft: any
+    problem (table not migrated, network, auth) returns []."""
+
+    try:
+        config = la.load_analytics_supabase_config()
+    except Exception:
+        return []
+    if not config.configured:
+        return []
+    base: dict[str, str] = {
+        "select": "provider,event_id,event_type,user_id,outcome,entitlement,reason,trial_transition,received_at",
+        "outcome": "eq.applied",
+        "order": "received_at.asc,event_id.asc",
+    }
+    if since_ts is not None:
+        base["received_at"] = "gte." + datetime.fromtimestamp(since_ts, tz=timezone.utc).isoformat()
+    out: list[dict[str, Any]] = []
+    offset = 0
+    while len(out) < limit:
+        page_size = min(la.SUPABASE_PAGE_SIZE, limit - len(out))
+        try:
+            response = requests.get(
+                f"{config.url}/rest/v1/{BILLING_WEBHOOK_TABLE}",
+                headers=la._analytics_supabase_headers(config),
+                params={**base, "limit": str(page_size), "offset": str(offset)},
+                timeout=15,
+            )
+            if response.status_code >= 400:
+                return []
+            parsed = response.json()
+        except Exception:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        out.extend(dict(r) for r in parsed if isinstance(r, Mapping))
+        if len(parsed) < page_size:
+            break
+        offset += len(parsed)
+    return out
+
+
+def _billing_lifecycle_rows(
+    billing_rows: list[dict[str, Any]], existing: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Derive trial_started / subscribed / churned / feature_use trial rows from
+    billing_webhook_events -- what modules.stripe_webhook / revenuecat_webhook
+    used to emit through track_event before billing moved to the Supabase edge
+    functions (which only write that table). A derived row is skipped when
+    ``existing`` already holds the same event for the same account within
+    ``_BILLING_DEDUPE_WINDOW_S`` (webhook rolled back to the Python service).
+
+    RevenueCat rows carry no platform, so they are summarized only (not added
+    to the per-platform feature table). Returns (synthetic_rows, summary)."""
+
+    existing_ts: dict[tuple[str, str], list[float]] = {}
+    for row in existing:
+        name = la.normalize_event_name(str(row.get("event") or ""))
+        if name in {"trial_started", "subscribed", "churned"}:
+            key = (name, str(row.get("user_key") or row.get("account_hash") or ""))
+            try:
+                existing_ts.setdefault(key, []).append(float(row.get("ts") or 0))
+            except (TypeError, ValueError):
+                continue
+
+    def _dupe(name: str, user_key: str, ts: float) -> bool:
+        return any(abs(t - ts) <= _BILLING_DEDUPE_WINDOW_S for t in existing_ts.get((name, user_key), []))
+
+    synthetic: list[dict[str, Any]] = []
+    summary: dict[str, Any] = {
+        "source": BILLING_WEBHOOK_TABLE,
+        "stripe": {"trial_started": 0, "subscribed": 0, "churned": 0, "trial_converted": 0, "trial_canceled": 0},
+        "revenuecat": {"trial_started": 0, "trial_converted": 0, "trial_canceled": 0},
+    }
+    for raw in billing_rows:
+        provider = str(raw.get("provider") or "").strip().casefold()
+        event_type = str(raw.get("event_type") or "").strip()
+        entitlement = str(raw.get("entitlement") or "").strip().casefold()
+        transition = str(raw.get("trial_transition") or "").strip().casefold()
+        user_id = str(raw.get("user_id") or "").strip()
+        try:
+            ts = datetime.fromisoformat(str(raw.get("received_at") or "").replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            ts_epoch = ts.timestamp()
+        except ValueError:
+            continue
+        user_key = la.hash_account_id(user_id)
+
+        def _row(event: str, props: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "event": event,
+                "ts": ts_epoch,
+                "anon_id": "",
+                "session_key": "",
+                "user_key": user_key,
+                "account_hash": user_key,
+                "props": {"source_surface": BILLING_WEBHOOK_TABLE, **props},
+            }
+
+        if provider == "revenuecat":
+            if transition in {"started", "converted", "canceled"}:
+                summary["revenuecat"][f"trial_{transition}"] += 1
+            continue
+        if provider != "stripe":
+            continue
+        derived: list[dict[str, Any]] = []
+        if entitlement in _PAID_ENTITLEMENTS and event_type in _BILLING_START_EVENTS:
+            name = "trial_started" if transition == "started" else "subscribed"
+            if not _dupe(name, user_key, ts_epoch):
+                derived.append(_row(name, {"platform": "web", "tier": "pro" if entitlement == "premium" else entitlement}))
+                summary["stripe"][name] += 1
+        if transition in {"converted", "canceled"}:
+            derived.append(_row("feature_use", {"platform": "web", "feature": "trial", "action": transition}))
+            summary["stripe"][f"trial_{transition}"] += 1
+        if entitlement == "free" and event_type == "customer.subscription.deleted":
+            if not _dupe("churned", user_key, ts_epoch):
+                derived.append(_row("churned", {"platform": "web", "reason": event_type}))
+                summary["stripe"]["churned"] += 1
+        synthetic.extend(derived)
+    return synthetic, summary
+
 
 
 def _storage_honesty(*, writes_enabled: bool, path: Path, source: str = "local_jsonl") -> dict[str, Any]:
@@ -300,6 +500,15 @@ def build_report(
     # the same rows for adoption/health below rather than issuing a second
     # (and third) Supabase round trip for the same report.
     rows, source = la.read_events_with_source(path=path, since_ts=since)
+    # Drop pytest/CI rows if a test run ever shared the durable table; legacy
+    # rows with no environment stamp are kept.
+    rows = [r for r in rows if str(r.get("environment") or "").strip().casefold() != "test"]
+    lifecycle_rows: list[dict[str, Any]] = []
+    billing_lifecycle: dict[str, Any] | None = None
+    if path is None and source == "supabase":
+        lifecycle_rows, billing_lifecycle = _billing_lifecycle_rows(
+            _fetch_billing_webhook_events(since_ts=since), rows
+        )
     event_counts: dict[str, int] = {}
     for row in rows:
         event = la.normalize_event_name(str(row.get("event") or ""))
@@ -335,10 +544,11 @@ def build_report(
         or _unique_ids(rows, field="account_hash"),
         "product_modules": modules,
         "decision_engagement": _count_named(rows, DECISION_EVENTS),
-        "premium": _count_named(rows, PREMIUM_EVENTS),
+        "premium": _count_named(rows + lifecycle_rows, PREMIUM_EVENTS),
+        "billing_lifecycle": billing_lifecycle,
         "checkout_intervals": _interval_counts(rows),
         "platforms": _platform_counts(rows),
-        "feature_use": _feature_use_table(rows),
+        "feature_use": _feature_use_table(rows + lifecycle_rows),
         "onboarding_funnel": _onboarding_funnel(rows),
         "espn_import_outcomes": _espn_import_outcomes(rows),
         "errors": health.get("errors_by_class") or {},

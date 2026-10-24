@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingPaywall } from "./OnboardingPaywall";
 import { api, type BillingPlan } from "@/lib/api";
+import { ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
+import * as onboardingAnalytics from "@/lib/onboardingAnalytics";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -96,5 +98,18 @@ describe("OnboardingPaywall", () => {
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
     expect(await screen.findByText("Could not load plans.")).toBeInTheDocument();
+  });
+
+  it("reports the paywall step right after the carousel's last step (not a stale index)", () => {
+    const spy = vi.spyOn(onboardingAnalytics, "trackOnboardingStepViewed").mockImplementation(() => {});
+    vi.mocked(api.getBillingPlans).mockResolvedValue({
+      ok: true,
+      plans: PLANS,
+      stripe_publishable_key: "pk_test_123",
+      trial: { days: 3, eligible: true },
+    });
+    render(<OnboardingPaywall onSkip={vi.fn()} />);
+    expect(spy).toHaveBeenCalledWith("paywall", ONBOARDING_STEP_KEYS.length);
+    spy.mockRestore();
   });
 });

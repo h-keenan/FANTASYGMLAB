@@ -10,7 +10,7 @@ import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
-import { trackFeatureUse } from "@/lib/analytics";
+import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { setLandingPending } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 import { supabase } from "@/lib/supabase";
@@ -76,6 +76,15 @@ export function LandingAuthIsland() {
   // checkout means it was necessarily already seen or skipped this session.
   const [carouselDone, setCarouselDone] = useState(() => returnedFromCheckout);
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
+  // Checkout completion is no longer recorded server-side as a client-visible
+  // event (billing webhooks moved to Supabase edge functions), so the return
+  // itself is counted: feature_use billing/checkout_return. Once per page load.
+  const checkoutReturnTracked = useRef(false);
+  useEffect(() => {
+    if (!returnedFromCheckout || checkoutReturnTracked.current) return;
+    checkoutReturnTracked.current = true;
+    trackUse("billing", "checkout_return", { props: { result: "success", source_surface: "landing_hero" } });
+  }, [returnedFromCheckout]);
   const skippedExistingSession = useRef(false);
   // Guards the one-time `landing_viewed` fire below -- see its own effect's
   // doc comment for why a plain `!loading && !checkingSavedLeagues` check

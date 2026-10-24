@@ -362,6 +362,13 @@ RATE_LIMIT_GENERAL_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_GENERAL_WINDO
 RATE_LIMIT_MUTATING_MAX = int(os.environ.get("RATE_LIMIT_MUTATING_MAX", "20"))
 RATE_LIMIT_MUTATING_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_MUTATING_WINDOW_SECONDS", "60"))
 _RATE_LIMIT_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# Telemetry ingest has its own bucket. It used to share the 20/min "mutating"
+# budget with trade analysis etc., so one active session (page_view + feature_use
+# per tap, onboarding steps) tripped 429s: analytics events were silently dropped
+# AND the user's real writes started failing. A separate, larger budget fixes both.
+RATE_LIMIT_ANALYTICS_MAX = int(os.environ.get("RATE_LIMIT_ANALYTICS_MAX", "240"))
+RATE_LIMIT_ANALYTICS_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_ANALYTICS_WINDOW_SECONDS", "60"))
+_RATE_LIMIT_ANALYTICS_PATH = "/v1/analytics/event"
 
 
 class _RedisFixedWindowRateLimiter:
@@ -446,6 +453,8 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         limit = RATE_LIMIT_MUTATING_MAX if is_mutating else RATE_LIMIT_GENERAL_MAX
         window = RATE_LIMIT_MUTATING_WINDOW_SECONDS if is_mutating else RATE_LIMIT_GENERAL_WINDOW_SECONDS
         scope = "mutating" if is_mutating else "general"
+        if is_mutating and request.url.path == _RATE_LIMIT_ANALYTICS_PATH:
+            limit, window, scope = RATE_LIMIT_ANALYTICS_MAX, RATE_LIMIT_ANALYTICS_WINDOW_SECONDS, "analytics"
         client_key = _client_rate_limit_key(request)
         # hit() calls the plain synchronous redis-py client (see
         # modules/redis_cache.py), which can block for up to
