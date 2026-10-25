@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ValueStat from '../components/ValueStat';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -393,8 +394,7 @@ function RosterPlayerRow({
         />
       </View>
       <View style={styles.valueColumn}>
-        <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-        <AppText style={styles.valueLabel}>VALUE</AppText>
+        <ValueStat value={player.score != null ? player.score : '—'} />
         <OverallRatingBadge rating={player.overall_rating} />
       </View>
     </TouchableOpacity>
@@ -483,8 +483,6 @@ function createStyles(colors: ThemeColors) {
   compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   compactIdentity: { flex: 1 },
   valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
-  valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
-  valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   error: { color: colors.danger, textAlign: 'center' },
   });
 }

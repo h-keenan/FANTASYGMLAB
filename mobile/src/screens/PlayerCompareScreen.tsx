@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -282,7 +283,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
-        <View style={styles.discoveryCard}>
+        <GlassCard style={styles.discoveryCard}>
           <PlayerIdentityRow
             playerId={player.player_id}
             name={player.name}
@@ -297,7 +298,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
             onChangeText={setSearch}
             autoCapitalize="none"
           />
-        </View>
+        </GlassCard>
         {candidates === null ? (
           <BrandedSpinner style={styles.center} />
         ) : (
@@ -447,16 +448,7 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  discoveryCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.glass,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.glassBorder,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
+  discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   candidateListCard: {
     flex: 1,
     marginHorizontal: spacing.lg,

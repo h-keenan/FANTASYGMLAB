@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import ValueStat from '../components/ValueStat';
 import BeginnerHelp from '../components/BeginnerHelp';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
@@ -387,8 +388,7 @@ function TeamSnapshot({
               <AppText style={styles.outlookBadgeText}>{outlook.toUpperCase()}</AppText>
             </View>
           ) : null}
-          <AppText style={styles.teamValueLabel}>TEAM VALUE</AppText>
-          <AppText style={styles.teamValueNumber}>{teamValue > 0 ? Math.round(teamValue).toLocaleString() : '—'}</AppText>
+          <ValueStat label="Team value" value={teamValue > 0 ? teamValue : '—'} size="lg" />
         </View>
       </View>
       <View style={styles.analyticsMetricsRow}>
@@ -629,8 +629,6 @@ function createStyles(colors: ThemeColors) {
   analysisStatus: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   analysisBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingBottom: spacing.sm },
   analysisNotes: { marginTop: spacing.sm },
-  teamValueLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
-  teamValueNumber: { fontSize: 24, fontWeight: '800', color: colors.textPrimary },
   compBar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: spacing.md },
   compLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   compLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },

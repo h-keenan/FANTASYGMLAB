@@ -29,3 +29,9 @@ Not verified on device. This PR is PR 1 of a split (inventory + first modules).
 - Empty states: "not ready" messages on Dashboard, Trade Hub, Trade Analyzer now use `EmptyState` (no CTA: there is no retry action to attach; Dashboard "nothing urgent" card keeps its BrandMark + BeginnerHelp).
 - Trade Hub position chips: a 9+ option scroll row cannot fit `SegmentedTabBar`'s single track, so it now uses `FilterDropdownButton` like Players/Waivers. The four impact-count tiles are filter stat tiles and stay.
 - Section titles: Home uses `SectionHeading` (3 copies). Uppercase in-card sub-labels ("You give", "On the clock", page kickers) are intentional kickers, left as is.
+
+## PR 3 status
+
+- `GlassCard` (new, `components/GlassCard.tsx`): static glass card; replaces the filter-card and grid-cell copies in Players, Waivers, PlayerCompare. About 28 other files still read `colors.glass` directly (pressable cards use `AnimatedCard`); migrate opportunistically.
+- `ValueStat` gained `size="lg"` and `color`; now used by My Team (Team value), Dashboard (trade value gain chip) and Team Roster rows (number was below its label).
+- Home's "8 Modals" was a grep false positive. Home already uses the shared `ModalFormCard` sheet for add-league and rename; no copies to merge.

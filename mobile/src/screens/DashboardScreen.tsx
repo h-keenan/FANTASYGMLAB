@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ValueStat from '../components/ValueStat';
 import EmptyState from '../components/EmptyState';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -870,14 +871,13 @@ function TopPriorityTradeCard({
       </View>
 
       <View style={styles.valueRow}>
-        <AppText style={styles.valueLabel}>
-          TRADE VALUE / {presentation.trade_market_realism_label.toUpperCase()}
-        </AppText>
         <View style={[styles.valueChip, { backgroundColor: gainChipColor }]}>
-          <AppText style={[styles.valueNumber, { color: gainColor }]}>
-            {gain > 0 ? '+' : ''}
-            {gain}
-          </AppText>
+          <ValueStat
+            align="flex-start"
+            label={`Trade value / ${presentation.trade_market_realism_label}`}
+            value={`${gain > 0 ? '+' : ''}${gain}`}
+            color={gainColor}
+          />
         </View>
       </View>
       <View style={styles.meterRow}>
@@ -1257,14 +1257,13 @@ function createStyles(colors: ThemeColors) {
   },
   valueRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     marginTop: spacing.md,
     paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
-  valueLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4, flexShrink: 1 },
   // A soft tinted chip around the number, not just colored text — "obvious
   // but not sloppy" per coridian_'s brief, so the value result reads as the
   // one clear headline of the row instead of competing with its own label.
@@ -1273,7 +1272,6 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
-  valueNumber: { fontSize: 20, fontWeight: '800' },
   meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   meterSegments: { flexDirection: 'row', gap: 3 },

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -165,7 +166,7 @@ function PlayerRankRow({
 
   if (grid) {
     return (
-      <View style={styles.gridCell}>
+      <GlassCard compact style={styles.gridCell}>
         <PlayerIdentityRow
           layout="grid"
           playerId={player.player_id}
@@ -208,7 +209,7 @@ function PlayerRankRow({
         </TouchableOpacity>
         {tradeActions}
         </View>
-      </View>
+      </GlassCard>
     );
   }
 
@@ -350,7 +351,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
-      <View style={styles.discoveryCard}>
+      <GlassCard style={styles.discoveryCard}>
         <Input
           placeholder="Search players"
           value={search}
@@ -369,7 +370,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
           />
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </View>
-      </View>
+      </GlassCard>
 
       {loading ? (
         <BrandedSpinner style={styles.loading} />
@@ -439,16 +440,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
-  discoveryCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.glass,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.glassBorder,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
+  discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position/Age/Status/Availability now render as one wrapping row of
   // compact dropdown buttons (FilterDropdownButton) instead of four full
   // rows of always-expanded pills — coridian_, Discord: "these filter pills
@@ -498,14 +490,7 @@ function createStyles(colors: ThemeColors) {
   // unpaired last card (odd total count) from stretching to double width
   // instead of sitting flush left like every other card.
   gridRow: { justifyContent: 'space-between', marginBottom: spacing.sm },
-  gridCell: {
-    width: '48%',
-    backgroundColor: colors.glass,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.glassBorder,
-    padding: spacing.sm,
-  },
+  gridCell: { width: '48%' },
   gridFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
