@@ -75,7 +75,7 @@ import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
@@ -444,7 +444,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
         tradePending={Boolean(dashboardData?.trade_ideas_deferred)}
         onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={8}>
+          <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
             <AppText style={styles.viewAll}>View All ›</AppText>
           </TouchableOpacity>
         }
@@ -1101,7 +1101,7 @@ function WatchlistAlertsSection({
       <SectionHeading
         title="Watchlist & Alerts"
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={8}>
+          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
             <AppText style={styles.viewAll}>View All ›</AppText>
           </TouchableOpacity>
         }

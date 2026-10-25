@@ -11,6 +11,7 @@ import SampleLeagueBanner from '../components/SampleLeagueBanner';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import ToneBadge from '../components/ToneBadge';
+import ValueStat from '../components/ValueStat';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   SAMPLE_GAME_PLAN,
@@ -46,14 +47,16 @@ export default function SampleLeagueScreen({ navigation }: Props) {
 
   const playerRow = (player: SamplePlayer) => (
     <View key={player.id} style={styles.playerRow}>
-      <PositionBadge position={player.position} />
+      <View style={styles.badgeSlot}>
+        <PositionBadge position={player.position} />
+      </View>
       <View style={styles.playerText}>
         <AppText style={styles.playerName}>{player.name}</AppText>
         <AppText style={styles.muted}>
           Age {player.age} · {player.note}
         </AppText>
       </View>
-      <AppText style={styles.playerName}>{player.value}</AppText>
+      <ValueStat value={player.value} />
     </View>
   );
 
@@ -143,6 +146,7 @@ function createStyles(colors: ThemeColors) {
     kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.accent },
     cardTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
     link: { fontSize: 14, fontWeight: '700', color: colors.accent },
+    badgeSlot: { width: 40, alignItems: 'flex-start' },
     playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
     playerText: { flex: 1 },
     playerName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },

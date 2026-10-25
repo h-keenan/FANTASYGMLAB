@@ -381,6 +381,9 @@ describe("PortfolioContent", () => {
     render(<PortfolioContent data={{ ...BASE_RESPONSE, leagues: [], failed_leagues: [] }} />);
 
     expect(screen.getByText("No saved leagues yet")).toBeInTheDocument();
+    // New-user audit: a real next step, not just a small text link.
+    expect(screen.getByRole("link", { name: "Connect a league" })).toHaveAttribute("href", "/connect-league");
+    expect(screen.getByTestId("sample-league-link")).toBeInTheDocument();
   });
 
   it("holds a still-loading league's place with a skeleton card, in saved order", () => {
@@ -418,9 +421,9 @@ describe("PortfolioContent", () => {
     expect(screen.getByRole("link", { name: "+ Add a league" })).toHaveAttribute("href", "/connect-league");
   });
 
-  it("offers Add a league on the empty state too", () => {
+  it("offers Connect a league on the empty state too", () => {
     render(<PortfolioContent data={{ ...BASE_RESPONSE, leagues: [] }} />);
-    expect(screen.getByRole("link", { name: "+ Add a league" })).toHaveAttribute("href", "/connect-league");
+    expect(screen.getByRole("link", { name: "Connect a league" })).toHaveAttribute("href", "/connect-league");
   });
 
   it("shows free accounts the upsell (their upgrade path), not the add link", () => {

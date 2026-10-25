@@ -110,7 +110,7 @@ export function TradeHubContent({
       {data.ideas.length > 0 ? <TradeHubFilters ideas={data.ideas} filter={filter} onChange={setFilter} /> : null}
 
       {data.ideas.length === 0 && data.hold ? (
-        <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="text-sm font-bold" style={{ color: "var(--color-accent)" }}>
+        <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="tap-link text-sm font-bold" style={{ color: "var(--color-accent)" }}>
           Build your own in Trade Finder →
         </Link>
       ) : data.ideas.length === 0 ? (
@@ -118,7 +118,7 @@ export function TradeHubContent({
           title="No trade ideas right now"
           subtitle="Ideas appear when rosters move. Build your own in Trade Finder."
         >
-          <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="text-sm font-bold mt-2" style={{ color: "var(--color-accent)" }}>
+          <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="tap-link text-sm font-bold" style={{ color: "var(--color-accent)" }}>
             Open Trade Finder →
           </Link>
         </EmptyState>

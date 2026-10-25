@@ -177,7 +177,7 @@ export function DashboardContent({
 
 function ViewAllLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} aria-label={label} className="text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
+    <Link href={href} aria-label={label} className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
       View All →
     </Link>
   );

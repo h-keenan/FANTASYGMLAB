@@ -448,6 +448,12 @@ export const lightGradients = {
  */
 export const disabledOpacity = 0.5;
 
+/**
+ * hitSlop for small text links (View All, Skip) so the tap area reaches the
+ * 44pt minimum around ~12-16pt text. Mirrors web's `.tap-link`.
+ */
+export const LINK_HIT_SLOP = { top: 14, bottom: 14, left: 12, right: 12 } as const;
+
 export const spacing = {
   xs: 4,
   sm: 8,

@@ -30,7 +30,7 @@ import {
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { freeTrialForUser, thenPriceLine, trialCtaLabel, type IntroEligibility } from '../lib/freeTrial';
-import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
+import { disabledOpacity, LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
@@ -323,7 +323,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         />
       }
     >
-      <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={exit} hitSlop={8}>
+      <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={exit} hitSlop={LINK_HIT_SLOP}>
         <AppText style={styles.closeButtonText}>{fromOnboarding ? 'Skip' : 'Close'}</AppText>
       </TouchableOpacity>
 
@@ -510,7 +510,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       </TouchableOpacity>
 
       {fromOnboarding ? (
-        <TouchableOpacity accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={8}>
+        <TouchableOpacity accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={LINK_HIT_SLOP}>
           <AppText style={styles.skipFreeText}>Skip for now — continue free</AppText>
         </TouchableOpacity>
       ) : null}
