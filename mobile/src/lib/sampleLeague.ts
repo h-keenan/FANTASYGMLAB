@@ -19,8 +19,9 @@ export const SAMPLE_CTA_LABEL = "Connect your real league";
 export const SAMPLE_CONNECT_ROUTE = "/connect-league";
 export const SAMPLE_ENTRY_LABEL = "Explore a sample league first";
 
-export type SampleTab = "roster" | "game_plan" | "trade";
+export type SampleTab = "dashboard" | "roster" | "game_plan" | "trade";
 export const SAMPLE_TABS: { value: SampleTab; label: string }[] = [
+  { value: "dashboard", label: "Dashboard" },
   { value: "roster", label: "Roster" },
   { value: "game_plan", label: "Game Plan" },
   { value: "trade", label: "Trade" },
@@ -106,3 +107,110 @@ export function sampleTradeVerdict(trade: SampleTrade): SampleVerdict {
   if (gap <= -5) return { label: "Favors them", tone: "danger", giveTotal, getTotal, gap };
   return { label: "Fair", tone: "warning", giveTotal, getTotal, gap };
 }
+
+// ---------------------------------------------------------------------------
+// Sample Dashboard: fictional inputs for the REAL Dashboard modules (Today
+// hero, rank strip, Watchlist & Alerts, League Activity, Team Snapshot). Each
+// platform maps these to its own API shapes (lib/sampleDashboard.ts on web and
+// mobile); nothing here is fetched or stored. Player ids are left empty on
+// purpose so no avatar or player lookup is ever made.
+// ---------------------------------------------------------------------------
+
+export const SAMPLE_DASHBOARD_WEEK = 6;
+export const SAMPLE_DASHBOARD_NOTE =
+  "Sample Dashboard: every card, rank and number below is made up. Taps are turned off here; connect your league to open them.";
+export const SAMPLE_BLOCKED_MESSAGE = "That opens in your real league. Connect your league to use it.";
+
+export interface SampleThisWeekRow {
+  key: "lineup" | "waiver" | "trade";
+  status: string;
+  tone: "positive" | "risk" | "waiver" | "trade" | "neutral";
+  headline: string;
+  why: string;
+  cta_label: string;
+  route: "matchup" | "waivers" | "trade_hub";
+}
+
+export const SAMPLE_THIS_WEEK_ROWS: SampleThisWeekRow[] = [
+  {
+    key: "lineup",
+    status: "Set",
+    tone: "positive",
+    headline: "Your sample lineup looks ready",
+    why: "Sample reasoning: all eight starters are healthy and none is on a bye.",
+    cta_label: "Review lineup",
+    route: "matchup",
+  },
+  {
+    key: "waiver",
+    status: "Add",
+    tone: "waiver",
+    headline: "A sample handcuff is available",
+    why: "Sample reasoning: Riley Demoway carries most of the RB workload and his backup is unrostered.",
+    cta_label: "Open waivers",
+    route: "waivers",
+  },
+];
+
+export interface SampleDashboardItem {
+  category: "top_priority" | "watch" | "waiver_opportunity";
+  headline: string;
+  reason: string;
+  destination: "trade_hub" | "waivers" | "my_team";
+  tier_label: string;
+}
+
+export const SAMPLE_DASHBOARD_ITEMS: SampleDashboardItem[] = [
+  {
+    category: "top_priority",
+    headline: SAMPLE_GAME_PLAN[0].headline,
+    reason: SAMPLE_GAME_PLAN[0].reason,
+    destination: "trade_hub",
+    tier_label: "Priority",
+  },
+  {
+    category: "watch",
+    headline: "Taylor Exampleton is trending up",
+    reason: "Sample reasoning: snap share is climbing. Hold unless an offer clears his current value.",
+    destination: "my_team",
+    tier_label: "",
+  },
+  {
+    category: "watch",
+    headline: "Morgan Testwell is losing usage",
+    reason: "Sample reasoning: usage down 31% (sample figure) over three weeks; his sell window is closing.",
+    destination: "my_team",
+    tier_label: "",
+  },
+  {
+    category: "waiver_opportunity",
+    headline: "Add a handcuff for Riley Demoway",
+    reason: "Sample reasoning: your RB1 carries most of the workload and the backup is unrostered.",
+    destination: "waivers",
+    tier_label: "",
+  },
+];
+
+export const SAMPLE_SNAPSHOT = {
+  wins: 4,
+  losses: 2,
+  powerRank: 3,
+  franchiseRank: 2,
+  averageAge: 25.8,
+  starterRank: 4,
+  benchRank: 7,
+  injuredStarters: 0,
+};
+
+export interface SamplePulseTeam {
+  team_name: string;
+  transaction_activity_count: number;
+  current_streak: number;
+}
+
+export const SAMPLE_PULSE_TEAMS: SamplePulseTeam[] = [
+  { team_name: "Team Placeholder", transaction_activity_count: 14, current_streak: 1 },
+  { team_name: "Mock Mavericks", transaction_activity_count: 6, current_streak: 4 },
+  { team_name: "Example Eagles", transaction_activity_count: 3, current_streak: -3 },
+  { team_name: SAMPLE_TEAM_NAME, transaction_activity_count: 5, current_streak: 2 },
+];

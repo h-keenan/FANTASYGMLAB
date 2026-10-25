@@ -3,13 +3,17 @@
 import { useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
+import { DashboardContent } from "@/components/DashboardContent";
 import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SampleLeagueBanner } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValueStat } from "@/components/ValueStat";
+import { SAMPLE_DASHBOARD_LEAGUE_ID, sampleDashboardResponse, sampleTeamRankings } from "@/lib/sampleDashboard";
 import {
+  SAMPLE_BLOCKED_MESSAGE,
+  SAMPLE_DASHBOARD_NOTE,
   SAMPLE_GAME_PLAN,
   SAMPLE_LEAGUE_NAME,
   SAMPLE_ROSTER,
@@ -35,6 +39,32 @@ function SamplePlayerRow({ player }: { player: SamplePlayer }) {
       </span>
       <ValueStat value={player.value} />
     </li>
+  );
+}
+
+/** The real Dashboard modules fed static fictional data; links are inert. */
+function DashboardTab() {
+  const [data] = useState(sampleDashboardResponse);
+  const [teamRankings] = useState(sampleTeamRankings);
+  const [blocked, setBlocked] = useState(false);
+  return (
+    <section className="flex flex-col gap-3" aria-label="Sample dashboard">
+      <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+        {SAMPLE_DASHBOARD_NOTE}
+      </p>
+      {blocked ? (
+        <p role="status" className="text-xs font-bold" style={{ color: "var(--color-accent)" }} data-testid="sample-blocked">
+          {SAMPLE_BLOCKED_MESSAGE}
+        </p>
+      ) : null}
+      <DashboardContent
+        leagueId={SAMPLE_DASHBOARD_LEAGUE_ID}
+        leagueName={SAMPLE_LEAGUE_NAME}
+        data={data}
+        teamRankings={teamRankings}
+        sample={{ onBlockedLink: () => setBlocked(true) }}
+      />
+    </section>
   );
 }
 
@@ -122,7 +152,7 @@ function TradeTab() {
 
 /** Static sample league: no network calls, no auth, no analytics. */
 export function SampleLeagueContent() {
-  const [tab, setTab] = useState<SampleTab>("roster");
+  const [tab, setTab] = useState<SampleTab>("dashboard");
   return (
     <main className="flex-1 flex flex-col gap-4 px-4 py-4 w-full max-w-2xl mx-auto">
       <SampleLeagueBanner />
@@ -139,6 +169,7 @@ export function SampleLeagueContent() {
         active={tab}
         onSelect={(value) => setTab(value as SampleTab)}
       />
+      {tab === "dashboard" ? <DashboardTab /> : null}
       {tab === "roster" ? <RosterTab /> : null}
       {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
       {tab === "trade" ? <TradeTab /> : null}
