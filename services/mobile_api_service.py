@@ -1038,6 +1038,13 @@ def _premium_benefit_lines() -> list[str]:
         return list(_FALLBACK_PREMIUM_BENEFIT_LINES)
 
 
+def _premium_comparison_rows() -> list[dict[str, str]]:
+    try:
+        return premium_benefits.premium_comparison()
+    except Exception:
+        return []
+
+
 def _founder_analytics_capable(user: dict[str, Any]) -> bool:
     """True only when the caller's own Supabase Auth app_metadata carries
     `founder_ops: true`.
@@ -1256,6 +1263,10 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
         # the same list web's Premium page renders. The mobile Paywall fetches
         # this instead of keeping its own independently-authored copy.
         "premium_benefits": _premium_benefit_lines(),
+        # Structured Free-vs-Pro rows built from the enforced limits
+        # (modules.premium_benefits.premium_comparison). Clients fall back to
+        # a static copy of the same shape when this is empty or missing.
+        "premium_comparison": _premium_comparison_rows(),
     }
 
 
@@ -9478,7 +9489,7 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
 # Matches web's app.py `visible_action_items = action_center_items if
 # is_premium else action_center_items[:4]` — the free-tier cap on Today's
 # Game Plan.
-FREE_DASHBOARD_VISIBLE_ITEMS = 4
+FREE_DASHBOARD_VISIBLE_ITEMS = premium_benefits.FREE_NEXT_MOVE_ITEMS
 
 
 @app.get("/v1/leagues/{league_id}/dashboard")

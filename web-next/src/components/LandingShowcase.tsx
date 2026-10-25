@@ -18,7 +18,7 @@ export const SHOWCASE_RESUME_MS = 4000;
  * Landing-page product strip: real screenshots (sample league data) in phone
  * frames, one benefit line under each. A CSS scroll-snap row, so it is
  * swipeable on touch and the first slide renders fully on the server. After
- * hydration it auto-advances every ~4.5s; the active screenshot slowly zooms
+ * hydration it auto-advances every ~4.5s for a single loop, then stops; the active screenshot slowly zooms
  * in (transform only) and eases back out as it scrolls away. Autoplay pauses on
  * hover/focus/touch/manual scroll, when off-screen, when the tab is hidden, via
  * a pause button (WCAG 2.2.2), and never runs under prefers-reduced-motion.
@@ -36,8 +36,12 @@ export function LandingShowcase() {
   const [interacting, setInteracting] = useState(false);
   const [visible, setVisible] = useState(false);
   const [tabVisible, setTabVisible] = useState(true);
+  // Autoplay runs ONE loop (first slide to last) and then stops for good, so
+  // the page stops moving once the visitor has seen everything. A dot tap also
+  // ends it (the visitor is driving). The play button restarts one loop.
+  const [finished, setFinished] = useState(false);
 
-  const playing = !reduced && !userPaused && !interacting && visible && tabVisible;
+  const playing = !reduced && !userPaused && !interacting && !finished && visible && tabVisible;
 
   // Reduced-motion preference (live).
   useEffect(() => {
@@ -85,7 +89,11 @@ export function LandingShowcase() {
   useEffect(() => {
     if (!playing) return;
     const id = setTimeout(() => {
-      const next = (active + 1) % count;
+      if (active >= count - 1) {
+        setFinished(true);
+        return;
+      }
+      const next = active + 1;
       setActive(next);
       scrollToIndex(next);
     }, SHOWCASE_SLIDE_MS);
@@ -165,9 +173,24 @@ export function LandingShowcase() {
 
   const goTo = (i: number) => {
     beginHold();
+    setFinished(true);
     setActive(i);
     scrollToIndex(i);
     endHold();
+  };
+
+  const togglePause = () => {
+    if (finished || userPaused) {
+      // Play: restart a single loop from the first slide when it had ended.
+      if (finished) {
+        setFinished(false);
+        setActive(0);
+        scrollToIndex(0);
+      }
+      setUserPaused(false);
+      return;
+    }
+    setUserPaused(true);
   };
 
   return (
@@ -223,12 +246,12 @@ export function LandingShowcase() {
           <button
             type="button"
             className="landing-showcase-pause"
-            aria-pressed={userPaused}
-            aria-label={userPaused ? "Play slideshow" : "Pause slideshow"}
-            onClick={() => setUserPaused((p) => !p)}
+            aria-pressed={userPaused || finished}
+            aria-label={userPaused || finished ? "Play slideshow" : "Pause slideshow"}
+            onClick={togglePause}
           >
             <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-              {userPaused ? <path d="M2 1l7 4-7 4z" /> : <path d="M2 1h2v8H2zM6 1h2v8H6z" />}
+              {userPaused || finished ? <path d="M2 1l7 4-7 4z" /> : <path d="M2 1h2v8H2zM6 1h2v8H6z" />}
             </svg>
           </button>
         )}

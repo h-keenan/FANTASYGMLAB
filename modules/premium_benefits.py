@@ -1,5 +1,9 @@
 from __future__ import annotations
-from modules import product_copy
+from modules import gm_targets, product_copy, saved_leagues, trade_hub_presentation
+
+# Free accounts see this many Next Moves / Game Plan items; Pro sees all.
+# services.mobile_api_service.FREE_DASHBOARD_VISIBLE_ITEMS is set from this.
+FREE_NEXT_MOVE_ITEMS = 4
 
 FREE_INCLUDES = (
     ("League import", "Load Sleeper leagues and keep the main roster tools useful."),
@@ -94,3 +98,51 @@ def mobile_premium_benefit_lines() -> list[str]:
             raise ValueError(f"Mobile Premium benefit line references unknown title: {title!r}")
         lines.append(entry["line"])
     return lines
+
+
+def premium_comparison() -> list[dict[str, str]]:
+    """Free-vs-Pro rows for the paywall / Premium page, built from the real
+    enforced limits (never hand-typed numbers) so copy cannot drift from the
+    gates. Served in GET /v1/me as `premium_comparison`; web and mobile keep
+    a static fallback of the same shape for offline/failed fetches.
+    """
+    pro_leagues = saved_leagues.max_leagues_for("premium")
+    free_leagues = saved_leagues.MAX_LEAGUES_FREE
+    return [
+        {
+            "key": "next_moves",
+            "label": "Next Moves",
+            "free": f"Top {FREE_NEXT_MOVE_ITEMS}",
+            "pro": "Your full briefing",
+        },
+        {
+            "key": "trade_hub",
+            "label": "Trade Hub ideas",
+            "free": f"First {trade_hub_presentation.FREE_VISIBLE_IDEAS}",
+            "pro": "Every idea",
+        },
+        {
+            "key": "gm_targets",
+            "label": "GM Targets",
+            "free": f"{gm_targets.MAX_TARGETS_FREE} players",
+            "pro": f"{gm_targets.MAX_TARGETS_PREMIUM} players",
+        },
+        {
+            "key": "waivers",
+            "label": "Waiver board",
+            "free": "Priority Adds",
+            "pro": "Full board, stashes, FAAB",
+        },
+        {
+            "key": "league_pulse",
+            "label": "League Pulse leaders",
+            "free": "Activity only",
+            "pro": "Contender, rebuilder, picks",
+        },
+        {
+            "key": "leagues",
+            "label": "Saved leagues",
+            "free": f"{free_leagues} league" if free_leagues == 1 else f"{free_leagues} leagues",
+            "pro": "Unlimited" if pro_leagues is None else f"Up to {pro_leagues}",
+        },
+    ]

@@ -43,7 +43,7 @@ export default function LandingPage() {
               current names (Game Plan, not the retired "Next Move"). */}
           <div className="landing-hero flex flex-col gap-2">
             <h1 style={{ font: "var(--font-page-title)" }}>Your fantasy front office, not just a stats app.</h1>
-            <p className="hidden md:block text-base" style={{ color: "var(--color-text-secondary)" }}>
+            <p className="text-sm md:text-base" style={{ color: "var(--color-text-secondary)" }}>
               Real recommendations across your Game Plan, Trade Hub and Waivers, not raw data you have to interpret
               yourself.
             </p>

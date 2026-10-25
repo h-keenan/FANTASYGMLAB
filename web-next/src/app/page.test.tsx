@@ -277,3 +277,14 @@ describe("LandingPage app store modules", () => {
     );
   });
 });
+
+// Audit 2026-10 item 10: the one-line subtitle was `hidden md:block`, so phones
+// (the main audience) never saw what the product does under the H1.
+describe("LandingPage hero subtitle", () => {
+  it("is not hidden on phone widths", () => {
+    mockAuth(null, false);
+    render(<LandingPage />);
+    const sub = screen.getByText(/Real recommendations across your Game Plan/);
+    expect(sub.className).not.toMatch(/\bhidden\b/);
+  });
+});

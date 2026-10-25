@@ -17,6 +17,8 @@ const EmbeddedCheckoutModal = dynamic(() => import("@/components/EmbeddedCheckou
 });
 import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
 import { Button } from "@/components/Button";
+import { PremiumComparison } from "@/components/PremiumComparison";
+import type { PremiumComparisonRow } from "@/lib/premiumComparison";
 
 const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   pro: "Pro",
@@ -176,12 +178,14 @@ export function PremiumContent({
   publishableKey,
   trial,
   trialEndsAt,
+  comparison,
 }: {
   entitlement: "free" | "premium";
   plans: BillingPlan[];
   publishableKey: string;
   trial?: BillingTrial;
   trialEndsAt?: string;
+  comparison?: PremiumComparisonRow[];
 }) {
   const trialDays = activeTrialDays(trial);
   useEffect(() => {
@@ -197,6 +201,13 @@ export function PremiumContent({
       </header>
 
       {entitlement === "premium" ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
+
+      <section className="flex flex-col gap-3" aria-labelledby="compare-heading">
+        <SectionHeading id="compare-heading">Free vs Pro</SectionHeading>
+        <div className="glass-surface p-4">
+          <PremiumComparison rows={comparison} />
+        </div>
+      </section>
 
       <section className="flex flex-col gap-3" aria-labelledby="plans-heading">
         <SectionHeading id="plans-heading">

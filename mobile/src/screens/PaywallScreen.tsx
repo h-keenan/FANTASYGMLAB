@@ -19,6 +19,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api } from '../lib/api';
+import {
+  FALLBACK_PREMIUM_COMPARISON,
+  normalizePremiumComparison,
+  type PremiumComparisonRow,
+} from '../lib/premiumComparison';
 import { trackUse } from '../lib/analytics';
 import { useOrbClearance } from '../lib/orbLayout';
 import {
@@ -46,35 +51,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 const INITIAL_LOAD_MAX_ATTEMPTS = 3;
 const INITIAL_LOAD_BACKOFF_MS = 900;
 
-// Canonical source is modules/premium_page.py (PREMIUM_INCLUDED_NOW /
-// MOBILE_PREMIUM_BENEFIT_LINES) — the same benefit list web's Premium page
-// renders — fetched from GET /v1/me at render time. This copy is only the
-// fallback for when that request fails, so it stays a plain string list that
-// exactly matches the server's current canonical copy. Every line here
-// corresponds to a real, server-enforced gate — see the paywall audit
-// (2026-09-18). Don't add a benefit unless something in
-// services/mobile_api_service.py actually withholds it from a Free account.
-const FALLBACK_FEATURES = [
-  'Your full Next Move briefing, not just the top 4',
-  'League Pulse leaders in the mobile app — the league’s top contender, rebuilder, draft capital, and most active manager',
-  'The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist',
-  'Every Trade Hub idea, not just the first 2',
-  'GM Targets watchlist up to 50 players (Free is capped at 3)',
-  'Portfolio — your record, rank, and top need across every saved league, not just one',
-];
-
-// The feature list came back as a flat checklist with every line weighted
-// identically — coridian_ flagged the Premium screen as "not convincing."
-// Rather than inventing stats or new brand assets, these two lines are
-// highlighted because they're the most concretely quantified unlocks already
-// present in the copy (50 vs. a 3-player cap; every idea vs. the first 2) —
-// the clearest "before vs. after" contrast available without fabricating
-// social proof. Matched by substring, not index, since FALLBACK_FEATURES and
-// the live server copy (modules/premium_page.py) must stay text-identical
-// but aren't guaranteed to stay in the same order forever.
-function isHighImpactFeature(feature: string): boolean {
-  return feature.includes('GM Targets') || feature.includes('Trade Hub');
-}
+// The Free-vs-Pro rows come from GET /v1/me `premium_comparison`, built from the
+// enforced limits in modules/premium_benefits.py. lib/premiumComparison.ts holds
+// the static fallback used only when that request fails. Every row corresponds
+// to a real server-enforced gate; don't add one that Free is not actually held to.
 
 // Apple App Store Review Guideline 3.1.2 requires a subscription's length to
 // be clearly displayed. `pack.product.title` is whatever display name is
@@ -155,7 +135,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
-  const [features, setFeatures] = useState<string[]>(FALLBACK_FEATURES);
+  const [comparison, setComparison] = useState<PremiumComparisonRow[]>(FALLBACK_PREMIUM_COMPARISON);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -213,16 +193,14 @@ export default function PaywallScreen({ navigation, route }: Props) {
   // Independent of loadOffering: the benefit copy comes from the FantasyGM
   // Lab API (shared with web's Premium page), not the store, so one failing
   // shouldn't block the other. Any failure — network, auth, empty list —
-  // silently keeps FALLBACK_FEATURES so the paywall never renders empty.
+  // silently keeps FALLBACK_PREMIUM_COMPARISON so the paywall never renders empty.
   const loadFeatures = useCallback(async () => {
     try {
       const me = await api.getMe();
       if (!mountedRef.current) return;
-      if (Array.isArray(me.premium_benefits) && me.premium_benefits.length > 0) {
-        setFeatures(me.premium_benefits);
-      }
+      setComparison(normalizePremiumComparison(me.premium_comparison));
     } catch {
-      // Keep FALLBACK_FEATURES.
+      // Keep the static fallback rows.
     }
   }, []);
 
@@ -353,34 +331,23 @@ export default function PaywallScreen({ navigation, route }: Props) {
           : 'Your price is locked in for as long as you stay subscribed.'}
       </AppText>
 
-      <SectionHeading title="What's Included" icon="checkmark-done" />
+      <SectionHeading title="Free vs Premium" icon="checkmark-done" />
       <AppText style={styles.featuresIntro}>
-        Free shows you a preview of each of these. Premium removes every cap.
+        Free keeps working. Premium removes the caps.
       </AppText>
-      <View style={styles.featuresCard}>
-        {features.map((feature, index) => {
-          const highImpact = isHighImpactFeature(feature);
-          return (
-            <View key={feature} style={[styles.featureRow, index > 0 && styles.featureRowDivider]}>
-              <Ionicons
-                name="checkmark-circle"
-                size={highImpact ? 20 : 18}
-                color={highImpact ? colors.premium : colors.success}
-                style={styles.featureIcon}
-              />
-              <View style={styles.featureTextCol}>
-                <AppText style={[styles.featureText, highImpact && styles.featureTextHighImpact]}>
-                  {feature}
-                </AppText>
-                {highImpact ? (
-                  <View style={styles.featureBadge}>
-                    <AppText style={styles.featureBadgeText}>Biggest unlock</AppText>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          );
-        })}
+      <View style={styles.featuresCard} accessibilityLabel="Free compared with Pro">
+        <View style={[styles.compareRow, styles.compareHeaderRow]}>
+          <AppText style={[styles.compareLabel, styles.compareHeaderText]}>What you get</AppText>
+          <AppText style={[styles.compareCell, styles.compareHeaderText]}>Free</AppText>
+          <AppText style={[styles.compareCell, styles.compareHeaderText, styles.compareProHeader]}>Pro</AppText>
+        </View>
+        {comparison.map((row) => (
+          <View key={row.key} style={[styles.compareRow, styles.featureRowDivider]}>
+            <AppText style={styles.compareLabel}>{row.label}</AppText>
+            <AppText style={[styles.compareCell, styles.compareFree]}>{row.free}</AppText>
+            <AppText style={[styles.compareCell, styles.comparePro]}>{row.pro}</AppText>
+          </View>
+        ))}
       </View>
 
       {loading ? (
@@ -597,6 +564,14 @@ function createStyles(colors: ThemeColors) {
     lineHeight: 18,
     marginBottom: spacing.sm,
   },
+  compareRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.sm + 2, gap: spacing.sm },
+  compareHeaderRow: { paddingVertical: spacing.sm },
+  compareHeaderText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textSecondary },
+  compareProHeader: { color: colors.premium },
+  compareLabel: { flex: 1.1, color: colors.textPrimary, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  compareCell: { flex: 1, fontSize: 13, lineHeight: 18 },
+  compareFree: { color: colors.textSecondary },
+  comparePro: { color: colors.textPrimary, fontWeight: '700' },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.sm + 2 },
   featureRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline },
   featureIcon: { marginRight: spacing.sm, marginTop: 1 },

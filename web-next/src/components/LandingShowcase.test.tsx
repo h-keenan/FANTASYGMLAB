@@ -66,13 +66,21 @@ describe("LandingShowcase autoplay", () => {
     expect(section().dataset.playing).toBe("false");
   });
 
-  it("advances on a timer and loops", () => {
+  it("advances on a timer for one loop, then stops on the last slide", () => {
     start();
     expect(section().dataset.playing).toBe("true");
     advance(SHOWCASE_SLIDE_MS);
     expect(activeIndex()).toBe(1);
-    for (let i = 0; i < 5; i++) advance(SHOWCASE_SLIDE_MS);
+    for (let i = 0; i < 4; i++) advance(SHOWCASE_SLIDE_MS);
+    expect(activeIndex()).toBe(5);
+    advance(SHOWCASE_SLIDE_MS * 4);
+    expect(activeIndex()).toBe(5);
+    expect(section().dataset.playing).toBe("false");
+    // Play restarts a single loop from the first slide.
+    fireEvent.click(screen.getByRole("button", { name: "Play slideshow" }));
     expect(activeIndex()).toBe(0);
+    advance(SHOWCASE_SLIDE_MS);
+    expect(activeIndex()).toBe(1);
   });
 
   it("pauses on interaction and resumes ~4s after it ends", () => {
