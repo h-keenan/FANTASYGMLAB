@@ -29,9 +29,8 @@
 # than gzip when the client supports it, e.g. recent Chrome/Firefox/curl),
 # falling back to gzip for older clients; Caddy negotiates via the request's
 # Accept-Encoding header, so clients that send neither get an uncompressed
-# response same as today. Not applied to the two webhook endpoints — those
-# are small, infrequent, machine-to-machine payloads where compression has
-# no measurable upside.
+# response same as today. (The former Stripe/RevenueCat webhook
+# routes were retired 2026-10-24; see the note at the bottom of this file.)
 (encode_responses) {
 	encode zstd gzip
 }
@@ -147,12 +146,7 @@ http://www.fantasydesk.app {
 	reverse_proxy mobile-api:8080
 }
 
-# --- fantasygm-lab-stripe-webhook --------------------------------------------
-{$STRIPE_WEBHOOK_DOMAIN} {
-	reverse_proxy stripe-webhook:8080
-}
-
-# --- fantasygm-lab-revenuecat-webhook -----------------------------------------
-{$REVENUECAT_WEBHOOK_DOMAIN} {
-	reverse_proxy revenuecat-webhook:8080
-}
+# stripe-webhook / revenuecat-webhook routes were removed 2026-10-24: Stripe
+# and RevenueCat webhooks now terminate at Supabase Edge Functions
+# (docs/billing-on-supabase.md). The STRIPE_WEBHOOK_DOMAIN and
+# REVENUECAT_WEBHOOK_DOMAIN env vars are no longer read by this file.

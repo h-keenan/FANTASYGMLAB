@@ -403,6 +403,8 @@ To revoke access later, delete or comment out their line in
 `/home/fgl-releaser/.ssh/authorized_keys` (as `deploy` or root) — no
 restart needed, it takes effect on the next connection attempt.
 
+> **Update 2026-10-24:** the `stripe-webhook` and `revenuecat-webhook` containers, their Caddy routes and the `stripe-webhook.` / `revenuecat-webhook.` hostnames were retired (billing runs on Supabase Edge Functions; see [billing-on-supabase.md](billing-on-supabase.md)). References to them below are historical. The box-local `autopull.sh` health-check list and `docker-compose.override.yml` must not name them.
+
 ## 5.7. Auto-deploy: `fantasygmlab-autopull.timer` (server-side)
 
 Production's real, authoritative auto-deploy mechanism runs **on the

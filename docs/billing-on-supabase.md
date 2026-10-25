@@ -8,7 +8,7 @@ Supabase function secrets.
 Status (2026-10-24): **cutover state.**
 - Phase 1 (#1513): `stripe-webhook`, `revenuecat-webhook`, `create-checkout-session`, `billing-portal-session` deployed with secrets set; Stripe and RevenueCat webhooks now hit Supabase.
 - Phase 2 (this change): new public `billing-plans` function; web-next repointed from FastAPI `/v1/billing/*` to the Edge Functions through ONE client (`web-next/src/lib/billingClient.ts`). The mobile app has no Stripe web checkout/portal/plans calls (store purchases go through RevenueCat, untouched), so there is nothing to repoint there.
-- The self-hosted box no longer takes part in billing. The Python services and the FastAPI `/v1/billing/*` routes stay in the repo, marked deprecated, as the rollback path.
+- Phase 3 (box retirement, 2026-10-24): the `stripe-webhook` and `revenuecat-webhook` containers, their Caddy routes/hostnames, and the box payment-env scripts (`deploy/set_payment_env.sh`, `deploy/push_payment_env.sh`) are removed. The Python webhook services/modules (`services/stripe_webhook_service.py`, `services/revenuecat_webhook_service.py`, `modules/stripe_webhook.py`, `modules/revenuecat_webhook.py`) stay in the repo, marked DEPRECATED/rollback-only, and the FastAPI `/v1/billing/*` routes plus `NEXT_PUBLIC_BILLING_BACKEND=fastapi` stay intact as the rollback path. See "Box retirement" below.
 
 ## Architecture
 
@@ -121,9 +121,35 @@ Do TEST mode end to end first, then repeat for live.
 7. [ ] LIVE cutover window (low traffic): set `STRIPE_BILLING_MODE=live` + live key/prices/webhook secret and `REVENUECAT_BILLING_MODE=live`; add the live Stripe endpoint; in the SAME window disable (not delete) the old Stripe and RevenueCat webhook endpoints so only one system writes `profiles`. (Both writing is safe thanks to the ordering guard, but pick one to avoid double analytics/confusion.)
 8. [x] Repoint clients (Phase 2, code done): web-next calls `billing-plans` / `create-checkout-session` / `billing-portal-session` at `${NEXT_PUBLIC_SUPABASE_URL}/functions/v1/<name>` with the user's Supabase JWT (`Authorization`) and the anon key (`apikey`). TODO before merging/deploying: `supabase secrets set STRIPE_PUBLISHABLE_KEY=...` and `supabase functions deploy billing-plans --no-verify-jwt`; confirm `APP_BASE_URL` / `CORS_ALLOWED_ORIGINS` include every web origin (app.fantasygmlab.com, fantasygmlab.com, and app/fantasydesk.app when live) because the browser now calls the functions cross-origin.
 9. [ ] Verify live: real $-charge (refund after) or a 100%-off promo code; watch function logs (`supabase functions logs stripe-webhook`) for 24h.
-10. [ ] After a stable window: remove Stripe/RevenueCat/service-role secrets from the box and from the old Render services; then retire the Python services (separate PR).
+10. [x] Box containers/routes retired (Phase 3, see "Box retirement"). Still to do by the person running the box: remove the secrets listed there; delete the old Render services and the old Stripe/RevenueCat endpoints once the stable window has passed. Deleting the Python modules is a separate, later PR.
+
+## Box retirement (Phase 3)
+
+What this change does in the repo: `docker-compose.yml` no longer defines `stripe-webhook` / `revenuecat-webhook` and Caddy no longer `depends_on` them; the `Caddyfile` no longer has the `STRIPE_WEBHOOK_DOMAIN` / `REVENUECAT_WEBHOOK_DOMAIN` blocks; the two box-only payment-env scripts are deleted; `.env.example` marks the webhook values rollback-only. Remaining box services: `mobile-api`, `redis`, `web-next`, `caddy`.
+
+What the main API (`mobile-api`) still needs (verified by grep, not assumed):
+- `SUPABASE_SERVICE_ROLE_KEY`: KEEP. Read by modules the main API imports (`community_trades`, `games`, `launch_analytics`, `guess_the_player_leaderboard`, `referrals`, `player_rating_history`, `push_triggers`, `trade_outcome_results`), not just the webhooks.
+- `STRIPE_SECRET_KEY`, `STRIPE_BILLING_MODE`, `STRIPE_PRICE_*`: only needed while the FastAPI `/v1/billing/*` rollback path may be used. Safe to leave; removable once the rollback window closes.
+
+No longer needed on the box (only the retired webhook services and `scripts/stripe_webhook_harness.py` read them): `STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_AUTH_TOKEN`, `REVENUECAT_SECRET_KEY`, `REVENUECAT_PROJECT_ID`, `REVENUECAT_BILLING_MODE`, `STRIPE_WEBHOOK_DOMAIN`, `REVENUECAT_WEBHOOK_DOMAIN`. (`STRIPE_WEBHOOK_SECRET` is also on the managed-host forbidden list for the web process, so removing it only helps.) Supabase function secrets are unaffected.
+
+Order of operations for the person running the box:
+1. Merge. `fantasygmlab-autopull` (about 2 min) fast-forwards `/opt/fantasygmlab`, regenerates the runtime Caddyfile via `fantasygmlab-sync-caddy`, and runs compose. Compose no longer knows the two services, so they become orphans. `docker compose up -d` leaves orphans RUNNING unless `--remove-orphans` is passed (the systemd unit passes it on boot; autopull is a box-local script, check it). Verify with `docker compose ps`; if they are still up: `docker compose rm -sf stripe-webhook revenuecat-webhook`.
+2. Check the box-local pieces that are NOT in this repo and may still name the retired services: `deploy/autopull.sh` (its service health-check list; a stale list would fail the deploy and trigger its auto-rollback), `/opt/fantasygmlab/docker-compose.override.yml` (remove any `stripe-webhook` / `revenuecat-webhook` entries, an override-only service has no image and breaks `compose up`), and `/usr/local/bin/fantasygmlab-sync-caddy` (must not hard-code the two hostnames; it should derive routes from the repo Caddyfile, which keeps working because only blocks were removed).
+3. Confirm the Stripe and RevenueCat dashboards show deliveries succeeding to the Supabase URLs and the old endpoints are disabled (not deleted yet).
+4. In Cloudflare Zero Trust, delete the tunnel public hostnames `stripe-webhook.fantasygmlab.com` and `revenuecat-webhook.fantasygmlab.com` (they would now 502), and their DNS records if separate.
+5. Edit `/opt/fantasygmlab/.env`: delete the secret lines listed above and the two `*_WEBHOOK_DOMAIN` lines; leave `SUPABASE_SERVICE_ROLE_KEY`. Not urgent; nothing breaks if they linger.
+6. After a stable window (suggest 1-2 weeks): disable/delete the old Render webhook services and old provider endpoints, then drop the Python webhook modules in a separate PR.
 
 ## Rollback plan
+
+Box rollback (re-enable box webhook processing), if the Supabase functions must be abandoned:
+1. Revert the Phase 3 merge commit on `main` (restores the two compose services, Caddy routes, scripts); autopull redeploys it.
+2. Re-add the removed secrets to the box `.env` (`STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_AUTH_TOKEN`, `REVENUECAT_SECRET_KEY`, `REVENUECAT_PROJECT_ID`, `*_BILLING_MODE`, and the two `*_WEBHOOK_DOMAIN` values) and recreate the Cloudflare tunnel hostnames (`stripe-webhook.` / `revenuecat-webhook.` pointing at Caddy). Secret values come from the Stripe and RevenueCat dashboards, not the repo.
+3. In the Stripe and RevenueCat dashboards re-enable the old endpoints (`/stripe/webhook`, `/revenuecat/webhook`) and disable the Supabase ones.
+4. Rebuild web-next with `NEXT_PUBLIC_BILLING_BACKEND=fastapi` (below) if checkout/portal/plans must also leave Supabase.
+`profiles` data is compatible both ways.
+
 
 Client rollback (Phase 2): rebuild web-next with `NEXT_PUBLIC_BILLING_BACKEND=fastapi`; plans/checkout/portal then go to the deprecated FastAPI `/v1/billing/*` routes again (needs the Stripe key on the box). The landing-page trial headline falls back to its shared default (`DEFAULT_TRIAL_DAYS` in `web-next/src/lib/landingTrial.ts`).
 
@@ -131,8 +157,8 @@ Webhook rollback: nothing in Phase 1 changes production data shape. After cutove
 Stripe/RevenueCat webhook endpoints (Python services still deployed and the code
 still in the repo), disable the Supabase endpoints in the provider dashboards, and
 leave FastAPI checkout/portal as is. Data is compatible both ways (same `profiles`
-columns); `billing_webhook_events` is additive and can stay. Do not delete the Python
-services or box secrets until step 10 is complete.
+columns); `billing_webhook_events` is additive and can stay. The Python
+service code is still in the repo (deprecated); the box containers are gone, so use the Box rollback above to bring them back.
 
 ## What was ported, and what was not
 

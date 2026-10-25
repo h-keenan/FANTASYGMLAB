@@ -1,4 +1,4 @@
-> **DEPRECATED (2026-10-24):** payment and entitlement processing is moving off the self-hosted box onto Supabase Edge Functions. See [billing-on-supabase.md](billing-on-supabase.md). The Python services/modules described here (`services/stripe_webhook_service.py`, `services/revenuecat_webhook_service.py`, `modules/stripe_webhook.py`, `modules/revenuecat_webhook.py`) stay in the repo only as the rollback path until the cutover checklist is complete; do not extend them.
+> **DEPRECATED (2026-10-24):** payment and entitlement processing has moved off the self-hosted box onto Supabase Edge Functions; the box's `stripe-webhook` and `revenuecat-webhook` containers and Caddy routes were retired. See [billing-on-supabase.md](billing-on-supabase.md). The Python services/modules described here (`services/stripe_webhook_service.py`, `services/revenuecat_webhook_service.py`, `modules/stripe_webhook.py`, `modules/revenuecat_webhook.py`) stay in the repo only as the rollback path until the cutover checklist is complete; do not extend them.
 
 > **Historical / partly obsolete (2026-10):** this document describes the retired Streamlit web app (`app.py`, `streamlit run`, `/_stcore/health`, `st.session_state`), which has been removed. The production web app is `web-next/` (Next.js) on the FastAPI services. See [`streamlit-removal-2026-10.md`](streamlit-removal-2026-10.md). Streamlit-specific details below are no longer current.
 
@@ -34,6 +34,17 @@ not currently deployed** architecture — do not treat it as live.
 Stripe checkout remains optional on the web process: missing prices/secret
 disables checkout (fail-closed) and does **not** take down the app.
 
+## Self-hosted box after billing retirement (2026-10-24)
+
+Stack: `mobile-api`, `redis`, `web-next`, `caddy`. The `stripe-webhook` and `revenuecat-webhook` containers are gone; Stripe and RevenueCat webhooks, checkout, portal and plans are Supabase Edge Functions (see [billing-on-supabase.md](billing-on-supabase.md), which has the removal order and rollback recipe).
+
+| Name | On the box now |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Keep** (mobile-api modules use it) |
+| `STRIPE_SECRET_KEY`, `STRIPE_BILLING_MODE`, `STRIPE_PRICE_*` | Only for the FastAPI `/v1/billing/*` rollback; may be removed once rollback is no longer wanted |
+| `STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_AUTH_TOKEN`, `REVENUECAT_SECRET_KEY`, `REVENUECAT_PROJECT_ID`, `REVENUECAT_BILLING_MODE` | **No longer needed**; remove |
+| `STRIPE_WEBHOOK_DOMAIN`, `REVENUECAT_WEBHOOK_DOMAIN` | No longer read by the Caddyfile; remove |
+
 ## Streamlit web — variables
 
 | Name | Owner | Consumer(s) | Secret? | Prod required? | Dev required? | Default / fallback | Missing behavior | Still used? |
@@ -41,7 +52,7 @@ disables checkout (fail-closed) and does **not** take down the app.
 | `APP_BASE_URL` | Render / local | `app_config`, Stripe returns, auth redirects | No | Yes (explicit recommended) | No | Managed: `https://app.fantasygmlab.com`; local: `http://localhost:8501` | Loopback on managed host fails closed | Yes |
 | `SUPABASE_URL` | Supabase / Render | `auth_supabase`, webhook | No | **Yes** on managed web | No (auth off) | empty | Managed web fails closed; local auth unavailable | Yes |
 | `SUPABASE_ANON_KEY` | Supabase / Render | `auth_supabase` | Yes (public client key, treat as credential) | **Yes** on managed web | No | empty | Same as URL | Yes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase / Render | webhook only | **Yes** | Webhook yes; **must be absent** on Streamlit | No | empty | Forbidden on managed web (fail closed); webhook `/ready` 503 | Yes (webhook) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase / Render | backend services (mobile-api: community trades, games, analytics, referrals; and the retired webhooks) | **Yes** | Yes for mobile-api on the self-hosted box (keep); **must be absent** on Streamlit | No | empty | Forbidden on managed web (fail closed) | Yes |
 | `STRIPE_SECRET_KEY` | Stripe / Render | `stripe_billing`, webhook | **Yes** | If charging | No | empty | Checkout unavailable | Yes |
 | `STRIPE_BILLING_MODE` | Render | `stripe_billing` | No | If charging (`test` or `live`) | No | `test` | Live keys without `live` stay OFF | Yes |
 | `STRIPE_PRICE_MONTHLY` | Stripe / Render | `stripe_billing` | No | If charging (GM Pro, legacy name) | No | empty | Checkout unavailable; `STRIPE_PRICE_PRO_MONTHLY` wins if both set | Yes |
@@ -53,7 +64,7 @@ disables checkout (fail-closed) and does **not** take down the app.
 | `STRIPE_CHECKOUT_SUCCESS_URL` | Render | `stripe_billing` | No | Recommended | No | built from `APP_BASE_URL` | Safe default | Yes |
 | `STRIPE_CHECKOUT_CANCEL_URL` | Render | `stripe_billing` | No | Recommended | No | built from `APP_BASE_URL` | Safe default | Yes |
 | `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | Render | `stripe_billing` | No | If portal used | No | `/?page=premium` on app base | Safe default | Yes |
-| `STRIPE_WEBHOOK_SECRET` | Stripe / Render | webhook only | **Yes** | Webhook yes; **must be absent** on Streamlit | No | empty | Forbidden on managed web; webhook unsigned events rejected | Yes (webhook) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe / Supabase function secret | retired box webhook only (rollback) | **Yes** | **No longer needed on the box** (lives in Supabase function secrets); **must be absent** on Streamlit | No | empty | Forbidden on managed web | Rollback only |
 | `DYNASTYGM_BUILD` | Render optional | `build_identity` fallback | No | No (Render Git SHA preferred) | No | `local` | Unmarked local build | Yes |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | Render / local | destination visibility | No | Must stay unset/false | No | false; **forced false** on managed host without `DYNASTYGM_ALLOW_PROD_DEBUG` | Hidden experimental nav | Yes |
 | `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY` | Render / local | kill switch | No | No | No | **ON** unless `0/false` | Graduated feature | Yes |

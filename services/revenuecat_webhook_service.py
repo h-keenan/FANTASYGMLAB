@@ -1,4 +1,6 @@
-"""Backend-only RevenueCat webhook service for Founder Premium (mobile + web RC Billing).
+"""DEPRECATED (2026-10-24) -- ROLLBACK ONLY. Stripe/RevenueCat webhooks are processed by Supabase Edge Functions now (docs/billing-on-supabase.md); this service is no longer deployed on the self-hosted box (removed from docker-compose.yml and the Caddyfile). Kept in the repo only so billing can be rolled back; do not extend it.
+
+Backend-only RevenueCat webhook service for Founder Premium (mobile + web RC Billing).
 
 Deployment topology (Render):
   - Service name: fantasygm-lab-revenuecat-webhook
