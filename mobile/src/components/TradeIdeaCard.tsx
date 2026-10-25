@@ -10,6 +10,7 @@ import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
 import { TradeAssetList } from './TradeAssetRow';
 import TeamAvatar from './TeamAvatar';
+import Button from './Button';
 import ToneBadge from './ToneBadge';
 import TradeSharePreviewModal from './TradeSharePreviewModal';
 import TradeValueBar from './TradeValueBar';
@@ -487,16 +488,7 @@ export default function TradeIdeaCard({
           header icon — no new logic — just makes that path an explicit,
           full-width, clearly-labeled primary affordance at the natural end
           of the card, after the reasoning that justifies it. */}
-      <TouchableOpacity
-        style={styles.proposeButton}
-        onPress={() => setShareOpen(true)}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Share this trade to propose it"
-      >
-        <Ionicons name="paper-plane-outline" size={15} color={colors.background} />
-        <AppText style={styles.proposeButtonText}>Share to Propose</AppText>
-      </TouchableOpacity>
+      <Button label="Share to Propose" onPress={() => setShareOpen(true)} style={styles.proposeButton} />
     </AccentCard>
   );
 }
@@ -707,18 +699,6 @@ function createStyles(colors: ThemeColors) {
   // "primary interaction" per Magna Carta §3/§17, not a value judgment on
   // the trade itself (a bad-value trade gets this exact same button; the
   // button proposes it, it doesn't endorse it).
-  proposeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-  },
-  proposeButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
+  proposeButton: { marginHorizontal: spacing.md, marginTop: spacing.sm, marginBottom: spacing.md },
   });
 }

@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 
 import { calculateAge, MINIMUM_AGE, setPassedAgeGate } from '../lib/ageGate';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
+import { spacing, typography, type ThemeColors } from '../theme';
+import Button from './Button';
 import Input from './Input';
 
 /**
@@ -100,13 +101,7 @@ export default function AgeGate({ onPassed }: { onPassed: () => void }) {
             />
           </View>
           {error ? <AppText style={styles.error}>{error}</AppText> : null}
-          <TouchableOpacity
-            style={[styles.button, (!month || !day || !year) && styles.buttonDisabled]}
-            onPress={submit}
-            disabled={!month || !day || !year}
-          >
-            <AppText style={styles.buttonText}>Continue</AppText>
-          </TouchableOpacity>
+          <Button label="Continue" onPress={submit} disabled={!month || !day || !year} />
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -123,14 +118,6 @@ function createStyles(colors: ThemeColors) {
     input: { textAlign: 'center' },
     inputSmall: { flex: 1 },
     inputLarge: { flex: 1.6 },
-    button: {
-      backgroundColor: colors.accent,
-      borderRadius: radii.sm,
-      paddingVertical: spacing.md,
-      alignItems: 'center',
-    },
-    buttonDisabled: { opacity: disabledOpacity },
-    buttonText: { color: colors.onAccent, fontSize: 16, fontWeight: '600' },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
 }

@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import ToneBadge from '../components/ToneBadge';
 import ErrorState from '../components/ErrorState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -205,9 +206,7 @@ function PlayoffOddsRow({
             {item.team_name}
           </AppText>
           {isMine ? (
-            <View style={styles.mineBadge}>
-              <AppText style={styles.mineBadgeText}>You</AppText>
-            </View>
+            <ToneBadge label="You" color={colors.accent} textColor={colors.onAccent} solid />
           ) : null}
         </View>
         <AppText style={styles.record}>
@@ -278,13 +277,6 @@ function createStyles(colors: ThemeColors) {
       marginTop: spacing.xs,
     },
     statusBadgeText: { fontSize: 10, fontWeight: '700' },
-    mineBadge: {
-      backgroundColor: colors.accent,
-      borderRadius: radii.pill,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-    },
-    mineBadgeText: { color: colors.onAccent, fontSize: 11, fontWeight: '700' },
     oddsPill: {
       backgroundColor: colors.background,
       borderRadius: radii.sm,

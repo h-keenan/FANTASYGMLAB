@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import ToneBadge from '../components/ToneBadge';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -622,9 +623,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     {item.league_name || item.league_id}
                   </AppText>
                   {item.is_default ? (
-                    <View style={styles.defaultBadge}>
-                      <AppText style={styles.defaultBadgeText}>Default</AppText>
-                    </View>
+                    <ToneBadge label="Default" color={colors.accent} textColor={colors.onAccent} solid />
                   ) : null}
                 </View>
               </View>
@@ -1027,13 +1026,6 @@ function createStyles(colors: ThemeColors) {
   leagueTextGroup: { flex: 1, marginRight: spacing.sm },
   leagueNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   leagueName: { flexShrink: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary },
-  defaultBadge: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.pill,
-  },
-  defaultBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   renameButton: { marginLeft: spacing.sm, marginRight: spacing.sm, padding: 2 },
   error: {
     color: colors.danger,

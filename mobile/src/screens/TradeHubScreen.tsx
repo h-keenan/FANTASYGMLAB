@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -480,18 +480,13 @@ function TradeHubGateCard({
       </AppText>
       <View style={styles.gateButtonRow}>
         {canWatchMoreAds ? (
-          <TouchableOpacity style={styles.gateSecondaryButton} onPress={onWatchAd} disabled={watchingAd}>
-            {watchingAd ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
-            ) : (
-              <>
-                <Ionicons name="play-circle-outline" size={16} color={colors.textPrimary} />
-                <AppText style={styles.gateSecondaryButtonText}>
-                  Watch ad for +{entitlement.ad_bonus_per_unlock}
-                </AppText>
-              </>
-            )}
-          </TouchableOpacity>
+          <Button
+            label={`Watch ad for +${entitlement.ad_bonus_per_unlock}`}
+            variant="secondary"
+            onPress={onWatchAd}
+            loading={watchingAd}
+            style={styles.gatePrimaryButton}
+          />
         ) : null}
         <Button label="Upgrade to Pro" variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </View>
@@ -688,17 +683,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.md,
   },
   gateButtonRow: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
-  gateSecondaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.md,
-    backgroundColor: colors.backgroundElevated,
-  },
-  gateSecondaryButtonText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   gatePrimaryButton: { flex: 1 },
   root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },

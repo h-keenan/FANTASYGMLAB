@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ToneBadge from '../components/ToneBadge';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -472,9 +473,7 @@ function TeamRowCard({
             {item.teamName}
           </AppText>
           {item.isMine ? (
-            <View style={styles.mineBadge}>
-              <AppText style={styles.mineBadgeText}>You</AppText>
-            </View>
+            <ToneBadge label="You" color={colors.accent} textColor={colors.onAccent} solid />
           ) : null}
         </View>
         {item.recordLabel ? <AppText style={styles.record}>{item.recordLabel}</AppText> : null}
@@ -635,13 +634,6 @@ function createStyles(colors: ThemeColors) {
   // the rest of the pack.
   rankPillFirst: { backgroundColor: `${colors.premium}1F` },
   rankTrophy: { marginBottom: 1 },
-  mineBadge: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  mineBadgeText: { color: colors.onAccent, fontSize: 11, fontWeight: '700' },
   countPill: {
     backgroundColor: colors.background,
     borderRadius: radii.pill,
