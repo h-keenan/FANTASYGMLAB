@@ -7,6 +7,8 @@ import { LEAGUE_CAP_UPSELL, isSaveFailure, saveFailureMessage } from "@/lib/leag
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
+import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
+import { describeSleeperConnectError, isConnectivityFailure, type SleeperConnectError } from "@/lib/sleeperConnectErrors";
 import { EspnImportForm } from "@/components/EspnImportForm";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { PillRow } from "@/components/PillRow";
@@ -76,11 +78,11 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
-  // Distinguishes "that username has a typo" from "I don't have a Sleeper
-  // account at all" — the API's plain message text only covers the first
-  // case ("Check spelling and try again"), which left a genuinely new-to-
-  // Sleeper user with no path forward (see onboarding audit, 2026-10-18).
-  const [noSleeperAccount, setNoSleeperAccount] = useState(false);
+  // Structured error from lib/sleeperConnectErrors (the single copy source):
+  // user_not_found / no_leagues / network each get their own guidance, plus
+  // the sample-league and "no Sleeper account yet" paths (onboarding audit,
+  // 2026-10-18; connect-failure analytics, 2026-10).
+  const [connectError, setConnectError] = useState<SleeperConnectError | null>(null);
   const [leagues, setLeagues] = useState<SleeperLeagueSummary[]>([]);
   // Set once a save reports the server is warming the league's first-load
   // data; shows real progress until it is ready, then continues.
@@ -120,7 +122,7 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
 
     setStatus("loading");
     setMessage(null);
-    setNoSleeperAccount(false);
+    setConnectError(null);
     setLeagues([]);
     // Mirrors app.py's load_leagues_for_username, which fires this on every
     // lookup attempt (once per session) regardless of outcome -- this is
@@ -147,8 +149,13 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       }
       if (!result.ok || result.leagues.length === 0) {
         setStatus("error");
-        setNoSleeperAccount(result.status === "user_not_found");
-        setMessage(result.message || "No eligible leagues found for that username.");
+        setConnectError(
+          describeSleeperConnectError({
+            status: result.ok ? "no_leagues" : result.status,
+            username: clean,
+            serverMessage: result.message,
+          }),
+        );
         if (!result.ok) {
           trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: result.status || "unavailable" } });
         }
@@ -178,7 +185,11 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
       setStatus("idle");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      if (isConnectivityFailure(error)) {
+        setConnectError(describeSleeperConnectError({ status: "network", username: clean }));
+      } else {
+        setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      }
       trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
     }
   };
@@ -294,10 +305,15 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
           placeholder="Sleeper username"
         />
       </label>
-      {message ? (
-        <div role="alert" className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-warning)" }}>
-          <p className="m-0">{message}</p>
-          {noSleeperAccount ? (
+      {connectError ? (
+        <div role="alert" className="flex flex-col gap-2 text-xs" style={{ color: "var(--color-warning)" }}>
+          <p className="m-0 font-bold">{connectError.message}</p>
+          {connectError.hint ? (
+            <p className="m-0" style={{ color: "var(--color-text-secondary)" }}>
+              {connectError.hint}
+            </p>
+          ) : null}
+          {connectError.offerSleeperSignup ? (
             <p className="m-0" style={{ color: "var(--color-text-secondary)" }}>
               Don&apos;t have a Sleeper account?{" "}
               <a
@@ -312,13 +328,18 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
               , join or start a league, then come back here.
             </p>
           ) : null}
+          {connectError.offerSample ? <SampleLeagueButton surface="connect_error" /> : null}
+        </div>
+      ) : message ? (
+        <div role="alert" className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-warning)" }}>
+          <p className="m-0">{message}</p>
         </div>
       ) : null}
       <Button
         type="submit"
         loading={status === "loading"}
       >
-        {status === "loading" ? "Loading leagues from Sleeper…" : "Load my leagues"}
+        {status === "loading" ? "Loading leagues from Sleeper…" : connectError?.kind === "network" ? "Try again" : "Load my leagues"}
       </Button>
     </form>
   );

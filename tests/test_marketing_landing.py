@@ -15,6 +15,7 @@ def test_landing_analytics_events_are_allowlisted():
         "landing_viewed",
         "primary_cta_clicked",
         "secondary_cta_clicked",
+        "sample_league_cta_clicked",
         "pricing_viewed",
         "signup_started",
     ):

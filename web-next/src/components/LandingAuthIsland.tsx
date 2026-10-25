@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
-import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
+import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
@@ -210,7 +210,7 @@ export function LandingAuthIsland() {
           </p>
         ) : null}
         <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
-        <SampleLeagueLink />
+        <SampleLeagueButton surface="connect_step" />
       </>
     ) : (
       <OnboardingPaywall onSkip={() => setPaywallDismissed(true)} />

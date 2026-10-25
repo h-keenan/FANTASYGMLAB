@@ -18,6 +18,8 @@ export const SAMPLE_CTA_LABEL = "Connect your real league";
 /** Where the CTA goes: the existing Add-a-league flow. */
 export const SAMPLE_CONNECT_ROUTE = "/connect-league";
 export const SAMPLE_ENTRY_LABEL = "Explore a sample league first";
+/** Prominent button label on the landing page and the connect step / error states. */
+export const SAMPLE_TRY_LABEL = "Try a sample league";
 
 export type SampleTab = "dashboard" | "roster" | "game_plan" | "trade";
 export const SAMPLE_TABS: { value: SampleTab; label: string }[] = [
