@@ -484,6 +484,17 @@ Deno.test("billing-plans: signed-in account with no billing history is trial-eli
   assert(!f.calls.some((c) => c.url.includes("/customers")));
 });
 
+Deno.test("billing-plans: anonymous (guest) user with a valid JWT gets no trial", async () => {
+  resetPriceCacheForTests();
+  const f = fakeFetch({ ...priceRoutes(), ...userRoutes({}, "", true) });
+  const r = await plans(plansReq("good-jwt"), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(r.status, 200);
+  const body = await r.json();
+  assertEquals(body.trial, { days: 0, eligible: false });
+  assertEquals(body.trial_days, 3);
+  assert(!f.calls.some((c) => c.url.includes("/rest/v1/profiles")));
+});
+
 Deno.test("billing-plans: invalid JWT or anon key is anonymous; trial disabled => 0 days", async () => {
   resetPriceCacheForTests();
   const f = fakeFetch({ ...priceRoutes(), ...userRoutes({}) });

@@ -28,3 +28,10 @@ test('validateGuestConversionInput: null for acceptable input', () => {
   assert.equal(validateGuestConversionInput('a@b.com', 'password1'), null);
   assert.equal(validateGuestConversionInput('  a@b.com  ', 'password1'), null);
 });
+
+test('guestMustCreateAccountToBuy: guests blocked, signed-in and signed-out not flagged', async () => {
+  const { guestMustCreateAccountToBuy } = await import('./guestConversion.ts');
+  assert.equal(guestMustCreateAccountToBuy({ user: { is_anonymous: true } }), true);
+  assert.equal(guestMustCreateAccountToBuy({ user: { is_anonymous: false } }), false);
+  assert.equal(guestMustCreateAccountToBuy(null), false);
+});

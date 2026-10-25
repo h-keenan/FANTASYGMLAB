@@ -111,6 +111,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (auth && supabase.url && supabase.serviceRoleKey) {
     try {
       const user = await verifyUserJwt(supabase, deps.fetch, auth);
+      // Guests (GoTrue is_anonymous) cannot buy, so no trial is offered, even with a valid JWT.
+      if (user.isAnonymous) throw new Error("anonymous");
       const profile = await fetchBillingProfile(supabase, deps.fetch, user.id);
       // check-Stripe-by-email is skipped (email ""), exactly like FastAPI's check_stripe=False.
       eligible = await trialEligible(config, deps.fetch, {

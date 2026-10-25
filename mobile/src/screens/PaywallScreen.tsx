@@ -27,6 +27,10 @@ import {
   purchasePackage,
   restorePurchases,
 } from '../lib/revenuecat';
+import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
+import { GUEST_PURCHASE_CTA, GUEST_PURCHASE_HINT } from '../lib/guestConversion';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { freeTrialForUser, thenPriceLine, trialCtaLabel, type IntroEligibility } from '../lib/freeTrial';
@@ -141,6 +145,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
     }
     navigation.goBack();
   }, [fromOnboarding, completeOnboarding, completeOnboardingViaGetStarted, navigation]);
+  // Guests (Supabase anonymous users) may not buy: they must create an
+  // account first (owner decision 2026-10-25, mirrors web TrialAccountGate).
+  // Restore purchases stays available to everyone (Apple 3.1.1).
+  const { isGuest } = useAuth();
+  const [createAccountOpen, setCreateAccountOpen] = useState(false);
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -260,6 +269,10 @@ export default function PaywallScreen({ navigation, route }: Props) {
   }, []);
 
   const onPurchase = async (pack: PurchasesPackage) => {
+    if (isGuest) {
+      setCreateAccountOpen(true);
+      return;
+    }
     setPurchaseError(null);
     setPurchasing(true);
     trackUse('paywall', 'purchase_started', { tier: 'free' });
@@ -469,6 +482,13 @@ export default function PaywallScreen({ navigation, route }: Props) {
 
       {purchaseError ? <AppText style={styles.error}>{purchaseError}</AppText> : null}
 
+      {isGuest ? (
+        <View>
+          <Button label={GUEST_PURCHASE_CTA} variant="premium" onPress={() => setCreateAccountOpen(true)} />
+          <AppText style={styles.trialTerms}>{GUEST_PURCHASE_HINT}</AppText>
+        </View>
+      ) : (
+        <>
       <PremiumGlow radius={radii.md} active={Boolean(selected) && !purchasing} style={styles.glowWrap}>
         <TouchableOpacity accessibilityRole="button"
           style={[styles.primaryButton, styles.premiumButton, (!selected || purchasing) && styles.primaryButtonDisabled]}
@@ -489,6 +509,8 @@ export default function PaywallScreen({ navigation, route }: Props) {
           {thenPriceLine(selected.product.priceString, packagePriceSuffix(selected.packageType))}
         </AppText>
       ) : null}
+        </>
+      )}
 
       {/* Upgraded from a bare text link to a real bordered secondary button
           (same recipe LoginScreen's socialButton already uses: 1px border +
@@ -537,6 +559,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
         .
       </AppText>
     </ScrollView>
+    <GuestCreateAccountModal
+      visible={createAccountOpen}
+      onClose={() => setCreateAccountOpen(false)}
+      hint="Create your account to start your free trial. Your league carries over automatically."
+    />
     </View>
   );
 }

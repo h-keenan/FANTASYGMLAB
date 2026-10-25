@@ -37,10 +37,9 @@ import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import type { ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
-import Input from '../components/Input';
 import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
-import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
+import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -93,7 +92,7 @@ export default function MoreScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
-  const { deleteAccount, session, isGuest, convertGuestToAccount } = useAuth();
+  const { deleteAccount, session, isGuest } = useAuth();
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -122,11 +121,6 @@ export default function MoreScreen({ navigation }: Props) {
   }, [isGuest]);
   const [deleting, setDeleting] = useState(false);
   const [guestUpgradeOpen, setGuestUpgradeOpen] = useState(false);
-  const [guestUpgradeEmail, setGuestUpgradeEmail] = useState('');
-  const [guestUpgradePassword, setGuestUpgradePassword] = useState('');
-  const [guestUpgradeSubmitting, setGuestUpgradeSubmitting] = useState(false);
-  const [guestUpgradeError, setGuestUpgradeError] = useState<string | null>(null);
-  const [guestUpgradeNotice, setGuestUpgradeNotice] = useState<string | null>(null);
   const { showcaseMode, setShowcaseMode } = useShowcaseMode();
   const { status: collegeInterestStatus, respond: respondToCollegeInterest } = useCollegeInterest();
   // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
@@ -250,31 +244,6 @@ export default function MoreScreen({ navigation }: Props) {
       return;
     }
     navigation.navigate(screen, league);
-  };
-
-  const closeGuestUpgrade = () => {
-    setGuestUpgradeOpen(false);
-    setGuestUpgradeEmail('');
-    setGuestUpgradePassword('');
-    setGuestUpgradeError(null);
-    setGuestUpgradeNotice(null);
-  };
-
-  // Fix 3 (welcome/signup audit): upgrades the CURRENT guest session in
-  // place (see AuthContext.convertGuestToAccount) — the connected league
-  // and everything else already tied to this guest's id simply stays
-  // connected, nothing to re-enter.
-  const onSubmitGuestUpgrade = async () => {
-    setGuestUpgradeError(null);
-    setGuestUpgradeNotice(null);
-    setGuestUpgradeSubmitting(true);
-    const result = await convertGuestToAccount(guestUpgradeEmail, guestUpgradePassword);
-    setGuestUpgradeSubmitting(false);
-    if (result.error) {
-      setGuestUpgradeError(result.error);
-      return;
-    }
-    setGuestUpgradeNotice('Check your email to confirm your account. Your league stays connected once you do.');
   };
 
   const onDeleteAccount = () => {
@@ -597,42 +566,7 @@ export default function MoreScreen({ navigation }: Props) {
         </AnimatedCard>
       </ScrollView>
 
-      <ModalFormCard visible={guestUpgradeOpen} onClose={closeGuestUpgrade}>
-        <ModalFormTitle>Create account</ModalFormTitle>
-        <ModalFormHint>Your connected league carries over automatically — nothing to re-enter.</ModalFormHint>
-        <Input
-          style={styles.modalInput}
-          placeholder="Email"
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          textContentType="username"
-          autoComplete="email"
-          value={guestUpgradeEmail}
-          onChangeText={setGuestUpgradeEmail}
-          editable={!guestUpgradeSubmitting}
-        />
-        <Input
-          style={styles.modalInput}
-          placeholder="Password"
-          secureTextEntry
-          textContentType="newPassword"
-          autoComplete="new-password"
-          value={guestUpgradePassword}
-          onChangeText={setGuestUpgradePassword}
-          editable={!guestUpgradeSubmitting}
-        />
-        {guestUpgradeError ? <AppText style={styles.guestUpgradeError}>{guestUpgradeError}</AppText> : null}
-        {guestUpgradeNotice ? <AppText style={styles.guestUpgradeNotice}>{guestUpgradeNotice}</AppText> : null}
-        <ModalFormActions
-          onCancel={closeGuestUpgrade}
-          cancelDisabled={guestUpgradeSubmitting}
-          confirmLabel="Create account"
-          onConfirm={onSubmitGuestUpgrade}
-          confirmDisabled={!guestUpgradeEmail || !guestUpgradePassword}
-          confirmLoading={guestUpgradeSubmitting}
-        />
-      </ModalFormCard>
+      <GuestCreateAccountModal visible={guestUpgradeOpen} onClose={() => setGuestUpgradeOpen(false)} />
     </View>
   );
 }
@@ -818,8 +752,5 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       color: colors.textSecondary,
     },
-    modalInput: { marginBottom: spacing.sm },
-    guestUpgradeError: { fontSize: 12, color: colors.danger, marginTop: spacing.xs, lineHeight: 16 },
-    guestUpgradeNotice: { fontSize: 12, color: colors.success, marginTop: spacing.xs, lineHeight: 16 },
   });
 }

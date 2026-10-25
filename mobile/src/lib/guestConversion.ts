@@ -60,3 +60,17 @@ export function validateGuestConversionInput(email: string, password: string): s
   }
   return null;
 }
+
+/**
+ * Owner decision (coridian_, 2026-10-25): guests may not buy. Mirrors web
+ * (#1521: TrialAccountGate + server 403 account_required). A guest must
+ * create an account (in-place upgrade, same user id) before any
+ * purchase/trial button is shown. Restore Purchases is NOT gated (Apple).
+ */
+export const GUEST_PURCHASE_CTA = 'Create an account to start your free trial';
+export const GUEST_PURCHASE_HINT =
+  'Free trials and subscriptions need an account so your Premium follows you across devices.';
+
+export function guestMustCreateAccountToBuy(session: GuestSessionLike | null | undefined): boolean {
+  return canConvertGuestToAccount(session);
+}
