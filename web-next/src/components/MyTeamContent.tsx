@@ -42,7 +42,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 // coridian_, 2026-10-18: "the bench should be in order so. QBs, RBs, WRs,
 // TEs, K, DST" — any position not in this list (a rare/unknown value)
 // sorts after every known one rather than being dropped or erroring.
-const BENCH_POSITION_ORDER = ["QB", "RB", "WR", "TE", "K", "DST"];
+const BENCH_POSITION_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF", "DST"];
 function positionSortIndex(position: string | null | undefined): number {
   const index = BENCH_POSITION_ORDER.indexOf((position || "").toUpperCase());
   return index === -1 ? BENCH_POSITION_ORDER.length : index;

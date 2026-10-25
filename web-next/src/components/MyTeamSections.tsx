@@ -109,12 +109,14 @@ function RosterRow({
 }) {
   const { openPlayer } = usePlayerQuickView();
   const identity = { ...player, sourceLabel: "My Team" };
+  // A team defense has no player record behind it: no Quick View, no OVR.
+  const isTeamDefense = (player.position || "").toUpperCase() === "DEF";
   const ineligibleTag = lineupIneligibleTag(player);
   const surplus = surplusText(keeper);
   return (
     <PlayerRow
       bordered
-      identity={identity}
+      identity={isTeamDefense ? undefined : identity}
       playerId={player.player_id}
       name={player.name || "Unknown player"}
       position={badgeLabel(player, showSlot)}
@@ -126,15 +128,17 @@ function RosterRow({
         <>
           <OvrGauge rating={player.overall_rating} size="sm" />
           <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
-          <button
-            type="button"
-            aria-label={`Open ${player.name || "player"}`}
-            onClick={() => openPlayer(identity)}
-            className="inline-flex items-center justify-center -my-3 min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
-            style={{ background: "none", border: "none", cursor: "pointer" }}
-          >
-            <Chevron />
-          </button>
+          {isTeamDefense ? null : (
+            <button
+              type="button"
+              aria-label={`Open ${player.name || "player"}`}
+              onClick={() => openPlayer(identity)}
+              className="inline-flex items-center justify-center -my-3 min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
+              style={{ background: "none", border: "none", cursor: "pointer" }}
+            >
+              <Chevron />
+            </button>
+          )}
         </>
       }
     >

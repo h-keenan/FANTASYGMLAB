@@ -484,7 +484,9 @@ def build_trade_tile(
     # modules.player_state_authority.NFL_NON_ACTIONABLE_STATUSES) is named
     # right in the short text a user actually sees, instead of reading as a
     # clean opportunity.
-    trade_value = _text(narrative.target_label, _text(headline_idea.get("partner_team_name"), "Open Trade Hub"))
+    # Never fall back to the partner's team/manager name: this value is the
+    # push headline (push-safety rule: no league/team/manager names in push text).
+    trade_value = _text(narrative.target_label, "Open Trade Hub")
     if receive_assets:
         headline_status = str(receive_assets[0].get("status") or "").strip().casefold()
         if headline_status in NFL_NON_ACTIONABLE_STATUSES:

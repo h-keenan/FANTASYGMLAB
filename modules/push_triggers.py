@@ -691,15 +691,32 @@ def league_briefing_push_items(
         untouchable_player_ids=untouchable_player_ids,
     )
     league_name = _safe_text(league.get("name"), "Your league")
+    # Push-safety (#1493): no league/team/manager names in push text. A trade
+    # headline must never name the partner; scrub any known team name.
+    private_names: set[str] = set()
+    for roster in rosters:
+        meta = roster.get("metadata") if isinstance(roster.get("metadata"), Mapping) else {}
+        private_names.add(_safe_text(meta.get("team_name")))
+    if league_name != "Your league":
+        private_names.add(league_name)
     items: list[dict[str, Any]] = []
     for item in briefing.items:
         if item.category not in PUSH_CATEGORIES or not item.recommendation_id:
             continue
+        item_names = set(private_names)
+        presentation = getattr(item, "presentation", None)
+        if isinstance(presentation, Mapping):
+            item_names.add(_safe_text(presentation.get("partner_team_name")))
+        item_names.discard("")
+        item_names.discard("Trade partner")
+        headline_text = item.headline
+        if any(name.casefold() in headline_text.casefold() for name in item_names):
+            headline_text = "A trade idea is ready to review"
         push_item: dict[str, Any] = {
             "league_id": league_id,
             "league_name": league_name,
             "category": item.category,
-            "headline": item.headline,
+            "headline": headline_text,
             "recommendation_id": item.recommendation_id,
         }
         # route_player_id/_name already exist on DailyBriefingItem for the
@@ -910,8 +927,10 @@ def waiver_reminder_push_item(
 
     1. Timing: the league has a known waiver system, is in season, is not
        daily-waiver, and tomorrow (America/New_York) is its
-       settings.waiver_day_of_week (Sleeper numbers days Monday=0, matching
-       its Wednesday default of 2). Sleeper does not expose the processing
+       settings.waiver_day_of_week (assumed Monday=0, matching Sleeper's
+       Wednesday default of 2; UNVERIFIED: docs.sleeper.com does not document
+       this field, checked 2026-10-24. Keep the mapping in one place here
+       and re-check against a real league's UI day if it is ever in doubt). Sleeper does not expose the processing
        time of day, so the reminder goes out from midday the day BEFORE,
        never claiming an exact deadline. FAAB leagues with no budget left
        are skipped.

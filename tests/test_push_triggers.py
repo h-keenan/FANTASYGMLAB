@@ -1242,3 +1242,39 @@ def test_waiver_reminder_skips_faab_league_with_no_budget(monkeypatch):
     assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=faab_league, roster_settings=spent) is None
     left = {"waiver_budget_used": 40}
     assert _waiver_item(monkeypatch, now=_TUESDAY_3PM_ET, league=faab_league, roster_settings=left) is not None
+
+
+def test_league_briefing_push_items_never_names_trade_partner():
+    fake_item = Mock(
+        category="top_priority",
+        headline="Team Rocket",
+        recommendation_id="rec-x",
+        route_player_id="",
+        route_player_name="",
+        presentation={"partner_team_name": "Team Rocket"},
+    )
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+    with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+        with patch(
+            "modules.sleeper.get_rosters",
+            return_value=[
+                {"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]},
+                {"roster_id": 2, "owner_id": "o2", "players": [], "metadata": {"team_name": "Team Rocket"}},
+            ],
+        ):
+            with patch("modules.dashboard_engine.compose_next_move_briefing", return_value=Mock(items=[fake_item])):
+                items = push_triggers.league_briefing_push_items(
+                    league_id="league-1",
+                    sleeper_user_id="sleeper-user-1",
+                    players_df=players_df,
+                    score_field="dynasty_score",
+                )
+    assert "Rocket" not in items[0]["headline"]
+
+
+def test_trade_tile_value_never_falls_back_to_partner_name():
+    import inspect
+
+    from modules import dashboard_engine
+
+    assert 'headline_idea.get("partner_team_name"), "Open Trade Hub"' not in inspect.getsource(dashboard_engine)

@@ -513,6 +513,8 @@ function LineupRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   // A bye-week player (benched by the server's weekly lineup) shows a
   // "Bye" pill in the calmer watch tone; a real injury label always wins.
+  // A team defense has no player record behind it: not tappable.
+  const isTeamDefense = (player.position ?? '').toUpperCase() === 'DEF';
   const injuryTone = isByeOnlyLabel(player) ? 'watch' : waiverInjuryDisplay(player.injury_status).tone;
   return (
     <PlayerIdentityRow
@@ -543,9 +545,9 @@ function LineupRow({
           ) : null}
         </>
       }
-      chevron
+      chevron={!isTeamDefense}
       showDivider={showDivider}
-      onPress={onPress}
+      onPress={isTeamDefense ? undefined : onPress}
     />
   );
 }
