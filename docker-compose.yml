@@ -1,7 +1,10 @@
 # FantasyDesk — self-hosted stack.
 #
 # Replicates render.yaml's real (non-cron) services plus a Caddy reverse
-# proxy with automatic HTTPS. The legacy Streamlit `web` service (app.py)
+# proxy with automatic HTTPS. The stripe-webhook and revenuecat-webhook
+# services were RETIRED from this stack on 2026-10-24: billing and
+# entitlement processing now runs on Supabase Edge Functions (see
+# docs/billing-on-supabase.md, which also has the rollback recipe). The legacy Streamlit `web` service (app.py)
 # was removed in 2026-10 -- see docs/streamlit-removal-2026-10.md.
 # The 4 cron jobs in render.yaml
 # (push-trigger sweep, trade-outcome-result sweep, players-db refresh,
@@ -17,7 +20,7 @@
 #
 # Per-service resource limits (`mem_limit`/`cpus` below): on Render, every
 # service got its own isolated instance, so one runaway service could not
-# starve another. Colocating all six containers on one shared box removes
+# starve another. Colocating all four containers (mobile-api, redis, web-next, caddy) on one shared box removes
 # that isolation — a leak or a CPU-bound spike (pandas/Monte Carlo work in
 # `mobile-api`) in one container could otherwise exhaust the host's
 # RAM/CPU and take the others down with it. `mem_limit`/`cpus` are the
@@ -36,8 +39,9 @@
 # is derived from it): `mobile-api` does the real pandas/Monte
 # Carlo/player-cache work, so it gets the largest share; `redis` is a
 # small, fast in-memory state store (not a database) so it needs very
-# little; the two webhook services only handle occasional small
-# Stripe/RevenueCat POSTs; Caddy just proxies.
+# little; Caddy just proxies. (The two small Stripe/RevenueCat webhook
+# containers, 0.5g / 0.5 cpu each, were retired -- that headroom is now
+# simply unallocated.)
 #
 # `mobile-api` specifically now runs multiple uvicorn worker processes
 # (see its own command/comment below) instead of one, which is why its
@@ -52,8 +56,10 @@
 # playoff-odds caches are NOT duplicated per worker the way they used to
 # be.
 #
-# Total mem_limit across the remaining services is ~8.5GB of this box's
-# 16GB (the removed Streamlit `web` service used to take 5g / 3.0 cpus), so
+# Total mem_limit across the remaining production-path services
+# (mobile-api 7g + redis 256m + caddy 256m) is ~7.5GB of this box's 16GB
+# and ~4.75 cpus (the removed Streamlit `web` service used to take 5g / 3.0
+# cpus, and the two retired webhook services 1g / 1.0 cpu combined), so
 # host headroom is larger than the historical ~2.5GB / ~3.25 threads below.
 # These are ceilings, not reservations, so normal (non-spiking) operation
 # is unaffected — they only bound the worst case. Sign-off note: this is a
@@ -64,7 +70,7 @@
 # normal-load throttling) given the stated 6c/12t spec.
 #
 # `web-next` (below, added after the above budget was last signed off) is
-# NOT counted in that ~13.5GB/~8.75-CPU total — it's an additive,
+# NOT counted in that ~7.5GB/~4.75-CPU total — it's an additive,
 # test-subdomain-only preview service, not part of the production traffic
 # path (see its own service comment and docs/SELF_HOSTED_MIGRATION.md).
 # Its 1g/1.0 is sized independently against the box's existing headroom
@@ -123,8 +129,8 @@ services:
     # correct, but not the steady-state this should run in.
     #
     # MOBILE_API_WORKERS defaults to 4: on the stated 6-core/12-thread box,
-    # that leaves the two webhooks' 1 combined core,
-    # caddy's 0.5, and redis' 0.25 all still fitting comfortably under the
+    # that leaves caddy's 0.5 and redis' 0.25 (plus web-next's 1.0) all
+    # still fitting comfortably under the
     # 12 logical threads with real headroom (see this file's top-of-file
     # resource-limit comment for the full budget) -- override via `.env`
     # if the actual box differs from that spec.
@@ -182,58 +188,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
-    restart: unless-stopped
-    networks:
-      - internal
-
-  stripe-webhook:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: fantasygmlab-app:latest
-    # See the "mobile-api" service's command comment above for why this is
-    # wrapped in sh -c and uses the doubled "$$PORT".
-    command: ["sh", "-c", "uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $$PORT"]
-    environment:
-      PORT: "8080"
-      # See the "mobile-api" service's DYNASTYGM_SELF_HOSTED comment above.
-      DYNASTYGM_SELF_HOSTED: "1"
-    env_file:
-      - .env
-    mem_limit: 512m
-    cpus: 0.5
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - internal
-
-  revenuecat-webhook:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: fantasygmlab-app:latest
-    # See the "mobile-api" service's command comment above for why this is
-    # wrapped in sh -c and uses the doubled "$$PORT".
-    command: ["sh", "-c", "uvicorn services.revenuecat_webhook_service:app --host 0.0.0.0 --port $$PORT"]
-    environment:
-      PORT: "8080"
-      # See the "mobile-api" service's DYNASTYGM_SELF_HOSTED comment above.
-      DYNASTYGM_SELF_HOSTED: "1"
-    env_file:
-      - .env
-    mem_limit: 512m
-    cpus: 0.5
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     restart: unless-stopped
     networks:
       - internal
@@ -328,10 +282,6 @@ services:
     # but pieces of it fail") this stack should not risk on every restart.
     depends_on:
       mobile-api:
-        condition: service_healthy
-      stripe-webhook:
-        condition: service_healthy
-      revenuecat-webhook:
         condition: service_healthy
       web-next:
         condition: service_healthy

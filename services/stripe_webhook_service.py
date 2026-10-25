@@ -1,4 +1,6 @@
-"""Backend-only Stripe webhook service for Founder Premium.
+"""DEPRECATED (2026-10-24) -- ROLLBACK ONLY. Stripe/RevenueCat webhooks are processed by Supabase Edge Functions now (docs/billing-on-supabase.md); this service is no longer deployed on the self-hosted box (removed from docker-compose.yml and the Caddyfile). Kept in the repo only so billing can be rolled back; do not extend it.
+
+Backend-only Stripe webhook service for Founder Premium.
 
 Deployment topology (Render):
   - Service name: fantasygmlab-stripe-webhook

@@ -3,8 +3,7 @@
 On Render, every service in render.yaml got its own isolated instance, so
 one runaway service could not starve another and uvicorn's lack of a
 `--workers` flag just meant "one process per already-isolated instance."
-Colocating all the services (mobile-api, redis, stripe-webhook,
-revenuecat-webhook, web-next, caddy) on one self-hosted box (docker-compose.yml)
+Colocating all the services (mobile-api, redis, web-next, caddy) on one self-hosted box (docker-compose.yml)
 removes both of those properties, so this test file pins down the
 decisions that keep that safe:
 
@@ -60,8 +59,6 @@ def test_every_app_proxy_and_state_service_has_memory_and_cpu_limits():
     expected = [
         ("mobile-api", "7g", "4.0"),
         ("redis", "256m", "0.25"),
-        ("stripe-webhook", "512m", "0.5"),
-        ("revenuecat-webhook", "512m", "0.5"),
         ("web-next", "1g", "1.0"),
         ("caddy", "256m", "0.5"),
     ]
@@ -81,15 +78,11 @@ def test_resource_limits_leave_headroom_on_target_box():
     mem_limits_gb = {
         "mobile-api": 7,
         "redis": 0.25,
-        "stripe-webhook": 0.5,
-        "revenuecat-webhook": 0.5,
         "caddy": 0.25,
     }
     cpu_limits = {
         "mobile-api": 4.0,
         "redis": 0.25,
-        "stripe-webhook": 0.5,
-        "revenuecat-webhook": 0.5,
         "caddy": 0.5,
     }
     total_mem_gb = sum(mem_limits_gb.values())
@@ -120,7 +113,7 @@ def test_mobile_api_runs_multiple_workers_with_documented_rationale():
 
 def test_mobile_api_depends_on_redis_being_healthy():
     text = _compose_text()
-    names = ["mobile-api", "redis", "stripe-webhook", "revenuecat-webhook", "caddy"]
+    names = ["mobile-api", "redis", "web-next", "caddy"]
     block = _service_block(text, "mobile-api", names)
     assert "depends_on:" in block
     assert "redis:" in block
@@ -129,7 +122,7 @@ def test_mobile_api_depends_on_redis_being_healthy():
 
 def test_redis_service_has_a_healthcheck_and_no_hardcoded_cache_dependency():
     text = _compose_text()
-    names = ["mobile-api", "redis", "stripe-webhook", "revenuecat-webhook", "caddy"]
+    names = ["mobile-api", "redis", "web-next", "caddy"]
     block = _service_block(text, "redis", names)
     assert "redis-cli" in block and "ping" in block, "redis service should healthcheck via redis-cli ping"
     assert "image: redis" in block
@@ -166,13 +159,13 @@ def test_every_app_service_sets_self_hosted_managed_host_marker():
     # production box as a contributor's local checkout (see
     # docs/SELF_HOSTED_MIGRATION.md).
     text = _compose_text()
-    for name in ("mobile-api", "stripe-webhook", "revenuecat-webhook"):
+    for name in ("mobile-api",):
         service_header = f"\n  {name}:\n"
         start = text.index(service_header) + len(service_header)
         rest = text[start:]
         other_headers = [
             rest.find(f"\n  {other}:")
-            for other in ("mobile-api", "stripe-webhook", "revenuecat-webhook", "caddy")
+            for other in ("mobile-api", "web-next", "caddy")
             if other != name and rest.find(f"\n  {other}:") != -1
         ]
         end = min(other_headers) if other_headers else len(rest)
@@ -191,7 +184,24 @@ def test_caddy_waits_for_healthy_app_services_before_proxying():
     # web-next (additive test-subdomain preview — docs/SELF_HOSTED_MIGRATION.md
     # section 9) is included here too: Caddy waits on its healthcheck before
     # proxying, same as every other app service.
-    for name in ("mobile-api", "stripe-webhook", "revenuecat-webhook", "web-next"):
+    for name in ("mobile-api", "web-next"):
         assert f"{name}:\n" in depends_on_block
-    assert depends_on_block.count("condition: service_healthy") == 4
+    assert depends_on_block.count("condition: service_healthy") == 2
     assert "web:\n" not in depends_on_block.replace("web-next:\n", "")
+
+
+def test_billing_webhook_services_are_retired_from_compose_and_caddy():
+    # Billing moved to Supabase Edge Functions (docs/billing-on-supabase.md);
+    # the box must not run, route to, or wait on the old webhook containers.
+    compose = _compose_text()
+    caddyfile = (ROOT / "Caddyfile").read_text(encoding="utf-8")
+    for name in ("stripe-webhook", "revenuecat-webhook"):
+        assert f"\n  {name}:\n" not in compose
+        assert f"reverse_proxy {name}:" not in caddyfile
+    assert "services.stripe_webhook_service" not in compose
+    assert "services.revenuecat_webhook_service" not in compose
+    assert "{$STRIPE_WEBHOOK_DOMAIN}" not in caddyfile
+    assert "{$REVENUECAT_WEBHOOK_DOMAIN}" not in caddyfile
+    # Rollback-only modules stay importable in the repo.
+    assert (ROOT / "services" / "stripe_webhook_service.py").exists()
+    assert (ROOT / "services" / "revenuecat_webhook_service.py").exists()

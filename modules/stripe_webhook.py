@@ -1,3 +1,6 @@
+"""DEPRECATED (2026-10-24) -- ROLLBACK ONLY. Stripe/RevenueCat webhooks are processed by Supabase Edge Functions now (docs/billing-on-supabase.md); this module is no longer deployed on the self-hosted box (removed from docker-compose.yml and the Caddyfile). Kept in the repo only so billing can be rolled back; do not extend it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
