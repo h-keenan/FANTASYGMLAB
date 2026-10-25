@@ -39,6 +39,8 @@ describe("SleeperImportForm", () => {
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
       deleteAccount: vi.fn(),
+      upgradeGuestWithEmail: vi.fn(),
+      callbackNotice: null,
       isGuest: false,
     });
     vi.mocked(trackFeatureUse).mockClear();

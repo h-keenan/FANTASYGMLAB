@@ -66,6 +66,8 @@ function mockAuth(session: MockSession | null, loading = false) {
     signInAsGuest: vi.fn(),
     signOut: vi.fn(),
     deleteAccount: vi.fn(),
+    upgradeGuestWithEmail: vi.fn(),
+    callbackNotice: null,
     isGuest: false,
   });
 }

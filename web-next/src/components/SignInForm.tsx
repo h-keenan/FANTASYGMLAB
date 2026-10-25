@@ -63,7 +63,14 @@ import { Input } from "@/components/Input";
  * resolves automatically either way (Zach's ask).
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
-  const { signIn, signUp, signInWithOAuth } = useAuth();
+  const { signIn, signUp, signInWithOAuth, upgradeGuestWithEmail, isGuest, callbackNotice } = useAuth();
+  // Guest (anonymous) sessions are upgraded in place so the user id and saved
+  // data are kept; the notice explains the rare cases where that is impossible.
+  const [localNotice, setNotice] = useState<string | null>(null);
+  const notice = localNotice ?? callbackNotice?.message ?? null;
+  // Set once linking failed and the user must opt in to a plain sign-in.
+  const [plainOAuthChosen, setPlainOAuth] = useState(false);
+  const plainOAuth = plainOAuthChosen || Boolean(callbackNotice);
   const [step, setStep] = useState<"email" | "password" | "check-email">("email");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   // Set only once signIn has actually failed and this turned out to need
@@ -83,7 +90,15 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   // build of these buttons already accepted.
   const handleOAuth = async (provider: "google" | "apple") => {
     setOauthBusy(provider);
-    const result = await signInWithOAuth(provider);
+    const result = plainOAuth ? await signInWithOAuth(provider, { plain: true }) : await signInWithOAuth(provider);
+    if (result.fallback) {
+      // Linking to the guest session is not possible; do NOT silently drop
+      // the guest's data: ask first. Next click proceeds with plain sign-in.
+      setOauthBusy(null);
+      setPlainOAuth(true);
+      setNotice(result.notice ?? null);
+      return;
+    }
     if (result.error) {
       setOauthBusy(null);
       setError(result.error);
@@ -117,7 +132,40 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     setStep("password");
   };
 
+  const finishGuestUpgrade = async () => {
+    const result = await upgradeGuestWithEmail(email, password);
+    if (result.outcome === "converted") {
+      setBusy(false);
+      onSignedIn();
+      return;
+    }
+    if (result.outcome === "confirm-email") {
+      setBusy(false);
+      setStep("check-email");
+      return;
+    }
+    if (result.outcome === "email-exists") {
+      // The email belongs to an existing account: keep the old behavior
+      // (plain sign-in) after telling the user the guest data is not merged.
+      setNotice(result.error);
+      const signInResult = await signIn(email, password);
+      setBusy(false);
+      if (!signInResult.error) {
+        onSignedIn();
+        return;
+      }
+      setError("Incorrect password. Try again.");
+      return;
+    }
+    setBusy(false);
+    setError(result.error);
+  };
+
   const finishSignUp = async () => {
+    if (isGuest) {
+      await finishGuestUpgrade();
+      return;
+    }
     const result = await signUp(email, password);
     setBusy(false);
     if (result.error) {
@@ -148,6 +196,17 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    if (isGuest) {
+      // Skip the sign-in-first attempt: signing in would replace the guest
+      // session (new user id). Upgrade in place; fall back inside.
+      if (!ageConfirmed) {
+        setBusy(false);
+        setNeedsAgeGate(true);
+        return;
+      }
+      await finishGuestUpgrade();
+      return;
+    }
     const signInResult = await signIn(email, password);
     if (!signInResult.error) {
       setBusy(false);
@@ -175,7 +234,9 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         </h2>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
           We sent a confirmation link to <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>.
-          Confirm your account, then come back here to sign in.
+          {isGuest
+            ? " Confirm it to finish creating your account. Everything you set up as a guest stays with it."
+            : " Confirm your account, then come back here to sign in."}
         </p>
         <Button
           type="button"
@@ -214,6 +275,11 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
+          {notice ? (
+            <p role="status" className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              {notice}
+            </p>
+          ) : null}
           {error ? (
             <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
               {error}
@@ -312,6 +378,11 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             />
           </label>
 
+          {notice ? (
+            <p role="status" className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              {notice}
+            </p>
+          ) : null}
           {error ? (
             <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
               {error}

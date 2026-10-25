@@ -54,6 +54,8 @@ describe("SignInForm", () => {
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
       deleteAccount: vi.fn(),
+      upgradeGuestWithEmail: vi.fn(),
+      callbackNotice: null,
       isGuest: false,
     });
   });
@@ -214,5 +216,70 @@ describe("SignInForm", () => {
     fireEvent.click(screen.getByText("← back@example.com"));
     expect(screen.getByLabelText("Email")).toHaveValue("back@example.com");
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  });
+  describe("guest (anonymous) session", () => {
+    const upgradeGuestWithEmail = vi.fn();
+    beforeEach(() => {
+      upgradeGuestWithEmail.mockReset();
+      vi.mocked(useAuth).mockReturnValue({
+        session: null,
+        loading: false,
+        signIn,
+        signUp,
+        signInWithOAuth,
+        signInAsGuest: vi.fn(),
+        signOut: vi.fn(),
+        deleteAccount: vi.fn(),
+        upgradeGuestWithEmail,
+        callbackNotice: null,
+        isGuest: true,
+      });
+    });
+
+    it("upgrades in place (no signIn / signUp) after the age gate and finishes when converted", async () => {
+      upgradeGuestWithEmail.mockResolvedValue({ error: null, outcome: "converted" });
+      const onSignedIn = vi.fn();
+      render(<SignInForm onSignedIn={onSignedIn} />);
+      continuePastEmailStep("g@example.com");
+      enterPasswordAndContinue("secret1");
+      await fillAgeGate();
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
+      expect(upgradeGuestWithEmail).toHaveBeenCalledWith("g@example.com", "secret1");
+      expect(signIn).not.toHaveBeenCalled();
+      expect(signUp).not.toHaveBeenCalled();
+    });
+
+    it("shows the confirm-email screen when confirmation is pending", async () => {
+      upgradeGuestWithEmail.mockResolvedValue({ error: null, outcome: "confirm-email" });
+      render(<SignInForm onSignedIn={vi.fn()} />);
+      continuePastEmailStep("g@example.com");
+      enterPasswordAndContinue("secret1");
+      await fillAgeGate();
+      expect(await screen.findByText("Check your email")).toBeInTheDocument();
+      expect(screen.getByText(/guest stays with it/)).toBeInTheDocument();
+    });
+
+    it("on an existing email, warns that guest data is not merged and signs in", async () => {
+      upgradeGuestWithEmail.mockResolvedValue({ error: "NOT MERGED NOTICE", outcome: "email-exists" });
+      signIn.mockResolvedValue({ error: null });
+      const onSignedIn = vi.fn();
+      render(<SignInForm onSignedIn={onSignedIn} />);
+      continuePastEmailStep("old@example.com");
+      enterPasswordAndContinue("secret1");
+      await fillAgeGate();
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
+      expect(signIn).toHaveBeenCalledWith("old@example.com", "secret1");
+    });
+
+    it("asks before falling back to a plain OAuth sign-in when linking is unavailable", async () => {
+      signInWithOAuth.mockResolvedValueOnce({ error: null, fallback: "link-unavailable", notice: "WILL NOT BE CARRIED" });
+      signInWithOAuth.mockResolvedValueOnce({ error: null });
+      render(<SignInForm onSignedIn={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+      expect(await screen.findByText("WILL NOT BE CARRIED")).toBeInTheDocument();
+      expect(signInWithOAuth).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+      await waitFor(() => expect(signInWithOAuth).toHaveBeenLastCalledWith("google", { plain: true }));
+    });
   });
 });
