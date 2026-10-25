@@ -1800,6 +1800,10 @@ export interface QuickViewModel {
   opportunity_confidence: number | null;
   workload_trend: string | null;
   usage_trend: UsageTrend | null;
+  // Plain-language depth-chart move since the last players.db refresh
+  // (modules.depth_chart_history); null when no prior snapshot or too small.
+  // Same field web's quick-view response carries.
+  depth_chart_note?: string | null;
   // One real sentence naming this player's strongest/weakest composite
   // value-score inputs (percentile-based, see modules.player_quick_view.
   // decision_fit_narrative) — null when the position pool is too thin to
