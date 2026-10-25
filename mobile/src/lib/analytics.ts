@@ -9,9 +9,11 @@ import { supabase } from './supabase';
  * Mobile product analytics -> the existing `POST /v1/e` (neutral alias of /v1/analytics/event)
  * ingest (same pipeline and taxonomy as web-next/src/lib/analytics.ts).
  *
- * KILL SWITCH: ON by default. Only an explicit
- * EXPO_PUBLIC_ANALYTICS_ENABLED=0/false/off at build time disables it (see
- * docs/analytics-coverage-2026-10.md).
+ * KILL SWITCH: ships DARK. Analytics is OFF unless the build sets
+ * EXPO_PUBLIC_ANALYTICS_ENABLED=1 (see docs/analytics-coverage-2026-10.md).
+ * Turning it on needs a new app build and, before that, the owner's sign-off
+ * on the App Store "Data collection" answers. Owner decision 2026-10-25: keep
+ * it OFF in the app (Apple App Privacy concerns).
  */
 
 const REQUEST_TIMEOUT_MS = 8000;
