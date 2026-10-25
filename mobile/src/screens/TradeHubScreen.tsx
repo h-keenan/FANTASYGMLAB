@@ -14,6 +14,7 @@ import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenInfoNote';
+import FreeLimitNote from '../components/FreeLimitNote';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
@@ -295,6 +296,16 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
             }
             legend={isForYou ? impactLegend(colors) : undefined}
           />
+          {isForYou && !activeLoading && !activeError && !notReadyReason && entitlement ? (
+            <FreeLimitNote
+              kind="window"
+              noun="trade ideas"
+              limit={entitlement.free_limit}
+              total={entitlement.approved_count}
+              shown={entitlement.visible_count}
+              isPremium={entitlement.is_premium}
+            />
+          ) : null}
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
             <IdeaSummaryRow
               ideas={ideas}

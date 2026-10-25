@@ -1,3 +1,4 @@
+import { FreeLimitNote } from "@/components/FreeLimitNote";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
 import { useMemo, useState } from "react";
@@ -104,6 +105,17 @@ export function TradeHubContent({
         <BeginnerHelp term="tradeHubIntro" />
         {data.posture_sentence ? <PostureLine sentence={data.posture_sentence} /> : null}
       </header>
+
+      {entitlement ? (
+        <FreeLimitNote
+          kind="window"
+          noun="trade ideas"
+          limit={entitlement.free_limit}
+          total={entitlement.approved_count}
+          shown={entitlement.visible_count}
+          isPremium={entitlement.is_premium}
+        />
+      ) : null}
 
       {data.hold ? <TradeHubHoldCard hold={data.hold} /> : null}
 

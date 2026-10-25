@@ -1,5 +1,6 @@
 "use client";
 
+import { FreeLimitNote } from "@/components/FreeLimitNote";
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { AccentCard } from "@/components/AccentCard";
@@ -390,6 +391,7 @@ export function GmPlanContent({
   rankings,
   snapshot,
   initialTab,
+  targetsLimit,
 }: {
   /** Optional only so this component's existing unit tests (which predate
    * the Revision 20 merge below) don't all need the full data set —
@@ -404,6 +406,9 @@ export function GmPlanContent({
   /** Plan Snapshot tiles (lib/gmPlanSnapshot); omitted tiles never render. */
   snapshot?: PlanSnapshotTile[];
   initialTab?: GmPlanTab;
+  /** The server's GM Targets cap for Free and whether this account is
+   * Premium (GET .../gm-targets), for the "Free: X of Y" note. */
+  targetsLimit?: { freeLimit?: number; isPremium?: boolean };
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<GmPlanTab>(initialTab ?? "overview");
@@ -427,6 +432,16 @@ export function GmPlanContent({
     [trackedRows, byId],
   );
   const { watching } = useMemo(() => groupTargetRows(joinedTargets), [joinedTargets]);
+
+  const targetsNote = (
+    <FreeLimitNote
+      kind="cap"
+      noun="GM Targets"
+      limit={targetsLimit?.freeLimit}
+      used={trackedRows.length}
+      isPremium={targetsLimit?.isPremium}
+    />
+  );
 
   const onPickStance = (value: string) => {
     const next = value as TeamStance;
@@ -724,6 +739,7 @@ export function GmPlanContent({
               toggling it here or there shows up in both places.
             </InfoTip>
           </div>
+          {targetsNote}
           {!myTeam || !leagueId ? null : noRoster ? (
             <EmptyState title="No roster players found for this league." />
           ) : (
@@ -761,6 +777,7 @@ export function GmPlanContent({
       {tab === "watching" ? (
         <section className="flex flex-col gap-2">
           <SectionHeading note="Considering or monitoring; not trade-protected.">Watching</SectionHeading>
+          {targetsNote}
           {!rankings || !leagueId ? null : watching.length === 0 ? (
             <EmptyState
               title="Nothing here yet."

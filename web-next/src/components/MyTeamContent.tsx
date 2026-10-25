@@ -1,3 +1,4 @@
+import { GlossaryNote } from "@/components/GlossaryNote";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ToneBadge } from "@/components/ToneBadge";
 import { InfoTip } from "@/components/InfoTip";
@@ -252,6 +253,13 @@ export function MyTeamContent({
         </div>
         <StatStrip items={snapshotItems.slice(0, 3)} columns={3} />
         <StatStrip items={snapshotItems.slice(3)} columns={3} />
+        <GlossaryNote
+          terms={
+            showFranchiseConstruction
+              ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge"]
+              : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
+          }
+        />
       </section>
 
       {analysisRows.length > 0 ? (

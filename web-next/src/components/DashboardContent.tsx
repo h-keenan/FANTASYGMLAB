@@ -5,6 +5,7 @@ import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
+import { GlossaryNote } from "@/components/GlossaryNote";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
@@ -78,6 +79,14 @@ export function DashboardContent({
 
       <GuillotineCard data={guillotine} />
 
+      {data.platform_notice ? (
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-notice">
+          {data.platform_notice}
+        </p>
+      ) : null}
+
+      <TodayModule data={data} leagueId={leagueId} leagueName={leagueName} />
+
       {snapshot ? (
         <section className="flex flex-col gap-2" aria-label="Team summary">
           <StatStrip
@@ -109,16 +118,9 @@ export function DashboardContent({
           <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
           <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
           <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
+          <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge"]} />
         </section>
       ) : null}
-
-      {data.platform_notice ? (
-        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-notice">
-          {data.platform_notice}
-        </p>
-      ) : null}
-
-      <TodayModule data={data} leagueId={leagueId} leagueName={leagueName} />
 
       {watchItems.length > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
@@ -133,11 +135,7 @@ export function DashboardContent({
           phone-narrow viewport, where the playable game needs the width).
           Both self-fetch and render nothing on failure; a lone card takes
           the full row. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 [&>*:only-child]:sm:col-span-2">
-        <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
-        <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
-      </div>
-      <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
+      <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
 
       {snapshot ? (
         <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true">
@@ -168,8 +166,14 @@ export function DashboardContent({
           />
           <BeginnerHelp text={copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null} />
           <BeginnerHelp text={copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null} />
+          <GlossaryNote terms={["starterStrength", "benchStrength"]} />
         </section>
       ) : null}
+      {/* The two mini-games are play, not decisions: lowest on the page. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 [&>*:only-child]:sm:col-span-2">
+        <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
+      </div>
+      <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
       <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />
     </main>
   );

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { FreeLeagueLimitNote } from "@/components/FreeLeagueLimitNote";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
@@ -40,7 +41,8 @@ export default function ConnectLeaguePage() {
           Add a Sleeper, ESPN, Fleaflicker or MFL league alongside the leagues you already have.
         </p>
       </div>
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm flex flex-col gap-3">
+        <FreeLeagueLimitNote />
         <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(leagueHomePath(leagueId, leagueName))} />
         <SampleLeagueLink />
       </div>

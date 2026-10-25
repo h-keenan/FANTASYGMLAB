@@ -48,6 +48,8 @@ import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import FreeLimitNote from '../components/FreeLimitNote';
+import GlossaryNote from '../components/GlossaryNote';
 import SectionHeading from '../components/SectionHeading';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
 import LeaguePulseCard from '../components/LeaguePulseCard';
@@ -426,8 +428,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
         />
       ) : null}
 
-      {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
-
       {dashboardData?.platform_notice ? (
         <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
@@ -470,6 +470,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
         }
       />
 
+      {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
+
       {/* Watchlist & Alerts: urgent risks and opportunities in one list. */}
       <WatchlistAlertsSection
         snapshot={teamSnapshot}
@@ -480,6 +482,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
         newRecommendationIds={newRecommendationIds}
         showExplanations={showExplanations}
       />
+
+      {entitlement ? (
+        <FreeLimitNote
+          kind="window"
+          noun="next moves"
+          limit={entitlement.free_limit}
+          total={entitlement.visible_count + entitlement.hidden_count}
+          shown={entitlement.visible_count}
+          isPremium={entitlement.is_premium}
+        />
+      ) : null}
 
       {entitlement && !entitlement.is_premium && entitlement.hidden_count > 0 ? (
         <View style={styles.lockWrap}>
@@ -556,13 +569,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
             </View>
           )
         ) : null}
-        <View style={styles.activityCell}>
-          <DashboardGuessCard />
-        </View>
       </View>
       {teamSnapshot ? (
         <TeamSnapshotRow snapshot={teamSnapshot} />
       ) : null}
+      {/* The mini-game is play, not a decision: lowest module on the screen. */}
+      <View style={{ marginBottom: spacing.md }}>
+        <DashboardGuessCard />
+      </View>
       <View style={styles.standingStrips}>
         <LeagueStandingStrips
           leagueId={leagueId}
@@ -742,6 +756,7 @@ function DashboardStatStrip({
       {termHelp.map(([term, help]) => (
         <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} />
       ))}
+      <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge']} />
     </View>
   );
 }
@@ -785,6 +800,7 @@ function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
       {termHelp.map(([term, help]) => (
         <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} style={styles.snapshotHelp} />
       ))}
+      <GlossaryNote terms={['starterStrength', 'benchStrength']} />
     </View>
   );
 }

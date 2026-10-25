@@ -66,7 +66,8 @@ polish. Size: S under half a day, M about a day, L multi-day. Fix type:
 
 1. **Give Dashboard one dominant module for a first run** (Today hero above the
    rank strip, strip lower or collapsed, mini-games below Team Snapshot).
-   M. Designer/product call, same order on app. *(not done)*
+   M. Designer/product call, same order on app. **Done** (follow-up PR: Today
+   first, rank strip second, mini-games last, web and app; no module removed).
 2. **Portfolio no-league empty state with a real button and sample path**
    (web dead end). S. **Done.**
 3. **Tap targets on first-run links**: Dashboard "View All", GamePlan CTA,
@@ -78,11 +79,13 @@ polish. Size: S under half a day, M about a day, L multi-day. Fix type:
    a real user lands on can be previewed. L, needs designer plus fixtures.
 6. **Plain-language labels for Power / Franchise Rank and Starter/Bench
    Strength** for everyone, not only the beginner flag (one shared glossary
-   sheet, `InfoTip` on the tiles). M.
+   sheet, `InfoTip` on the tiles). M. **Done** (`lib/glossary.ts` on web and
+   app, `GlossaryNote` under the Dashboard, My Team and Portfolio rank labels).
 7. **Paywall value list**: three concrete Pro benefits and what Free keeps,
    replacing "Full access to the GM toolkit". M, designer copy plus layout.
 8. **Free limits shown before they bite** ("Free shows your top 2 ideas
-   today") on Trade Hub, GM Plan and the connect step. S-M.
+   today") on Trade Hub, GM Plan and the connect step. S-M. **Done** (`FreeLimitNote`;
+   every number comes from the API, not a client copy).
 9. **Landing: trial length from the billing API, and the store-badge row**
    ("App Store: Coming soon" next to a live Google Play) reviewed once iOS
    is out of review. S.

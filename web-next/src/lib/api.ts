@@ -412,7 +412,13 @@ export interface DashboardResponse {
   quiet_reason: string;
   team_snapshot: TeamSnapshot | null;
   reason: string;
-  entitlement: { is_premium: boolean; visible_count: number; hidden_count: number };
+  entitlement: {
+    is_premium: boolean;
+    visible_count: number;
+    hidden_count: number;
+    /** The server's Free cap on next moves (FREE_DASHBOARD_VISIBLE_ITEMS). */
+    free_limit?: number;
+  };
   /** Only present (true) on the progressive first call
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
@@ -1979,6 +1985,10 @@ export interface GmTarget {
 export interface GmTargetsResponse {
   ok: boolean;
   targets: GmTarget[];
+  /** This plan's cap on saved targets, and Free's cap (server constants). */
+  limit?: number;
+  free_limit?: number;
+  is_premium?: boolean;
 }
 
 export type GmTargetMutationReason = "" | "at_cap" | "not_available" | "not_found";

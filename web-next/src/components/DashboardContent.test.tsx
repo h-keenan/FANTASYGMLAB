@@ -131,4 +131,28 @@ describe("DashboardContent", () => {
 
     expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
   });
+
+  it("puts the Today hero above the rank strip and the mini-games below Team Snapshot", () => {
+    const { container } = render(
+      <DashboardContent
+        leagueId="abc"
+        leagueName="Dynasty Overlords"
+        data={{ ...FIXTURE, entitlement: { ...FIXTURE.entitlement, free_limit: 1 } }}
+      />,
+    );
+    const html = container.innerHTML;
+    const today = html.indexOf("game-plan-heading");
+    const strip = html.indexOf("Team summary");
+    const snapshot = html.indexOf("snapshot-heading");
+    expect(today).toBeGreaterThan(-1);
+    expect(strip).toBeGreaterThan(today);
+    expect(snapshot).toBeGreaterThan(strip);
+    // Free caps are announced up front, from the server's number.
+    expect(screen.getByText("Free: showing 1 of 3 next moves")).toBeInTheDocument();
+  });
+
+  it("offers the shared glossary for the rank labels", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(2);
+  });
 });
