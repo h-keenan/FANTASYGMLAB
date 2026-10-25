@@ -7,6 +7,7 @@ import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import PositionBadge from '../components/PositionBadge';
+import SampleDashboard from '../components/SampleDashboard';
 import SampleLeagueBanner from '../components/SampleLeagueBanner';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -40,7 +41,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const headerHeight = useHeaderHeight();
   const orbClearance = useOrbClearance();
-  const [tab, setTab] = useState<SampleTab>('roster');
+  const [tab, setTab] = useState<SampleTab>('dashboard');
 
   // Home hosts the Add League sheet; openAddLeague opens it on arrival.
   const connect = () => navigation.navigate('Home', { openAddLeague: true });
@@ -81,6 +82,8 @@ export default function SampleLeagueScreen({ navigation }: Props) {
           active={tab}
           onChange={setTab}
         />
+
+        {tab === 'dashboard' ? <SampleDashboard /> : null}
 
         {tab === 'roster' ? (
           <>

@@ -82,7 +82,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
-type DashboardNavigation = Props['navigation'];
+export type DashboardNavigation = Props['navigation'];
 
 // Only destinations mobile can navigate to with just {leagueId, leagueName} —
 // "my_team" would need TeamRoster's ownerName/playerIds params, which this
@@ -702,7 +702,7 @@ function DestinationButton({
  * is one), and gets `valueColor` emphasis when non-zero instead of a
  * one-off danger tile.
  */
-function DashboardStatStrip({
+export function DashboardStatStrip({
   snapshot,
   leagueId,
   leagueName,
@@ -763,7 +763,7 @@ function DashboardStatStrip({
 
 /** Team Snapshot: Starter Strength, Bench Strength and Injuries only. The
  * record/rank/age strip lives once at the top of the screen. */
-function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
+export function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const copy = useExperienceCopy();
@@ -909,7 +909,7 @@ function TopPriorityTradeCard({
  * still gets full-card, glow-eligible-by-category emphasis rather than
  * shrinking to an InsightRow, since this is literally the screen's single
  * most important answer. */
-function BriefingCard({
+export function BriefingCard({
   item,
   leagueId,
   leagueName,
@@ -1084,7 +1084,7 @@ function DashboardInsightRow({
  * TRENDING / INJURY / WAIVER tag; a trend indicator on the right appears only
  * when the item has a real figure (see lib/dashboardWatch.ts).
  */
-function WatchlistAlertsSection({
+export function WatchlistAlertsSection({
   snapshot,
   items,
   leagueId,

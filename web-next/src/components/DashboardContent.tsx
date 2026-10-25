@@ -1,5 +1,6 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
+import type { MouseEvent } from "react";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -43,6 +44,7 @@ export function DashboardContent({
   teamRankings,
   userId,
   accountCreatedAt,
+  sample,
 }: {
   leagueId: string;
   leagueName: string;
@@ -53,13 +55,19 @@ export function DashboardContent({
   /** Signed-in user, for the first-run Start here card (omitted: no card). */
   userId?: string;
   accountCreatedAt?: string | null;
+  /** Sample-league preview (static fictional `data`, see lib/sampleDashboard.ts):
+   * renders the same modules without any fetch (no Guillotine lookup, no
+   * games, no league-type control), inside a plain container instead of
+   * <main>, and turns every link into a no-op that calls `onBlockedLink`. */
+  sample?: { onBlockedLink: () => void };
 }) {
   const snapshot = data.team_snapshot;
-  const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(leagueId);
+  const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(sample ? undefined : leagueId);
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
   const query = `?name=${encodeURIComponent(leagueName)}`;
+  const Shell: "div" | "main" = sample ? "div" : "main";
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
 
   return (
@@ -69,11 +77,25 @@ export function DashboardContent({
     // shell (gap-8 px-4 py-8) and the "Today's Game Plan" subtitle dropped
     // (it only restated what the heading already said; the real content —
     // the actionable cards below — is what should hit the fold).
-    <main className="flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto">
+    <Shell
+      className={sample ? "flex flex-col gap-6" : "flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto"}
+      {...(sample
+        ? {
+            "data-testid": "sample-dashboard",
+            onClickCapture: (event: MouseEvent) => {
+              if ((event.target as HTMLElement).closest("a")) {
+                event.preventDefault();
+                event.stopPropagation();
+                sample.onBlockedLink();
+              }
+            },
+          }
+        : {})}
+    >
       {/* The page title lives in the persistent Header (level with search and
           alerts); the league name stays here as the page's <h1> for screen
           readers and is already in the header's league switcher. */}
-      <h1 className="sr-only">{leagueName}</h1>
+      {sample ? null : <h1 className="sr-only">{leagueName}</h1>}
 
       {userId ? <StartHereCard userId={userId} accountCreatedAt={accountCreatedAt} leagueId={leagueId} leagueName={leagueName} /> : null}
 
@@ -170,12 +192,16 @@ export function DashboardContent({
         </section>
       ) : null}
       {/* The two mini-games are play, not decisions: lowest on the page. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 [&>*:only-child]:sm:col-span-2">
-        <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
-      </div>
-      <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
-      <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />
-    </main>
+      {sample ? null : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 [&>*:only-child]:sm:col-span-2">
+            <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
+          </div>
+          <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
+          <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />
+        </>
+      )}
+    </Shell>
   );
 }
 
