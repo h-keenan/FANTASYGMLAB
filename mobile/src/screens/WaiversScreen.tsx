@@ -124,6 +124,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
   // IDP leagues only; empty otherwise.
   const [idpAgents, setIdpAgents] = useState<WaiverPlayer[]>([]);
+  const [defenseSlotOpen, setDefenseSlotOpen] = useState(false);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [neededPositions, setNeededPositions] = useState<string[]>([]);
   const [stashCandidates, setStashCandidates] = useState<WaiverPlayer[]>([]);
@@ -171,6 +172,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           if (cancelled) return;
           setFreeAgents(result.players);
           setIdpAgents(result.idp_players ?? []);
+          setDefenseSlotOpen(result.team_defense?.empty_slot === true);
           setPriorityAdds(result.priority_adds);
           setNeededPositions(result.needed_positions);
           setStashCandidates(result.stash_candidates);
@@ -354,6 +356,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
         <AppText style={styles.notice}>That player isn&apos;t on your waiver list right now.</AppText>
       ) : null}
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
+      {defenseSlotOpen ? (
+        <AppText style={styles.notice}>{"Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper's free agents for one."}</AppText>
+      ) : null}
 
       <View style={styles.tabWrap}>
         <SegmentedTabBar options={TAB_OPTIONS} active={tab} onChange={setTab} />

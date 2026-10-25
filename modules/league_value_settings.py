@@ -271,6 +271,11 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
         idp_slots = {name: count for name, count in idp_slots.items() if count}
         if idp_slots:
             settings["idp_slots"] = idp_slots
+        # Team-defense (D/ST) starter slots; absent when the league has none
+        # so every other league's settings are byte-identical to before.
+        def_count = sum(1 for pos in starter_positions if pos in {"DEF", "DST", "D/ST"})
+        if def_count:
+            settings["def_count"] = def_count
         counted_core = (
             int(settings["qb_count"])
             + int(settings["rb_count"])

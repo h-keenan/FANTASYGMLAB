@@ -10984,7 +10984,7 @@ def get_gm_plan(
 # Display order for My Team's starters section — matches
 # modules.team_eval.suggest_optimal_lineup's own slot-assignment order.
 # Bench keeps the frame's existing sort_score-descending order untouched.
-_LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "DL", "LB", "DB", "IDP_FLEX"]
+_LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "DEF", "DL", "LB", "DB", "IDP_FLEX"]
 
 
 def _matchup_player_identity_fields(row: pd.Series, score_field: str) -> dict[str, Any]:
@@ -11296,6 +11296,35 @@ def _idp_lineup_frame_rows(
     return rows
 
 
+def _team_defense_frame_rows(roster_player_ids: set[str], score_field: str) -> list[dict[str, Any]]:
+    """Rostered team defenses (Sleeper player_id = NFL team abbreviation) as
+    lineup-frame rows. The valued pool has no DEF rows, so identity comes from
+    modules.team_defense; every valuation field stays null (no invented
+    score, tier, rating or projection)."""
+
+    rows: list[dict[str, Any]] = []
+    for player_id in sorted(roster_player_ids):
+        identity = team_defense.team_defense_identity(player_id)
+        if not identity:
+            continue
+        rows.append(
+            {
+                "player_id": player_id,
+                "name": identity["name"],
+                "position": identity["position"],
+                "team": identity["team"],
+                "age": None,
+                "status": "Active",
+                "injury_status": None,
+                "player_tier": None,
+                "opportunity_label": None,
+                "_overall_rating_col": None,
+                score_field: None,
+            }
+        )
+    return rows
+
+
 def _suggested_lineup_split(
     valued: pd.DataFrame,
     roster: dict[str, Any],
@@ -11365,6 +11394,13 @@ def _suggested_lineup_split(
         )
         if reinstated_rows:
             roster_df = pd.concat([roster_df, pd.DataFrame(reinstated_rows)], ignore_index=True, sort=False)
+
+    # Rostered team defenses are not in the valued pool: add them with real
+    # identity only (see _team_defense_frame_rows).
+    have_ids = set(roster_df["player_id"].astype(str)) if not roster_df.empty else set()
+    team_defenses = _team_defense_frame_rows(roster_player_ids - have_ids, score_field)
+    if team_defenses:
+        roster_df = pd.concat([roster_df, pd.DataFrame(team_defenses)], ignore_index=True, sort=False)
 
     if settings.get("idp_slots") and idp_result and idp_result.get("idp"):
         defenders = _idp_lineup_frame_rows(idp_result, roster_player_ids, players_lookup, score_field)
@@ -13524,6 +13560,26 @@ def _project_priority_add(
     return projected
 
 
+def _waivers_team_defense_context(settings: dict[str, Any], roster_player_ids: Any) -> dict[str, Any]:
+    """Honest D/ST context for Waivers: slot count, the rostered D/ST (real
+    identity only) and whether a D/ST slot is unfilled. No ranking, no
+    valuations, no waiver recommendation."""
+
+    slots = int(settings.get("def_count") or 0)
+    rostered = [
+        {**identity, "player_id": pid}
+        for pid in sorted({str(p) for p in (roster_player_ids or ())})
+        for identity in [team_defense.team_defense_identity(pid)]
+        if identity
+    ]
+    return {
+        "slots": slots,
+        "rostered": rostered,
+        "empty_slot": bool(slots and len(rostered) < slots),
+        "recommendations_supported": False,
+    }
+
+
 @app.get("/v1/leagues/{league_id}/waivers")
 @_with_sleeper_as_of
 def get_league_waivers(
@@ -13814,6 +13870,11 @@ def get_league_waivers(
         "players": players,
         # Additive: unrostered defenders, IDP leagues only ([] otherwise).
         "idp_players": _waivers_idp_rows(league_id, league, rosters),
+        # Additive, deliberately minimal: team defenses are not in the valued
+        # pool, so there is no free-agent D/ST ranking or recommendation.
+        # Only the real facts: the league's D/ST slot count and which D/ST
+        # (if any) this roster already holds.
+        "team_defense": _waivers_team_defense_context(settings, roster_player_ids),
         "priority_adds": priority_adds,
         "needed_positions": needed_positions,
         "available_count": int(len(free_agents)),

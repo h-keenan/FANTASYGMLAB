@@ -488,6 +488,11 @@ export function WaiversContent({
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Place claims in Sleeper — we don&apos;t submit them.
             </p>
+            {data.team_defense?.empty_slot ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper&apos;s free agents for one.
+              </p>
+            ) : null}
             {data.injury_positions && data.injury_positions.length > 0 ? (
               <p className="text-xs" style={{ color: "var(--color-warning)" }}>
                 Injury cover: {data.injury_positions.join(" / ")} ({data.injured_starters ?? 0} injured starter

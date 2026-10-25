@@ -123,6 +123,10 @@ def _lineup_slots(lineup_settings: Optional[Dict[str, Any]] = None) -> Dict[str,
     elif str(lineup_settings.get("qb_format") or "") == "Superflex":
         slots["SUPER_FLEX"] = max(1, slots["SUPER_FLEX"])
     slots["K"] = max(0, _safe_int(lineup_settings.get("k_count"), slots.get("K", 0)))
+    # Team-defense (D/ST) slots exist only when the league lists them.
+    def_count = max(0, _safe_int(lineup_settings.get("def_count"), 0))
+    if def_count:
+        slots["DEF"] = def_count
     # Defensive slots exist only in IDP leagues (settings["idp_slots"]).
     for name, count in (lineup_settings.get("idp_slots") or {}).items():
         if name in IDP_LINEUP_SLOTS:
@@ -464,8 +468,10 @@ def _assign_weekly_lineup(
     # no points estimate, is ordered by his own model value, and only ever
     # competes with other defenders (IDP slots admit nothing else).
     idp_rows = [str(pos).upper() in _IDP_POSITIONS for pos in df["position"].tolist()]
+    # Team defenses likewise have no points estimate (no invented projection).
+    def_rows = [str(pos).upper() == "DEF" for pos in df["position"].tolist()]
     for i in range(n):
-        if idp_rows[i]:
+        if idp_rows[i] or def_rows[i]:
             estimates[i] = None
 
     if has_projection:
@@ -473,7 +479,11 @@ def _assign_weekly_lineup(
         df["lineup_points_basis"] = [
             None
             if on_bye[i]
-            else ("value" if idp_rows[i] else ("projection" if projected_mask[i] else "value_estimate"))
+            else (
+                None
+                if def_rows[i]
+                else ("value" if idp_rows[i] else ("projection" if projected_mask[i] else "value_estimate"))
+            )
             for i in range(n)
         ]
         eligible = [i for i in range(n) if reasons[i] is None]
@@ -483,7 +493,10 @@ def _assign_weekly_lineup(
         sort_scores = df["sort_score"].tolist()
         selection_order = sorted(
             eligible,
-            key=lambda i: (not locked_in[i], -float(sort_scores[i] if idp_rows[i] else estimates[i])),
+            key=lambda i: (
+                not locked_in[i],
+                -float(sort_scores[i] if (idp_rows[i] or def_rows[i]) else estimates[i]),
+            ),
         )
     else:
         df["lineup_points"] = None
@@ -522,7 +535,7 @@ def lineup_open_slots(
         for slot in lineup_df["slot"].tolist():
             filled[str(slot)] = filled.get(str(slot), 0) + 1
     open_slots: List[str] = []
-    for slot_name in ("QB", "RB", "WR", "TE", "K", "WR/RB", "REC_FLEX", "FLEX", "SUPER_FLEX", *IDP_LINEUP_SLOTS):
+    for slot_name in ("QB", "RB", "WR", "TE", "K", "DEF", "WR/RB", "REC_FLEX", "FLEX", "SUPER_FLEX", *IDP_LINEUP_SLOTS):
         missing = int(slots.get(slot_name, 0) or 0) - filled.get(slot_name, 0)
         open_slots.extend([slot_name] * max(0, missing))
     return open_slots
@@ -629,6 +642,7 @@ def suggest_optimal_lineup(
         take(["WR"], "WR", slots["WR"])
         take(["TE"], "TE", slots["TE"])
         take(["K"], "K", slots["K"])
+        take(["DEF"], "DEF", slots.get("DEF", 0))
         # Narrowest flex first: WR/RB ⊂ FLEX ⊂ SUPER_FLEX. Filling FLEX
         # before WR/RB let FLEX take the best RB/WR and left WR/RB a worse
         # player while a better TE sat on the bench.

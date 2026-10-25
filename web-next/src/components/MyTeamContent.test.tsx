@@ -369,6 +369,16 @@ describe("MyTeamContent best ball", () => {
     expect(screen.getByText("900")).toBeInTheDocument();
   });
 
+  it("renders a D/ST starter with identity only: no Quick View button", () => {
+    const dst = player({ player_id: "SF", name: "49ers D/ST", position: "DEF", team: "SF", slot: "DEF", tier: null, score: null, overall_rating: null, age: null });
+    render(
+      <MyTeamContent leagueName="L" myTeam={{ ...MY_TEAM, starters: [...MY_TEAM.starters, dst] }} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />,
+    );
+    expect(screen.getByText("49ers D/ST")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open 49ers D/ST" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Test Quarterback" })).toBeInTheDocument();
+  });
+
   it("shows no IDP tab in a non-IDP league", () => {
     render(<MyTeamContent leagueName="Std" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />);
     expect(screen.queryByRole("button", { name: "IDP" })).not.toBeInTheDocument();

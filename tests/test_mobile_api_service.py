@@ -15415,6 +15415,70 @@ def test_dashboard_defer_trade_ideas_skips_the_search_and_the_full_call_is_uncha
     assert not [r for r in deferred_rows if r["key"] == "trade" and r["status"] == "Hold" and "no trade improves" in r["headline"]]
 
 
+def _my_team_with_defense(monkeypatch, positions):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb", "SF"]
+    league = {**_TRADE_ANALYZER_LEAGUE, "roster_positions": positions}
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+            ):
+                with patch("modules.sleeper.get_league", return_value=league):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/my-team",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_my_team_surfaces_rostered_team_defense_in_def_slot_with_real_identity_only(monkeypatch):
+    body = _my_team_with_defense(
+        monkeypatch, ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DEF", "BN", "BN"]
+    )
+    dst = [p for p in body["starters"] if p["player_id"] == "SF"]
+    assert len(dst) == 1
+    dst = dst[0]
+    assert dst["slot"] == "DEF"
+    assert dst["name"] == "49ers D/ST"
+    assert dst["position"] == "DEF"
+    assert dst["team"] == "SF"
+    # No invented valuation fields.
+    assert dst["score"] is None
+    assert dst["tier"] is None
+    assert dst["overall_rating"] is None
+
+
+def test_my_team_keeps_rostered_team_defense_on_bench_without_def_slot(monkeypatch):
+    body = _my_team_with_defense(monkeypatch, ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN", "BN"])
+    assert "SF" not in {p["player_id"] for p in body["starters"]}
+    bench = [p for p in body["bench"] if p["player_id"] == "SF"]
+    assert len(bench) == 1 and bench[0]["name"] == "49ers D/ST" and bench[0]["score"] is None
+
+
+def test_waivers_team_defense_context_is_honest():
+    from services import mobile_api_service
+
+    ctx = mobile_api_service._waivers_team_defense_context({"def_count": 1}, ("a", "SF"))
+    assert ctx["slots"] == 1 and ctx["empty_slot"] is False
+    assert ctx["rostered"][0]["name"] == "49ers D/ST"
+    assert ctx["recommendations_supported"] is False
+    empty = mobile_api_service._waivers_team_defense_context({"def_count": 1}, ("a",))
+    assert empty["empty_slot"] is True and empty["rostered"] == []
+    assert mobile_api_service._waivers_team_defense_context({}, ("SF",))["empty_slot"] is False
+
+
 def test_analytics_alias_route_uses_the_same_handler(monkeypatch):
     client = _client(monkeypatch)
     from services import mobile_api_service

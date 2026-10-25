@@ -559,6 +559,13 @@ export interface DraftCenterResponse {
   upsell?: { title: string; body: string } | null;
 }
 
+export interface WaiverTeamDefenseContext {
+  slots: number;
+  rostered: { player_id: string; name: string; position: string; team: string }[];
+  empty_slot: boolean;
+  recommendations_supported: boolean;
+}
+
 export interface LineupPlayer {
   player_id: string;
   name: string | null;
@@ -1163,6 +1170,8 @@ export interface WaiversResponse {
   players: WaiverPlayer[];
   /** Free-agent defenders (DL/LB/DB) in IDP leagues only. Absent/empty otherwise. */
   idp_players?: WaiverPlayer[];
+  /** Team-defense (D/ST) context: real slot count and rostered D/ST only. No D/ST ranking or recommendations exist. */
+  team_defense?: WaiverTeamDefenseContext;
   priority_adds: WaiverPriorityAdd[];
   needed_positions: string[];
   available_count?: number;
