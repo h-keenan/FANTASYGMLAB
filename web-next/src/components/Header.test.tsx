@@ -58,6 +58,8 @@ beforeEach(() => {
     signInAsGuest: vi.fn(),
     signOut: vi.fn(),
     deleteAccount: vi.fn(),
+    upgradeGuestWithEmail: vi.fn(),
+    callbackNotice: null,
     isGuest: false,
   } as never);
   mockParams.leagueId = "league-7";

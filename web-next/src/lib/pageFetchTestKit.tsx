@@ -44,5 +44,7 @@ export const signedIn = {
   signInAsGuest: vi.fn(),
   signOut: vi.fn(),
   deleteAccount: vi.fn(),
+  upgradeGuestWithEmail: vi.fn(),
+  callbackNotice: null,
   isGuest: false,
 };
