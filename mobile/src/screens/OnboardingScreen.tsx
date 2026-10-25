@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -22,6 +21,7 @@ import Animated, {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppText from '../components/AppText';
+import Button from '../components/Button';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import type { ExperienceLevelValue } from '../lib/api';
@@ -30,7 +30,7 @@ import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
+import { radii, spacing, typography, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
@@ -395,19 +395,13 @@ export default function OnboardingScreen({ navigation, route }: Props) {
               <AppText style={styles.backText}>Back</AppText>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity
-            style={[styles.primaryButton, primaryDisabled && styles.primaryButtonDisabled]}
+          <Button
+            label={primaryLabel}
             onPress={() => (isLast ? void onFinish() : goTo(index + 1))}
             disabled={primaryDisabled}
-            accessibilityRole="button"
-            accessibilityLabel={isLast ? primaryLabel : 'Next slide'}
-          >
-            {saving ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : (
-              <AppText style={styles.primaryText}>{primaryLabel}</AppText>
-            )}
-          </TouchableOpacity>
+            loading={saving}
+            style={styles.primaryButton}
+          />
         </View>
       </View>
     </View>
@@ -505,14 +499,6 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     backText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-    primaryButton: {
-      flex: 1,
-      backgroundColor: colors.accent,
-      borderRadius: radii.md,
-      paddingVertical: spacing.md,
-      alignItems: 'center',
-    },
-    primaryButtonDisabled: { opacity: disabledOpacity },
-    primaryText: { fontSize: 16, fontWeight: '600', color: colors.onAccent },
+    primaryButton: { flex: 1 },
   });
 }

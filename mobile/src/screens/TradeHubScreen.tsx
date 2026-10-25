@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../components/Button';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import ErrorState from '../components/ErrorState';
 import MeterRow, { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
@@ -355,9 +356,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
             <TradeHubHoldCard hold={hold} ideaCount={ideas?.length ?? 0} />
           ) : null}
           {showNotReady && !(hold && notReadyReason === 'trade_deadline_passed') ? (
-            <AppText style={styles.notReadyText}>
-              {NOT_READY_MESSAGES[notReadyReason ?? ""] ?? "Couldn't build Trade Hub ideas for this league."}
-            </AppText>
+            <EmptyState icon="time-outline" title="Not ready yet" subtitle={NOT_READY_MESSAGES[notReadyReason ?? ""] ?? "Couldn't build Trade Hub ideas for this league."} />
           ) : null}
         </View>
       }
@@ -641,23 +640,14 @@ function PositionFilterRow({
   }, [ideas]);
   if (positions.length < 2) return null;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.positionChipRow}>
-      {[null, ...positions].map((pos) => {
-        const isActive = pos === active;
-        return (
-          <TouchableOpacity
-            key={pos ?? 'all'}
-            style={[styles.positionChip, isActive && styles.summaryTileActive]}
-            onPress={() => onSelect(pos)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: isActive }}
-            accessibilityLabel={pos ? `Show ${pos} trade ideas` : 'Show all positions'}
-          >
-            <AppText style={styles.summaryLabel}>{pos ?? 'All positions'}</AppText>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    <View style={styles.positionChipRow}>
+      <FilterDropdownButton
+        label="Position"
+        options={['ALL', ...positions]}
+        value={active ?? 'ALL'}
+        onChange={(next) => onSelect(next === 'ALL' ? null : next)}
+      />
+    </View>
   );
 }
 
@@ -728,13 +718,6 @@ function createStyles(colors: ThemeColors) {
   },
   summaryValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
-  positionChipRow: { gap: spacing.xs, paddingBottom: spacing.md },
-  positionChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-  },
+  positionChipRow: { paddingBottom: spacing.md, alignItems: 'flex-start' },
   });
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import Input from '../components/Input';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -350,13 +351,11 @@ export default function PlayersScreen({ route, navigation }: Props) {
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <View style={styles.discoveryCard}>
-        <TextInput
-          style={styles.searchInput}
+        <Input
           placeholder="Search players"
           value={search}
           onChangeText={setSearch}
           autoCapitalize="none"
-          placeholderTextColor={colors.textTertiary}
         />
         <View style={styles.filterRow}>
           <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
@@ -449,16 +448,6 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.glassBorder,
     padding: spacing.md,
     gap: spacing.sm,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: colors.background,
-    color: colors.textPrimary,
   },
   // Position/Age/Status/Availability now render as one wrapping row of
   // compact dropdown buttons (FilterDropdownButton) instead of four full

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import Button from '../components/Button';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -199,17 +200,7 @@ export default function LoginScreen() {
 
         {resetMode ? (
           <>
-            <TouchableOpacity accessibilityRole="button"
-              style={[styles.button, (resetSubmitting || !email) && styles.buttonDisabled]}
-              onPress={onResetPasswordPress}
-              disabled={resetSubmitting || !email}
-            >
-              {resetSubmitting ? (
-                <ActivityIndicator color={colors.onAccent} />
-              ) : (
-                <AppText style={styles.buttonText}>Send reset link</AppText>
-              )}
-            </TouchableOpacity>
+            <Button label="Send reset link" onPress={onResetPasswordPress} disabled={!email} loading={resetSubmitting} style={styles.button} />
 
             <TouchableOpacity accessibilityRole="button"
               onPress={() => {
@@ -223,19 +214,7 @@ export default function LoginScreen() {
           </>
         ) : (
           <>
-            <TouchableOpacity accessibilityRole="button"
-              style={[styles.button, (submitting || !email || !password) && styles.buttonDisabled]}
-              onPress={submit}
-              disabled={submitting || !email || !password}
-            >
-              {submitting ? (
-                <ActivityIndicator color={colors.onAccent} />
-              ) : (
-                <AppText style={styles.buttonText}>
-                  {mode === 'signIn' ? 'Sign in' : 'Sign up'}
-                </AppText>
-              )}
-            </TouchableOpacity>
+            <Button label={mode === 'signIn' ? 'Sign in' : 'Sign up'} onPress={submit} disabled={!email || !password} loading={submitting} style={styles.button} />
 
             {mode === 'signIn' ? (
               <TouchableOpacity accessibilityRole="button"
@@ -336,19 +315,8 @@ function createStyles(colors: ThemeColors) {
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   dividerText: { color: colors.textTertiary, fontSize: 12, marginHorizontal: spacing.sm },
   input: { marginBottom: spacing.md },
-  button: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
+  button: { marginTop: spacing.xs },
   buttonDisabled: { opacity: disabledOpacity },
-  buttonText: {
-    color: colors.onAccent,
-    fontSize: 16,
-    fontWeight: '600',
-  },
   switchMode: {
     textAlign: 'center',
     marginTop: spacing.lg,

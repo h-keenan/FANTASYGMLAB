@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import SectionHeading from '../components/SectionHeading';
 import ToneBadge from '../components/ToneBadge';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -513,7 +514,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             ) : null}
 
             <View style={styles.sectionHeader}>
-              <AppText style={styles.sectionTitle}>Your leagues</AppText>
+              <View style={styles.sectionTitleWrap}><SectionHeading title="Your leagues" /></View>
               {atLeagueCap ? null : (
                 <TouchableOpacity accessibilityRole="button"
                   style={styles.addLeagueButton}
@@ -768,7 +769,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
             {addOptions && addOptions.length > 0 ? (
               <View style={styles.addOptions}>
-                <AppText style={styles.addOptionsLabel}>Tap a league to save it</AppText>
+                <SectionHeading title="Tap a league to save it" />
                 {/* Bug report, 2026-10-21: "it keeps auto defaulting to
                     2025" / "we need to be able to separate by year" -- a
                     continuing dynasty league gets a new league_id every
@@ -783,7 +784,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   keyboardShouldPersistTaps="handled"
                   stickySectionHeadersEnabled={false}
                   renderSectionHeader={({ section }) => (
-                    <AppText style={styles.addOptionsSeasonHeader}>{section.title} season</AppText>
+                    <SectionHeading title={`${section.title} season`} topGap={spacing.sm} />
                   )}
                   renderItem={({ item }) => (
                     <TouchableOpacity accessibilityRole="button"
@@ -912,15 +913,7 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'space-between',
     paddingRight: spacing.sm,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: spacing.xl,
-    marginBottom: spacing.sm,
-  },
+  sectionTitleWrap: { paddingHorizontal: spacing.xl },
   addLeagueButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -966,19 +959,6 @@ function createStyles(colors: ThemeColors) {
   },
   noLeagueButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   addOptions: { marginTop: spacing.md },
-  addOptionsLabel: {
-    ...typography.kicker,
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    marginBottom: spacing.xs,
-  },
-  addOptionsSeasonHeader: {
-    ...typography.kicker,
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
   // Bounded so a manager with a dozen leagues still sees the action row
   // below the list instead of a modal that runs off the screen.
   addOptionsList: { maxHeight: 220 },

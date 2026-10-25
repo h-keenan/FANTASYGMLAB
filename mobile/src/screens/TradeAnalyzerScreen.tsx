@@ -7,11 +7,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import EmptyState from '../components/EmptyState';
+import Input from '../components/Input';
 import ErrorState from '../components/ErrorState';
 import Button from '../components/Button';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -454,9 +455,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   if (notReadyReason) {
     return (
       <View style={styles.center}>
-        <AppText style={styles.notReadyText}>
-          {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't verify your roster in this league."}
-        </AppText>
+        <EmptyState icon="time-outline" title="Not ready yet" subtitle={NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't verify your roster in this league."} />
       </View>
     );
   }
@@ -602,8 +601,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         </>
       )}
 
-      <TextInput
-        style={styles.searchInput}
+      <Input
+        style={{ marginBottom: spacing.sm }}
         placeholder={
           activeSide === 'send'
             ? `Search your ${assetType === 'picks' ? 'picks' : 'roster'}`
@@ -614,7 +613,6 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         value={search}
         onChangeText={setSearch}
         autoCapitalize="none"
-        placeholderTextColor={colors.textTertiary}
       />
     </View>
   );
@@ -1114,17 +1112,6 @@ function createStyles(colors: ThemeColors) {
   // The rationale is a full-width block under the hero strip now, not a
   // flex child sharing a row with the confidence ring.
   verdictRationale: { flex: 0 },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: colors.glass,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
   resultsList: { paddingBottom: spacing.xl },
   // A pick search row pairs DraftPickAssetRow (which owns the "add to
   // package" tap) with a separate "view pick detail" button — the outer row
