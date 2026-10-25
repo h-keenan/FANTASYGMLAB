@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
@@ -472,7 +473,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               </View>
             ) : tab === 'explore' ? (
               <View>
-                <View style={styles.discoveryCard}>
+                <GlassCard style={styles.discoveryCard}>
                   <Input
                     placeholder="Search free agents"
                     value={search}
@@ -483,7 +484,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
                     <ViewModeToggle value={viewMode} onChange={setViewMode} />
                   </View>
-                </View>
+                </GlassCard>
                 <SectionHeading title="All Free Agents" />
               </View>
             ) : (
@@ -723,7 +724,7 @@ function FreeAgentRow({
 
   if (grid) {
     return (
-      <View style={[styles.gridCell, player.stale_free_agent && styles.freeAgentStale]}>
+      <GlassCard compact style={[styles.gridCell, player.stale_free_agent && styles.freeAgentStale]}>
         <PlayerIdentityRow
           layout="grid"
           playerId={player.player_id}
@@ -754,7 +755,7 @@ function FreeAgentRow({
             <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
           </View>
         </TouchableOpacity>
-      </View>
+      </GlassCard>
     );
   }
 
@@ -816,16 +817,7 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
     lineHeight: 18,
   },
-  discoveryCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.glass,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.glassBorder,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
+  discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position used to be a full row of always-expanded pills — now one
   // compact dropdown button (FilterDropdownButton), matching Players'
   // treatment of the same filter pattern.
@@ -935,14 +927,7 @@ function createStyles(colors: ThemeColors) {
   // width/space-between approach as PlayersScreen's PlayerRankRow grid cell
   // (keeps an unpaired last card from stretching to double width).
   gridRow: { justifyContent: 'space-between', marginBottom: spacing.sm },
-  gridCell: {
-    width: '48%',
-    backgroundColor: colors.glass,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.glassBorder,
-    padding: spacing.sm,
-  },
+  gridCell: { width: '48%' },
   gridTrailingFooter: {
     flexDirection: 'row',
     alignItems: 'center',
