@@ -6,69 +6,86 @@ import { useQuery } from '@tanstack/react-query';
 import AppText from './AppText';
 import AwardsStrip from './AwardsStrip';
 import Button from './Button';
+import DecisionFitCard from './DecisionFitCard';
 import MetricCard from './MetricCard';
-import OverallRatingBadge from './OverallRatingBadge';
-import PlayerAvatar from './PlayerAvatar';
-import PositionBadge from './PositionBadge';
+import ModelRadarChart from './ModelRadarChart';
+import PercentileExplorerSheet from './PercentileExplorerSheet';
+import PlayerHero from './PlayerHero';
+import PlayerLeagueActions from './PlayerLeagueActions';
+import PlayerTrendsPanel from './PlayerTrendsPanel';
 import SectionHeading from './SectionHeading';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock, { SkeletonChart } from './SkeletonBlock';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import SubRatingRow from './SubRatingRow';
-import TierBadge from './TierBadge';
 import ToneBadge from './ToneBadge';
-import UsageTrendPill from './UsageTrendPill';
-import WeeklyPointsChart from './WeeklyPointsChart';
+import ValuesCredit from './ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { api, type QuickViewStatItem } from '../lib/api';
-import { injuryAbbreviation } from '../lib/injuryDisplay';
+import { injuryAbbreviation, injuryTone } from '../lib/injuryDisplay';
 import { getLastLeague } from '../lib/lastLeague';
+import { explorerStatKey, type ExplorerPlayer } from '../lib/percentileExplorer';
+import { overallRatingColor } from '../lib/percentile';
+import { resolvePlayerTier } from '../lib/playerTier';
 import {
   fullProfileTarget,
   leagueScopedIdentity,
+  stubPlayer,
   type QuickViewLeague,
   type QuickViewRequest,
 } from '../lib/playerQuickView';
+import { rankLine, seasonStatGroups, tierOpportunityMismatchCaption } from '../lib/playerQuickViewPresentation';
 import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
 import { navigationRef } from '../navigation/navigationRef';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
-function StatTiles({ title, items }: { title: string; items: QuickViewStatItem[] }) {
+type ExplorerTarget = { key: string; label: string };
+
+/** One web-PQV section: hairline top rule, small caps heading. */
+function Section({ title, icon, children }: { title: string; icon?: React.ComponentProps<typeof SectionHeading>['icon']; children: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  if (!items.length) return null;
   return (
     <View style={styles.section}>
-      <SectionHeading title={title} />
-      <View style={styles.tileGrid}>
-        {items.map((item) => (
-          <MetricCard
-            key={item.label}
-            label={item.label}
-            value={item.value || null}
-            percentile={item.percentile ?? null}
-          />
-        ))}
-      </View>
+      <SectionHeading title={title} icon={icon} />
+      {children}
     </View>
   );
 }
 
-function WeeklyPoints({ playerId }: { playerId: string }) {
-  const query = useQuery({
-    queryKey: [...queryKeys.playerQuickView(playerId), 'weekly'],
-    queryFn: () => api.getPlayerWeeklyStats(playerId),
-    staleTime: 5 * 60 * 1000,
-  });
+function StatTiles({
+  title,
+  items,
+  onExplore,
+}: {
+  title: string;
+  items: QuickViewStatItem[];
+  onExplore?: (target: ExplorerTarget) => void;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const weeks = query.data?.weeks ?? [];
-  if (!weeks.length) return null;
+  if (!items.length) return null;
   return (
-    <View style={styles.section}>
-      <SectionHeading title="Points by week" icon="trending-up-outline" />
-      <WeeklyPointsChart weeks={weeks} />
+    <View style={styles.statGroup}>
+      <AppText style={styles.groupTitle}>{title}</AppText>
+      <View style={styles.tileGrid}>
+        {items.map((item) => {
+          // Tiles that carry a percentile open the Percentile Explorer, same
+          // as web's StatGroup and Player Detail.
+          const key = onExplore && item.percentile != null ? explorerStatKey(item.label) : null;
+          return (
+            <MetricCard
+              key={item.label}
+              label={item.label}
+              value={item.value || null}
+              percentile={item.percentile ?? null}
+              onPress={key && onExplore ? () => onExplore({ key, label: item.label }) : undefined}
+            />
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -81,9 +98,11 @@ function WeeklyPoints({ playerId }: { playerId: string }) {
  * last-used league for navigation.
  */
 export default function PlayerQuickViewSheet({ request, onClose }: { request: QuickViewRequest; onClose: () => void }) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { openPlayer } = usePlayerQuickView();
   const { player } = request;
+  const [explorer, setExplorer] = useState<ExplorerTarget | null>(null);
   const scoped = leagueScopedIdentity(request);
 
   const detailQuery = useQuery({
@@ -137,7 +156,6 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
   const model = detail?.model ?? null;
   const bio = detail?.bio ?? null;
   const awards = awardsQuery.data?.ok ? awardsQuery.data.awards : [];
-  const season = stats?.seasons?.[0] ?? null;
 
   const name = player.name || resolved?.name || `Player ${player.player_id}`;
   const position = player.position || resolved?.position || null;
@@ -160,6 +178,14 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
     }
   };
 
+  const openExplorerPlayer = (other: ExplorerPlayer) => {
+    setExplorer(null);
+    openPlayer(
+      stubPlayer({ player_id: other.player_id, name: other.name, position: other.position, team: other.team || null }),
+      { leagueId: request.league?.leagueId, leagueName: request.league?.leagueName, sourceLabel: 'Percentile Explorer' },
+    );
+  };
+
   const openFullProfile = () => {
     if (!target) return;
     onClose();
@@ -178,97 +204,166 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
       ] as const).filter(([, v]) => Boolean(v))
     : [];
 
+  const tierIdentity = resolvePlayerTier(scoped.tier, isDark);
+  const mismatch = tierOpportunityMismatchCaption(scoped.tier, scoped.opportunityLabel);
+  const ranks = rankLine(position, scoped.overallRank, scoped.positionRank);
+  const subRatings = model ? playerSubRatings(model) : [];
+  const hasSubRatings = subRatings.some((item) => item.rating != null);
+  const showSignals = !!scoped.opportunityLabel || !!injury;
+
   return (
     <SheetModal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close player quick view">
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose} testID="player-quick-view">
           <SheetScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.hero}>
-              <PlayerAvatar playerId={player.player_id} size={64} tier={scoped.tier} />
-              <View style={styles.heroText}>
-                {request.sourceLabel ? <AppText style={styles.kicker}>{request.sourceLabel}</AppText> : null}
-                <AppText style={styles.name} numberOfLines={2}>
-                  {name}
-                </AppText>
-                <View style={styles.metaRow}>
-                  <PositionBadge position={position} size="sm" />
-                  {team ? <AppText style={styles.meta}>{team}</AppText> : null}
-                  {age != null ? <AppText style={styles.meta}>{`Age ${age}`}</AppText> : null}
-                </View>
-              </View>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
-                <Ionicons name="close" size={22} color={colors.textSecondary} />
+            {/* Top bar: source label left, round close right (web .pqv-topbar). */}
+            <View style={styles.topBar}>
+              <AppText style={styles.kicker} numberOfLines={1}>
+                {request.sourceLabel ?? ''}
+              </AppText>
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
               </Pressable>
             </View>
 
-            <View style={styles.chipRow}>
-              <OverallRatingBadge rating={overallRating} size="md" positionRank={scoped.positionRank} />
-              <TierBadge storedTier={scoped.tier} size="md" />
-              {scoped.overallRank != null ? <ToneBadge label={`#${scoped.overallRank} overall`} color={colors.textSecondary} size="xs" /> : null}
-              {model?.usage_trend ? <UsageTrendPill trend={model.usage_trend} /> : null}
-              {injury ? <ToneBadge label={`Health: ${injury}`} color={colors.danger} size="xs" /> : null}
-              {scoped.opportunityLabel ? <ToneBadge label={scoped.opportunityLabel} color={colors.accent} size="xs" /> : null}
-            </View>
+            <PlayerHero
+              playerId={player.player_id}
+              tier={scoped.tier}
+              tierLabel={scoped.tier ? tierIdentity.semanticLabel : null}
+              tierColor={tierIdentity.color}
+              name={name}
+              position={position}
+              team={team}
+              age={age}
+              score={player.score ?? resolved?.value_score ?? null}
+              valueNote={resolved?.value_note}
+              byeWeek={resolved?.bye_week ?? null}
+              onByeThisWeek={resolved?.on_bye_this_week ?? false}
+              overallRating={overallRating}
+              ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
+              usageTrend={model?.usage_trend ?? null}
+              usageLoading={loading}
+            >
+              {ranks || model?.depth_chart_note ? (
+                <View style={styles.footnote}>
+                  {ranks ? <AppText style={styles.rankLine}>{ranks}</AppText> : null}
+                  {model?.depth_chart_note ? <AppText style={styles.note}>{model.depth_chart_note}</AppText> : null}
+                </View>
+              ) : null}
+              {showSignals ? (
+                <View style={styles.signalRow}>
+                  {scoped.opportunityLabel ? (
+                    <ToneBadge label={scoped.opportunityLabel} color={colors.textSecondary} size="xs" />
+                  ) : null}
+                  {injury ? (
+                    <ToneBadge
+                      label={`Health: ${injury}`}
+                      color={injuryTone(player.injury_status) === 'danger' ? colors.danger : colors.premium}
+                      size="xs"
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+              {mismatch ? <AppText style={styles.note}>{mismatch}</AppText> : null}
+            </PlayerHero>
 
             {loading ? (
-              <View style={styles.section}>
-                <SkeletonBlock height={14} />
-                <SkeletonBlock height={90} style={styles.skeletonGap} />
-                <SkeletonBlock height={90} style={styles.skeletonGap} />
+              <View style={styles.body}>
+                <SkeletonBlock height={64} />
+                <SkeletonChart />
+                <SkeletonBlock height={90} />
+                <SkeletonBlock height={90} />
               </View>
             ) : detailQuery.isError || !detail ? (
               <AppText style={styles.muted}>Couldn&apos;t load this player&apos;s detail right now.</AppText>
             ) : (
-              <>
-                {model?.decision_fit_narrative ? (
-                  <AppText style={styles.narrative}>{model.decision_fit_narrative}</AppText>
-                ) : null}
-                <WeeklyPoints playerId={player.player_id} />
-                {season ? (
-                  <>
-                    <AppText style={styles.seasonLabel}>
-                      {season.label}
-                      {season.games != null ? ` · ${season.games} games` : ''}
-                    </AppText>
-                    <StatTiles title="Fantasy" items={season.fantasy} />
-                    <StatTiles title="Production" items={season.key_stats} />
-                    <StatTiles title="Usage" items={season.usage} />
-                  </>
-                ) : null}
-                {awards.length > 0 ? (
+              <View style={styles.body}>
+                {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
+                <View style={styles.section}>
+                  <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
+                </View>
+                {(stats?.seasons ?? []).map((seasonItem) => (
+                  <View key={seasonItem.label} style={styles.section}>
+                    <SectionHeading
+                      title={`${seasonItem.label}${seasonItem.games != null ? ` · ${seasonItem.games} games` : ''}`}
+                    />
+                    {seasonStatGroups(seasonItem).map((group) => (
+                      <StatTiles key={group.title} title={group.title} items={group.items} onExplore={setExplorer} />
+                    ))}
+                  </View>
+                ))}
+                {stats && stats.college.length > 0 ? (
                   <View style={styles.section}>
-                    <SectionHeading title="Awards" />
-                    <AwardsStrip awards={awards} />
+                    <SectionHeading title="College" />
+                    <View style={styles.tileGrid}>
+                      {stats.college.map((item) => (
+                        <MetricCard key={item.label} label={item.label} value={item.value || null} percentile={item.percentile ?? null} />
+                      ))}
+                    </View>
                   </View>
                 ) : null}
+                {awards.length > 0 ? (
+                  <Section title="Awards">
+                    <AwardsStrip awards={awards} />
+                  </Section>
+                ) : null}
                 {bioRows.length > 0 ? (
-                  <View style={styles.section}>
-                    <SectionHeading title="Bio" />
+                  <Section title="Bio">
                     <View style={styles.tileGrid}>
                       {bioRows.map(([label, value]) => (
                         <MetricCard key={label} label={label} value={value} />
                       ))}
                     </View>
-                  </View>
+                  </Section>
                 ) : null}
-                {model ? (
-                  <View style={styles.section}>
-                    <SectionHeading title="Model" />
-                    <SubRatingRow ratings={playerSubRatings(model)} size="md" />
-                  </View>
+                {/* Model is the last section, as on web: radar when every
+                    axis has a rating, chip row otherwise. */}
+                {hasSubRatings ? (
+                  <Section title="Model">
+                    <ModelRadarChart ratings={subRatings} />
+                    {subRatings.every((item) => item.rating != null) ? null : (
+                      <SubRatingRow ratings={subRatings} size="md" />
+                    )}
+                  </Section>
                 ) : null}
-              </>
+              </View>
             )}
 
-            {onWaivers ? (
-              <Button label="View on Waivers" variant="secondary" onPress={openWaivers} style={styles.cta} />
-            ) : null}
-            {target ? (
-              <Button label="Full profile" onPress={openFullProfile} style={styles.cta} />
-            ) : null}
+            {/* Actions row (web .pqv-actions): league actions, then the
+                profile / waivers destinations. */}
+            <View style={styles.actions}>
+              {request.league ? (
+                <PlayerLeagueActions
+                  player={player}
+                  leagueId={request.league.leagueId}
+                  leagueName={request.league.leagueName}
+                  onNavigate={onClose}
+                />
+              ) : null}
+              {onWaivers ? (
+                <Button label="View on Waivers" variant="secondary" onPress={openWaivers} />
+              ) : null}
+              {target ? <Button label="Open Full Profile" onPress={openFullProfile} /> : null}
+            </View>
+            <ValuesCredit />
           </SheetScrollView>
         </SwipeDismissCard>
       </Pressable>
+      {explorer ? (
+        <PercentileExplorerSheet
+          playerId={player.player_id}
+          statKey={explorer.key}
+          statLabel={explorer.label}
+          onClose={() => setExplorer(null)}
+          onOpenPlayer={openExplorerPlayer}
+        />
+      ) : null}
     </SheetModal>
   );
 }
@@ -283,22 +378,36 @@ function createStyles(colors: ThemeColors) {
       borderTopRightRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.border,
-      maxHeight: '88%',
+      maxHeight: '92%',
     },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
-    hero: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-    heroText: { flex: 1, gap: 4 },
-    kicker: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
-    name: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
-    metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    meta: { fontSize: 12, color: colors.textSecondary },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
-    section: { gap: spacing.sm },
-    skeletonGap: { marginTop: spacing.sm },
+    topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
+    kicker: { flex: 1, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary, textTransform: 'uppercase' },
+    closeButton: {
+      width: 28,
+      height: 28,
+      borderRadius: radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      backgroundColor: colors.glassInset,
+    },
+    footnote: { gap: 2 },
+    rankLine: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+    note: { fontSize: 12, lineHeight: 17, color: colors.textTertiary },
+    signalRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
+    body: { gap: spacing.lg },
+    section: { gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: spacing.md },
+    statGroup: { gap: spacing.xs },
+    groupTitle: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
     tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    narrative: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
-    seasonLabel: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
     muted: { fontSize: 13, color: colors.textSecondary },
-    cta: { marginTop: spacing.sm },
+    actions: {
+      gap: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      paddingTop: spacing.md,
+    },
   });
 }

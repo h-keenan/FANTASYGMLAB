@@ -31,10 +31,10 @@ import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnaps
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonCard, SkeletonChart, SkeletonRow } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRow } from '../components/SkeletonBlock';
 import SubRatingRow from '../components/SubRatingRow';
 import ValuesCredit from '../components/ValuesCredit';
-import WeeklyPointsChart from '../components/WeeklyPointsChart';
+import PlayerTrendsPanel from '../components/PlayerTrendsPanel';
 import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor, overallRatingColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import { playerSubRatings } from '../lib/subRatings';
@@ -50,7 +50,6 @@ import {
   type QuickViewStats,
   type ScheduleWeek,
   type UsageTrend,
-  type WeeklyStatPoint,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { resolvePlayerTier } from '../lib/playerTier';
@@ -608,102 +607,6 @@ function metricGroupCardStyle(count: number): { minWidth: number; flexBasis: `${
     return { minWidth: 88, flexBasis: '31%' };
   }
   return { minWidth: 120, flexBasis: '46%' };
-}
-
-// Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK —
-// the weekly-stats endpoint already serves up to 7 prior seasons on
-// request, but a single-season player (e.g. week 1 of a rookie year, or
-// just the current season in view) previously had no year list to pick
-// from at all: the picker was built from quick-view's `seasons`, which is
-// always a ONE-element tuple (the current season only — see
-// player_quick_view.py's `seasons=(season_view,)`), so it could never
-// produce more than one year and the picker silently never rendered. Build
-// the year list from the season the weekly-stats endpoint itself reports
-// as current instead, so a lightly-played current season still lets you
-// page back to prior seasons.
-const WEEKLY_STATS_SEASONS_BACK = 7;
-
-/** "Rookie" or "N season(s)" — see modules/player_quick_view.py's
- * build_executive_snapshot (years_exp=0 -> "Rookie", else "{n} season(s)").
- * Returns how many seasons before the current one actually happened, so
- * the year picker below doesn't offer tabs for years before the player
- * was in the league (coridian_: "it shouldn't show other years if he's a
- * rookie this year"). Null (parse failure/no bio yet) falls back to the
- * full 3-year window rather than guessing wrong in the other direction. */
-function priorSeasonsFromExperience(yearsInLeague: string | null): number | null {
-  if (!yearsInLeague) return null;
-  if (yearsInLeague === 'Rookie') return 0;
-  const match = /^(\d+)\s+season/.exec(yearsInLeague);
-  return match ? Number(match[1]) : null;
-}
-
-function TrendsSection({ playerId, yearsInLeague }: { playerId: string; yearsInLeague: string | null }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  // Set once from the first response and never touched again — the anchor
-  // for the year picker's window, independent of whichever year the user
-  // has since tapped over to.
-  const [defaultYear, setDefaultYear] = useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [weeks, setWeeks] = useState<WeeklyStatPoint[] | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    api
-      .getPlayerWeeklyStats(playerId, selectedYear ?? undefined)
-      .then((result) => {
-        if (cancelled) return;
-        setWeeks(result.weeks);
-        setSelectedYear((current) => current ?? result.season);
-        setDefaultYear((current) => current ?? result.season);
-      })
-      .catch(() => {
-        if (!cancelled) setWeeks([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [playerId, selectedYear]);
-
-  if (!loading && defaultYear === null) {
-    return <AppText style={styles.notice}>No weekly trend data available for this player yet.</AppText>;
-  }
-
-  const priorSeasons = priorSeasonsFromExperience(yearsInLeague);
-  const seasonCount =
-    priorSeasons === null ? WEEKLY_STATS_SEASONS_BACK : Math.min(WEEKLY_STATS_SEASONS_BACK, priorSeasons + 1);
-  const yearOptions = defaultYear === null
-    ? []
-    : Array.from({ length: seasonCount }, (_, index) => defaultYear - index);
-
-  return (
-    <View style={styles.card}>
-      <SectionHeading title="Points By Week" icon="trending-up-outline" />
-      {yearOptions.length > 1 ? (
-        <View style={styles.yearRow}>
-          {yearOptions.map((year) => (
-            <TouchableOpacity
-              key={year}
-              style={[styles.yearPill, selectedYear === year && styles.yearPillActive]}
-              onPress={() => setSelectedYear(year)}
-            >
-              <AppText style={[styles.yearPillText, selectedYear === year && styles.yearPillTextActive]}>{year}</AppText>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ) : null}
-      {loading || weeks === null ? (
-        <SkeletonChart />
-      ) : (
-        <WeeklyPointsChart weeks={weeks} />
-      )}
-    </View>
-  );
 }
 
 function BioSection({ bio }: { bio: QuickViewBio }) {
@@ -1982,7 +1885,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
     if (activeTab === 'trends') {
       content.push(
-        <TrendsSection key="trends-tab" playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />,
+        <View key="trends-tab" style={styles.card}>
+          <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
+        </View>,
       );
     }
 
@@ -2346,21 +2251,6 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  // flexWrap matches this screen's other pill/chip rows (actionRow,
-  // pairedRow, awardsBioRow) — with up to 7 season pills now on offer,
-  // an unwrapped row would overflow the card on narrow devices.
-  yearRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
-  yearPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceSolid,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-  },
-  yearPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  yearPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  yearPillTextActive: { color: colors.onAccent },
   beginnerHelpBlock: { marginTop: spacing.sm, gap: spacing.xs },
   notice: {
     marginTop: spacing.md,
