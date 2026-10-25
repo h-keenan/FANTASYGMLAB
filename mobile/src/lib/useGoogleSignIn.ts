@@ -7,6 +7,7 @@ import { discovery as googleDiscovery } from 'expo-auth-session/providers/google
 
 import { supabase } from './supabase';
 import { env } from './env';
+import { exchangeIdToken, type GuestLinkFailure } from './guestConversion';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -27,11 +28,12 @@ function resolveClientId(): string {
  * `available` is false — and the button should stay hidden — until a real
  * Google Cloud OAuth client id exists; see mobile/.env.example.
  */
-export function useGoogleSignIn() {
+export function useGoogleSignIn(opts: { linkGuest?: boolean } = {}) {
   const clientId = resolveClientId();
   const available = Boolean(clientId);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<GuestLinkFailure | null>(null);
   const [nonce, setNonce] = useState<{ raw: string; hashed: string } | null>(null);
 
   useEffect(() => {
@@ -71,10 +73,15 @@ export function useGoogleSignIn() {
       return;
     }
     setSubmitting(true);
-    supabase.auth
-      .signInWithIdToken({ provider: 'google', token: idToken, nonce: nonce?.raw })
-      .then(({ error: signInError }) => {
-        setError(signInError?.message ?? null);
+    exchangeIdToken(supabase.auth, {
+      provider: 'google',
+      token: idToken,
+      nonce: nonce?.raw,
+      linkGuest: Boolean(opts.linkGuest),
+    })
+      .then((result) => {
+        setError(result.error);
+        setFailure(result.failure ?? null);
       })
       .finally(() => setSubmitting(false));
     // Only the response identity should re-trigger this exchange.
@@ -83,8 +90,9 @@ export function useGoogleSignIn() {
 
   const signIn = async () => {
     setError(null);
+    setFailure(null);
     await promptAsync();
   };
 
-  return { available, ready: Boolean(request) && Boolean(nonce), submitting, error, signIn };
+  return { available, ready: Boolean(request) && Boolean(nonce), submitting, error, failure, signIn };
 }

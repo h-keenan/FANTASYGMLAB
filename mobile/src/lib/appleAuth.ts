@@ -3,6 +3,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
 import { supabase } from './supabase';
+import { exchangeIdToken, type AuthResult } from './guestConversion';
 
 export async function isAppleAuthAvailable(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
@@ -20,7 +21,7 @@ export async function isAppleAuthAvailable(): Promise<boolean> {
  * The nonce round-trip (raw here, SHA-256 to Apple) is Apple's documented
  * replay-attack mitigation for this flow.
  */
-export async function signInWithApple(): Promise<{ error: string | null }> {
+export async function signInWithApple(opts: { linkGuest?: boolean } = {}): Promise<AuthResult> {
   try {
     const rawNonce = Crypto.randomUUID();
     const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
@@ -34,12 +35,14 @@ export async function signInWithApple(): Promise<{ error: string | null }> {
     if (!credential.identityToken) {
       return { error: "Apple didn't return an identity token." };
     }
-    const { error } = await supabase.auth.signInWithIdToken({
+    // linkGuest: attach Apple to the current anonymous user (same user id)
+    // instead of signing in as a separate user.
+    return await exchangeIdToken(supabase.auth, {
       provider: 'apple',
       token: credential.identityToken,
       nonce: rawNonce,
+      linkGuest: Boolean(opts.linkGuest),
     });
-    return { error: error?.message ?? null };
   } catch (err) {
     const code = (err as { code?: string } | null)?.code;
     if (code === 'ERR_REQUEST_CANCELED') {

@@ -35,3 +35,64 @@ test('guestMustCreateAccountToBuy: guests blocked, signed-in and signed-out not 
   assert.equal(guestMustCreateAccountToBuy({ user: { is_anonymous: false } }), false);
   assert.equal(guestMustCreateAccountToBuy(null), false);
 });
+
+import {
+  classifyGuestLinkError,
+  exchangeIdToken,
+  GUEST_EMAIL_EXISTS_MESSAGE,
+  GUEST_IDENTITY_EXISTS_MESSAGE,
+} from './guestConversion.ts';
+
+test('classifyGuestLinkError maps Supabase errors', () => {
+  assert.equal(classifyGuestLinkError({ code: 'identity_already_exists' }), 'identity-exists');
+  assert.equal(classifyGuestLinkError({ message: 'Identity is already linked to another user' }), 'identity-exists');
+  assert.equal(classifyGuestLinkError({ code: 'email_exists' }), 'email-exists');
+  assert.equal(classifyGuestLinkError({ message: 'A user with this email address has already been registered' }), 'email-exists');
+  assert.equal(classifyGuestLinkError({ code: 'manual_linking_disabled' }), 'link-unavailable');
+  assert.equal(classifyGuestLinkError({ message: 'boom' }), 'other');
+  assert.equal(classifyGuestLinkError(null), 'other');
+});
+
+function fakeClient(err: { code?: string; message?: string } | null = null) {
+  const calls: string[] = [];
+  return {
+    calls,
+    client: {
+      signInWithIdToken: async () => {
+        calls.push('signIn');
+        return { error: err };
+      },
+      linkIdentity: async () => {
+        calls.push('link');
+        return { error: err };
+      },
+    },
+  };
+}
+
+test('exchangeIdToken links (never signs in) for a guest', async () => {
+  const f = fakeClient();
+  const r = await exchangeIdToken(f.client, { provider: 'apple', token: 't', nonce: 'n', linkGuest: true });
+  assert.deepEqual(f.calls, ['link']);
+  assert.equal(r.error, null);
+});
+
+test('exchangeIdToken signs in normally when not a guest', async () => {
+  const f = fakeClient();
+  await exchangeIdToken(f.client, { provider: 'google', token: 't', linkGuest: false });
+  assert.deepEqual(f.calls, ['signIn']);
+});
+
+test('exchangeIdToken: identity already exists gives plain message, no fallback sign-in', async () => {
+  const f = fakeClient({ code: 'identity_already_exists', message: 'x' });
+  const r = await exchangeIdToken(f.client, { provider: 'google', token: 't', linkGuest: true });
+  assert.deepEqual(f.calls, ['link']);
+  assert.equal(r.failure, 'identity-exists');
+  assert.equal(r.error, GUEST_IDENTITY_EXISTS_MESSAGE);
+});
+
+test('exchangeIdToken: email exists message', async () => {
+  const f = fakeClient({ code: 'email_exists', message: 'x' });
+  const r = await exchangeIdToken(f.client, { provider: 'apple', token: 't', linkGuest: true });
+  assert.equal(r.error, GUEST_EMAIL_EXISTS_MESSAGE);
+});

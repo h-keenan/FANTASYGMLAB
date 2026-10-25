@@ -1,11 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import AppText from './AppText';
+import Button from './Button';
 import Input from './Input';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from './ModalFormCard';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
+import type { GuestLinkFailure } from '../lib/guestConversion';
+import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
@@ -23,7 +27,10 @@ export default function GuestCreateAccountModal({
   onClose: () => void;
   hint?: string;
 }) {
-  const { convertGuestToAccount } = useAuth();
+  const { convertGuestToAccount, signOut } = useAuth();
+  const google = useGoogleSignIn({ linkGuest: true });
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const [failure, setFailure] = useState<GuestLinkFailure | null>(null);
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
@@ -32,7 +39,20 @@ export default function GuestCreateAccountModal({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    void isAppleAuthAvailable().then(setAppleAvailable);
+  }, []);
+
+  // Google's link result arrives asynchronously through the hook.
+  useEffect(() => {
+    if (google.error) {
+      setError(google.error);
+      setFailure(google.failure);
+    }
+  }, [google.error, google.failure]);
+
   const close = () => {
+    setFailure(null);
     setEmail('');
     setPassword('');
     setError(null);
@@ -42,21 +62,58 @@ export default function GuestCreateAccountModal({
 
   const submit = async () => {
     setError(null);
+    setFailure(null);
     setNotice(null);
     setSubmitting(true);
     const result = await convertGuestToAccount(email, password);
     setSubmitting(false);
     if (result.error) {
       setError(result.error);
+      setFailure(result.failure ?? null);
       return;
     }
     setNotice('Check your email to confirm your account. Your league stays connected once you do.');
+  };
+
+  const onApple = async () => {
+    setError(null);
+    setFailure(null);
+    setSubmitting(true);
+    // Links Apple to THIS guest user (same id) rather than signing in as a new user.
+    const result = await signInWithApple({ linkGuest: true });
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error);
+      setFailure(result.failure ?? null);
+      return;
+    }
+    close();
+  };
+
+  // Only offered after Supabase says the email/identity already belongs to an
+  // account. Signing out drops the guest session, which the copy already warns about.
+  const signInInstead = async () => {
+    close();
+    await signOut();
   };
 
   return (
     <ModalFormCard visible={visible} onClose={close}>
       <ModalFormTitle>Create account</ModalFormTitle>
       <ModalFormHint>{hint}</ModalFormHint>
+      {appleAvailable ? (
+        <Button label="Continue with Apple" variant="secondary" onPress={() => void onApple()} disabled={submitting} style={styles.input} />
+      ) : null}
+      {google.available ? (
+        <Button
+          label="Continue with Google"
+          variant="secondary"
+          onPress={() => void google.signIn()}
+          disabled={!google.ready || google.submitting || submitting}
+          loading={google.submitting}
+          style={styles.input}
+        />
+      ) : null}
       <Input
         style={styles.input}
         placeholder="Email"
@@ -80,6 +137,9 @@ export default function GuestCreateAccountModal({
         editable={!submitting}
       />
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
+      {failure === 'email-exists' || failure === 'identity-exists' ? (
+        <Button label="Sign in instead" variant="ghost" onPress={() => void signInInstead()} />
+      ) : null}
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
       <ModalFormActions
         onCancel={close}
