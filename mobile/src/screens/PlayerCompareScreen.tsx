@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import Input from '../components/Input';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -290,13 +291,11 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
             tier={player.tier}
             contextLine="Choose an opponent below"
           />
-          <TextInput
-            style={styles.searchInput}
+          <Input
             placeholder="Search for a player to compare"
             value={search}
             onChangeText={setSearch}
             autoCapitalize="none"
-            placeholderTextColor={colors.textTertiary}
           />
         </View>
         {candidates === null ? (
@@ -457,16 +456,6 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.glassBorder,
     padding: spacing.md,
     gap: spacing.sm,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: colors.background,
-    color: colors.textPrimary,
   },
   candidateListCard: {
     flex: 1,

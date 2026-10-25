@@ -21,3 +21,11 @@ App counterpart of `ui-module-inventory.md`. Counts are from grep over
 | Stat tile / value | `MetricCard`, `ValueStat`, `DashboardStatRow` | Dashboard `valueLabel`/`valueNumber`, MyTeam `teamValueLabel`/`valueLabel` own 9-10px label styles | Next: switch to `ValueStat` |
 
 Not verified on device. This PR is PR 1 of a split (inventory + first modules).
+
+## PR 2 status (same day)
+
+- Primary buttons: Login (2), Onboarding, Paywall (Continue premium, Done, Restore premiumOutline), 5 share-preview modals now use `Button`. Remaining: PlayerDetail watch pill (pill-shaped by design), TradeFinder propose.
+- Inputs: Players, PlayerCompare, TradeAnalyzer, ProspectScouting note now use `Input`. GmOrb stays custom.
+- Empty states: "not ready" messages on Dashboard, Trade Hub, Trade Analyzer now use `EmptyState` (no CTA: there is no retry action to attach; Dashboard "nothing urgent" card keeps its BrandMark + BeginnerHelp).
+- Trade Hub position chips: a 9+ option scroll row cannot fit `SegmentedTabBar`'s single track, so it now uses `FilterDropdownButton` like Players/Waivers. The four impact-count tiles are filter stat tiles and stay.
+- Section titles: Home uses `SectionHeading` (3 copies). Uppercase in-card sub-labels ("You give", "On the clock", page kickers) are intentional kickers, left as is.

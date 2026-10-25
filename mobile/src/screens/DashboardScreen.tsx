@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import EmptyState from '../components/EmptyState';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -378,9 +379,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   if (notReadyReason) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.notReadyText}>
-          {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."}
-        </AppText>
+        <EmptyState icon="time-outline" title="Not ready yet" subtitle={NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."} />
         <TodayHero
           thisWeek={dashboardData?.this_week}
           leagueId={leagueId}

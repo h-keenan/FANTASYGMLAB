@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
+import Button from './Button';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { Ionicons } from '@expo/vector-icons';
 
 import type { WeeklyRecap } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -71,16 +71,7 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
               <RecapShareCard ref={cardRef} leagueName={leagueName} recap={recap} rosterMap={rosterMap} />
             </View>
           </View>
-          <TouchableOpacity style={styles.primaryButton} onPress={onShareImage} disabled={capturing}>
-            {capturing ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : (
-              <>
-                <Ionicons name="image-outline" size={16} color={colors.onAccent} />
-                <AppText style={styles.primaryButtonText}>Share image</AppText>
-              </>
-            )}
-          </TouchableOpacity>
+          <Button label="Share image" onPress={onShareImage} loading={capturing} style={styles.primaryButton} />
           <TouchableOpacity style={styles.secondaryButton} onPress={onShareText}>
             <AppText style={styles.secondaryButtonText}>Share as text instead</AppText>
           </TouchableOpacity>
@@ -128,18 +119,7 @@ function createStyles(colors: ThemeColors) {
     transform: [{ scale: PREVIEW_SCALE }],
     transformOrigin: '0 0',
   },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    width: '100%',
-    marginTop: spacing.md,
-  },
-  primaryButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
+  primaryButton: { width: '100%', marginTop: spacing.md },
   secondaryButton: { paddingVertical: spacing.sm, marginTop: spacing.xs },
   secondaryButtonText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   closeButton: { paddingVertical: spacing.sm },

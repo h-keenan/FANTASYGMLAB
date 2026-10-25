@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
-import PremiumGlow from '../components/PremiumGlow';
 import SectionHeading from '../components/SectionHeading';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -290,9 +289,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
           <AppText style={styles.successSubtitle}>
             It may take a moment to reflect everywhere in the app.
           </AppText>
-          <TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={exit}>
-            <AppText style={styles.primaryButtonText}>Done</AppText>
-          </TouchableOpacity>
+          <Button label="Done" onPress={exit} />
         </View>
       </View>
     );
@@ -456,21 +453,14 @@ export default function PaywallScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <>
-      <PremiumGlow radius={radii.md} active={Boolean(selected) && !purchasing} style={styles.glowWrap}>
-        <TouchableOpacity accessibilityRole="button"
-          style={[styles.primaryButton, styles.premiumButton, (!selected || purchasing) && styles.primaryButtonDisabled]}
-          onPress={() => selected && onPurchase(selected)}
-          disabled={!selected || purchasing}
-        >
-          {purchasing ? (
-            <ActivityIndicator color={colors.onPremium} />
-          ) : (
-            <AppText style={[styles.primaryButtonText, { color: colors.onPremium }]}>
-              {trial ? trialCtaLabel(trial) : 'Continue'}
-            </AppText>
-          )}
-        </TouchableOpacity>
-      </PremiumGlow>
+      <Button
+        variant="premium"
+        label={trial ? trialCtaLabel(trial) : 'Continue'}
+        onPress={() => selected && onPurchase(selected)}
+        disabled={!selected}
+        loading={purchasing}
+        style={styles.glowWrap}
+      />
       {trial && selected ? (
         <AppText style={styles.trialTerms}>
           {thenPriceLine(selected.product.priceString, packagePriceSuffix(selected.packageType))}
@@ -486,17 +476,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
           thing on a screen this conversion-critical. Still visually
           subordinate to the cyan primary Continue button above it (Magna
           Carta button hierarchy), just no longer easy to miss entirely. */}
-      <TouchableOpacity accessibilityRole="button"
-        onPress={onRestore}
-        disabled={restoring}
-        style={[styles.restoreButton, restoring && styles.primaryButtonDisabled]}
-      >
-        {restoring ? (
-          <ActivityIndicator color={colors.premium} />
-        ) : (
-          <AppText style={styles.restoreButtonText}>Restore purchases</AppText>
-        )}
-      </TouchableOpacity>
+      <Button variant="premiumOutline" label="Restore purchases" onPress={onRestore} loading={restoring} />
 
       {fromOnboarding ? (
         <TouchableOpacity accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={LINK_HIT_SLOP}>
