@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { FreeLeagueLimitNote } from "@/components/FreeLeagueLimitNote";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
+import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 
@@ -44,7 +44,7 @@ export default function ConnectLeaguePage() {
       <div className="w-full max-w-sm flex flex-col gap-3">
         <FreeLeagueLimitNote />
         <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(leagueHomePath(leagueId, leagueName))} />
-        <SampleLeagueLink />
+        <SampleLeagueButton surface="connect_step" />
       </div>
     </main>
   );

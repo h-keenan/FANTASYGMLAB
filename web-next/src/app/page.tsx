@@ -6,6 +6,7 @@ import { LandingAuthIsland, LandingAuthSlotPlaceholder } from "@/components/Land
 import { LandingShowcase } from "@/components/LandingShowcase";
 import { LandingTrialHeadline } from "@/components/LandingTrialHeadline";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
 
 /**
@@ -47,6 +48,7 @@ export default function LandingPage() {
               Real recommendations across your Game Plan, Trade Hub and Waivers, not raw data you have to interpret
               yourself.
             </p>
+            <SampleLeagueButton surface="landing_hero" fullWidth={false} />
           </div>
 
           {/* Real screenshots (sample league data) lead the page. */}

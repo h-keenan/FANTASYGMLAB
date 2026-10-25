@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SleeperImportForm } from "./SleeperImportForm";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 
 vi.mock("@/context/AuthContext", () => ({
@@ -70,8 +70,54 @@ describe("SleeperImportForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
-    expect(screen.getByRole("alert")).toHaveTextContent(/no sleeper account matched/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn't find a sleeper user named "nobody"/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/not your display name or email/i);
     expect(screen.getByRole("alert")).toHaveTextContent(/don't have a sleeper account/i);
+    // The typed username stays filled in, and the sample league is offered.
+    expect(screen.getByPlaceholderText("Sleeper username")).toHaveValue("nobody");
+    expect(screen.getByRole("link", { name: /try a sample league/i })).toHaveAttribute("href", "/sample-league");
+  });
+
+  it("explains no_leagues and links the sample league", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: false,
+      status: "no_leagues",
+      username: "empty",
+      leagues: [],
+      message: "server text",
+    });
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "empty" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent(/no leagues found on sleeper for "empty"/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/this season and last season/i);
+    expect(screen.getByRole("link", { name: /try a sample league/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Sleeper username")).toHaveValue("empty");
+  });
+
+  it("shows a retry message on a network failure and keeps the username", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockRejectedValue(new ApiError(0, "Could not reach the server."));
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn't reach sleeper or fantasydesk/i);
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Sleeper username")).toHaveValue("someone");
+  });
+
+  it("tracks a click on the sample league button", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    const link = await screen.findByRole("link", { name: /try a sample league/i });
+    fireEvent.click(link);
+    expect(trackFeatureUse).toHaveBeenCalledWith("sample_league_cta_clicked", {
+      dedupe: false,
+      props: { source_surface: "connect_error" },
+    });
   });
 
   it("does not show the no-account CTA for an unrelated lookup failure", async () => {

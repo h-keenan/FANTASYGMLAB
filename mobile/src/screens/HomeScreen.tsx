@@ -44,7 +44,13 @@ import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors, scrim } from '../theme';
-import { SAMPLE_ENTRY_LABEL } from '../lib/sampleLeague';
+import { SAMPLE_TRY_LABEL } from '../lib/sampleLeague';
+import {
+  describeSleeperConnectError,
+  isConnectivityFailure,
+  type SleeperConnectError,
+} from '../lib/sleeperConnectErrors';
+import Button from '../components/Button';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { leagueCapMessage } from '../lib/leagueCap';
 import Input from '../components/Input';
@@ -80,6 +86,9 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [addBusy, setAddBusy] = useState(false);
   const [addOptions, setAddOptions] = useState<SleeperLeagueOption[] | null>(null);
   const [addMessage, setAddMessage] = useState<string | null>(null);
+  // Structured Sleeper-lookup error (lib/sleeperConnectErrors, the single copy
+  // source): username not found / no leagues / network each get guidance.
+  const [addConnectError, setAddConnectError] = useState<SleeperConnectError | null>(null);
   // Which platform the Add League sheet is importing from. Sleeper is the
   // default; ESPN is EspnLeagueImport (public leagues, a subset of
   // features — see lib/leaguePlatform.ts).
@@ -136,6 +145,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     setAddQuery('');
     setAddOptions(null);
     setAddMessage(null);
+    setAddConnectError(null);
     setAddCapMessage(null);
     setShowNoLeagueHelp(false);
   };
@@ -304,12 +314,19 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
     setAddBusy(true);
     setAddMessage(null);
+    setAddConnectError(null);
     setAddCapMessage(null);
     try {
       const result = await api.lookupSleeperLeagues(trimmed);
       setAddOptions(result.leagues);
       if (!result.ok || result.leagues.length === 0) {
-        setAddMessage(result.message || 'No leagues found for that Sleeper username.');
+        setAddConnectError(
+          describeSleeperConnectError({
+            status: result.ok ? 'no_leagues' : result.status,
+            username: trimmed,
+            serverMessage: result.message,
+          }),
+        );
         // A real zero-result search is exactly the moment someone with no
         // Sleeper account/league actually needs this explanation — surface
         // it automatically rather than relying on them to notice the
@@ -318,12 +335,21 @@ export default function HomeScreen({ navigation, route }: Props) {
       }
     } catch (error) {
       setAddOptions(null);
-      setAddMessage(
-        error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.',
-      );
+      if (isConnectivityFailure(error)) {
+        setAddConnectError(describeSleeperConnectError({ status: 'network', username: trimmed }));
+      } else {
+        setAddMessage(
+          error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.',
+        );
+      }
     } finally {
       setAddBusy(false);
     }
+  };
+
+  const openSampleLeague = () => {
+    closeAddLeague();
+    navigation.navigate('SampleLeague');
   };
 
   // useFocusEffect (not a plain mount effect) so returning here after a
@@ -566,13 +592,12 @@ export default function HomeScreen({ navigation, route }: Props) {
             }
           />
           {!leaguesError ? (
-            <TouchableOpacity
-              accessibilityRole="button"
+            <Button
+              label={SAMPLE_TRY_LABEL}
+              variant="secondary"
               onPress={() => navigation.navigate('SampleLeague')}
-              style={styles.sampleLeagueLink}
-            >
-              <AppText style={styles.sampleLeagueLinkText}>{SAMPLE_ENTRY_LABEL}</AppText>
-            </TouchableOpacity>
+              style={styles.sampleLeagueButton}
+            />
           ) : null}
           </View>
         }
@@ -724,6 +749,20 @@ export default function HomeScreen({ navigation, route }: Props) {
             {addCapMessage ? (
               <View style={styles.capLockInModal}>
                 <PremiumLock title="League limit reached" description={addCapMessage} />
+              </View>
+            ) : null}
+            {addConnectError ? (
+              <View>
+                <AppText style={[styles.addError, styles.addErrorTitle]}>{addConnectError.message}</AppText>
+                {addConnectError.hint ? <AppText style={styles.addErrorHint}>{addConnectError.hint}</AppText> : null}
+                {addConnectError.offerSample ? (
+                  <Button
+                    label={SAMPLE_TRY_LABEL}
+                    variant="secondary"
+                    onPress={openSampleLeague}
+                    style={styles.sampleLeagueButton}
+                  />
+                ) : null}
               </View>
             ) : null}
             {addMessage ? <AppText style={styles.addError}>{addMessage}</AppText> : null}
@@ -906,8 +945,9 @@ function createStyles(colors: ThemeColors) {
     gap: 4,
     marginTop: spacing.md,
   },
-  sampleLeagueLink: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
-  sampleLeagueLinkText: { fontSize: 14, fontWeight: '700', color: colors.accent },
+  sampleLeagueButton: { marginTop: spacing.md, alignSelf: 'stretch' },
+  addErrorTitle: { fontWeight: '700' },
+  addErrorHint: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 17 },
   noLeagueToggleText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   noLeagueCard: {
     marginTop: spacing.sm,

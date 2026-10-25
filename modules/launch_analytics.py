@@ -56,6 +56,7 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         "page_view",
         "primary_cta_clicked",
         "secondary_cta_clicked",
+        "sample_league_cta_clicked",
         "pricing_viewed",
         "how_it_works_viewed",
         # Auth / onboarding
