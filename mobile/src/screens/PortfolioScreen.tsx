@@ -269,9 +269,11 @@ export default function PortfolioScreen() {
         <EmptyState
           icon="layers-outline"
           title="No saved leagues yet"
-          subtitle="Save a league from Home to see your standing, record, and top need or opportunity across every league here."
-          actionLabel="Go to Home"
-          onPressAction={() => navigation.navigate('Home')}
+          subtitle="Connect a league to see your standing, record, and top need or opportunity across every league here."
+          actionLabel="Connect a league"
+          onPressAction={() => navigation.navigate('Home', { openAddLeague: true })}
+          secondaryLabel="Explore a sample league first"
+          onPressSecondary={() => navigation.navigate('SampleLeague')}
         />
       </View>
     );

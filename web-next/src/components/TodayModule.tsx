@@ -68,7 +68,7 @@ export function TodayModule({
           <Link
             href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`}
             aria-label="View all game plan items"
-            className="text-sm font-bold shrink-0"
+            className="tap-link text-sm font-bold shrink-0"
             style={{ color: "var(--color-accent)" }}
           >
             View All →

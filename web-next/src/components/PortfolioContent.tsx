@@ -13,9 +13,12 @@ import {
 } from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
 import { BriefingItemPlayers, briefingItemIsSinglePlayer } from "@/components/BriefingItemPlayers";
+import { ButtonLink } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { PortfolioExposureView } from "@/components/PortfolioExposureView";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
+import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -491,12 +494,19 @@ export function PortfolioContent({
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Portfolio
           </span>
-          <h1 style={{ font: "var(--font-page-title)" }}>No saved leagues yet</h1>
-          <AddLeagueLink />
+          <h1 style={{ font: "var(--font-page-title)" }}>Your leagues</h1>
         </header>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Save a league to see it here.
-        </p>
+        <EmptyState
+          title="No saved leagues yet"
+          subtitle="Connect a league to see your standing, record, and top need across every league here."
+        >
+          <div className="flex flex-col items-start gap-1 mt-2">
+            <ButtonLink href="/connect-league" size="sm">
+              Connect a league
+            </ButtonLink>
+            <SampleLeagueLink />
+          </div>
+        </EmptyState>
       </main>
     );
   }

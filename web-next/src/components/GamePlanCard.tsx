@@ -72,7 +72,7 @@ export function GamePlanCard({
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
       <Link
         href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
-        className="self-start text-sm font-bold mt-1"
+        className="tap-link self-start text-sm font-bold"
         style={{ color: "var(--color-accent)" }}
       >
         {destinationCtaLabel(item.destination)} →

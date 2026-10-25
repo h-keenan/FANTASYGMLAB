@@ -45,7 +45,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
@@ -342,7 +342,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   );
 
   const link = (label: string, onPress: () => void) => (
-    <TouchableOpacity accessibilityRole="button" onPress={onPress} hitSlop={8}>
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} hitSlop={LINK_HIT_SLOP}>
       <AppText style={styles.link}>{label}</AppText>
     </TouchableOpacity>
   );

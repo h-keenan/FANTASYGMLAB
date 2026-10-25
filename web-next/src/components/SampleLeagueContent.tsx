@@ -8,6 +8,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { SampleLeagueBanner } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
+import { ValueStat } from "@/components/ValueStat";
 import {
   SAMPLE_GAME_PLAN,
   SAMPLE_LEAGUE_NAME,
@@ -23,14 +24,16 @@ import {
 function SamplePlayerRow({ player }: { player: SamplePlayer }) {
   return (
     <li className="flex items-center gap-3 py-2 min-h-[var(--touch-target-min)]" style={{ borderTop: "1px solid var(--color-border)" }}>
-      <PositionBadge position={player.position} />
+      <span className="flex w-10 shrink-0 justify-start">
+        <PositionBadge position={player.position} />
+      </span>
       <span className="min-w-0 flex-1 flex flex-col">
         <span className="text-sm font-bold">{player.name}</span>
         <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
           Age {player.age} · {player.note}
         </span>
       </span>
-      <span className="text-sm font-bold">{player.value}</span>
+      <ValueStat value={player.value} />
     </li>
   );
 }

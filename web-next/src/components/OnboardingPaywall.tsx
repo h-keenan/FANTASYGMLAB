@@ -148,7 +148,7 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
           trackOnboarding("skipped", { step: "paywall", step_index: PAYWALL_STEP_INDEX });
           onSkip();
         }}
-        className="text-xs underline self-center"
+        className="tap-link text-xs underline self-center"
         style={{ color: "var(--color-text-muted)" }}
       >
         Skip for now — continue free

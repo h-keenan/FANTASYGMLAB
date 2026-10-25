@@ -2808,3 +2808,11 @@ body:has(.fd-landing-dark) .brand-mark-icon {
     animation: none;
   }
 }
+
+/* Inline text links/buttons (View All, card CTAs) keep their text-sm look but
+   get the 44px touch target. Use instead of per-link padding hacks. */
+.tap-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+}
