@@ -169,6 +169,8 @@ export function stripeStore(cfg: SupabaseConfig, fetchFn: FetchFn): BillingStore
 export interface VerifiedUser {
   id: string;
   email: string;
+  /** GoTrue `is_anonymous`: a guest session with no email/identity. */
+  isAnonymous: boolean;
 }
 
 /** Verify the caller's Supabase JWT with GoTrue. Email comes from here, never from the request body. */
@@ -182,7 +184,7 @@ export async function verifyUserJwt(cfg: SupabaseConfig, fetchFn: FetchFn, autho
   const user = await res.json();
   const id = isObj(user) ? st(user.id) : "";
   if (!id) throw new HttpError(401, "Sign in to continue.");
-  return { id, email: isObj(user) ? st(user.email) : "" };
+  return { id, email: isObj(user) ? st(user.email) : "", isAnonymous: isObj(user) && user.is_anonymous === true };
 }
 
 /** Billing-history columns for trial eligibility, progressively narrower for older schemas. Returns null if unreadable. */

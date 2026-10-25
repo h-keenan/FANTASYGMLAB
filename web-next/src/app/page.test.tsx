@@ -220,7 +220,10 @@ describe("LandingPage welcome-page analytics", () => {
     render(<LandingPage />);
 
     expect(await screen.findByText("OnboardingCarousel")).toBeInTheDocument();
-    expect(trackFeatureUse).toHaveBeenCalledTimes(1);
+    // The landing_viewed effect runs after the commit that shows the carousel,
+    // so findByText can resolve one tick before it fires; wait for it (still
+    // asserting exactly one call).
+    await waitFor(() => expect(trackFeatureUse).toHaveBeenCalledTimes(1));
     expect(trackFeatureUse).toHaveBeenCalledWith("landing_viewed", { props: { source_surface: "landing_hero" } });
     expect(mockReplace).not.toHaveBeenCalled();
   });

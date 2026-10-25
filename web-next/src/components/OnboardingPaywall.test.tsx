@@ -3,6 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingPaywall } from "./OnboardingPaywall";
 import { api, type BillingPlan } from "@/lib/api";
+
+const authState = vi.hoisted(() => ({ isGuest: false }));
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({
+    isGuest: authState.isGuest,
+    session: null,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signInWithOAuth: vi.fn(),
+  }),
+}));
 import { ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
 import * as onboardingAnalytics from "@/lib/onboardingAnalytics";
 
@@ -66,6 +77,21 @@ describe("OnboardingPaywall", () => {
     expect(await screen.findByRole("button", { name: "Subscribe" })).toBeInTheDocument();
     expect(screen.queryByText(/free trial/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/free for/i)).not.toBeInTheDocument();
+  });
+
+  it("guest sees the create-account gate instead of Start trial and checkout is never called", async () => {
+    authState.isGuest = true;
+    try {
+      vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
+      render(<OnboardingPaywall onSkip={vi.fn()} />);
+      expect(await screen.findByText("Create an account to start your free trial.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+      expect(screen.getByLabelText("Continue with Google")).toBeInTheDocument();
+      expect(api.startBillingCheckout).not.toHaveBeenCalled();
+    } finally {
+      authState.isGuest = false;
+    }
   });
 
   it("calls onSkip when 'Skip for now' is clicked", async () => {

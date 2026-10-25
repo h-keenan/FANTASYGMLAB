@@ -246,11 +246,11 @@ Deno.test("revenuecat: upstream RC failure => non-2xx so RevenueCat retries", as
 });
 
 // ---------- checkout / portal ----------
-function userRoutes(profile: Record<string, unknown> | null, email = "real@example.com") {
+function userRoutes(profile: Record<string, unknown> | null, email = "real@example.com", isAnonymous = false) {
   return {
     "GET /auth/v1/user": (c: { init: RequestInit }) => {
       const auth = (c.init.headers as Record<string, string>).Authorization;
-      return auth === "Bearer good-jwt" ? j({ id: USER_ID, email }) : j({ msg: "bad" }, 401);
+      return auth === "Bearer good-jwt" ? j({ id: USER_ID, email, is_anonymous: isAnonymous }) : j({ msg: "bad" }, 401);
     },
     "GET /rest/v1/profiles": () => (profile === null ? j({ message: "boom" }, 500) : j([profile])),
   };
@@ -277,6 +277,18 @@ Deno.test("checkout: rejects missing/invalid JWT and never calls Stripe", async 
   assertEquals((await checkout(checkoutReq({}, null), deps)).status, 401);
   assertEquals((await checkout(checkoutReq({}, "bad-jwt"), deps)).status, 401);
   assert(!f.calls.some((c) => c.url.includes("api.stripe.com")));
+});
+
+Deno.test("checkout: anonymous (guest) user gets 403 account_required and no profile/Stripe call", async () => {
+  const f = fakeFetch({ ...userRoutes({}, "", true), ...stripeRoutes() });
+  const res = await checkout(checkoutReq({ tier: "pro" }), { env: envOf(BASE_ENV), fetch: f.fn, now: () => NOW });
+  assertEquals(res.status, 403);
+  const body = await res.json();
+  assertEquals(body.ok, false);
+  assertEquals(body.code, "account_required");
+  assertEquals(body.error, "Create an account to start your free trial.");
+  assert(!f.calls.some((c) => c.url.includes("api.stripe.com")));
+  assert(!f.calls.some((c) => c.url.includes("/rest/v1/profiles")));
 });
 
 Deno.test("checkout: embedded session for new user: verified email prefill, trial from constant, return_url, metadata", async () => {
