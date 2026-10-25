@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import AppText from './AppText';
+import PageTitle from './PageTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
@@ -41,9 +42,7 @@ export default function BrandHeaderBar({
   if (title) {
     return (
       <View style={styles.row}>
-        <AppText style={styles.pageTitle} accessibilityRole="header">
-          {title}
-        </AppText>
+        <PageTitle>{title}</PageTitle>
         <View style={[styles.side, styles.actions]}>
           {onSearch ? (
             <TouchableOpacity style={styles.iconButton} hitSlop={8} onPress={onSearch} accessibilityLabel="Search players and pages">
@@ -103,7 +102,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   side: { flex: 1 },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
   centerGroup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -136,7 +134,8 @@ function createStyles(colors: ThemeColors) {
     height: 40,
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glass,
     alignItems: 'center',
     justifyContent: 'center',
   },

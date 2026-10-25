@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -200,17 +200,13 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           {error ? <AppText style={styles.error}>{error}</AppText> : null}
           {saved ? <AppText style={styles.saved}>Saved — thanks for scouting.</AppText> : null}
 
-          <TouchableOpacity accessibilityRole="button"
-            style={[styles.submitButton, grade == null && styles.submitButtonDisabled]}
+          <Button
+            label={hadReport ? 'Update Grade' : 'Submit Grade'}
             onPress={() => void submit()}
-            disabled={grade == null || submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.onAccent} />
-            ) : (
-              <AppText style={styles.submitButtonText}>{hadReport ? 'Update Grade' : 'Submit Grade'}</AppText>
-            )}
-          </TouchableOpacity>
+            disabled={grade == null}
+            loading={submitting}
+            style={styles.submitButton}
+          />
 
           {hadReport ? (
             <Button
@@ -279,16 +275,7 @@ function createStyles(colors: ThemeColors) {
     noteCounter: { fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 2 },
     error: { color: colors.danger, fontSize: 12, marginTop: spacing.sm, textAlign: 'center' },
     saved: { color: colors.success, fontSize: 12, marginTop: spacing.sm, textAlign: 'center', fontWeight: '600' },
-    submitButton: {
-      marginTop: spacing.md,
-      borderRadius: radii.md,
-      paddingVertical: spacing.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.accent,
-    },
-    submitButtonDisabled: { opacity: 0.5 },
-    submitButtonText: { color: colors.onAccent, fontSize: 14, fontWeight: '700' },
+    submitButton: { marginTop: spacing.md },
     removeButton: { marginTop: spacing.sm },
   });
 }

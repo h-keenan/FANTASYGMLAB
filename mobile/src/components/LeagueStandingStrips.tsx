@@ -5,12 +5,13 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
+import ToneBadge from './ToneBadge';
 import IconCircle from './IconCircle';
 import TeamAvatar from './TeamAvatar';
 import { api } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 
 function scoringLabel(scoringSettings: Record<string, unknown> | undefined): string {
   const rec = Number(scoringSettings?.rec ?? 0);
@@ -109,9 +110,7 @@ export default function LeagueStandingStrips({
               <AppText style={styles.stripName} numberOfLines={1}>
                 {myTeam.teamName}
               </AppText>
-              <View style={styles.youBadge}>
-                <AppText style={styles.youBadgeText}>You</AppText>
-              </View>
+              <ToneBadge label="You" color={colors.accent} textColor={colors.onAccent} solid />
             </View>
           </View>
           <AppText style={styles.stripValue}>{playerIds.length}</AppText>
@@ -138,8 +137,6 @@ function createStyles(colors: ThemeColors) {
     stripTextGroup: { flex: 1 },
     stripNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     stripName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-    youBadge: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-    youBadgeText: { color: colors.onAccent, fontSize: 10, fontWeight: '700' },
     stripValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
     stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },

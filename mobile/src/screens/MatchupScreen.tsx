@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import PageTitle from '../components/PageTitle';
 import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -195,7 +196,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
         >
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <View style={styles.titleRow}>
-            <AppText style={styles.title}>Matchup</AppText>
+            <PageTitle>Matchup</PageTitle>
             {guillotine.week != null ? <AppText style={styles.weekLabel}>Week {guillotine.week}</AppText> : null}
           </View>
           <GuillotineCard data={guillotine} />
@@ -250,7 +251,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
       >
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <View style={styles.titleRow}>
-          <AppText style={styles.title}>Matchup</AppText>
+          <PageTitle>Matchup</PageTitle>
           {matchup.week != null ? <AppText style={styles.weekLabel}>Week {matchup.week}</AppText> : null}
           {matchup.game_state === 'live' ? (
             <View style={styles.liveBadge} accessibilityLabel="Games in progress">
@@ -752,7 +753,6 @@ function createStyles(colors: ThemeColors) {
     notice: { color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
     bestBallNote: { color: colors.textSecondary, lineHeight: 20 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary },
     weekLabel: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
     liveBadge: {
       flexDirection: 'row',

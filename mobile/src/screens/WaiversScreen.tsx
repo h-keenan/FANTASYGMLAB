@@ -5,11 +5,11 @@ import {
   type NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import Input from '../components/Input';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -473,13 +473,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
             ) : tab === 'explore' ? (
               <View>
                 <View style={styles.discoveryCard}>
-                  <TextInput
-                    style={styles.searchInput}
+                  <Input
                     placeholder="Search free agents"
                     value={search}
                     onChangeText={setSearch}
                     autoCapitalize="none"
-                    placeholderTextColor={colors.textTertiary}
                   />
                   <View style={styles.filterRow}>
                     <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
@@ -828,16 +826,6 @@ function createStyles(colors: ThemeColors) {
     padding: spacing.md,
     gap: spacing.sm,
   },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: colors.background,
-    color: colors.textPrimary,
-  },
   // Position used to be a full row of always-expanded pills — now one
   // compact dropdown button (FilterDropdownButton), matching Players'
   // treatment of the same filter pattern.
@@ -849,15 +837,6 @@ function createStyles(colors: ThemeColors) {
   loading: { marginTop: spacing.xl },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   sectionBlock: { marginBottom: spacing.lg },
-  sectionHeaderWrap: { marginBottom: spacing.sm, gap: 2 },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sectionCaption: { fontSize: 11.5, color: colors.textTertiary },
   compactGroupCard: { marginTop: spacing.sm, padding: spacing.sm },
   bestAvailableRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   bestAvailableCard: {
