@@ -176,6 +176,9 @@ export interface MeResponse {
   // independently-authored local copy; see its own hardcoded fallback for
   // when this request fails.
   premium_benefits?: string[];
+  // Free-vs-Pro rows built server-side from the enforced limits
+  // (modules/premium_benefits.premium_comparison); see lib/premiumComparison.ts.
+  premium_comparison?: { key: string; label: string; free: string; pro: string }[];
 }
 
 /** One Sleeper league behind a username, for the add-league picker. */

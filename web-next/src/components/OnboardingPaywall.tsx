@@ -16,6 +16,8 @@ const EmbeddedCheckoutModal = dynamic(() => import("@/components/EmbeddedCheckou
   ssr: false,
 });
 import { Button } from "@/components/Button";
+import { PremiumComparison } from "@/components/PremiumComparison";
+import { FALLBACK_PREMIUM_COMPARISON, normalizePremiumComparison, type PremiumComparisonRow } from "@/lib/premiumComparison";
 
 // Zach: "have one product here and call it Get Started For Free with a few
 // bullets" (first pass: one CTA, the annual plan, with a handful of its
@@ -98,6 +100,24 @@ const PAYWALL_STEP_INDEX = ONBOARDING_STEP_KEYS.length;
 export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   const [plans, setPlans] = useState<BillingPlansResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<PremiumComparisonRow[]>(FALLBACK_PREMIUM_COMPARISON);
+
+  // Best effort: the real limits come from /v1/me; the static fallback shows
+  // if it fails, so the paywall never waits on or breaks because of this.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await api.getMe();
+        if (!cancelled) setComparison(normalizePremiumComparison(me.premium_comparison));
+      } catch {
+        // keep fallback
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     trackOnboardingStepViewed("paywall", PAYWALL_STEP_INDEX);
@@ -126,8 +146,12 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
       <div className="flex flex-col gap-1 text-center">
         <SectionHeading>{trialDays > 0 ? `Try Pro free for ${trialDays} days` : "Unlock the full GM toolkit"}</SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Full access to the GM toolkit.
+          Free keeps working. Pro removes the caps.
         </p>
+      </div>
+
+      <div className="glass-surface p-3">
+        <PremiumComparison rows={comparison} />
       </div>
 
       {error ? (

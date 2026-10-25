@@ -71,3 +71,14 @@ def test_analytics_allowlist_covers_premium_funnel():
     assert "item_kind" in launch_analytics.ALLOWED_PROP_KEYS
     for blocked in ("email", "username", "player_name"):
         assert blocked in launch_analytics.BLOCKED_PROP_KEYS
+
+
+def test_premium_comparison_uses_enforced_limits():
+    from modules import gm_targets, trade_hub_presentation
+
+    rows = {r["key"]: r for r in premium_benefits.premium_comparison()}
+    assert rows["next_moves"]["free"] == f"Top {premium_benefits.FREE_NEXT_MOVE_ITEMS}"
+    assert str(trade_hub_presentation.FREE_VISIBLE_IDEAS) in rows["trade_hub"]["free"]
+    assert rows["gm_targets"]["free"].startswith(str(gm_targets.MAX_TARGETS_FREE))
+    assert rows["gm_targets"]["pro"].startswith(str(gm_targets.MAX_TARGETS_PREMIUM))
+    assert all(r["label"] and r["free"] and r["pro"] for r in rows.values())

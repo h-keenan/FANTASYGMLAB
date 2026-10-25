@@ -23,6 +23,7 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     api: {
       getBillingPlans: vi.fn(),
+      getMe: vi.fn(),
       startBillingCheckout: vi.fn(),
     },
   };
@@ -43,6 +44,8 @@ const PLANS: BillingPlan[] = [
 describe("OnboardingPaywall", () => {
   beforeEach(() => {
     vi.mocked(api.getBillingPlans).mockReset();
+    vi.mocked(api.getMe).mockReset();
+    vi.mocked(api.getMe).mockRejectedValue(new Error("offline"));
     vi.mocked(api.startBillingCheckout).mockReset();
   });
 
@@ -137,5 +140,28 @@ describe("OnboardingPaywall", () => {
     render(<OnboardingPaywall onSkip={vi.fn()} />);
     expect(spy).toHaveBeenCalledWith("paywall", ONBOARDING_STEP_KEYS.length);
     spy.mockRestore();
+  });
+
+  it("shows the Free vs Pro table from the server, falling back to static rows", async () => {
+    vi.mocked(api.getBillingPlans).mockResolvedValue({
+      ok: true,
+      plans: PLANS,
+      stripe_publishable_key: "pk_test_123",
+      trial: { days: 3, eligible: true },
+    });
+    const { unmount } = render(<OnboardingPaywall onSkip={vi.fn()} />);
+    // getMe rejected: static fallback rows render.
+    expect(await screen.findByRole("rowheader", { name: "GM Targets" })).toBeTruthy();
+    expect(screen.getByText("3 players")).toBeTruthy();
+    unmount();
+
+    vi.mocked(api.getMe).mockResolvedValue({
+      ok: true,
+      user: {} as never,
+      premium_benefits: [],
+      premium_comparison: [{ key: "gm_targets", label: "GM Targets", free: "9 players", pro: "99 players" }],
+    });
+    render(<OnboardingPaywall onSkip={vi.fn()} />);
+    expect(await screen.findByText("99 players")).toBeTruthy();
   });
 });

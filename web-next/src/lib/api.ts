@@ -195,6 +195,8 @@ export interface MeResponse {
     trial_ends_at?: string;
   };
   premium_benefits: string[];
+  /** Free-vs-Pro rows from the enforced limits; see lib/premiumComparison.ts. */
+  premium_comparison?: { key: string; label: string; free: string; pro: string }[];
 }
 
 export interface BillingPlan {

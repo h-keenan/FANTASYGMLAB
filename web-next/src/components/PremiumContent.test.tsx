@@ -165,4 +165,10 @@ describe("PremiumContent", () => {
     render(<PremiumContent entitlement="premium" plans={PLANS} publishableKey="pk" trialEndsAt={end} />);
     expect(screen.getByText(/^Trial ends /)).toBeInTheDocument();
   });
+
+  it("renders the Free vs Pro comparison", () => {
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
+    expect(screen.getByRole("table")).toBeTruthy();
+    expect(screen.getByRole("rowheader", { name: "Trade Hub ideas" })).toBeTruthy();
+  });
 });

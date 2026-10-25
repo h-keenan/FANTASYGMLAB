@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api, type BillingPlansResponse, type MeResponse } from "@/lib/api";
 import { PremiumContent } from "@/components/PremiumContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
+import { normalizePremiumComparison } from "@/lib/premiumComparison";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // First real checkout surface in web-next — every other "Upgrade" link
@@ -56,5 +57,5 @@ export default function PremiumPage() {
     );
   }
 
-  return <PremiumContent entitlement={me.user.entitlement} plans={plans.plans} publishableKey={plans.stripe_publishable_key} trial={plans.trial} trialEndsAt={me.user.trial_ends_at} />;
+  return <PremiumContent entitlement={me.user.entitlement} plans={plans.plans} publishableKey={plans.stripe_publishable_key} trial={plans.trial} trialEndsAt={me.user.trial_ends_at} comparison={normalizePremiumComparison(me.premium_comparison)} />;
 }
