@@ -74,3 +74,86 @@ export const GUEST_PURCHASE_HINT =
 export function guestMustCreateAccountToBuy(session: GuestSessionLike | null | undefined): boolean {
   return canConvertGuestToAccount(session);
 }
+
+// ---------------------------------------------------------------------------
+// In-place linking for every sign-up path (email, Apple, Google).
+//
+// `signInWithIdToken` on an anonymous session signs in as a DIFFERENT user and
+// strands the guest's id/data; `linkIdentity({ provider, token })` attaches the
+// provider identity to the CURRENT user instead (needs "Allow manual linking"
+// in the Supabase project). Web already does the OAuth equivalent
+// (web-next/src/lib/guestUpgrade.ts).
+// ---------------------------------------------------------------------------
+
+export type GuestLinkFailure = 'email-exists' | 'identity-exists' | 'link-unavailable' | 'other';
+
+interface ErrorLike {
+  code?: string | null;
+  message?: string | null;
+}
+
+export function classifyGuestLinkError(err: ErrorLike | null | undefined): GuestLinkFailure {
+  if (!err) return 'other';
+  const code = err.code ?? '';
+  const message = (err.message ?? '').toLowerCase();
+  if (code === 'manual_linking_disabled' || message.includes('manual linking is disabled')) return 'link-unavailable';
+  if (code === 'identity_already_exists' || message.includes('identity is already linked')) return 'identity-exists';
+  if (
+    code === 'email_exists' ||
+    code === 'user_already_exists' ||
+    message.includes('already been registered') ||
+    message.includes('already registered') ||
+    message.includes('email address has already')
+  ) {
+    return 'email-exists';
+  }
+  return 'other';
+}
+
+export const GUEST_EMAIL_EXISTS_MESSAGE =
+  "That email already has an account. Sign in to it instead — note that what you set up as a guest won't carry over.";
+export const GUEST_IDENTITY_EXISTS_MESSAGE =
+  "That Apple/Google account is already in use. Sign in to it instead — note that what you set up as a guest won't carry over.";
+export const GUEST_LINK_UNAVAILABLE_MESSAGE =
+  "We couldn't link this sign-in to your guest session right now. Try email instead, or try again later.";
+
+export function guestLinkFailureMessage(failure: GuestLinkFailure, fallback: string): string {
+  switch (failure) {
+    case 'email-exists':
+      return GUEST_EMAIL_EXISTS_MESSAGE;
+    case 'identity-exists':
+      return GUEST_IDENTITY_EXISTS_MESSAGE;
+    case 'link-unavailable':
+      return GUEST_LINK_UNAVAILABLE_MESSAGE;
+    default:
+      return fallback;
+  }
+}
+
+export interface AuthResult {
+  error: string | null;
+  failure?: GuestLinkFailure;
+}
+
+interface IdTokenAuthClient {
+  signInWithIdToken(c: { provider: 'apple' | 'google'; token: string; nonce?: string }): Promise<{ error: ErrorLike | null }>;
+  linkIdentity(c: { provider: 'apple' | 'google'; token: string; nonce?: string }): Promise<{ error: ErrorLike | null }>;
+}
+
+/**
+ * Exchanges a native Apple/Google id token. With `linkGuest` the identity is
+ * LINKED to the current anonymous user (same user id); otherwise it is a plain
+ * sign-in. A guest is never silently replaced: on a link failure the caller
+ * gets a plain-language error and a `failure` kind, and no sign-in happens.
+ */
+export async function exchangeIdToken(
+  client: IdTokenAuthClient,
+  args: { provider: 'apple' | 'google'; token: string; nonce?: string; linkGuest: boolean },
+): Promise<AuthResult> {
+  const { linkGuest, ...credentials } = args;
+  const { error } = linkGuest ? await client.linkIdentity(credentials) : await client.signInWithIdToken(credentials);
+  if (!error) return { error: null };
+  if (!linkGuest) return { error: error.message ?? 'Sign-in failed.' };
+  const failure = classifyGuestLinkError(error);
+  return { error: guestLinkFailureMessage(failure, error.message ?? 'Sign-in failed.'), failure };
+}

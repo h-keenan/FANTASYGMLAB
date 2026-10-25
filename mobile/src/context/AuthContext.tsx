@@ -16,7 +16,13 @@ import {
   setCurrentAuthScopeUserId,
   writeStoredAuthScopeUserId,
 } from '../lib/authScope';
-import { canConvertGuestToAccount, validateGuestConversionInput } from '../lib/guestConversion';
+import {
+  canConvertGuestToAccount,
+  classifyGuestLinkError,
+  guestLinkFailureMessage,
+  validateGuestConversionInput,
+  type AuthResult,
+} from '../lib/guestConversion';
 import { clearAuthenticatedQueryCache } from '../lib/queryClient';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
 import { syncLastLeagueFromServer } from '../lib/lastLeague';
@@ -64,7 +70,7 @@ interface AuthContextValue {
    * nothing to snapshot or restore. No-op error when called outside a
    * guest session.
    */
-  convertGuestToAccount: (email: string, password: string) => Promise<{ error: string | null }>;
+  convertGuestToAccount: (email: string, password: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -221,7 +227,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: 'Only a guest session can be converted to an account.' };
         }
         const { error } = await supabase.auth.updateUser({ email, password });
-        return { error: error?.message ?? null };
+        if (!error) return { error: null };
+        const failure = classifyGuestLinkError(error);
+        return { error: guestLinkFailureMessage(failure, error.message), failure };
       },
       signInAsGuest: async () => {
         // Requires "Allow anonymous sign-ins" enabled in the Supabase
