@@ -6579,6 +6579,8 @@ def test_get_gm_targets_returns_watchlist(monkeypatch):
             "untouchable": True,
         },
     ]
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
 
     # resolve_league_path_id's own rollover check calls sleeper.get_league
     # before this route body runs -- pin it so it can't eat one of this
@@ -6586,12 +6588,14 @@ def test_get_gm_targets_returns_watchlist(monkeypatch):
     # process-level lru_cache entry for "abc" (observed under CI's
     # parallel xdist workers, each with independent cache state).
     with patch("modules.sleeper.get_league", return_value={"status": "in_season"}):
-        with patch("requests.get", side_effect=[auth_user_response, targets_response]):
+        with patch("requests.get", side_effect=[auth_user_response, targets_response, profile_response]):
             response = client.get("/v1/leagues/abc/gm-targets", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
+    assert body["limit"] == body["free_limit"] == 3
+    assert body["is_premium"] is False
     assert body["targets"] == [
         {
             "player_id": "9001",
@@ -7806,7 +7810,7 @@ def test_dashboard_reports_no_linked_username(monkeypatch):
     # contract (web-next/src/lib/api.ts's DashboardResponse), not just be
     # present in some shape.
     assert body["quiet_reason"] == "no_sleeper_username_linked"
-    assert body["entitlement"] == {"is_premium": False, "visible_count": 0, "hidden_count": 0}
+    assert body["entitlement"] == {"is_premium": False, "visible_count": 0, "hidden_count": 0, "free_limit": 4}
     # "This week" strip: one next action (connect a league), never empty rows.
     assert body["this_week"]["mode"] == "next_action"
     assert body["this_week"]["next_action"]["route"] == "connect_league"
@@ -7894,7 +7898,7 @@ def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monke
 
     assert response.status_code == 200
     body = response.json()
-    assert body["entitlement"] == {"is_premium": True, "visible_count": 0, "hidden_count": 0}
+    assert body["entitlement"] == {"is_premium": True, "visible_count": 0, "hidden_count": 0, "free_limit": 4}
 
 
 @pytest.mark.known_flaky
@@ -8115,7 +8119,7 @@ def test_dashboard_caps_items_at_four_for_free_users(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert len(body["items"]) == 4
-    assert body["entitlement"] == {"is_premium": False, "visible_count": 4, "hidden_count": 2}
+    assert body["entitlement"] == {"is_premium": False, "visible_count": 4, "hidden_count": 2, "free_limit": 4}
 
 
 def test_dashboard_shows_all_items_for_premium_users(monkeypatch):
@@ -8124,7 +8128,7 @@ def test_dashboard_shows_all_items_for_premium_users(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert len(body["items"]) == 6
-    assert body["entitlement"] == {"is_premium": True, "visible_count": 6, "hidden_count": 0}
+    assert body["entitlement"] == {"is_premium": True, "visible_count": 6, "hidden_count": 0, "free_limit": 4}
 
 
 def test_dashboard_includes_team_snapshot(monkeypatch):

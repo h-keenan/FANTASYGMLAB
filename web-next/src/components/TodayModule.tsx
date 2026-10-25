@@ -4,6 +4,7 @@ import type { BriefingItem, DashboardResponse, ThisWeekRow } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ButtonLink } from "@/components/Button";
+import { FreeLimitNote } from "@/components/FreeLimitNote";
 import { EmptyState } from "@/components/EmptyState";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -78,6 +79,14 @@ export function TodayModule({
         {todayTitle(thisWeek)}
       </SectionHeading>
       <BeginnerHelp term="dashboardGamePlan" />
+      <FreeLimitNote
+        kind="window"
+        noun="next moves"
+        limit={data.entitlement.free_limit}
+        total={data.entitlement.visible_count + data.entitlement.hidden_count}
+        shown={data.entitlement.visible_count}
+        isPremium={data.entitlement.is_premium}
+      />
 
       {nextAction ? (
         <AccentCard accent="var(--color-accent)" compact>

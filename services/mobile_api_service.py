@@ -8546,7 +8546,17 @@ def get_gm_targets(league_id: str = Depends(resolve_league_path_id), user: dict[
     )
     if error:
         return {"ok": True, "targets": []}
-    return {"ok": True, "targets": [_project_gm_target(row) for row in rows]}
+    # The plan's cap, so clients can say "Free: 2 of 3" without carrying a
+    # copy of the number (same limit add_gm_target enforces below).
+    profile = _fetch_profile_fields(config, user_id, access_token)
+    is_pro = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    return {
+        "ok": True,
+        "targets": [_project_gm_target(row) for row in rows],
+        "limit": gm_targets.MAX_TARGETS_PREMIUM if is_pro else gm_targets.MAX_TARGETS_FREE,
+        "free_limit": gm_targets.MAX_TARGETS_FREE,
+        "is_premium": is_pro,
+    }
 
 
 @app.post("/v1/leagues/{league_id}/gm-targets")
@@ -9552,7 +9562,12 @@ def get_league_dashboard(
             "quiet_reason": reason_value,
             "team_snapshot": None,
             "reason": reason_value,
-            "entitlement": {"is_premium": is_premium, "visible_count": 0, "hidden_count": 0},
+            "entitlement": {
+                "is_premium": is_premium,
+                "visible_count": 0,
+                "hidden_count": 0,
+                "free_limit": FREE_DASHBOARD_VISIBLE_ITEMS,
+            },
             "this_week": this_week.not_ready_this_week(reason_value),
         }
 
@@ -9803,6 +9818,8 @@ def get_league_dashboard(
             "is_premium": is_premium,
             "visible_count": len(visible_items),
             "hidden_count": len(all_items) - len(visible_items),
+            # Sent so clients can say "Free shows N" without a copy of N.
+            "free_limit": FREE_DASHBOARD_VISIBLE_ITEMS,
         },
         # Additive. Built only from data computed above; see modules.this_week.
         "this_week": _dashboard_this_week(

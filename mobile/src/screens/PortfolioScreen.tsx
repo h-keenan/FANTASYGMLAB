@@ -1,3 +1,4 @@
+import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
@@ -318,6 +319,7 @@ export default function PortfolioScreen() {
                 <AppText style={styles.linkText}>+ Add a league</AppText>
               </TouchableOpacity>
             </View>
+            <GlossaryNote terms={['rosterPower']} label="What is Roster Power?" />
             {draftingLeagues.length > 0 ? (
               <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('LiveDraft', { leagueId: league.league_id, leagueName: league.league_name })} />
             ) : null}

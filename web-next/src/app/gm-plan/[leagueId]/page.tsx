@@ -129,6 +129,7 @@ export default function GmPlanPage() {
       teamStance={teamStance}
       myTeam={myTeam}
       targets={targets.targets}
+      targetsLimit={{ freeLimit: targets.free_limit, isPremium: targets.is_premium }}
       rankings={rankings}
     />
   );

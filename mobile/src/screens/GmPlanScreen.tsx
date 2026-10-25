@@ -1,3 +1,4 @@
+import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -104,6 +105,8 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const [snapshot, setSnapshot] = useState<PlanSnapshotTile[]>([]);
   const [roster, setRoster] = useState<LineupPlayer[]>([]);
   const [targets, setTargets] = useState<GmTarget[]>([]);
+  // The server's GM Targets cap for Free (GET .../gm-targets), for the note.
+  const [targetsMeta, setTargetsMeta] = useState<{ freeLimit?: number; isPremium?: boolean }>({});
   const [ranked, setRanked] = useState<Map<string, RankedPlayer>>(new Map());
   const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
   const [tradeWindow, setTradeWindow] = useState<GmPlanResponse['trade_window']>(undefined);
@@ -135,6 +138,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
           [...myTeam.starters, ...myTeam.bench].filter((p) => (seen.has(p.player_id) ? false : (seen.add(p.player_id), true))),
         );
         setTargets(targetsResult.targets);
+        setTargetsMeta({ freeLimit: targetsResult.free_limit, isPremium: targetsResult.is_premium });
         setRanked(new Map(rankings.players.map((p) => [p.player_id, p])));
 
         // Best-effort snapshot sources: a tile just doesn't render if a call fails.
@@ -166,6 +170,15 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const protectedRows = useMemo(() => roster.filter((p) => protectedIds.has(p.player_id)), [roster, protectedIds]);
   const otherRows = useMemo(() => roster.filter((p) => !protectedIds.has(p.player_id)), [roster, protectedIds]);
   const watching = useMemo(() => targets.filter((t) => !t.untouchable), [targets]);
+  const targetsNote = (
+    <FreeLimitNote
+      kind="cap"
+      noun="GM Targets"
+      limit={targetsMeta.freeLimit}
+      used={targets.length}
+      isPremium={targetsMeta.isPremium}
+    />
+  );
 
   const onToggleProtect = useCallback(
     async (playerId: string, next: boolean) => {
@@ -458,6 +471,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
               icon="lock-closed-outline"
               caption="Players you won't trade. Same flag as Watching's untouchable."
             />
+            {targetsNote}
             {roster.length === 0 ? (
               <EmptyState icon="people-outline" title="No roster players found for this league" />
             ) : (
@@ -495,6 +509,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         {tab === 'watching' ? (
           <>
             <SectionHeading title="Watching" icon="eye-outline" caption="Considering or monitoring; not trade-protected." />
+            {targetsNote}
             {watching.length === 0 ? (
               <EmptyState
                 icon="eye-outline"

@@ -1,5 +1,6 @@
 "use client";
 
+import { GlossaryNote } from "@/components/GlossaryNote";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -542,6 +543,7 @@ export function PortfolioContent({
         </p>
       ) : data.leagues.length > 0 || pending.length > 0 ? (
         <div className="flex flex-col gap-4">
+          <GlossaryNote terms={["rosterPower"]} label="What is Roster Power?" />
           {cardSlots(data.leagues, pending, order).map((slot) =>
             slot.kind === "league" ? (
               <PortfolioLeagueCard key={slot.league.league_id} league={slot.league} />

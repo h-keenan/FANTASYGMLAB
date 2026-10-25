@@ -1,3 +1,4 @@
+import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -500,6 +501,15 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </TouchableOpacity>
               )}
             </View>
+            {!atLeagueCap && me ? (
+              <FreeLimitNote
+                kind="cap"
+                noun={leagueCap === 1 ? 'league' : 'leagues'}
+                limit={leagueCap}
+                used={leagues?.length ?? 0}
+                isPremium={me.profile_status === 'ok' ? me.entitlement === 'premium' : null}
+              />
+            ) : null}
             {atLeagueCap ? (
               <View style={styles.capLock}>
                 <PremiumLock

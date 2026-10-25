@@ -1973,6 +1973,10 @@ export interface GmTarget {
 export interface GmTargetsResponse {
   ok: true;
   targets: GmTarget[];
+  /** This plan's cap on saved targets, and Free's cap (server constants). */
+  limit?: number;
+  free_limit?: number;
+  is_premium?: boolean;
 }
 
 export type GmTargetMutationReason = '' | 'at_cap' | 'not_available' | 'not_found';
@@ -2178,6 +2182,8 @@ export interface TeamSnapshot {
 export interface DashboardEntitlementInfo extends EntitlementGateInfo {
   visible_count: number;
   hidden_count: number;
+  /** The server's Free cap on next moves (FREE_DASHBOARD_VISIBLE_ITEMS). */
+  free_limit?: number;
 }
 
 /** One row of the Dashboard's "This week" strip (modules/this_week.py). */

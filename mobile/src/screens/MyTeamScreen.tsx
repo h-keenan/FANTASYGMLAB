@@ -1,3 +1,4 @@
+import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -406,6 +407,7 @@ function TeamSnapshot({
           { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—' },
         ]}
       />
+      <GlossaryNote terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge']} />
     </AnimatedCard>
   );
 }
