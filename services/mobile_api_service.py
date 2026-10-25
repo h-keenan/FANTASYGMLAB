@@ -8,7 +8,7 @@ Deployment topology (Render):
   - GET  /v1/me               — authenticated user + entitlement + saved-league cap
   - GET  /v1/founder/analytics — founder-only product analytics report (403 for
                                   anyone without a server-issued founder_ops claim)
-  - POST /v1/analytics/event   — record one product analytics event (guest-allowed;
+  - POST /v1/e (alias: /v1/analytics/event)   — record one product analytics event (guest-allowed;
                                   see modules.launch_analytics.TRACKED_EVENTS)
   - POST /v1/me/link-sleeper  — link a Sleeper username onto the caller's profile (roster resolution)
   - GET  /v1/sleeper/leagues?username=x  — the Sleeper leagues behind a username (add-league picker)
@@ -369,6 +369,12 @@ _RATE_LIMIT_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 RATE_LIMIT_ANALYTICS_MAX = int(os.environ.get("RATE_LIMIT_ANALYTICS_MAX", "240"))
 RATE_LIMIT_ANALYTICS_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_ANALYTICS_WINDOW_SECONDS", "60"))
 _RATE_LIMIT_ANALYTICS_PATH = "/v1/analytics/event"
+# Neutral alias for the same ingest: "/analytics/" in a URL is a common
+# ad-blocker filter pattern, so current web/mobile clients post here instead.
+# The legacy path stays for already-shipped builds. Both share one handler and
+# one rate-limit bucket.
+_ANALYTICS_INGEST_ALIAS_PATH = "/v1/e"
+_RATE_LIMIT_ANALYTICS_PATHS = frozenset({_RATE_LIMIT_ANALYTICS_PATH, _ANALYTICS_INGEST_ALIAS_PATH})
 
 
 class _RedisFixedWindowRateLimiter:
@@ -453,7 +459,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         limit = RATE_LIMIT_MUTATING_MAX if is_mutating else RATE_LIMIT_GENERAL_MAX
         window = RATE_LIMIT_MUTATING_WINDOW_SECONDS if is_mutating else RATE_LIMIT_GENERAL_WINDOW_SECONDS
         scope = "mutating" if is_mutating else "general"
-        if is_mutating and request.url.path == _RATE_LIMIT_ANALYTICS_PATH:
+        if is_mutating and request.url.path in _RATE_LIMIT_ANALYTICS_PATHS:
             limit, window, scope = RATE_LIMIT_ANALYTICS_MAX, RATE_LIMIT_ANALYTICS_WINDOW_SECONDS, "analytics"
         client_key = _client_rate_limit_key(request)
         # hit() calls the plain synchronous redis-py client (see
@@ -1100,6 +1106,7 @@ class AnalyticsEventRequest(BaseModel):
     once_key: str | None = None
 
 
+@app.post("/v1/e")
 @app.post("/v1/analytics/event")
 def record_analytics_event(
     body: AnalyticsEventRequest,

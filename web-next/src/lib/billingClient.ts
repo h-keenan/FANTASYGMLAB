@@ -74,10 +74,11 @@ export async function billingRequest<T>(
   }
 
   if (!response.ok) {
-    const record = body && typeof body === "object" ? (body as { detail?: unknown; error?: unknown; msg?: unknown; message?: unknown }) : {};
+    const record = body && typeof body === "object" ? (body as { detail?: unknown; error?: unknown; msg?: unknown; message?: unknown; code?: unknown }) : {};
     // Edge Functions: {ok:false,error}; FastAPI: {detail}; Supabase gateway (e.g. bad JWT): {msg|message}.
     const detail = String(record.detail ?? record.error ?? record.msg ?? record.message ?? "");
-    throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
+    const code = typeof record.code === "string" ? record.code : undefined;
+    throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`, code);
   }
   return body as T;
 }

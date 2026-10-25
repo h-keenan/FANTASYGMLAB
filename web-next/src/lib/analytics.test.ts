@@ -81,7 +81,7 @@ describe("lib/analytics", () => {
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
 
     const [url, init] = mockFetch.mock.calls[0];
-    expect(url).toBe("http://localhost:8000/v1/analytics/event");
+    expect(url).toBe("http://localhost:8000/v1/e");
     const body = JSON.parse(init.body as string);
     expect(body.event).toBe("page_view");
     expect(body.props.route).toBe("/trade-hub/league-1");

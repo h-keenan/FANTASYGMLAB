@@ -26,7 +26,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     if (!url) return errorResponse(502, "Could not open billing portal.", cors);
     return jsonResponse({ ok: true, portal_url: url }, 200, cors);
   } catch (e) {
-    if (e instanceof HttpError) return errorResponse(e.status, e.message, cors);
+    if (e instanceof HttpError) return errorResponse(e.status, e.message, cors, e.code);
     console.error("billing-portal-session failed", (e as Error).message);
     return errorResponse(502, "Could not open billing portal.", cors);
   }

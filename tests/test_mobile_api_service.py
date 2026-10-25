@@ -15477,3 +15477,18 @@ def test_waivers_team_defense_context_is_honest():
     empty = mobile_api_service._waivers_team_defense_context({"def_count": 1}, ("a",))
     assert empty["empty_slot"] is True and empty["rostered"] == []
     assert mobile_api_service._waivers_team_defense_context({}, ("SF",))["empty_slot"] is False
+
+
+def test_analytics_alias_route_uses_the_same_handler(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        bad = client.post("/v1/e", json={"event": "not_a_real_event", "anon_id": "anon_abc123"})
+        blank = client.post("/v1/e", json={"event": "pqv_opened", "anon_id": " "})
+
+    assert bad.status_code == 200 and bad.json() == {"ok": False}
+    assert blank.status_code == 200 and blank.json() == {"ok": False}
+    mock_track.assert_not_called()
+    paths = {r.path for r in mobile_api_service.app.routes}
+    assert {"/v1/e", "/v1/analytics/event"} <= paths

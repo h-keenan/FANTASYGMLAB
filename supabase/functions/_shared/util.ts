@@ -55,16 +55,18 @@ export function jsonResponse(body: unknown, status = 200, extra: HeadersInit = {
   });
 }
 
-export function errorResponse(status: number, error: string, extra: HeadersInit = {}): Response {
-  return jsonResponse({ ok: false, error }, status, extra);
+export function errorResponse(status: number, error: string, extra: HeadersInit = {}, code?: string): Response {
+  return jsonResponse(code ? { ok: false, error, code } : { ok: false, error }, status, extra);
 }
 
 /** Thrown with an HTTP status; message is client-safe. */
 export class HttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -73,3 +75,7 @@ export type Env = (name: string) => string | undefined;
 export function envValue(env: Env, name: string): string {
   return st(env(name));
 }
+
+/** Stable machine code + copy for "guests may not buy" (create-checkout-session). */
+export const ACCOUNT_REQUIRED_CODE = "account_required";
+export const ACCOUNT_REQUIRED_MESSAGE = "Create an account to start your free trial.";
