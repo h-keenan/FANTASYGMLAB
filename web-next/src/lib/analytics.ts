@@ -2,7 +2,7 @@ import { env } from "./env";
 import { supabase } from "./supabase";
 
 /**
- * Client for services/mobile_api_service.py's `POST /v1/analytics/event` —
+ * Client for services/mobile_api_service.py's `POST /v1/e` —
  * the fix for a real bug: web-next (and mobile) never called into
  * modules/launch_analytics.py at all, so the `analytics_events` table
  * stayed empty despite real user traffic. That module's track_* functions
@@ -76,7 +76,7 @@ interface AnalyticsEventBody {
 }
 
 /**
- * Fire-and-forget POST to `/v1/analytics/event`. Never awaited by a caller,
+ * Fire-and-forget POST to `/v1/e`. Never awaited by a caller,
  * never throws, never surfaces a loading/error state — analytics must not
  * be able to affect the page it's instrumenting. Attaches the caller's own
  * Supabase bearer token when a session exists so the backend can attribute
@@ -106,7 +106,7 @@ function postEvent(input: AnalyticsEventBody): void {
       } catch {
         accessToken = undefined;
       }
-      await fetch(`${env.apiBaseUrl}/v1/analytics/event`, {
+      await fetch(`${env.apiBaseUrl}/v1/e`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

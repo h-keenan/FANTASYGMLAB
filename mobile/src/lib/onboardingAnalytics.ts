@@ -4,7 +4,7 @@ import { trackUse } from './analytics';
  * Privacy-safe onboarding funnel events (feature_use / onboarding), same
  * shape as web-next/src/lib/onboardingAnalytics.ts. Fixed snake_case ids
  * only; `step_viewed` once per step per app session. No-ops while
- * EXPO_PUBLIC_ANALYTICS_ENABLED is off (the analytics core drops events).
+ * EXPO_PUBLIC_ANALYTICS_ENABLED is explicitly disabled (the analytics core drops events).
  */
 const viewedSteps = new Set<string>();
 

@@ -2,7 +2,7 @@
 
 ## Pipeline
 
-client -> `POST /v1/analytics/event` (`services/mobile_api_service.record_analytics_event`, optional bearer) ->
+client -> `POST /v1/e` (neutral alias of the legacy `POST /v1/analytics/event`, same handler; `services/mobile_api_service.record_analytics_event`, optional bearer) ->
 `modules/launch_analytics.track_event` (allowlist `TRACKED_EVENTS`, prop allowlist `ALLOWED_PROP_KEYS`, blocked keys,
 internal-traffic exclusion, account/league hashing) -> Supabase `analytics_events` (durable) with host-local JSONL fallback ->
 `modules/founder_analytics.build_report` -> `GET /v1/founder/analytics` -> `/founder-analytics` (`FounderAnalyticsContent`).
@@ -65,7 +65,7 @@ Legal copy today (`modules/legal_pages.py`, `mobile/src/data/legalContent.json`,
 
 ## Mobile kill switch
 
-`EXPO_PUBLIC_ANALYTICS_ENABLED` (read in `mobile/src/lib/analytics.ts`) defaults OFF. Only `1/true/yes/on` enables it. When off nothing is queued, stored or sent. To turn on: set the variable in `mobile/.env` / EAS env for the next build (needs a new app build; never from fastlane without approval) and make sure `DYNASTYGM_LAUNCH_ANALYTICS=1` on the API. Events are batched (25 per flush), flushed every 30 s and on background, kept in a persisted queue (200 max, 3-day expiry), and every failure is swallowed.
+`EXPO_PUBLIC_ANALYTICS_ENABLED` (read in `mobile/src/lib/analytics.ts`) defaults ON (absent/blank => on); only `0/false/no/off` disables it. It previously defaulted OFF and the release env never set it, so builds 56-58 sent no analytics. When off nothing is queued, stored or sent. The fastlane release env guard prints a warning if a release build explicitly disables it. Takes effect in the next app build; make sure `DYNASTYGM_LAUNCH_ANALYTICS=1` on the API. Events are batched (25 per flush), flushed every 30 s and on background, kept in a persisted queue (200 max, 3-day expiry), and every failure is swallowed.
 
 ## Recommendations
 
@@ -76,9 +76,13 @@ Legal copy today (`modules/legal_pages.py`, `mobile/src/data/legalContent.json`,
 
 ## 2026-10-24 pipeline audit fixes
 
-- Ingest rate limit: `POST /v1/analytics/event` had shared the 20/min "mutating" bucket with real writes (429s dropped events and could fail trade analysis). It now has its own `analytics` bucket (`RATE_LIMIT_ANALYTICS_MAX`, default 240/min). Mobile now keeps 429s queued instead of dropping them.
+- Ingest rate limit: `POST /v1/analytics/event` (and its alias `POST /v1/e`) had shared the 20/min "mutating" bucket with real writes (429s dropped events and could fail trade analysis). It now has its own `analytics` bucket (`RATE_LIMIT_ANALYTICS_MAX`, default 240/min). Mobile now keeps 429s queued instead of dropping them.
 - Mobile sanitizer dropped `step`, `step_index`, `experience` (and `os_result`) on every onboarding / push pre-prompt event; added to mobile and backend allowlists. Mobile onboarding rows written before this build have no step data and cannot be recovered.
 - Founder report: Supabase reads are paginated (PostgREST caps one response at 1000 rows, so the report used the OLDEST 1000 rows of the window); rows stamped `environment=test` are excluded; onboarding users are stitched anon_id -> account key; legacy 10-step ids are returned in `onboarding_funnel.legacy_steps` instead of being merged into `steps`; completed/skipped users without a stored `step_viewed` are in the rate denominator.
 - Web paywall step index now derives from `ONBOARDING_STEP_KEYS.length` (was a stale 10).
 - `trial_started` / `subscribed` / `churned` / `feature_use trial` are derived in the report from `billing_webhook_events` (Stripe rows; RevenueCat is summarized in `billing_lifecycle` only because the table has no platform). Web checkout return (`?billing=success|complete`) emits `feature_use billing/checkout_return`.
 - Supabase event write retries once on transport error / 5xx / 429.
+
+## Ingest URL alias (ad-blockers)
+
+`/analytics/` in a URL is a common ad-blocker filter pattern, so web events were likely blocked for some users. Web and mobile now post to `POST /v1/e`, handled by the same function as the legacy `POST /v1/analytics/event` (kept for already-shipped builds), with the same optional-bearer auth and the same `analytics` rate-limit bucket.

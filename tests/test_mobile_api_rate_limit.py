@@ -258,3 +258,18 @@ def test_analytics_ingest_has_its_own_budget_and_spares_mutating_tier(monkeypatc
     # analytics traffic never consumed the mutating budget
     other = client.post("/v1/preferences", json={})
     assert other.status_code != 429
+
+
+def test_analytics_alias_path_shares_the_analytics_budget(monkeypatch):
+    client, mobile_api_service = _client(monkeypatch)
+    _force_rate_limiting(
+        monkeypatch,
+        mobile_api_service,
+        RATE_LIMIT_MUTATING_MAX=2,
+        RATE_LIMIT_ANALYTICS_MAX=4,
+    )
+    body = {"event": "page_view", "anon_id": "anon_x", "props": {"route": "/x"}}
+    for path in ("/v1/e", "/v1/analytics/event", "/v1/e", "/v1/analytics/event"):
+        assert client.post(path, json=body).status_code == 200
+    assert client.post("/v1/e", json=body).status_code == 429
+    assert client.post("/v1/analytics/event", json=body).status_code == 429

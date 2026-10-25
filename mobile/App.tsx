@@ -58,7 +58,7 @@ export default function App() {
   useEffect(() => {
     configureRevenueCat();
     void initAds();
-    // No-op unless the build sets EXPO_PUBLIC_ANALYTICS_ENABLED=1 (ships dark).
+    // No-op only when the build sets EXPO_PUBLIC_ANALYTICS_ENABLED=0.
     const stopAnalytics = startAnalytics();
     const stopNotificationTap = registerNotificationTapHandler();
     return () => {

@@ -4,7 +4,7 @@
  * AsyncStorage / fetch / AppState / Supabase dependencies.
  *
  * Same wire format as web-next/src/lib/analytics.ts and the same backend
- * ingest (`POST /v1/analytics/event`, modules.launch_analytics): events are
+ * ingest (`POST /v1/e`, modules.launch_analytics): events are
  * `{event, props, anon_id}`; generic feature interactions are the
  * `feature_use` event with `feature` / `action` / optional `tier` props, and a
  * `platform` prop ("ios" | "android") so the founder dashboard can split and
@@ -80,9 +80,13 @@ const ALLOWED_PROP_KEYS = new Set([
   'league_id', // hashed server-side into league_key, never stored raw
 ]);
 
-/** Parse the EXPO_PUBLIC_ANALYTICS_ENABLED flag. Absent/unknown => OFF. */
+/**
+ * Parse the EXPO_PUBLIC_ANALYTICS_ENABLED flag. Absent/blank/unknown => ON;
+ * only an explicit 0/false/no/off disables. (It used to default OFF, and the
+ * release env never set it, so shipped builds sent nothing.)
+ */
 export function parseAnalyticsFlag(value: string | undefined | null): boolean {
-  return ['1', 'true', 'yes', 'on'].includes(String(value ?? '').trim().toLowerCase());
+  return !['0', 'false', 'no', 'off'].includes(String(value ?? '').trim().toLowerCase());
 }
 
 export function sanitizeProps(

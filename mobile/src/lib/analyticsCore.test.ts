@@ -41,13 +41,17 @@ function make(opts: { enabled?: boolean; failSend?: boolean; storage?: ReturnTyp
   return { a, sent, state, storage };
 }
 
-test('parseAnalyticsFlag: defaults OFF, only explicit truthy values enable', () => {
-  assert.equal(parseAnalyticsFlag(undefined), false);
-  assert.equal(parseAnalyticsFlag(''), false);
-  assert.equal(parseAnalyticsFlag('0'), false);
-  assert.equal(parseAnalyticsFlag('maybe'), false);
+test('parseAnalyticsFlag: defaults ON, only explicit falsy values disable', () => {
+  assert.equal(parseAnalyticsFlag(undefined), true);
+  assert.equal(parseAnalyticsFlag(null), true);
+  assert.equal(parseAnalyticsFlag(''), true);
+  assert.equal(parseAnalyticsFlag('maybe'), true);
   assert.equal(parseAnalyticsFlag('1'), true);
   assert.equal(parseAnalyticsFlag(' TRUE '), true);
+  assert.equal(parseAnalyticsFlag('0'), false);
+  assert.equal(parseAnalyticsFlag(' False '), false);
+  assert.equal(parseAnalyticsFlag('off'), false);
+  assert.equal(parseAnalyticsFlag('NO'), false);
 });
 
 test('kill switch: disabled queues, stores and sends nothing', async () => {

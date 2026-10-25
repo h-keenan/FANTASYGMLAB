@@ -38,3 +38,9 @@ test('guard requires the vars env.ts throws on', () => {
     assert.ok(fastfile.includes(name), `${name} missing from REQUIRED_RELEASE_ENV`);
   }
 });
+
+test('guard warns when analytics is explicitly disabled in a release build', () => {
+  assert.match(fastfile, /EXPO_PUBLIC_ANALYTICS_ENABLED/);
+  assert.match(fastfile, /UI\.important\([^)]*NO product analytics/);
+  assert.ok(!/REQUIRED_RELEASE_ENV = %w\[[^\]]*ANALYTICS/.test(fastfile), 'analytics flag must not be required');
+});

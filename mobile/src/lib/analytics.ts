@@ -6,13 +6,12 @@ import { env } from './env';
 import { supabase } from './supabase';
 
 /**
- * Mobile product analytics -> the existing `POST /v1/analytics/event`
+ * Mobile product analytics -> the existing `POST /v1/e` (neutral alias of /v1/analytics/event)
  * ingest (same pipeline and taxonomy as web-next/src/lib/analytics.ts).
  *
- * KILL SWITCH: ships DARK. Analytics is OFF unless the build sets
- * EXPO_PUBLIC_ANALYTICS_ENABLED=1 (see docs/analytics-coverage-2026-10.md).
- * Turning it on needs a new app build and, before that, the owner's sign-off
- * on the App Store "Data collection" answers.
+ * KILL SWITCH: ON by default. Only an explicit
+ * EXPO_PUBLIC_ANALYTICS_ENABLED=0/false/off at build time disables it (see
+ * docs/analytics-coverage-2026-10.md).
  */
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -29,7 +28,7 @@ async function send(event: AnalyticsEvent): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(`${env.apiBaseUrl}/v1/analytics/event`, {
+    const response = await fetch(`${env.apiBaseUrl}/v1/e`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

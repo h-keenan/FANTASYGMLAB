@@ -31,6 +31,10 @@ def ensure_release_env
   missing = REQUIRED_RELEASE_ENV.select do |name|
     (ENV[name] || file_vars[name]).to_s.strip.empty?
   end
+  analytics = (ENV["EXPO_PUBLIC_ANALYTICS_ENABLED"] || file_vars["EXPO_PUBLIC_ANALYTICS_ENABLED"]).to_s.strip.downcase
+  if %w[0 false no off].include?(analytics)
+    UI.important("EXPO_PUBLIC_ANALYTICS_ENABLED=#{analytics}: this release build will send NO product analytics (default is ON when unset).")
+  end
   return if missing.empty?
   UI.user_error!(
     "Refusing to build: #{missing.join(', ')} not set (no #{env_path} here and not in the environment). " \
