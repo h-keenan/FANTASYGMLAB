@@ -8,7 +8,7 @@ import { loadStripeConfig, loadSupabaseConfig, TIER_PRO, MONTHLY } from "../_sha
 import { corsHeaders, Deps } from "../_shared/deps.ts";
 import { createCheckoutSession, trialEligible } from "../_shared/stripe_api.ts";
 import { fetchBillingProfile, verifyUserJwt } from "../_shared/supabase_rest.ts";
-import { errorResponse, HttpError, isObj, jsonResponse, st } from "../_shared/util.ts";
+import { ACCOUNT_REQUIRED_CODE, ACCOUNT_REQUIRED_MESSAGE, errorResponse, HttpError, isObj, jsonResponse, st } from "../_shared/util.ts";
 
 export async function handle(req: Request, deps: Deps): Promise<Response> {
   const cors = corsHeaders(deps.env, req.headers.get("origin"));
@@ -20,6 +20,9 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   try {
     if (!supabase.url || !supabase.serviceRoleKey) throw new HttpError(500, "Supabase is not configured.");
     const user = await verifyUserJwt(supabase, deps.fetch, req.headers.get("authorization") ?? "");
+    // Guests (GoTrue is_anonymous) may not buy: a purchase would be tied to a throwaway
+    // user id. Reject before any trial lookup or Stripe call.
+    if (user.isAnonymous) throw new HttpError(403, ACCOUNT_REQUIRED_MESSAGE, ACCOUNT_REQUIRED_CODE);
 
     let body: Record<string, unknown> = {};
     try {
@@ -60,7 +63,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     if (!url) return errorResponse(502, "Could not start checkout.", cors);
     return jsonResponse({ ok: true, checkout_url: url, trial_days: trialOk ? config.trialDays : 0 }, 200, cors);
   } catch (e) {
-    if (e instanceof HttpError) return errorResponse(e.status, e.message, cors);
+    if (e instanceof HttpError) return errorResponse(e.status, e.message, cors, e.code);
     console.error("create-checkout-session failed", (e as Error).message);
     return errorResponse(502, "Could not start checkout.", cors);
   }

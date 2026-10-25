@@ -3,6 +3,8 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/context/AuthContext";
+import { TrialAccountGate, isAccountRequiredError } from "@/components/TrialAccountGate";
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel } from "@/lib/trialCopy";
 import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
@@ -28,6 +30,9 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { isGuest } = useAuth();
+  // Also set when the server says account_required (stale/out-of-sync guest state).
+  const [accountRequired, setAccountRequired] = useState(false);
 
   const subscribe = async () => {
     setBusy(true);
@@ -37,6 +42,10 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
       if (!result.client_secret) throw new Error("Could not start checkout.");
       setClientSecret(result.client_secret);
     } catch (err) {
+      if (isAccountRequiredError(err)) {
+        setAccountRequired(true);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Could not start checkout.");
     } finally {
       setBusy(false);
@@ -50,15 +59,19 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
           {error}
         </p>
       ) : null}
-      <Button
-        variant="premium"
-        type="button"
-        onClick={subscribe}
-        loading={busy}
-        style={{ alignSelf: "auto" }}
-      >
-        {busy ? "Starting…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
-      </Button>
+      {isGuest || accountRequired ? (
+        <TrialAccountGate onSignedIn={() => setAccountRequired(false)} />
+      ) : (
+        <Button
+          variant="premium"
+          type="button"
+          onClick={subscribe}
+          loading={busy}
+          style={{ alignSelf: "auto" }}
+        >
+          {busy ? "Starting…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
+        </Button>
+      )}
       <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
         {trialDays > 0 ? thenPriceLine(plan) : `${plan.price} ${plan.cadence}. Cancel anytime.`}
       </p>

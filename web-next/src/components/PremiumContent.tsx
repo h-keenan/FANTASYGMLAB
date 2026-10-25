@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 
 import { trackFeatureUse } from "@/lib/analytics";
 
+import { useAuth } from "@/context/AuthContext";
+import { TrialAccountGate, isAccountRequiredError } from "@/components/TrialAccountGate";
 import { api, type BillingPlan, type BillingTrial } from "@/lib/api";
 import { activeTrialDays, thenPriceLine, trialCtaLabel, trialEndLabel } from "@/lib/trialCopy";
 import dynamic from "next/dynamic";
@@ -35,6 +37,9 @@ export function PlanCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { isGuest } = useAuth();
+  // Also set when the server says account_required (stale/out-of-sync guest state).
+  const [accountRequired, setAccountRequired] = useState(false);
 
   // Zach, 2026-10-19: "We need to try to embed stripe so theres not a
   // million redirectes" — mounts Stripe's own Checkout UI in place
@@ -53,6 +58,10 @@ export function PlanCard({
       trackFeatureUse("checkout_started", { dedupe: false, props: { tier: plan.tier, interval: plan.interval } });
       setClientSecret(result.client_secret);
     } catch (err) {
+      if (isAccountRequiredError(err)) {
+        setAccountRequired(true);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Could not start checkout.");
     } finally {
       setBusy(false);
@@ -92,14 +101,18 @@ export function PlanCard({
           {error}
         </p>
       ) : null}
-      <Button
-        variant="premium"
-        type="button"
-        onClick={subscribe}
-        loading={busy}
-      >
-        {busy ? "Starting checkout…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
-      </Button>
+      {isGuest || accountRequired ? (
+        <TrialAccountGate onSignedIn={() => setAccountRequired(false)} />
+      ) : (
+        <Button
+          variant="premium"
+          type="button"
+          onClick={subscribe}
+          loading={busy}
+        >
+          {busy ? "Starting checkout…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
+        </Button>
+      )}
       {trialDays > 0 ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {thenPriceLine(plan)}

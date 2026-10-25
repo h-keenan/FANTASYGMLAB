@@ -14,10 +14,13 @@ import { billingRequest, type BillingFunction } from "./billingClient";
  */
 export class ApiError extends Error {
   status: number;
+  /** Stable machine code from the server when present (e.g. "account_required"). */
+  code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    if (code) this.code = code;
   }
 }
 

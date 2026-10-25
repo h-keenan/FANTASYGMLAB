@@ -2,7 +2,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PremiumContent } from "./PremiumContent";
-import { api, type BillingPlan } from "@/lib/api";
+import { ApiError, api, type BillingPlan } from "@/lib/api";
+
+const authState = vi.hoisted(() => ({ isGuest: false }));
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({
+    isGuest: authState.isGuest,
+    session: null,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signInWithOAuth: vi.fn(),
+  }),
+}));
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -83,6 +94,30 @@ describe("PremiumContent", () => {
 
     expect(await screen.findByLabelText("Close checkout")).toBeInTheDocument();
     expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", undefined, "embedded");
+  });
+
+  it("guest sees account-required gate instead of a checkout button and never calls checkout", () => {
+    authState.isGuest = true;
+    try {
+      render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
+      expect(screen.getAllByText("Create an account to start your free trial.").length).toBeGreaterThan(0);
+      expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+      fireEvent.click(screen.getAllByRole("button", { name: "Create account" })[0]);
+      expect(screen.getAllByLabelText("Continue with Google").length).toBeGreaterThan(0);
+      expect(api.startBillingCheckout).not.toHaveBeenCalled();
+    } finally {
+      authState.isGuest = false;
+    }
+  });
+
+  it("handles a server account_required error defensively by showing the gate", async () => {
+    vi.mocked(api.startBillingCheckout).mockRejectedValue(
+      new ApiError(403, "Create an account to start your free trial.", "account_required"),
+    );
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
+    expect((await screen.findAllByText("Create an account to start your free trial.")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("shows an error instead of redirecting when checkout fails to start", async () => {
