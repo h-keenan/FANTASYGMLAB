@@ -12,6 +12,7 @@ import {
   PLAYER_PATH,
   POSITION_NAMES,
   RANKINGS_PATH,
+  OG_IMAGE,
 } from "@/lib/seo/site";
 import { assignSlugs, findPlayerBySlug } from "@/lib/seo/slug";
 
@@ -47,8 +48,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: "article", siteName: "FantasyDesk" },
-    twitter: { card: "summary", title, description },
+    openGraph: { title, description, url, type: "article", siteName: "FantasyDesk", images: [OG_IMAGE] },
+    twitter: { card: "summary_large_image", title, description, images: [OG_IMAGE.url] },
   };
 }
 

@@ -211,7 +211,7 @@ describe("LandingPage welcome-page analytics", () => {
 
     // The marketing content is server-rendered and present regardless; only
     // the auth island's slot is held back until auth resolves.
-    expect(screen.getByRole("heading", { name: /Your fantasy front office/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Get the trade your leaguemate would actually accept/ })).toBeInTheDocument();
     expect(screen.queryByText("SignInForm")).toBeNull();
     expect(trackFeatureUse).not.toHaveBeenCalled();
   });
@@ -284,7 +284,17 @@ describe("LandingPage hero subtitle", () => {
   it("is not hidden on phone widths", () => {
     mockAuth(null, false);
     render(<LandingPage />);
-    const sub = screen.getByText(/Real recommendations across your Game Plan/);
+    const sub = screen.getByText(/Roster-aware dynasty trades, waivers and a weekly Game Plan/);
     expect(sub.className).not.toMatch(/\bhidden\b/);
+  });
+});
+
+describe("LandingPage hero CTA", () => {
+  it("leads with the sample league as the primary CTA (value before the account wall)", () => {
+    vi.mocked(useAuth).mockReturnValue({ session: null, loading: false } as unknown as ReturnType<typeof useAuth>);
+    render(<LandingPage />);
+    const cta = screen.getByTestId("sample-league-button");
+    expect(cta).toHaveAttribute("href", "/sample-league");
+    expect(cta).toHaveTextContent("Try a sample league");
   });
 });

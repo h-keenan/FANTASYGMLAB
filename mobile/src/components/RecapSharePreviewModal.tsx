@@ -10,6 +10,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import RecapShareCard, { CARD_HEIGHT, CARD_WIDTH, type RecapRosterMap } from './RecapShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
+import { shareLink } from '../lib/shareLinks';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -58,7 +59,7 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
       '',
       'Recapped with FantasyDesk',
     ].filter(Boolean);
-    Share.share({ message: lines.join('\n') }).catch(() => {});
+    Share.share({ message: [...lines, '', shareLink('recap')].join('\n') }).catch(() => {});
   };
 
   return (

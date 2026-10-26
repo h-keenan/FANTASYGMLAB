@@ -40,16 +40,24 @@ export default function LandingPage() {
         <div className="onboarding-field" aria-hidden="true" />
         <div className="onboarding-sweep" aria-hidden="true" />
         <div className="landing-grid">
-          {/* Hero copy. The H1 is the coridian_-approved product line (do not
-              rephrase without product). The sub line names features by their
-              current names (Game Plan, not the retired "Next Move"). */}
+          {/* Hero copy. 2026-10-26 (marketing pass, Zach): leads with the real
+              differentiator, the roster-aware trade verdict, instead of the
+              "front office" metaphor (kept as brand flavour in the sub line).
+              No superlatives or unverifiable claims. The primary CTA is the
+              sample league so value shows before any account wall; guests
+              cannot buy, so nothing here can start a purchase. */}
           <div className="landing-hero flex flex-col gap-2">
-            <h1 style={{ font: "var(--font-page-title)" }}>Your fantasy front office, not just a stats app.</h1>
+            <h1 style={{ font: "var(--font-page-title)" }}>
+              Paste your Sleeper username. Get the trade your leaguemate would actually accept.
+            </h1>
             <p className="text-sm md:text-base" style={{ color: "var(--color-text-secondary)" }}>
-              Real recommendations across your Game Plan, Trade Hub and Waivers, not raw data you have to interpret
-              yourself.
+              Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front
+              office would.
             </p>
-            <SampleLeagueButton surface="landing_hero" fullWidth={false} />
+            <SampleLeagueButton surface="landing_hero" variant="primary" fullWidth={false} />
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Free to start, no card. Look around a sample league first, then connect your own.
+            </p>
           </div>
 
           {/* Real screenshots (sample league data) lead the page. */}

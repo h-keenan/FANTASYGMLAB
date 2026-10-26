@@ -253,6 +253,8 @@ export interface SleeperLeaguesResponse {
   username: string;
   leagues: SleeperLeagueSummary[];
   message: string;
+  /** Present only when a pending ?ref= code was sent with the lookup. */
+  referral?: unknown;
 }
 
 export interface SaveLeagueResponse {
@@ -3353,9 +3355,13 @@ export const api = {
   openBillingPortal: () =>
     authorizedBillingRequest<BillingPortalResponse>("billing-portal-session", { method: "POST" }),
 
-  lookupSleeperLeagues: (username: string) =>
+  /** `referralCode`: the visitor's captured ?ref= invite code; the server
+   * credits the referrer when the username resolves (see lib/attribution.ts). */
+  lookupSleeperLeagues: (username: string, referralCode?: string) =>
     authorizedRequest<SleeperLeaguesResponse>(
-      `/v1/sleeper/leagues?username=${encodeURIComponent(username)}`,
+      `/v1/sleeper/leagues?username=${encodeURIComponent(username)}${
+        referralCode ? `&referral_code=${encodeURIComponent(referralCode)}` : ""
+      }`,
     ),
 
   saveLeague: (input: {

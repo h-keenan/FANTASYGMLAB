@@ -11,6 +11,10 @@ from io import BytesIO
 from modules import brand_identity
 
 CANONICAL_SHARE_URL = brand_identity.PRODUCT_URL  # https://fantasygmlab.com
+# What the QR actually encodes: the same public site, tagged so scans show up
+# as utm_source=share in first-party landing analytics. Keep in lockstep with
+# web-next/public/share-card/qr-site.png and mobile ShareCardChrome's SHARE_QR_URL.
+SHARE_QR_TRACKED_URL = f"{CANONICAL_SHARE_URL}/?utm_source=share&utm_medium=qr&utm_campaign=share_card"
 QR_LABEL = "Scan to try FantasyDesk"
 RENDER_VERSION = 1
 
@@ -36,8 +40,8 @@ def share_qr_png_bytes(
             "Install qrcode[pil] via requirements.txt."
         ) from exc
 
-    target = (url or CANONICAL_SHARE_URL).strip()
-    if target != CANONICAL_SHARE_URL:
+    target = (url or SHARE_QR_TRACKED_URL).strip()
+    if target not in {CANONICAL_SHARE_URL, SHARE_QR_TRACKED_URL}:
         raise ValueError("Share-card QR must encode the canonical public site URL.")
 
     qr = qrcode.QRCode(
@@ -57,4 +61,4 @@ def share_qr_png_bytes(
 def qr_payload_for_tests() -> str:
     """The exact string encoded into every share-card QR."""
 
-    return CANONICAL_SHARE_URL
+    return SHARE_QR_TRACKED_URL

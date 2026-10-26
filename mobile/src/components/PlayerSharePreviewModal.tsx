@@ -11,6 +11,7 @@ import type { UsageTrend } from '../lib/api';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import PlayerShareCard, { CARD_HEIGHT, CARD_WIDTH } from './PlayerShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
+import { shareLink } from '../lib/shareLinks';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -102,7 +103,7 @@ export default function PlayerSharePreviewModal({
       '',
       'Analyzed with FantasyDesk',
     ].filter(Boolean);
-    Share.share({ message: lines.join('\n') }).catch(() => {});
+    Share.share({ message: [...lines, '', shareLink('player')].join('\n') }).catch(() => {});
   };
 
   return (

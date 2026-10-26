@@ -7,7 +7,9 @@ import { colors, radii, spacing } from '../theme';
 
 const CARD_WIDTH = 360;
 const CARD_HEIGHT = 540;
-const SHARE_QR_URL = 'https://fantasygmlab.com';
+// Tagged so scans show up as utm_source=share on the landing page (same URL as
+// modules/share_card_qr.py's SHARE_QR_TRACKED_URL and web's qr-site.png).
+const SHARE_QR_URL = 'https://fantasygmlab.com/?utm_source=share&utm_medium=qr&utm_campaign=share_card';
 const SHARE_DOMAIN = 'fantasygmlab.com';
 const QR_SIZE = 52;
 /** assets/share-lockup-white.png is web-next's public/share-card/lockup-white.png

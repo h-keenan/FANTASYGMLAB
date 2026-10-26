@@ -27,3 +27,12 @@ export const RANKINGS_PATH = (position: SeoPosition) => `/dynasty-rankings/${pos
 export const CHART_PATH = "/dynasty-trade-value-chart";
 export const HUB_PATH = "/dynasty-tools";
 export const PLAYER_PATH = (slug: string) => `/dynasty-players/${slug}`;
+
+/** Shared 1200x630 share-preview card (public/og-image.png) for the root
+ * layout and every public SEO page; absolute so no metadataBase is needed. */
+export const OG_IMAGE = {
+  url: "https://app.fantasygmlab.com/og-image.png",
+  width: 1200,
+  height: 630,
+  alt: "FantasyDesk: the trade your leaguemate would actually accept",
+};
