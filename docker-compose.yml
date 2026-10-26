@@ -216,6 +216,9 @@ services:
     command: ["npm", "run", "start"]
     environment:
       PORT: "8080"
+      # Server-side only (SEO pages): reach the API over the Docker network
+      # at runtime, not through the public URL baked into the browser bundle.
+      API_INTERNAL_URL: "http://mobile-api:8080"
     env_file:
       - .env
     # web-next calls services/mobile_api_service.py entirely from the
