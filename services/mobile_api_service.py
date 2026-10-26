@@ -236,6 +236,7 @@ from modules import (
 )
 from modules import public_dynasty_values
 from modules import external_news_contract
+from modules import external_news_feed, news_identity, news_ingest
 from modules import this_week
 from modules import team_defense
 from modules import idp_scoring
@@ -4813,7 +4814,11 @@ def get_news(
 
     news_cache.schedule_news_cache_refresh()
     items = news_cache.general_news_feed(limit)
-    return {"ok": True, "items": [_project_general_news_item(item) for item in items]}
+    return {
+        "ok": True,
+        "items": [_project_general_news_item(item) for item in items],
+        "status": news_cache.news_feed_status(),
+    }
 
 
 MAX_PLAYER_NEWS_LIMIT = 10
@@ -7981,6 +7986,18 @@ def get_external_week_projections(
 # ---------------------------------------------------------------------------
 
 
+def _external_news_players_frame() -> Any:
+    """Players table for the external news routes, opened read-only.
+
+    Deliberately NOT ``rankings.load_players`` / ``build_players_table``,
+    which can write back to the real ``data/players.db`` from inside a
+    request. An empty frame means "players table unavailable" and callers
+    degrade honestly.
+    """
+
+    return news_identity.read_players_frame(PLAYERS_DB_PATH)
+
+
 def _external_news_payload(
     player_id: str,
     group: Mapping[str, Any],
@@ -8070,10 +8087,12 @@ def get_external_player_news(
     if not 1 <= limit <= MAX_PLAYER_NEWS_LIMIT:
         raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_PLAYER_NEWS_LIMIT}.")
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    row_matches = players_df[players_df["player_id"] == player_id] if not players_df.empty else players_df
+    players_df = _external_news_players_frame()
+    row_matches = (
+        players_df[players_df["player_id"].astype(str) == str(player_id)]
+        if not players_df.empty and "player_id" in players_df.columns
+        else players_df
+    )
     player_name = str(row_matches.iloc[0].get("name") or "").strip() if not row_matches.empty else ""
     if not player_name:
         return {"ok": True, "player_id": str(player_id), "items": []}
@@ -8084,7 +8103,7 @@ def get_external_player_news(
         item
         for item in enriched
         if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS
-        and news_signal.contains_phrase(news_signal.article_text(item), player_name)
+        and news_identity.article_names_player(item, str(player_id), player_name, players_df)
     ]
 
     groups = news_intelligence.group_player_events_by_identity(
@@ -8115,6 +8134,38 @@ def get_external_player_news(
         for group in groups[:limit]
     ]
     return {"ok": True, "player_id": str(player_id), "items": items}
+
+
+@app.get(
+    "/v1/external/news",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_news_feed(
+    cursor: str | None = None,
+    since: str | None = None,
+    limit: int = external_news_feed.DEFAULT_LIMIT,
+) -> dict[str, Any]:
+    """Cursor feed of ingested NFL headlines for the content bot
+    (docs/external-api-contract.md, "News feed"). Reads the store written by
+    the scheduled ingest (scripts/ingest_news.py); never fetches from the
+    network and never writes. Use ``next_cursor`` from the previous response
+    as ``cursor``; ``since`` (ISO-8601 or epoch seconds) is only for the
+    first call and defaults to the last 24 hours.
+    """
+
+    if not 1 <= limit <= external_news_feed.MAX_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {external_news_feed.MAX_LIMIT}.")
+    try:
+        external_news_feed.decode_cursor(cursor)
+        external_news_feed.parse_since(since)
+    except external_news_feed.CursorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    store = news_ingest.open_store(use_cache=True)
+    players_df, index = news_identity.load_index(PLAYERS_DB_PATH)
+    return external_news_feed.build_feed(
+        store, players_df=players_df, index=index, cursor=cursor, since=since, limit=limit
+    )
 
 
 # ---------------------------------------------------------------------------

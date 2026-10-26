@@ -106,8 +106,11 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Tuple
+
+import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -145,6 +148,74 @@ COMMIT_MESSAGE_NOTE = (
     "the status/injury_status columns of existing data/players.db rows "
     "from Sleeper's live player feed -- not a full players.db rebuild."
 )
+
+
+# Zero-patch alarm. A run that patches 0 rows is normal on a quiet day, but on
+# a game day (Thu/Sat/Sun/Mon in season) Sleeper changes designations
+# constantly, so a long stretch of zero-patch runs means the sync is reading a
+# stale/poisoned dump or Sleeper stopped updating (it sat at "patched 0 of N"
+# for days unnoticed). The job is stateless across runs, so the streak is
+# measured as time since the last injury-sync commit on the repo: at the 30
+# minute cadence, 12 hours is 24 consecutive zero-patch runs.
+ZERO_PATCH_MAX_HOURS_ENV = "INJURY_SYNC_ZERO_PATCH_MAX_HOURS"
+ZERO_PATCH_MAX_HOURS_DEFAULT = 12.0
+GAME_DAY_WEEKDAYS_UTC = (0, 3, 5, 6)  # Mon, Thu, Sat, Sun
+SEASON_MONTHS = (9, 10, 11, 12, 1)  # Sep through Jan (playoffs); Feb excluded
+EXIT_ZERO_PATCH_ALARM = 3
+
+
+def is_game_day(now: datetime) -> bool:
+    now = now.astimezone(timezone.utc)
+    return now.month in SEASON_MONTHS and now.weekday() in GAME_DAY_WEEKDAYS_UTC
+
+
+def evaluate_zero_patch(
+    *, updated: int, now: datetime, last_patch_ts: float | None, max_hours: float
+) -> tuple[bool, str]:
+    """(alarm, message). Alarm only when this run patched 0 rows on a game day
+    and the last injury-sync commit is older than ``max_hours``. Unknown last
+    commit (API unavailable) warns but never fails the job."""
+
+    if updated > 0:
+        return False, ""
+    if not is_game_day(now):
+        return False, "zero rows patched; not a game day, no alarm"
+    if last_patch_ts is None:
+        return False, "zero rows patched on a game day; last injury-sync commit time unknown, cannot evaluate alarm"
+    hours = (now.timestamp() - last_patch_ts) / 3600.0
+    if hours >= max_hours:
+        return True, (
+            f"ALARM: 0 rows patched on a game day and the last injury-sync commit was {hours:.1f}h ago "
+            f"(threshold {max_hours:g}h, about {int(max_hours * 2)} consecutive 30-minute runs). "
+            "Sleeper data or the sync is stale."
+        )
+    return False, f"zero rows patched on a game day; last injury-sync commit {hours:.1f}h ago (< {max_hours:g}h)"
+
+
+def last_injury_patch_commit_ts(repo_slug: str, token: str | None) -> float | None:
+    """Committer time of the newest injury-sync commit touching players.db via
+    the GitHub API; None when it cannot be determined."""
+
+    try:
+        resp = requests.get(
+            f"https://api.github.com/repos/{repo_slug}/commits",
+            params={"path": "data/players.db", "per_page": 100},
+            headers={
+                "Accept": "application/vnd.github+json",
+                **({"Authorization": f"Bearer {token}"} if token else {}),
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        for commit in resp.json():
+            message = str(((commit.get("commit") or {}).get("message")) or "")
+            if message.startswith(COMMIT_MESSAGE_SUBJECT):
+                date = ((commit.get("commit") or {}).get("committer") or {}).get("date")
+                return datetime.fromisoformat(str(date).replace("Z", "+00:00")).timestamp()
+        return None
+    except Exception as exc:  # noqa: BLE001
+        print(f"could not read injury-sync commit history: {exc}", file=sys.stderr)
+        return None
 
 
 def patch_injury_columns(db_path: Path, players: Dict[str, Any]) -> Tuple[int, int]:
@@ -245,12 +316,10 @@ def default_patch_runner(db_path: Path) -> int:
     injury data).
     """
 
-    # refresh=False: Sleeper's own 5-minute disk cache (modules.sleeper.
-    # PLAYERS_CACHE_TTL_SECONDS) already comfortably covers this cron's own
-    # 30-minute cadence, so a run that lands within 5 minutes of another
-    # consumer's fetch (e.g. the full rebuild cron, or the live app) reuses
-    # that fetch instead of hitting Sleeper again.
-    players = sleeper.get_players(refresh=False)
+    # refresh=True: the committed data/sleeper_players.json is freshly
+    # checked out (mtime = now), so refresh=False treated a stale committed
+    # dump as a fresh 5-minute cache and the sync silently patched 0 rows.
+    players = sleeper.get_players(refresh=True)
     if not players:
         print(
             "modules.sleeper.get_players() returned no data; leaving "
@@ -264,6 +333,24 @@ def default_patch_runner(db_path: Path) -> int:
         f"examined {examined} local players.db rows; "
         f"patched status/injury_status on {updated} of them"
     )
+    if updated == 0:
+        now = datetime.now(timezone.utc)
+        max_hours = float(os.environ.get(ZERO_PATCH_MAX_HOURS_ENV, ZERO_PATCH_MAX_HOURS_DEFAULT))
+        last_ts = (
+            last_injury_patch_commit_ts(
+                os.environ.get("GITHUB_REPO_SLUG", DEFAULT_REPO_SLUG).strip(),
+                os.environ.get("GITHUB_PUSH_TOKEN", "").strip() or None,
+            )
+            if is_game_day(now)
+            else None
+        )
+        alarm, message = evaluate_zero_patch(
+            updated=updated, now=now, last_patch_ts=last_ts, max_hours=max_hours
+        )
+        if message:
+            print(message, file=sys.stderr if alarm else sys.stdout)
+        if alarm:
+            return EXIT_ZERO_PATCH_ALARM
     return 0
 
 

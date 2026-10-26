@@ -101,3 +101,7 @@ settings.local.json
 # Cross-process refresh lock for data/sleeper_players.json (modules/sleeper.py)
 data/*.lock
 data/news_value_events.json
+
+# Runtime news caches/stores (written by modules.news / modules.news_ingest; never committed seeds)
+data/news_cache.json
+data/news_items.json

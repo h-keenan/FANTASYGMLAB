@@ -6041,7 +6041,7 @@ def test_external_player_news_returns_full_field_shape_for_normal_item(monkeypat
     ]
 
     news_module.clear_enriched_news_pool_cache()
-    with patch("modules.rankings.load_players", return_value=players_frame):
+    with patch("services.mobile_api_service._external_news_players_frame", return_value=players_frame):
         with patch("modules.news.schedule_news_cache_refresh", return_value=False):
             with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
                 response = client.get(
@@ -6081,7 +6081,7 @@ def test_external_player_news_unknown_player_returns_empty_items(monkeypatch):
     client = TestClient(mobile_api_service.app)
 
     players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
-    with patch("modules.rankings.load_players", return_value=players_frame):
+    with patch("services.mobile_api_service._external_news_players_frame", return_value=players_frame):
         response = client.get(
             "/v1/external/players/does-not-exist/news",
             headers={"Authorization": "Bearer the-real-secret-key"},
@@ -6131,7 +6131,7 @@ def test_external_player_news_supersession_fires_for_recovery_not_for_escalation
         },
     ]
     news_module.clear_enriched_news_pool_cache()
-    with patch("modules.rankings.load_players", return_value=players_frame):
+    with patch("services.mobile_api_service._external_news_players_frame", return_value=players_frame):
         with patch("modules.news.schedule_news_cache_refresh", return_value=False):
             with patch("modules.news.load_cached_news_pool", return_value=recovery_pool):
                 response = client.get(
@@ -6163,7 +6163,7 @@ def test_external_player_news_supersession_fires_for_recovery_not_for_escalation
         },
     ]
     news_module.clear_enriched_news_pool_cache()
-    with patch("modules.rankings.load_players", return_value=players_frame):
+    with patch("services.mobile_api_service._external_news_players_frame", return_value=players_frame):
         with patch("modules.news.schedule_news_cache_refresh", return_value=False):
             with patch("modules.news.load_cached_news_pool", return_value=escalation_pool):
                 response = client.get(

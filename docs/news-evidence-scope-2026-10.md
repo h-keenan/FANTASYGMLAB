@@ -1,5 +1,15 @@
 # News evidence scope (2026-10-22)
 
+> **Status update 2026-10-26:** `modules/news_evidence.py` (the fetch-and-hash
+> `EvidenceFetcher`/`EvidenceStore`) was **deleted** in the Streamlit removal
+> (#1452) and is not in the tree. Sections 2 and 4 below describe it as it was
+> designed on 2026-10-22; treat those parts as history, not as shipped code.
+> Still in the tree: `modules/gsis_crosswalk.py` and the Sleeper-dump GSIS
+> lookup. The API never fetches or hashes an article document: provenance
+> `content_sha256`, `checked_at` and `excerpt` are always `null`. Restoring a
+> fetch step (from commit `f609b35c`) would need a source a human has recorded
+> as permitted; none exists. See `docs/external-api-contract.md`.
+
 Scope and findings for (A) a GSIS crosswalk and (B) a licensed fetch-and-hash
 evidence step for the automatic news pipeline. Everything implemented is OFF
 by default behind `DYNASTYGM_NEWS_EVIDENCE_FETCH` (unset/`0`). Production
@@ -31,9 +41,9 @@ step (single CSV, ~MBs, not committed) feeding the same
 | Allowlisted publishers (espn.com, cbssports.com, sports.yahoo.com, nbcsports.com, rotowire.com, profootballrumors.com) | Not reviewed for article pages | Not reviewed for body fetching; RSS headline use only | **NEEDS HUMAN REVIEW**, not fetched |
 | operations.nfl.com | n/a | No public API/data licence for injury reports or transactions found; a "Licensing" form exists for media | Contact NFL |
 
-The shipped registry (`modules/news_evidence.py::SOURCE_POLICIES`) therefore
-contains **no permitted source**. The fetcher is complete and tested but
-inert until a human records a terms review and flips a source to `permitted`.
+The registry that existed (`modules/news_evidence.py::SOURCE_POLICIES`, since
+deleted) contained **no permitted source**; no fetcher ships today. Any future
+fetcher must start from a human-recorded terms review per source.
 A source may only be set `permitted` together with `allow_excerpt` and
 `max_excerpt_chars` decisions; the default is no excerpt.
 
@@ -56,7 +66,7 @@ vendor. Nothing paid is wired up.
   `insufficient_identity_key`. `resolve_player_identity` takes an optional
   `gsis_crosswalk`; `/v1/external/players/{id}/news` passes one only when the
   flag is on (otherwise `None`, identical output to before).
-* `modules/news_evidence.py`: `EvidenceFetcher` (flag, https only, exact
+* (DELETED, historical design) `modules/news_evidence.py`: `EvidenceFetcher` (flag, https only, exact
   registry match, `permitted` only, robots.txt with fail-closed, per-host rate
   limit, 10 s timeout, identifying user-agent, 2 MB cap, text content types,
   no redirects), `content_sha256` of the exact bytes, `checked_at`,
@@ -70,9 +80,9 @@ vendor. Nothing paid is wired up.
   the prior revision is reported `superseded` / `retracted`, and retracted
   documents never support claims. Freshness uses the contract limits (general
   24 h/1 h, urgent availability 6 h/15 min) on the real `checked_at`.
-* Tests (offline, mocked HTTP): `tests/test_news_evidence.py`. All players,
-  hosts and article texts in them are synthetic and labelled so; no live data
-  and no `data/*.json` is committed.
+* Tests: `tests/test_news_evidence.py` now covers only the GSIS crosswalk and
+  the contract helpers (the fetcher tests went with the module). All players
+  in them are synthetic; no live data and no `data/*.json` is committed.
 
 ## 5. Remaining gaps
 
@@ -80,8 +90,10 @@ vendor. Nothing paid is wired up.
   in production and the API stays headline-only/review-only.
 * Sleeper-only GSIS coverage is ~19% of current skill players; the nflverse
   players file would fix it once its licence is confirmed.
-* The pipeline is not wired into the request path or a scheduler, and revision
-  history is in-memory (the caller persists it); `evaluate_claim` is
+* Article-level evidence is not implemented. Revision history for FEED text
+  (title/summary changes) is now persisted by the scheduled ingest
+  (`modules/news_ingest.py`, `docs/supabase_news_items.sql`), but that is not a
+  checked document; the deleted design's `evaluate_claim` is
   conservative keyword matching, not NLP, and `event_type` values it cannot
   verify (e.g. `STARTER_CHANGE`) are never marked supported.
 * The public API contract does not yet expose the overlay (`supported`,

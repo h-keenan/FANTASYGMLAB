@@ -22,7 +22,7 @@ def _get(pool, players_frame, player_id="9001"):
     client = TestClient(mobile_api_service.app)
     news_module.clear_enriched_news_pool_cache()
     try:
-        with patch("modules.rankings.load_players", return_value=players_frame):
+        with patch("services.mobile_api_service._external_news_players_frame", return_value=players_frame):
             with patch("modules.news.schedule_news_cache_refresh", return_value=False):
                 with patch("modules.news.load_cached_news_pool", return_value=pool):
                     return client.get(

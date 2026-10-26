@@ -441,12 +441,85 @@ def relevance_reason_for_google_path(text: str) -> str:
     return ", ".join(labels)
 
 
+_TITLE_OUTLET_SUFFIX_RE = re.compile(
+    r"\s*[\-\u2013\u2014|:]\s*(?:espn|cbs sports|cbssports\.com|yahoo sports|yahoo|rotowire|nbc sports|pro football talk|pft|"
+    r"pro football rumors|profootballrumors\.com|nfl\.com|the athletic|sports illustrated|bleacher report|fox sports)\s*$",
+    re.IGNORECASE,
+)
+_TITLE_STOPWORDS = frozenset(
+    "a an the of for to in on at by with and or is are was be as from after before into over its his her their this that "
+    "will has have had says said reportedly report reports per source sources nfl".split()
+)
+# Cross-outlet rewrites of one story arrive within hours of each other.
+NEAR_DUPLICATE_WINDOW_SECONDS = 36 * 3600
+_TRACKING_PARAM_PREFIXES = ("utm_", "fbclid", "gclid", "mc_", "ocid", "cmpid", "ftag", "taid", "partner")
+
+
+def normalize_title(title: Any) -> str:
+    """Headline reduced to its comparable core: outlet suffix stripped,
+    case/punctuation/whitespace folded. Used by every dedupe key so the same
+    headline with a different outlet tag or punctuation collides."""
+
+    text = str(title or "")
+    text = _TITLE_OUTLET_SUFFIX_RE.sub("", text.strip())
+    text = re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+    return text
+
+
+def title_tokens(title: Any) -> frozenset:
+    return frozenset(
+        token for token in normalize_title(title).split() if token and token not in _TITLE_STOPWORDS
+    )
+
+
+def tokens_near_duplicate(a: Any, b: Any) -> bool:
+    """True when two headline token sets describe the same story: heavy
+    overlap relative to the shorter headline and a non-trivial Jaccard.
+    Requires at least four content tokens on both sides so short generic
+    headlines never collapse."""
+
+    if len(a) < 4 or len(b) < 4:
+        return False
+    inter = len(a & b)
+    if not inter:
+        return False
+    return inter / min(len(a), len(b)) >= 0.8 and inter / len(a | b) >= 0.5
+
+
+def canonical_url(url: Any) -> str:
+    """Stable URL for identity: lowercase scheme/host (``www.`` dropped),
+    tracking params and fragment removed, trailing slash trimmed."""
+
+    from urllib.parse import parse_qsl, urlencode, urlsplit
+
+    raw = str(url or "").strip()
+    if not raw:
+        return ""
+    try:
+        parts = urlsplit(raw)
+    except ValueError:
+        return raw.lower()
+    host = (parts.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    query = [
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if not k.lower().startswith(_TRACKING_PARAM_PREFIXES)
+    ]
+    path = parts.path.rstrip("/")
+    out = f"{host}{path}"
+    if query:
+        out += "?" + urlencode(sorted(query))
+    return out.lower()
+
+
 def event_identity(item: Mapping[str, Any]) -> str:
     """Canonical identity for dedupe across syndicated URLs."""
 
     player = normalize_player_name(str(item.get("matched_player") or ""))
     reason = str(item.get("relevance_reason") or item.get("signal_primary_event") or "").lower()
-    title = re.sub(r"[^a-z0-9]+", " ", str(item.get("title") or "").lower()).strip()
+    title = normalize_title(item.get("title"))
     # Bucket by day so updated syndicated copies collide.
     try:
         ts = float(item.get("published_ts") or 0)

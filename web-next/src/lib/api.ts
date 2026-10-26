@@ -1549,9 +1549,17 @@ export interface NewsItem {
   matched_players?: [NewsPlayerIdentity, NewsPlayerIdentity];
 }
 
+export interface NewsFeedStatus {
+  /** ok | warming_up (nothing cached yet) | stale (nothing recent). */
+  state: "ok" | "warming_up" | "stale";
+  last_updated_ts: number;
+  message: string;
+}
+
 export interface NewsResponse {
   ok: boolean;
   items: NewsItem[];
+  status?: NewsFeedStatus;
 }
 
 /** One roster-relevant news item — mirrors mobile's AlertItem (mobile/src/

@@ -121,6 +121,14 @@ NEWS_REFRESH_STUCK_SECONDS = 180
 # that keeps failing shows an honest empty state instead of month-old items.
 GENERAL_NEWS_MAX_AGE_DAYS = 21
 
+# Honest, identifying agent for every outbound feed request (RSS etiquette:
+# say who is fetching and where to find them). Never impersonate a browser.
+NEWS_USER_AGENT = "FantasyDeskNewsBot/1.0 (+https://fantasydesk.app; RSS headline reader)"
+FEED_REQUEST_HEADERS = {
+    "User-Agent": NEWS_USER_AGENT,
+    "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+}
+
 
 def _parse_feed(feed_url: str):
     """Fetch a feed with a hard timeout, then parse the bytes.
@@ -133,7 +141,7 @@ def _parse_feed(feed_url: str):
     try:
         response = requests.get(
             feed_url,
-            headers={"User-Agent": "Mozilla/5.0"},
+            headers=dict(FEED_REQUEST_HEADERS),
             timeout=FEED_FETCH_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
@@ -216,6 +224,35 @@ def schedule_news_cache_refresh(*, force: bool = False) -> bool:
         _NEWS_REFRESH_STARTED_AT = time.time()
         _NEWS_REFRESH_THREAD.start()
         return True
+
+
+def news_feed_status(now: float | None = None) -> dict:
+    """Honest, UI-ready state of the general feed's on-disk cache.
+
+    ``state`` is one of ``ok`` (recent headlines available), ``warming_up``
+    (nothing cached yet: a fresh deploy or first request, a background
+    refresh is starting) or ``stale`` (cache exists but nothing inside the
+    display window). ``message`` is user-facing copy for the empty state and
+    ``last_updated_ts`` is the newest cached headline time (0 when none),
+    so a client can say "as of" instead of showing a bare empty page.
+    """
+
+    now = time.time() if now is None else now
+    oldest, newest = news_cache_timestamp_bounds(NEWS_CACHE_PATH)
+    cutoff = now - GENERAL_NEWS_MAX_AGE_DAYS * 86400
+    if newest <= 0:
+        return {
+            "state": "warming_up",
+            "last_updated_ts": 0,
+            "message": "News is loading for the first time. Headlines are being pulled in now; check back in a minute or two.",
+        }
+    if newest < cutoff:
+        return {
+            "state": "stale",
+            "last_updated_ts": int(newest),
+            "message": "We have not received fresh headlines recently. The latest refresh is still running or a source is down; check back shortly.",
+        }
+    return {"state": "ok", "last_updated_ts": int(newest), "message": ""}
 
 
 def load_cached_news_pool():
@@ -428,13 +465,26 @@ def general_news_feed(limit: int = 30, *, players_df=None) -> list:
     actionable.sort(key=_news_item_timestamp, reverse=True)
 
     seen_links: set = set()
+    kept_titles: list = []
     items: list = []
     for item in actionable:
-        link = str(item.get("link") or "").strip().lower()
+        link = news_signal.canonical_url(item.get("link"))
         if link and link in seen_links:
+            continue
+        # Cross-outlet rewrites of one story: same normalized headline
+        # tokens within a day and a half collapse into the earliest-listed
+        # (newest) copy.
+        title_tokens = news_signal.title_tokens(item.get("title"))
+        ts = _news_item_timestamp(item)
+        if title_tokens and any(
+            abs(ts - other_ts) <= news_signal.NEAR_DUPLICATE_WINDOW_SECONDS
+            and news_signal.tokens_near_duplicate(title_tokens, other_tokens)
+            for other_tokens, other_ts in kept_titles
+        ):
             continue
         if link:
             seen_links.add(link)
+        kept_titles.append((title_tokens, ts))
         projected = dict(item)
         projected["event_type"] = item.get("signal_primary_event")
         projected["speculative"] = bool(item.get("signal_speculative"))

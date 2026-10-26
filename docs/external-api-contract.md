@@ -726,21 +726,16 @@ report: `depth_chart`, `roster_move_notice`, `coach_press_conference`,
 `game_status_designation`. Proposal only: the server emits none of these
 today (every `document_type` is `headline_only_feed_item`).
 
-**Evidence step (code present, OFF by default, not wired into this endpoint).**
-`modules/news_evidence.py` implements a fetch-and-hash step behind
-`DYNASTYGM_NEWS_EVIDENCE_FETCH` (default `0`), and `modules/gsis_crosswalk.py`
-a Sleeper-dump GSIS crosswalk that the endpoint uses only when the same flag
-is on. The shipped source registry has no `permitted` source (NFL.com terms
-forbid it; the rest need human review), so the guarantees above remain true in
-production. When a source is permitted and a pipeline stores the overlay:
-`claims[].status` may be `supported` (fetched text contains that claim's
-player + designation/event/team) or `retracted`; `content_sha256` is the hash
-of the exact bytes checked; a changed hash or retraction notice yields a new
-`revision_id` (with `previous_revision_id`) and the prior revision reads
-`superseded`/`retracted`; `confirmed` needs an official-primary document or
-independent corroboration of distinct origins. GSIS reason codes added when the
-crosswalk is on: `gsis_shared_by_multiple_sleeper_ids`,
-`player_not_in_sleeper_dump`. See `docs/news-evidence-scope-2026-10.md`.
+**Evidence step (not implemented).** There is no fetch-and-hash step: the
+earlier `modules/news_evidence.py` was deleted (#1452) and the server never
+retrieves or hashes a publisher article. `content_sha256`, provenance
+`checked_at` and `excerpt` are therefore always `null`, `evidence.status` is
+always `unavailable`, and `confirmed` never occurs (no official-primary domain
+arrives through RSS). A hash of a headline is never reported as a checked
+document. `modules/gsis_crosswalk.py` (Sleeper-dump GSIS lookup, used by this
+endpoint only when `DYNASTYGM_NEWS_EVIDENCE_FETCH=1`, and always by the news
+feed below) adds GSIS reason codes `gsis_shared_by_multiple_sleeper_ids` and
+`player_not_in_sleeper_dump`. History: `docs/news-evidence-scope-2026-10.md`.
 
 **Retraction behaviour.** Only the supersession detector above exists. Publisher
 retractions/corrections are not detected, so `retracted` is always `false` and
@@ -818,6 +813,151 @@ Remaining gap: to ever return `content_sha256`, `checked_at` and a licensed
 excerpt, the server would need a permitted fetch-and-hash step for
 allowlisted publishers (not implemented), and a GSIS crosswalk column in the
 player table (not present).
+
+## `GET /v1/external/news`
+
+Cursor feed of ingested NFL headlines for the content bot. Same auth as every
+`/v1/external/*` route. Read-only: it reads the store written by the scheduled
+ingest (`.github/workflows/news-ingest.yml`, every 15 minutes, existing
+publisher RSS feeds only, honest `FantasyDeskNewsBot` user agent) and never
+fetches during a request. Per-player pull
+(`/v1/external/players/{id}/news`) is unchanged.
+
+Query: `cursor` (opaque `next_cursor` from the previous response), `since`
+(ISO-8601 or epoch seconds; first call only, default last 24 hours; ignored
+when `cursor` is given), `limit` (1-100, default 50). A bad cursor/`since`
+returns 422. Items are in revision order (`seq`); a changed headline/summary on
+the same URL is a NEW item entry with the same `id`, a new `revision_id`, and
+`previous_revision_id` set. Cross-outlet near-duplicate headlines (same story
+within 36 h) are collapsed into the earliest copy; the other outlets appear as
+additional `provenance` entries.
+
+Persist `next_cursor` after processing a page and send it next time. When
+`items` is empty `next_cursor` is the cursor you sent. `has_more` means call
+again immediately.
+
+Item fields (every one is real or `null` with a reason):
+
+| field | meaning |
+|---|---|
+| `league` | always `"NFL"` |
+| `id` / `revision_id` / `previous_revision_id` | stable per canonical URL / per feed-text version / prior version or `null` |
+| `player_ids[]` | `sleeper`, `gsis` (`null` + `gsis_unavailable_reason`), `name`, `team`, `position`, `match_method` (`explicit_id`, `unique_name`, `name_plus_team`). A name shared by several players is matched only when exactly one candidate's team is also named in the text, else the item is `unmatched` |
+| `unmatched`, `player_match_unavailable_reason` | `true` plus `no_unambiguous_player_named`, `ambiguous_player_name` or `players_table_unavailable`; three or more named players also fail closed |
+| `event_type` | classifier label, e.g. `injury/status`, `role/depth chart`, `transaction/drama`; may be `null` |
+| `status` | `reported`, `speculative` or `superseded`. Never `confirmed` (no official source) |
+| `speculative` | deterministic classifier over headline + feed summary |
+| `superseded`, `superseded_by_revision_id` | true only when a newer stored revision of the same URL exists |
+| `retracted` | always `false`; `retraction_detection` is `"not_performed"`. Absence of the flag is not evidence of no retraction |
+| `provenance[]` | `publisher_domain`, `original_url`, `published_at`, `first_seen_at` (our ingest time), `feed_url`; `checked_at` and `content_sha256` and `excerpt` are `null` with `*_unavailable_reason` because only the RSS feed was read |
+| `claims[]` | only from Sleeper structured status of a matched player: `availability_designation` (`out`/`doubtful`/`questionable`), `roster_status`, `team_affiliation`, each `source: "sleeper_api"`, `scope: "player_current_state"`, `article_supported: false`, `as_of: null` + reason. These describe the player now, not what the article asserts. No article-derived claims exist |
+| `content` | `headline_only`; `body` always `null` |
+| `review_only` | always `true` |
+
+Top-level: `ok`, `league`, `items`, `next_cursor`, `has_more`, `generated_at`
+(response time, not freshness), `ingest` (`backend` `supabase`/`file`,
+`durable`, `fallback_reason`, `last_success_at`, per-source `last_attempt_at`,
+`last_success_at`, `consecutive_failures`, `last_error`, `last_item_count`),
+`unavailable[]` (`reason` + `detail`). Reasons: `no_ingest_data_yet` (job has
+not recorded a run), `no_items_in_window`, `players_table_unavailable`,
+`ingest_store_unavailable`, `durable_store_unavailable_using_local_file`
+(Supabase not configured or `docs/supabase_news_items.sql` not applied).
+Check `ingest.sources[].consecutive_failures` and `last_success_at` before
+trusting an empty page.
+
+Example (real code, synthetic RSS row and synthetic player; the player and
+article are labelled test data):
+
+```json
+{
+  "ok": true,
+  "league": "NFL",
+  "items": [
+    {
+      "league": "NFL",
+      "id": "5d1f0c9a7e3b4a2c8f6e1b0d",
+      "revision_id": "a94b2c1d0e7f3a5b6c8d9e01",
+      "previous_revision_id": null,
+      "cursor": "c1.41",
+      "player_ids": [
+        {"sleeper": "9001", "gsis": "00-0012345", "gsis_unavailable_reason": null,
+         "name": "Test Alpha", "team": "HOU", "position": "WR", "match_method": "unique_name"}
+      ],
+      "player_match_unavailable_reason": null,
+      "unmatched": false,
+      "event_type": "injury/status",
+      "status": "reported",
+      "speculative": false,
+      "superseded": false,
+      "superseded_by_revision_id": null,
+      "retracted": false,
+      "retraction_detection": "not_performed",
+      "published_ts": 1790000000,
+      "first_seen_at": "2026-10-26T15:02:11+00:00",
+      "revision_created_at": "2026-10-26T15:02:11+00:00",
+      "content": {"kind": "headline_only", "headline": "Test Alpha (hamstring) questionable for Sunday",
+                  "body": null, "body_unavailable_reason": "article_body_not_fetched_or_licensed"},
+      "provenance": [
+        {"id": "prov_1c2d3e4f5a6b7c8d", "publisher_domain": "espn.com",
+         "original_url": "https://www.espn.com/nfl/story/test-alpha",
+         "retrieved_url": "https://www.espn.com/nfl/story/test-alpha",
+         "published_at": 1790000000, "first_seen_at": "2026-10-26T15:02:11+00:00",
+         "feed_url": "https://www.espn.com/espn/rss/nfl/news", "retrieval": "publisher_rss_feed_only",
+         "checked_at": null, "checked_at_unavailable_reason": "article_document_not_fetched_only_rss_feed_read",
+         "content_sha256": null, "content_sha256_unavailable_reason": "document_not_fetched_feed_headline_only",
+         "excerpt": null, "excerpt_unavailable_reason": "no_licensed_excerpt_supplied",
+         "document_type": "headline_only_feed_item", "is_official_primary": false,
+         "allowlist_status": "allowlisted", "retracted": false}
+      ],
+      "claims": [
+        {"id": "claim_0a1b2c3d4e5f6a7b", "field": "availability_designation", "value": "questionable",
+         "player_id": "9001", "source": "sleeper_api", "scope": "player_current_state",
+         "article_supported": false, "as_of": null,
+         "as_of_unavailable_reason": "players_db_snapshot_time_not_recorded"},
+        {"id": "claim_1b2c3d4e5f6a7b8c", "field": "team_affiliation", "value": "HOU",
+         "player_id": "9001", "source": "sleeper_api", "scope": "player_current_state",
+         "article_supported": false, "as_of": null,
+         "as_of_unavailable_reason": "players_db_snapshot_time_not_recorded"}
+      ],
+      "claims_unavailable_reason": null,
+      "evidence": {"status": "unavailable", "reason_codes": ["document_not_fetched", "no_licensed_excerpt"]},
+      "review_only": true
+    }
+  ],
+  "next_cursor": "c1.41",
+  "has_more": false,
+  "generated_at": "2026-10-26T15:05:00+00:00",
+  "ingest": {
+    "backend": "supabase", "durable": true, "fallback_reason": null,
+    "last_success_at": "2026-10-26T15:00:04+00:00",
+    "sources": [
+      {"source": "espn.com", "last_attempt_at": "2026-10-26T15:00:04+00:00",
+       "last_success_at": "2026-10-26T15:00:04+00:00", "consecutive_failures": 0,
+       "last_error": null, "last_item_count": 25}
+    ]
+  },
+  "unavailable": []
+}
+```
+
+Example: before the Supabase migration is applied (data in a local file that
+a CI runner would lose) or before the first ingest run:
+
+```json
+{"ok": true, "league": "NFL", "items": [], "next_cursor": null, "has_more": false,
+ "generated_at": "2026-10-26T15:05:00+00:00",
+ "ingest": {"backend": "file", "durable": false,
+            "fallback_reason": "supabase_news_tables_missing_or_unreadable: ...", "last_success_at": null, "sources": []},
+ "unavailable": [
+   {"reason": "durable_store_unavailable_using_local_file", "detail": "supabase_news_tables_missing_or_unreadable: ..."},
+   {"reason": "no_ingest_data_yet", "detail": "the scheduled ingest has not recorded any source run"}]}
+```
+
+Limits: headline-only, six publisher RSS feeds, no retraction detection, no
+confirmed status, GSIS only where the Sleeper dump carries one (about 19% of
+current skill players). Duplicate collapsing is token-based and conservative
+(needs 4+ content tokens and heavy overlap), so some cross-outlet duplicates
+will still appear as separate items.
 
 ## `GET /v1/external/players/{player_id}/rating-history`
 
@@ -1750,3 +1890,8 @@ nflverse data on 2026-10-22:
   routes; its shape is unchanged. Purely additive: no existing field,
   status value, or route changed.
 - `v1` (2026-10-22): `GET /v1/external/players/{player_id}/news` gained the additive source-backed fields (`league`, `id`, `revision_id`, `player_ids`, `status`, `published_ts`, `provenance[]`, `claims[]`, `freshness`, `review_only`, ...). All headline-only and review-only until a permitted fetch-and-hash step exists. No existing field changed.
+- `v1` (2026-10-26): added `GET /v1/external/news` (cursor feed backed by the
+  scheduled RSS ingest, `docs/supabase_news_items.sql`). The per-player news
+  route now matches articles with team-aware identity (a name shared by two
+  players needs a team mention) and reads `players.db` read-only. Corrected the
+  "Evidence step" paragraph: no fetch-and-hash code exists. Additive otherwise.
