@@ -26,6 +26,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
 import { startAnalytics } from './src/lib/analytics';
+import { startReferralCapture } from './src/lib/referralCapture';
 import { registerNotificationTapHandler } from './src/lib/pushNotifications';
 import {
   asyncStoragePersister,
@@ -61,7 +62,9 @@ export default function App() {
     // No-op unless the build sets EXPO_PUBLIC_ANALYTICS_ENABLED=1 (ships dark).
     const stopAnalytics = startAnalytics();
     const stopNotificationTap = registerNotificationTapHandler();
+    const stopReferralCapture = startReferralCapture();
     return () => {
+      stopReferralCapture();
       stopAnalytics();
       stopNotificationTap();
     };

@@ -186,6 +186,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   if (!portalRoot) return null;
   return createPortal(
     <div className="onboarding-shell">
+      <div className="onboarding-aurora" aria-hidden="true" />
       <div className="onboarding-field" aria-hidden="true" />
       <div className="onboarding-sweep" aria-hidden="true" />
 
@@ -231,7 +232,9 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
           <div key={step} className={`onboarding-hero onboarding-slide onboarding-slide--${direction}`}>
             <Image src="/brand-mark-white.png" alt="" width={56} height={56} className="onboarding-mark" />
             <span className="onboarding-eyebrow">One setup step</span>
-            <h1 className="onboarding-headline onboarding-headline--sm">Connect Sleeper or ESPN</h1>
+            <h1 className="onboarding-headline onboarding-headline--sm">
+              Connect <span className="onboarding-gradient">Sleeper or ESPN</span>
+            </h1>
             <p className="onboarding-body">Every recommendation is built around your league.</p>
           </div>
         ) : null}
@@ -239,7 +242,9 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
         {step === levelStep ? (
           <div className="onboarding-section onboarding-section--center">
             <span className="onboarding-eyebrow">Last thing</span>
-            <h1 className="onboarding-headline onboarding-headline--sm">How much dynasty experience do you have?</h1>
+            <h1 className="onboarding-headline onboarding-headline--sm">
+              How much dynasty <span className="onboarding-gradient">experience</span> do you have?
+            </h1>
             <p className="onboarding-body onboarding-body--center">
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
             </p>

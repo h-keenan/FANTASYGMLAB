@@ -201,7 +201,7 @@ def test_share_qr_encodes_canonical_site_and_survives_resize():
     assert qr_img.getpixel((1, 1)) == (255, 255, 255)
     decoded = _decode_qr_png(qr_png)
     if decoded is not None:
-        assert decoded == "https://fantasygmlab.com"
+        assert decoded == share_card_qr.SHARE_QR_TRACKED_URL
     # Compressed/social scale
     small = qr_img.resize((180, 180), Image.Resampling.NEAREST if hasattr(Image, "Resampling") else Image.NEAREST)
     buf = BytesIO()
@@ -212,7 +212,7 @@ def test_share_qr_encodes_canonical_site_and_survives_resize():
     small.save(resized_png, format="PNG")
     decoded_small = _decode_qr_png(resized_png.getvalue())
     if decoded is not None:
-        assert decoded_small == "https://fantasygmlab.com"
+        assert decoded_small == share_card_qr.SHARE_QR_TRACKED_URL
 
 
 def _decode_qr_png(png: bytes) -> str | None:

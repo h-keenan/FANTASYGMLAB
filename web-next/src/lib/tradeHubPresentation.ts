@@ -174,7 +174,9 @@ export function tradeIdeaShareText(idea: TradeIdea): string {
     `Trade idea vs. ${idea.partner_team_name} (${idea.value_edge_band || "Fair"})\n` +
     `You send: ${send}\n` +
     `You get: ${receive}\n` +
-    `Balance: ${formatTradeGain(idea.trade_gain)}`
+    `Balance: ${formatTradeGain(idea.trade_gain)}\n` +
+    // Attribution-tagged so shares show up as utm_source=share on the landing.
+    `https://fantasygmlab.com/?utm_source=share&utm_medium=text&utm_campaign=trade`
   );
 }
 

@@ -1,3 +1,4 @@
+import { getAttributionProps } from "./attribution";
 import { env } from "./env";
 import { supabase } from "./supabase";
 
@@ -96,7 +97,12 @@ function postEvent(input: AnalyticsEventBody): void {
   if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/sample-league")) return;
   // `platform` lets the founder dashboard split web vs mobile; the backend
   // also defaults a missing platform to "web".
-  const body: AnalyticsEventBody = { ...input, props: { platform: "web", ...(input.props || {}) } };
+  // First-touch acquisition props (utm_*, referrer_host, has_ref) ride on
+  // every web event so the funnel can be cut by channel; see lib/attribution.ts.
+  const body: AnalyticsEventBody = {
+    ...input,
+    props: { platform: "web", ...getAttributionProps(), ...(input.props || {}) },
+  };
   void (async () => {
     try {
       let accessToken: string | undefined;

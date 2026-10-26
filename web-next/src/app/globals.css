@@ -2360,6 +2360,86 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   background: var(--color-accent-soft) !important;
 }
 
+/* "Signal" onboarding refresh (2026-10-26): a slow cyan -> violet aurora
+   (--color-accent-strong / --color-diagnostic) behind the existing field
+   texture, glow on the mark, active progress segment and primary button, a
+   gradient on the key headline word, and a staggered rise on each step's
+   children. Scoped to .onboarding-shell so the landing page and app
+   background (which share .onboarding-field) are untouched. Mobile twin:
+   mobile/src/screens/OnboardingScreen.tsx (same hues and rhythm). */
+@keyframes onboarding-aurora-drift {
+  0% { transform: translate3d(-4%, -2%, 0) scale(1); }
+  50% { transform: translate3d(4%, 3%, 0) scale(1.08); }
+  100% { transform: translate3d(-4%, -2%, 0) scale(1); }
+}
+@keyframes onboarding-rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+.onboarding-aurora {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 80%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(48% 55% at 28% 30%, color-mix(in srgb, var(--color-accent-strong) 38%, transparent), transparent 70%),
+    radial-gradient(46% 52% at 74% 22%, color-mix(in srgb, var(--color-diagnostic) 42%, transparent), transparent 70%);
+  filter: blur(36px);
+  animation: onboarding-aurora-drift 18s ease-in-out infinite;
+}
+.onboarding-shell .onboarding-field {
+  opacity: 0.22;
+}
+.onboarding-shell .onboarding-sweep {
+  opacity: 0.45;
+}
+.onboarding-mark {
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--color-accent-strong) 70%, transparent));
+}
+.onboarding-shell .onboarding-headline,
+.onboarding-shell .onboarding-benefit {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.onboarding-gradient {
+  background: linear-gradient(100deg, var(--color-accent) 0%, var(--color-accent-strong) 40%, var(--color-diagnostic) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.onboarding-dot--active {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-strong) 80%, transparent);
+}
+.onboarding-footer > :last-child:not(:disabled) {
+  box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent-strong) 45%, transparent);
+}
+.onboarding-slide > *,
+.onboarding-hero > * {
+  animation: onboarding-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.onboarding-slide > :nth-child(2),
+.onboarding-hero > :nth-child(2) { animation-delay: 70ms; }
+.onboarding-slide > :nth-child(3),
+.onboarding-hero > :nth-child(3) { animation-delay: 140ms; }
+.onboarding-slide > :nth-child(4),
+.onboarding-hero > :nth-child(4) { animation-delay: 210ms; }
+.onboarding-slide > :nth-child(n + 5) { animation-delay: 280ms; }
+.onboarding-cards > * {
+  animation: onboarding-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.onboarding-cards > :nth-child(2) { animation-delay: 90ms; }
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-aurora,
+  .onboarding-slide > *,
+  .onboarding-hero > *,
+  .onboarding-cards > * {
+    animation: none;
+  }
+}
+
 /* Percentile Explorer sheet (components/PercentileExplorerSheet.tsx): reuses
    the shared .pqv-backdrop/.pqv-modal sheet shell; only the chart, marker and
    compare-card pieces are new. Colors are existing semantic tokens. */

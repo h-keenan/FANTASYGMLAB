@@ -7,6 +7,7 @@ import { LEAGUE_CAP_UPSELL, isSaveFailure, saveFailureMessage } from "@/lib/leag
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
+import { clearPendingReferralCode, getPendingReferralCode } from "@/lib/attribution";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { describeSleeperConnectError, isConnectivityFailure, type SleeperConnectError } from "@/lib/sleeperConnectErrors";
 import { EspnImportForm } from "@/components/EspnImportForm";
@@ -139,7 +140,11 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
         }
       }
 
-      const result = await api.lookupSleeperLeagues(clean);
+      // Redeem a captured /?ref=CODE invite on the first username that
+      // resolves (the server only credits it once and ignores bad codes).
+      const pendingRef = getPendingReferralCode();
+      const result = pendingRef ? await api.lookupSleeperLeagues(clean, pendingRef) : await api.lookupSleeperLeagues(clean);
+      if (pendingRef && result.ok) clearPendingReferralCode();
       if (result.ok) {
         // Mirrors app.py: the username itself resolved on Sleeper's side
         // (even a zero-leagues account counts here, same as lookup.status

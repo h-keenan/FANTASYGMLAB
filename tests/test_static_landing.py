@@ -27,12 +27,19 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "landing.css" in html
     assert "fonts.googleapis" not in html
     assert "fonts.googleapis" not in css
-    assert "FantasyDesk — Your Fantasy Football Front Office" in html
-    assert "Your fantasy football front office." in html
-    assert (
-        "The only dynasty tool that runs your team like a front office: "
-        "a plan, a target board, and a memory, built on your real Sleeper league."
-    ) in html
+    assert "FantasyDesk — The dynasty trade your leaguemate would accept" in html
+    assert "Get the trade your leaguemate would actually accept." in html
+    # Roster-aware trade verdict leads; no unverifiable superlatives and no
+    # stale "coming soon"/billing-disabled copy (marketing pass 2026-10-26).
+    assert "The only dynasty tool" not in html
+    assert "Coming soon" not in html
+    assert "Live billing is not enabled" not in html
+    # Value before the account wall: the sample league is the primary CTA.
+    assert 'data-fd-cta="primary" href="https://app.fantasygmlab.com/sample-league?utm_source=static_landing' in html
+    # First-party beacon only, no third-party pixels.
+    assert "/api/lp" in html
+    assert "googletagmanager" not in html and "connect.facebook" not in html
+    assert "og.png" in html
     assert "Trade Calculator" not in html
     assert "Trade Evaluator" not in html
     # Feature order: GM Plan, then GM Targets, then Trade Hub, then Decision

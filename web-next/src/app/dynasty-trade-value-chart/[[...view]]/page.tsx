@@ -6,7 +6,7 @@ import { ValueTable, type ValueRow } from "@/components/seo/ValueTable";
 import { CHART_ROWS, isPageEligible } from "@/lib/seo/content";
 import { itemListLd, webPageLd } from "@/lib/seo/jsonld";
 import { fetchBoard, formatUpdated } from "@/lib/seo/publicValues";
-import { absoluteUrl, CHART_PATH, PLAYER_PATH } from "@/lib/seo/site";
+import { absoluteUrl, CHART_PATH, PLAYER_PATH, OG_IMAGE } from "@/lib/seo/site";
 import { assignSlugs } from "@/lib/seo/slug";
 
 // Optional catch-all with no build-time params: lets the page be generated on
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: { params: Promise<{ view?: st
     title: TITLE,
     description: DESCRIPTION,
     alternates: { canonical: url },
-    openGraph: { title: TITLE, description: DESCRIPTION, url, type: "website", siteName: "FantasyDesk" },
-    twitter: { card: "summary", title: TITLE, description: DESCRIPTION },
+    openGraph: { title: TITLE, description: DESCRIPTION, url, type: "website", siteName: "FantasyDesk", images: [OG_IMAGE] },
+    twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [OG_IMAGE.url] },
   };
 }
 

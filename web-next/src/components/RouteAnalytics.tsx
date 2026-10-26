@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 import { trackPageView } from "@/lib/analytics";
+import { captureAttribution } from "@/lib/attribution";
 
 /**
  * Fires a `page_view` analytics event on every real route change — see
@@ -23,6 +24,8 @@ export function RouteAnalytics() {
   const pathname = usePathname();
 
   useEffect(() => {
+    // Capture utm_*/ref/referrer first so this very page_view carries them.
+    captureAttribution();
     trackPageView(pathname || "");
   }, [pathname]);
 

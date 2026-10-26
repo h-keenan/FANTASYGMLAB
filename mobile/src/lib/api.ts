@@ -3251,8 +3251,13 @@ export const api = {
     authorizedFetch<CareerResponse>(`/v1/players/${encodeURIComponent(playerId)}/career`),
   getPlayerSchedule: (playerId: string) =>
     authorizedFetch<ScheduleResponse>(`/v1/players/${encodeURIComponent(playerId)}/schedule`),
-  lookupSleeperLeagues: (username: string) => {
-    const query = username ? `?username=${encodeURIComponent(username)}` : '';
+  // `referralCode`: pending invite code (lib/referralCapture.ts); the server
+  // credits the referrer when the username resolves.
+  lookupSleeperLeagues: (username: string, referralCode?: string) => {
+    const params: string[] = [];
+    if (username) params.push(`username=${encodeURIComponent(username)}`);
+    if (referralCode) params.push(`referral_code=${encodeURIComponent(referralCode)}`);
+    const query = params.length ? `?${params.join('&')}` : '';
     return authorizedFetch<SleeperLeagueLookupResponse>(`/v1/sleeper/leagues${query}`);
   },
   // Cap-enforced server-side (free vs. premium) — check `reason === 'at_cap'`

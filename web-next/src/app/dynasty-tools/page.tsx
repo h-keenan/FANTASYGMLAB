@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { AppCta, SeoPageShell } from "@/components/seo/SeoChrome";
 import { itemListLd, webPageLd } from "@/lib/seo/jsonld";
-import { absoluteUrl, CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS } from "@/lib/seo/site";
+import { absoluteUrl, CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS, OG_IMAGE } from "@/lib/seo/site";
 
 export const revalidate = 86400; // daily ISR (segment config must be a literal)
 
@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: absoluteUrl(HUB_PATH) },
-  openGraph: { title: TITLE, description: DESCRIPTION, url: absoluteUrl(HUB_PATH), type: "website", siteName: "FantasyDesk" },
-  twitter: { card: "summary", title: TITLE, description: DESCRIPTION },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: absoluteUrl(HUB_PATH), type: "website", siteName: "FantasyDesk", images: [OG_IMAGE] },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [OG_IMAGE.url] },
 };
 
 const TOOLS = [

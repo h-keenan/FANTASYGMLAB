@@ -11,6 +11,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import TradeShareCard, { CARD_HEIGHT, CARD_WIDTH } from './TradeShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
+import { shareLink } from '../lib/shareLinks';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -162,7 +163,7 @@ export default function TradeSharePreviewModal({
       '',
       'Analyzed with FantasyDesk',
     ].filter(Boolean);
-    Share.share({ message: lines.join('\n') })
+    Share.share({ message: [...lines, '', shareLink('trade')].join('\n') })
       .then(recordShare)
       .catch(() => {});
   };

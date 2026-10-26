@@ -4,21 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="google-site-verification" content="fBEGsZjztT-g7yKvi-kNsNKzAKi39LtQ36UcqYe51iE">
-  <title>FantasyDesk — Your Fantasy Football Front Office</title>
-  <meta name="description" content="The only dynasty tool that runs your team like a front office: a plan, a target board, and a memory, built on your real Sleeper league.">
+  <title>FantasyDesk — The dynasty trade your leaguemate would accept</title>
+  <meta name="description" content="Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real Sleeper league. Free to start, no card. Try a sample league first.">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://fantasygmlab.com/">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="FantasyDesk">
-  <meta property="og:title" content="FantasyDesk — Your Fantasy Football Front Office">
-  <meta property="og:description" content="The only dynasty tool that runs your team like a front office: a plan, a target board, and a memory, built on your real Sleeper league.">
+  <meta property="og:title" content="FantasyDesk — The dynasty trade your leaguemate would accept">
+  <meta property="og:description" content="Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real Sleeper league. Free to start, no card. Try a sample league first.">
   <meta property="og:url" content="https://fantasygmlab.com/">
-  <meta property="og:image" content="https://fantasygmlab.com/assets/og-founder-beta.png">
+  <meta property="og:image" content="https://fantasygmlab.com/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="FantasyDesk — Your Fantasy Football Front Office">
-  <meta name="twitter:description" content="The only dynasty tool that runs your team like a front office: a plan, a target board, and a memory, built on your real Sleeper league.">
-  <meta name="twitter:image" content="https://fantasygmlab.com/assets/og-founder-beta.png">
+  <meta name="twitter:title" content="FantasyDesk — The dynasty trade your leaguemate would accept">
+  <meta name="twitter:description" content="Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real Sleeper league. Free to start, no card. Try a sample league first.">
+  <meta name="twitter:image" content="https://fantasygmlab.com/assets/og.png">
   <link rel="stylesheet" href="landing.css">
 </head>
 <body data-fgl-static-landing="1">
@@ -30,13 +32,12 @@
           <div class="fgl-landing__product">FantasyDesk</div>
         </div>
       </div>
-      <h1 class="fgl-landing__value">Your fantasy football front office.</h1>
-      <p class="fgl-landing__support">The only dynasty tool that runs your team like a front office: a plan, a target board, and a memory, built on your real Sleeper league.</p>
-      <p class="fgl-landing__trust">No account required to try it · Sleeper supported</p>
-      <span class="fgl-landing__mobile-badge" title="Mobile apps are in private beta today"><em>Coming soon</em><span>iOS &amp; Android apps</span></span>
+      <h1 class="fgl-landing__value">Paste your Sleeper username. Get the trade your leaguemate would actually accept.</h1>
+      <p class="fgl-landing__support">Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front office would.</p>
+      <p class="fgl-landing__trust">Free to start, no card · No account needed to look around · Sleeper supported · <a href="https://play.google.com/store/apps/details?id=com.fantasygmlab.app" data-fd-cta="secondary">Android app on Google Play</a></p>
       <div class="fgl-landing__cta-row">
-        <a class="fgl-landing__btn fgl-landing__btn--primary" href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=cta">Import your league</a>
-        <a class="fgl-landing__btn fgl-landing__btn--secondary" href="#how-it-works">See how it works</a>
+        <a class="fgl-landing__btn fgl-landing__btn--primary" data-fd-cta="primary" href="https://app.fantasygmlab.com/sample-league?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=sample_league">Try a sample league</a>
+        <a class="fgl-landing__btn fgl-landing__btn--secondary" data-fd-cta="secondary" href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=connect">Import your league</a>
       </div>
     </section>
 
@@ -109,12 +110,43 @@
           <p class="fgl-landing__note">Premium is deeper decision support on the same FantasyDesk surfaces — not a separate product.</p>
         </div>
       </div>
-      <p class="fgl-landing__billing">Premium checkout appears when billing is enabled for your account. Live billing is not enabled.</p>
+      <p class="fgl-landing__billing">Premium is optional. Checkout, plan changes and cancellation all happen inside your account.</p>
     </section>
 
     <footer class="fgl-landing__footer">
-      FantasyDesk · <a href="https://app.fantasygmlab.com/">app.fantasygmlab.com</a>
+      FantasyDesk · <a href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=footer">app.fantasygmlab.com</a>
     </footer>
   </main>
+  <script>
+  /* First-party landing beacon (no third-party pixels, honours Do Not Track):
+     one landing_viewed on load and a CTA click event, relayed by the app's
+     /api/lp route to the first-party analytics API. Only sanitized utm_*,
+     the referrer's hostname and a click-id KIND are sent, never the URL. */
+  (function () {
+    try {
+      if (navigator.doNotTrack === "1" || window.doNotTrack === "1") return;
+      var tok = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 40); };
+      var q = new URLSearchParams(location.search), id = "";
+      try { id = localStorage.getItem("fd_lp_anon") || ""; } catch (e) {}
+      if (!/^anon_[a-f0-9]{16}$/.test(id)) {
+        id = "anon_"; for (var i = 0; i < 16; i++) id += Math.floor(Math.random() * 16).toString(16);
+        try { localStorage.setItem("fd_lp_anon", id); } catch (e) {}
+      }
+      var props = { utm_source: tok(q.get("utm_source")), utm_medium: tok(q.get("utm_medium")), utm_campaign: tok(q.get("utm_campaign")) };
+      try { var h = new URL(document.referrer).hostname.replace(/^www\./, ""); if (h && h !== location.hostname) props.referrer_host = h.slice(0, 80); } catch (e) {}
+      ["gclid", "fbclid", "ttclid", "msclkid"].some(function (k) { if (q.get(k)) { props.click_id = k; return true; } });
+      var send = function (event) {
+        try {
+          fetch("https://app.fantasygmlab.com/api/lp", { method: "POST", mode: "no-cors", keepalive: true, headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ event: event, props: props, anon_id: id }) });
+        } catch (e) {}
+      };
+      send("landing_viewed");
+      document.addEventListener("click", function (ev) {
+        var a = ev.target && ev.target.closest ? ev.target.closest("[data-fd-cta]") : null;
+        if (a) send(a.getAttribute("data-fd-cta") === "primary" ? "primary_cta_clicked" : "secondary_cta_clicked");
+      });
+    } catch (e) {}
+  })();
+  </script>
 </body>
 </html>

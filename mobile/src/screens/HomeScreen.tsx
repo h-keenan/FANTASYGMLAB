@@ -1,4 +1,5 @@
 import FreeLimitNote from '../components/FreeLimitNote';
+import { clearPendingReferralCode, getPendingReferralCode } from '../lib/referralCapture';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -319,7 +320,9 @@ export default function HomeScreen({ navigation, route }: Props) {
     setAddConnectError(null);
     setAddCapMessage(null);
     try {
-      const result = await api.lookupSleeperLeagues(trimmed);
+      const pendingRef = await getPendingReferralCode();
+      const result = await api.lookupSleeperLeagues(trimmed, pendingRef || undefined);
+      if (pendingRef && result.ok) void clearPendingReferralCode();
       setAddOptions(result.leagues);
       if (!result.ok || result.leagues.length === 0) {
         setAddConnectError(

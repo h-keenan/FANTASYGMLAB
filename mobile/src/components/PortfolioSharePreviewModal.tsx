@@ -10,6 +10,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import PortfolioShareCard, { CARD_HEIGHT, CARD_WIDTH, portfolioHeadlineStat } from './PortfolioShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
+import { shareLink } from '../lib/shareLinks';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -78,7 +79,7 @@ export default function PortfolioSharePreviewModal({ visible, onClose, leagues }
       '',
       'Tracked with FantasyDesk',
     ].filter(Boolean);
-    Share.share({ message: lines.join('\n') }).catch(() => {});
+    Share.share({ message: [...lines, '', shareLink('portfolio')].join('\n') }).catch(() => {});
   };
 
   return (

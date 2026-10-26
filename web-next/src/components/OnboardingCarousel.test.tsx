@@ -50,10 +50,10 @@ describe("OnboardingCarousel", () => {
     expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(3);
 
     clickNext(1); // -> connect
-    expect(screen.getByText("Connect Sleeper or ESPN")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
 
     clickNext(1); // -> experience level
-    expect(screen.getByText(/how much dynasty experience/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /how much dynasty experience/i })).toBeInTheDocument();
 
     // Can't finish without picking a level.
     expect(screen.getByRole("button", { name: /^continue$/i })).toBeDisabled();
@@ -72,17 +72,17 @@ describe("OnboardingCarousel", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
 
     clickNext(1);
-    expect(screen.getByText("Connect Sleeper or ESPN")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByText(ONBOARDING_VALUE_HEADLINE)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
 
     const content = document.querySelector(".onboarding-content") as HTMLElement;
     fireEvent.touchStart(content, { touches: [{ clientX: 300 }] });
     fireEvent.touchEnd(content, { changedTouches: [{ clientX: 100 }] });
-    expect(screen.getByText("Connect Sleeper or ESPN")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
     fireEvent.touchStart(content, { touches: [{ clientX: 100 }] });
     fireEvent.touchEnd(content, { changedTouches: [{ clientX: 300 }] });
-    expect(screen.getByText(ONBOARDING_VALUE_HEADLINE)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
   });
 
   it("calls onDone immediately on Skip, without saving an experience level", () => {
@@ -139,7 +139,7 @@ describe("OnboardingCarousel replay", () => {
     render(<OnboardingCarousel replay onDone={onDone} />);
     clickNext(FEATURE_COUNT - 1);
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    expect(screen.queryByText("Connect Sleeper or ESPN")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(api.setExperienceLevel).not.toHaveBeenCalled();

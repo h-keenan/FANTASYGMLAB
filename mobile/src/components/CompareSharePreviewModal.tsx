@@ -10,6 +10,7 @@ import type { CompareRow } from '../lib/playerCompare';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import CompareShareCard, { CARD_HEIGHT, CARD_WIDTH, type CompareShareCardSide } from './CompareShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
+import { shareLink } from '../lib/shareLinks';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -78,7 +79,7 @@ export default function CompareSharePreviewModal({ visible, onClose, sideA, side
       .filter((row) => row.a !== null || row.b !== null)
       .map((row) => `${row.label}: ${display(row, row.a)} vs ${display(row, row.b)}`);
     const lines = [`${sideA.name} vs ${sideB.name}`, ...rowLines, '', 'Compared with FantasyDesk'].filter(Boolean);
-    Share.share({ message: lines.join('\n') }).catch(() => {});
+    Share.share({ message: [...lines, '', shareLink('compare')].join('\n') }).catch(() => {});
   };
 
   return (

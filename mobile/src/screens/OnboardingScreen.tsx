@@ -16,6 +16,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -24,6 +25,7 @@ import AppText from '../components/AppText';
 import Button from '../components/Button';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
+import OnboardingAurora from '../components/OnboardingAurora';
 import type { ExperienceLevelValue } from '../lib/api';
 import { PLAIN_COPY } from '../lib/experienceCopy';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
@@ -94,6 +96,47 @@ function SlideIn({ active, direction, children }: { active: boolean; direction: 
 }
 const styles_slideFill = { alignItems: 'center' as const, alignSelf: 'stretch' as const };
 
+// "Signal" stagger (web parity: .onboarding-slide > * rise, 70ms apart):
+// each child of the active step fades up 14px, one after another. Opacity and
+// transform only; skipped under reduced motion.
+const RISE_PX = 14;
+const RISE_MS = 480;
+const RISE_STAGGER_MS = 70;
+
+function Rise({ active, index, children }: { active: boolean; index: number; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(1);
+  useLayoutEffect(() => {
+    if (reduceMotion || !active) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = 0;
+    progress.value = withDelay(
+      Math.min(index, 4) * RISE_STAGGER_MS,
+      withTiming(1, { duration: RISE_MS, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [active, index, reduceMotion, progress]);
+  const style = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateY: (1 - progress.value) * RISE_PX }],
+  }));
+  return <Animated.View style={[styles_slideFill, style]}>{children}</Animated.View>;
+}
+
+/** Wraps each top-level child of a step (unwrapping one fragment) in <Rise>. */
+function staggered(node: React.ReactNode, active: boolean): React.ReactNode {
+  const parts =
+    React.isValidElement<{ children?: React.ReactNode }>(node) && node.type === React.Fragment
+      ? React.Children.toArray(node.props.children)
+      : React.Children.toArray(node);
+  return parts.map((part, i) => (
+    <Rise key={i} active={active} index={i}>
+      {part}
+    </Rise>
+  ));
+}
+
 // web: .onboarding-dot transition width/background 0.2s; active = 20px accent.
 function ProgressDot({ active, color, activeColor }: { active: boolean; color: string; activeColor: string }) {
   const reduceMotion = useReducedMotion();
@@ -102,7 +145,15 @@ function ProgressDot({ active, color, activeColor }: { active: boolean; color: s
     w.value = reduceMotion ? (active ? 20 : 7) : withTiming(active ? 20 : 7, { duration: 200 });
   }, [active, reduceMotion, w]);
   const style = useAnimatedStyle(() => ({ width: w.value }));
-  return <Animated.View style={[{ height: 7, borderRadius: 999, backgroundColor: active ? activeColor : color }, style]} />;
+  return (
+    <Animated.View
+      style={[
+        { height: 7, borderRadius: 999, backgroundColor: active ? activeColor : color },
+        active ? { shadowColor: activeColor, shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } } : null,
+        style,
+      ]}
+    />
+  );
 }
 
 const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: ColorKey; title: string; body: string }[] = [
@@ -235,7 +286,8 @@ export default function OnboardingScreen({ navigation, route }: Props) {
         <>
           <AppText style={styles.eyebrow}>{current.title}</AppText>
           <AppText style={styles.headlineSm} accessibilityRole="header">
-            {VALUE_HEADLINE}
+            {VALUE_HEADLINE.slice(0, VALUE_HEADLINE.lastIndexOf(' ') + 1)}
+            <AppText style={styles.headlineAccent}>{VALUE_HEADLINE.slice(VALUE_HEADLINE.lastIndexOf(' ') + 1)}</AppText>
           </AppText>
           <View style={[styles.phoneFrame, { height: valuePhoneHeight, width: valuePhoneHeight * PHONE_ASPECT }]}>
             <Image
@@ -302,7 +354,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
           <>
             <BrandMark width={112} style={styles.mark} />
             <AppText style={styles.eyebrow}>One setup step</AppText>
-            <AppText style={styles.headlineSm}>Connect Sleeper or ESPN</AppText>
+            <AppText style={styles.headlineSm}>
+              Connect <AppText style={styles.headlineAccent}>Sleeper or ESPN</AppText>
+            </AppText>
             <AppText style={styles.body}>Every recommendation is built around your league.</AppText>
           </>
         );
@@ -310,7 +364,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
         return (
           <>
             <AppText style={styles.eyebrow}>Last thing</AppText>
-            <AppText style={styles.headlineSm}>How much dynasty experience do you have?</AppText>
+            <AppText style={styles.headlineSm}>
+              How much dynasty <AppText style={styles.headlineAccent}>experience</AppText> do you have?
+            </AppText>
             <AppText style={styles.body}>
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
             </AppText>
@@ -350,6 +406,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.root}>
+      <OnboardingAurora cyan={colors.accent} violet={colors.violet} />
       <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.dotsRow}>
           {stepKeys.map((key, i) => (
@@ -377,7 +434,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
             showsVerticalScrollIndicator={false}
           >
             <SlideIn active={stepKeys[index] === key} direction={direction}>
-              {renderStep(key)}
+              {staggered(renderStep(key), stepKeys[index] === key)}
             </SlideIn>
           </ScrollView>
         ))}
@@ -444,8 +501,11 @@ function createStyles(colors: ThemeColors) {
       textAlign: 'center',
       marginBottom: spacing.md,
     },
+    headlineAccent: { color: colors.accent, fontWeight: '800' },
     headlineSm: {
       ...typography.title,
+      fontWeight: '800',
+      letterSpacing: -0.3,
       fontSize: 22,
       lineHeight: 28,
       color: colors.textPrimary,
@@ -499,6 +559,12 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     backText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-    primaryButton: { flex: 1 },
+    primaryButton: {
+      flex: 1,
+      shadowColor: colors.accent,
+      shadowOpacity: 0.45,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 0 },
+    },
   });
 }

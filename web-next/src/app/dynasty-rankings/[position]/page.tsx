@@ -14,6 +14,7 @@ import {
   POSITION_NAMES,
   RANKINGS_PATH,
   type SeoPosition,
+  OG_IMAGE,
 } from "@/lib/seo/site";
 import { assignSlugs } from "@/lib/seo/slug";
 
@@ -51,8 +52,8 @@ export async function generateMetadata({ params }: { params: Promise<{ position:
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: "website", siteName: "FantasyDesk" },
-    twitter: { card: "summary", title, description },
+    openGraph: { title, description, url, type: "website", siteName: "FantasyDesk", images: [OG_IMAGE] },
+    twitter: { card: "summary_large_image", title, description, images: [OG_IMAGE.url] },
   };
 }
 

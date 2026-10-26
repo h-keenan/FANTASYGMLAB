@@ -32,6 +32,18 @@ function getReducedMotion() {
   return window.matchMedia(REDUCED_MOTION_QUERY).matches;
 }
 
+/** Gradient on the last word of the headline (the "Signal" accent). */
+function renderHeadline(text: string) {
+  const idx = text.lastIndexOf(" ");
+  if (idx < 0) return <span className="onboarding-gradient">{text}</span>;
+  return (
+    <>
+      {text.slice(0, idx + 1)}
+      <span className="onboarding-gradient">{text.slice(idx + 1)}</span>
+    </>
+  );
+}
+
 export function OnboardingValueSlides({ direction }: { direction: "next" | "back" }) {
   const [slide, setSlide] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -48,9 +60,9 @@ export function OnboardingValueSlides({ direction }: { direction: "next" | "back
   const upcoming = SLIDES[(slide + 1) % SLIDES.length];
 
   return (
-    <div className={`onboarding-section onboarding-section--center onboarding-feature onboarding-feature--value onboarding-slideonboarding-slide--${direction}`}>
+    <div className={`onboarding-section onboarding-section--center onboarding-feature onboarding-feature--value onboarding-slide onboarding-slide--${direction}`}>
       <span className="onboarding-eyebrow">{current.title}</span>
-      <h1 className="onboarding-headline onboarding-headline--sm">{ONBOARDING_VALUE_HEADLINE}</h1>
+      <h1 className="onboarding-headline onboarding-headline--sm">{renderHeadline(ONBOARDING_VALUE_HEADLINE)}</h1>
       <div className="onboarding-phone">
         <Image
           key={current.key}

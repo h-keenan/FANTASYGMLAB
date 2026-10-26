@@ -234,6 +234,15 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         # Push pre-prompt outcome (feature_use push_permission prompt_accepted):
         # granted | denied | undetermined only.
         "os_result",
+        # First-touch acquisition attribution (web only; see web-next
+        # lib/attribution.ts): sanitized utm tokens, the external referrer's
+        # hostname, a has-ref flag and the ad click-id KIND (never the id).
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "referrer_host",
+        "has_ref",
+        "click_id",
     }
 )
 
