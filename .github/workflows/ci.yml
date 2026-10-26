@@ -45,8 +45,12 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: git diff --check "$BASE_SHA"...HEAD
+      - name: Data files sanity (sleeper_players.json is a real player map)
+        run: python scripts/check_data_integrity.py
       - name: Full test suite
         run: python -m pytest -q -n auto -m "not known_flaky"
+      - name: Tests must not dirty tracked data files
+        run: python scripts/check_data_integrity.py --check-clean
       # A small, STABLE set of pre-existing tests has failed intermittently
       # on main for a while, unrelated to whatever PR touched them (see
       # pytest.ini's own comment on the known_flaky marker). Runs separately

@@ -48,6 +48,9 @@ on:
 
 permissions:
   contents: write
+  # issues: write lets the failure-alert step below open/update a tracking
+  # issue so a broken refresh is visible instead of failing silently.
+  issues: write
 
 concurrency:
   group: players-db-refresh
@@ -75,3 +78,25 @@ jobs:
           GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO_SLUG: ${{ github.repository }}
         run: python scripts/refresh_and_commit_players_db.py
+      - name: Alert on refresh failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Players DB refresh is failing"
+          body="Scheduled Players DB Refresh failed: ${RUN_URL} ($(date -u +%FT%TZ)). players.db is not being updated."
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+      - name: Close alert issue after recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for num in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search '"Players DB refresh is failing" in:title' --json number --jq '.[].number'); do
+            gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment "Refresh succeeded again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done

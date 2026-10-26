@@ -15,6 +15,82 @@ import pytest
 from modules import redis_cache
 
 
+_REPO_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+# Leaked writes to data/*.json are reverted (and surfaced as a warning) so
+# they can never be committed by accident. data/sleeper_players.json is
+# additionally validated: a test that leaves anything other than a real
+# id -> player-record map in it fails outright, because that file breaks the
+# scheduled players.db refresh.
+
+
+def _data_json_stat(path: Path):
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+# Session-start baseline (per xdist worker): stat + original bytes, so a leaked
+# write can be detected cheaply per test and then undone.
+_DATA_BASELINE = {
+    path.name: (_data_json_stat(path), path.read_bytes())
+    for path in sorted(_REPO_DATA_DIR.glob("*.json"))
+}
+
+
+@pytest.fixture(autouse=True)
+def _guard_real_data_json_files():
+    """Stop tests from persisting changes into the repo's real data/*.json.
+
+    Those files are committed, and the scheduled players.db refresh consumes
+    data/sleeper_players.json, so a test that forgets to redirect a cache
+    path to tmp_path silently corrupts production data once committed (PR
+    #1431 shipped a test fixture as sleeper_players.json and broke the
+    refresh for days). Tests should use tmp paths. This reverts any leaked
+    write and fails the test if it touched a protected file.
+    """
+    yield
+    from modules.sleeper import players_map_is_valid
+
+    current = {p.name: p for p in _REPO_DATA_DIR.glob("*.json")}
+    touched = []
+    corrupted = []
+    for name, path in current.items():
+        base = _DATA_BASELINE.get(name)
+        if name == "sleeper_players.json" and base is not None:
+            try:
+                valid = players_map_is_valid(json.loads(path.read_bytes()))
+            except ValueError:
+                valid = False
+            if not valid:
+                corrupted.append(name)
+        if base is None:
+            # New json file created under data/ by a test: remove it.
+            path.unlink(missing_ok=True)
+            touched.append(name)
+        elif _data_json_stat(path) != base[0] and path.read_bytes() != base[1]:
+            path.write_bytes(base[1])
+            touched.append(name)
+    for name, (_, content) in _DATA_BASELINE.items():
+        if name not in current:
+            (_REPO_DATA_DIR / name).write_bytes(content)
+            touched.append(name)
+    assert not corrupted, (
+        f"test left {corrupted} (reverted) without a valid id -> player "
+        "record map; redirect the cache path to tmp_path "
+        "(monkeypatch/patch.object) instead"
+    )
+    if touched:
+        import warnings
+
+        warnings.warn(
+            f"test wrote to real repo data files {sorted(set(touched))} "
+            "(reverted); use tmp_path instead",
+            stacklevel=1,
+        )
+
+
 @pytest.fixture(autouse=True)
 def _fake_redis_for_tests():
     """Every test gets a private, flushed in-memory Redis-compatible store
