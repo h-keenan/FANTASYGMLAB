@@ -861,6 +861,21 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
         )
 
 
+def players_map_is_valid(data: Any) -> bool:
+    """True when ``data`` looks like Sleeper's id -> player-record map.
+
+    Guards the on-disk dump against being overwritten (or committed) with an
+    unrelated JSON object, e.g. a test fixture such as
+    ``{"id": "user-123", "email": ...}`` whose values are strings. Every
+    consumer indexes ``players[pid].get(...)``, so a non-dict value anywhere
+    is fatal downstream.
+    """
+
+    if not isinstance(data, dict) or not data:
+        return False
+    return all(isinstance(value, dict) for value in data.values())
+
+
 def load_cached_players_disk(
     path: str | None = None,
 ) -> tuple[Dict[str, Any], int]:
@@ -879,7 +894,7 @@ def load_cached_players_disk(
         mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000)))
         with open(cache_path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
-        if isinstance(data, dict):
+        if players_map_is_valid(data):
             _note_provider_timing("sleeper_players_disk_only", 0.0, cache_status="hit")
             return data, mtime_ns
     except Exception:
@@ -1033,7 +1048,7 @@ def _read_players_cache_file(*, label: str) -> Optional[Dict[str, Any]]:
             data = json.load(f)
     except Exception:
         return None
-    if not isinstance(data, dict):
+    if not players_map_is_valid(data):
         return None
     _note_provider_timing(label, 0.0, cache_status="hit")
     with _players_memo_lock:
@@ -1123,7 +1138,7 @@ def _download_players() -> Dict[str, Any]:
             cache_status="error",
         )
         raise
-    if not isinstance(players, dict) or not players:
+    if not players_map_is_valid(players):
         # Never replace a good dump with an empty/garbage one; callers fall
         # back to the existing file (or {} when there is none, as before).
         _note_provider_timing(
@@ -1131,7 +1146,7 @@ def _download_players() -> Dict[str, Any]:
             (time.perf_counter() - started) * 1000.0,
             cache_status="error",
         )
-        raise ValueError("Sleeper players dump was empty or not an object")
+        raise ValueError("Sleeper players dump was empty or not an id -> player-record map")
     try:
         _write_players_cache_atomically(players)
         etag = ""

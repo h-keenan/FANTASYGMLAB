@@ -296,7 +296,31 @@ def refresh_and_commit(
     return 0
 
 
+def validate_refresh_inputs(repo_root: Path) -> list[str]:
+    """Shape-check the committed input dump before spending a rebuild on it.
+
+    A non-player-map data/sleeper_players.json (PR #1431 committed a test
+    fixture there) used to surface only as an opaque AttributeError deep in
+    rankings.normalize_player_record.
+    """
+
+    from scripts.check_data_integrity import check_sleeper_players
+
+    return check_sleeper_players(repo_root / "data" / "sleeper_players.json")
+
+
 def main(argv: list[str]) -> int:
+    problems = validate_refresh_inputs(ROOT)
+    if problems:
+        for problem in problems:
+            print(f"::error::refresh input invalid: {problem}", file=sys.stderr)
+        print(
+            "refusing to refresh: data/sleeper_players.json is not a Sleeper "
+            "player map. Restore it from a good commit (git log -- "
+            "data/sleeper_players.json).",
+            file=sys.stderr,
+        )
+        return 1
     push_token = os.environ.get("GITHUB_PUSH_TOKEN", "").strip()
     repo_slug = os.environ.get("GITHUB_REPO_SLUG", DEFAULT_REPO_SLUG).strip()
     push_url = (
