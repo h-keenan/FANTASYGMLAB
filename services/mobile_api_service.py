@@ -234,6 +234,7 @@ from modules import (
     waivers_logic,
     weekly_box_scores,
 )
+from modules import public_dynasty_values
 from modules import external_news_contract
 from modules import this_week
 from modules import team_defense
@@ -14610,3 +14611,17 @@ _content_feed = content_reader(PLAYERS_DB_PATH, _maybe_schedule_players_refresh,
 @app.get("/v1/content/feed", dependencies=[Depends(require_content_token)])
 def get_public_content_feed():
     return _content_feed()
+
+
+# Public, anonymous, league-agnostic value board for the SEO pages
+# (web-next /dynasty-rankings, /players/[slug], ...). Default 12-team PPR
+# dynasty settings only -- never reads a user, league, roster or account.
+@app.get("/v1/public/dynasty-values")
+def get_public_dynasty_values(format: str = "1qb") -> JSONResponse:
+    fmt = str(format or "").strip().lower()
+    if fmt not in public_dynasty_values.FORMATS:
+        raise HTTPException(status_code=422, detail="format must be one of: " + ", ".join(public_dynasty_values.FORMATS))
+    payload = public_dynasty_values.get_public_dynasty_values(PLAYERS_DB_PATH, fmt)
+    if payload is None:
+        raise HTTPException(status_code=503, detail="Dynasty values are not available right now.")
+    return JSONResponse(content=payload, headers={"Cache-Control": "public, max-age=300"})
