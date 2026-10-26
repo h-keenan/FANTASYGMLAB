@@ -65,11 +65,15 @@ export function parseBoard(value: unknown): PublicBoard | null {
   };
 }
 
-function apiBase(): string {
-  // Server-side only: the web container reaches the API over the Docker
-  // network (API_INTERNAL_URL) instead of hairpinning out through the public
-  // Cloudflare URL, which hangs/blocks server fetches.
-  return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+function apiBases(): string[] {
+  // Server-side only. Prefer the Docker-network address (the public URL
+  // can hang/block server fetches); the default keeps SEO pages working
+  // even when the container was started without API_INTERNAL_URL.
+  const bases = [
+    process.env.API_INTERNAL_URL || "http://mobile-api:8080",
+    process.env.NEXT_PUBLIC_API_BASE_URL || "",
+  ];
+  return bases.filter((b, i) => /^https?:\/\//.test(b) && bases.indexOf(b) === i);
 }
 
 /**
@@ -77,13 +81,22 @@ function apiBase(): string {
  * good page instead of caching an empty one. Returns the parsed board.
  */
 export async function fetchBoard(format: ValueFormat): Promise<PublicBoard> {
-  const response = await fetch(`${apiBase()}/v1/public/dynasty-values?format=${format}`, {
-    next: { revalidate: SEO_REVALIDATE_SECONDS },
-  });
-  if (!response.ok) throw new Error(`public dynasty values unavailable (${response.status})`);
-  const board = parseBoard(await response.json());
-  if (!board) throw new Error("public dynasty values payload was empty or malformed");
-  return board;
+  let lastError: unknown = new Error("no API base URL configured");
+  for (const base of apiBases()) {
+    try {
+      const response = await fetch(`${base}/v1/public/dynasty-values?format=${format}`, {
+        next: { revalidate: SEO_REVALIDATE_SECONDS },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) throw new Error(`public dynasty values unavailable (${response.status})`);
+      const board = parseBoard(await response.json());
+      if (!board) throw new Error("public dynasty values payload was empty or malformed");
+      return board;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 
 /** Players at one position, best first. */
