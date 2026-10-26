@@ -12,6 +12,7 @@ import pytest
 from modules import canonical_player_ranking
 from modules import injury_ui
 from modules import prepared_player_frame
+from modules import rankings
 from modules import session_integrity
 from modules import signal_freshness
 from modules import sleeper
@@ -213,7 +214,11 @@ def test_out_to_ir_updates_immediately():
     ir = _refresh(out, _sleeper_room(starter_status="Injured Reserve", starter_injury="IR"))
     starter = ir.set_index("player_id").loc["rb1"]
     assert injury_level(starter["status"], starter["injury_status"]) == "major"
-    assert float(starter["injury_multiplier"]) == pytest.approx(0.68)
+    # Dynasty-aware discount: a 25-year-old on IR is cut less than the flat 0.68.
+    assert float(starter["injury_multiplier"]) == pytest.approx(
+        rankings.injury_multiplier_for_age("Injured Reserve", "IR", 25)
+    )
+    assert 0.68 < float(starter["injury_multiplier"]) < 1.0
 
 
 def test_ir_to_active_clears_ghost_injury_state():

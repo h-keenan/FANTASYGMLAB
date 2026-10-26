@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 import time
+import unicodedata
 from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, List, Sequence
@@ -913,12 +914,29 @@ def attach_player_stats(
         source_fields=PRIOR_STATS_SOURCE_FIELDS,
         field_map=PRIOR_STATS_FIELD_MAP,
     )
+    enriched = _fill_missing_ppg(enriched)
     # Compute capped recency summaries from retained weekly rows (cache-side).
     # Do not attach raw weekly lists onto the valuation/UI frame.
     return attach_recency_features(
         enriched,
         stats_payload if isinstance(stats_payload, dict) else {},
     )
+
+
+def _fill_missing_ppg(frame: pd.DataFrame) -> pd.DataFrame:
+    """Derive ppg = PPR points / games for rows that have both but no ppg."""
+
+    if not {"ppg", "games_played", "fantasy_points_ppr"}.issubset(frame.columns):
+        return frame
+    games = pd.to_numeric(frame["games_played"], errors="coerce")
+    points = pd.to_numeric(frame["fantasy_points_ppr"], errors="coerce")
+    ppg = pd.to_numeric(frame["ppg"], errors="coerce")
+    fill = ppg.isna() & games.gt(0) & points.notna()
+    if fill.any():
+        frame = frame.copy()
+        frame["ppg"] = ppg
+        frame.loc[fill, "ppg"] = points[fill] / games[fill]
+    return frame
 
 
 def rank_to_value(search_rank) -> int:
@@ -955,8 +973,32 @@ def rank_to_value(search_rank) -> int:
     return 0
 
 
+_NAME_SUFFIX_TOKENS = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
 def _normalize_name(name: str) -> str:
-    return "".join(ch for ch in str(name or "").lower() if ch.isalnum())
+    """Market-matching key: accent-, punctuation- and generational-suffix-free.
+
+    "Kenneth Walker III", "Kenneth Walker" and "Ken\u00e9th Walker, Jr." all
+    reduce to the same key so a provider listing without the suffix (or with a
+    different one) still matches the Sleeper row.
+    """
+
+    text = unicodedata.normalize("NFKD", str(name or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
+    tokens = [
+        "".join(ch for ch in token if ch.isalnum())
+        for token in text.replace(".", " ").replace(",", " ").split()
+    ]
+    tokens = [token for token in tokens if token]
+    # Keep a lone token even if it looks like a suffix ("V", "Jr").
+    while len(tokens) > 1 and tokens[-1] in _NAME_SUFFIX_TOKENS:
+        tokens.pop()
+    return "".join(tokens)
+
+
+# Rows persisted before ages became nullable carry 99 for "unknown".
+LEGACY_UNKNOWN_AGE = 90.0
 
 
 def _age_curve_arrays(position: str) -> tuple[np.ndarray, np.ndarray]:
@@ -980,7 +1022,7 @@ def age_multiplier(position: str, age) -> float:
         age_value = float(age)
     except Exception:
         return 1.0
-    if not np.isfinite(age_value):
+    if not np.isfinite(age_value) or age_value >= LEGACY_UNKNOWN_AGE:
         return 1.0
 
     ages, multipliers = _age_curve_arrays(position)
@@ -994,7 +1036,7 @@ def age_multiplier_series(positions: Sequence[Any], ages: Sequence[Any]) -> pd.S
     age_series = pd.to_numeric(pd.Series(list(ages)), errors="coerce")
     out = np.ones(len(position_series), dtype=float)
     age_values = age_series.to_numpy(dtype=float)
-    valid_age = np.isfinite(age_values)
+    valid_age = np.isfinite(age_values) & (age_values < LEGACY_UNKNOWN_AGE)
     for position, points in AGE_CURVE_CONTROL_POINTS.items():
         mask = (position_series.to_numpy() == position) & valid_age
         if not mask.any():
@@ -2165,10 +2207,12 @@ def _normalize_opportunity_inputs(enriched: pd.DataFrame) -> None:
         enriched.get("years_exp", pd.Series(99.0, index=enriched.index)),
         errors="coerce",
     ).fillna(99.0)
+    # Missing age stays NaN (null) rather than a 99 sentinel; comparisons such
+    # as ``age <= 24`` are False for NaN and the sort key maps NaN to last.
     enriched["age"] = pd.to_numeric(
-        enriched.get("age", pd.Series(99.0, index=enriched.index)),
+        enriched.get("age", pd.Series(np.nan, index=enriched.index)),
         errors="coerce",
-    ).fillna(99.0)
+    )
 
 
 def _enrich_opportunity_context_full(df: pd.DataFrame) -> pd.DataFrame:
@@ -2743,6 +2787,31 @@ def injury_multiplier(status: str, injury_status: str = "") -> float:
     return 1.0
 
 
+# Dynasty-aware injury discount: a season-ending injury costs a 23-year-old
+# star little long-term value, but a 33-year-old may never come back.
+_INJURY_AGE_CURVE = {
+    "major": ((24.0, 0.80), (27.0, 0.70), (30.0, 0.52), (34.0, 0.45)),
+    "moderate": ((24.0, 0.88), (28.0, 0.80), (32.0, 0.70)),
+}
+
+
+def injury_multiplier_for_age(status: str, injury_status: str = "", age=None) -> float:
+    """Injury multiplier scaled by age; null/invalid age falls back to the flat value."""
+
+    flat = injury_multiplier(status, injury_status)
+    level = injury_level(status, injury_status)
+    points = _INJURY_AGE_CURVE.get(level)
+    try:
+        age_value = float(age)
+    except (TypeError, ValueError):
+        return flat
+    if points is None or not np.isfinite(age_value):
+        return flat
+    ages = [a for a, _ in points]
+    mults = [m for _, m in points]
+    return float(np.interp(age_value, ages, mults))
+
+
 def injury_risk_score(status: str, injury_status: str = "") -> float:
     level = injury_level(status, injury_status)
     if level == "major":
@@ -2778,10 +2847,10 @@ def non_injury_risk_multiplier(status: str, team: str, search_rank) -> float:
     return base_risk
 
 
-def risk_multiplier(status: str, team: str, search_rank, injury_status: str = "") -> float:
+def risk_multiplier(status: str, team: str, search_rank, injury_status: str = "", age=None) -> float:
     if not team or not str(team).strip():
         return 0.35
-    injury_risk = injury_multiplier(status, injury_status)
+    injury_risk = injury_multiplier_for_age(status, injury_status, age)
     base_risk = non_injury_risk_multiplier(status, team, search_rank)
     return min(base_risk, injury_risk)
 
@@ -3475,6 +3544,28 @@ def _normalize_fantasycalc_values(fc: pd.DataFrame) -> pd.DataFrame:
     return fc[["fc_key", "fantasycalc_value"]].drop_duplicates("fc_key")
 
 
+# A veteran with no NFL team and no market listing is valued from Sleeper's
+# search_rank alone, which is a popularity signal (retirees keep searching
+# well). Cap the raw value so an unsigned retiree cannot look like a starter.
+TEAMLESS_VETERAN_VALUE_CAP = 1500.0
+
+
+def _cap_teamless_veteran_values(df: pd.DataFrame) -> pd.DataFrame:
+    team = df["team"] if "team" in df.columns else pd.Series("", index=df.index)
+    teamless = team.fillna("").astype(str).str.strip().eq("")
+    years_exp = pd.to_numeric(
+        df["years_exp"] if "years_exp" in df.columns else pd.Series(np.nan, index=df.index),
+        errors="coerce",
+    )
+    # Rookies/prospects (0 years) are legitimately teamless before the draft.
+    veteran = years_exp.fillna(0) >= 1
+    no_market = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0) <= 0
+    mask = teamless & veteran & no_market
+    if mask.any():
+        df.loc[mask, "value"] = df.loc[mask, "value"].clip(upper=TEAMLESS_VETERAN_VALUE_CAP)
+    return df
+
+
 def _apply_market_valuation_context(
     frame: pd.DataFrame,
     fantasycalc_values: pd.DataFrame,
@@ -3496,6 +3587,7 @@ def _apply_market_valuation_context(
     else:
         df["fantasycalc_value"] = 0
     df["fantasycalc_value"] = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0)
+    df = _cap_teamless_veteran_values(df)
 
     reference_fc = pd.Series(dtype=float)
     if reference_frame is not None and "fantasycalc_value" in reference_frame.columns:
@@ -3851,14 +3943,15 @@ def apply_injury_risk_fields(df: pd.DataFrame) -> pd.DataFrame:
         injury_risk_score(status, injury)
         for status, injury in zip(status_values, injury_values)
     ]
+    age_values = work["age"].tolist() if "age" in work.columns else [None] * n
     work["injury_multiplier"] = [
-        injury_multiplier(status, injury)
-        for status, injury in zip(status_values, injury_values)
+        injury_multiplier_for_age(status, injury, age)
+        for status, injury, age in zip(status_values, injury_values, age_values)
     ]
     work["risk_multiplier"] = [
-        risk_multiplier(status, team, rank, injury)
-        for status, team, rank, injury in zip(
-            status_values, team_values, rank_values, injury_values
+        risk_multiplier(status, team, rank, injury, age=age)
+        for status, team, rank, injury, age in zip(
+            status_values, team_values, rank_values, injury_values, age_values
         )
     ]
     work["non_injury_risk_multiplier"] = [
@@ -3866,6 +3959,62 @@ def apply_injury_risk_fields(df: pd.DataFrame) -> pd.DataFrame:
         for status, team, rank in zip(status_values, team_values, rank_values)
     ]
     return work
+
+
+# Rest-of-season production term: how far a player's points-per-game rank sits
+# from his market rank, trusted more as games accumulate and hard-capped so no
+# single week (or short run) can swing a value by more than IN_SEASON_MAX_SWING.
+IN_SEASON_MIN_GAMES = 3
+IN_SEASON_MIN_POSITION_SAMPLE = 12
+IN_SEASON_TRUST_HALF_GAMES = 8.0   # weight = 0.5 * g / (g + 8)
+IN_SEASON_MAX_WEIGHT = 0.5
+IN_SEASON_MAX_SWING = 0.12         # fraction of max(score, floor)
+IN_SEASON_SWING_FLOOR = 3000.0
+
+
+def _in_season_production_adjustment(
+    work: pd.DataFrame,
+    market: pd.Series,
+    composite: pd.Series,
+    risk: pd.Series,
+) -> pd.Series:
+    """Bounded points added to the composite from current-season ppg.
+
+    Quantile-maps each player's ppg rank within his position onto the market
+    score distribution of that position, then moves the composite a
+    games-played-weighted fraction of the way there. Zero when the frame lacks
+    ppg/games, the position sample is small, or the player is injured/inactive
+    (risk < 1 already discounts him).
+    """
+
+    zero = pd.Series(0.0, index=work.index)
+    if not {"ppg", "games_played", "position"}.issubset(work.columns):
+        return zero
+    games = pd.to_numeric(work["games_played"], errors="coerce")
+    ppg = pd.to_numeric(work["ppg"], errors="coerce")
+    eligible = games.ge(IN_SEASON_MIN_GAMES) & ppg.notna() & risk.ge(0.999)
+    if not eligible.any():
+        return zero
+    position = work["position"].astype(str).str.upper()
+    adj = zero.copy()
+    for pos in position[eligible].unique():
+        if pos not in ("QB", "RB", "WR", "TE"):
+            continue
+        in_pos = eligible & position.eq(pos)
+        if int(in_pos.sum()) < IN_SEASON_MIN_POSITION_SAMPLE:
+            continue
+        pct = ppg[in_pos].rank(pct=True, method="average")
+        pos_market = np.sort(market[position.eq(pos) & market.gt(0)].to_numpy(dtype=float))
+        if pos_market.size < IN_SEASON_MIN_POSITION_SAMPLE:
+            continue
+        # Same-percentile market value among this position's valued players.
+        target = np.quantile(pos_market, pct.clip(0, 1).to_numpy())
+        g = games[in_pos].clip(upper=17)
+        weight = IN_SEASON_MAX_WEIGHT * g / (g + IN_SEASON_TRUST_HALF_GAMES)
+        delta = weight * (pd.Series(target, index=pct.index) - market[in_pos])
+        bound = IN_SEASON_MAX_SWING * composite[in_pos].clip(lower=IN_SEASON_SWING_FLOOR)
+        adj.loc[in_pos] = delta.clip(lower=-bound, upper=bound)
+    return adj
 
 
 def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
@@ -3925,6 +4074,7 @@ def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
         + work["factor_role"]
     )
     composite = (risk_sensitive * risk) + (work["factor_opportunity"] * opportunity_risk)
+    composite = composite + _in_season_production_adjustment(work, market, composite, risk)
     work["score"] = composite.clip(lower=0).round().astype(int)
     work["age_penalty"] = (age_curve - market).round().astype(int)
     work["news_factor"] = 0.0
@@ -4000,6 +4150,16 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
         df["valuation_blend"].astype(str) + " + production/usage + depth opportunity"
     )
     df["effective_market_linkage"] = effective_market_linkage_series(df)
+
+    # Stamp provenance on the main build path too (previously only the
+    # structured-refresh paths did, leaving authority NULL on every row).
+    has_provider = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0).gt(0)
+    df[STATUS_COLUMN] = MODEL_DERIVED
+    df.loc[has_provider, STATUS_COLUMN] = PROVIDER_BACKED
+    df[SOURCE_COLUMN] = "canonical_model"
+    df.loc[has_provider, SOURCE_COLUMN] = "fantasycalc_plus_canonical_model"
+    df[AUTHORITATIVE_COLUMN] = True
+    df[TRADE_ELIGIBLE_COLUMN] = True
 
     cleanup_cols = ["search_rank_num", "name_key", "position_key", "fc_key", "fantasycalc_score"]
     return df.drop(columns=[col for col in cleanup_cols if col in df.columns])
