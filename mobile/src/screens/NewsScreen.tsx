@@ -9,7 +9,7 @@ import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import { api, type NewsItem } from '../lib/api';
+import { api, type NewsItem, type NewsResponse } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { newsPlayerIdentities } from '../lib/newsIdentity';
 import { stubPlayer } from '../lib/playerQuickView';
@@ -132,12 +132,14 @@ export default function NewsScreen() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedStatus, setFeedStatus] = useState<NewsResponse['status']>(undefined);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const result = await api.getNews(30);
       setItems(result.items);
+      setFeedStatus(result.status);
     } catch (err) {
       setError(toUserErrorMessage(err, 'Failed to load news.'));
     } finally {
@@ -173,8 +175,8 @@ export default function NewsScreen() {
           !loading ? (
             <EmptyState
               icon="newspaper-outline"
-              title="No news right now"
-              subtitle="Check back later for injury, role, transaction, and off-field updates."
+              title={feedStatus?.state === 'warming_up' ? 'News is warming up' : 'No news right now'}
+              subtitle={feedStatus?.message || 'Check back later for injury, role, transaction, and off-field updates.'}
             />
           ) : null
         }

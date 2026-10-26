@@ -135,4 +135,16 @@ describe("NewsContent", () => {
 
     expect(screen.getByText(/No news right now/)).toBeInTheDocument();
   });
+
+  it("explains a cold start instead of a bare empty page", () => {
+    const data: NewsResponse = {
+      ok: true,
+      items: [],
+      status: { state: "warming_up", last_updated_ts: 0, message: "News is loading for the first time." },
+    };
+    render(<NewsContent data={data} />);
+
+    expect(screen.getByText(/News is warming up/)).toBeInTheDocument();
+    expect(screen.getByText(/loading for the first time/)).toBeInTheDocument();
+  });
 });

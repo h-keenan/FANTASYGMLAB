@@ -180,7 +180,10 @@ export function NewsContent({ data }: { data: NewsResponse }) {
       </header>
 
       {sections.length === 0 ? (
-        <EmptyState title="No news right now." subtitle="Check back later for injury, role, transaction, and off-field updates." />
+        <EmptyState
+          title={data.status?.state === "warming_up" ? "News is warming up." : "No news right now."}
+          subtitle={data.status?.message || "Check back later for injury, role, transaction, and off-field updates."}
+        />
       ) : (
         <div className="flex flex-col gap-6">
           {sections.map((section) => (

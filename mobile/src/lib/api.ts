@@ -1222,9 +1222,17 @@ export interface NewsMatchedPlayer {
   matched_player_team: string | null;
 }
 
+export interface NewsFeedStatus {
+  /** ok | warming_up (nothing cached yet) | stale (nothing recent). */
+  state: 'ok' | 'warming_up' | 'stale';
+  last_updated_ts: number;
+  message: string;
+}
+
 export interface NewsResponse {
   ok: true;
   items: NewsItem[];
+  status?: NewsFeedStatus;
 }
 
 export type RosterRelationship = 'starter' | 'bench' | 'taxi' | 'ir' | null;

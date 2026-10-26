@@ -79,7 +79,8 @@ Working-tree copies of the tmp logs were removed locally.
 | `players.db` | Canonical checked-in player fixture / SQLite source |
 | `sleeper_players.json`, `sleeper_player_stats_2025.json` | Seed/provider snapshots |
 | `fantasycalc_values.csv` | Valuation seed |
-| `news_cache.json`, `roster_news_cache.json` | Seeded runtime news cache (may refresh locally) |
+| `roster_news_cache.json` | Seeded runtime news cache (may refresh locally) |
+| `news_cache.json`, `news_items.json` | Runtime-only, git-ignored (no committed seed: a stale seed showed month-old headlines on cold start) |
 | `accounts.json`, `profile.json`, `weekly_rank_snapshots.json` | App fixture/config seeds |
 | `.gitkeep` | Keeps empty-data edge cases safe |
 
@@ -110,4 +111,4 @@ Do not ignore: `assets/`, checked-in `data/` seeds, root favicons (Streamlit `pa
 
 - `run_dynastygm_3030.bat` — local Streamlit launcher convenience
 - Root favicons — dual of `assets/brand/` for `page_icon` fallback
-- Seeded `data/news_cache.json` may diverge locally after runs (restore before commit if dirty)
+- `data/news_cache.json` is no longer tracked; the News page shows a `warming_up` state until the first live refresh
