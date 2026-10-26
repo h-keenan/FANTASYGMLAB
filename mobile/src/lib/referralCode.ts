@@ -12,4 +12,3 @@ export function parseReferralCode(url: string | null | undefined): string {
   }
   return value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
 }
-
