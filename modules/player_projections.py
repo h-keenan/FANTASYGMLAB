@@ -1002,6 +1002,20 @@ _V2_INTERVAL_Z: Dict[str, tuple] = {
     "TE": (-0.903, 1.234),
     "K": (-1.257, 1.162),
 }
+# v3.1: the single per-position multipliers above under-cover high-estimate
+# players (the ones people actually start): errors grow faster with the estimate
+# than the 5-knot scale captures. 68% coverage on the "relevant players" pool was
+# QB 67 / RB 61 / WR 60 / TE 53 (2022-26 walk-forward, out of sample). These are
+# the 16th/84th percentiles of error / scale in five estimate quintiles per
+# position (same data, ``scripts/projection_walkforward.py``), interpolated.
+# Per position: (estimate knots, low z at knots, high z at knots).
+_V2_INTERVAL_Z_KNOTS: Dict[str, tuple] = {
+    "QB": ((2.87, 13.09, 15.52, 17.36, 19.89), (-0.717, -1.163, -1.263, -1.183, -1.339), (1.643, 1.393, 1.34, 1.218, 1.118)),
+    "RB": ((0.05, 2.10, 5.21, 10.17, 15.78), (-0.318, -0.785, -1.093, -1.225, -1.361), (1.163, 1.427, 1.28, 1.325, 1.193)),
+    "WR": ((0.29, 2.28, 5.13, 9.12, 14.28), (-0.527, -0.88, -1.152, -1.229, -1.404), (1.251, 1.103, 1.152, 1.295, 1.165)),
+    "TE": ((0.04, 1.04, 2.42, 5.08, 9.93), (-0.399, -0.717, -0.967, -1.178, -1.319), (1.0, 1.184, 1.152, 1.449, 1.276)),
+    "K": ((7.19, 7.5, 7.69, 7.88, 8.19), (-1.105, -1.211, -0.989, -1.25, -1.271), (1.508, 1.215, 1.382, 1.35, 1.155)),
+}
 # Availability multipliers for the player's NEXT game. Out/IR/PUP/NFI/
 # Suspended are certain zeros; Doubtful/Questionable are prior-based play
 # probabilities (NOT backtested: Sleeper does not publish point-in-time injury
@@ -1111,7 +1125,9 @@ def _v2_range(estimate: float, position: str, confidence: str) -> tuple:
     scale = _interp(estimate, knots, errors)
     # ``confidence`` is kept in the signature (callers pass it) but the v3
     # interval multipliers are per position.
-    z_low, z_high = _V2_INTERVAL_Z[position]
+    z_knots, z_lows, z_highs = _V2_INTERVAL_Z_KNOTS[position]
+    z_low = _interp(estimate, z_knots, z_lows)
+    z_high = _interp(estimate, z_knots, z_highs)
     return max(0.0, estimate + z_low * scale), max(0.0, estimate + z_high * scale)
 
 

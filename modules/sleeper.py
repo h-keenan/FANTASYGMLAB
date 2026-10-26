@@ -401,6 +401,13 @@ def _aggregate_player_week_stats(
 
         games_played = result.get("games_played")
         fantasy_points_ppr = result.get("fantasy_points_ppr")
+        if games_played and fantasy_points_ppr is None:
+            # Sleeper drops zero-valued stat keys, so a player whose every
+            # played game scored exactly 0 PPR has no pts_ppr at all. That is
+            # a real 0.0, not an unknown: without it ppg stayed null for rows
+            # that clearly have games played.
+            fantasy_points_ppr = 0.0
+            result["fantasy_points_ppr"] = 0.0
         if games_played and fantasy_points_ppr is not None:
             result["ppg"] = float(fantasy_points_ppr) / float(games_played)
 

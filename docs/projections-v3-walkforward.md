@@ -179,3 +179,13 @@ python scripts/projection_walkforward.py evaluate --cache /tmp/pwf
 
 The layer experiments and the per-position coverage study used a scratch harness built on the
 same panel code (not committed); the table above is the record.
+
+## v3.1 interval recalibration (2026-10)
+
+The single per-position 16th/84th multipliers under-covered the players people start (high
+estimates): 68% coverage on the relevant-players pool was 61.2% overall (QB 67, RB 61, WR 60, TE 53)
+over the 2022-26 walk-forward. Errors grow faster with the estimate than the 5-knot scale captures,
+so the multipliers are now interpolated over the estimate (`_V2_INTERVAL_Z_KNOTS`, fit on estimate
+quintiles per position). Coverage with the new knots on the same panel: relevant pool 67.3%
+(QB 69, RB 67, WR 68, TE 66), all eligible 69.0% (was 68.4%), 2026 relevant pool 58.0% -> 65.4%.
+The knots are fit on all five seasons (not held out), so expect a point or two less out of sample.
