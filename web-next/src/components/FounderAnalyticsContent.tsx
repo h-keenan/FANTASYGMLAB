@@ -195,6 +195,15 @@ export function FounderAnalyticsContent({
         </p>
       ) : null}
 
+      {data.feature_use && data.feature_use.length === 0 ? (
+        <section className="flex flex-col gap-2">
+          {sectionLabel("Feature use (web + mobile)")}
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            No feature use events in this time window. Try a longer range.
+          </p>
+        </section>
+      ) : null}
+
       {data.feature_use && data.feature_use.length > 0 ? (
         <section className="flex flex-col gap-2">
           {sectionLabel("Feature use (web + mobile)")}
