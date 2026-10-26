@@ -66,7 +66,10 @@ export function parseBoard(value: unknown): PublicBoard | null {
 }
 
 function apiBase(): string {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  // Server-side only: the web container reaches the API over the Docker
+  // network (API_INTERNAL_URL) instead of hairpinning out through the public
+  // Cloudflare URL, which hangs/blocks server fetches.
+  return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 }
 
 /**
