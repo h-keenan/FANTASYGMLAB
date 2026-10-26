@@ -26,6 +26,14 @@ const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations
 export const metadata: Metadata = {
   title: BRAND_NAME,
   description: DESCRIPTION,
+  // Google Search Console ownership tags (public values). One per domain:
+  // fantasygmlab.com / app.fantasygmlab.com and fantasydesk.app.
+  verification: {
+    google: [
+      "fBEGsZjztT-g7yKvi-kNsNKzAKi39LtQ36UcqYe51iE",
+      "p9D15VjX8Pr_DqegZr_0Db6n9mb4X3BLGpXSpTmm2Rc",
+    ],
+  },
   openGraph: {
     title: BRAND_NAME,
     description: DESCRIPTION,
