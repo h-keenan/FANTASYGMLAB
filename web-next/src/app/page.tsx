@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { AppStoreModules } from "@/components/AppStoreModules";
@@ -85,6 +86,18 @@ export default function LandingPage() {
             {/* Store slots stay quiet: Google Play is live, App Store is
                 "Coming soon" until lib/appStoreLinks.ts has a URL. */}
             <AppStoreModules />
+            {/* Crawlable internal links into the public SEO pages. */}
+            <nav aria-label="Dynasty tools" className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <Link href="/dynasty-tools" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+                Dynasty tools
+              </Link>
+              <Link href="/dynasty-rankings/qb" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+                Dynasty rankings
+              </Link>
+              <Link href="/dynasty-trade-value-chart" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+                Trade value chart
+              </Link>
+            </nav>
           </div>
         </div>
       </main>

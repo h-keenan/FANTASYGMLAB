@@ -15496,3 +15496,69 @@ def test_analytics_alias_route_uses_the_same_handler(monkeypatch):
     mock_track.assert_not_called()
     paths = {r.path for r in mobile_api_service.app.routes}
     assert {"/v1/e", "/v1/analytics/event"} <= paths
+
+
+def _public_values_frame():
+    rows = []
+    for idx, (pos, base) in enumerate([("WR", 9000), ("RB", 8000), ("QB", 6000), ("TE", 5000), ("K", 4000)]):
+        rows.append(
+            {
+                "player_id": str(7000 + idx),
+                "name": f"Public {pos}",
+                "position": pos,
+                "team": "KC",
+                "age": 25,
+                "years_exp": 3,
+                "status": "Active",
+                "injury_status": None,
+                "search_rank": 10 + idx,
+                "score": base,
+                "dynasty_score": base,
+                "value_score": base,
+                "market_score": base,
+                "role_score": base,
+                "opportunity_score": base,
+                "scarcity_score": base,
+                "risk_multiplier": 1.0,
+                "workload_trend": "Stable",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def test_public_dynasty_values_is_anonymous_and_league_agnostic(monkeypatch):
+    from modules import public_dynasty_values
+
+    public_dynasty_values._cache.clear()
+    client = _client(monkeypatch)
+    with patch("modules.rankings.load_players", return_value=_public_values_frame()), patch(
+        "modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kw: df
+    ), patch("modules.public_dynasty_values.os.path.getmtime", return_value=1_700_000_000):
+        one_qb = client.get("/v1/public/dynasty-values?format=1qb")
+        public_dynasty_values._cache.clear()
+        superflex = client.get("/v1/public/dynasty-values?format=superflex")
+    public_dynasty_values._cache.clear()
+
+    assert one_qb.status_code == 200
+    body = one_qb.json()
+    assert body["format"] == "1qb"
+    names = [p["name"] for p in body["players"]]
+    assert "Public K" not in names  # only QB/RB/WR/TE
+    assert body["players"][0]["name"] == "Public WR"
+    assert body["players"][0]["overall_rank"] == 1
+    assert {"player_id", "name", "position", "score", "position_rank", "age", "trend"} <= set(body["players"][0])
+    assert not {"league_id", "roster", "user_id", "email"} & set(body["players"][0])
+
+    sf_scores = {p["position"]: p["score"] for p in superflex.json()["players"]}
+    og_scores = {p["position"]: p["score"] for p in body["players"]}
+    assert sf_scores["QB"] >= og_scores["QB"]
+
+
+def test_public_dynasty_values_rejects_unknown_format_and_empty_data(monkeypatch):
+    from modules import public_dynasty_values
+
+    public_dynasty_values._cache.clear()
+    client = _client(monkeypatch)
+    assert client.get("/v1/public/dynasty-values?format=nope").status_code == 422
+    with patch("modules.rankings.load_players", return_value=pd.DataFrame()):
+        assert client.get("/v1/public/dynasty-values?format=1qb").status_code == 503

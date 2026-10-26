@@ -12,9 +12,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("/design reference page", () => {
-  it("is noindex and excluded from the sitemap", () => {
+  it("is noindex and excluded from the sitemap", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
-    expect(sitemap().some((entry) => entry.url.includes("/design"))).toBe(false);
+    expect((await sitemap()).some((entry) => entry.url.includes("/design"))).toBe(false);
     const rules = robots().rules;
     const disallow = (Array.isArray(rules) ? rules[0] : rules).disallow;
     expect(disallow).toContain("/design");
