@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const trackUse = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/analytics", () => ({ trackUse }));
+vi.mock("@/lib/analytics", () => ({ trackUse, trackFeatureUse: vi.fn() }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
