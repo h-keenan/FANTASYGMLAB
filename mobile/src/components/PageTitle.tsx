@@ -6,7 +6,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import type { ThemeColors } from '../theme';
 
 /**
- * The one screen title (web `--font-page-title` h1): 22/800, tight tracking.
+ * The one screen title (web `--font-page-title` h1): 24/900, tight tracking.
  * Used by the Dashboard header bar and Matchup so page titles stop varying
  * per screen (Matchup was 26, Dashboard 22).
  */
@@ -22,6 +22,6 @@ export default function PageTitle({ children, style }: { children: React.ReactNo
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.2, color: colors.textPrimary },
+    title: { fontSize: 24, fontWeight: '900', letterSpacing: -0.2, color: colors.textPrimary },
   });
 }

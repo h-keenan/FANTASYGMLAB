@@ -27,3 +27,11 @@ test('secondary text stays AA-readable on glass over its normal backgrounds', ()
     assert.ok(contrastRatio([0x3e, 0x58, 0x67], fill) >= 4.5, `light on ${bg}`);
   }
 });
+
+test('glass input fill and rim are translucent and distinct from the card rim', () => {
+  for (const tokens of [darkGlass, lightGlass]) {
+    const fill = parseRgba(tokens.glassInput).a;
+    assert.ok(fill > 0 && fill <= 0.7);
+    assert.ok(parseRgba(tokens.glassInputBorder).a > 0);
+  }
+});
