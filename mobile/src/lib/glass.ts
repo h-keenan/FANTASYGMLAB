@@ -18,18 +18,25 @@ export interface GlassTokens {
   glass: string;
   glassInset: string;
   glassBorder: string;
+  /** Text input / small control fill + rim (web `.glass-input`). */
+  glassInput: string;
+  glassInputBorder: string;
 }
 
 export const darkGlass: GlassTokens = {
   glass: 'rgba(28,32,40,0.58)',
   glassInset: 'rgba(255,255,255,0.06)',
   glassBorder: 'rgba(255,255,255,0.14)',
+  glassInput: 'rgba(255,255,255,0.05)',
+  glassInputBorder: 'rgba(255,255,255,0.14)',
 };
 
 export const lightGlass: GlassTokens = {
   glass: 'rgba(255,255,255,0.68)',
   glassInset: 'rgba(10,30,45,0.05)',
   glassBorder: 'rgba(10,30,45,0.12)',
+  glassInput: 'rgba(255,255,255,0.6)',
+  glassInputBorder: 'rgba(10,30,45,0.12)',
 };
 
 export function parseRgba(value: string): { r: number; g: number; b: number; a: number } {

@@ -5,7 +5,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
- * The one text input: surface fill, hairline border, `radii.sm`, 44pt minimum
+ * The one text input: web `.glass-input` fill + rim, `radii.input` (web control radius), 44pt minimum
  * height and the theme placeholder color. `invalid` swaps the border to the
  * danger lane. Mirrors web-next's components/Input.tsx.
  */
@@ -30,12 +30,12 @@ function createStyles(colors: ThemeColors) {
     input: {
       minHeight: 44,
       borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radii.sm,
+      borderColor: colors.glassInputBorder,
+      borderRadius: radii.input,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       fontSize: 16,
-      backgroundColor: colors.surfaceSolid,
+      backgroundColor: colors.glassInput,
       color: colors.textPrimary,
     },
     invalid: { borderColor: colors.danger },
