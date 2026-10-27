@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ButtonLink } from "@/components/Button";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { breadcrumbLd, serializeLd, type Crumb } from "@/lib/seo/jsonld";
-import { CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS } from "@/lib/seo/site";
+import { CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS, TRADE_ANALYZER_PUBLIC_PATH } from "@/lib/seo/site";
 
 /** Server-rendered JSON-LD script(s). */
 export function JsonLd({ data }: { data: readonly unknown[] }) {
@@ -42,6 +42,7 @@ export function Breadcrumbs({ crumbs }: { crumbs: readonly Crumb[] }) {
 export function SpokeNav({ className = "" }: { className?: string }) {
   const links = [
     ...SEO_POSITIONS.map((p) => ({ href: RANKINGS_PATH(p), label: `Dynasty ${POSITION_NAMES[p].upper} rankings` })),
+    { href: TRADE_ANALYZER_PUBLIC_PATH, label: "Fantasy football trade analyzer" },
     { href: CHART_PATH, label: "Dynasty trade value chart" },
     { href: HUB_PATH, label: "All dynasty tools" },
     { href: "/methodology", label: "How we value players" },

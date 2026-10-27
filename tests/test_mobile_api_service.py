@@ -15785,6 +15785,30 @@ def test_public_dynasty_values_is_anonymous_and_league_agnostic(monkeypatch):
     assert sf_scores["QB"] >= og_scores["QB"]
 
 
+def test_public_dynasty_values_tep_flag_and_cache_isolation(monkeypatch):
+    from modules import public_dynasty_values
+
+    public_dynasty_values._cache.clear()
+    client = _client(monkeypatch)
+    with patch("modules.rankings.load_players", return_value=_public_values_frame()), patch(
+        "modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kw: df
+    ), patch("modules.public_dynasty_values.os.path.getmtime", return_value=1_700_000_000):
+        std = client.get("/v1/public/dynasty-values?format=1qb").json()
+        tep = client.get("/v1/public/dynasty-values?format=1qb&tep=true").json()
+        std_again = client.get("/v1/public/dynasty-values?format=1qb").json()
+    public_dynasty_values._cache.clear()
+
+    assert std["tep"] is False and std_again["tep"] is False
+    assert tep["tep"] is True
+    te_std = [p["score"] for p in std["players"] if p["position"] == "TE"]
+    te_tep = [p["score"] for p in tep["players"] if p["position"] == "TE"]
+    if te_std and te_tep:
+        assert max(te_tep) >= max(te_std)
+    wr_std = {p["player_id"]: p["score"] for p in std["players"] if p["position"] == "WR"}
+    wr_tep = {p["player_id"]: p["score"] for p in tep["players"] if p["position"] == "WR"}
+    assert wr_std == wr_tep  # TEP only moves tight ends
+
+
 def test_public_dynasty_values_rejects_unknown_format_and_empty_data(monkeypatch):
     from modules import public_dynasty_values
 

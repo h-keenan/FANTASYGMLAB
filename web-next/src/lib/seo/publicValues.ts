@@ -26,6 +26,8 @@ export interface PublicPlayer {
 
 export interface PublicBoard {
   format: ValueFormat;
+  /** True when the board was valued with the tight-end premium setting. */
+  tep: boolean;
   scoring: string;
   teams: number;
   generated_at: string;
@@ -57,6 +59,7 @@ export function parseBoard(value: unknown): PublicBoard | null {
   if (players.length === 0) return null;
   return {
     format: b.format === "superflex" ? "superflex" : "1qb",
+    tep: b.tep === true,
     scoring: typeof b.scoring === "string" ? b.scoring : "PPR",
     teams: typeof b.teams === "number" ? b.teams : 12,
     generated_at: typeof b.generated_at === "string" ? b.generated_at : b.source_updated_at,
@@ -80,11 +83,11 @@ function apiBases(): string[] {
  * Throws on any transport/server failure so ISR keeps serving the previous
  * good page instead of caching an empty one. Returns the parsed board.
  */
-export async function fetchBoard(format: ValueFormat): Promise<PublicBoard> {
+export async function fetchBoard(format: ValueFormat, tep = false): Promise<PublicBoard> {
   let lastError: unknown = new Error("no API base URL configured");
   for (const base of apiBases()) {
     try {
-      const response = await fetch(`${base}/v1/public/dynasty-values?format=${format}`, {
+      const response = await fetch(`${base}/v1/public/dynasty-values?format=${format}${tep ? "&tep=true" : ""}`, {
         next: { revalidate: SEO_REVALIDATE_SECONDS },
         signal: AbortSignal.timeout(8000),
       });

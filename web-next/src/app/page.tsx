@@ -127,6 +127,9 @@ export default function LandingPage() {
               <Link href="/dynasty-rankings/qb" className="underline" style={{ color: "var(--color-text-secondary)" }}>
                 Dynasty rankings
               </Link>
+              <Link href="/trade-analyzer" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+                Free trade analyzer
+              </Link>
               <Link href="/dynasty-trade-value-chart" className="underline" style={{ color: "var(--color-text-secondary)" }}>
                 Trade value chart
               </Link>
