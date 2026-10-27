@@ -4,12 +4,16 @@
  *
  * The onboarding carousel asks "How much dynasty experience do you have?"
  * and stores the answer in the user_settings blob through
- * POST /v1/preferences (`experience_level`, which can be "beginner",
- * "advanced" or null). This module is how pages use that answer. It only
- * changes copy, never features:
+ * POST /v1/preferences (`experience_level`, which can be "new_to_fantasy",
+ * "beginner", "advanced" or null). This module is how pages use that
+ * answer. It only changes copy, never features:
  *
- * - "beginner": key first-run surfaces add short plain-language helper text
- *   and spell out a few abbreviations.
+ * - "new_to_fantasy" and "beginner": key first-run surfaces add short
+ *   plain-language helper text and spell out a few abbreviations. Added
+ *   2026-10-27 (onboarding audit P1): "new_to_fantasy" is a third, more
+ *   granular level alongside the original "beginner" — both get today's
+ *   beginner copy; this only changed which accounts land on "beginner" vs
+ *   the new value, never the copy itself or how it's gated.
  * - "advanced" and null (unanswered, skipped, or an account older than the
  *   question): today's terse copy, unchanged. `label()` returns the
  *   caller's current label and `help()` returns null.
@@ -21,13 +25,36 @@
  * checks that the two stay in sync.
  */
 
-export type ExperienceLevel = "beginner" | "advanced";
+export type ExperienceLevel = "new_to_fantasy" | "beginner" | "advanced";
 /** null = never answered. Treated exactly like "advanced". */
 export type ExperienceLevelSetting = ExperienceLevel | null;
 
 export function normalizeExperienceLevel(value: unknown): ExperienceLevelSetting {
-  return value === "beginner" || value === "advanced" ? value : null;
+  return value === "new_to_fantasy" || value === "beginner" || value === "advanced" ? value : null;
 }
+
+/**
+ * The exact same wording used by both the onboarding picker and the
+ * Settings page's mirrored control (previously "Beginner"/"Advanced" in
+ * Settings vs. "New to dynasty"/"I know my stuff" in onboarding — a known
+ * gap fixed 2026-10-27 by having both read from this one map instead of
+ * each spelling its own copy). Byte-identical to mobile's copy (same sync
+ * test as BEGINNER_HELP/BEGINNER_LABELS/PLAIN_COPY below).
+ */
+export const EXPERIENCE_LEVEL_OPTIONS = {
+  new_to_fantasy: {
+    title: "New to fantasy football",
+    body: "We'll explain everything from the ground up, including basic fantasy terms.",
+  },
+  beginner: {
+    title: "New to dynasty",
+    body: "Explain the why behind every recommendation — trade logic, value, roster strategy.",
+  },
+  advanced: {
+    title: "Veteran dynasty manager",
+    body: "Skip the explanations — just the call, the value, and the confidence.",
+  },
+} as const;
 
 export const BEGINNER_HELP = {
   // Dashboard (services/mobile_api_service.py get_league_dashboard,
@@ -136,6 +163,24 @@ export const BEGINNER_LABELS = {
 
 export type BeginnerLabelKey = keyof typeof BEGINNER_LABELS;
 
+/** The optional "what's your goal this season?" chip, alongside experience
+ * level (same onboarding step, same Settings mirror). Stored separately
+ * through POST /v1/preferences (`experience_goal`), skippable and
+ * changeable anytime — unlike experience_level, it can be cleared back to
+ * null. Copy only, same byte-identical-with-mobile guarantee. */
+export type ExperienceGoal = "win_now" | "rebuilding" | "exploring";
+export type ExperienceGoalSetting = ExperienceGoal | null;
+
+export function normalizeExperienceGoal(value: unknown): ExperienceGoalSetting {
+  return value === "win_now" || value === "rebuilding" || value === "exploring" ? value : null;
+}
+
+export const EXPERIENCE_GOAL_OPTIONS = {
+  win_now: { label: "Win Now" },
+  rebuilding: { label: "Rebuilding" },
+  exploring: { label: "Just Exploring" },
+} as const;
+
 /** Plain (not beginner-gated) next-step and orientation copy that must read
  * the same on web and mobile. A web test keeps the two maps byte-identical. */
 export const PLAIN_COPY = {
@@ -147,7 +192,9 @@ export const PLAIN_COPY = {
   gmPlanProBody:
     "A season headline for your team, your best trade paths, and roster-construction focus areas, all built from your Team Snapshot above.",
   onboardingDynastyNote:
-    "Dynasty is the long-term fantasy format where you keep your players year to year. If you're new to fantasy football overall, choose New to dynasty.",
+    "Dynasty is the long-term fantasy format where you keep your players year to year. If you're completely new to fantasy football, choose New to fantasy football.",
+  experienceGoalPrompt: "What's your goal this season?",
+  experienceGoalOptionalNote: "Optional — skip if you're not sure yet.",
 } as const;
 
 const VERDICT_HELP_KEY: Record<string, BeginnerHelpKey> = {
@@ -177,7 +224,9 @@ export interface ExperienceCopy {
 }
 
 export function experienceCopy(level: ExperienceLevelSetting): ExperienceCopy {
-  const isBeginner = level === "beginner";
+  // "new_to_fantasy" and "beginner" both get the beginner copy — see the
+  // module doc comment above for why there are two beginner-ish levels.
+  const isBeginner = level === "beginner" || level === "new_to_fantasy";
   const help = (key: BeginnerHelpKey) => (isBeginner ? BEGINNER_HELP[key] : null);
   return {
     level,

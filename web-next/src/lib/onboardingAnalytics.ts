@@ -26,7 +26,10 @@ export function trackOnboardingStepViewed(step: string, stepIndex: number): void
   trackOnboarding("step_viewed", { step, step_index: stepIndex });
 }
 
-/** Experience picker value -> the funnel's new|expert split. */
+/** Experience picker value -> the funnel's new|expert split. Both
+ * beginner-ish levels ("new_to_fantasy" and "beginner") bucket as "new" —
+ * the funnel keeps its original two buckets even though the picker itself
+ * grew a third, more granular level. */
 export function experienceBucket(level: string): "new" | "expert" {
-  return level === "beginner" ? "new" : "expert";
+  return level === "beginner" || level === "new_to_fantasy" ? "new" : "expert";
 }

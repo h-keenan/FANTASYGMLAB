@@ -2099,13 +2099,16 @@ export type UiDensityValue = 'guided' | 'compact';
 
 export type ThemeModeValue = 'light' | 'dark' | 'auto';
 
-export type ExperienceLevelValue = 'beginner' | 'advanced';
+export type ExperienceLevelValue = 'new_to_fantasy' | 'beginner' | 'advanced';
+
+export type ExperienceGoalValue = 'win_now' | 'rebuilding' | 'exploring';
 
 export interface DevicePreferencesResponse {
   ok: boolean;
   ui_density: UiDensityValue;
   theme_mode: ThemeModeValue;
   experience_level?: ExperienceLevelValue | null;
+  experience_goal?: ExperienceGoalValue | null;
   last_league: { league_id: string; league_name: string } | null;
 }
 
@@ -3380,6 +3383,11 @@ export const api = {
    * OnboardingCarousel (`api.setExperienceLevel`). */
   setExperienceLevel: (level: ExperienceLevelValue) =>
     authorizedPost<DevicePreferencesResponse>('/v1/preferences', { experience_level: level }),
+  /** The optional "what's your goal this season?" chip, alongside
+   * experience level. `null` clears it back to unset (sent to the backend
+   * as "", its explicit-clear sentinel). */
+  setExperienceGoal: (goal: ExperienceGoalValue | null) =>
+    authorizedPost<DevicePreferencesResponse>('/v1/preferences', { experience_goal: goal ?? '' }),
   updateDevicePreferences: (body: {
     uiDensity?: UiDensityValue;
     themeMode?: ThemeModeValue;

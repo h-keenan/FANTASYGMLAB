@@ -3,7 +3,13 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { BEGINNER_HELP, BEGINNER_LABELS, experienceCopy, normalizeExperienceLevel } from "./experienceCopy";
+import {
+  BEGINNER_HELP,
+  BEGINNER_LABELS,
+  experienceCopy,
+  normalizeExperienceGoal,
+  normalizeExperienceLevel,
+} from "./experienceCopy";
 
 describe("experienceCopy", () => {
   it("gives a beginner every helper line and the spelled-out labels", () => {
@@ -14,6 +20,15 @@ describe("experienceCopy", () => {
     }
     expect(copy.label("averageAge", "Avg Age")).toBe("Average Age");
     expect(copy.label("yourFaab", "Your FAAB")).toBe("Your Waiver Budget (FAAB)");
+  });
+
+  it("gives new_to_fantasy the exact same beginner copy as beginner", () => {
+    const copy = experienceCopy("new_to_fantasy");
+    expect(copy.isBeginner).toBe(true);
+    for (const key of Object.keys(BEGINNER_HELP) as Array<keyof typeof BEGINNER_HELP>) {
+      expect(copy.help(key)).toBe(BEGINNER_HELP[key]);
+    }
+    expect(copy.label("averageAge", "Avg Age")).toBe("Average Age");
   });
 
   it.each([
@@ -46,12 +61,23 @@ describe("experienceCopy", () => {
     expect(copy.impactTagHelp("")).toBeNull();
   });
 
-  it("normalizes anything other than beginner/advanced to null", () => {
+  it("normalizes anything other than new_to_fantasy/beginner/advanced to null", () => {
+    expect(normalizeExperienceLevel("new_to_fantasy")).toBe("new_to_fantasy");
     expect(normalizeExperienceLevel("beginner")).toBe("beginner");
     expect(normalizeExperienceLevel("advanced")).toBe("advanced");
     expect(normalizeExperienceLevel("expert")).toBeNull();
     expect(normalizeExperienceLevel(undefined)).toBeNull();
     expect(normalizeExperienceLevel(null)).toBeNull();
+  });
+
+  it("normalizes the optional goal chip, same null-for-anything-else rule", () => {
+    expect(normalizeExperienceGoal("win_now")).toBe("win_now");
+    expect(normalizeExperienceGoal("rebuilding")).toBe("rebuilding");
+    expect(normalizeExperienceGoal("exploring")).toBe("exploring");
+    expect(normalizeExperienceGoal("")).toBeNull();
+    expect(normalizeExperienceGoal("championship")).toBeNull();
+    expect(normalizeExperienceGoal(undefined)).toBeNull();
+    expect(normalizeExperienceGoal(null)).toBeNull();
   });
 
   it("stays byte-identical to mobile's copy map", () => {
@@ -67,5 +93,7 @@ describe("experienceCopy", () => {
     expect(extract(mobile, "BEGINNER_HELP")).toBe(extract(web, "BEGINNER_HELP"));
     expect(extract(mobile, "BEGINNER_LABELS")).toBe(extract(web, "BEGINNER_LABELS"));
     expect(extract(mobile, "PLAIN_COPY")).toBe(extract(web, "PLAIN_COPY"));
+    expect(extract(mobile, "EXPERIENCE_LEVEL_OPTIONS")).toBe(extract(web, "EXPERIENCE_LEVEL_OPTIONS"));
+    expect(extract(mobile, "EXPERIENCE_GOAL_OPTIONS")).toBe(extract(web, "EXPERIENCE_GOAL_OPTIONS"));
   });
 });

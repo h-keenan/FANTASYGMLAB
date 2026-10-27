@@ -3,9 +3,16 @@
 import { useState } from "react";
 
 import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
+import { PillRow } from "@/components/PillRow";
 import { ReferralCard } from "@/components/ReferralCard";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
-import type { ExperienceLevel } from "@/lib/experienceCopy";
+import {
+  EXPERIENCE_GOAL_OPTIONS,
+  EXPERIENCE_LEVEL_OPTIONS,
+  PLAIN_COPY,
+  type ExperienceGoal,
+  type ExperienceLevel,
+} from "@/lib/experienceCopy";
 import { trialEndLabel } from "@/lib/trialCopy";
 import { Button, ButtonLink } from "@/components/Button";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
@@ -124,20 +131,28 @@ function BillingSection({
   );
 }
 
-const EXPLANATION_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = [
-  {
-    value: "beginner",
-    label: "Beginner",
-    description: "Plain-language explanations of terms like value, tier and trade verdicts",
-  },
-  { value: "advanced", label: "Advanced", description: "The standard terse copy" },
-];
+/** Same wording the onboarding picker uses (lib/experienceCopy.ts
+ * EXPERIENCE_LEVEL_OPTIONS) — previously this spelled its own
+ * "Beginner"/"Advanced" labels, which didn't match onboarding's "New to
+ * dynasty"/"I know my stuff" for the same two values. Fixed 2026-10-27. */
+const EXPLANATION_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = (
+  Object.keys(EXPERIENCE_LEVEL_OPTIONS) as ExperienceLevel[]
+).map((value) => ({
+  value,
+  label: EXPERIENCE_LEVEL_OPTIONS[value].title,
+  description: EXPERIENCE_LEVEL_OPTIONS[value].body,
+}));
+
+const GOAL_OPTIONS = (Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]).map((value) => ({
+  value,
+  label: EXPERIENCE_GOAL_OPTIONS[value].label,
+}));
 
 /** The onboarding carousel's "How much dynasty experience do you have?"
  * answer, editable later. Reads/writes through ExperienceLevelContext (the
  * same /v1/preferences field), so the change applies across the app right
- * away. An unanswered account (null) shows Advanced, which is how it
- * already behaves. */
+ * away. An unanswered account (null) shows Veteran dynasty manager, which
+ * is how it already behaves. */
 function ExplanationsSetting() {
   const { level, setLevel } = useExperienceLevel();
   const [saving, setSaving] = useState(false);
@@ -147,7 +162,7 @@ function ExplanationsSetting() {
   return (
     <div className="flex flex-col gap-2">
       <span id="account-explanations-label" className="text-sm font-semibold">
-        Explanations
+        Dynasty experience
       </span>
       <div
         role="radiogroup"
@@ -206,6 +221,39 @@ function ExplanationsSetting() {
   );
 }
 
+/** The optional "what's your goal this season?" chip, alongside experience
+ * level. Skippable — tapping the already-selected chip clears it back to
+ * unset. Reads/writes through ExperienceLevelContext, same /v1/preferences
+ * field the onboarding carousel's goal chip writes. */
+function GoalSetting() {
+  const { goal, setGoal } = useExperienceLevel();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const pick = (value: string) => {
+    const next = goal === value ? null : (value as ExperienceGoal);
+    setSaving(true);
+    setError(null);
+    setGoal(next)
+      .catch(() => setError("Couldn't save this setting. Try again."))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span id="account-goal-label" className="text-sm font-semibold">
+        {PLAIN_COPY.experienceGoalPrompt}
+      </span>
+      <PillRow ariaLabel={PLAIN_COPY.experienceGoalPrompt} options={GOAL_OPTIONS} active={goal ?? ""} onSelect={saving ? undefined : pick} />
+      {error ? (
+        <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function PreferencesSection({
   communityOptedOut,
   onToggleCommunityOptOut,
@@ -225,6 +273,8 @@ function PreferencesSection({
       <SectionHeading id="account-preferences-heading">Preferences</SectionHeading>
 
       <ExplanationsSetting />
+
+      <GoalSetting />
 
       <div
         className="flex items-center justify-between gap-3 p-3"

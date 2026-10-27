@@ -256,7 +256,17 @@ export function MyTeamContent({
         <GlossaryNote
           terms={
             showFranchiseConstruction
-              ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge"]
+              ? [
+                  "powerRank",
+                  "franchiseRank",
+                  "starterStrength",
+                  "benchStrength",
+                  "averageAge",
+                  "draftPicks",
+                  "pqv",
+                  "superflex",
+                  "tep",
+                ]
               : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
           }
         />

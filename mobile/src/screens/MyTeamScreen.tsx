@@ -407,7 +407,9 @@ function TeamSnapshot({
           { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—' },
         ]}
       />
-      <GlossaryNote terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge']} />
+      <GlossaryNote
+        terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep']}
+      />
     </AnimatedCard>
   );
 }

@@ -21,12 +21,16 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getDevicePreferences: vi.fn(),
       setExperienceLevel: vi.fn(),
+      setExperienceGoal: vi.fn(),
     },
   };
 });
 
-function preferences(experience_level: DevicePreferencesResponse["experience_level"]): DevicePreferencesResponse {
-  return { ok: true, ui_density: "guided", theme_mode: "dark", experience_level, last_league: null };
+function preferences(
+  experience_level: DevicePreferencesResponse["experience_level"],
+  experience_goal: DevicePreferencesResponse["experience_goal"] = null,
+): DevicePreferencesResponse {
+  return { ok: true, ui_density: "guided", theme_mode: "dark", experience_level, experience_goal, last_league: null };
 }
 
 function withProvider(children: ReactNode) {
@@ -119,6 +123,7 @@ function renderAccount() {
 beforeEach(() => {
   vi.mocked(api.getDevicePreferences).mockReset();
   vi.mocked(api.setExperienceLevel).mockReset();
+  vi.mocked(api.setExperienceGoal).mockReset();
 });
 
 describe("experience level copy on Dashboard", () => {
@@ -171,20 +176,30 @@ describe("experience level copy on Trade Hub idea cards", () => {
 });
 
 describe("Account page Explanations setting", () => {
-  it("shows Advanced for an unset account and switches to Beginner, saving through /v1/preferences", async () => {
+  it("shows Veteran dynasty manager for an unset account and switches to New to dynasty, saving through /v1/preferences", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
     vi.mocked(api.setExperienceLevel).mockResolvedValue(preferences("beginner"));
     renderAccount();
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    const advanced = screen.getByRole("radio", { name: /advanced/i });
-    const beginner = screen.getByRole("radio", { name: /beginner/i });
+    const advanced = screen.getByRole("radio", { name: /veteran dynasty manager/i });
+    const beginner = screen.getByRole("radio", { name: /new to dynasty/i });
     expect(advanced).toHaveAttribute("aria-checked", "true");
     expect(beginner).toHaveAttribute("aria-checked", "false");
 
     fireEvent.click(beginner);
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
-    expect(screen.getByRole("radio", { name: /beginner/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("offers the third, more granular level too", async () => {
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
+    vi.mocked(api.setExperienceLevel).mockResolvedValue(preferences("new_to_fantasy"));
+    renderAccount();
+
+    await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("radio", { name: /new to fantasy football/i }));
+    await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("new_to_fantasy"));
   });
 
   it("restores the previous choice and shows an error when the save fails", async () => {
@@ -192,10 +207,31 @@ describe("Account page Explanations setting", () => {
     vi.mocked(api.setExperienceLevel).mockRejectedValue(new Error("network"));
     renderAccount();
 
-    await waitFor(() => expect(screen.getByRole("radio", { name: /beginner/i })).toHaveAttribute("aria-checked", "true"));
-    fireEvent.click(screen.getByRole("radio", { name: /advanced/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true"),
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /veteran dynasty manager/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't save/i);
-    expect(screen.getByRole("radio", { name: /beginner/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+describe("Account page goal setting", () => {
+  it("is unselected by default, saves a pick, and clears it on a second click", async () => {
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
+    vi.mocked(api.setExperienceGoal).mockResolvedValue(preferences(null, "win_now"));
+    renderAccount();
+
+    await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
+    const winNow = screen.getByRole("button", { name: /^win now$/i });
+    expect(winNow).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(winNow);
+    await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith("win_now"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^win now$/i })).toHaveAttribute("aria-pressed", "true"));
+
+    fireEvent.click(screen.getByRole("button", { name: /^win now$/i }));
+    await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith(null));
   });
 });

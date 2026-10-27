@@ -7,7 +7,11 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
     ...actual,
-    api: { ...actual.api, setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }) },
+    api: {
+      ...actual.api,
+      setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }),
+      setExperienceGoal: vi.fn().mockResolvedValue({ ok: true }),
+    },
   };
 });
 
@@ -43,7 +47,7 @@ describe("onboarding funnel analytics", () => {
   it("tracks experience_selected (new|expert) and completed with only allowlisted fixed props", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
     for (let i = 0; i < 2; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
+    fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
     const all = calls();
     expect(all.find((c) => c.action === "experience_selected")).toMatchObject({ experience: "expert" });
@@ -51,5 +55,12 @@ describe("onboarding funnel analytics", () => {
     for (const c of all) {
       expect(Object.keys(c).every((k) => ["feature", "action", "step", "step_index", "experience"].includes(k))).toBe(true);
     }
+  });
+
+  it("buckets the new, more granular level as 'new' too", () => {
+    render(<OnboardingCarousel onDone={vi.fn()} />);
+    for (let i = 0; i < 2; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: /new to fantasy football/i }));
+    expect(calls().find((c) => c.action === "experience_selected")).toMatchObject({ experience: "new" });
   });
 });

@@ -12,6 +12,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }),
+      setExperienceGoal: vi.fn().mockResolvedValue({ ok: true }),
     },
   };
 });
@@ -58,13 +59,48 @@ describe("OnboardingCarousel", () => {
     // Can't finish without picking a level.
     expect(screen.getByRole("button", { name: /^continue$/i })).toBeDisabled();
 
+    // All three levels are offered, including the new, more granular one.
+    expect(screen.getByRole("button", { name: /new to fantasy football/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /new to dynasty/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /veteran dynasty manager/i })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
     expect(screen.getByRole("button", { name: /^continue$/i })).not.toBeDisabled();
 
+    // The goal chip is optional: picking a level alone is enough to continue.
+    fireEvent.click(screen.getByRole("button", { name: /^win now$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
+    await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith("win_now"));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
+  it("lets a brand-new fantasy player pick the most beginner level, and skips the goal chip write when none is picked", async () => {
+    const onDone = vi.fn();
+    render(<OnboardingCarousel onDone={onDone} />);
+    clickNext(2);
+
+    fireEvent.click(screen.getByRole("button", { name: /new to fantasy football/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+    await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("new_to_fantasy"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(api.setExperienceGoal).not.toHaveBeenCalled();
+  });
+
+  it("clears the goal chip on a second click, same as never picking one", async () => {
+    const onDone = vi.fn();
+    render(<OnboardingCarousel onDone={onDone} />);
+    clickNext(2);
+
+    fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^rebuilding$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^rebuilding$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(api.setExperienceGoal).not.toHaveBeenCalled();
   });
 
   it("goes back a slide with Back and advances/retreats on swipe", () => {
@@ -101,7 +137,7 @@ describe("OnboardingCarousel", () => {
     render(<OnboardingCarousel onDone={onDone} />);
 
     clickNext(2);
-    fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
+    fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));

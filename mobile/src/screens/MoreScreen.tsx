@@ -34,7 +34,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCollegeInterest } from '../context/CollegeInterestContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
-import type { ExperienceLevel } from '../lib/experienceCopy';
+import { EXPERIENCE_GOAL_OPTIONS, EXPERIENCE_LEVEL_OPTIONS, PLAIN_COPY, type ExperienceGoal, type ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
@@ -59,11 +59,23 @@ const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: str
 
 // Onboarding's "How much dynasty experience do you have?" answer, changeable
 // here later. Copy only (lib/experienceCopy.ts); an unanswered account shows
-// as Advanced because that's exactly how it behaves.
-const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = [
-  { value: 'beginner', label: 'Beginner', description: 'Plain-language explanations of terms like value, tier and trade verdicts' },
-  { value: 'advanced', label: 'Advanced', description: 'The standard terse copy' },
-];
+// as Veteran dynasty manager because that's exactly how it behaves. Same
+// wording as the onboarding picker (EXPERIENCE_LEVEL_OPTIONS) — this used to
+// spell its own "Beginner"/"Advanced" labels, which didn't match onboarding's
+// "New to dynasty"/"I know my stuff" for the same two values. Fixed 2026-10-27.
+const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = (
+  Object.keys(EXPERIENCE_LEVEL_OPTIONS) as ExperienceLevel[]
+).map((value) => ({
+  value,
+  label: EXPERIENCE_LEVEL_OPTIONS[value].title,
+  description: EXPERIENCE_LEVEL_OPTIONS[value].body,
+}));
+
+// The optional "what's your goal this season?" chip, alongside experience
+// level. Tapping the already-selected one clears it back to unset.
+const GOAL_OPTIONS: Array<{ value: ExperienceGoal; label: string }> = (
+  Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]
+).map((value) => ({ value, label: EXPERIENCE_GOAL_OPTIONS[value].label }));
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string }> = [
   { value: 'dark', label: 'Night', description: 'OLED black — always dark' },
@@ -87,7 +99,12 @@ export default function MoreScreen({ navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
-  const { level: experienceLevel, setLevel: setExperienceLevel } = useExperienceLevel();
+  const {
+    level: experienceLevel,
+    setLevel: setExperienceLevel,
+    goal: experienceGoal,
+    setGoal: setExperienceGoal,
+  } = useExperienceLevel();
   const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
@@ -332,6 +349,17 @@ export default function MoreScreen({ navigation }: Props) {
               description={option.description}
               active={(experienceLevel ?? 'advanced') === option.value}
               onPress={() => setExperienceLevel(option.value)}
+            />
+          ))}
+        </View>
+        <AppText style={styles.groupCaption}>{PLAIN_COPY.experienceGoalPrompt}</AppText>
+        <View style={styles.optionRow}>
+          {GOAL_OPTIONS.map((option) => (
+            <OptionCard
+              key={option.value}
+              label={option.label}
+              active={experienceGoal === option.value}
+              onPress={() => setExperienceGoal(experienceGoal === option.value ? null : option.value)}
             />
           ))}
         </View>
@@ -587,7 +615,7 @@ function OptionCard({
   onPress,
 }: {
   label: string;
-  description: string;
+  description?: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -600,7 +628,7 @@ function OptionCard({
       activeOpacity={0.8}
     >
       <AppText style={[styles.optionLabel, active && styles.optionLabelActive]}>{label}</AppText>
-      <AppText style={styles.optionDescription}>{description}</AppText>
+      {description ? <AppText style={styles.optionDescription}>{description}</AppText> : null}
     </TouchableOpacity>
   );
 }

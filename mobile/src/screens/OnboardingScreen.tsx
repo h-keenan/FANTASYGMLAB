@@ -26,8 +26,8 @@ import Button from '../components/Button';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import OnboardingAurora from '../components/OnboardingAurora';
-import type { ExperienceLevelValue } from '../lib/api';
-import { PLAIN_COPY } from '../lib/experienceCopy';
+import type { ExperienceGoalValue, ExperienceLevelValue } from '../lib/api';
+import { EXPERIENCE_GOAL_OPTIONS, EXPERIENCE_LEVEL_OPTIONS, PLAIN_COPY } from '../lib/experienceCopy';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -156,22 +156,33 @@ function ProgressDot({ active, color, activeColor }: { active: boolean; color: s
   );
 }
 
+// Titles/bodies come from the shared EXPERIENCE_LEVEL_OPTIONS (lib/
+// experienceCopy.ts) so this never drifts from web's onboarding picker or
+// either platform's Settings mirror — only icon/color stay mobile-only.
 const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: ColorKey; title: string; body: string }[] = [
+  {
+    value: 'new_to_fantasy',
+    icon: 'sparkles-outline',
+    color: 'accent',
+    ...EXPERIENCE_LEVEL_OPTIONS.new_to_fantasy,
+  },
   {
     value: 'beginner',
     icon: 'leaf-outline',
     color: 'success',
-    title: 'New to dynasty',
-    body: 'Explain the why behind every recommendation — trade logic, value, roster strategy.',
+    ...EXPERIENCE_LEVEL_OPTIONS.beginner,
   },
   {
     value: 'advanced',
     icon: 'trophy-outline',
     color: 'premium',
-    title: 'I know my stuff',
-    body: 'Skip the explanations — just the call, the value, and the confidence.',
+    ...EXPERIENCE_LEVEL_OPTIONS.advanced,
   },
 ];
+
+const GOAL_OPTIONS: { value: ExperienceGoalValue; label: string }[] = (
+  Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoalValue[]
+).map((value) => ({ value, label: EXPERIENCE_GOAL_OPTIONS[value].label }));
 
 /**
  * First-run intro carousel, shown once after sign-in (gated by
@@ -197,7 +208,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   // The value step adds a headline and preview controls above/below.
   const valuePhoneHeight = Math.max(200, Math.min(height * 0.44, 380));
   const { onboardingComplete, completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
-  const { setLevel: saveExperienceLevel } = useExperienceLevel();
+  const { setLevel: saveExperienceLevel, setGoal: saveExperienceGoal } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const prevIndex = useRef(0);
@@ -206,6 +217,8 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     prevIndex.current = index;
   }, [index]);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
+  // Optional, skippable — never gates the primary button, unlike level.
+  const [goal, setGoal] = useState<ExperienceGoalValue | null>(null);
   const [valueSlide, setValueSlide] = useState(0);
   const [valuePaused, setValuePaused] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -265,6 +278,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     // /v1/preferences in the background. Best-effort, same as web: a failed
     // preference write never blocks onboarding.
     saveExperienceLevel(level);
+    // Optional, so only saved when the user actually picked one. Also
+    // best-effort, same as the level write above.
+    if (goal) saveExperienceGoal(goal);
     setSaving(false);
     if (isFirstRun) {
       navigation.navigate('Paywall', { fromOnboarding: 'getStarted' });
@@ -396,6 +412,25 @@ export default function OnboardingScreen({ navigation, route }: Props) {
                 );
               })}
             </View>
+            <AppText style={[styles.body, styles.goalPrompt]}>{PLAIN_COPY.experienceGoalPrompt}</AppText>
+            <View style={styles.goalChipRow}>
+              {GOAL_OPTIONS.map((option) => {
+                const selected = goal === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setGoal((current) => (current === option.value ? null : option.value))}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    activeOpacity={0.85}
+                    style={[styles.goalChip, selected && styles.goalChipSelected]}
+                  >
+                    <AppText style={[styles.goalChipLabel, selected && styles.goalChipLabelSelected]}>{option.label}</AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <AppText style={styles.goalOptionalNote}>{PLAIN_COPY.experienceGoalOptionalNote}</AppText>
           </>
         );
     }
@@ -544,6 +579,19 @@ function createStyles(colors: ThemeColors) {
     pickCard: { padding: spacing.md, borderWidth: 1.5, borderColor: 'transparent' },
     pickCardSelected: { borderColor: colors.accent },
     pickHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+    goalPrompt: { marginTop: spacing.lg, maxWidth: undefined },
+    goalChipRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },
+    goalChip: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    goalChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+    goalChipLabel: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+    goalChipLabelSelected: { color: colors.textPrimary },
+    goalOptionalNote: { fontSize: 12, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.xs },
     valueControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
     valueDotHit: { paddingVertical: 8, paddingHorizontal: 3 },
     footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },

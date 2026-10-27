@@ -7246,6 +7246,7 @@ def test_get_device_preferences_defaults_to_guided_with_no_league(monkeypatch):
         "ui_density": "guided",
         "theme_mode": "dark",
         "experience_level": None,
+        "experience_goal": None,
         "last_league": None,
     }
 
@@ -7264,6 +7265,7 @@ def test_get_device_preferences_reflects_stored_values(monkeypatch):
                 "last_league_id": "abc",
                 "last_league_name": "Dynasty Warriors",
                 "experience_level": "advanced",
+                "experience_goal": "win_now",
             },
         }
     ]
@@ -7277,6 +7279,7 @@ def test_get_device_preferences_reflects_stored_values(monkeypatch):
         "ui_density": "compact",
         "theme_mode": "dark",
         "experience_level": "advanced",
+        "experience_goal": "win_now",
         "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
     }
 
@@ -7372,6 +7375,98 @@ def test_update_device_preferences_stores_experience_level(monkeypatch):
     assert upserted_settings["experience_level"] == "beginner"
 
 
+def test_update_device_preferences_accepts_the_additive_new_to_fantasy_level(monkeypatch):
+    """new_to_fantasy was added 2026-10-27 (onboarding audit P1) as a third,
+    more-granular level alongside the original beginner/advanced — purely
+    additive, so this is just another accepted literal, same code path."""
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/preferences",
+                json={"experience_level": "new_to_fantasy"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["experience_level"] == "new_to_fantasy"
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["experience_level"] == "new_to_fantasy"
+
+
+def test_update_device_preferences_rejects_an_invalid_experience_goal(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/preferences",
+            json={"experience_goal": "championship"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_update_device_preferences_stores_experience_goal(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/preferences",
+                json={"experience_goal": "rebuilding"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["experience_goal"] == "rebuilding"
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["experience_goal"] == "rebuilding"
+
+
+def test_update_device_preferences_clears_experience_goal_with_empty_string(monkeypatch):
+    """The goal chip is optional/skippable and must be clearable later, unlike
+    experience_level. "" is the explicit-clear sentinel (same convention
+    last_league_id already uses), distinct from omitting the field entirely."""
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {"user_id": "user-123", "settings": {"experience_goal": "win_now"}}
+    ]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/preferences",
+                json={"experience_goal": ""},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["experience_goal"] is None
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["experience_goal"] == ""
+
+
 def test_update_device_preferences_merges_without_clobbering_push_categories(monkeypatch):
     client = _client(monkeypatch)
 
@@ -7397,6 +7492,7 @@ def test_update_device_preferences_merges_without_clobbering_push_categories(mon
         "ui_density": "compact",
         "theme_mode": "dark",
         "experience_level": None,
+        "experience_goal": None,
         "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
     }
     upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
@@ -7434,6 +7530,7 @@ def test_update_device_preferences_partial_update_only_touches_sent_fields(monke
         "ui_density": "compact",
         "theme_mode": "dark",
         "experience_level": None,
+        "experience_goal": None,
         "last_league": {"league_id": "xyz", "league_name": "New League"},
     }
 

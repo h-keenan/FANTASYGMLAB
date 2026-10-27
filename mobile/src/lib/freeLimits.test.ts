@@ -32,9 +32,27 @@ test('silent for Premium, unknown plan, or no server limit', () => {
 });
 
 test('glossary defines the audited labels and reuses beginner help', () => {
-  for (const key of ['powerRank', 'rosterPower', 'franchiseRank', 'starterStrength', 'benchStrength', 'ovr'] as const) {
+  for (const key of [
+    'powerRank',
+    'rosterPower',
+    'franchiseRank',
+    'starterStrength',
+    'benchStrength',
+    'ovr',
+    'pqv',
+    'draftPicks',
+    'superflex',
+    'tep',
+  ] as const) {
     assert.ok(GLOSSARY[key].definition.trim().endsWith('.'));
   }
   assert.equal(GLOSSARY.powerRank.definition, BEGINNER_HELP.powerRank);
   assert.equal(GLOSSARY.ovr.definition, BEGINNER_HELP.overallRating);
+});
+
+test('glossary covers the P1 onboarding audit gaps: PQV, draft picks, superflex and TEP', () => {
+  assert.match(GLOSSARY.pqv.label, /PQV/);
+  assert.equal(GLOSSARY.draftPicks.label, 'Draft Picks');
+  assert.equal(GLOSSARY.superflex.label, 'Superflex');
+  assert.match(GLOSSARY.tep.label, /TEP/);
 });

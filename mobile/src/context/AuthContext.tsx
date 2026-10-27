@@ -30,7 +30,7 @@ import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotificati
 import { supabase } from '../lib/supabase';
 import { useDensity } from './DensityContext';
 import { useExperienceLevel } from './ExperienceLevelContext';
-import { normalizeExperienceLevel } from '../lib/experienceCopy';
+import { normalizeExperienceGoal, normalizeExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode } from './ThemeModeContext';
 
 interface AuthContextValue {
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { syncDensityFromServer } = useDensity();
-  const { syncLevelFromServer } = useExperienceLevel();
+  const { syncLevelFromServer, syncGoalFromServer } = useExperienceLevel();
   const { syncModeFromServer } = useThemeMode();
   // Requirement 5 (auth session change hardening): the last authenticated
   // user id this provider has actually acted on, primed from AsyncStorage
@@ -106,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // account signing in on this device never inherits the last one's
         // cached experience level.
         syncLevelFromServer(normalizeExperienceLevel(result.experience_level));
+        syncGoalFromServer(normalizeExperienceGoal(result.experience_goal));
         syncModeFromServer(result.theme_mode);
         if (result.last_league) {
           await syncLastLeagueFromServer({
@@ -162,7 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(nextSession);
           // Signed out: drop the cached experience level so beginner copy
           // never carries over to whoever signs in next.
-          if (!nextSession) syncLevelFromServer(null);
+          if (!nextSession) {
+            syncLevelFromServer(null);
+            syncGoalFromServer(null);
+          }
           if (nextSession) {
             void identifyRevenueCatUser(nextSession.user.id);
             void syncPushToken({ requestPermission: false });
