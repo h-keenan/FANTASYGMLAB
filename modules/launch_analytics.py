@@ -62,6 +62,7 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         # Auth / onboarding
         "signup_started",
         "signup_completed",
+        "onboarding_completed",
         "login_completed",
         "guest_username_submitted",
         "guest_league_selected",
@@ -381,6 +382,26 @@ FEATURE_EVENT_MAP: dict[str, frozenset[str]] = {
     ),
 }
 
+# web-next sends the raw (id-collapsed) Next.js pathname as `route`, so
+# "/dashboard/:id" never matched ROUTE_EVENT_MAP's "dashboard" key and
+# dashboard_reached had zero rows. Only dashboard is aliased: every other
+# surface already emits its own explicit *_opened event from the client, and
+# aliasing them too would double count.
+WEB_ROUTE_SEGMENT_ALIASES: dict[str, str] = {
+    "dashboard": "dashboard",
+}
+
+
+def canonical_route_slug(route: str) -> str:
+    """Backend route slug for a web pathname, or the input unchanged."""
+
+    text = str(route or "").strip()
+    if not text.startswith("/"):
+        return text
+    seg = text.strip("/").split("/", 1)[0].casefold()
+    return WEB_ROUTE_SEGMENT_ALIASES.get(seg, text)
+
+
 ROUTE_EVENT_MAP: dict[str, str] = {
     "dashboard": "dashboard_reached",
     "trade_hub": "trade_hub_opened",
@@ -565,7 +586,10 @@ def _fetch_events_supabase(
     base_params: dict[str, str] = {
         "select": "event,event_version,ts,build,environment,session_key,anon_id,user_key,account_hash,props",
         # id breaks ts ties so offset pages never skip/duplicate rows.
-        "order": "ts.asc,id.asc",
+        # Newest first: when the window holds more than ``limit`` rows it is the
+        # OLDEST rows that get dropped (never the live edge). Reversed below so
+        # callers still receive ascending order.
+        "order": "ts.desc,id.desc",
     }
     if since_ts is not None:
         try:
@@ -599,6 +623,7 @@ def _fetch_events_supabase(
         if len(parsed) < page_size:
             break
         offset += len(parsed)
+    out.reverse()
     return out, True
 
 
@@ -1082,8 +1107,15 @@ def track_page_view(
     source_surface: str = "navigation",
     changed: bool = True,
     extra: Mapping[str, Any] | None = None,
+    dedupe: bool = True,
 ) -> bool:
     """Page/route view with Streamlit rerun protection.
+
+    ``dedupe=False`` skips the process-local once-marker for the generic
+    ``page_view`` (web-next dedupes per tab client-side; the in-memory set
+    resets on every deploy/restart and differs per instance, so it is not a
+    trustworthy dedupe). Mapped surface milestones keep their once-per-
+    account semantics.
 
     `extra` (e.g. {"platform": "ios"}) is merged into the generic page_view
     props only; allowlist filtering still applies.
@@ -1116,7 +1148,7 @@ def track_page_view(
             league_id=league,
             extra=extra,
         ),
-        once_key=f"{scope}:{hash_league_id(league)}:{route_key}",
+        once_key=f"{scope}:{hash_league_id(league)}:{route_key}" if dedupe else "",
         state=state,
     )
 

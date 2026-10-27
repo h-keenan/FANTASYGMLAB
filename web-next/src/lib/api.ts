@@ -2465,6 +2465,7 @@ export interface FounderAnalyticsReport {
   event_count: number;
   sessions: number;
   anonymous_users: number;
+  bot_filtered_sessions?: number;
   hashed_accounts: number;
   product_modules: FounderAnalyticsProductModule[];
   decision_engagement: FounderAnalyticsNamedCount[];

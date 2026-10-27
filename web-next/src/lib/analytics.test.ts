@@ -88,6 +88,18 @@ describe("lib/analytics", () => {
     expect(body.anon_id).toMatch(/^anon_/);
   });
 
+  it("trackPageView dedupes a repeat of the same route in a tab but not a new route", async () => {
+    const mockFetch = mockFetchOk();
+    const { trackPageView, resetPageViewDedupe } = await import("./analytics");
+    resetPageViewDedupe();
+
+    trackPageView("/news");
+    trackPageView("/news");
+    trackPageView("/waivers");
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    resetPageViewDedupe();
+  });
+
   it("trackPageView never calls fetch for a blank route", async () => {
     const mockFetch = mockFetchOk();
     const { trackPageView } = await import("./analytics");

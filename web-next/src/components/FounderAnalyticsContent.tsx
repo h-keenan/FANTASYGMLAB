@@ -150,6 +150,7 @@ export function FounderAnalyticsContent({
       <div className="flex flex-wrap gap-3">
         <SnapshotTile label="Events" value={data.event_count.toLocaleString()} />
         <SnapshotTile label="Sessions" value={data.sessions.toLocaleString()} />
+        <SnapshotTile label="Likely bots (excluded)" value={(data.bot_filtered_sessions ?? 0).toLocaleString()} />
         <SnapshotTile label="Anonymous users" value={data.anonymous_users.toLocaleString()} />
         <SnapshotTile label="Accounts" value={data.hashed_accounts.toLocaleString()} />
       </div>
