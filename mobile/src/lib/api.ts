@@ -2267,6 +2267,8 @@ export interface DashboardResponse {
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
   trade_ideas_deferred?: boolean;
+  /** League trade-deadline state (additive; absent on older servers). */
+  trade_window?: TradeWindow | null;
   /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
   platform_notice?: string;
 }

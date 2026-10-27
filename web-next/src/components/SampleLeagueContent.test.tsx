@@ -22,7 +22,7 @@ describe("SampleLeagueContent", () => {
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
     expect(screen.getByText("Power Rank")).toBeTruthy();
     expect(screen.getByTestId("watchlist-alerts")).toBeTruthy();
-    expect(screen.getByText("Team Snapshot")).toBeTruthy();
+    expect(screen.getByText("My Team")).toBeTruthy();
     // League Activity fills from the static promise.
     expect(await screen.findByTestId("league-pulse-card")).toBeTruthy();
     expect(screen.getByTestId("sample-banner")).toBeTruthy();

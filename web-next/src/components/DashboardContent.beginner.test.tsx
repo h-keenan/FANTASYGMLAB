@@ -7,6 +7,7 @@ import { experienceCopy } from "@/lib/experienceCopy";
 
 vi.mock("@/context/ExperienceLevelContext", () => ({
   useExperienceCopy: () => experienceCopy("beginner"),
+  useExperienceLevel: () => ({ level: "beginner", goal: "win_now" }),
 }));
 
 const FIXTURE: DashboardResponse = {
@@ -71,5 +72,12 @@ describe("DashboardContent for a beginner", () => {
     const quiet: DashboardResponse = { ...FIXTURE, items: [], entitlement: { is_premium: true, visible_count: 0, hidden_count: 0 } };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={quiet} />);
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
+  });
+
+  it("explains trades to a beginner, with a line for their season goal", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    const block = screen.getByTestId("dashboard-trades-block");
+    expect(block.textContent).toMatch(/who you give, who you get/);
+    expect(block.textContent).toMatch(/Tuned for winning this season/);
   });
 });
