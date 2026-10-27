@@ -33,13 +33,25 @@ import { darkGlass, lightGlass } from './lib/glass';
  * `border` is a *line* token: for solid chip/track/disc fills use
  * `backgroundElevated`, never `border`.
  */
+/*
+ * 2026-10-27 (coridian_: "sync the palette to web"): the neutral ramp, text
+ * greys and borders below now mirror web-next globals.css byte for byte
+ * (asserted by lib/webTokenSync.test.ts). Mapping: background=--color-bg,
+ * surface=--color-surface-primary, backgroundElevated=--color-surface-raised
+ * (dark) / --color-surface-muted (light, since light raised is plain white),
+ * border/borderStrong=--color-border(-strong), text*=--color-text-*,
+ * textDisabled=--color-muted composited over background. The 2026-09 contrast
+ * audit's hand-tuned greys were replaced; the AA checks it protected are now
+ * enforced against the synced values in lib/glass.test.ts. Comments below that
+ * quote old hexes or ratios describe that earlier audit.
+ */
 const darkColors = {
   background: '#000000',
-  backgroundElevated: '#1A1F26',
-  surface: '#0D1117',
-  surfaceSolid: '#0D1117',
-  border: '#242E3B',
-  borderStrong: '#2E3A4A',
+  backgroundElevated: '#3d4248',
+  surface: '#1f2226',
+  surfaceSolid: '#1f2226',
+  border: '#2a2e35',
+  borderStrong: '#64748b',
   // Concept-sheet card outline: every card there reads with a faint cyan
   // edge against the navy background, not a neutral gray hairline. Scoped
   // to AnimatedCard's default border only (never swapped in for the
@@ -50,8 +62,8 @@ const darkColors = {
   hairline: 'rgba(255,255,255,0.08)',
   // Shared liquid-glass surface (lib/glass.ts): translucent card fill, nested-tile tint, rim.
   ...darkGlass,
-  textPrimary: '#F2F4F7',
-  textSecondary: '#A6B0BB',
+  textPrimary: '#f7f8fa',
+  textSecondary: '#e5e7eb',
   // Color-system audit (2026-09-25): raised from #6F7A87 — that value only
   // hit 3.79:1 against `backgroundElevated` (fails WCAG AA's 4.5:1 for
   // normal text; MetricCard's note text and InsightRow-style secondary
@@ -62,13 +74,13 @@ const darkColors = {
   // didn't disappear: it's `textDisabled` below, since a WaiverRecommendationCard
   // comment on file documented exactly this token being read as "inert/disabled"
   // when used for merely-secondary copy — the two meanings needed separate colors.
-  textTertiary: '#7F8A97',
+  textTertiary: '#a8adb7',
   // Genuinely inactive/disabled content (distinct from textTertiary's
   // "readable but secondary" role). WCAG's contrast minimums don't apply to
   // disabled UI text, so this intentionally sits below AA (3.79:1 on
   // backgroundElevated, 4.33:1 on surface) — legible enough to read the
   // label, dim enough to unambiguously signal "not interactive right now."
-  textDisabled: '#6F7A87',
+  textDisabled: '#777879',
   // Liquid-glass pass, 2026-10-19 (Zach + coridian_, mockup approved):
   // matches web-next's --color-accent exactly (web-next/src/app/globals.css)
   // — the two platforms were drifting apart (web moved to this lighter,
@@ -136,17 +148,17 @@ const darkColors = {
  * text here).
  */
 const lightColors = {
-  background: '#EAF3F8',
-  backgroundElevated: '#D9E8F0',
-  surface: '#FFFFFF',
-  surfaceSolid: '#FFFFFF',
-  border: '#C7D9E3',
-  borderStrong: '#AFC7D5',
+  background: '#eef3f6',
+  backgroundElevated: '#e6edf1',
+  surface: '#ffffff',
+  surfaceSolid: '#ffffff',
+  border: '#c7d3da',
+  borderStrong: '#5d6b77',
   cardBorder: 'rgba(5,110,124,0.25)',
   hairline: 'rgba(10,30,45,0.08)',
   ...lightGlass,
-  textPrimary: '#0B1D26',
-  textSecondary: '#3E5867',
+  textPrimary: '#101820',
+  textSecondary: '#3b4a56',
   // Color-system audit (2026-09-25): darkened from #6B8494 — that value hit
   // only 3.13:1 against `backgroundElevated` and 3.92:1 against `surface`,
   // both under WCAG AA's 4.5:1 (this is the light-mode "secondary text is
@@ -155,12 +167,12 @@ const lightColors = {
   // `background`) while staying a visible step above the new `textDisabled`
   // below and a visible step below `textSecondary`. Old value preserved as
   // `textDisabled` rather than discarded — same rationale as darkColors.
-  textTertiary: '#4F6878',
+  textTertiary: '#57646f',
   // Genuinely inactive/disabled content — see darkColors.textDisabled for
   // the split rationale. Intentionally under AA (3.13-3.92:1 depending on
   // surface): WCAG's text-contrast minimums don't apply to disabled
   // controls, and this needs to read as dimmer than textTertiary.
-  textDisabled: '#6B8494',
+  textDisabled: '#8a9096',
   // Liquid-glass pass, 2026-10-19: matches web-next's light-mode
   // --color-accent / --color-accent-strong exactly (same source as the
   // dark-mode accent change above) — web already had to solve the "this
@@ -170,7 +182,7 @@ const lightColors = {
   // answers to the same contrast problem.
   accent: '#056e7c',
   accentSoft: '#0891a3',
-  accentMuted: 'rgba(5,110,124,0.12)',
+  accentMuted: 'rgba(6,110,124,0.16)',
   // On-tint text/icon variant for cyan content painted over an
   // `accentMuted` fill or the pale `backgroundElevated` sheet surface —
   // web-next's --color-accent-strong, its own stronger/on-tint variant.
@@ -179,12 +191,12 @@ const lightColors = {
   // Light theme's accent is a dark teal, so white reads cleanly on it.
   onAccent: '#FFFFFF',
   danger: '#c81111',
-  dangerMuted: 'rgba(200,17,17,0.12)',
+  dangerMuted: 'rgba(239,68,68,0.16)',
   success: '#147337',
   successBright: '#22C55E',
-  successMuted: 'rgba(20,115,55,0.12)',
+  successMuted: 'rgba(34,197,94,0.16)',
   warning: '#8a5906',
-  warningMuted: 'rgba(138,89,6,0.12)',
+  warningMuted: 'rgba(245,158,11,0.16)',
   // Color-system audit (2026-09-25): darkened from #B8860B, which measured
   // only 3.25:1 on a plain white surface (fails AA's 4.5:1) and a
   // near-invisible 2.86:1 when used as chip text directly on its own
@@ -201,7 +213,7 @@ const lightColors = {
   premiumGlow: '#BE7D00',
   badgeBackground: 'rgba(5,110,124,0.12)',
   badgeText: '#056e7c',
-  violet: '#6B5FCC',
+  violet: '#5f52c8',
   // Color-system audit (2026-10-03): see darkColors.diagnosticText for why
   // this is its own token rather than `success`. Unlike every other pair in
   // this file, dark and light share one literal value on purpose: this text

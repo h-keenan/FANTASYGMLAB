@@ -17,14 +17,16 @@ for (const [name, tokens] of [
   });
 }
 
-test('secondary text stays AA-readable on glass over its normal backgrounds', () => {
-  for (const bg of ['#000000', '#0B1220', '#1A1F26']) {
+test('secondary and muted text stay AA-readable on glass over their normal backgrounds (web-synced ramp)', () => {
+  for (const bg of ['#000000', '#0B1220', '#1f2226']) {
     const fill = compositeOver(darkGlass.glass, bg);
-    assert.ok(contrastRatio([0xa6, 0xb0, 0xbb], fill) >= 4.5, `dark on ${bg}`);
+    assert.ok(contrastRatio([0xe5, 0xe7, 0xeb], fill) >= 4.5, `dark secondary on ${bg}`);
+    assert.ok(contrastRatio([0xa8, 0xad, 0xb7], fill) >= 4.5, `dark muted on ${bg}`);
   }
-  for (const bg of ['#EAF3F8', '#D9E8F0']) {
+  for (const bg of ['#eef3f6', '#e6edf1']) {
     const fill = compositeOver(lightGlass.glass, bg);
-    assert.ok(contrastRatio([0x3e, 0x58, 0x67], fill) >= 4.5, `light on ${bg}`);
+    assert.ok(contrastRatio([0x3b, 0x4a, 0x56], fill) >= 4.5, `light secondary on ${bg}`);
+    assert.ok(contrastRatio([0x57, 0x64, 0x6f], fill) >= 4.5, `light muted on ${bg}`);
   }
 });
 
