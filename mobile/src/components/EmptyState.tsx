@@ -4,20 +4,20 @@ import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from './Button';
-import IconCircle from './IconCircle';
+import GlassCard from './GlassCard';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
- * The concept sheet's empty-state panel (icon + headline + subtext, an
- * optional CTA) — every list screen in the app used to fall back to a
- * single plain gray line instead. One shared component so every empty
- * list reads as "considered," not "we forgot to build this state."
+ * The one empty state, matching web-next's EmptyState (2026-10-27 parity):
+ * a left-aligned glass card with a bold title, a muted one-line reason and,
+ * when there is a next step, a small button. Web shows no icon, so `icon` is
+ * accepted to keep the call sites stable but is not drawn.
  */
 export default function EmptyState({
-  icon,
+  icon: _icon,
   title,
   subtitle,
   actionLabel,
@@ -42,39 +42,40 @@ export default function EmptyState({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.container}>
-      <IconCircle name={icon} color={colors.accent} size={56} iconSize={26} />
+    <GlassCard style={styles.container}>
       <AppText style={styles.title}>{title}</AppText>
       {subtitle ? <AppText style={styles.subtitle}>{subtitle}</AppText> : null}
       {actionLabel && onPressAction ? (
-        <Button label={actionLabel} onPress={onPressAction} variant={actionVariant} style={styles.button} />
+        <Button label={actionLabel} onPress={onPressAction} variant={actionVariant} size="sm" style={styles.button} />
       ) : null}
       {secondaryLabel && onPressSecondary ? (
         <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
           <AppText style={styles.secondaryLinkText}>{secondaryLabel}</AppText>
         </TouchableOpacity>
       ) : null}
-    </View>
+    </GlassCard>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    // Web: px-4 py-6, gap-1, items-start. Stretch so centered screen wrappers
+    // still give a full-width card.
     container: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: spacing.xxl,
-      paddingHorizontal: spacing.xl,
+      alignSelf: 'stretch',
+      alignItems: 'flex-start',
+      paddingVertical: spacing.xl,
+      paddingHorizontal: spacing.lg,
       gap: spacing.xs,
     },
-    title: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
-    subtitle: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 },
-    button: { marginTop: spacing.md },
+    title: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    subtitle: { fontSize: 12, color: colors.textTertiary, lineHeight: 17 },
+    button: { marginTop: spacing.sm, alignSelf: 'flex-start' },
     secondaryLink: { marginTop: spacing.sm, padding: spacing.xs },
     secondaryLinkText: {
       fontSize: 12,
       fontWeight: '600',
-      color: colors.textSecondary,
+      color: colors.textTertiary,
       textDecorationLine: 'underline',
     },
   });

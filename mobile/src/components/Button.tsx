@@ -20,6 +20,7 @@ export default function Button({
   variant = 'primary',
   disabled = false,
   loading = false,
+  size = 'md',
   style,
 }: {
   label: string;
@@ -27,11 +28,17 @@ export default function Button({
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'premium' | 'premiumOutline';
   disabled?: boolean;
   loading?: boolean;
+  /** `sm` mirrors web's size="sm" (compact padding, 12px label). */
+  size?: 'sm' | 'md';
   style?: StyleProp<ViewStyle>;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const inkColor =
+  const { colors, isDark } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  // Web parity: a disabled (not loading) button swaps to the muted surface
+  // fill + muted ink (filled variants) or muted ink + strong border
+  // (outline/ghost) instead of fading; loading keeps the opacity fade.
+  const showDisabled = disabled && !loading;
+  const liveInk =
     variant === 'primary' || variant === 'danger'
       ? colors.onAccent
       : variant === 'premium'
@@ -43,10 +50,17 @@ export default function Button({
         : variant === 'dangerOutline'
           ? colors.danger
           : colors.accent;
+  const inkColor = showDisabled ? colors.textTertiary : liveInk;
   const button = (
     <TouchableOpacity
       accessibilityRole="button"
-      style={[styles.base, styles[variant], (disabled || loading) && styles.disabled, variant !== 'premium' && style]}
+      style={[
+        styles.base,
+        size === 'sm' && styles.baseSm,
+        styles[variant],
+        showDisabled && styles[`${variant}Disabled` as const],
+        loading && styles.disabled,
+        variant !== 'premium' && style]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
@@ -54,7 +68,7 @@ export default function Button({
       {loading ? (
         <ActivityIndicator color={inkColor} />
       ) : (
-        <AppText style={[styles.text, { color: inkColor }]}>{label}</AppText>
+        <AppText style={[styles.text, size === 'sm' && styles.textSm, { color: inkColor }]}>{label}</AppText>
       )}
     </TouchableOpacity>
   );
@@ -67,7 +81,9 @@ export default function Button({
   );
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles(colors: ThemeColors, isDark: boolean) {
+  // Web --color-surface-muted: pure black in dark, the pale chip fill in light.
+  const mutedFill = isDark ? colors.background : colors.backgroundElevated;
   return StyleSheet.create({
     base: {
       minHeight: 44,
@@ -77,6 +93,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    baseSm: { minHeight: 36, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
     primary: { backgroundColor: colors.accentStrong },
     secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
     ghost: { backgroundColor: 'transparent' },
@@ -84,7 +101,15 @@ function createStyles(colors: ThemeColors) {
     premiumOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.premium },
     danger: { backgroundColor: colors.danger },
     dangerOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
+    primaryDisabled: { backgroundColor: mutedFill },
+    premiumDisabled: { backgroundColor: mutedFill },
+    dangerDisabled: { backgroundColor: mutedFill },
+    secondaryDisabled: {},
+    ghostDisabled: {},
+    premiumOutlineDisabled: { borderColor: colors.borderStrong },
+    dangerOutlineDisabled: { borderColor: colors.borderStrong },
     disabled: { opacity: disabledOpacity },
     text: { fontSize: 15, fontWeight: '700' },
+    textSm: { fontSize: 13 },
   });
 }
