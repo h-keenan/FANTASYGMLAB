@@ -144,9 +144,9 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-center">
-        <SectionHeading>{trialDays > 0 ? `Try Pro free for ${trialDays} days` : "Unlock the full GM toolkit"}</SectionHeading>
+        <SectionHeading>{trialDays > 0 ? `Try Premium free for ${trialDays} days` : "Unlock the full GM toolkit"}</SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Free keeps working. Pro removes the caps.
+          Free keeps working. Premium removes the caps.
         </p>
       </div>
 

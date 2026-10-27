@@ -282,7 +282,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
           kicker="Playoff Odds"
           upsell={result.upsell ?? null}
           fallbackTitle="Your real shot at the playoffs"
-          fallbackBody="Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
+          fallbackBody="Playoff Odds is a Premium feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
         />
       ) : null}
       {state === "ready" && result && result.is_premium !== false ? (
