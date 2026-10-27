@@ -314,6 +314,46 @@ describe("TradeAnalyzerContent", () => {
     });
   });
 
+  describe("Public Trade Analyzer bridge (bridgeTrade)", () => {
+    const renderBridge = (bridgeTrade: { a: string[]; b: string[] }) =>
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+          bridgeTrade={bridgeTrade}
+        />,
+      );
+
+    it("loads the entered trade into both sides and picks the partner", () => {
+      renderBridge({ a: ["send-1"], b: ["receive-1"] });
+      expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
+      expect(screen.getByTestId("bridge-notice")).toHaveTextContent("Your public trade is loaded (2 players)");
+      fireEvent.click(screen.getByText("You receive"));
+      expect(screen.getByPlaceholderText(/Search Rival Team/)).toBeInTheDocument();
+    });
+
+    it("flags players that are not on this league's rosters instead of forcing them in", () => {
+      renderBridge({ a: ["receive-1", "nobody"], b: ["receive-1"] });
+      expect(screen.queryByRole("button", { name: "Remove My RB" })).not.toBeInTheDocument();
+      const notice = screen.getByTestId("bridge-notice");
+      expect(notice).toHaveTextContent("Their WR (not on your roster)");
+      expect(notice).toHaveTextContent("not in this league's player pool");
+      // Send side is the one still to fill.
+      expect(screen.getByText("You send")).toHaveStyle({ color: "var(--color-accent)" });
+    });
+
+    it("shows no bridge notice for a plain visit", () => {
+      renderPage();
+      expect(screen.queryByTestId("bridge-notice")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Build the counter for a pick-type counter_action (Revision 21)", () => {
     it("renders the button and removes the exact pick from You send when the server suggests removing it", async () => {
       const sendPick = pick({ pick_id: "2027:1:1", label: "2027 Round 1" });

@@ -5,17 +5,20 @@ import { AppCta, SeoPageShell } from "@/components/seo/SeoChrome";
 import { PublicTradeAnalyzer } from "@/components/seo/PublicTradeAnalyzer";
 import { faqLd, webApplicationLd, webPageLd } from "@/lib/seo/jsonld";
 import { absoluteUrl, CHART_PATH, HUB_PATH, OG_IMAGE, TRADE_ANALYZER_PUBLIC_PATH } from "@/lib/seo/site";
-import { TRADE_FAQ } from "@/lib/seo/tradeAnalyzer";
+import { parseTradeUrl, TRADE_FAQ } from "@/lib/seo/tradeAnalyzer";
+import { publicTradeOgImageUrl } from "@/lib/seo/tradeShare";
 
-// Static shell: the value data loads client-side from /api/public-trade-values,
-// so a build never depends on the value API and the page is always crawlable.
+// The value data loads client-side from /api/public-trade-values, so rendering
+// never depends on the value API and the page is always crawlable. Reading
+// searchParams in generateMetadata (per-link OG image) makes the route render
+// on request instead of at build; the HTML itself is the same shell.
 
 const TITLE = "Fantasy Football Trade Analyzer: Free Dynasty Trade Calculator";
 const DESCRIPTION =
   "Free fantasy football trade analyzer. Search players for both sides, pick 1QB, Superflex or TE premium, and get an instant value total and fair-trade verdict.";
 const PAGE_URL = absoluteUrl(TRADE_ANALYZER_PUBLIC_PATH);
 
-export const metadata: Metadata = {
+const BASE_METADATA: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   // Shared links carry ?a=&b= state; they all canonicalize to the clean page.
@@ -23,6 +26,33 @@ export const metadata: Metadata = {
   openGraph: { title: TITLE, description: DESCRIPTION, url: PAGE_URL, type: "website", siteName: "FantasyDesk", images: [OG_IMAGE] },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [OG_IMAGE.url] },
 };
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function toSearch(params: Record<string, string | string[] | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string") query.set(key, value);
+  }
+  return query.toString();
+}
+
+/**
+ * A shared link (?a=&b=&f=&tep=) previews its own trade: og:image points at
+ * the public per-trade card (/share-card/public-trade), drawn from public
+ * values only. Anything else keeps the generic card. Canonical stays the
+ * clean page so shared variants never split SEO.
+ */
+export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
+  const image = publicTradeOgImageUrl(parseTradeUrl(toSearch(await searchParams)));
+  if (!image) return BASE_METADATA;
+  const card = { url: image, width: 1200, height: 630, alt: "A dynasty trade checked on FantasyDesk" };
+  return {
+    ...BASE_METADATA,
+    openGraph: { ...BASE_METADATA.openGraph, images: [card] },
+    twitter: { ...BASE_METADATA.twitter, images: [image] },
+  };
+}
 
 const STEPS = [
   "Search for the players you would send and add them to You send.",

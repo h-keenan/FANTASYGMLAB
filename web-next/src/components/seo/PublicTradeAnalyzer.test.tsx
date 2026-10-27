@@ -55,13 +55,55 @@ describe("PublicTradeAnalyzer", () => {
     expect(result).toHaveTextContent("Josh Jacobs (Questionable)");
     expect(document.querySelectorAll(".lean-bar-track").length).toBe(1);
 
-    const gate = screen.getByTestId("trade-gate");
-    const cta = within(gate).getByRole("link", { name: "Get a roster-aware verdict" });
+    expect(screen.queryByTestId("trade-gate")).toBeNull();
+    const teaser = screen.getByTestId("roster-teaser");
+    const cta = within(teaser).getByRole("link", { name: "See how this trade affects MY team" });
     expect(cta.getAttribute("href")).toContain("utm_campaign=public_trade_analyzer_verdict");
-    expect(within(gate).getByRole("link", { name: "Try a sample league first" }).getAttribute("href")).toMatch(/^\/sample-league\?/);
-    expect(gate).toHaveTextContent("Roster impact");
-    expect(gate).toHaveTextContent("Partner fit");
-    expect(gate).toHaveTextContent("Counter-offers");
+    expect(within(teaser).getByRole("link", { name: "Try a sample league first" }).getAttribute("href")).toMatch(/^\/sample-league\?/);
+    expect(teaser).toHaveTextContent("Roster-aware verdict");
+    expect(teaser).toHaveTextContent("Lineup impact");
+    expect(teaser).toHaveTextContent("Partner fit");
+    expect(teaser).toHaveTextContent("Counter-offers");
+    // Trade-specific: names the players actually entered.
+    expect(teaser).toHaveTextContent("sending Josh Jacobs");
+    expect(teaser).toHaveTextContent("has Ja'Marr Chase");
+  });
+
+  it("shows the generic account gate before a trade is entered", async () => {
+    mockFetch();
+    await renderLoaded();
+    const gate = screen.getByTestId("trade-gate");
+    expect(within(gate).getByRole("link", { name: "Get a roster-aware verdict" })).toBeInTheDocument();
+    expect(screen.queryByTestId("roster-teaser")).toBeNull();
+  });
+
+  it("carries the entered trade through sign-up and tags the copied link", async () => {
+    mockFetch();
+    window.localStorage.clear();
+    await renderLoaded();
+    addPlayer("You send", "jacobs", "Josh Jacobs");
+    addPlayer("You get", "chase", "Ja'Marr Chase");
+    fireEvent.click(within(screen.getByTestId("roster-teaser")).getByRole("link", { name: "See how this trade affects MY team" }));
+    const stored = JSON.parse(window.localStorage.getItem("fd_pending_bridge_trade_v1") || "{}");
+    expect(stored).toMatchObject({ a: ["4"], b: ["1"] });
+    // Names and values are never stored, only the ids already in the shared URL.
+    expect(JSON.stringify(stored)).not.toMatch(/Jacobs|Chase/);
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    fireEvent.click(screen.getByRole("button", { name: "Copy share link" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(String(writeText.mock.calls[0][0])).toContain("utm_source=share&utm_medium=copy_link&utm_campaign=public_trade_analyzer");
+  });
+
+  it("does not store the trade when the visitor takes the sample league instead", async () => {
+    mockFetch();
+    window.localStorage.clear();
+    await renderLoaded();
+    addPlayer("You send", "jacobs", "Josh Jacobs");
+    addPlayer("You get", "chase", "Ja'Marr Chase");
+    fireEvent.click(within(screen.getByTestId("roster-teaser")).getByRole("link", { name: "Try a sample league first" }));
+    expect(window.localStorage.getItem("fd_pending_bridge_trade_v1")).toBeNull();
   });
 
   it("recomputes for Superflex and TE premium and never sends names or ids to analytics", async () => {

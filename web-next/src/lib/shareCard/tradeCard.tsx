@@ -290,6 +290,8 @@ export interface TradePitch {
   headline: string;
   /** Supported facts only; may be empty (then no "why" block is drawn). */
   lines: string[];
+  /** Small label above the lines; defaults to the partner pitch's "Why it works for you". */
+  eyebrow?: string;
 }
 
 function PitchBlock({ pitch, compact }: { pitch: TradePitch; compact: boolean }) {
@@ -298,7 +300,7 @@ function PitchBlock({ pitch, compact }: { pitch: TradePitch; compact: boolean })
       <div style={{ display: "block", fontSize: compact ? 34 : 52, fontWeight: 900, lineHeight: 1.05, letterSpacing: "-0.02em", lineClamp: 2 }}>{pitch.headline}</div>
       {pitch.lines.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: compact ? 4 : 10 }}>
-          <div style={{ ...eyebrowStyle(T["--color-accent"], compact ? 16 : 22), letterSpacing: "0.18em" }}>Why it works for you</div>
+          <div style={{ ...eyebrowStyle(T["--color-accent"], compact ? 16 : 22), letterSpacing: "0.18em" }}>{pitch.eyebrow ?? "Why it works for you"}</div>
           {pitch.lines.slice(0, 3).map((line) => (
             <div key={line} style={{ display: "block", fontSize: compact ? 18 : 28, fontWeight: 600, lineHeight: 1.2, color: T["--color-text-secondary"], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{`• ${line}`}</div>
           ))}

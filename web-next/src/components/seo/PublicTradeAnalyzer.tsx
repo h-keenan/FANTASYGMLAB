@@ -8,6 +8,7 @@ import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { PositionBadge } from "@/components/PositionBadge";
 import { trackUse } from "@/lib/analytics";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
+import { storePendingBridgeTrade } from "@/lib/tradeBridge";
 import {
   buildTradeSearch,
   ctaHref,
@@ -22,6 +23,7 @@ import {
   type TradeCta,
   type TradeSettings,
 } from "@/lib/seo/tradeAnalyzer";
+import { shareLinkWithUtm } from "@/lib/seo/tradeShare";
 
 const FEATURE = "public_trade_analyzer";
 
@@ -273,6 +275,83 @@ function GateCard({ onCta }: { onCta: (cta: TradeCta) => void }) {
   );
 }
 
+/** "Name and Name" / "Name, Name and 2 more", for the teaser's trade-specific lines. */
+function nameList(players: readonly TradeBoardPlayer[], max = 2): string {
+  const names = players.slice(0, max).map((p) => p.name);
+  const rest = players.length - names.length;
+  if (rest > 0) return `${names.join(", ")} and ${rest} more`;
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";
+}
+
+/**
+ * "Your roster" teaser, shown once a trade is entered. It says exactly what a
+ * free account adds to THIS trade and carries the entered players through
+ * sign-up (lib/tradeBridge.ts) so they are waiting in the logged-in analyzer.
+ */
+function RosterTeaser({
+  sideA,
+  sideB,
+  onCta,
+}: {
+  sideA: readonly TradeBoardPlayer[];
+  sideB: readonly TradeBoardPlayer[];
+  onCta: (cta: TradeCta) => void;
+}) {
+  const sending = nameList(sideA);
+  const getting = nameList(sideB);
+  const items: { title: string; body: string }[] = [
+    {
+      title: "Roster-aware verdict",
+      body: "Accept, counter, fair or decline for your team, instead of a value total that ignores who you already have.",
+    },
+    {
+      title: "Lineup impact",
+      body: `Whether sending ${sending} leaves a hole in your starting lineup this week, with byes and injuries counted.`,
+    },
+    {
+      title: "Partner fit",
+      body: `Whether the manager who has ${getting} would say yes, based on their roster and needs.`,
+    },
+    {
+      title: "Counter-offers",
+      body: "Real alternate packages from your two rosters if this one is not fair, picks included.",
+    },
+  ];
+  return (
+    <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby="pta-teaser-title" data-testid="roster-teaser">
+      <h3 id="pta-teaser-title" style={{ font: "var(--type-section-title)" }}>
+        Now see it on your roster
+      </h3>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        This verdict is value-only, so it cannot see your team. A free FantasyDesk account connects your Sleeper league
+        and adds, for this exact trade:
+      </p>
+      <ul className="flex flex-col gap-2">
+        {items.map((item) => (
+          <li key={item.title} className="flex gap-2 text-sm">
+            <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+              ✓
+            </span>
+            <span>
+              <strong>{item.title}.</strong> <span style={{ color: "var(--color-text-secondary)" }}>{item.body}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <ButtonLink href={ctaHref("verdict")} variant="primary" fullWidth onClick={() => onCta("verdict")}>
+        See how this trade affects MY team
+      </ButtonLink>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        Your player picks are kept in this browser for 24 hours so the trade is waiting after you connect a league.
+        Players who are not on your league&apos;s rosters are flagged, not forced in.
+      </p>
+      <ButtonLink href={ctaHref("sample")} variant="secondary" fullWidth onClick={() => onCta("sample")}>
+        Try a sample league first
+      </ButtonLink>
+    </section>
+  );
+}
+
 export function PublicTradeAnalyzer() {
   const [board, setBoard] = useState<TradeBoard | null>(null);
   const [error, setError] = useState(false);
@@ -353,12 +432,16 @@ export function PublicTradeAnalyzer() {
     track("tep_toggled", { ...effective, tep });
   };
 
-  const onCta = (cta: TradeCta) =>
+  const onCta = (cta: TradeCta) => {
+    // The visitor's entered trade rides through sign-up and league connect
+    // (the sample league is a fixed demo, so it carries nothing).
+    if (cta !== "sample") storePendingBridgeTrade({ a: sideA.map((p) => p.id), b: sideB.map((p) => p.id) });
     track("cta_clicked", effective, { destination: cta === "sample" ? "sample_league" : "signup", item_kind: cta });
+  };
 
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareLinkWithUtm(window.location.href));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
       track("share_copied", effective);
@@ -491,7 +574,7 @@ export function PublicTradeAnalyzer() {
               </p>
             )}
           </section>
-          <GateCard onCta={onCta} />
+          {hasResult ? <RosterTeaser sideA={sideA} sideB={sideB} onCta={onCta} /> : <GateCard onCta={onCta} />}
         </>
       )}
     </div>
