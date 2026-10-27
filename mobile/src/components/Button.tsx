@@ -77,7 +77,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    primary: { backgroundColor: colors.accent },
+    primary: { backgroundColor: colors.accentStrong },
     secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
     ghost: { backgroundColor: 'transparent' },
     premium: { backgroundColor: colors.premiumFill },

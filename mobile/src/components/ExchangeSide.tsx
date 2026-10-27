@@ -35,7 +35,7 @@ export default function ExchangeSide({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const dot = side === 'send' ? colors.danger : colors.successBright;
+  const dot = side === 'send' ? colors.danger : colors.success;
   return (
     <View style={[styles.side, style]}>
       <View style={styles.labelRow}>
