@@ -209,6 +209,45 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByText("Ask for a sweetener too")).toBeInTheDocument();
   });
 
+  it("shows a lineup-hole warning and a direction-matched rationale heading (coridian_ 2026-10-27)", async () => {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
+      ok: true,
+      verdict: {
+        ...VERDICT,
+        band: "COUNTER",
+        ui_verdict: "COUNTER",
+        tone: "counter",
+        confidence: "Moderate confidence",
+        value_delta: -379,
+        rationale: "Leaves you without a startable RB in Week 8. Falls short: it pays a raw-value premium.",
+        rationale_label: "Why it needs changes",
+        lineup_warnings: [
+          {
+            code: "no_startable_position",
+            position: "RB",
+            severity: "critical",
+            headline: "Leaves you without a startable RB in Week 8",
+            detail: "You have 1 startable RB now and 2 RB slots to fill.",
+          },
+        ],
+      },
+      reason: "",
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    fireEvent.click(screen.getByText("Their WR"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+    });
+
+    const warnings = await screen.findByTestId("lineup-warnings");
+    expect(warnings).toHaveTextContent("Leaves you without a startable RB in Week 8");
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Why it needs changes")).toBeInTheDocument();
+    expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
+  });
+
   describe("Players' Add to Trade quick-add (quickAddPlayerId)", () => {
     it("pre-populates You Receive with a player owned by another team, and selects that team", () => {
       render(

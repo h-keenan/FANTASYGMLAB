@@ -32,6 +32,7 @@ import pandas as pd
 from modules import runtime_trace
 from modules.frame_records import frame_records
 from modules import trade_grade
+from modules import trade_lineup_impact
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_display import _format_score
@@ -43,6 +44,14 @@ from modules.team_eval import (
     suggest_optimal_lineup,
     team_strategy_label,
 )
+
+
+def _sentence(text: str) -> str:
+    text = (text or "").strip()
+    if not text:
+        return ""
+    text = text[:1].upper() + text[1:]
+    return text if text.endswith(".") else text + "."
 
 
 def _safe_text(value: Any, default: str = "") -> str:
@@ -480,6 +489,30 @@ def evaluate_trade_analyzer_fit(
 
     strategy_key = normalize_team_strategy(strategy)
 
+    # This-week lineup check on the REAL roster (byes + Out/IR honored): the
+    # healthy-equivalent snapshot above deliberately ignores both, so it can
+    # read "neutral" for a trade that leaves a starting slot empty.
+    try:
+        weekly_impact = trade_lineup_impact.weekly_lineup_impact(
+            my_team_df,
+            post_team_df,
+            lineup_settings,
+            current_week=window.current_week,
+            in_season=window.in_season,
+            score_field=score_column,
+        )
+    except Exception:
+        weekly_impact = {"available": False, "warnings": [], "new_open_slots": [], "week": 0}
+    lineup_warnings = list(weekly_impact.get("warnings") or [])
+    critical_warnings = [w for w in lineup_warnings if w.get("severity") == trade_lineup_impact.SEVERITY_CRITICAL]
+    weekly_lineup_component = 0
+    if lineup_warnings:
+        critical_penalty = -2 if strategy_key in {"rebuild", "tank"} else -3
+        weekly_lineup_component = max(
+            -4,
+            critical_penalty * len(critical_warnings) - (len(lineup_warnings) - len(critical_warnings)),
+        )
+
     rows_by_id = _asset_rows_by_id(my_team_df, all_players_df, send_assets, receive_assets)
     receive_values, receive_injury_lines = trade_grade.price_injured_assets(
         receive_assets,
@@ -712,6 +745,7 @@ def evaluate_trade_analyzer_fit(
         + draft_component
         + strategy_component
         + injury_component
+        + weekly_lineup_component
     )
     if fit_total >= 5:
         roster_fit_verdict = "Strong Fit"
@@ -723,6 +757,8 @@ def evaluate_trade_analyzer_fit(
         roster_fit_verdict = "Risky Fit"
     else:
         roster_fit_verdict = "Poor Fit"
+    if critical_warnings and roster_fit_verdict in {"Strong Fit", "Helpful Fit", "Mixed Fit"}:
+        roster_fit_verdict = "Risky Fit"
 
     if not send_positions and not receive_positions:
         lineup_summary = "No direct starter-lineup change because only draft capital moves."
@@ -731,6 +767,8 @@ def evaluate_trade_analyzer_fit(
             lineup_summary = f"Starter lineup improves by +{_format_score(lineup_delta)}."
         elif lineup_delta <= -120:
             lineup_summary = f"Starter lineup drops by {_format_score(abs(lineup_delta))}."
+        elif lineup_warnings:
+            lineup_summary = "Season-long starter strength stays close to neutral."
         else:
             lineup_summary = "Starter lineup stays close to neutral."
         if improved_positions:
@@ -745,6 +783,10 @@ def evaluate_trade_analyzer_fit(
             lineup_summary += f" Injury pressure rises to {post_injured_starters} injured starters."
         elif injury_reinforcements:
             lineup_summary += f" Adds healthy cover at {' / '.join(injury_reinforcements[:2])}."
+    if lineup_warnings:
+        lineup_summary = (
+            " ".join(f"{w['headline']}. {w['detail']}" for w in lineup_warnings[:2]) + " " + lineup_summary
+        ).strip()
 
     strategy_parts = []
     if strategy_key in {"contender", "fringe_contender"}:
@@ -805,6 +847,9 @@ def evaluate_trade_analyzer_fit(
     if injury_reinforcements or post_injured_starters < current_injured_starters:
         positives.append("improves injury cover")
 
+    for warning in lineup_warnings:
+        if warning.get("severity") != trade_lineup_impact.SEVERITY_CRITICAL and len(negatives) < 3:
+            negatives.append(f"thins this week's {warning['position']} lineup")
     if raw_value_delta < 0:
         negatives.append("pays a raw-value premium")
     if lineup_delta < 0:
@@ -825,13 +870,24 @@ def evaluate_trade_analyzer_fit(
         negatives.append(f"removes healthy cover at {' / '.join(injury_exposure[:2])}")
 
     if positives and negatives:
-        explanation = f"Helps because it {', '.join(positives[:2])}, but it also {', '.join(negatives[:2])}."
+        pos_text, neg_text = ", ".join(positives[:2]), ", ".join(negatives[:2])
+        if critical_warnings or (value_delta < 0 and fit_total <= 0):
+            # Net-negative: lead with the cost, never "Helps because" over a
+            # negative value balance.
+            explanation = f"Falls short: it {neg_text}, even though it {pos_text}."
+        elif value_delta >= 0 and fit_total >= 1:
+            explanation = f"Helps because it {pos_text}, but it also {neg_text}."
+        else:
+            explanation = f"Mixed: it {pos_text}, but it also {neg_text}."
     elif positives:
         explanation = f"Helps because it {', '.join(positives[:3])}."
     elif negatives:
         explanation = f"Hurts because it {', '.join(negatives[:3])}."
     else:
         explanation = "This is mostly a value-level reshuffle without a strong roster-fit swing."
+
+    if critical_warnings:
+        explanation = " ".join(f"{w['headline']}." for w in critical_warnings[:2]) + " " + explanation
 
     injury_summary_parts = []
     if injury_reinforcements:
@@ -846,17 +902,28 @@ def evaluate_trade_analyzer_fit(
         injury_summary_parts.append(
             f"acquires {incoming_moderate_injuries} shorter-term injury risk{'s' if incoming_moderate_injuries != 1 else ''}"
         )
+    same_flag = current_health_flag == post_health_flag
     if post_injury_burden <= current_injury_burden - 1.0:
+        lead = (
+            f"Injury risk eases but stays at {post_health_flag}."
+            if same_flag
+            else f"Injury risk improves from {current_health_flag} to {post_health_flag}."
+        )
         injury_summary = (
-            f"Injury risk improves from {current_health_flag} to {post_health_flag}. "
-            + (", ".join(injury_summary_parts) if injury_summary_parts else "The roster comes out healthier overall.")
-            + "."
+            lead
+            + " "
+            + (_sentence(", ".join(injury_summary_parts)) if injury_summary_parts else "The roster comes out healthier overall.")
         )
     elif post_injury_burden >= current_injury_burden + 1.0:
+        lead = (
+            f"Injury risk rises but stays at {post_health_flag}."
+            if same_flag
+            else f"Injury risk rises from {current_health_flag} to {post_health_flag}."
+        )
         injury_summary = (
-            f"Injury risk rises from {current_health_flag} to {post_health_flag}. "
-            + (", ".join(injury_summary_parts) if injury_summary_parts else "The return adds more health volatility than it removes.")
-            + "."
+            lead
+            + " "
+            + (_sentence(", ".join(injury_summary_parts)) if injury_summary_parts else "The return adds more health volatility than it removes.")
         )
     elif injury_summary_parts:
         injury_summary = (
@@ -864,6 +931,8 @@ def evaluate_trade_analyzer_fit(
             + ", ".join(injury_summary_parts)
             + "."
         )
+    elif current_health_flag != "Stable" and same_flag:
+        injury_summary = f"Injury risk is unchanged ({post_health_flag})."
     else:
         injury_summary = "Health context stays close to neutral."
     if injury_lines:
@@ -928,6 +997,12 @@ def evaluate_trade_analyzer_fit(
             "draft": draft_component,
             "strategy": strategy_component,
             "injury": injury_component,
+            "weekly_lineup": weekly_lineup_component,
         },
+        "weekly_lineup": {
+            key: weekly_impact.get(key)
+            for key in ("available", "week", "new_open_slots", "startable_before", "startable_after")
+        },
+        "lineup_warnings": lineup_warnings,
         "injury_burden_delta": injury_burden_delta,
     }
