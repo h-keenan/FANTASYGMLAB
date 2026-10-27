@@ -1,7 +1,8 @@
 /**
- * Trade idea share card: two "RECEIVES" panels (your team / the partner)
- * with swap arrows between them, the value-edge verdict with a confidence
- * meter, the server's own rationale, and the QR footer. Every field comes
+ * Trade idea share card, laid out like the in-app Trade Hub card: a
+ * "YOU SEND" (red-tinted) and "YOU GET" (green-tinted) column of player rows
+ * (position badge, ringed avatar, rating ring, value), the Balance line with
+ * the verdict chip and confidence meter, the server's own rationale, and the QR footer. Every field comes
  * straight off the server's TradeIdea (GET .../trade-hub), the same object
  * the in-app TradeIdeaCardView renders; nothing here is derived beyond
  * formatting. No NFL marks: team identity is the manager's own Sleeper
@@ -11,11 +12,12 @@
  */
 
 import type { TradeAsset, TradeIdea } from "@/lib/api";
-import { fairnessBandColor } from "@/lib/tradeHubPresentation";
+import { LOW_CONFIDENCE_USER_NOTE, fairnessBandColor, formatTradeGain } from "@/lib/tradeHubPresentation";
 
 import {
   ShareAvatar,
   ShareFrame,
+  ShareChip,
   ShareOvrRing,
   SharePositionBadge,
   ShareQr,
@@ -25,6 +27,7 @@ import {
   glassStyle,
   initials,
 } from "./frame";
+import { TRADE_SHARE_COPY } from "./tradeCopy";
 import { SHARE_TOKEN_HEX as T, resolveTokenColor, shareRadius, withAlpha } from "./tokens";
 import { BRAND_DOMAIN, BRAND_NAME } from "@/lib/brand";
 
@@ -66,15 +69,6 @@ export function clampText(text: string, max: number): string {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20)).replace(/[\s,.;:-]+$/, "")}…`;
 }
 
-/** Who the value edge favors, with the amount. */
-export function edgeSummary(gain: number, myTeam: string, partnerTeam: string): { text: string; color: string } {
-  if (!gain) return { text: "Even value", color: T["--color-text-secondary"] };
-  const amount = Math.abs(Math.round(gain)).toLocaleString("en-US");
-  return gain > 0
-    ? { text: `Edge: ${myTeam} +${amount}`, color: T["--color-success"] }
-    : { text: `Edge: ${partnerTeam} +${amount}`, color: T["--color-danger"] };
-}
-
 function PickPlate({ asset, size }: { asset: TradeAsset; size: number }) {
   // Same plate as the in-app pick tile: accent-soft square, round label.
   return (
@@ -98,54 +92,81 @@ function PickPlate({ asset, size }: { asset: TradeAsset; size: number }) {
   );
 }
 
-function AssetRow({ asset, size, headshot }: { asset: TradeAsset; size: number; headshot: string | null }) {
+/** Row tint by side, the app's ExchangeSide colors: red for what you send,
+ * green for what you get (danger/success soft tokens, same as the in-app card). */
+type Side = "send" | "get";
+const SIDE_COLOR: Record<Side, string> = { send: T["--color-danger"], get: T["--color-success"] };
+const SIDE_TINT: Record<Side, string> = { send: T["--color-danger-soft"], get: T["--color-success-soft"] };
+
+function AssetRow({ asset, side, size, headshot, compact }: { asset: TradeAsset; side: Side; size: number; headshot: string | null; compact: boolean }) {
   const isPick = asset.asset_type === "pick";
-  const nameSize = Math.round(size * 0.25);
-  const metaSize = Math.round(size * 0.2);
+  const nameSize = compact ? Math.round(size * 0.3) : size >= 180 ? 36 : size >= 130 ? 31 : 25;
+  const metaSize = compact ? Math.round(size * 0.24) : size >= 130 ? 22 : 18;
   const value = formatValue(asset.score);
   const meta: string[] = [];
   if (isPick) {
-    meta.push(value ? `${value} value` : "Draft pick");
+    meta.push("Draft pick");
     if (asset.owner_team_name && asset.owner_team_name.length <= 10) meta.push(`via ${asset.owner_team_name}`);
   } else {
     meta.push(asset.team || "FA");
+    if (asset.age) meta.push(`Age ${asset.age}`);
   }
+  const avatar = compact ? Math.round(size * 0.7) : Math.min(92, Math.round(size * 0.55));
+  const nameText = isPick ? pickTitle(asset) : asset.name || "Unknown player";
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: Math.round(size * 0.14),
-        height: size,
-        padding: `0 ${Math.round(size * 0.1)}px`,
+        gap: 14,
+        flexGrow: 1,
+        minHeight: size,
+        padding: `0 ${compact ? 12 : 14}px`,
         borderRadius: shareRadius("--radius-md"),
-        backgroundColor: "rgba(255, 255, 255, 0.045)",
-        border: `1.5px solid ${T["--color-border"]}`,
+        backgroundColor: SIDE_TINT[side],
+        border: `1.5px solid ${withAlpha(SIDE_COLOR[side], 0.35)}`,
       }}
     >
       {isPick ? (
-        <PickPlate asset={asset} size={Math.round(size * 0.62)} />
+        <PickPlate asset={asset} size={avatar} />
       ) : (
-        <ShareAvatar src={headshot} tier={asset.tier} size={Math.round(size * 0.62)} fallbackText={initials(asset.name)} />
+        <ShareAvatar src={headshot} tier={asset.tier} size={avatar} fallbackText={initials(asset.name)} />
       )}
-      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexShrink: 1, minWidth: 0, gap: Math.round(size * 0.06) }}>
-        <div style={{ display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {isPick ? pickTitle(asset) : asset.name || "Unknown player"}
+      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 6 }}>
+        <div
+          style={
+            compact
+              ? { display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
+              : { display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.1, lineClamp: 2 }
+          }
+        >
+          {nameText}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: metaSize, fontWeight: 600, color: T["--color-text-muted"] }}>
-          {isPick ? null : <SharePositionBadge position={asset.position} size={Math.round(metaSize * 0.9)} />}
-          <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.join(" · ")}</span>
+          {isPick ? null : <SharePositionBadge position={asset.position} size={Math.round(metaSize * 0.85)} />}
+          <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.join(" \u00b7 ")}</span>
         </div>
       </div>
-      {isPick ? null : <ShareOvrRing rating={asset.overall_rating} size={Math.round(size * 0.46)} />}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
+        {isPick ? null : <ShareOvrRing rating={asset.overall_rating} size={compact ? Math.round(size * 0.5) : size >= 130 ? 68 : size >= 112 ? 56 : 46} />}
+        {compact || !value ? null : (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+            <div style={{ ...eyebrowStyle(T["--color-text-muted"], 13), letterSpacing: "0.14em" }}>{TRADE_SHARE_COPY.value}</div>
+            <div style={{ display: "flex", fontSize: 24, fontWeight: 800, lineHeight: 1.05 }}>{value}</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function ReceivesPanel({
-  teamName,
-  avatar,
-  accent,
+/** One side of the exchange: "YOU SEND" / "YOU GET" label with its colored
+ * dot and total (ExchangeSide in the app), then tinted rows. Rows share the
+ * panel height equally, so a 1-player side fills the same space a 3-player
+ * side does instead of leaving an empty block. */
+function ExchangePanel({
+  label,
+  side,
   total,
   assets,
   rowSize,
@@ -153,9 +174,8 @@ function ReceivesPanel({
   headshots,
   compact,
 }: {
-  teamName: string;
-  avatar: string | null;
-  accent: string;
+  label: string;
+  side: Side;
   total: number;
   assets: TradeAsset[];
   rowSize: number;
@@ -165,57 +185,27 @@ function ReceivesPanel({
 }) {
   const shown = assets.slice(0, maxRows);
   const hidden = assets.length - shown.length;
-  const avatarSize = compact ? 44 : 60;
   return (
-    <div
-      style={{
-        ...glassStyle(),
-        flexDirection: "column",
-        flexGrow: 1,
-        flexBasis: 0,
-        minWidth: 0,
-        padding: compact ? "16px 18px" : "24px 20px",
-        gap: compact ? 8 : 12,
-        border: `2px solid ${withAlpha(accent, 0.55)}`,
-      }}
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: compact ? 2 : 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <ShareAvatar src={avatar} size={avatarSize} fallbackText={initials(teamName)} />
-          <div
-            style={{
-              display: "block",
-              flexGrow: 1,
-              flexShrink: 1,
-              minWidth: 0,
-              fontSize: compact ? 22 : 28,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              color: accent,
-              textTransform: "uppercase",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {teamName}
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 0, minWidth: 0, gap: compact ? 8 : 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", width: compact ? 12 : 16, height: compact ? 12 : 16, borderRadius: 16, backgroundColor: SIDE_COLOR[side] }} />
+          <div style={{ ...eyebrowStyle(T["--color-text-secondary"], compact ? 18 : 24), letterSpacing: "0.16em" }}>{label}</div>
         </div>
-        {(
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <div style={{ ...eyebrowStyle(T["--color-text-muted"], compact ? 15 : 20), letterSpacing: "0.2em" }}>Receives</div>
-            <div style={{ display: "flex", fontSize: compact ? 32 : 52, fontWeight: 900, lineHeight: 1 }}>{formatValue(total) || "0"}</div>
-          </div>
-        )}
+        <div style={{ display: "flex", fontSize: compact ? 28 : 40, fontWeight: 900, lineHeight: 1, color: T["--color-text-secondary"] }}>{formatValue(total) || "0"}</div>
       </div>
-      {shown.map((asset, index) => (
-        <AssetRow
-          key={`${asset.player_id || asset.label || "asset"}-${index}`}
-          asset={asset}
-          size={rowSize}
-          headshot={asset.player_id ? headshots[asset.player_id] ?? null : null}
-        />
-      ))}
+      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, gap: compact ? 8 : 12 }}>
+        {shown.map((asset, index) => (
+          <AssetRow
+            key={`${asset.player_id || asset.label || "asset"}-${index}`}
+            asset={asset}
+            side={side}
+            size={rowSize}
+            compact={compact}
+            headshot={asset.player_id ? headshots[asset.player_id] ?? null : null}
+          />
+        ))}
+      </div>
       {hidden > 0 ? <div style={{ display: "flex", fontSize: compact ? 18 : 24, fontWeight: 700, color: T["--color-text-muted"] }}>{`+${hidden} more`}</div> : null}
     </div>
   );
@@ -257,39 +247,38 @@ function ConfidenceMeter({ label, size }: { label: string; size: number }) {
   );
 }
 
-function VerdictBlock({
-  idea,
-  myTeam,
-  compact,
-  includeWhy,
-  why,
-}: {
-  idea: TradeIdea;
-  myTeam: string;
-  compact: boolean;
-  includeWhy: boolean;
-  why: string;
-}) {
+function VerdictBlock({ idea, compact, includeWhy, why }: { idea: TradeIdea; compact: boolean; includeWhy: boolean; why: string }) {
   const band = (idea.value_edge_band || "").trim();
-  const bandColor = band ? resolveTokenColor(fairnessBandColor(band)) : T["--color-text-primary"];
-  const edge = edgeSummary(idea.trade_gain, myTeam, idea.partner_team_name);
+  const bandColor = band ? resolveTokenColor(fairnessBandColor(band)) : T["--color-text-secondary"];
+  const gain = idea.trade_gain;
+  // Same Balance line + coloring as TradeIdeaCardView: signed delta, green
+  // when it favors you, red when it favors them.
+  const balanceColor = gain > 0 ? T["--color-success"] : gain < 0 ? T["--color-danger"] : T["--color-text-secondary"];
+  const lowConfidence = (idea.confidence_label || "").trim().toLowerCase() === "low";
+  const hasWhy = includeWhy && Boolean(why);
   return (
-    <div style={{ ...glassStyle(), flexGrow: compact ? 1 : 0, flexShrink: 1, flexBasis: compact ? 0 : "auto", minWidth: 0, alignItems: "stretch", padding: compact ? "14px 22px" : "28px 32px", gap: compact ? 22 : 30, border: `2px solid ${withAlpha(T["--color-accent"], 0.4)}` }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 14, flexShrink: 0, width: includeWhy && why ? (compact ? 370 : 400) : "100%" }}>
-        <div style={{ display: "flex", fontSize: compact ? 48 : 70, fontWeight: 900, lineHeight: 1.02, color: bandColor, letterSpacing: "-0.02em" }}>{band || "Trade idea"}</div>
-        <div style={{ display: "block", fontSize: compact ? 22 : 26, fontWeight: 800, color: edge.color, lineClamp: 2 }}>
-          {edge.text}
+    <div style={{ ...glassStyle(), flexGrow: compact ? 1 : 0, flexShrink: 1, flexBasis: compact ? 0 : "auto", minWidth: 0, alignItems: "stretch", padding: compact ? "14px 22px" : "26px 30px", gap: compact ? 22 : 28, border: `2px solid ${withAlpha(T["--color-accent"], 0.4)}` }}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 14, flexShrink: 0, width: hasWhy ? (compact ? 330 : 400) : "100%" }}>
+        {band ? (
+          <div style={{ display: "flex" }}>
+            <ShareChip label={band} color={bandColor} size={compact ? 22 : 34} />
+          </div>
+        ) : null}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+          <div style={{ ...eyebrowStyle(T["--color-text-muted"], compact ? 16 : 22), letterSpacing: "0.14em" }}>{TRADE_SHARE_COPY.balance}</div>
+          <div style={{ display: "flex", fontSize: compact ? 40 : 64, fontWeight: 900, lineHeight: 1, color: balanceColor }}>{formatTradeGain(gain)}</div>
         </div>
         <div style={{ display: "flex" }}>
-          <ConfidenceMeter label={idea.confidence_label} size={compact ? 16 : 22} />
+          <ConfidenceMeter label={idea.confidence_label} size={compact ? 16 : 20} />
         </div>
       </div>
-      {includeWhy && why ? (
+      {hasWhy ? (
         <>
           <div style={{ display: "flex", width: 2, backgroundColor: T["--color-border"] }} />
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 14, flexShrink: 0, width: compact ? 324 : 426, paddingLeft: compact ? 18 : 26, overflow: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 12, flexShrink: 0, width: compact ? 300 : 430, overflow: "hidden" }}>
             <div style={{ ...eyebrowStyle(T["--color-accent"], compact ? 18 : 24), letterSpacing: "0.18em" }}>Why</div>
-            <div style={{ display: "block", fontSize: compact ? 19 : 25, fontWeight: 500, lineHeight: 1.25, color: T["--color-text-secondary"], lineClamp: compact ? 4 : 6 }}>{why}</div>
+            <div style={{ display: "block", fontSize: compact ? 19 : 25, fontWeight: 500, lineHeight: 1.25, color: T["--color-text-secondary"], lineClamp: compact ? 3 : lowConfidence ? 4 : 5 }}>{why}</div>
+            {lowConfidence && !compact ? <div style={{ display: "block", fontSize: 21, fontWeight: 600, lineHeight: 1.2, color: T["--color-warning"] }}>{LOW_CONFIDENCE_USER_NOTE}</div> : null}
           </div>
         </>
       ) : null}
@@ -348,18 +337,22 @@ export function TradeShareCard({
   const send = idea.package.send ?? [];
   const maxRows = maxRowsFor(compact);
   const shownRows = Math.min(maxRows, Math.max(send.length, receive.length));
-  const rowSize = compact ? 66 : shownRows <= 2 ? 120 : shownRows === 3 ? 108 : 96;
-  const rationale = (idea.rationale || "").trim() || (idea.reasoning_tags ?? []).join(" · ");
+  const rowSize = compact ? 84 : shownRows <= 2 ? 196 : shownRows === 3 ? 136 : 104;
+  const rationale = (idea.rationale || "").trim() || (idea.reasoning_tags ?? []).join(" \u00b7 ");
   const why = clampText(rationale, compact ? 125 : 200);
-  const arrowSize = compact ? 56 : 76;
-  const nameStyle = { display: "block", maxWidth: compact ? 300 : 420, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } as const;
+  const avatarSize = compact ? 34 : 46;
+  const nameStyle = { display: "block", maxWidth: compact ? 230 : 330, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } as const;
   const matchup = (
     <>
+      <ShareAvatar src={images.myAvatar ?? null} size={avatarSize} fallbackText={initials(myTeam)} />
       <span style={nameStyle}>{myTeam}</span>
       <SwapArrows size={compact ? 30 : 40} />
+      <ShareAvatar src={images.partnerAvatar} size={avatarSize} fallbackText={initials(partnerTeam)} />
       <span style={nameStyle}>{partnerTeam}</span>
     </>
   );
+  const sendLabel = pitch ? TRADE_SHARE_COPY.pitchSend : TRADE_SHARE_COPY.send;
+  const getLabel = pitch ? TRADE_SHARE_COPY.pitchGet : TRADE_SHARE_COPY.get;
 
   return (
     <ShareFrame
@@ -372,40 +365,17 @@ export function TradeShareCard({
     >
       {compact ? null : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 38, fontWeight: 700 }}>{matchup}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 34, fontWeight: 700 }}>{matchup}</div>
         </div>
       )}
-      <div style={{ display: "flex", flexGrow: 1, position: "relative", gap: compact ? 44 : 56 }}>
-        <ReceivesPanel
-          teamName={myTeam}
-          avatar={images.myAvatar ?? null}
-          accent={T["--color-accent"]}
-          total={idea.receive_score}
-          assets={receive}
-          rowSize={rowSize}
-          maxRows={maxRows}
-          headshots={images.headshots}
-          compact={compact}
-        />
-        <ReceivesPanel
-          teamName={partnerTeam}
-          avatar={images.partnerAvatar}
-          accent={T["--color-action"]}
-          total={idea.send_score}
-          assets={send}
-          rowSize={rowSize}
-          maxRows={maxRows}
-          headshots={images.headshots}
-          compact={compact}
-        />
-        <div style={{ display: "flex", position: "absolute", top: "40%", left: "50%", marginLeft: -arrowSize / 2, width: arrowSize, height: arrowSize, alignItems: "center", justifyContent: "center", borderRadius: arrowSize, backgroundColor: T["--color-bg"], border: `2px solid ${withAlpha(T["--color-accent"], 0.5)}` }}>
-          <SwapArrows size={Math.round(arrowSize * 0.62)} />
-        </div>
+      <div style={{ display: "flex", gap: compact ? 24 : 28 }}>
+        <ExchangePanel label={sendLabel} side="send" total={idea.send_score} assets={send} rowSize={rowSize} maxRows={maxRows} headshots={images.headshots} compact={compact} />
+        <ExchangePanel label={getLabel} side="get" total={idea.receive_score} assets={receive} rowSize={rowSize} maxRows={maxRows} headshots={images.headshots} compact={compact} />
       </div>
 
       {compact ? (
         <div style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
-          {pitch ? <PitchBlock pitch={pitch} compact /> : <VerdictBlock idea={idea} myTeam={myTeam} compact includeWhy why={why} />}
+          {pitch ? <PitchBlock pitch={pitch} compact /> : <VerdictBlock idea={idea} compact includeWhy why={why} />}
           <div style={{ ...glassStyle(), flexShrink: 0, alignItems: "center", gap: 16, padding: "14px 20px" }}>
             <ShareQr brand={brand} size={92} />
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -415,7 +385,7 @@ export function TradeShareCard({
           </div>
         </div>
       ) : (
-        pitch ? <PitchBlock pitch={pitch} compact={false} /> : <VerdictBlock idea={idea} myTeam={myTeam} compact={false} includeWhy why={why} />
+        pitch ? <PitchBlock pitch={pitch} compact={false} /> : <VerdictBlock idea={idea} compact={false} includeWhy why={why} />
       )}
     </ShareFrame>
   );

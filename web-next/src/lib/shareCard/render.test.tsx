@@ -7,7 +7,7 @@ import type { RankedPlayer, TradeIdea } from "@/lib/api";
 
 import { clearShareCachesForTests, isAllowedImageUrl, renderPlayerCardPng, renderTradeCardPng, sniffImageType } from "./server";
 import { fixtureIdea as idea, fixturePlayer as player, pngSize } from "./testFixtures";
-import { clampText, confidenceBars, edgeSummary, maxRowsFor } from "./tradeCard";
+import { clampText, confidenceBars, maxRowsFor } from "./tradeCard";
 
 describe("share card rendering", () => {
   beforeEach(() => {
@@ -65,12 +65,6 @@ describe("share card helpers", () => {
     expect(confidenceBars("High")).toBe(3);
     expect(confidenceBars("")).toBeNull();
     expect(confidenceBars("Unrated")).toBeNull();
-  });
-
-  it("names the side the value edge favors", () => {
-    expect(edgeSummary(663, "Me", "Them").text).toBe("Edge: Me +663");
-    expect(edgeSummary(-663, "Me", "Them").text).toBe("Edge: Them +663");
-    expect(edgeSummary(0, "Me", "Them").text).toBe("Even value");
   });
 
   it("clamps rationale at a word boundary", () => {
