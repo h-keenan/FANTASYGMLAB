@@ -87,15 +87,22 @@ const darkColors = {
   // get the light-mode-correct answer for free (see lightColors.accentOnTint,
   // which is NOT an alias).
   accentOnTint: '#67e8f9',
+  // Solid-fill cyan for primary buttons: web-next's --color-accent-strong (Button primary uses it,
+  // not --color-accent). Lighter `accent` stays for text/icons/rims.
+  accentStrong: '#22d3ee',
   // Text/icons drawn ON a solid `accent` fill (primary buttons). The light
   // cyan accent needs dark ink, same as web's --color-brand-mark-ink on
   // its accent buttons; white text on #67e8f9 is ~1.4:1 and unreadable.
   onAccent: '#0B1220',
-  danger: '#FF4D4D',
-  dangerMuted: 'rgba(255,77,77,0.14)',
-  success: '#22C55E',
+  // Status colors synced to web-next (--color-danger / --color-success / --color-warning and their
+  // -soft fills) so red send / green get read identically on both platforms (parity pass 4).
+  danger: '#ef4444',
+  dangerMuted: 'rgba(239,68,68,0.15)',
+  success: '#22c55e',
   successBright: '#4ADE80',
-  successMuted: 'rgba(34,197,94,0.14)',
+  successMuted: 'rgba(34,197,94,0.15)',
+  warning: '#f59e0b',
+  warningMuted: 'rgba(245,158,11,0.14)',
   premium: '#E8B13A',
   premiumMuted: 'rgba(255,196,61,0.14)',
   // Premium gold button set (owner 2026-10-23: anything premium is ALWAYS gold with a glow).
@@ -168,13 +175,16 @@ const lightColors = {
   // `accentMuted` fill or the pale `backgroundElevated` sheet surface —
   // web-next's --color-accent-strong, its own stronger/on-tint variant.
   accentOnTint: '#08616e',
+  accentStrong: '#08616e',
   // Light theme's accent is a dark teal, so white reads cleanly on it.
   onAccent: '#FFFFFF',
-  danger: '#D92D2D',
-  dangerMuted: 'rgba(217,45,45,0.12)',
-  success: '#178A43',
+  danger: '#c81111',
+  dangerMuted: 'rgba(200,17,17,0.12)',
+  success: '#147337',
   successBright: '#22C55E',
-  successMuted: 'rgba(23,138,67,0.12)',
+  successMuted: 'rgba(20,115,55,0.12)',
+  warning: '#8a5906',
+  warningMuted: 'rgba(138,89,6,0.12)',
   // Color-system audit (2026-09-25): darkened from #B8860B, which measured
   // only 3.25:1 on a plain white surface (fails AA's 4.5:1) and a
   // near-invisible 2.86:1 when used as chip text directly on its own

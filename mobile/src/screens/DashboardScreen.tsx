@@ -23,7 +23,7 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
-import TradeAssetRow from '../components/TradeAssetRow';
+import ExchangeSide from '../components/ExchangeSide';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
@@ -618,8 +618,8 @@ function quickActions(
   color: string;
 }> {
   return [
-    { label: 'Trades', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
-    { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
+    { label: 'Trade Hub', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
+    { label: 'Players', route: 'Players', icon: 'people-outline', color: colors.violet },
     { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
     inSeason
       ? { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', color: colors.success }
@@ -629,7 +629,7 @@ function quickActions(
     // as GmOrb.
     { label: 'Matchup', route: 'Matchup', icon: 'american-football-outline', color: colors.success },
     { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', color: colors.danger },
-    { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
+    { label: 'League Rankings', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
     { label: 'GM Plan', route: 'GmPlan', icon: 'map-outline', color: colors.premium },
   ];
 }
@@ -844,30 +844,13 @@ function TopPriorityTradeCard({
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</AppText>
         {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
-        <View style={styles.tradeBadge}>
-          <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
-          <AppText style={styles.tradeBadgeText}>TRADE</AppText>
-        </View>
+        <ToneBadge label="Trade" icon="swap-horizontal" color={colors.textSecondary} style={styles.tradeBadge} />
       </View>
       <AppText style={styles.cardHeadline}>{presentation.partner_team_name}</AppText>
 
-      <View style={styles.sideBlock}>
-        <View style={[styles.sideBar, { backgroundColor: colors.danger }]} />
-        <View style={styles.sideContent}>
-          <AppText style={styles.sideLabel}>YOU GIVE</AppText>
-          {presentation.trade_package.send.map((asset, index) => (
-            <TradeAssetRow key={`send-${index}`} asset={asset} />
-          ))}
-        </View>
-      </View>
-      <View style={styles.sideBlock}>
-        <View style={[styles.sideBar, { backgroundColor: colors.successBright }]} />
-        <View style={styles.sideContent}>
-          <AppText style={styles.sideLabel}>YOU GET</AppText>
-          {presentation.trade_package.receive.map((asset, index) => (
-            <TradeAssetRow key={`receive-${index}`} asset={asset} />
-          ))}
-        </View>
+      <View style={styles.sidesStack}>
+        <ExchangeSide side="send" assets={presentation.trade_package.send} />
+        <ExchangeSide side="get" assets={presentation.trade_package.receive} />
       </View>
 
       <View style={styles.valueRow}>
@@ -957,9 +940,7 @@ export function BriefingCard({
             not a fabricated confidence score, since that ladder is a strict
             step-function. See modules.dashboard_engine.NEED_TIER_LABELS. */}
         {item.tier_label ? (
-          <View style={styles.tradeBadge}>
-            <AppText style={styles.tradeBadgeText}>{item.tier_label.toUpperCase()}</AppText>
-          </View>
+          <ToneBadge label={item.tier_label} color={colors.textSecondary} style={styles.tradeBadge} />
         ) : null}
       </View>
       <AppText style={styles.cardHeadline}>{item.headline}</AppText>
@@ -1234,27 +1215,8 @@ function createStyles(colors: ThemeColors) {
   cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   cardHeadline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
   cardReason: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
-  tradeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 'auto',
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  tradeBadgeText: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 },
-  sideBlock: { flexDirection: 'row', marginTop: spacing.sm },
-  sideBar: { width: 3, borderRadius: 2, marginRight: spacing.sm },
-  sideContent: { flex: 1, gap: spacing.xs },
-  sideLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  tradeBadge: { marginLeft: 'auto' },
+  sidesStack: { gap: spacing.sm, marginTop: spacing.sm },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',

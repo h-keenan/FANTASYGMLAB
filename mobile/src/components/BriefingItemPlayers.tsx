@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import CompactPlayerModule from './CompactPlayerModule';
-import TradeAssetRow from './TradeAssetRow';
+import ExchangeSide from './ExchangeSide';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardItem } from '../lib/api';
 import { hasTradePackage, signalPlayers, type SignalPlayer } from '../lib/portfolioSignals';
@@ -35,14 +35,8 @@ export default function BriefingItemPlayers({
   if (hasTradePackage(item) && pkg) {
     return (
       <View style={styles.stack}>
-        <AppText style={styles.sideLabel}>YOU SEND</AppText>
-        {pkg.send.map((asset, index) => (
-          <TradeAssetRow key={`send-${index}`} asset={asset} />
-        ))}
-        <AppText style={styles.sideLabel}>YOU GET</AppText>
-        {pkg.receive.map((asset, index) => (
-          <TradeAssetRow key={`receive-${index}`} asset={asset} />
-        ))}
+        <ExchangeSide side="send" assets={pkg.send} />
+        <ExchangeSide side="get" assets={pkg.receive} />
       </View>
     );
   }
@@ -72,6 +66,5 @@ export default function BriefingItemPlayers({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     stack: { gap: spacing.sm, marginTop: spacing.xs },
-    sideLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4, color: colors.textTertiary },
   });
 }

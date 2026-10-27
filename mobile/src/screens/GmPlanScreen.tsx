@@ -24,7 +24,7 @@ import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
-import TradeAssetRow from '../components/TradeAssetRow';
+import ExchangeSide from '../components/ExchangeSide';
 import {
   api,
   TEAM_STANCE_OPTIONS,
@@ -647,14 +647,8 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
       </View>
       {send.length > 0 || receive.length > 0 ? (
         <View style={styles.stack}>
-          <AppText style={styles.sideLabel}>YOU SEND</AppText>
-          {send.map((asset, i) => (
-            <TradeAssetRow key={`s${i}`} asset={asset} />
-          ))}
-          <AppText style={styles.sideLabel}>YOU GET</AppText>
-          {receive.map((asset, i) => (
-            <TradeAssetRow key={`r${i}`} asset={asset} />
-          ))}
+          <ExchangeSide side="send" assets={send} />
+          <ExchangeSide side="get" assets={receive} />
         </View>
       ) : (
         <AppText style={styles.caption}>
@@ -817,7 +811,6 @@ function createStyles(colors: ThemeColors) {
     tradeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
     tradeTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: colors.textPrimary },
     gain: { fontSize: 15, fontWeight: '800' },
-    sideLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textTertiary },
     tradeFooter: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
     action: {
       paddingHorizontal: spacing.md,

@@ -8,7 +8,7 @@ import AccentCard from './AccentCard';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
-import { TradeAssetList } from './TradeAssetRow';
+import ExchangeSide from './ExchangeSide';
 import TeamAvatar from './TeamAvatar';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
@@ -415,31 +415,27 @@ export default function TradeIdeaCard({
       />
 
       <View style={styles.exchangeRow}>
-        <View style={styles.exchangeSide}>
-          <View style={styles.exchangeLabelRow}>
-            <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
-            <AppText style={styles.exchangeLabel}>You Send</AppText>
-            {idea.send_score != null ? (
-              <AppText style={styles.exchangeTotal}>{Math.round(idea.send_score).toLocaleString()}</AppText>
-            ) : null}
-          </View>
-          <TradeAssetList assets={idea.package.send} onPressPlayer={openPlayer} onPressPick={openPick} />
-        </View>
+        <ExchangeSide
+          side="send"
+          total={idea.send_score}
+          assets={idea.package.send}
+          onPressPlayer={openPlayer}
+          onPressPick={openPick}
+          style={styles.exchangeSide}
+        />
         <View style={styles.exchangeGutter}>
           <View style={styles.swapDisc}>
             <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
           </View>
         </View>
-        <View style={styles.exchangeSide}>
-          <View style={styles.exchangeLabelRow}>
-            <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
-            <AppText style={styles.exchangeLabel}>You Get</AppText>
-            {idea.receive_score != null ? (
-              <AppText style={styles.exchangeTotal}>{Math.round(idea.receive_score).toLocaleString()}</AppText>
-            ) : null}
-          </View>
-          <TradeAssetList assets={idea.package.receive} onPressPlayer={openPlayer} onPressPick={openPick} />
-        </View>
+        <ExchangeSide
+          side="get"
+          total={idea.receive_score}
+          assets={idea.package.receive}
+          onPressPlayer={openPlayer}
+          onPressPick={openPick}
+          style={styles.exchangeSide}
+        />
       </View>
 
       {showExplanations && idea.rationale ? (
@@ -604,16 +600,7 @@ function createStyles(colors: ThemeColors) {
   // changed; `backgroundElevated` itself is untouched and still backs every
   // genuine neutral-chrome use (gateSecondaryButton, partnerAvatar, swapDisc,
   // rationaleSheet, etc).
-  exchangeSide: {
-    flex: 1,
-    backgroundColor: colors.accentMuted,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.xs,
-    paddingBottom: 2,
-  },
+  exchangeSide: { flex: 1 },
   exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
   swapDisc: {
     width: 26,
@@ -622,16 +609,6 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.glassInset,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  exchangeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
-  exchangeDot: { width: 6, height: 6, borderRadius: 3 },
-  exchangeTotal: { marginLeft: 'auto', fontSize: 12, fontWeight: '800', color: colors.textSecondary },
-  exchangeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   rationaleLabel: {
     fontSize: 12,

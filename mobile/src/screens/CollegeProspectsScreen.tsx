@@ -147,7 +147,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const { viewMode, setViewMode } = usePlayerListViewMode('college-prospects');
 
-  useScreenHeaderTitle(navigation, 'College Prospects');
+  useScreenHeaderTitle(navigation, 'College Scouting');
 
   const load = useCallback(async () => {
     setError(null);

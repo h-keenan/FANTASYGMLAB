@@ -1,3 +1,4 @@
+import { TRADE_SIDE_LABEL } from '../lib/tradeSideLabels';
 import ShareToCommunityToggle from '../components/ShareToCommunityToggle';
 import type { SharedTradeAssetInput } from '../lib/sharedTrades';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -483,7 +484,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
       <View style={styles.sidesRow}>
         <TradeSide
-          label="You Send"
+          label={TRADE_SIDE_LABEL.send}
           dotColor={colors.danger}
           items={[
             ...sendIds.map((player): SideAssetItem => ({ kind: 'player', player })),
@@ -494,7 +495,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           onRemove={(id) => removeFromSide('send', id)}
         />
         <TradeSide
-          label="You Receive"
+          label={TRADE_SIDE_LABEL.receive}
           dotColor={colors.successBright}
           items={[
             ...receiveIds.map((player): SideAssetItem => ({ kind: 'player', player })),

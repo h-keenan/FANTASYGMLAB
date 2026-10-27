@@ -128,7 +128,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       subtitle: 'Top adds, trends, and free agents',
     },
     {
-      label: 'Teams',
+      label: 'League Rankings',
       route: 'Teams',
       icon: 'people-circle-outline',
       needsLeague: true,
@@ -166,7 +166,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
     // TradesScreen. Trade Calculator stays separate for now (PR 2 folds it
     // into Trade Analyzer as a quick-mode toggle).
     {
-      label: 'Trades',
+      label: 'Trade Hub',
       route: 'Trades',
       icon: 'shuffle-outline',
       needsLeague: true,
