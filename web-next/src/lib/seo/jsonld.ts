@@ -50,6 +50,33 @@ export function itemListLd(input: {
   };
 }
 
+export function faqLd(items: readonly { q: string; a: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+}
+
+export function webApplicationLd(input: { name: string; description: string; path: string }) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: input.name,
+    description: input.description,
+    url: absoluteUrl(input.path),
+    applicationCategory: "UtilitiesApplication",
+    operatingSystem: "Any",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    publisher: { "@type": "Organization", name: "FantasyDesk", url: SITE_URL },
+  };
+}
+
 /** Safe for <script type="application/ld+json">: '<' escaped. */
 export function serializeLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");

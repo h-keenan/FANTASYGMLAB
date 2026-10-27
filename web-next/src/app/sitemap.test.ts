@@ -31,6 +31,7 @@ describe("sitemap SEO entries", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     const urls = (await sitemap()).map((e) => e.url);
     expect(urls).toContain(`${BASE}/dynasty-tools`);
+    expect(urls).toContain(`${BASE}/trade-analyzer`); // static shell: listed even when the API is down
     expect(urls.some((u) => u.includes("/dynasty-players/") || u.includes("/dynasty-rankings/"))).toBe(false);
     expect(urls.some((u) => u.includes("/dynasty-trade-value-chart"))).toBe(false);
   });

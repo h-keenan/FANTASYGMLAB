@@ -39,8 +39,11 @@ _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _cache_lock = threading.Lock()
 
 
-def settings_for_format(fmt: str) -> dict[str, Any]:
+def settings_for_format(fmt: str, tep: bool = False) -> dict[str, Any]:
     settings = copy.deepcopy(league_value_settings.DEFAULT_LEAGUE_VALUE_SETTINGS)
+    if tep:
+        # Tight-end premium (the app's own te_premium valuation setting).
+        settings["te_premium"] = True
     if fmt == "superflex":
         settings["qb_format"] = "Superflex"
         settings["superflex_count"] = 1
@@ -78,7 +81,7 @@ def _text_or_none(value: Any) -> str | None:
 
 
 def build_public_dynasty_values(
-    players_df: pd.DataFrame | None, fmt: str, *, source_updated_at: float | None = None
+    players_df: pd.DataFrame | None, fmt: str, *, source_updated_at: float | None = None, tep: bool = False
 ) -> dict[str, Any] | None:
     """Pure builder (no I/O): value board from an already-loaded players frame."""
 
@@ -91,7 +94,7 @@ def build_public_dynasty_values(
     if frame.empty:
         return None
 
-    settings = settings_for_format(fmt)
+    settings = settings_for_format(fmt, tep)
     valued = league_value_settings.apply_valuation_lens(frame, LENS, settings)
     if valued is None or valued.empty:
         return None
@@ -145,6 +148,7 @@ def build_public_dynasty_values(
     return {
         "ok": True,
         "format": fmt,
+        "tep": bool(tep),
         "scoring": "PPR",
         "teams": 12,
         "lens": LENS,
@@ -154,12 +158,12 @@ def build_public_dynasty_values(
     }
 
 
-def get_public_dynasty_values(db_path: str, fmt: str) -> dict[str, Any] | None:
+def get_public_dynasty_values(db_path: str, fmt: str, tep: bool = False) -> dict[str, Any] | None:
     """Cached front door: loads the shared players table and builds the board."""
 
     if fmt not in FORMATS:
         return None
-    key = f"{db_path}:{fmt}"
+    key = f"{db_path}:{fmt}:{'tep' if tep else 'std'}"
     now = time.time()
     with _cache_lock:
         hit = _cache.get(key)
@@ -170,7 +174,7 @@ def get_public_dynasty_values(db_path: str, fmt: str) -> dict[str, Any] | None:
         mtime = os.path.getmtime(db_path)
     except OSError:
         mtime = None
-    payload = build_public_dynasty_values(players_df, fmt, source_updated_at=mtime)
+    payload = build_public_dynasty_values(players_df, fmt, source_updated_at=mtime, tep=tep)
     if payload is not None:
         with _cache_lock:
             _cache[key] = (now, payload)

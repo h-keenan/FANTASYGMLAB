@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 import legalContent from "@/data/legalContent.json";
 import { isPageEligible } from "@/lib/seo/content";
 import { fetchBoard } from "@/lib/seo/publicValues";
-import { CHART_PATH, HUB_PATH, PLAYER_PATH, RANKINGS_PATH, SEO_POSITIONS, SITE_URL } from "@/lib/seo/site";
+import { CHART_PATH, HUB_PATH, PLAYER_PATH, RANKINGS_PATH, SEO_POSITIONS, SITE_URL, TRADE_ANALYZER_PUBLIC_PATH } from "@/lib/seo/site";
 import { assignSlugs } from "@/lib/seo/slug";
 
 // Only the genuinely public, non-league-specific static routes — every
@@ -28,6 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // board loaded and has real rows; if the API is unreachable they are simply
   // omitted (never listed as placeholders).
   entries.push({ url: `${BASE_URL}${HUB_PATH}` });
+  // Static page (values load client-side), so it is listed even if the value API is down.
+  entries.push({ url: `${BASE_URL}${TRADE_ANALYZER_PUBLIC_PATH}` });
   try {
     const board = await fetchBoard("1qb");
     const lastModified = new Date(board.source_updated_at);

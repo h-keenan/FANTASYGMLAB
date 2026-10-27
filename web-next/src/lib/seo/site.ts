@@ -26,6 +26,7 @@ export function parsePosition(value: string): SeoPosition | null {
 export const RANKINGS_PATH = (position: SeoPosition) => `/dynasty-rankings/${position}`;
 export const CHART_PATH = "/dynasty-trade-value-chart";
 export const HUB_PATH = "/dynasty-tools";
+export const TRADE_ANALYZER_PUBLIC_PATH = "/trade-analyzer";
 export const PLAYER_PATH = (slug: string) => `/dynasty-players/${slug}`;
 
 /** Shared 1200x630 share-preview card (public/og-image.png) for the root

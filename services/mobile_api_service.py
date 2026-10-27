@@ -14861,11 +14861,11 @@ def get_public_content_feed():
 # (web-next /dynasty-rankings, /players/[slug], ...). Default 12-team PPR
 # dynasty settings only -- never reads a user, league, roster or account.
 @app.get("/v1/public/dynasty-values")
-def get_public_dynasty_values(format: str = "1qb") -> JSONResponse:
+def get_public_dynasty_values(format: str = "1qb", tep: bool = False) -> JSONResponse:
     fmt = str(format or "").strip().lower()
     if fmt not in public_dynasty_values.FORMATS:
         raise HTTPException(status_code=422, detail="format must be one of: " + ", ".join(public_dynasty_values.FORMATS))
-    payload = public_dynasty_values.get_public_dynasty_values(PLAYERS_DB_PATH, fmt)
+    payload = public_dynasty_values.get_public_dynasty_values(PLAYERS_DB_PATH, fmt, bool(tep))
     if payload is None:
         raise HTTPException(status_code=503, detail="Dynasty values are not available right now.")
     return JSONResponse(content=payload, headers={"Cache-Control": "public, max-age=300"})
