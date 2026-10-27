@@ -1,4 +1,5 @@
 import { AppState } from 'react-native';
+import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 
 import { supabase } from './supabase';
 import { env } from './env';
@@ -1562,6 +1563,8 @@ export interface TradeAnalyzerResponse {
    * stays usable for offseason planning, this just says so. */
   planning_note?: string;
   trade_window?: TradeWindow;
+  /** What this verdict assumed (format, lens, posture, basis, injury timing). */
+  assumptions?: VerdictAssumptions;
 }
 
 export interface DraftPickAsset {
@@ -3479,6 +3482,38 @@ export const api = {
       return acc;
     }, {});
   },
+  // "Report a bad verdict": one fixed reason, no free text; the server stores
+  // it anonymously (modules.verdict_feedback). Same body as web's api.postVerdictFeedback.
+  postVerdictFeedback: (
+    reason: VerdictFeedbackReason,
+    context: {
+      surface: string;
+      platform: string;
+      leagueId: string;
+      lens: string;
+      strategy: string;
+      sendIds: string[];
+      receiveIds: string[];
+      verdictLabel: string;
+      confidence: string;
+      valueDelta: number | null;
+      assumptionsLine: string;
+    },
+  ) =>
+    authorizedPost<{ ok: boolean; reason: string }>('/v1/feedback/verdict', {
+      reason,
+      surface: context.surface,
+      platform: context.platform,
+      league_id: context.leagueId,
+      lens: context.lens,
+      strategy: context.strategy,
+      send_ids: context.sendIds,
+      receive_ids: context.receiveIds,
+      verdict_label: context.verdictLabel,
+      confidence: context.confidence,
+      value_delta: context.valueDelta,
+      assumptions_line: context.assumptionsLine,
+    }),
   recordTradeShare: (
     leagueId: string,
     body: {

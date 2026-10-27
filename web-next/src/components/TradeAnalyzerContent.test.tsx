@@ -176,6 +176,24 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
   });
 
+  it("shows what the verdict assumed and offers Report a bad verdict with the analyzed trade", async () => {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
+      ok: true,
+      verdict: VERDICT,
+      reason: "",
+      assumptions: { line: "Assumed: 1QB, PPR, Dynasty values, Retool posture.", items: [] },
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    fireEvent.click(screen.getByText("Their WR"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+    });
+    expect(await screen.findByTestId("verdict-assumptions-line")).toHaveTextContent("Assumed: 1QB, PPR");
+    expect(screen.getByRole("button", { name: "Report a bad verdict" })).toBeInTheDocument();
+  });
+
   it("analyzes a built package and renders the verdict with the width-fill grid, a single value bar, and confidence/risk rows", async () => {
     vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "" });
     renderPage();
