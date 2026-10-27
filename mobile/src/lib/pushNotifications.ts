@@ -138,7 +138,7 @@ function routeNotificationTap(data: unknown): void {
     return;
   }
 
-  if (target.screen === 'Matchup' || target.screen === 'Waivers') {
+  if (target.screen === 'Matchup' || target.screen === 'Waivers' || target.screen === 'Trades') {
     navigationRef.navigate(target.screen, { leagueId: target.leagueId, leagueName: target.leagueName });
     return;
   }

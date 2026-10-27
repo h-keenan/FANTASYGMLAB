@@ -66,6 +66,20 @@ week or less, and is omitted when the league has no deadline, it has passed,
 or the server did not send it. After the deadline the Trades block says
 trades reopen after the season and hides the board link.
 
+### Deadline mode
+
+`modules.league_calendar` now also exposes `weeks_to_deadline` and
+`deadline_phase` (none / open / final_week / passed) inside `trade_window`.
+`deadlineMode.ts` (shared block, byte-identical on web and app) turns the
+window plus the effective `team_strategy` into "Deadline in 2 weeks: buy a
+starter" (contender) or "...sell aging depth" (rebuild); other strategies get
+a neutral line. The card shows in the Trades block for the last two weeks and
+always at the top of Trade Hub. After the deadline there is no card and the
+Trades block says trades are closed. Push category `trade_deadline` fires at
+2 weeks, 1 week and the deadline week (weeks, because Sleeper stores no date),
+honors the per-category toggle and quiet hours, dedups per tier, and may use
+the reserved last weekly-cap slot.
+
 ## Tiers
 
 `experience_tier` (new_to_fantasy/beginner => guided; advanced/unset =>

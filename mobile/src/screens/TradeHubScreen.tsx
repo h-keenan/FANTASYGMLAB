@@ -20,6 +20,7 @@ import BeginnerHelp from '../components/BeginnerHelp';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
+import DeadlineCard from '../components/DeadlineCard';
 import TradeHubHoldCard from '../components/TradeHubHoldCard';
 import TradeIdeaCard, { impactTagConfig, type ImpactTagKey } from '../components/TradeIdeaCard';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -32,6 +33,7 @@ import {
   type PresentationAsset,
   type RankedPlayer,
   type TeamStrategy,
+  type TradeWindow,
   type TradeHubEntitlement,
   type TradeHubHold,
   type TradeIdea,
@@ -109,6 +111,8 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [hold, setHold] = useState<TradeHubHold | null>(null);
   const [postureSentence, setPostureSentence] = useState('');
+  const [tradeWindow, setTradeWindow] = useState<TradeWindow | undefined>(undefined);
+  const [teamStrategy, setTeamStrategy] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adUnlocks, setAdUnlocks] = useState(0);
@@ -143,6 +147,8 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
         const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks, nextLens);
         setHold(result.hold ?? null);
         setPostureSentence(result.posture_sentence ?? '');
+        setTradeWindow(result.trade_window);
+        setTeamStrategy(result.team_strategy);
         if (result.reason) {
           setNotReadyReason(result.reason);
           setIdeas(null);
@@ -351,6 +357,9 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               <AppText style={styles.postureText}>{postureSentence}</AppText>
               <BeginnerHelp term="tradeHubPosture" />
             </View>
+          ) : null}
+          {isForYou && !activeLoading && !activeError ? (
+            <DeadlineCard window={tradeWindow} strategy={teamStrategy} />
           ) : null}
           {isForYou && !activeLoading && !activeError && hold ? (
             <TradeHubHoldCard hold={hold} ideaCount={ideas?.length ?? 0} />

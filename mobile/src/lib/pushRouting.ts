@@ -23,6 +23,7 @@ export type PushTapTarget =
   | { screen: 'Dashboard'; leagueId: string; leagueName: string }
   | { screen: 'Matchup'; leagueId: string; leagueName: string }
   | { screen: 'Waivers'; leagueId: string; leagueName: string }
+  | { screen: 'Trades'; leagueId: string; leagueName: string }
   | { screen: 'TradeHistory' }
   | null;
 
@@ -49,6 +50,7 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
   // hijacked by a player_id in the payload.
   const category = str(payload.category);
   if (category === 'lineup_lock') return { screen: 'Matchup', leagueId, leagueName };
+  if (category === 'trade_deadline') return { screen: 'Trades', leagueId, leagueName };
   if (category === 'waiver_reminder') return { screen: 'Waivers', leagueId, leagueName };
 
   const playerId = str(payload.player_id);
