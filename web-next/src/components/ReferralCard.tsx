@@ -73,7 +73,7 @@ export function ReferralCard({
         <>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             For every {referral.referrals_per_comp_month} friends who connect their Sleeper account through your
-            link, you earn a free month of GM Pro, up to {referral.max_comp_months} free months total.
+            link, you earn a free month of Premium, up to {referral.max_comp_months} free months total.
           </p>
 
           <div className="flex items-center gap-2">

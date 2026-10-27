@@ -2,7 +2,7 @@ import type { SaveLeagueResponse } from "@/lib/api";
 
 /** Honest copy for the saved-league cap (modules/saved_leagues.py). */
 export const LEAGUE_CAP_UPSELL = {
-  title: "Add more leagues with Pro",
+  title: "Add more leagues with Premium",
   body: "Free includes 1 league. Upgrade to add more.",
 };
 

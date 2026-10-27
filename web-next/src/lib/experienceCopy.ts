@@ -143,7 +143,7 @@ export const PLAIN_COPY = {
   matchupSeasonSubtitle: "Check back when the season starts.",
   matchupDashboardAction: "Open Dashboard",
   matchupConnectAction: "Connect a league",
-  gmPlanProTitle: "What Pro unlocks",
+  gmPlanProTitle: "What Premium unlocks",
   gmPlanProBody:
     "A season headline for your team, your best trade paths, and roster-construction focus areas, all built from your Team Snapshot above.",
   onboardingDynastyNote:

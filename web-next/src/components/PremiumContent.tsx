@@ -203,7 +203,7 @@ export function PremiumContent({
       {entitlement === "premium" ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="compare-heading">
-        <SectionHeading id="compare-heading">Free vs Pro</SectionHeading>
+        <SectionHeading id="compare-heading">Free vs Premium</SectionHeading>
         <div className="glass-surface p-4">
           <PremiumComparison rows={comparison} />
         </div>

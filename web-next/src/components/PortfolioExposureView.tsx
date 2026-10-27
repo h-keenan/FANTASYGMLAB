@@ -158,7 +158,7 @@ export function PortfolioExposureView({ lens = "Dynasty" }: { lens?: string }) {
           kicker="Exposure"
           upsell={data.upsell}
           fallbackTitle="See your player exposure"
-          fallbackBody="Exposure is a Pro feature: which players you own across every league and how concentrated your portfolio is."
+          fallbackBody="Exposure is a Premium feature: which players you own across every league and how concentrated your portfolio is."
         />
       );
     }
