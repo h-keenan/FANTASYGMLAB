@@ -20,6 +20,12 @@ import { BEGINNER_HELP } from "./experienceCopy";
  *   add_league_detail_ranks, from starter_score / bench_score.
  * - OVR: modules/player_quick_view.py _overall_rating (0-99 percentile of
  *   the player's value among players at his position).
+ * - Player Quick View / Draft Picks / Superflex / TEP added 2026-10-27
+ *   (onboarding audit P1, "expand the glossary past 7 terms"):
+ *   PlayerQuickView.tsx (the player popup these onboarding slides describe),
+ *   modules/draft_assistant.py pick_label (how a pick is named), and
+ *   modules/methodology_page.py's required user-facing phrases for how this
+ *   app already describes Superflex/2QB and tight-end premium leagues.
  */
 
 export const GLOSSARY = {
@@ -38,6 +44,26 @@ export const GLOSSARY = {
   },
   ovr: { label: "OVR", definition: BEGINNER_HELP.overallRating },
   averageAge: { label: "Average Age", definition: BEGINNER_HELP.averageAge },
+  pqv: {
+    label: "Player Quick View (PQV)",
+    definition:
+      "The player popup you open by tapping a player row: value, usage, and roster fit without leaving the page.",
+  },
+  draftPicks: {
+    label: "Draft Picks",
+    definition:
+      "Future rookie draft picks (like a 2027 1st) count as tradable dynasty assets with their own value, shown alongside your players in trades and Franchise Rank.",
+  },
+  superflex: {
+    label: "Superflex",
+    definition:
+      "A league format where a second quarterback can start in a FLEX spot, which raises quarterback value leaguewide.",
+  },
+  tep: {
+    label: "TEP (Tight End Premium)",
+    definition:
+      "A scoring format that gives tight ends bonus points per reception, raising their dynasty value relative to other positions.",
+  },
 } as const;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

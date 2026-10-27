@@ -5,12 +5,38 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "@/components/Button";
+import { PillRow } from "@/components/PillRow";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { ONBOARDING_FEATURES, ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
 import { OnboardingValueSlides } from "@/components/OnboardingValueSlides";
-import { PLAIN_COPY, type ExperienceLevel } from "@/lib/experienceCopy";
+import {
+  EXPERIENCE_GOAL_OPTIONS,
+  EXPERIENCE_LEVEL_OPTIONS,
+  PLAIN_COPY,
+  type ExperienceGoal,
+  type ExperienceLevel,
+} from "@/lib/experienceCopy";
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
+
+const LEVEL_ICONS: Record<ExperienceLevel, { stroke: string; path: string }> = {
+  new_to_fantasy: {
+    stroke: "var(--color-accent)",
+    path: "M12 2l2.2 6.6H21l-5.4 4 2.1 6.6L12 15.2 6.3 19.2l2.1-6.6L3 8.6h6.8z",
+  },
+  beginner: {
+    stroke: "var(--color-success)",
+    path: "M12 21V11M12 11C12 7 9 5 5 5c0 4 2.5 6.5 7 6M12 11c0-3.5 2-5.5 6-5.5 0 3.5-2 5.5-6 5.5",
+  },
+  advanced: {
+    stroke: "var(--color-premium)",
+    path: "M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z M6 5H4a2 2 0 0 0 0 4h2M18 5h2a2 2 0 0 1 0 4h-2",
+  },
+};
+const GOAL_OPTIONS = (Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]).map((value) => ({
+  value,
+  label: EXPERIENCE_GOAL_OPTIONS[value].label,
+}));
 
 /**
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
@@ -82,6 +108,8 @@ function usePortalRoot(): HTMLElement | null {
 export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => void; replay?: boolean }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
+  // Optional, skippable — never gates Continue, unlike level.
+  const [goal, setGoal] = useState<ExperienceGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -91,7 +119,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   // open every other <body> child is made inert + aria-hidden.
   const portalRoot = usePortalRoot();
   const [direction, setDirection] = useState<"next" | "back">("next");
-  const { setLevel: saveExperienceLevel } = useExperienceLevel();
+  const { setLevel: saveExperienceLevel, setGoal: saveExperienceGoal } = useExperienceLevel();
 
   const featureCount = ONBOARDING_FEATURES.length;
   // Replay (Account > "Replay the tour"): all feature slides, nothing else.
@@ -127,6 +155,15 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
       // onboarding itself; the answer can be changed later on the Account
       // page's Explanations setting.
     }
+    if (goal) {
+      // Optional, so only saved when the user actually picked one. Also
+      // best-effort, same as the level write above.
+      try {
+        await saveExperienceGoal(goal);
+      } catch {
+        // Best-effort.
+      }
+    }
     setSaving(false);
     onDone();
   };
@@ -159,6 +196,10 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   const pickLevel = (value: ExperienceLevel) => {
     setLevel(value);
     trackOnboarding("experience_selected", { experience: experienceBucket(value) });
+  };
+  // Tapping the already-selected chip clears it (it's optional — unlike level).
+  const pickGoal = (value: string) => {
+    setGoal((current) => (current === value ? null : (value as ExperienceGoal)));
   };
 
   const onTouchEnd = (clientX: number, clientY: number) => {
@@ -250,35 +291,38 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
             </p>
             <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingDynastyNote}</p>
             <div className="onboarding-cards" style={{ marginTop: "var(--space-md)" }}>
-              <button
-                type="button"
-                onClick={() => pickLevel("beginner")}
-                className={`onboarding-glass onboarding-pick${level === "beginner" ? " onboarding-pick--selected" : ""}`}
-              >
-                <div className="onboarding-row">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2" aria-hidden="true">
-                    <path d="M12 21V11M12 11C12 7 9 5 5 5c0 4 2.5 6.5 7 6M12 11c0-3.5 2-5.5 6-5.5 0 3.5-2 5.5-6 5.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="onboarding-row-title">New to dynasty</span>
-                </div>
-                <span className="onboarding-row-body">
-                  Explain the why behind every recommendation — trade logic, value, roster strategy.
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => pickLevel("advanced")}
-                className={`onboarding-glass onboarding-pick${level === "advanced" ? " onboarding-pick--selected" : ""}`}
-              >
-                <div className="onboarding-row">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-premium)" strokeWidth="2" aria-hidden="true">
-                    <path d="M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M6 5H4a2 2 0 0 0 0 4h2M18 5h2a2 2 0 0 1 0 4h-2" strokeLinecap="round" />
-                  </svg>
-                  <span className="onboarding-row-title">I know my stuff</span>
-                </div>
-                <span className="onboarding-row-body">Skip the explanations — just the call, the value, and the confidence.</span>
-              </button>
+              {(Object.keys(EXPERIENCE_LEVEL_OPTIONS) as ExperienceLevel[]).map((value) => {
+                const option = EXPERIENCE_LEVEL_OPTIONS[value];
+                const icon = LEVEL_ICONS[value];
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => pickLevel(value)}
+                    className={`onboarding-glass onboarding-pick${level === value ? " onboarding-pick--selected" : ""}`}
+                  >
+                    <div className="onboarding-row">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={icon.stroke} strokeWidth="2" aria-hidden="true">
+                        <path d={icon.path} strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="onboarding-row-title">{option.title}</span>
+                    </div>
+                    <span className="onboarding-row-body">{option.body}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-col gap-2 w-full" style={{ marginTop: "var(--space-lg)" }}>
+              <span className="onboarding-body onboarding-body--center">{PLAIN_COPY.experienceGoalPrompt}</span>
+              <PillRow
+                ariaLabel={PLAIN_COPY.experienceGoalPrompt}
+                options={GOAL_OPTIONS}
+                active={goal ?? ""}
+                onSelect={pickGoal}
+              />
+              <span className="text-xs onboarding-body--center" style={{ color: "var(--color-text-muted)" }}>
+                {PLAIN_COPY.experienceGoalOptionalNote}
+              </span>
             </div>
           </div>
         ) : null}

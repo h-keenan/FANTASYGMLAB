@@ -3318,7 +3318,8 @@ export interface DevicePreferencesResponse {
   ok: boolean;
   ui_density: "guided" | "compact";
   theme_mode: "light" | "dark" | "auto";
-  experience_level: "beginner" | "advanced" | null;
+  experience_level: "new_to_fantasy" | "beginner" | "advanced" | null;
+  experience_goal: "win_now" | "rebuilding" | "exploring" | null;
   last_league: { league_id: string; league_name: string } | null;
 }
 
@@ -3334,10 +3335,19 @@ export const api = {
    * getDevicePreferences by ExperienceLevelContext, which feeds
    * lib/experienceCopy.ts (beginner helper text). Backed by the same
    * user_settings row every other device preference already uses. */
-  setExperienceLevel: (level: "beginner" | "advanced") =>
+  setExperienceLevel: (level: "new_to_fantasy" | "beginner" | "advanced") =>
     authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
       method: "POST",
       jsonBody: { experience_level: level },
+    }),
+
+  /** The optional "what's your goal this season?" chip, alongside
+   * experience level. `null` clears it back to unset (sent to the backend
+   * as "", its explicit-clear sentinel). */
+  setExperienceGoal: (goal: "win_now" | "rebuilding" | "exploring" | null) =>
+    authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
+      method: "POST",
+      jsonBody: { experience_goal: goal ?? "" },
     }),
 
   // Stripe web billing runs on Supabase Edge Functions (lib/billingClient.ts;

@@ -2,7 +2,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BEGINNER_HELP, BEGINNER_LABELS, experienceCopy, normalizeExperienceLevel } from './experienceCopy.ts';
+import {
+  BEGINNER_HELP,
+  BEGINNER_LABELS,
+  experienceCopy,
+  normalizeExperienceGoal,
+  normalizeExperienceLevel,
+} from './experienceCopy.ts';
 
 test('beginner gets the plain-language help and labels', () => {
   const copy = experienceCopy('beginner');
@@ -11,6 +17,13 @@ test('beginner gets the plain-language help and labels', () => {
   assert.equal(copy.help('playerTier'), BEGINNER_HELP.playerTier);
   assert.equal(copy.label('averageAge', 'Avg Age'), BEGINNER_LABELS.averageAge);
   assert.equal(copy.label('yourFaab', 'Your FAAB'), 'Your Waiver Budget (FAAB)');
+});
+
+test('new_to_fantasy gets the exact same beginner copy as beginner', () => {
+  const copy = experienceCopy('new_to_fantasy');
+  assert.equal(copy.isBeginner, true);
+  assert.equal(copy.help('powerRank'), BEGINNER_HELP.powerRank);
+  assert.equal(copy.label('averageAge', 'Avg Age'), BEGINNER_LABELS.averageAge);
 });
 
 test('advanced and unset keep today\'s copy exactly', () => {
@@ -39,10 +52,21 @@ test('verdict and impact-tag lookups map to the right entries', () => {
   assert.equal(copy.impactTagHelp(''), null);
 });
 
-test('normalizeExperienceLevel only accepts the two real values', () => {
+test('normalizeExperienceLevel only accepts the three real values', () => {
+  assert.equal(normalizeExperienceLevel('new_to_fantasy'), 'new_to_fantasy');
   assert.equal(normalizeExperienceLevel('beginner'), 'beginner');
   assert.equal(normalizeExperienceLevel('advanced'), 'advanced');
   assert.equal(normalizeExperienceLevel('expert'), null);
   assert.equal(normalizeExperienceLevel(null), null);
   assert.equal(normalizeExperienceLevel(undefined), null);
+});
+
+test('normalizeExperienceGoal only accepts the three real values', () => {
+  assert.equal(normalizeExperienceGoal('win_now'), 'win_now');
+  assert.equal(normalizeExperienceGoal('rebuilding'), 'rebuilding');
+  assert.equal(normalizeExperienceGoal('exploring'), 'exploring');
+  assert.equal(normalizeExperienceGoal(''), null);
+  assert.equal(normalizeExperienceGoal('championship'), null);
+  assert.equal(normalizeExperienceGoal(null), null);
+  assert.equal(normalizeExperienceGoal(undefined), null);
 });

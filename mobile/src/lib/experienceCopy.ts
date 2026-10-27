@@ -3,28 +3,55 @@
  * the one place that decides what a beginner sees differently from an
  * advanced user, based on the onboarding answer ("How much dynasty
  * experience do you have?") stored through POST /v1/preferences as
- * `experience_level` ("beginner" | "advanced" | null).
+ * `experience_level` ("new_to_fantasy" | "beginner" | "advanced" | null).
  *
  * Copy only, never features:
- * - "beginner": key first-run surfaces add short plain-language helper text
- *   and spell out a few abbreviations.
+ * - "new_to_fantasy" and "beginner": key first-run surfaces add short
+ *   plain-language helper text and spell out a few abbreviations. Added
+ *   2026-10-27 (onboarding audit P1): "new_to_fantasy" is a third, more
+ *   granular level alongside the original "beginner" — both get today's
+ *   beginner copy.
  * - "advanced" and null (unanswered, skipped, or an account older than the
  *   question): today's terse copy, unchanged. `label()` returns the
  *   caller's current label and `help()` returns null.
  *
- * The BEGINNER_HELP and BEGINNER_LABELS blocks below are byte-identical to
- * web's; a web-next test compares them, so edit both files together. Each
+ * The BEGINNER_HELP, BEGINNER_LABELS, PLAIN_COPY, EXPERIENCE_LEVEL_OPTIONS
+ * and EXPERIENCE_GOAL_OPTIONS blocks below are byte-identical to web's; a
+ * web-next test compares them, so edit both files together. Each
  * explanation describes what the engine actually computes (source noted
  * per entry). Pure TS (no React Native imports) so node --test can run it.
  */
 
-export type ExperienceLevel = "beginner" | "advanced";
+export type ExperienceLevel = "new_to_fantasy" | "beginner" | "advanced";
 /** null = never answered. Treated exactly like "advanced". */
 export type ExperienceLevelSetting = ExperienceLevel | null;
 
 export function normalizeExperienceLevel(value: unknown): ExperienceLevelSetting {
-  return value === "beginner" || value === "advanced" ? value : null;
+  return value === "new_to_fantasy" || value === "beginner" || value === "advanced" ? value : null;
 }
+
+/**
+ * The exact same wording used by both the onboarding picker and the
+ * Settings page's mirrored control (previously "Beginner"/"Advanced" in
+ * Settings vs. "New to dynasty"/"I know my stuff" in onboarding — a known
+ * gap fixed 2026-10-27 by having both read from this one map instead of
+ * each spelling its own copy). Byte-identical to mobile's copy (same sync
+ * test as BEGINNER_HELP/BEGINNER_LABELS/PLAIN_COPY below).
+ */
+export const EXPERIENCE_LEVEL_OPTIONS = {
+  new_to_fantasy: {
+    title: "New to fantasy football",
+    body: "We'll explain everything from the ground up, including basic fantasy terms.",
+  },
+  beginner: {
+    title: "New to dynasty",
+    body: "Explain the why behind every recommendation — trade logic, value, roster strategy.",
+  },
+  advanced: {
+    title: "Veteran dynasty manager",
+    body: "Skip the explanations — just the call, the value, and the confidence.",
+  },
+} as const;
 
 export const BEGINNER_HELP = {
   // Dashboard (services/mobile_api_service.py get_league_dashboard,
@@ -133,6 +160,24 @@ export const BEGINNER_LABELS = {
 
 export type BeginnerLabelKey = keyof typeof BEGINNER_LABELS;
 
+/** The optional "what's your goal this season?" chip, alongside experience
+ * level (same onboarding step, same Settings mirror). Stored separately
+ * through POST /v1/preferences (`experience_goal`), skippable and
+ * changeable anytime — unlike experience_level, it can be cleared back to
+ * null. Copy only, same byte-identical-with-mobile guarantee. */
+export type ExperienceGoal = "win_now" | "rebuilding" | "exploring";
+export type ExperienceGoalSetting = ExperienceGoal | null;
+
+export function normalizeExperienceGoal(value: unknown): ExperienceGoalSetting {
+  return value === "win_now" || value === "rebuilding" || value === "exploring" ? value : null;
+}
+
+export const EXPERIENCE_GOAL_OPTIONS = {
+  win_now: { label: "Win Now" },
+  rebuilding: { label: "Rebuilding" },
+  exploring: { label: "Just Exploring" },
+} as const;
+
 /** Plain (not beginner-gated) next-step and orientation copy that must read
  * the same on web and mobile. A web test keeps the two maps byte-identical. */
 export const PLAIN_COPY = {
@@ -144,7 +189,9 @@ export const PLAIN_COPY = {
   gmPlanProBody:
     "A season headline for your team, your best trade paths, and roster-construction focus areas, all built from your Team Snapshot above.",
   onboardingDynastyNote:
-    "Dynasty is the long-term fantasy format where you keep your players year to year. If you're new to fantasy football overall, choose New to dynasty.",
+    "Dynasty is the long-term fantasy format where you keep your players year to year. If you're completely new to fantasy football, choose New to fantasy football.",
+  experienceGoalPrompt: "What's your goal this season?",
+  experienceGoalOptionalNote: "Optional — skip if you're not sure yet.",
 } as const;
 
 const VERDICT_HELP_KEY: Record<string, BeginnerHelpKey> = {
@@ -174,7 +221,9 @@ export interface ExperienceCopy {
 }
 
 export function experienceCopy(level: ExperienceLevelSetting): ExperienceCopy {
-  const isBeginner = level === "beginner";
+  // "new_to_fantasy" and "beginner" both get the beginner copy — see the
+  // module doc comment above for why there are two beginner-ish levels.
+  const isBeginner = level === "beginner" || level === "new_to_fantasy";
   const help = (key: BeginnerHelpKey) => (isBeginner ? BEGINNER_HELP[key] : null);
   return {
     level,

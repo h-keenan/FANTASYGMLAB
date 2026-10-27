@@ -9143,13 +9143,21 @@ def update_push_preference(
 
 UI_DENSITY_VALUES = {"guided", "compact"}
 THEME_MODE_VALUES = {"light", "dark", "auto"}
-# Set once during the new web onboarding carousel's last step ("How much
-# dynasty experience do you have?") — not yet consumed anywhere to actually
-# vary copy/explanation depth (that's separate, later work); this is just
-# the durable store for the answer. None/unset is a real third state (an
-# existing account from before this question existed, or one who skipped
-# onboarding), distinct from "beginner" — never defaulted to either value.
-EXPERIENCE_LEVEL_VALUES = {"beginner", "advanced"}
+# Set during onboarding's last step ("How much dynasty experience do you
+# have?"), consumed by web-next/mobile lib/experienceCopy.ts to decide
+# whether a page shows beginner helper text. None/unset is a real third
+# state (an existing account from before this question existed, or one who
+# skipped onboarding), distinct from "beginner" — never defaulted to either
+# value. "new_to_fantasy" added 2026-10-27 (onboarding audit P1): a third,
+# more-granular level alongside the original two. Purely additive — the
+# original "beginner"/"advanced" values, and every account that already has
+# one stored, keep meaning exactly what they always did.
+EXPERIENCE_LEVEL_VALUES = {"beginner", "advanced", "new_to_fantasy"}
+# Optional, skippable "what's your goal this season?" chip added alongside
+# experience level (same onboarding audit). Stored the same way: a plain
+# string in the user_settings blob, "" (sent explicitly) clears it back to
+# unset, matching the existing last_league_id convention below.
+EXPERIENCE_GOAL_VALUES = {"win_now", "rebuilding", "exploring"}
 
 
 def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
@@ -9164,10 +9172,14 @@ def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any
     experience_level = settings.get("experience_level")
     if experience_level not in EXPERIENCE_LEVEL_VALUES:
         experience_level = None
+    experience_goal = settings.get("experience_goal")
+    if experience_goal not in EXPERIENCE_GOAL_VALUES:
+        experience_goal = None
     return {
         "ui_density": density,
         "theme_mode": theme_mode,
         "experience_level": experience_level,
+        "experience_goal": experience_goal,
         "last_league": (
             {"league_id": last_league_id, "league_name": last_league_name} if last_league_id else None
         ),
@@ -9199,6 +9211,11 @@ class UpdateDevicePreferencesRequest(BaseModel):
     last_league_id: str | None = None
     last_league_name: str | None = None
     experience_level: str | None = None
+    # None = not sent, leave untouched (same partial-update convention as
+    # every other field here). "" = sent explicitly to clear the goal back
+    # to unset (same convention last_league_id already uses). Any other
+    # value must be one of EXPERIENCE_GOAL_VALUES.
+    experience_goal: str | None = None
 
 
 @app.post("/v1/preferences")
@@ -9227,6 +9244,15 @@ def update_device_preferences(
             status_code=422,
             detail="experience_level must be one of: " + ", ".join(EXPERIENCE_LEVEL_VALUES),
         )
+    if (
+        body.experience_goal is not None
+        and body.experience_goal != ""
+        and body.experience_goal not in EXPERIENCE_GOAL_VALUES
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="experience_goal must be one of: " + ", ".join(EXPERIENCE_GOAL_VALUES),
+        )
 
     config = auth_supabase.get_supabase_config()
     access_token = str(user.get("_access_token") or "")
@@ -9245,6 +9271,8 @@ def update_device_preferences(
         settings["last_league_name"] = body.last_league_name
     if body.experience_level is not None:
         settings["experience_level"] = body.experience_level
+    if body.experience_goal is not None:
+        settings["experience_goal"] = body.experience_goal
     payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
     ok, error = account_store.upsert_user_settings(config, access_token, payload)
     if not ok:
