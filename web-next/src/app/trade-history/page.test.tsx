@@ -56,6 +56,9 @@ describe("TradeHistoryPage", () => {
       upgradeGuestWithEmail: vi.fn(),
       callbackNotice: null,
       isGuest: false,
+      resetPassword: vi.fn(),
+      recoveryPending: false,
+      completeRecovery: vi.fn(),
     });
     vi.mocked(api.getTradeOutcomeHistory)
       .mockResolvedValueOnce({ ok: true, outcomes: [past("Team Rocket")] })

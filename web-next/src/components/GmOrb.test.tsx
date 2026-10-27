@@ -48,6 +48,9 @@ function mockAuth(session: MockSession | null) {
     upgradeGuestWithEmail: vi.fn(),
     callbackNotice: null,
     isGuest: false,
+    resetPassword: vi.fn(),
+    recoveryPending: false,
+    completeRecovery: vi.fn(),
   });
 }
 

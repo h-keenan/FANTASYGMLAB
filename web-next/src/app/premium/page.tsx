@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { api, type BillingPlansResponse, type MeResponse } from "@/lib/api";
 import { PremiumContent } from "@/components/PremiumContent";
+import { PublicPricingContent } from "@/components/PublicPricingContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { normalizePremiumComparison } from "@/lib/premiumComparison";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,7 +16,6 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 // league page, this has no [leagueId] segment (same reasoning as
 // Portfolio) — a subscription applies to the account, not one league.
 export default function PremiumPage() {
-  const router = useRouter();
   const { session, loading: authLoading } = useAuth();
 
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -24,11 +23,7 @@ export default function PremiumPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!session) {
-      router.replace("/");
-      return;
-    }
+    if (authLoading || !session) return;
     let cancelled = false;
 
     Promise.all([api.getMe(), api.getBillingPlans()])
@@ -45,9 +40,22 @@ export default function PremiumPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, router]);
+  }, [authLoading, session]);
 
-  if (authLoading || (!me && !plans && !error)) {
+  if (authLoading) {
+    return <LoadingScreen status="Loading Premium…" />;
+  }
+
+  // P0 UX audit, 2026-10-27: this used to `router.replace("/")` a signed-out
+  // visitor before they ever saw a price -- /premium had no public content
+  // at all. Real checkout needs an account (Stripe Checkout attaches to a
+  // signed-in customer), so this shows pricing and a "Create your account"
+  // CTA instead of a live Subscribe button; see PublicPricingContent.
+  if (!session) {
+    return <PublicPricingContent />;
+  }
+
+  if (!me && !plans && !error) {
     return <LoadingScreen status="Loading Premium…" />;
   }
 

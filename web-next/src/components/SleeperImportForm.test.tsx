@@ -42,6 +42,9 @@ describe("SleeperImportForm", () => {
       upgradeGuestWithEmail: vi.fn(),
       callbackNotice: null,
       isGuest: false,
+      resetPassword: vi.fn(),
+      recoveryPending: false,
+      completeRecovery: vi.fn(),
     });
     vi.mocked(trackFeatureUse).mockClear();
   });

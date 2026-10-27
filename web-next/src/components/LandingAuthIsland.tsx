@@ -13,6 +13,7 @@ import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { setLandingPending } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
+import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
 import { supabase } from "@/lib/supabase";
 import { maskSavedLeagueRows } from "@/lib/privacy";
 
@@ -132,6 +133,21 @@ export function LandingAuthIsland() {
       try {
         const { data } = await supabase.from("saved_leagues").select("league_id, league_name");
         const leagues = maskSavedLeagueRows(data ?? []);
+        if (leagues.length >= 1) {
+          // P0 UX audit, 2026-10-27: an existing account (already past
+          // onboarding, which is exactly what "leagues.length >= 1" means
+          // here) that got signed out of /premium or /connect-league used
+          // to always land on Dashboard/Portfolio after signing back in,
+          // losing whatever they actually clicked through for. Only
+          // consumed here, never for a brand-new signup still going
+          // through the carousel/paywall below (that branch never reaches
+          // this far) -- see protectedRouteReturn.ts's own comment.
+          const returnPath = consumeProtectedReturnPath();
+          if (returnPath) {
+            router.replace(returnPath);
+            return;
+          }
+        }
         if (leagues.length === 1) {
           const only = leagues[0];
           router.replace(leagueHomePath(only.league_id, only.league_name || only.league_id));
@@ -206,7 +222,16 @@ export function LandingAuthIsland() {
       <>
         {returnedFromCheckout ? (
           <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
-            You&apos;re in. Pro is unlocked. Connect your league to get started.
+            {/* P0 UX audit, 2026-10-27: was "Pro is unlocked" -- the site's
+                one consistent term for the paid tier everywhere else (nav
+                label, Account page, every upsell line: "Upgrade to
+                Premium") is "Premium", and this line also used to say "Pro"
+                for a Front Office subscriber too, which isn't even the
+                plan they bought. "Pro"/"Front Office" stay correct as the
+                two specific plan names inside the Premium page itself
+                (PremiumContent's TIER_LABELS) -- this is the one umbrella
+                completion message, tier-agnostic by design. */}
+            You&apos;re in. Premium is unlocked. Connect your league to get started.
           </p>
         ) : null}
         <SleeperImportForm onLeagueChosen={handleLeagueChosen} />

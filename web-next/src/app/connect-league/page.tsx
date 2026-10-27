@@ -9,6 +9,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { leagueHomePath } from "@/lib/leaguePlatform";
+import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
 
 // coridian_, screenshot of the league switcher: "how do i add leauges" —
 // SleeperImportForm (the real "load my Sleeper leagues, pick one, save it"
@@ -26,7 +27,18 @@ export default function ConnectLeaguePage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!session) router.replace("/");
+    if (!session) {
+      // P0 UX audit, 2026-10-27: this used to silently drop a signed-out
+      // visitor on "/" with no way back to this page once they signed in.
+      // "/" is itself a reasonable destination (it's the real sign-in/
+      // signup surface), so it stays the redirect target -- only the
+      // missing return path is the bug. Consumed by LandingAuthIsland's
+      // existing-saved-leagues branch (an account that's already past
+      // onboarding), never by a brand-new signup still going through the
+      // carousel/paywall -- see protectedRouteReturn.ts's own comment.
+      storeCurrentPathForReturnAfterSignIn();
+      router.replace("/");
+    }
   }, [loading, session, router]);
 
   if (loading || !session) {

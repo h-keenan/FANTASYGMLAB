@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { trackFeatureUse } from "@/lib/analytics";
 import { LANDING_PENDING_ATTR, LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
+import { readProtectedReturnPath, storeProtectedReturnPath } from "@/lib/protectedRouteReturn";
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -69,6 +70,9 @@ function mockAuth(session: MockSession | null, loading = false) {
     upgradeGuestWithEmail: vi.fn(),
     callbackNotice: null,
     isGuest: false,
+    resetPassword: vi.fn(),
+    recoveryPending: false,
+    completeRecovery: vi.fn(),
   });
 }
 
@@ -264,6 +268,62 @@ describe("LandingPage welcome-page analytics", () => {
   });
 });
 
+// P0 UX audit, 2026-10-27: a signed-out visitor bounced from /premium or
+// /connect-league used to always land on Dashboard/Portfolio after signing
+// back in, losing whatever they actually clicked through for. Only applies
+// to an EXISTING account (1+ saved leagues) -- a brand-new signup must
+// still go through the onboarding carousel/paywall regardless of any
+// stored return path (see protectedRouteReturn.ts's own comment on why).
+describe("LandingPage existing-user protected-route return path", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("returns a single-league account to a stored /premium path instead of their Dashboard", async () => {
+    storeProtectedReturnPath(window.localStorage, "/premium");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [{ league_id: "league-1", league_name: "My League" }] });
+    render(<LandingPage />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/premium"));
+    expect(mockReplace).not.toHaveBeenCalledWith("/dashboard/league-1?name=My%20League");
+    expect(readProtectedReturnPath(window.localStorage)).toBeNull();
+  });
+
+  it("returns a multi-league account to a stored /connect-league path instead of Portfolio", async () => {
+    storeProtectedReturnPath(window.localStorage, "/connect-league");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({
+      data: [
+        { league_id: "league-1", league_name: "League One" },
+        { league_id: "league-2", league_name: "League Two" },
+      ],
+    });
+    render(<LandingPage />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/connect-league"));
+    expect(mockReplace).not.toHaveBeenCalledWith("/portfolio");
+  });
+
+  it("ignores a stored return path for a brand-new signup with zero saved leagues", async () => {
+    storeProtectedReturnPath(window.localStorage, "/premium");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [] });
+    render(<LandingPage />);
+
+    expect(await screen.findByText("OnboardingCarousel")).toBeInTheDocument();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the normal Dashboard redirect when nothing is stored", async () => {
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [{ league_id: "league-1", league_name: "My League" }] });
+    render(<LandingPage />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/dashboard/league-1?name=My%20League"));
+  });
+});
+
 describe("LandingPage app store modules", () => {
   it("shows App Store coming soon and a live Google Play link to a signed-out visitor", async () => {
     mockAuth(null);
@@ -296,5 +356,25 @@ describe("LandingPage hero CTA", () => {
     const cta = screen.getByTestId("sample-league-button");
     expect(cta).toHaveAttribute("href", "/sample-league");
     expect(cta).toHaveTextContent("Try a sample league");
+  });
+});
+
+// P0 UX audit, 2026-10-27: the headline used to say "Paste your Sleeper
+// username," which is not the real signup flow (create account -> onboarding
+// carousel -> paywall -> only then connect a league). The "Free, no card"
+// note also sat right above the real trial CTA's "Start free for N days"
+// further down the page, reading as a contradiction.
+describe("LandingPage hero copy accuracy", () => {
+  it("never claims connecting a Sleeper league is the first step", () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    expect(screen.queryByText(/Paste your Sleeper username/)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Create your account\. Get the trade your leaguemate would actually accept\./ })).toBeInTheDocument();
+  });
+
+  it("scopes the free/no-card note to the sample league, not the real signup trial", () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    expect(screen.getByText(/Look around a full sample league free, no account or card needed\./)).toBeInTheDocument();
   });
 });
