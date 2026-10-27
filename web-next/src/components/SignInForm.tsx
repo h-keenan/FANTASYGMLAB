@@ -63,7 +63,7 @@ import { Input } from "@/components/Input";
  * resolves automatically either way (Zach's ask).
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
-  const { signIn, signUp, signInWithOAuth, upgradeGuestWithEmail, isGuest, callbackNotice } = useAuth();
+  const { signIn, signUp, signInWithOAuth, upgradeGuestWithEmail, isGuest, callbackNotice, resetPassword } = useAuth();
   // Guest (anonymous) sessions are upgraded in place so the user id and saved
   // data are kept; the notice explains the rare cases where that is impossible.
   const [localNotice, setNotice] = useState<string | null>(null);
@@ -73,6 +73,14 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const plainOAuth = plainOAuthChosen || Boolean(callbackNotice);
   const [step, setStep] = useState<"email" | "password" | "check-email">("email");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  // "Forgot password?" (P0 UX audit, 2026-10-27): a real password-auth user
+  // with no way to recover a forgotten password was a hard lockout on both
+  // platforms. Mirrors mobile's LoginScreen resetMode toggle exactly, same
+  // enumeration-safe notice copy, same supabase.auth.resetPasswordForEmail
+  // call (via AuthContext.resetPassword) — only the completion step differs
+  // (see PasswordRecoveryGate, mounted at the root layout).
+  const [resetMode, setResetMode] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   // Set only once signIn has actually failed and this turned out to need
   // the signUp fallback — an existing user who signs in correctly never
   // sees this at all.
@@ -190,6 +198,22 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     // most needs to actually notice. A full dedicated screen can't be
     // scrolled past unread.
     setStep("check-email");
+  };
+
+  const handleResetPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setResetBusy(true);
+    setError(null);
+    const result = await resetPassword(email);
+    setResetBusy(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    // Enumeration-safe: identical copy whether or not an account exists for
+    // this email (mirrors mobile's LoginScreen and Supabase's own /recover
+    // response).
+    setNotice("If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.");
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -349,13 +373,43 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
       </button>
 
       <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-        Create your account or sign in
+        {resetMode ? "Reset your password" : "Create your account or sign in"}
       </h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        New here? Choose a password (6+ characters) to create your account. Already have one? Enter it to sign in.
+        {resetMode
+          ? "We'll email a link to set a new password."
+          : "New here? Choose a password (6+ characters) to create your account. Already have one? Enter it to sign in."}
       </p>
 
-      {needsAgeGate && !ageConfirmed ? (
+      {resetMode ? (
+        <form onSubmit={handleResetPassword} className="flex flex-col gap-3">
+          {notice ? (
+            <p role="status" className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              {notice}
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+              {error}
+            </p>
+          ) : null}
+          <Button type="submit" loading={resetBusy}>
+            {resetBusy ? "Sending…" : "Send reset link"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => {
+              setResetMode(false);
+              setError(null);
+              setNotice(null);
+            }}
+            className="self-start text-xs"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            Back to sign in
+          </button>
+        </form>
+      ) : needsAgeGate && !ageConfirmed ? (
         <AgeGate
           onConfirmed={() => {
             setAgeConfirmed(true);
@@ -394,6 +448,20 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           >
             {busy ? "Continuing…" : "Continue"}
           </Button>
+          {!isGuest ? (
+            <button
+              type="button"
+              onClick={() => {
+                setResetMode(true);
+                setError(null);
+                setNotice(null);
+              }}
+              className="self-start text-xs"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              Forgot password?
+            </button>
+          ) : null}
         </form>
       )}
     </div>

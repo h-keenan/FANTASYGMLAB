@@ -40,11 +40,13 @@ describe("SignInForm", () => {
   const signIn = vi.fn();
   const signUp = vi.fn();
   const signInWithOAuth = vi.fn();
+  const resetPassword = vi.fn();
 
   beforeEach(() => {
     signIn.mockReset();
     signUp.mockReset();
     signInWithOAuth.mockReset();
+    resetPassword.mockReset();
     vi.mocked(useAuth).mockReturnValue({
       session: null,
       loading: false,
@@ -57,6 +59,9 @@ describe("SignInForm", () => {
       upgradeGuestWithEmail: vi.fn(),
       callbackNotice: null,
       isGuest: false,
+      resetPassword,
+      recoveryPending: false,
+      completeRecovery: vi.fn(),
     });
   });
 
@@ -207,6 +212,60 @@ describe("SignInForm", () => {
     expect(screen.queryByText(/Check your email to confirm/)).not.toBeInTheDocument();
   });
 
+  // P0 UX audit, 2026-10-27: a password-auth user who forgot their password
+  // had no way back in — any wrong password fell through to the signUp
+  // "already exists" branch and just said "Incorrect password," forever.
+  describe("forgot password", () => {
+    it("shows a Forgot password? link once past the email step, not before", () => {
+      render(<SignInForm onSignedIn={vi.fn()} />);
+      expect(screen.queryByRole("button", { name: "Forgot password?" })).not.toBeInTheDocument();
+
+      continuePastEmailStep("forgot@example.com");
+      expect(screen.getByRole("button", { name: "Forgot password?" })).toBeInTheDocument();
+    });
+
+    it("sends a reset link with enumeration-safe copy and never calls signIn/signUp", async () => {
+      resetPassword.mockResolvedValue({ error: null });
+      render(<SignInForm onSignedIn={vi.fn()} />);
+
+      continuePastEmailStep("forgot@example.com");
+      fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+      expect(screen.getByRole("heading", { name: "Reset your password" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+      await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("forgot@example.com"));
+      expect(
+        await screen.findByText(
+          "If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.",
+        ),
+      ).toBeInTheDocument();
+      expect(signIn).not.toHaveBeenCalled();
+      expect(signUp).not.toHaveBeenCalled();
+    });
+
+    it("shows a real error when the send itself fails", async () => {
+      resetPassword.mockResolvedValue({ error: "Too many requests" });
+      render(<SignInForm onSignedIn={vi.fn()} />);
+
+      continuePastEmailStep("forgot@example.com");
+      fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+      fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+
+      expect(await screen.findByText("Too many requests")).toBeInTheDocument();
+    });
+
+    it("returns to the password form without losing the typed email", () => {
+      render(<SignInForm onSignedIn={vi.fn()} />);
+
+      continuePastEmailStep("forgot@example.com");
+      fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+      fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+
+      expect(screen.getByRole("heading", { name: "Create your account or sign in" })).toBeInTheDocument();
+      expect(screen.getByText("← forgot@example.com")).toBeInTheDocument();
+    });
+  });
+
   it("goes back to the email step without losing the typed email", () => {
     render(<SignInForm onSignedIn={vi.fn()} />);
 
@@ -233,6 +292,9 @@ describe("SignInForm", () => {
         upgradeGuestWithEmail,
         callbackNotice: null,
         isGuest: true,
+        resetPassword,
+        recoveryPending: false,
+        completeRecovery: vi.fn(),
       });
     });
 

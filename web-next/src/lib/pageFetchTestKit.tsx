@@ -47,4 +47,7 @@ export const signedIn = {
   upgradeGuestWithEmail: vi.fn(),
   callbackNotice: null,
   isGuest: false,
+  resetPassword: vi.fn(),
+  recoveryPending: false,
+  completeRecovery: vi.fn(),
 };

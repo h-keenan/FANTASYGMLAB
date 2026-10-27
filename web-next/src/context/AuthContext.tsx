@@ -79,6 +79,24 @@ interface AuthContextValue {
    * sessionless model — see PR description for why Revision 1 follows
    * mobile's reference implementation instead. */
   isGuest: boolean;
+  /** Forgot-password (P0 UX audit, 2026-10-27): sends the Supabase recovery
+   * email. Same call as mobile (mobile/src/context/AuthContext.tsx,
+   * supabase.auth.resetPasswordForEmail) with no redirectTo override — the
+   * link lands on this web app via the project's default Site URL, which is
+   * also where recoveryPending below picks it up. Always report success
+   * (enumeration-safe) regardless of whether the email has an account,
+   * mirroring mobile's identical notice copy; only a real send failure
+   * (rate limit, bad request) surfaces an error. */
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  /** True once Supabase's recovery link has established a session and
+   * fired the PASSWORD_RECOVERY auth event. The caller must render a
+   * blocking "set a new password" UI while this is true — the session is
+   * real but the user hasn't actually proven a new password yet, so normal
+   * app content should not be reachable (see PasswordRecoveryGate). */
+  recoveryPending: boolean;
+  /** Finishes a recovery: sets the new password on the recovery session.
+   * Clears recoveryPending on success so the gate unmounts. */
+  completeRecovery: (password: string) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -87,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [callbackNotice, setCallbackNotice] = useState<AuthContextValue["callbackNotice"]>(null);
+  const [recoveryPending, setRecoveryPending] = useState(false);
 
   // A failed provider link comes back as error params on the callback URL.
   useEffect(() => {
@@ -137,10 +156,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     })();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
       setSession(nextSession);
       setLoading(false);
+      // Fired once the recovery link in the email is opened and Supabase
+      // (via detectSessionInUrl) establishes a session from it. The user
+      // must still prove a new password before using this session for
+      // anything else — see PasswordRecoveryGate, mounted at the root
+      // layout so it catches the link regardless of which page it lands on.
+      if (event === "PASSWORD_RECOVERY") setRecoveryPending(true);
     });
 
     return () => {
@@ -229,6 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signOut: async () => {
+        setRecoveryPending(false);
         await supabase.auth.signOut();
       },
       deleteAccount: async () => {
@@ -237,8 +263,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
         return { error: null };
       },
+      resetPassword: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        return { error: error?.message ?? null };
+      },
+      recoveryPending,
+      completeRecovery: async (password) => {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) return { error: error.message };
+        setRecoveryPending(false);
+        return { error: null };
+      },
     }),
-    [session, loading, callbackNotice],
+    [session, loading, callbackNotice, recoveryPending],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

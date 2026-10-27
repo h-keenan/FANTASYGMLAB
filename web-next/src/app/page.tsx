@@ -40,15 +40,24 @@ export default function LandingPage() {
         <div className="onboarding-field" aria-hidden="true" />
         <div className="onboarding-sweep" aria-hidden="true" />
         <div className="landing-grid">
-          {/* Hero copy. 2026-10-26 (marketing pass, Zach): leads with the real
-              differentiator, the roster-aware trade verdict, instead of the
-              "front office" metaphor (kept as brand flavour in the sub line).
-              No superlatives or unverifiable claims. The primary CTA is the
-              sample league so value shows before any account wall; guests
-              cannot buy, so nothing here can start a purchase. */}
+          {/* Hero copy. 2026-10-27 (P0 UX audit): the previous headline, "Paste
+              your Sleeper username," named an action that isn't actually the
+              first step — the real flow is create account -> onboarding
+              carousel -> paywall -> only then connect a Sleeper (or ESPN/
+              Fleaflicker/MFL) league. Still leads with the real differentiator,
+              the roster-aware trade verdict (2026-10-26 marketing pass,
+              Zach), just without claiming a specific first action that isn't
+              true. No superlatives or unverifiable claims. The primary CTA is
+              the sample league so value shows before any account wall;
+              guests cannot buy, so nothing here can start a purchase.
+              The "free, no card" note below was also sitting right above the
+              real signup form's "Start free for N days" trial CTA further
+              down the page, reading as a contradiction (free vs. a trial that
+              eventually charges) — reworded here to scope "no card" to the
+              sample league only, a separate, genuinely free-forever demo. */}
           <div className="landing-hero flex flex-col gap-2">
             <h1 style={{ font: "var(--font-page-title)" }}>
-              Paste your Sleeper username. Get the trade your leaguemate would actually accept.
+              Create your account. Get the trade your leaguemate would actually accept.
             </h1>
             <p className="text-sm md:text-base" style={{ color: "var(--color-text-secondary)" }}>
               Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front
@@ -56,7 +65,8 @@ export default function LandingPage() {
             </p>
             <SampleLeagueButton surface="landing_hero" variant="primary" fullWidth={false} />
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Free to start, no card. Look around a sample league first, then connect your own.
+              Look around a full sample league free, no account or card needed. Ready for your own? Create an
+              account to get started.
             </p>
           </div>
 

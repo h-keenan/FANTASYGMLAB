@@ -76,6 +76,9 @@ describe("SleeperImportForm warm-up hand-off", () => {
       upgradeGuestWithEmail: vi.fn(),
       callbackNotice: null,
       isGuest: false,
+      resetPassword: vi.fn(),
+      recoveryPending: false,
+      completeRecovery: vi.fn(),
     });
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
       ok: true,
