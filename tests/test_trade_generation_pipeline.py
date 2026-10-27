@@ -134,6 +134,10 @@ def test_optimized_pipeline_preserves_every_recommendation_field(monkeypatch):
 
 def test_protected_player_exclusion_is_identical_with_pipeline_cache(monkeypatch):
     _install_deterministic_context(monkeypatch)
+    # This test covers protected-player exclusion, not the user-side gate: the
+    # tiny fixture roster would otherwise pass or fail on the calendar-week
+    # lineup check (a fixture with no RB left reads as an empty RB slot).
+    _bypass_analyzer_gate(monkeypatch)
     for ideas in (_build(False), _build(True)):
         assert ideas
         assert all("Protected Core" not in idea["my_player"] for idea in ideas)

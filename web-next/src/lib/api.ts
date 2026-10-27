@@ -2765,6 +2765,19 @@ export interface TradeVerdict {
   tone: "accept" | "counter" | "decline" | "fair";
   counter_action?: TradeCounterAction | null;
   alternate_packages?: TradeAlternatePackage[];
+  /** This-week lineup holes the evaluator found (modules/trade_lineup_impact.py);
+   * "critical" = leaves a starting position with no startable player. */
+  lineup_warnings?: TradeLineupWarning[];
+  /** Heading for `rationale` that matches the verdict direction. */
+  rationale_label?: string;
+}
+
+export interface TradeLineupWarning {
+  code: string;
+  position: string;
+  severity: "critical" | "warn";
+  headline: string;
+  detail: string;
 }
 
 export type TradeAnalyzerReason =

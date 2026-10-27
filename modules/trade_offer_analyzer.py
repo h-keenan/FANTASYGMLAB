@@ -75,6 +75,12 @@ class OfferVerdict:
     # `with_alternate_packages` since this dataclass has no access to the
     # players dataframe / regrade machinery needed to build them.
     alternate_packages: tuple[dict[str, Any], ...] = ()
+    # First-class this-week lineup warnings from the fit engine (see
+    # modules.trade_lineup_impact), e.g. "Leaves you without a startable RB".
+    lineup_warnings: tuple[dict[str, Any], ...] = ()
+    # Heading for `rationale` that matches the verdict's direction, so a
+    # losing trade is never headlined "Why this works".
+    rationale_label: str = "Why this works"
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -92,6 +98,8 @@ class OfferVerdict:
             "tone": self.tone,
             "counter_action": self.counter_action,
             "alternate_packages": [dict(pkg) for pkg in self.alternate_packages],
+            "lineup_warnings": [dict(w) for w in self.lineup_warnings],
+            "rationale_label": self.rationale_label,
         }
 
     def with_alternate_packages(
@@ -184,7 +192,7 @@ def _fit_total(fit: Mapping[str, Any] | None) -> int:
     if not isinstance(components, dict):
         return 0
     total = 0
-    for key in ("value", "lineup", "needs", "age", "draft", "strategy", "injury"):
+    for key in ("value", "lineup", "needs", "age", "draft", "strategy", "injury", "weekly_lineup"):
         try:
             total += int(components.get(key) or 0)
         except (TypeError, ValueError):
@@ -538,12 +546,85 @@ def build_counter_offer_packages(
     return results[:max_packages]
 
 
+def _rationale_label(tone: str, value_delta: int) -> str:
+    if tone == "accept":
+        return "Why this works" if value_delta >= 0 else "Why it still works"
+    if tone == "fair":
+        return "Why it's close"
+    if tone == "counter":
+        return "Why it needs changes"
+    return "Why it doesn't work"
+
+
+def _startable_candidates(
+    assets: Sequence[Mapping[str, Any]] | None, position: str, limit: int = 2
+) -> list[dict[str, Any]]:
+    """Verified partner players at `position` who could actually start (not
+    ruled out, not on a listed injury), best value first."""
+
+    from modules.rankings import injury_level, is_ruled_out
+
+    out = []
+    for asset in assets or ():
+        if str(asset.get("asset_type") or "player") != "player":
+            continue
+        if str(asset.get("position") or "").upper() != position:
+            continue
+        if asset.get("owner_roster_id") in (None, ""):
+            continue
+        status, injury = str(asset.get("status") or ""), str(asset.get("injury_status") or "")
+        if is_ruled_out(status, injury) or injury_level(status, injury) != "healthy":
+            continue
+        if int(asset.get("score") or asset.get("value_score") or 0) <= 0:
+            continue
+        out.append(dict(asset))
+    out.sort(key=lambda a: int(a.get("score") or a.get("value_score") or 0))
+    # Prefer a modest piece (the cheaper startable options) before a star.
+    return out[:limit]
+
+
+def lineup_fix_guidance(
+    warnings: Sequence[Mapping[str, Any]],
+    *,
+    partner_assets: Sequence[Mapping[str, Any]] | None = None,
+    waiver_options: Mapping[str, Sequence[str]] | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Concrete ways to close a critical this-week lineup hole."""
+
+    critical = [w for w in warnings if w.get("severity") == "critical"]
+    if not critical:
+        return "", None
+    warning = critical[0]
+    pos = str(warning.get("position") or "")
+    parts: list[str] = []
+    action: dict[str, Any] | None = None
+    candidates = _startable_candidates(partner_assets, pos)
+    if candidates:
+        names = " or ".join(str(c.get("name") or c.get("label") or "") for c in candidates if c.get("name") or c.get("label"))
+        parts.append(f"Ask for a startable {pos} back, such as {names} (verified on their roster)")
+        top = candidates[0]
+        action = {
+            "action": "add_to_receive",
+            "player_id": str(top.get("player_id") or ""),
+            "asset_type": "player",
+            "label": str(top.get("name") or top.get("label") or ""),
+        }
+    else:
+        parts.append(f"Ask for a startable {pos} back in the deal")
+    waiver = [n for n in (waiver_options or {}).get(pos, ()) if n][:3]
+    if waiver:
+        parts.append(f"or pick up a free-agent {pos} first ({', '.join(waiver)})")
+    parts.append(f"or hold off until you have another {pos} you can start")
+    return ", ".join(parts) + ".", action
+
+
 def decide_offer_verdict(
     fit: Mapping[str, Any] | None,
     *,
     send_assets: Sequence[Mapping[str, Any]] | None = None,
     receive_assets: Sequence[Mapping[str, Any]] | None = None,
     partner_assets: Sequence[Mapping[str, Any]] | None = None,
+    waiver_options: Mapping[str, Sequence[str]] | None = None,
 ) -> OfferVerdict:
     """Map fit-engine outputs into a restrained accept/decline/counter verdict."""
 
@@ -601,6 +682,13 @@ def decide_offer_verdict(
         ui = UI_VERDICT_FAIR
         tone = "fair"
 
+    lineup_warnings = tuple(dict(w) for w in (fit.get("lineup_warnings") or ()) if isinstance(w, Mapping))
+    has_critical_hole = any(w.get("severity") == "critical" for w in lineup_warnings)
+    if has_critical_hole and tone in {"accept", "fair"}:
+        # Leaving a starting slot empty this week is never an "accept as
+        # offered" or a coin-flip: it needs a fix first.
+        band, ui, tone = VERDICT_COUNTER, UI_VERDICT_COUNTER, "counter"
+
     if band in {VERDICT_SMASH_ACCEPT, VERDICT_HARD_DECLINE}:
         confidence = CONFIDENCE_HIGH
     elif band == VERDICT_FAIR or (close_value and abs(fit_total) <= 2):
@@ -608,6 +696,11 @@ def decide_offer_verdict(
     elif abs(value_delta) >= 1000 or abs(fit_total) >= 4:
         confidence = CONFIDENCE_HIGH
     else:
+        confidence = CONFIDENCE_MODERATE
+
+    if has_critical_hole and confidence == CONFIDENCE_CLOSE:
+        confidence = CONFIDENCE_MODERATE
+    elif has_critical_hole and confidence == CONFIDENCE_HIGH and tone == "counter":
         confidence = CONFIDENCE_MODERATE
 
     if explanation:
@@ -629,6 +722,13 @@ def decide_offer_verdict(
     )
     if band == VERDICT_FAIR and not counter:
         counter = ""
+    if has_critical_hole:
+        fix_text, fix_action = lineup_fix_guidance(
+            lineup_warnings, partner_assets=partner_assets, waiver_options=waiver_options
+        )
+        if fix_text:
+            counter = fix_text if not counter else f"{fix_text} Value-wise: {counter}"
+            counter_action = fix_action or counter_action
 
     # The label talks about raw asset value, so it reads the raw delta; the
     # band above uses the posture-adjusted value_delta (consolidation,
@@ -659,6 +759,8 @@ def decide_offer_verdict(
         value_delta=value_delta,
         tone=tone,
         counter_action=counter_action,
+        lineup_warnings=lineup_warnings,
+        rationale_label=_rationale_label(tone, raw_value_delta),
     )
 
 
@@ -802,7 +904,7 @@ def build_offer_result_card_html(
         + "</div>"
     )
     risk_cue = cue_html("risk", verdict.risk_summary)
-    why_cue = cue_html("why", verdict.rationale)
+    why_cue = cue_html("why", verdict.rationale, label=verdict.rationale_label)
     # The one thing a COUNTER/DECLINE/FAIR-with-counter reader actually needs
     # to act — what to ask for or trim — must be visible without a tap, not
     # buried in the same collapsed drawer as restated reference detail.

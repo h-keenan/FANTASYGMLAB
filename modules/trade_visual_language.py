@@ -444,11 +444,11 @@ def confidence_segments_html(label: object, *, extra_class: str = "") -> str:
     )
 
 
-def cue_html(kind: CueKind, text: object) -> str:
+def cue_html(kind: CueKind, text: object, label: str | None = None) -> str:
     body = str(text or "").strip()
     if not body:
         return ""
-    kicker = {
+    kicker = label or {
         "why": "Why this works",
         "risk": "Risk",
         "fit": "Team fit",
@@ -459,7 +459,7 @@ def cue_html(kind: CueKind, text: object) -> str:
     return (
         f"<div class='tvl-cue tvl-cue--{kind}'>"
         "<span class='tvl-cue-mark' aria-hidden='true'></span>"
-        f"<span class='tvl-cue-kicker'>{kicker}</span>"
+        f"<span class='tvl-cue-kicker'>{escape(kicker)}</span>"
         f"<p class='tvl-cue-body'>{escape(body)}</p>"
         "</div>"
     )

@@ -377,6 +377,32 @@ function VerdictCard({
         <TradeMatchup sendAssets={sendAssets} receiveAssets={receiveAssets} />
       </div>
 
+      {(verdict.lineup_warnings ?? []).length > 0 ? (
+        <ul className="flex flex-col gap-2" aria-label="Lineup warnings" data-testid="lineup-warnings">
+          {(verdict.lineup_warnings ?? []).map((warning) => {
+            const critical = warning.severity === "critical";
+            return (
+              <li
+                key={`${warning.code}-${warning.position}`}
+                role={critical ? "alert" : undefined}
+                className="flex flex-col gap-0.5 p-3"
+                style={{
+                  background: "var(--color-warning-soft)",
+                  borderLeft: `4px solid ${critical ? "var(--color-danger)" : "var(--color-warning)"}`,
+                }}
+              >
+                <span className="text-sm font-bold" style={{ color: critical ? "var(--color-danger)" : "var(--color-text-primary)" }}>
+                  {warning.headline}
+                </span>
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                  {warning.detail}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline gap-2">
           <span
@@ -398,7 +424,7 @@ function VerdictCard({
       {verdict.rationale ? (
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
-            Why this works
+            {verdict.rationale_label || "Why this works"}
           </span>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {verdict.rationale}

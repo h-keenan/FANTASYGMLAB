@@ -4981,6 +4981,36 @@ class TradeAnalyzerRequest(BaseModel):
     partner_roster_id: str = ""
 
 
+def _lineup_hole_waiver_options(
+    league_id: str, valued: pd.DataFrame, score_field: str, positions: set[str]
+) -> dict[str, list[str]]:
+    """Top real free agents (unrostered, healthy, waiver-actionable) per position."""
+
+    roster_map = {
+        str(r.get("roster_id")): list(r.get("players") or []) for r in sleeper.get_rosters(league_id) or []
+    }
+    rostered = {str(pid) for players in roster_map.values() for pid in players}
+    pool = valued[~valued["player_id"].astype(str).isin(rostered)]
+    if pool.empty:
+        return {}
+    from modules.player_state_authority import waiver_actionable_player_pool
+    from modules.rankings import injury_level
+
+    pool = waiver_actionable_player_pool(pool, roster_map, surface="trade_analyzer_lineup_hole")
+    if pool.empty or score_field not in pool.columns:
+        return {}
+    pool = pool.sort_values(score_field, ascending=False)
+    out: dict[str, list[str]] = {}
+    for pos in positions:
+        names = [
+            str(row.get("name"))
+            for _, row in pool[pool["position"].astype(str).str.upper() == pos].iterrows()
+            if row.get("name") and injury_level(str(row.get("status") or ""), str(row.get("injury_status") or "")) == "healthy"
+        ][:3]
+        if names:
+            out[pos] = names
+    return out
+
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
 def post_trade_analyzer(
     body: TradeAnalyzerRequest,
@@ -5189,11 +5219,28 @@ def post_trade_analyzer(
     if not fit or not fit.get("available"):
         return {"ok": True, "verdict": None, "reason": "fit_unavailable"}
 
+    # A critical this-week lineup hole ("no startable RB") gets concrete
+    # free-agent options in its fix guidance: real, unowned, healthy players.
+    waiver_options: dict[str, list[str]] = {}
+    critical_positions = {
+        str(w.get("position") or "")
+        for w in (fit.get("lineup_warnings") or [])
+        if w.get("severity") == "critical" and w.get("position")
+    }
+    if critical_positions:
+        try:
+            waiver_options = _lineup_hole_waiver_options(
+                league_id, valued, score_field, critical_positions
+            )
+        except Exception:
+            waiver_options = {}
+
     verdict = trade_offer_analyzer.decide_offer_verdict(
         fit,
         send_assets=send_assets,
         receive_assets=receive_assets,
         partner_assets=partner_assets,
+        waiver_options=waiver_options,
     )
 
     if getattr(verdict, "band", None) in trade_offer_analyzer.COUNTER_PACKAGE_BANDS:
@@ -5228,6 +5275,9 @@ def post_trade_analyzer(
                         partner_asset_pool.append(pick_asset_from_mapping(pick, pick_score_multiplier=pick_score_multiplier))
 
             my_needs = trade_analyzer_fit.get_needed_positions(my_team_df, None, settings)
+            # Positions the trade would leave empty this week rank first when
+            # looking for a partner piece to ask for.
+            my_needs = list(dict.fromkeys([*sorted(critical_positions), *my_needs]))
 
             def _regrade_counter_package(cand_send, cand_receive):
                 cand_fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
@@ -5247,6 +5297,7 @@ def post_trade_analyzer(
                     send_assets=cand_send,
                     receive_assets=cand_receive,
                     partner_assets=partner_asset_pool,
+                    waiver_options=waiver_options,
                 )
 
             alternate_packages = trade_offer_analyzer.build_counter_offer_packages(

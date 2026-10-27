@@ -1529,6 +1529,19 @@ export interface TradeVerdict {
   // or declined, and the share card's headline says so directly.
   tone: 'accept' | 'counter' | 'decline' | 'fair' | 'idea';
   counter_action?: TradeCounterAction | null;
+  // This-week lineup holes from the evaluator (modules/trade_lineup_impact.py);
+  // 'critical' = leaves a starting position with no startable player.
+  lineup_warnings?: TradeLineupWarning[];
+  // Heading for `rationale` that matches the verdict direction.
+  rationale_label?: string;
+}
+
+export interface TradeLineupWarning {
+  code: string;
+  position: string;
+  severity: 'critical' | 'warn';
+  headline: string;
+  detail: string;
 }
 
 export type TradeAnalyzerReason =

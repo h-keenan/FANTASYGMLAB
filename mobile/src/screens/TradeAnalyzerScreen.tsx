@@ -834,8 +834,28 @@ function VerdictCard({
         text={copy.help('analyzerConfidence') && `Confidence: ${copy.help('analyzerConfidence')}`}
         style={styles.beginnerHelp}
       />
+      {(verdict.lineup_warnings ?? []).map((warning) => (
+        <View
+          key={`${warning.code}-${warning.position}`}
+          accessibilityRole={warning.severity === 'critical' ? 'alert' : undefined}
+          style={[
+            styles.lineupWarning,
+            { borderLeftColor: warning.severity === 'critical' ? colors.danger : colors.warning },
+          ]}
+        >
+          <AppText
+            style={[styles.lineupWarningHeadline, warning.severity === 'critical' && { color: colors.danger }]}
+          >
+            {warning.headline}
+          </AppText>
+          <AppText style={styles.lineupWarningDetail}>{warning.detail}</AppText>
+        </View>
+      ))}
       {showExplanations ? (
         <>
+          <AppText style={[styles.verdictLabel, { color: toneColor }]}>
+            {verdict.rationale_label || 'Why this works'}
+          </AppText>
           <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
 
           <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
@@ -1113,6 +1133,14 @@ function createStyles(colors: ThemeColors) {
   // The rationale is a full-width block under the hero strip now, not a
   // flex child sharing a row with the confidence ring.
   verdictRationale: { flex: 0 },
+  lineupWarning: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderLeftWidth: 4,
+    backgroundColor: colors.warningMuted,
+  },
+  lineupWarningHeadline: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+  lineupWarningDetail: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
   resultsList: { paddingBottom: spacing.xl },
   // A pick search row pairs DraftPickAssetRow (which owns the "add to
   // package" tap) with a separate "view pick detail" button — the outer row
