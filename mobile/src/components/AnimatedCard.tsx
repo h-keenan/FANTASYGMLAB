@@ -103,7 +103,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   card: {
     backgroundColor: colors.glass,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     borderWidth: StyleSheet.hairlineWidth * 1.5,
     borderColor: colors.glassBorder,
     padding: spacing.lg,
@@ -120,8 +120,8 @@ function createStyles(colors: ThemeColors) {
     // Bench list in one groupCard). 56 comfortably covers one row's worth
     // of sheen on every card size in the app without needing to scale.
     height: 56,
-    borderTopLeftRadius: radii.md,
-    borderTopRightRadius: radii.md,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
     overflow: 'hidden',
   },
   // Shadow is applied at render time (default `shadows.orbGlow`, or
@@ -129,7 +129,7 @@ function createStyles(colors: ThemeColors) {
   // than baked in here, so a single `glow` card can tint its own drop
   // shadow instead of always inheriting brand cyan.
   glowRim: {
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     padding: 1.5,
   },
   cardGlowInner: { borderWidth: 0 },
