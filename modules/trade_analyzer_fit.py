@@ -32,7 +32,7 @@ import pandas as pd
 from modules import runtime_trace
 from modules.frame_records import frame_records
 from modules import trade_grade
-from modules import trade_lineup_impact
+from modules import trade_lineup_impact, trade_lineup_model
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_display import _format_score
@@ -63,6 +63,28 @@ def _safe_text(value: Any, default: str = "") -> str:
     except Exception:
         pass
     return str(value)
+
+
+def _model_risk_summary(lineup_model: dict, injury_lines, window) -> str:
+    """Risk text from the lineup model's own numbers: who is estimated out and
+    for how long, what stays open, and how wide the outcome range is."""
+
+    parts: list[str] = []
+    for line in injury_lines[:3]:
+        parts.append(
+            f"{line.name} ({line.absence.status_label}): {trade_grade._weeks_text(line.absence.weeks)} "
+            f"estimated ({line.absence.basis}; no return date in the data)."
+        )
+    opened = lineup_model.get("new_open_slot_weeks") or {}
+    if opened:
+        slot, weeks = max(opened.items(), key=lambda kv: kv[1])
+        parts.append(f"Leaves a {slot} slot open ~{weeks:.0f} week{'s' if round(weeks) != 1 else ''} unless filled from waivers.")
+    unc = lineup_model["uncertainty"]
+    parts.append(
+        f"Outcome range: about +/-{unc['sigma_points']:.0f} lineup points over the rest of the season "
+        f"(injury timing and projection spread); {lineup_model['confidence_pct']:.0f}% sure of the direction."
+    )
+    return " ".join(parts)
 
 
 @runtime_trace.traced("roster_normalization", phase="roster_normalization")
@@ -453,7 +475,12 @@ def evaluate_trade_analyzer_fit(
     score_field: str,
     *,
     current_context: dict | None = None,
+    waiver_df: pd.DataFrame | None = None,
 ) -> dict | None:
+    """``waiver_df``: the league's real free-agent pool (unrostered, valued
+    like ``all_players_df``). Optional; without it the lineup model fills
+    holes at the market replacement level and says so."""
+
     if my_team_df is None or my_team_df.empty:
         return None
     if not send_assets and not receive_assets:
@@ -533,7 +560,7 @@ def evaluate_trade_analyzer_fit(
         window=window,
     )
     injury_lines = receive_injury_lines + send_injury_lines
-    injury_value_adjustment = int(
+    legacy_injury_value_adjustment = int(
         round(
             sum(line.adjusted_value - line.listed_value for line in receive_injury_lines)
             - sum(line.adjusted_value - line.listed_value for line in send_injury_lines)
@@ -544,8 +571,64 @@ def evaluate_trade_analyzer_fit(
         receive_assets,
         values={**receive_values, **send_values},
     )
-    starter_adjustment = trade_grade.starter_strength_adjustment(lineup_delta, strategy_key)
-    value_delta = int(raw_value_delta + injury_value_adjustment + consolidation_adjustment + starter_adjustment)
+    legacy_starter_adjustment = trade_grade.starter_strength_adjustment(lineup_delta, strategy_key)
+
+    # Trade engine v2 (docs/trade-engine-v2.md): in season, ONE expected
+    # lineup-points model replaces the three older single-signal pieces (the
+    # healthy-equivalent starter-strength weight, the flat injury availability
+    # cost and the this-week hole penalty). Offseason has no weekly claims, so
+    # the older value-based pieces stand.
+    lineup_model = None
+    if window.in_season:
+        try:
+            model_score_column = score_field if score_field in all_players_df.columns else score_column
+            model_ctx = trade_lineup_model.get_context(
+                all_players_df,
+                lineup_settings,
+                model_score_column,
+                window=window,
+                strategy=strategy_key,
+                waiver_df=waiver_df,
+            )
+            # A short-term injury is priced here in lineup points, so the
+            # market's risk discount on those players is restored first.
+            healthy_by_id = {line.player_id: line.healthy_value for line in injury_lines}
+
+            def model_asset_value(asset):
+                if asset.get("asset_type") == "player":
+                    pid = str(asset.get("player_id") or "")
+                    if pid in healthy_by_id:
+                        return float(healthy_by_id[pid])
+                return float(score_asset_value(asset))
+
+            healthy_restore = sum(
+                line.healthy_value - line.listed_value for line in injury_lines if line.side == "receive"
+            ) - sum(line.healthy_value - line.listed_value for line in injury_lines if line.side == "send")
+            lineup_model = trade_lineup_model.evaluate_trade(
+                my_team_df,
+                post_team_df,
+                model_ctx,
+                send_assets=send_assets,
+                receive_assets=receive_assets,
+                raw_value_delta=raw_value_delta,
+                healthy_restore=healthy_restore,
+                consolidation_adjustment=consolidation_adjustment,
+                asset_value=model_asset_value,
+            )
+        except Exception:
+            lineup_model = None
+    if lineup_model is not None:
+        injury_value_adjustment = 0
+        starter_adjustment = 0
+        weekly_lineup_component = 0
+        trade_score = int(lineup_model["trade_score"])
+        value_delta = int(raw_value_delta + consolidation_adjustment)
+        injury_value_adjustment = int(lineup_model["components"]["injury_value_restore"])
+    else:
+        injury_value_adjustment = legacy_injury_value_adjustment
+        starter_adjustment = legacy_starter_adjustment
+        value_delta = int(raw_value_delta + injury_value_adjustment + consolidation_adjustment + starter_adjustment)
+        trade_score = value_delta
     current_needs = current_context["needs"]
     need_set = {str(pos).upper() for pos in current_needs}
     strength_set = {str(pos).upper() for pos in (metrics or {}).get("strengths", []) or []}
@@ -650,8 +733,11 @@ def evaluate_trade_analyzer_fit(
     send_pick_count = sum(1 for asset in send_assets if asset.get("asset_type") == "pick")
     receive_pick_count = sum(1 for asset in receive_assets if asset.get("asset_type") == "pick")
 
-    value_component = 2 if value_delta >= 700 else 1 if value_delta >= 150 else 0 if value_delta > -250 else -1 if value_delta > -1000 else -2
-    lineup_component = 2 if lineup_delta >= 500 else 1 if lineup_delta >= 120 else 0 if lineup_delta > -120 else -1 if lineup_delta > -500 else -2
+    value_component = 2 if trade_score >= 700 else 1 if trade_score >= 150 else 0 if trade_score > -250 else -1 if trade_score > -1000 else -2
+    # Model mode: the lineup component is the model's win-now delta (value
+    # units, same bands); otherwise the season-value starter delta.
+    lineup_basis = int(lineup_model["win_now_delta"]) if lineup_model is not None else lineup_delta
+    lineup_component = 2 if lineup_basis >= 500 else 1 if lineup_basis >= 120 else 0 if lineup_basis > -120 else -1 if lineup_basis > -500 else -2
     need_component = min(2, len(filled_needs)) - min(2, len(exposed_needs) + len(depth_losses))
     if surplus_moves:
         need_component = min(2, need_component + 1)
@@ -836,7 +922,11 @@ def evaluate_trade_analyzer_fit(
         positives.append("wins on raw value")
     if consolidation_adjustment > 0:
         positives.append("consolidates into the best asset in the deal")
-    if lineup_delta > 0:
+    model_pts = (lineup_model or {}).get("points") or {}
+    if lineup_model is not None:
+        if model_pts.get("ros_delta", 0) >= 5:
+            positives.append(f"adds ~{model_pts['ros_delta']:.0f} lineup points over the rest of the season")
+    elif lineup_delta > 0:
         positives.append("improves the starting lineup")
     if filled_needs:
         positives.append(f"helps at {' / '.join(filled_needs[:2])}")
@@ -852,7 +942,10 @@ def evaluate_trade_analyzer_fit(
             negatives.append(f"thins this week's {warning['position']} lineup")
     if raw_value_delta < 0:
         negatives.append("pays a raw-value premium")
-    if lineup_delta < 0:
+    if lineup_model is not None:
+        if model_pts.get("ros_delta", 0) <= -5:
+            negatives.append(f"costs ~{abs(model_pts['ros_delta']):.0f} lineup points over the rest of the season")
+    elif lineup_delta < 0:
         negatives.append("costs starter strength")
     if consolidation_adjustment < 0:
         negatives.append("breaks up the best asset in the deal for depth")
@@ -871,11 +964,17 @@ def evaluate_trade_analyzer_fit(
 
     if positives and negatives:
         pos_text, neg_text = ", ".join(positives[:2]), ", ".join(negatives[:2])
-        if critical_warnings or (value_delta < 0 and fit_total <= 0):
+        net_negative = (
+            trade_score < 0 if lineup_model is not None else (value_delta < 0 and fit_total <= 0)
+        )
+        net_positive = (
+            trade_score >= 150 if lineup_model is not None else (value_delta >= 0 and fit_total >= 1)
+        )
+        if (critical_warnings and not (lineup_model is not None and trade_score >= 150)) or net_negative:
             # Net-negative: lead with the cost, never "Helps because" over a
             # negative value balance.
             explanation = f"Falls short: it {neg_text}, even though it {pos_text}."
-        elif value_delta >= 0 and fit_total >= 1:
+        elif net_positive:
             explanation = f"Helps because it {pos_text}, but it also {neg_text}."
         else:
             explanation = f"Mixed: it {pos_text}, but it also {neg_text}."
@@ -888,6 +987,12 @@ def evaluate_trade_analyzer_fit(
 
     if critical_warnings:
         explanation = " ".join(f"{w['headline']}." for w in critical_warnings[:2]) + " " + explanation
+    if lineup_model is not None:
+        warning_prefix = (
+            " ".join(f"{w['headline']}. {w['detail']}" for w in lineup_warnings[:2]) + " " if lineup_warnings else ""
+        )
+        lineup_summary = (warning_prefix + lineup_model["explanation"]).strip()
+        explanation = f"{explanation} {lineup_model['explanation']}"
 
     injury_summary_parts = []
     if injury_reinforcements:
@@ -935,17 +1040,27 @@ def evaluate_trade_analyzer_fit(
         injury_summary = f"Injury risk is unchanged ({post_health_flag})."
     else:
         injury_summary = "Health context stays close to neutral."
-    if injury_lines:
+    if lineup_model is not None:
+        injury_summary = _model_risk_summary(lineup_model, injury_lines, window)
+    elif injury_lines:
         injury_summary += " " + " ".join(line.note(strategy_key, window) for line in injury_lines)
 
     return {
         "available": True,
         "value_delta": value_delta,
+        "trade_score": trade_score,
+        "lineup_model": lineup_model,
+        "confidence_pct": (lineup_model or {}).get("confidence_pct"),
         "raw_value_delta": raw_value_delta,
         "value_adjustments": {
             "injury": injury_value_adjustment,
             "consolidation": consolidation_adjustment,
             "starter_strength": starter_adjustment,
+            "lineup_model": (
+                {k: v for k, v in lineup_model["components"].items() if k not in {"raw_value_delta", "consolidation"}}
+                if lineup_model is not None
+                else None
+            ),
         },
         "value_adjustment_notes": [
             note

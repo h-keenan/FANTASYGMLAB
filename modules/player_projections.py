@@ -1484,3 +1484,55 @@ def project_player_week(
             "point_estimate_floored": raw_point_estimate < 0.0,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Batch baseline for the trade lineup model (trade engine v2)
+# ---------------------------------------------------------------------------
+
+
+def baseline_weekly_points(
+    player_rows: List[Dict[str, Any]],
+    *,
+    season: Optional[int] = None,
+    weekly_by_player: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    as_of_week: Optional[int] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """The v3 walk-forward baseline (PPR points per game, availability NOT
+    applied) for many players at once, from the weekly rows already cached.
+
+    This is the same estimator ``project_player_week`` uses for its point
+    estimate, minus the schedule/availability layers: the trade lineup model
+    handles byes and injuries itself, week by week. A player with no usable
+    recent production gets NO entry (never a fabricated number); the model
+    then falls back to his season average or a value-derived estimate and
+    labels the basis.
+
+    ``player_rows``: dicts with ``player_id`` and ``position``. Returns
+    ``{player_id: {"ppg", "sd", "games", "confidence"}}``.
+    """
+
+    season = int(season) if season is not None else sleeper.default_player_stats_season()
+    weekly_map = weekly_by_player if weekly_by_player is not None else sleeper.cached_season_weekly_map(season)
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in player_rows or []:
+        pid = str(row.get("player_id") or "")
+        position = str(row.get("position") or "").strip().upper()
+        weekly_rows = weekly_map.get(pid) or []
+        if not pid or position not in PROJECTABLE_POSITIONS or not weekly_rows:
+            continue
+        before = int(as_of_week) if as_of_week is not None else 99
+        upto = _most_recent_played_week(weekly_rows, before_week=before)
+        trend = _player_usage_trend(weekly_rows, position=position, upto_week=upto)
+        if trend is None:
+            continue
+        estimate = max(0.0, trend["baseline_ppr"])
+        confidence = _v2_confidence(trend["games_played"])
+        low, high = _v2_range(estimate, position, confidence)
+        out[pid] = {
+            "ppg": round(estimate, 2),
+            "sd": round(max(0.5, (high - low) / 2.0), 2),
+            "games": trend["games_played"],
+            "confidence": confidence,
+        }
+    return out

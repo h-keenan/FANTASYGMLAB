@@ -46,6 +46,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
+import { formatTradeGain } from '../lib/liveDraft';
 import { idpTradePoolPlayers, tradePositionOptions } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
 import { useDensity } from '../context/DensityContext';
@@ -111,6 +112,22 @@ const CONFIDENCE_PERCENT: Record<string, number> = {
 
 function confidencePercent(confidence: string): number {
   return CONFIDENCE_PERCENT[confidence.toLowerCase()] ?? 50;
+}
+
+// Ring level (1-3). With the lineup model the label comes from a computed
+// P(direction is right); older servers only send the three label strings.
+function confidenceLevel(verdict: TradeVerdict): 1 | 2 | 3 {
+  if (verdict.confidence_pct != null) {
+    return verdict.confidence_pct >= 88 ? 3 : verdict.confidence_pct >= 70 ? 2 : 1;
+  }
+  const pct = confidencePercent(verdict.confidence);
+  return pct >= 80 ? 3 : pct >= 50 ? 2 : 1;
+}
+
+// Signed lineup points: one decimal under 10, none above ("+4.2", "-92").
+function formatLineupPoints(points: number): string {
+  const rounded = Math.abs(points) < 10 ? Math.round(points * 10) / 10 : Math.round(points);
+  return `${rounded > 0 ? '+' : rounded < 0 ? '-' : ''}${Math.abs(rounded)}`;
 }
 
 function playerScore(player: RankedPlayer): number {
@@ -816,8 +833,8 @@ function VerdictCard({
         <View style={styles.verdictMeter}>
           <MeterRow
             label="CONFIDENCE"
-            value={verdict.confidence}
-            level={confidencePercent(verdict.confidence) >= 80 ? 3 : confidencePercent(verdict.confidence) >= 50 ? 2 : 1}
+            value={verdict.confidence_pct != null ? `${verdict.confidence} (${Math.round(verdict.confidence_pct)}%)` : verdict.confidence}
+            level={confidenceLevel(verdict)}
             color={toneColor}
           />
         </View>
@@ -851,6 +868,21 @@ function VerdictCard({
           <AppText style={styles.lineupWarningDetail}>{warning.detail}</AppText>
         </View>
       ))}
+      {verdict.lineup_model ? (
+        <View testID="lineup-model" style={styles.lineupModel}>
+          <AppText style={styles.lineupModelLabel}>LINEUP IMPACT</AppText>
+          <AppText style={styles.lineupModelHeadline}>
+            {formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts over Weeks{' '}
+            {verdict.lineup_model.weeks.first}-{verdict.lineup_model.weeks.last} (
+            {formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week)
+          </AppText>
+          <AppText style={styles.lineupWarningDetail}>{verdict.lineup_model.explanation}</AppText>
+          <AppText style={styles.lineupModelFootnote}>
+            Trade score {formatTradeGain(verdict.lineup_model.trade_score)} = value balance plus lineup points under
+            your posture.
+          </AppText>
+        </View>
+      ) : null}
       {showExplanations ? (
         <>
           <AppText style={[styles.verdictLabel, { color: toneColor }]}>
@@ -1141,6 +1173,10 @@ function createStyles(colors: ThemeColors) {
   },
   lineupWarningHeadline: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   lineupWarningDetail: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
+  lineupModel: { marginTop: spacing.sm, gap: 2 },
+  lineupModelLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
+  lineupModelHeadline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  lineupModelFootnote: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
   resultsList: { paddingBottom: spacing.xl },
   // A pick search row pairs DraftPickAssetRow (which owns the "add to
   // package" tap) with a separate "view pick detail" button — the outer row

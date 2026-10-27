@@ -1534,6 +1534,40 @@ export interface TradeVerdict {
   lineup_warnings?: TradeLineupWarning[];
   // Heading for `rationale` that matches the verdict direction.
   rationale_label?: string;
+  // The one number the verdict, confidence, risk text and counters derive
+  // from (value balance + posture + expected lineup points). Equals
+  // value_delta when no lineup model ran (offseason).
+  trade_score?: number;
+  // P(the direction of trade_score is right), 50-100.
+  confidence_pct?: number | null;
+  lineup_model?: TradeLineupModel | null;
+}
+
+// modules/trade_lineup_model.py's `lineup_model` block, verbatim. Additive:
+// absent in the offseason and for older servers. All numbers are expected
+// lineup points over the remaining weeks, never a promise.
+export interface TradeLineupModel {
+  trade_score: number;
+  confidence_pct: number;
+  confidence_label: string;
+  explanation: string;
+  posture: string;
+  weights: { now: number; future: number };
+  weeks: { first: number; last: number; count: number };
+  points: {
+    ros_before: number;
+    ros_after: number;
+    ros_delta: number;
+    per_week_delta: number;
+    this_week_delta: number;
+    future_delta: number;
+  };
+  worst_position?: string | null;
+  pickup?: { player_id: string; name: string; position: string; expected_ppg: number; points_recovered_ros: number } | null;
+  waiver_pool_used: boolean;
+  uncertainty: { sigma_points: number; estimate_sigma_points: number };
+  win_now_delta: number;
+  future_delta: number;
 }
 
 export interface TradeLineupWarning {

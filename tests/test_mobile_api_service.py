@@ -2378,6 +2378,65 @@ def test_trade_analyzer_returns_real_verdict_for_lopsided_upgrade(monkeypatch):
         assert key in verdict
 
 
+def test_trade_analyzer_returns_lineup_model_numbers_in_season(monkeypatch):
+    """Trade engine v2 end to end through the endpoint: in season the verdict
+    carries the one trade score, the computed confidence and the lineup-point
+    numbers; the league's real free-agent pool reaches the model. The legacy
+    fields stay, so older app builds keep working."""
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    free_agents = pd.DataFrame(
+        [
+            {"player_id": "fa_rb", "name": "Waiver Runner", "position": "RB", "team": "KC", "age": 25,
+             "status": "Active", "injury_status": None, "score": 100, "dynasty_score": 100, "value_score": 100,
+             "rebuild_score": 100, "ppg": 6.0, "games_played": 7, "receptions": 14},
+        ]
+    )
+
+    with patch("modules.trade_grade.estimate_nfl_week", return_value=8):
+        with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+            with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+                with patch(
+                    "modules.sleeper.get_rosters",
+                    return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+                ):
+                    with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                with patch("services.mobile_api_service._league_waiver_pool", return_value=free_agents) as pool:
+                                    response = client.post(
+                                        "/v1/leagues/abc/trade-analyzer",
+                                        json={
+                                            "send_player_ids": ["my_bench_rb"],
+                                            "receive_player_ids": ["target_rb"],
+                                            "strategy": "contender",
+                                        },
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    verdict = response.json()["verdict"]
+    pool.assert_called_once()
+    for legacy in ("band", "ui_verdict", "confidence", "rationale", "value_summary", "roster_summary",
+                   "risk_summary", "value_delta", "tone", "lineup_warnings", "rationale_label"):
+        assert legacy in verdict
+    model = verdict["lineup_model"]
+    assert model and model["waiver_pool_used"] is True
+    assert verdict["trade_score"] == model["trade_score"]
+    assert verdict["confidence_pct"] == model["confidence_pct"]
+    assert verdict["confidence"] == model["confidence_label"]
+    assert model["points"]["ros_delta"] > 0  # a far better RB starts instead of a bench RB
+    assert verdict["tone"] == "accept"
+
+
 def test_trade_analyzer_passes_partner_roster_assets_when_given(monkeypatch):
     """partner_roster_id should resolve to that roster's real players and
     reach decide_offer_verdict as partner_assets — the input

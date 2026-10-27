@@ -248,6 +248,54 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
   });
 
+  it("shows the lineup model's points, the one trade score and the computed confidence", async () => {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
+      ok: true,
+      verdict: {
+        ...VERDICT,
+        band: "DECLINE",
+        ui_verdict: "DECLINE",
+        tone: "decline",
+        confidence: "High confidence",
+        confidence_pct: 93.4,
+        value_delta: -379,
+        trade_score: -1704,
+        rationale_label: "Why it doesn't work",
+        lineup_model: {
+          trade_score: -1704,
+          confidence_pct: 93.4,
+          confidence_label: "High confidence",
+          explanation:
+            "You lose ~7.6 pts/week at RB for 10 weeks unless you pick up Waiver Runner (~6.5 ppg, worth ~65 pts); net -76 lineup pts over Weeks 8-17 (-6.0 this week).",
+          posture: "retool",
+          weights: { now: 1.15, future: 1 },
+          weeks: { first: 8, last: 17, count: 10 },
+          points: { ros_before: 992.1, ros_after: 916.2, ros_delta: -75.9, per_week_delta: -7.59, this_week_delta: -6, future_delta: -40 },
+          worst_position: "RB",
+          pickup: { player_id: "fa", name: "Waiver Runner", position: "RB", expected_ppg: 6.5, points_recovered_ros: 65 },
+          waiver_pool_used: true,
+          uncertainty: { sigma_points: 30, estimate_sigma_points: 20 },
+          win_now_delta: -2500,
+          future_delta: 800,
+        },
+      },
+      reason: "",
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    fireEvent.click(screen.getByText("Their WR"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+    });
+
+    const block = await screen.findByTestId("lineup-model");
+    expect(block).toHaveTextContent("-76 lineup pts over Weeks 8-17 (-6 this week)");
+    expect(block).toHaveTextContent("pick up Waiver Runner");
+    expect(block).toHaveTextContent("Trade score");
+    expect(screen.getByText("High confidence (93%)")).toBeInTheDocument();
+  });
+
   describe("Players' Add to Trade quick-add (quickAddPlayerId)", () => {
     it("pre-populates You Receive with a player owned by another team, and selects that team", () => {
       render(

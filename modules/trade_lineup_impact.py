@@ -15,6 +15,13 @@ before and after the trade and reports, per position, how many startable
 players remain, which dedicated slots go (or stay) empty, and whether the
 only players left are injury-designated (Questionable/Doubtful).
 
+Trade engine v2 (docs/trade-engine-v2.md): the SCORE no longer reads this
+module. ``modules.trade_lineup_model`` prices lineup holes, byes, injuries and
+waiver replacement in expected points. This module stays for what it states
+as fact (this week's startable counts and the "no startable RB" headline the
+UI shows as a warning), so the warning list and the score cannot drift apart
+on facts, only the score carries the cost.
+
 Pure: no I/O beyond the cached NFL schedule lookup for byes (failures read
 as "no bye", never invented). Offseason (no fantasy week) returns
 ``available: False`` so nothing here is ever claimed out of season.

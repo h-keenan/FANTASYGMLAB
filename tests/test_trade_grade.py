@@ -223,7 +223,12 @@ def _grade(strategy, send_rows, receive_rows, pool):
     return fit, trade_offer_analyzer.decide_offer_verdict(fit, send_assets=send, receive_assets=receive)
 
 
-def test_contender_breaking_up_a_stud_for_depth_is_a_decline():
+def test_breaking_up_a_stud_for_depth_is_a_decline():
+    # Trade engine v2: in season the lineup-points model (not the old
+    # starter-strength weight) decides. The market says "wins on raw value"
+    # but the depth pieces would not start, so the expected lineup points
+    # drop. The contender, who weights real lineup points 1.5x, declines; the
+    # rebuilder (1.05x) is hurt much less.
     depth = [_row("D1", "WR", 3400), _row("D2", "RB", 3300), _row("D3", "TE", 3300)]
     pool = _pool(*depth)
     stud = _roster().set_index("player_id").loc["STUD"].to_dict() | {"player_id": "STUD"}
@@ -234,10 +239,31 @@ def test_contender_breaking_up_a_stud_for_depth_is_a_decline():
     assert contender_fit["raw_value_delta"] > 0  # wins on raw value...
     assert contender_fit["lineup_delta"] < -1500  # ...but guts the starting lineup
     assert contender_fit["value_adjustments"]["consolidation"] < 0
-    assert contender_fit["value_adjustments"]["starter_strength"] == round(contender_fit["lineup_delta"] * 0.5)
+    # Season-value starter weight and flat injury cost are replaced in season.
+    assert contender_fit["value_adjustments"]["starter_strength"] == 0
+    assert contender_fit["lineup_model"]["points"]["ros_delta"] < 0
     assert contender.ui_verdict == "DECLINE"
-    assert rebuild_fit["value_adjustments"]["starter_strength"] == round(rebuild_fit["lineup_delta"] * 0.05)
-    assert rebuild.value_delta > contender.value_delta
+    assert rebuild.trade_score > contender.trade_score
+    # Posture is a parameter of the one model: contenders weight real
+    # lineup points more than rebuilders do.
+    assert contender_fit["lineup_model"]["weights"]["now"] == 1.5
+    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.05
+    assert contender.trade_score == contender_fit["trade_score"]
+
+
+def test_offseason_keeps_the_value_based_starter_strength_weight():
+    # No weekly claims in the offseason: the older value-based pieces stand.
+    depth = [_row("D1", "WR", 3400), _row("D2", "RB", 3300), _row("D3", "TE", 3300)]
+    pool = _pool(*depth)
+    roster = pool[pool["player_id"].isin(_roster()["player_id"])]
+    stud = _asset(_roster().set_index("player_id").loc["STUD"].to_dict() | {"player_id": "STUD"})
+    send, receive = [stud], [_asset(r) for r in depth]
+    fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
+        roster, pool, send, receive, None, "contender", dict(SETTINGS, current_week=0), "dynasty_score"
+    )
+    assert fit["lineup_model"] is None
+    assert fit["value_adjustments"]["starter_strength"] == round(fit["lineup_delta"] * 0.5)
+    assert fit["trade_score"] == fit["value_delta"]
 
 
 def test_short_injury_is_an_availability_cost_not_a_value_wipe():
