@@ -739,6 +739,140 @@ def test_analytics_event_is_fail_soft_when_track_event_raises(monkeypatch):
     assert response.json() == {"ok": False}
 
 
+def test_analytics_event_rejects_a_known_bot_user_agent(monkeypatch):
+    # 2026-10-27 Founder Analytics audit: a known crawler/bot User-Agent must
+    # be dropped before it ever reaches track_event, so it can never inflate
+    # event_count/sessions/visitors.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False}
+    mock_track.assert_not_called()
+
+
+def test_analytics_event_allows_a_real_browser_user_agent(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    mock_track.assert_called_once()
+
+
+def test_analytics_event_passes_the_client_session_id_through_to_track_event(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123", "session_id": "sess_real1234567890"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    _args, kwargs = mock_track.call_args
+    assert kwargs["state"][mobile_api_service.launch_analytics.SESSION_REAL_ID_KEY] == "sess_real1234567890"
+
+
+def test_analytics_event_page_view_also_receives_the_session_id(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_page_view") as mock_track_page_view:
+        response = client.post(
+            "/v1/analytics/event",
+            json={
+                "event": "page_view",
+                "anon_id": "anon_abc123",
+                "session_id": "sess_real1234567890",
+                "props": {"route": "/trade-hub/123"},
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    _args, kwargs = mock_track_page_view.call_args
+    assert kwargs["state"][mobile_api_service.launch_analytics.SESSION_REAL_ID_KEY] == "sess_real1234567890"
+
+
+def test_analytics_event_without_a_session_id_omits_it_from_state(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+        )
+
+    _args, kwargs = mock_track.call_args
+    assert mobile_api_service.launch_analytics.SESSION_REAL_ID_KEY not in kwargs["state"]
+
+
+def test_analytics_event_resolves_the_caller_real_entitlement_for_an_authenticated_user(monkeypatch):
+    # 2026-10-27 Founder Analytics audit: every event was tagged
+    # entitlement="free" regardless of the real tier because this endpoint
+    # never looked a profile up at all. Now it does, same cached helper
+    # every other authenticated endpoint already uses.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-analytics-entitlement-1", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "pro", "sleeper_username": "", "trial_ends_at": None}]
+
+    with (
+        patch("requests.get", side_effect=[auth_user_response, profile_response]),
+        patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track,
+    ):
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    _args, kwargs = mock_track.call_args
+    assert kwargs["state"]["account_profile"]["entitlement"] == "premium"
+
+
+def test_analytics_event_leaves_entitlement_default_for_an_anonymous_caller(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+        )
+
+    _args, kwargs = mock_track.call_args
+    assert "account_profile" not in kwargs["state"]
+
+
 def test_me_reports_ok_status_for_a_new_user_with_no_profile_row_yet(monkeypatch):
     client = _client(monkeypatch)
 

@@ -208,6 +208,65 @@ describe("lib/analytics", () => {
     expect(() => trackPageView("/news")).not.toThrow();
   });
 
+  it("mints a session id once and persists it across calls", async () => {
+    mockFetchOk();
+    const { getOrCreateSessionId } = await import("./analytics");
+
+    const first = getOrCreateSessionId();
+    const second = getOrCreateSessionId();
+
+    expect(first).toMatch(/^sess_[0-9a-f]{16}$/);
+    expect(second).toBe(first);
+  });
+
+  it("starts a new session once the stored one has expired", async () => {
+    mockFetchOk();
+    window.localStorage.setItem(
+      "dynastygm_analytics_session_id",
+      JSON.stringify({ id: "sess_expired000000", expiresAt: Date.now() - 1000 }),
+    );
+    const { getOrCreateSessionId } = await import("./analytics");
+
+    expect(getOrCreateSessionId()).not.toBe("sess_expired000000");
+  });
+
+  it("reuses a still-fresh session id stored from a prior page load", async () => {
+    mockFetchOk();
+    window.localStorage.setItem(
+      "dynastygm_analytics_session_id",
+      JSON.stringify({ id: "sess_stillfresh1234", expiresAt: Date.now() + 60_000 }),
+    );
+    const { getOrCreateSessionId } = await import("./analytics");
+
+    expect(getOrCreateSessionId()).toBe("sess_stillfresh1234");
+  });
+
+  it("every tracked event carries the session id alongside anon_id", async () => {
+    const mockFetch = mockFetchOk();
+    const { trackPageView } = await import("./analytics");
+
+    trackPageView("/dashboard/league-1");
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(body.session_id).toMatch(/^sess_[0-9a-f]{16}$/);
+    expect(body.anon_id).toMatch(/^anon_/);
+  });
+
+  it("sends no analytics when visiting the founder analytics dashboard itself", async () => {
+    const mockFetch = mockFetchOk();
+    window.history.pushState({}, "", "/founder-analytics");
+    try {
+      const { trackPageView, trackFeatureUse } = await import("./analytics");
+      trackPageView("/founder-analytics");
+      trackFeatureUse("landing_viewed");
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
+
   it("sends no analytics from the static /sample-league demo", async () => {
     const mockFetch = mockFetchOk();
     window.history.pushState({}, "", "/sample-league");

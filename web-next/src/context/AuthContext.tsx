@@ -3,6 +3,7 @@
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
+import { trackFeatureUse } from "@/lib/analytics";
 import {
   GUEST_DATA_NOT_MERGED_NOTICE,
   IDENTITY_EXISTS_NOTICE,
@@ -157,6 +158,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       callbackNotice,
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // Real login/signup instrumentation: these events existed in the
+        // canonical taxonomy (modules.launch_analytics.TRACKED_EVENTS) but
+        // no web-next call site ever fired them (Founder Analytics audit,
+        // 2026-10). dedupe: false -- every real sign-in is its own
+        // countable event, not a reached-once milestone.
+        if (!error) trackFeatureUse("login_completed", { dedupe: false });
         return { error: error?.message ?? null };
       },
       signUp: async (email, password) => {
@@ -180,8 +187,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // account that already exists — the real fix here, not just a
         // UI polish pass.
         if (data.user && data.user.identities && data.user.identities.length === 0) {
+          // Anti-enumeration path: this is an EXISTING account, not a new
+          // signup -- no signup event for it.
           return { error: "An account with this email already exists. Try signing in instead.", signedIn: false };
         }
+        // signed in immediately (email auto-confirm on) vs. confirmation
+        // email pending -- both are a genuinely new account, so both are
+        // tracked, just as two different funnel steps.
+        trackFeatureUse(data.session ? "signup_completed" : "signup_started", { dedupe: false });
         return { error: null, signedIn: Boolean(data.session) };
       },
       signInWithOAuth: async (provider, options) => {

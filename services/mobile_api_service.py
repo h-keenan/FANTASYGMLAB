@@ -1114,12 +1114,18 @@ class AnalyticsEventRequest(BaseModel):
     props: dict[str, Any] | None = None
     anon_id: str
     once_key: str | None = None
+    # Real per-visit session id (web-next's getOrCreateSessionId: a
+    # localStorage-backed, TTL'd id distinct from the durable anon_id) —
+    # optional so older clients / mobile keep working unchanged (session_key
+    # then falls back to anon_id, today's behavior).
+    session_id: str | None = None
 
 
 @app.post("/v1/e")
 @app.post("/v1/analytics/event")
 def record_analytics_event(
     body: AnalyticsEventRequest,
+    request: Request,
     user: dict[str, Any] | None = Depends(optional_user),
 ) -> dict[str, bool]:
     """Product analytics ingestion for web-next/mobile — the only caller of
@@ -1150,9 +1156,18 @@ def record_analytics_event(
     unrecognized event, a malformed/missing anon_id, or any internal error
     here returns `{"ok": False}` rather than ever raising — an analytics
     ping must never fail a real user-facing request.
+
+    Bot/crawler traffic: a known crawler/bot/scripted-client User-Agent (see
+    modules.launch_analytics.is_bot_user_agent) is dropped before anything is
+    written — it never reaches track_event/track_page_view, so it cannot
+    inflate event_count, sessions, or any other Founder Analytics count. A
+    crawler using a generic/browser-like User-Agent is instead caught at
+    report time by modules.founder_analytics._filter_bot_like_sessions.
     """
 
     try:
+        if launch_analytics.is_bot_user_agent(request.headers.get("user-agent", "")):
+            return {"ok": False}
         event_name = launch_analytics.normalize_event_name(str(body.event or "").strip())
         if event_name not in launch_analytics.TRACKED_EVENTS:
             return {"ok": False}
@@ -1167,8 +1182,28 @@ def record_analytics_event(
 
         user_id = str((user or {}).get("id") or "").strip()
         state_shim: dict[str, Any] = {launch_analytics.SESSION_ANON_KEY: anon_id}
+        session_id = str(body.session_id or "").strip()[:64]
+        if session_id:
+            state_shim[launch_analytics.SESSION_REAL_ID_KEY] = session_id
         if user_id:
             state_shim["auth_session"] = {"user_id": user_id}
+            # Real entitlement at event time (was always the "free" default:
+            # this endpoint never looked a profile up at all). Reuses the
+            # same cached (15s TTL) profile read every other authenticated
+            # endpoint on this service already uses — see
+            # _fetch_profile_fields's own docstring/history. Fail-soft: any
+            # lookup problem already fails closed to "free" inside that
+            # helper, so this can never raise or block the event.
+            access_token = str((user or {}).get("_access_token") or "")
+            try:
+                config = auth_supabase.get_supabase_config()
+                profile = _fetch_profile_fields(config, user_id, access_token)
+                entitlement_value = "trial" if _active_trial_end(profile) else str(
+                    profile.get("entitlement") or "free"
+                )
+            except Exception:
+                entitlement_value = "free"
+            state_shim["account_profile"] = {"entitlement": entitlement_value}
 
         if event_name == "page_view":
             route = str(raw_props.get("route") or "").strip()

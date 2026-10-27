@@ -196,6 +196,122 @@ def test_identity_map_ignores_anon_shared_by_two_accounts():
     assert founder_analytics._identity_map([a, b]) == {}
 
 
+# --- Bot/crawler session filter (2026-10-27 audit: 193 single-pageview, ----
+# --- no-referrer SEO-page "visitors" in a 7d window were really crawlers) --
+
+
+def _page_view(anon, route, *, referrer_host="", ts=1_700_000_000.0):
+    return {
+        "event": "page_view",
+        "ts": ts,
+        "anon_id": anon,
+        "session_key": anon,
+        "props": {"route": route, **({"referrer_host": referrer_host} if referrer_host else {})},
+    }
+
+
+def test_filter_bot_like_sessions_drops_single_seo_pageview_with_no_referrer():
+    rows = [
+        _page_view("anon_bot1", "/dynasty-rankings/qb"),
+        _page_view("anon_bot2", "/dynasty-trade-value-chart"),
+        _page_view("anon_human", "/dashboard"),
+    ]
+    kept, dropped = founder_analytics._filter_bot_like_sessions(rows)
+    assert dropped == 2
+    assert [r["anon_id"] for r in kept] == ["anon_human"]
+
+
+def test_filter_bot_like_sessions_keeps_a_seo_pageview_with_a_real_referrer():
+    rows = [_page_view("anon_real", "/dynasty-rankings/qb", referrer_host="reddit.com")]
+    kept, dropped = founder_analytics._filter_bot_like_sessions(rows)
+    assert dropped == 0
+    assert kept == rows
+
+
+def test_filter_bot_like_sessions_keeps_a_single_app_pageview_not_seo():
+    # /dashboard is never in the public sitemap -- a crawler cannot land
+    # there cold, so a single no-referrer hit on it is left alone.
+    rows = [_page_view("anon_real", "/dashboard")]
+    kept, dropped = founder_analytics._filter_bot_like_sessions(rows)
+    assert dropped == 0
+    assert kept == rows
+
+
+def test_filter_bot_like_sessions_keeps_an_identity_with_more_than_one_event():
+    rows = [
+        _page_view("anon_multi", "/dynasty-rankings/qb"),
+        _page_view("anon_multi", "/dashboard"),
+    ]
+    kept, dropped = founder_analytics._filter_bot_like_sessions(rows)
+    assert dropped == 0
+    assert len(kept) == 2
+
+
+def test_build_report_excludes_bot_like_sessions_from_counts(tmp_path):
+    path = tmp_path / "e.jsonl"
+    now = 1_700_000_000.0
+    rows = [
+        _page_view("anon_bot1", "/news", ts=now - 100),
+        _page_view("anon_bot2", "/methodology", ts=now - 200),
+        _page_view("anon_human", "/dashboard", ts=now - 50),
+    ]
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    report = founder_analytics.build_report(window_key="7d", path=path, now=now, writes_enabled=True)
+    assert report["bot_filtered_sessions"] == 2
+    assert report["anonymous_users"] == 1
+    assert report["event_count"] == 1
+    assert any("bot" in note.casefold() for note in report["partial_notes"])
+
+
+# --- Decision engagement: feature_use (feature, action) mapped onto the ---
+# --- same labels literal events nothing actually sends (Trade Analyzer ----
+# --- ran / Share card shared / Alerts opened stuck at 0) ------------------
+
+
+def _feature_use(feature, action, *, ts=1_700_000_000.0):
+    return {
+        "event": "feature_use",
+        "ts": ts,
+        "anon_id": "anon_x",
+        "session_key": "anon_x",
+        "props": {"feature": feature, "action": action},
+    }
+
+
+def test_decision_engagement_counts_trade_analyzer_evaluated_as_trade_analyzer_ran():
+    rows = [_feature_use("trade_analyzer", "evaluated"), _feature_use("trade_analyzer", "evaluated")]
+    rows_out = founder_analytics._decision_engagement(rows)
+    row = next(r for r in rows_out if r["label"] == "Trade Analyzer ran")
+    assert row["count"] == 2
+
+
+def test_decision_engagement_combines_share_card_and_trade_analyzer_shared_into_one_label():
+    rows = [_feature_use("share_card", "shared"), _feature_use("trade_analyzer", "shared")]
+    rows_out = founder_analytics._decision_engagement(rows)
+    matches = [r for r in rows_out if r["label"] == "Share card shared"]
+    assert len(matches) == 1
+    assert matches[0]["count"] == 2
+
+
+def test_decision_engagement_counts_alerts_dropdown_opened_as_alerts_opened():
+    rows = [_feature_use("alerts_dropdown", "opened")]
+    rows_out = founder_analytics._decision_engagement(rows)
+    row = next(r for r in rows_out if r["label"] == "Alerts opened")
+    assert row["count"] == 1
+
+
+def test_decision_engagement_folds_literal_event_and_feature_use_into_one_row():
+    rows = [
+        {"event": "pqv_opened", "ts": 1.0, "anon_id": "a", "session_key": "a", "props": {}},
+        _feature_use("trade_analyzer", "evaluated"),
+    ]
+    rows_out = founder_analytics._decision_engagement(rows)
+    labels = [r["label"] for r in rows_out]
+    assert labels.count("Trade Analyzer ran") == 1
+    pqv = next(r for r in rows_out if r["label"] == "PQV opened")
+    assert pqv["count"] == 1
+
+
 def _billing(event_id, event_type, entitlement, transition="", provider="stripe", user="u-1"):
     return {
         "provider": provider, "event_id": event_id, "event_type": event_type, "user_id": user,
@@ -214,8 +330,21 @@ def test_billing_lifecycle_rows_derive_trial_subscribed_churned():
     ]
     synthetic, summary = founder_analytics._billing_lifecycle_rows(rows, [])
     names = sorted(r["event"] for r in synthetic)
-    assert names == ["churned", "feature_use", "subscribed", "trial_started"]
+    # Row 2 (checkout.session.completed, premium) now also derives
+    # checkout_completed + premium_entitlement_activated alongside the
+    # existing subscribed row -- see 2026-10-27 Founder Analytics fix:
+    # those two PREMIUM_EVENTS rows had no derivation at all before this.
+    assert names == [
+        "checkout_completed",
+        "churned",
+        "feature_use",
+        "premium_entitlement_activated",
+        "subscribed",
+        "trial_started",
+    ]
     assert summary["stripe"]["trial_converted"] == 1
+    assert summary["stripe"]["checkout_completed"] == 1
+    assert summary["stripe"]["premium_entitlement_activated"] == 1
     assert summary["revenuecat"]["trial_started"] == 1
     assert all(r["user_key"].startswith("acct_") for r in synthetic)
     # a Python-emitted row for the same account/time suppresses the derived one

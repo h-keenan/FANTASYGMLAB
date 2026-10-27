@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { trackFeatureUse } from "@/lib/analytics";
 import type { ReferralStatusResponse } from "@/lib/api";
 
 /**
@@ -35,6 +36,11 @@ export function ReferralCard({
     try {
       await navigator.clipboard.writeText(referral.link);
       setCopied(true);
+      // `referral_sent` is already in the canonical taxonomy
+      // (modules.launch_analytics.TRACKED_EVENTS) and paired server-side
+      // with `referral_connected` (modules/referrals.py) -- this invite
+      // action itself was never tracked (Founder Analytics audit, 2026-10).
+      trackFeatureUse("referral_sent", { dedupe: false, props: { source_surface: "account" } });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // No clipboard permission in this browser -- nothing more to do.
