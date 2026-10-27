@@ -10117,6 +10117,9 @@ def get_league_dashboard(
     # Additive: lets the Dashboard's "what matters now" strip show the real
     # trade-deadline week (modules.league_calendar), never a guessed date.
     response["trade_window"] = league_calendar.trade_window(league)
+    # Additive: the effective strategy (declared Team Situation, else retool)
+    # so the deadline card can frame buy vs sell without a second request.
+    response["team_strategy"] = team_strategy
     if trade_ideas_deferred:
         response["trade_ideas_deferred"] = True
     if is_external:

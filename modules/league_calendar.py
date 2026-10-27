@@ -95,6 +95,42 @@ def trade_deadline_passed(league: Mapping[str, Any] | None) -> bool:
     return week is not None and week > deadline
 
 
+# Phases of the trade window a league can be in. ``none`` = no deadline set
+# (or offseason, where trades are open regardless); ``open`` = a deadline is
+# still ahead; ``final_week`` = the deadline week itself (last call);
+# ``passed`` = trades closed until the offseason.
+DEADLINE_PHASE_NONE = "none"
+DEADLINE_PHASE_OPEN = "open"
+DEADLINE_PHASE_FINAL_WEEK = "final_week"
+DEADLINE_PHASE_PASSED = "passed"
+
+
+def weeks_to_deadline(league: Mapping[str, Any] | None) -> int | None:
+    """Whole weeks between the league's current week and its deadline week.
+
+    0 during the deadline week itself. None when there is no deadline, the
+    league is not in season, the current week is unknown, or the deadline has
+    already passed (never guessed: Sleeper exposes weeks, not dates).
+    """
+
+    deadline = trade_deadline_week(league)
+    if deadline is None or not is_in_season(league):
+        return None
+    week = current_league_week(league)
+    if week is None or week > deadline:
+        return None
+    return deadline - week
+
+
+def deadline_phase(league: Mapping[str, Any] | None) -> str:
+    if trade_deadline_passed(league):
+        return DEADLINE_PHASE_PASSED
+    left = weeks_to_deadline(league)
+    if left is None:
+        return DEADLINE_PHASE_NONE
+    return DEADLINE_PHASE_FINAL_WEEK if left == 0 else DEADLINE_PHASE_OPEN
+
+
 def is_best_ball(league: Mapping[str, Any] | None) -> bool:
     return _int_or_none(_settings(league).get("best_ball")) == 1
 
@@ -107,5 +143,7 @@ def trade_window(league: Mapping[str, Any] | None) -> dict[str, Any]:
         "trade_deadline_week": trade_deadline_week(league),
         "current_week": current_league_week(league),
         "trade_deadline_passed": passed,
+        "weeks_to_deadline": weeks_to_deadline(league),
+        "deadline_phase": deadline_phase(league),
         "message": TRADE_DEADLINE_PASSED_MESSAGE if passed else "",
     }

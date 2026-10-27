@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { TradeHubFilters } from "@/components/TradeHubFilters";
 import { filterTradeIdeas } from "@/lib/tradeHubFilters";
 import { TradeHubHoldCard } from "@/components/TradeHubHoldCard";
+import { DeadlineCard } from "@/components/DeadlineCard";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -116,6 +117,8 @@ export function TradeHubContent({
           isPremium={entitlement.is_premium}
         />
       ) : null}
+
+      <DeadlineCard window={data.trade_window} strategy={data.team_strategy} />
 
       {data.hold ? <TradeHubHoldCard hold={data.hold} /> : null}
 

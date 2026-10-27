@@ -8,6 +8,8 @@ import { GamePlanCard } from "@/components/GamePlanCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { buildNowChips, tradesGoalLine, TRADES_BLOCK_COPY, type DashboardNowChip } from "@/lib/dashboardLayout";
+import { DeadlineCard } from "@/components/DeadlineCard";
+import { DEADLINE_CARD_WEEKS } from "@/lib/deadlineMode";
 import { thisWeekHref } from "@/lib/thisWeek";
 
 const TONE_COLOR: Record<DashboardNowChip["tone"], string> = {
@@ -92,6 +94,13 @@ export function DashboardTradesBlock({
       {isBeginner ? (
         <BeginnerHelp text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
       ) : null}
+      <DeadlineCard
+        window={data.trade_window}
+        strategy={data.team_strategy}
+        maxWeeksLeft={DEADLINE_CARD_WEEKS}
+        href={`/trade-hub/${id}${query}`}
+        ctaLabel="See deadline trade ideas"
+      />
       {deadlinePassed ? (
         <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
           {TRADES_BLOCK_COPY.deadlinePassed}

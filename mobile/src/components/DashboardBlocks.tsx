@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
 import Button from './Button';
+import DeadlineCard from './DeadlineCard';
 import SectionHeading from './SectionHeading';
 import SkeletonBlock from './SkeletonBlock';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -15,6 +16,7 @@ import {
   TRADES_BLOCK_COPY,
   type DashboardNowChip,
 } from '../lib/dashboardLayout';
+import { DEADLINE_CARD_WEEKS } from '../lib/deadlineMode';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 
 type Navigate = (name: string, params?: object) => void;
@@ -105,6 +107,13 @@ export function DashboardTradesBlock({
       {isBeginner ? (
         <BeginnerHelp text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ''}`} />
       ) : null}
+      <DeadlineCard
+        window={data.trade_window}
+        strategy={data.team_strategy}
+        maxWeeksLeft={DEADLINE_CARD_WEEKS}
+        ctaLabel="See deadline trade ideas"
+        onPress={() => onNavigate('Trades', { leagueId, leagueName })}
+      />
       {deadlinePassed ? (
         <AppText style={styles.bodyText}>{TRADES_BLOCK_COPY.deadlinePassed}</AppText>
       ) : tradeItems.length > 0 ? (

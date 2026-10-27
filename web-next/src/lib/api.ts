@@ -429,6 +429,8 @@ export interface DashboardResponse {
   trade_ideas_deferred?: boolean;
   /** League trade-deadline state (additive; absent on older servers). */
   trade_window?: TradeWindow | null;
+  /** Effective team strategy (contender/rebuild/retool/...); frames the deadline card as buy vs sell. */
+  team_strategy?: string;
   /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
   platform_notice?: string;
 }
@@ -3045,7 +3047,8 @@ export type PushCategory =
   | "team_situation"
   | "trade_followup"
   | "lineup_lock"
-  | "waiver_reminder";
+  | "waiver_reminder"
+  | "trade_deadline";
 
 export interface PushPreferencesResponse {
   ok: boolean;

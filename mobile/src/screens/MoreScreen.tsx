@@ -91,6 +91,7 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
   { value: 'team_situation', label: 'Team Situation reminder', description: 'A one-time nudge to set rebuilding, competing, or balanced' },
   { value: 'trade_followup', label: 'Trade follow-ups', description: 'Asking whether a trade you shared actually happened' },
   { value: 'lineup_lock', label: 'Lineup lock reminders', description: 'An empty slot or an injured starter shortly before kickoff' },
+  { value: 'trade_deadline', label: 'Trade deadline', description: 'Two weeks out, one week out, and the deadline week itself' },
   { value: 'waiver_reminder', label: 'Waiver reminders', description: 'Before waivers process, only when you have a clear need' },
 ];
 

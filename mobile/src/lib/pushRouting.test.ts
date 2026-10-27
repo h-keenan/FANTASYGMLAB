@@ -4,6 +4,14 @@ import assert from 'node:assert/strict';
 
 import { resolvePushTapTarget } from './pushRouting.ts';
 
+test('trade_deadline pushes open the Trades screen', () => {
+  assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'trade_deadline' }), {
+    screen: 'Trades',
+    leagueId: 'L1',
+    leagueName: 'X',
+  });
+});
+
 test('trade follow-up push routes to Trade History even without league_id', () => {
   assert.deepEqual(resolvePushTapTarget({ type: 'trade_outcome_followup', outcome_id: 'o1' }), {
     screen: 'TradeHistory',

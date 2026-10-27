@@ -544,11 +544,11 @@ def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
         preferences = push_triggers.fetch_push_preferences(_config(), ["u1", "u2"])
     assert preferences["u1"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": False,
-        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True,
     }
     assert preferences["u2"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": True,
-        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True,
     }
 
 
@@ -1278,3 +1278,50 @@ def test_trade_tile_value_never_falls_back_to_partner_name():
     from modules import dashboard_engine
 
     assert 'headline_idea.get("partner_team_name"), "Open Trade Hub"' not in inspect.getsource(dashboard_engine)
+
+
+def _deadline_league(*, leg, deadline=11, status="in_season"):
+    return {"name": "Secret League", "status": status, "settings": {"trade_deadline": deadline, "leg": leg}}
+
+
+def test_trade_deadline_push_fires_at_two_one_and_zero_weeks_out():
+    seen = {}
+    for leg, weeks_left in ((9, 2), (10, 1), (11, 0)):
+        item = push_triggers.trade_deadline_push_item(
+            league_id="L1", league_name="Secret League", league=_deadline_league(leg=leg)
+        )
+        assert item["category"] == "trade_deadline"
+        assert item["recommendation_id"] == f"trade_deadline:L1:11:{weeks_left}"
+        assert "Secret League" not in item["headline"]
+        seen[weeks_left] = item["headline"]
+    assert len(set(seen.values())) == 3  # distinct copy per tier
+
+
+def test_trade_deadline_push_is_silent_when_far_off_passed_or_unknown():
+    def item(league):
+        return push_triggers.trade_deadline_push_item(league_id="L1", league_name="x", league=league)
+
+    assert item(_deadline_league(leg=7)) is None  # 4 weeks out
+    assert item(_deadline_league(leg=12)) is None  # passed: trades closed
+    assert item(_deadline_league(leg=9, deadline=99)) is None  # no deadline
+    assert item(_deadline_league(leg=9, status="complete")) is None  # offseason
+    assert item({"status": "in_season", "settings": {"trade_deadline": 11}}) is None  # week unknown
+
+
+def test_trade_deadline_category_is_toggleable_titled_and_cap_reserved():
+    assert "trade_deadline" in push_triggers.TOGGLEABLE_PUSH_CATEGORIES
+    assert push_triggers.PUSH_TITLE_BY_CATEGORY["trade_deadline"]
+    prefs = {"u1": {"trade_deadline": False}}
+    assert not push_triggers.push_item_allowed(prefs, user_id="u1", category="trade_deadline")
+    items = [{"category": "trade_deadline"}, {"category": "watch"}]
+    assert push_triggers.apply_weekly_cap(items, sent_this_week=3, cap=4) == [{"category": "trade_deadline"}]
+
+
+def test_trade_deadline_push_dedups_per_tier_in_the_sweep_log():
+    # Each tier has its own recommendation_id, so the already-sent filter that
+    # the sweep applies drops a repeat of the same tier but lets the next one through.
+    two = push_triggers.trade_deadline_push_item(league_id="L1", league_name="x", league=_deadline_league(leg=9))
+    one = push_triggers.trade_deadline_push_item(league_id="L1", league_name="x", league=_deadline_league(leg=10))
+    assert two["recommendation_id"] != one["recommendation_id"]
+    again = push_triggers.trade_deadline_push_item(league_id="L1", league_name="x", league=_deadline_league(leg=9))
+    assert again["recommendation_id"] == two["recommendation_id"]
