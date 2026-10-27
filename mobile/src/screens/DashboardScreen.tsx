@@ -23,7 +23,7 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
 import PlayerInsightRow from '../components/PlayerInsightRow';
-import TradeAssetRow from '../components/TradeAssetRow';
+import ExchangeSide from '../components/ExchangeSide';
 import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
@@ -851,23 +851,9 @@ function TopPriorityTradeCard({
       </View>
       <AppText style={styles.cardHeadline}>{presentation.partner_team_name}</AppText>
 
-      <View style={styles.sideBlock}>
-        <View style={[styles.sideBar, { backgroundColor: colors.danger }]} />
-        <View style={styles.sideContent}>
-          <AppText style={styles.sideLabel}>YOU GIVE</AppText>
-          {presentation.trade_package.send.map((asset, index) => (
-            <TradeAssetRow key={`send-${index}`} asset={asset} />
-          ))}
-        </View>
-      </View>
-      <View style={styles.sideBlock}>
-        <View style={[styles.sideBar, { backgroundColor: colors.successBright }]} />
-        <View style={styles.sideContent}>
-          <AppText style={styles.sideLabel}>YOU GET</AppText>
-          {presentation.trade_package.receive.map((asset, index) => (
-            <TradeAssetRow key={`receive-${index}`} asset={asset} />
-          ))}
-        </View>
+      <View style={styles.sidesStack}>
+        <ExchangeSide side="send" assets={presentation.trade_package.send} />
+        <ExchangeSide side="get" assets={presentation.trade_package.receive} />
       </View>
 
       <View style={styles.valueRow}>
@@ -1245,16 +1231,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 2,
   },
   tradeBadgeText: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 },
-  sideBlock: { flexDirection: 'row', marginTop: spacing.sm },
-  sideBar: { width: 3, borderRadius: 2, marginRight: spacing.sm },
-  sideContent: { flex: 1, gap: spacing.xs },
-  sideLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  sidesStack: { gap: spacing.sm, marginTop: spacing.sm },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',

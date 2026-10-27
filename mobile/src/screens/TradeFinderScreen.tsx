@@ -12,7 +12,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
-import { TradeAssetList } from '../components/TradeAssetRow';
+import ExchangeSide from '../components/ExchangeSide';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -334,25 +334,25 @@ function ResultCard({
       <TradeValueHero delta={idea.trade_gain} size="sm" style={styles.valueHero} />
 
       <View style={styles.exchangeRow}>
-        <View style={styles.exchangeSide}>
-          <View style={styles.exchangeLabelRow}>
-            <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
-            <AppText style={styles.exchangeLabel}>You Send</AppText>
-          </View>
-          <TradeAssetList assets={idea.package.send} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
-        </View>
+        <ExchangeSide
+          side="send"
+          assets={idea.package.send}
+          onPressPlayer={onPressPlayer}
+          onPressPick={onPressPick}
+          style={styles.exchangeSide}
+        />
         <View style={styles.exchangeGutter}>
           <View style={styles.swapDisc}>
             <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
           </View>
         </View>
-        <View style={styles.exchangeSide}>
-          <View style={styles.exchangeLabelRow}>
-            <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
-            <AppText style={styles.exchangeLabel}>You Receive</AppText>
-          </View>
-          <TradeAssetList assets={idea.package.receive} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
-        </View>
+        <ExchangeSide
+          side="get"
+          assets={idea.package.receive}
+          onPressPlayer={onPressPlayer}
+          onPressPick={onPressPick}
+          style={styles.exchangeSide}
+        />
       </View>
 
       {showExplanations && idea.rationale ? (
@@ -712,14 +712,7 @@ function createStyles(colors: ThemeColors) {
     // DraftPickAssetRow's dividers have a clear boundary to sit inside of,
     // rather than floating on the card's bare background — same pattern
     // Trade Hub's idea feed uses for this exact content type.
-    exchangeSide: {
-      flex: 1,
-      backgroundColor: colors.glassInset,
-      borderRadius: radii.md,
-      paddingHorizontal: spacing.sm,
-      paddingTop: spacing.xs,
-      paddingBottom: 2,
-    },
+    exchangeSide: { flex: 1 },
     exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
     swapDisc: {
       width: 26,
@@ -728,15 +721,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.glassInset,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    exchangeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
-    exchangeDot: { width: 6, height: 6, borderRadius: 3 },
-    exchangeLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.textTertiary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
     },
     rationaleLabel: {
       fontSize: 12,
