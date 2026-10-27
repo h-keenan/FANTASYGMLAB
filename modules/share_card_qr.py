@@ -15,6 +15,10 @@ CANONICAL_SHARE_URL = brand_identity.PRODUCT_URL  # https://fantasygmlab.com
 # as utm_source=share in first-party landing analytics. Keep in lockstep with
 # web-next/public/share-card/qr-site.png and mobile ShareCardChrome's SHARE_QR_URL.
 SHARE_QR_TRACKED_URL = f"{CANONICAL_SHARE_URL}/?utm_source=share&utm_medium=qr&utm_campaign=share_card"
+# External (content/ad bot) cards point at the new public domain.
+FANTASYDESK_URL = "https://fantasydesk.app"
+FANTASYDESK_DOMAIN = "fantasydesk.app"
+FANTASYDESK_TRACKED_URL = f"{FANTASYDESK_URL}/?utm_source=share&utm_medium=qr&utm_campaign=share_card"
 QR_LABEL = "Scan to try FantasyDesk"
 RENDER_VERSION = 1
 
@@ -41,7 +45,7 @@ def share_qr_png_bytes(
         ) from exc
 
     target = (url or SHARE_QR_TRACKED_URL).strip()
-    if target not in {CANONICAL_SHARE_URL, SHARE_QR_TRACKED_URL}:
+    if target not in {CANONICAL_SHARE_URL, SHARE_QR_TRACKED_URL, FANTASYDESK_URL, FANTASYDESK_TRACKED_URL}:
         raise ValueError("Share-card QR must encode the canonical public site URL.")
 
     qr = qrcode.QRCode(

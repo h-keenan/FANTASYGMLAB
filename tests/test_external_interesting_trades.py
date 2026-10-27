@@ -155,20 +155,91 @@ def test_filters_type_min_spice_and_exclude(pool):
     assert not ({i["id"] for i in first} & {i["id"] for i in rest})
 
 
-def test_since_suppresses_earlier_days_heads(pool):
-    yesterday = NOW - timedelta(days=1)
-    head_yesterday = {i["id"] for i in E.select_items(pool, now=yesterday, limit=3)}
-    today = {i["id"] for i in E.select_items(pool, now=NOW, limit=3, since=yesterday.date())}
-    assert not (head_yesterday & today)
+def test_since_filters_on_generated_at_not_rotation_history(pool):
+    """Regression: a 14-day epoch `since` used to return 0 items. It skipped
+    the top-`limit` of every UTC day's rotation back 14 days (14 x limit ids,
+    more than the pool), so a bot polling with since=<14 days ago> got nothing
+    while the same query without `since` returned items."""
+
+    baseline = [i["id"] for i in E.select_items(pool, now=NOW, limit=5)]
+    assert baseline
+    for raw in (str(int(NOW.timestamp()) - 14 * 86400), str(int(NOW_MS) - 14 * 86400 * 1000),
+                (NOW - timedelta(days=14)).isoformat(), "2020-01-01"):
+        since = E.parse_since(raw, NOW)
+        assert [i["id"] for i in E.select_items(pool, now=NOW, limit=5, since=since)] == baseline, raw
 
 
-def test_parse_since_accepts_iso_and_epoch_and_rejects_junk():
-    assert E.parse_since("2026-10-25T00:00:00Z", NOW) == date(2026, 10, 25)
-    assert E.parse_since(str(int(NOW.timestamp()) - 86400), NOW) == date(2026, 10, 26)
-    assert E.parse_since("2020-01-01", NOW) == (NOW - timedelta(days=E.MAX_SINCE_DAYS)).date()
-    assert E.parse_since(None, NOW) is None
-    with pytest.raises(ValueError):
-        E.parse_since("yesterday-ish", NOW)
+def test_since_future_cutoff_returns_nothing_and_cutoff_is_inclusive(pool):
+    assert E.select_items(pool, now=NOW, limit=5, since=NOW + timedelta(seconds=1)) == []
+    assert E.select_items(pool, now=NOW, limit=5, since=NOW)
+
+
+def test_parse_since_accepts_iso_epoch_seconds_and_millis_and_rejects_junk():
+    day_ago = NOW - timedelta(days=1)
+    assert E.parse_since("2026-10-25T00:00:00Z", NOW) == datetime(2026, 10, 25, tzinfo=timezone.utc)
+    assert E.parse_since("2026-10-25", NOW) == datetime(2026, 10, 25, tzinfo=timezone.utc)
+    assert E.parse_since(str(int(day_ago.timestamp())), NOW) == day_ago
+    assert E.parse_since(str(int(day_ago.timestamp() * 1000)), NOW) == day_ago
+    assert E.parse_since("2020-01-01", NOW) == NOW - timedelta(days=E.MAX_SINCE_DAYS)
+    assert E.parse_since(None, NOW) is None and E.parse_since("  ", NOW) is None
+    for bad in ("yesterday-ish", "99999999999999999999999"):
+        with pytest.raises(ValueError):
+            E.parse_since(bad, NOW)
+
+
+def test_free_text_numbers_come_from_structured_fields(pool):
+    assert pool
+    for it in pool:
+        assert E.unreconciled_numbers(it) == [], (it["id"], it["hook"], it["why"])
+        assert it["text_figures"] is not None
+
+
+def test_number_scan_catches_a_drifted_number(pool):
+    it = dict(pool[0])
+    it["why"] = [*it["why"], "He is worth 12,345 in this deal."]
+    assert E.unreconciled_numbers(it) == ["12,345"]
+
+
+def test_buy_low_hook_and_why_share_one_market_price(pool):
+    it = next(i for i in pool if i["type"] == E.TYPE_BUY_LOW)
+    price = f"{int(it['text_figures']['market_price']):,}"
+    assert price in it["hook"] and price in it["why"][0]
+    assert f"{it['receive']['assets'][0]['value']:,}" in it["hook"]
+    assert f"{it['send']['assets'][0]['value']:,}" in it["why"][2]
+
+
+def test_share_card_descriptor_contract(pool):
+    sc = pool[0]["share_card"]
+    assert (sc["width"], sc["height"]) == (1600, 1600)
+    assert sc["brand"] == "FantasyDesk" and sc["destination"] == "https://fantasydesk.app"
+    assert sc["content_type"] == "image/png" and sc["available"] and sc["path"].startswith("/v1/external/")
+    assert sc["safe_area"] == {"margin_pct": 8, "x": 128, "y": 128, "width": 1344, "height": 1344}
+    assert sc["focus"] == {"x": 0.5, "y": 0.5}
+
+
+def test_square_card_is_1600_fantasydesk_and_inside_safe_area(pool):
+    from io import BytesIO
+
+    from PIL import Image
+
+    from modules import share_card_renderer, share_card_qr, share_recommendation_cards
+
+    card = share_recommendation_cards.build_trade_share_card(
+        E.idea_for_share_card({k: v for k, v in pool[0].items() if not k.startswith("_")}),
+        source_surface="external_trades", scoring_format="PPR", my_team_name="Team A",
+    )
+    png = share_card_renderer.render_square_share_card_png(card, destination=E.SHARE_CARD_DESTINATION, portraits={})
+    img = Image.open(BytesIO(png)).convert("RGB")
+    assert img.size == (1600, 1600)
+    # nothing but background outside the 8% safe margins
+    bg = img.getpixel((0, 0))
+    sa = share_card_renderer.square_safe_area()
+    for box in ((0, 0, 1600, sa["y"]), (0, 1600 - sa["y"], 1600, 1600), (0, 0, sa["x"], 1600), (1600 - sa["x"], 0, 1600, 1600)):
+        region = img.crop(box)
+        assert region.getextrema() == tuple((c, c) for c in bg), box
+    # the QR encodes fantasydesk.app, never the legacy domain
+    assert share_card_qr.FANTASYDESK_TRACKED_URL.startswith("https://fantasydesk.app/")
+    assert "fantasygmlab" not in share_card_qr.FANTASYDESK_TRACKED_URL
 
 
 def test_spice_is_transparent_and_bounded(pool):
@@ -233,10 +304,21 @@ def test_share_card_unknown_id_is_404_and_known_renders_png(client, pool, monkey
     assert client.get("/v1/external/trades/interesting/it_nope/share-card.png", headers=AUTH).status_code == 404
     from modules import share_card_renderer
 
-    monkeypatch.setattr(share_card_renderer, "render_share_card_png", lambda card: b"\x89PNG-fake")
+    seen = {}
+    monkeypatch.setattr(share_card_renderer, "render_square_share_card_png", lambda card, **kw: seen.update(kw) or b"\x89PNG-fake")
     iid = pool[0]["id"]
     r = client.get(f"/v1/external/trades/interesting/{iid}/share-card.png", headers=AUTH)
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert seen == {"size": 1600, "destination": "https://fantasydesk.app"}
+
+
+def test_endpoint_14_day_epoch_since_returns_what_no_since_returns(client):
+    base = client.get("/v1/external/trades/interesting", params={"limit": 4}, headers=AUTH).json()
+    assert base["count"] > 0 and base["since_applied"] is None
+    import time
+    for since in (str(int(time.time()) - 14 * 86400), str((int(time.time()) - 14 * 86400) * 1000)):
+        r = client.get("/v1/external/trades/interesting", params={"limit": 4, "since": since}, headers=AUTH).json()
+        assert r["count"] == base["count"] and r["since_applied"]
 
 
 def test_idea_for_share_card_has_no_private_fields(pool):

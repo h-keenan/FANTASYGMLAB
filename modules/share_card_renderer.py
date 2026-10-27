@@ -636,6 +636,7 @@ def render_share_card_png(
     width: int = share.SHARE_WIDTH,
     height: int | None = None,
     portraits: dict[str, bytes | None] | None = None,
+    destination: str | None = None,
 ) -> bytes:
     """Render a share PNG. Uses cache when fingerprint matches.
 
@@ -711,7 +712,7 @@ def render_share_card_png(
     if height is not None and int(height) == canvas_h:
         canvas_h = int(height)
 
-    key = _cache_key(card, width, canvas_h) if card.fingerprint else ""
+    key = _cache_key(card, width, canvas_h) + f":{destination or ''}" if card.fingerprint else ""
     cached = share.cache_get(key) if key else None
     if cached:
         return cached
@@ -792,7 +793,7 @@ def render_share_card_png(
         y += 32 * s
 
     y += tokens.section_gap
-    _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font)
+    _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font, destination=destination)
 
     buffer = BytesIO()
     canvas.save(buffer, format="PNG", optimize=True, compress_level=4)
@@ -850,9 +851,13 @@ def describe_share_layout(card: share.ShareRecommendationCard, *, width: int = s
     }
 
 
-def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font):
+def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font, destination: str | None = None):
     qr_size = 64 * s
-    qr_bytes = share_card_qr.share_qr_png_bytes(box_size=max(4, 3 * s), border=4)
+    if destination == share_card_qr.FANTASYDESK_URL:
+        qr_url, domain = share_card_qr.FANTASYDESK_TRACKED_URL, share_card_qr.FANTASYDESK_DOMAIN
+    else:
+        qr_url, domain = None, brand_identity.PRODUCT_DOMAIN
+    qr_bytes = share_card_qr.share_qr_png_bytes(box_size=max(4, 3 * s), border=4, url=qr_url)
     qr_img = Image.open(BytesIO(qr_bytes)).convert("RGB")
     resample = getattr(getattr(Image, "Resampling", Image), "NEAREST", Image.NEAREST)
     qr_img = qr_img.resize((qr_size, qr_size), resample)
@@ -862,7 +867,7 @@ def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font,
     _rounded_rect(draw, plate, 8 * s, (255, 255, 255))
     canvas.paste(qr_img, (qr_x, qr_y))
     copy_x = qr_x + qr_size + 16 * s
-    draw.text((copy_x, qr_y + 8 * s), _t(brand_identity.PRODUCT_DOMAIN), font=footer_font, fill=MUTED)
+    draw.text((copy_x, qr_y + 8 * s), _t(domain), font=footer_font, fill=MUTED)
     draw.text((copy_x, qr_y + 34 * s), _t(share_card_qr.QR_LABEL), font=footer_font, fill=MUTED)
     return y + qr_size + 8 * s
 
@@ -1230,3 +1235,51 @@ def _truncate(draw, text: str, font, max_w: int) -> str:
         if _text_width(draw, trial, font) <= max_w:
             return trial
     return ell
+
+
+# ---------------------------------------------------------------------------
+# Square (1:1) export for external consumers (content/ad bot)
+# ---------------------------------------------------------------------------
+
+SQUARE_SIZE = 1600
+SQUARE_MARGIN_PCT = 8  # safe area: 8% on every side => 1344x1344 content box
+SQUARE_MARGIN_PX = SQUARE_SIZE * SQUARE_MARGIN_PCT // 100
+
+
+def square_safe_area(size: int = SQUARE_SIZE) -> dict:
+    margin = size * SQUARE_MARGIN_PCT // 100
+    return {"margin_pct": SQUARE_MARGIN_PCT, "x": margin, "y": margin, "width": size - 2 * margin, "height": size - 2 * margin}
+
+
+def render_square_share_card_png(
+    card: share.ShareRecommendationCard,
+    *,
+    size: int = SQUARE_SIZE,
+    destination: str | None = None,
+    portraits: dict[str, bytes | None] | None = None,
+) -> bytes:
+    """Exactly ``size`` x ``size`` PNG: the standard card is rendered at full
+    resolution, scaled to fit (never cropped) inside the centered 8% safe area
+    and centered on the card background, so every element stays inside the
+    safe margins for centered zoom/pan."""
+
+    Image, _, _ = _require_pillow()
+    key = f"{_cache_key(card, size, size)}:sq:{destination or ''}" if card.fingerprint else ""
+    cached = share.cache_get(key) if key else None
+    if cached:
+        return cached
+    base_png = render_share_card_png(card, portraits=portraits, destination=destination)
+    base = Image.open(BytesIO(base_png)).convert("RGB")
+    box = size - 2 * (size * SQUARE_MARGIN_PCT // 100)
+    ratio = min(box / base.width, box / base.height)
+    new_w, new_h = max(1, int(round(base.width * ratio))), max(1, int(round(base.height * ratio)))
+    resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS", Image.LANCZOS)
+    scaled = base.resize((new_w, new_h), resample)
+    canvas = Image.new("RGB", (size, size), BG)
+    canvas.paste(scaled, ((size - new_w) // 2, (size - new_h) // 2))
+    buffer = BytesIO()
+    canvas.save(buffer, format="PNG", optimize=True, compress_level=4)
+    payload = buffer.getvalue()
+    if key:
+        share.cache_put(key, payload)
+    return payload
