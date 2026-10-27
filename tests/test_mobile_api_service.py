@@ -2376,6 +2376,11 @@ def test_trade_analyzer_returns_real_verdict_for_lopsided_upgrade(monkeypatch):
     assert verdict["value_delta"] > 0
     for key in ("band", "ui_verdict", "confidence", "rationale", "value_summary", "roster_summary"):
         assert key in verdict
+    # What the verdict assumed rides along, read-only (modules.verdict_assumptions).
+    assumptions = body["assumptions"]
+    assert assumptions["line"].startswith("Assumed: ")
+    assert "Contender posture" in assumptions["line"]
+    assert {item["key"] for item in assumptions["items"]} >= {"format", "lens", "posture", "basis", "injury"}
 
 
 def test_trade_analyzer_passes_partner_roster_assets_when_given(monkeypatch):
@@ -13221,6 +13226,69 @@ def test_record_trade_share_fails_closed_when_table_missing(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"ok": False, "reason": "not_available"}
+
+
+def test_verdict_feedback_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.post("/v1/feedback/verdict", json={"reason": "values_off"}).status_code == 401
+
+
+def test_verdict_feedback_stores_an_anonymous_hashed_row(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=Mock(status_code=201)) as mock_post:
+            response = client.post(
+                "/v1/feedback/verdict",
+                json={
+                    "reason": "lineup_wrong",
+                    "surface": "trade_analyzer",
+                    "platform": "web",
+                    "league_id": "abc",
+                    "lens": "Dynasty",
+                    "strategy": "retool",
+                    "send_ids": ["p1"],
+                    "receive_ids": ["p2"],
+                    "verdict_label": "ACCEPT",
+                    "confidence": "High confidence",
+                    "value_delta": -379,
+                    "assumptions_line": "Assumed: 1QB, PPR.",
+                },
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    kwargs = mock_post.call_args.kwargs
+    # Anonymous insert: the reporter's own bearer token is never sent.
+    assert kwargs["headers"].get("Authorization", "") != "Bearer good-token"
+    row = kwargs["json"]
+    assert row["user_id"] is None and row["email"] == "" and row["message"] == ""
+    assert row["feedback_type"] == "bad_verdict" and row["category"] == "lineup_wrong"
+    assert len(row["context"]["account_hash"]) == 16
+    serialized = str(row)
+    assert "user-123" not in serialized and "gm@example.com" not in serialized
+
+
+def test_verdict_feedback_rejects_unknown_reason_and_fails_closed(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        bad = client.post(
+            "/v1/feedback/verdict", json={"reason": "free text here"}, headers={"Authorization": "Bearer good-token"}
+        )
+        assert bad.status_code == 422
+        with patch("requests.post", return_value=Mock(status_code=404)):
+            down = client.post(
+                "/v1/feedback/verdict", json={"reason": "values_off"}, headers={"Authorization": "Bearer good-token"}
+            )
+    assert down.json() == {"ok": False, "reason": "not_available"}
 
 
 def test_pending_trade_outcomes_returns_real_rows(monkeypatch):
