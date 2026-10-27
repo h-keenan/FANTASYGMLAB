@@ -9,7 +9,8 @@ import { spacing, type ThemeColors } from '../theme';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
- * The one section title: UPPERCASE with tight tracking (owner decision 1).
+ * The one section title: UPPERCASE, display weight, primary text color (owner decision 1;
+ * web `SectionHeading` / --type-section-title).
  * Optional accent icon, a muted `caption` line under it, and a `right` slot
  * (a total, a link). Replaces the seven screen-local uppercase kicker
  * restyles (DraftCenter, TeamRoster, MyTeam, TradeFinder, More, Waivers) and
@@ -34,7 +35,7 @@ export default function SectionHeading({
   return (
     <View style={[styles.wrap, { marginTop: topGap }]}>
       <View style={styles.row}>
-        {icon ? <Ionicons name={icon} size={14} color={colors.accent} style={styles.icon} /> : null}
+        {icon ? <Ionicons name={icon} size={16} color={colors.accent} style={styles.icon} /> : null}
         <AppText style={styles.title} numberOfLines={1} accessibilityRole="header">
           {title}
         </AppText>
@@ -52,13 +53,15 @@ function createStyles(colors: ThemeColors) {
     icon: { marginRight: spacing.xs },
     title: {
       flexShrink: 1,
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.textTertiary,
+      // Web --type-section-title: display weight, primary text color, uppercase, 0.02em tracking.
+      // Web scales 21.6px at phone width; 17 keeps one-line titles inside the app's denser cards.
+      fontSize: 17,
+      fontWeight: '900',
+      color: colors.textPrimary,
       textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      letterSpacing: 0.35,
     },
     right: { marginLeft: 'auto' },
-    caption: { fontSize: 11.5, color: colors.textTertiary },
+    caption: { fontSize: 12, color: colors.textTertiary },
   });
 }
