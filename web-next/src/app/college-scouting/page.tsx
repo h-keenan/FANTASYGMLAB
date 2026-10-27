@@ -63,7 +63,7 @@ export default function CollegeScoutingPage() {
         kicker="College Scouting"
         upsell={data.upsell ?? null}
         fallbackTitle="Scout the next rookie class"
-        fallbackBody="College Scouting is a Pro feature: the shared prospect board, community grades, your own scouting reports and watchlist. Start your free trial to unlock it."
+        fallbackBody="College Scouting is a Premium feature: the shared prospect board, community grades, your own scouting reports and watchlist. Start your free trial to unlock it."
       />
     );
   }
