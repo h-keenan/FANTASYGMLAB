@@ -618,8 +618,8 @@ function quickActions(
   color: string;
 }> {
   return [
-    { label: 'Trades', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
-    { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
+    { label: 'Trade Hub', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
+    { label: 'Players', route: 'Players', icon: 'people-outline', color: colors.violet },
     { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
     inSeason
       ? { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', color: colors.success }
@@ -629,7 +629,7 @@ function quickActions(
     // as GmOrb.
     { label: 'Matchup', route: 'Matchup', icon: 'american-football-outline', color: colors.success },
     { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', color: colors.danger },
-    { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
+    { label: 'League Rankings', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
     { label: 'GM Plan', route: 'GmPlan', icon: 'map-outline', color: colors.premium },
   ];
 }

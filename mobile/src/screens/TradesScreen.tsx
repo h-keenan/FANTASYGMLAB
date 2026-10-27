@@ -64,7 +64,7 @@ export default function TradesScreen({ route, navigation }: Props) {
     setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
   }, []);
 
-  useScreenHeaderTitle(navigation, 'Trades', leagueName);
+  useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
 
   useEffect(() => {
     navigation.setOptions({

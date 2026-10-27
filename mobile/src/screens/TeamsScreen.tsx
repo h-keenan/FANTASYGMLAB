@@ -56,7 +56,7 @@ const METRIC_CONFIG: Record<
   }
 > = {
   power: {
-    title: 'Teams',
+    title: 'League Rankings',
     pillLabel: 'ROSTER POWER',
     infoLabel: 'How Roster Power works',
     infoText:

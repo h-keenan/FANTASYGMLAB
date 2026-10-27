@@ -420,7 +420,7 @@ export default function MoreScreen({ navigation }: Props) {
               <SettingsRow
                 icon="school-outline"
                 iconColor={colors.accent}
-                label="College Prospects"
+                label="College Scouting"
                 description="Grade incoming prospects and follow your own watchlist"
                 onPress={() => navigation.navigate('CollegeProspects')}
                 showDivider={false}
