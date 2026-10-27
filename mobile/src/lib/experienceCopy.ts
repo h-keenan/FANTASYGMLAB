@@ -26,6 +26,64 @@ export function normalizeExperienceLevel(value: unknown): ExperienceLevelSetting
   return value === "beginner" || value === "advanced" ? value : null;
 }
 
+/** The three-way onboarding answer. Additive to the legacy two-value level:
+ * "new_fantasy" and "new_dynasty" both map to "beginner", "veteran" to
+ * "advanced". null = never answered. */
+export type ExperienceTier = "new_fantasy" | "new_dynasty" | "veteran";
+export type ExperienceTierSetting = ExperienceTier | null;
+/** Optional onboarding goal. Used only to suggest a Team Situation, never
+ * to set anything on its own. null = not answered. */
+export type PrimaryGoal = "win_now" | "rebuild" | "exploring";
+export type PrimaryGoalSetting = PrimaryGoal | null;
+
+export function normalizeExperienceTier(value: unknown): ExperienceTierSetting {
+  return value === "new_fantasy" || value === "new_dynasty" || value === "veteran" ? value : null;
+}
+
+export function normalizePrimaryGoal(value: unknown): PrimaryGoalSetting {
+  return value === "win_now" || value === "rebuild" || value === "exploring" ? value : null;
+}
+
+/** The legacy level a tier implies (what old app builds read). */
+export function levelForTier(tier: ExperienceTier): ExperienceLevel {
+  return tier === "veteran" ? "advanced" : "beginner";
+}
+
+/** The default tier for a legacy level, when only the level is known. */
+export function tierForLevel(level: ExperienceLevel): ExperienceTier {
+  return level === "advanced" ? "veteran" : "new_dynasty";
+}
+
+/** Team Situation values (api.ts TeamStance) a goal can suggest. */
+export function stanceForGoal(goal: PrimaryGoalSetting): "competing" | "rebuilding" | null {
+  if (goal === "win_now") return "competing";
+  if (goal === "rebuild") return "rebuilding";
+  return null;
+}
+
+/** One set of labels for onboarding and the Settings screens (web Account,
+ * mobile More), so the same choice is never named two ways. */
+export const EXPERIENCE_TIERS = {
+  new_fantasy: {
+    label: "New to fantasy",
+    description: "Explain the basics. Plain words for every term, and the why behind each recommendation.",
+  },
+  new_dynasty: {
+    label: "New to dynasty",
+    description: "I play fantasy, but keeping players year to year is new. Explain the dynasty parts.",
+  },
+  veteran: {
+    label: "Dynasty veteran",
+    description: "Skip the explanations. Just the call, the value, and the confidence.",
+  },
+} as const;
+
+export const PRIMARY_GOALS = {
+  win_now: { label: "Win now", description: "Compete for a title this season." },
+  rebuild: { label: "Build for the future", description: "Trade for youth and draft picks." },
+  exploring: { label: "Just looking", description: "Not sure yet. Show me around." },
+} as const;
+
 export const BEGINNER_HELP = {
   // Dashboard (services/mobile_api_service.py get_league_dashboard,
   // modules/league_rankings.py build_league_display_frame /
@@ -122,6 +180,31 @@ export const BEGINNER_HELP = {
 
 export type BeginnerHelpKey = keyof typeof BEGINNER_HELP;
 
+/** Plainer, shorter wording for "New to fantasy" accounts. Same facts as
+ * BEGINNER_HELP (same source code), fewer terms. Keys not listed here fall
+ * back to the BEGINNER_HELP line. */
+export const NEW_FANTASY_HELP = {
+  dashboardGamePlan:
+    "A short to-do list for your team, with the most important move first. You don't have to do them all.",
+  dashboardSnapshot:
+    "Team Snapshot shows where your team stands compared to the other teams in your league. #1 is the best.",
+  powerRank:
+    "How strong your team is this season. It adds up the value of the best lineup you could start, plus a little for your backups.",
+  franchiseRank:
+    "How good your team looks over the long run. It adds up the value of every player you own and your draft picks.",
+  verdictAccept: "You get back more than you give up, and your lineup still fits together. A good deal for you.",
+  verdictCounter:
+    "You'd give up more than you get back. It's close, so ask for a little more instead of saying yes right away.",
+  verdictDecline: "You'd give up much more than you get back, or the trade would leave a hole in your lineup.",
+  playerValue:
+    "A number for how much a player is worth in your league. Higher is better. Use it to compare players, not to guess how many points he will score.",
+  faab: "FAAB is a budget of pretend money your league gives you to bid on free agents. The suggested bid is how much of your remaining money this player is worth.",
+  tradeHubPosture:
+    "Posture is your plan for your team: win now, build for the future, or somewhere in between. Trade ideas lean toward that plan. You can change it under Team Situation.",
+  tradeHubHold: "Holding means not trading. That is a real answer. Only trade when the deal clearly beats keeping your team as it is.",
+} as const;
+
+
 /** Labels that are abbreviated or jargon for a beginner. An advanced user
  * keeps whatever label the page already passes in. */
 export const BEGINNER_LABELS = {
@@ -144,7 +227,10 @@ export const PLAIN_COPY = {
   gmPlanProBody:
     "A season headline for your team, your best trade paths, and roster-construction focus areas, all built from your Team Snapshot above.",
   onboardingDynastyNote:
-    "Dynasty is the long-term fantasy format where you keep your players year to year. If you're new to fantasy football overall, choose New to dynasty.",
+    "Dynasty is the long-term fantasy format where you keep your players year to year. Pick the closest fit. You can change this anytime in Settings.",
+  onboardingGoalTitle: "What's your goal this season? (optional)",
+  teamSituationSuggestion:
+    "Based on the goal you picked in onboarding, this is a suggestion only. Nothing changes until you tap it.",
 } as const;
 
 const VERDICT_HELP_KEY: Record<string, BeginnerHelpKey> = {
@@ -162,7 +248,10 @@ const IMPACT_TAG_HELP_KEY: Record<string, BeginnerHelpKey> = {
 
 export interface ExperienceCopy {
   level: ExperienceLevelSetting;
+  tier: ExperienceTierSetting;
   isBeginner: boolean;
+  /** True only for the "New to fantasy" tier (plainer wording). */
+  isNewToFantasy: boolean;
   /** The beginner explanation for `key`, or null for advanced/unset. */
   help: (key: BeginnerHelpKey) => string | null;
   /** The beginner label for `key`, or `advancedLabel` (today's copy). */
@@ -173,12 +262,25 @@ export interface ExperienceCopy {
   impactTagHelp: (tag: string | null | undefined) => string | null;
 }
 
-export function experienceCopy(level: ExperienceLevelSetting): ExperienceCopy {
+/** `tier` only refines the wording for "New to fantasy"; the level alone
+ * (legacy accounts, old builds) behaves as before. A tier that disagrees
+ * with the level is ignored. */
+export function experienceCopy(
+  level: ExperienceLevelSetting,
+  tier: ExperienceTierSetting = null,
+): ExperienceCopy {
   const isBeginner = level === "beginner";
-  const help = (key: BeginnerHelpKey) => (isBeginner ? BEGINNER_HELP[key] : null);
+  const isNewToFantasy = isBeginner && tier === "new_fantasy";
+  const help = (key: BeginnerHelpKey) => {
+    if (!isBeginner) return null;
+    if (isNewToFantasy && key in NEW_FANTASY_HELP) return NEW_FANTASY_HELP[key as keyof typeof NEW_FANTASY_HELP];
+    return BEGINNER_HELP[key];
+  };
   return {
     level,
+    tier,
     isBeginner,
+    isNewToFantasy,
     help,
     label: (key, advancedLabel) => (isBeginner ? BEGINNER_LABELS[key] : advancedLabel),
     verdictHelp: (uiVerdict) => {

@@ -35,7 +35,8 @@ import { PillRow } from "@/components/PillRow";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
-import { PLAIN_COPY } from "@/lib/experienceCopy";
+import { PLAIN_COPY, stanceForGoal } from "@/lib/experienceCopy";
+import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
@@ -411,6 +412,7 @@ export function GmPlanContent({
   targetsLimit?: { freeLimit?: number; isPremium?: boolean };
 }) {
   const router = useRouter();
+  const { goal } = useExperienceLevel();
   const [tab, setTab] = useState<GmPlanTab>(initialTab ?? "overview");
   const [showRoster, setShowRoster] = useState(false);
   const [stance, setStanceState] = useState<TeamStance | "">(teamStance?.stance ?? "");
@@ -643,6 +645,7 @@ export function GmPlanContent({
           {teamStance ? (
             <TeamSituationCard
               stance={stance}
+              suggestedStance={stanceForGoal(goal)}
               onPick={onPickStance}
               banner={banner}
               pastDeadline={pastDeadline}

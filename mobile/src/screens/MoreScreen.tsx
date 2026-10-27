@@ -34,7 +34,9 @@ import { useAuth } from '../context/AuthContext';
 import { useCollegeInterest } from '../context/CollegeInterestContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
-import type { ExperienceLevel } from '../lib/experienceCopy';
+import { EXPERIENCE_TIERS, PRIMARY_GOALS, type ExperienceTier, type PrimaryGoal } from '../lib/experienceCopy';
+import GlossaryNote from '../components/GlossaryNote';
+import { SETTINGS_GLOSSARY_TERMS } from '../lib/glossary';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
@@ -57,13 +59,17 @@ const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: str
   { value: 'compact', label: 'Compact', description: 'Just the calls — hide the explanation text' },
 ];
 
-// Onboarding's "How much dynasty experience do you have?" answer, changeable
-// here later. Copy only (lib/experienceCopy.ts); an unanswered account shows
-// as Advanced because that's exactly how it behaves.
-const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = [
-  { value: 'beginner', label: 'Beginner', description: 'Plain-language explanations of terms like value, tier and trade verdicts' },
-  { value: 'advanced', label: 'Advanced', description: 'The standard terse copy' },
-];
+// Onboarding's experience question (and optional goal), changeable here
+// later with the same labels (lib/experienceCopy EXPERIENCE_TIERS /
+// PRIMARY_GOALS). Copy only. An unanswered account shows "Not set".
+const EXPERIENCE_OPTIONS = (Object.keys(EXPERIENCE_TIERS) as ExperienceTier[]).map((value) => ({
+  value,
+  ...EXPERIENCE_TIERS[value],
+}));
+const GOAL_OPTIONS = (Object.keys(PRIMARY_GOALS) as PrimaryGoal[]).map((value) => ({
+  value,
+  ...PRIMARY_GOALS[value],
+}));
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string }> = [
   { value: 'dark', label: 'Night', description: 'OLED black — always dark' },
@@ -87,7 +93,12 @@ export default function MoreScreen({ navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
-  const { level: experienceLevel, setLevel: setExperienceLevel } = useExperienceLevel();
+  const { tier: experienceTier, goal: primaryGoal, setProfile: setExperienceProfile } = useExperienceLevel();
+  const [experienceError, setExperienceError] = useState<string | null>(null);
+  const saveExperience = (next: { tier: ExperienceTier; goal?: PrimaryGoal | null }) => {
+    setExperienceError(null);
+    setExperienceProfile(next, { persist: !isGuest }).catch(() => setExperienceError("Couldn't save this setting. Try again."));
+  };
   const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
@@ -330,11 +341,31 @@ export default function MoreScreen({ navigation }: Props) {
               key={option.value}
               label={option.label}
               description={option.description}
-              active={(experienceLevel ?? 'advanced') === option.value}
-              onPress={() => setExperienceLevel(option.value)}
+              active={experienceTier === option.value}
+              onPress={() => saveExperience({ tier: option.value })}
             />
           ))}
         </View>
+        {experienceTier === null ? (
+          <AppText style={styles.groupCaption}>Not set. Until you pick one, you see the standard short copy.</AppText>
+        ) : (
+          <>
+            <AppText style={styles.groupCaption}>Your goal (optional)</AppText>
+            <View style={styles.optionRow}>
+              {GOAL_OPTIONS.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  description={option.description}
+                  active={primaryGoal === option.value}
+                  onPress={() => saveExperience({ tier: experienceTier, goal: primaryGoal === option.value ? null : option.value })}
+                />
+              ))}
+            </View>
+          </>
+        )}
+        {experienceError ? <AppText style={styles.groupCaption}>{experienceError}</AppText> : null}
+        <GlossaryNote terms={SETTINGS_GLOSSARY_TERMS} label="What do these terms mean?" />
         <AppText style={styles.groupCaption}>Theme</AppText>
         <View style={styles.optionRow}>
           {THEME_OPTIONS.map((option) => (

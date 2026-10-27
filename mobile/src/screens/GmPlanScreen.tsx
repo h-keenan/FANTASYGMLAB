@@ -18,7 +18,8 @@ import InsightRow from '../components/InsightRow';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import BeginnerHelp from '../components/BeginnerHelp';
-import { PLAIN_COPY } from '../lib/experienceCopy';
+import { PLAIN_COPY, stanceForGoal } from '../lib/experienceCopy';
+import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -95,6 +96,10 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const { stance, setStance } = useGmStance(leagueId);
+  // Onboarding goal -> a Team Situation suggestion. Shown only while no stance
+  // is declared and never applied until the user taps it.
+  const { goal: onboardingGoal } = useExperienceLevel();
+  const suggestedStance = stanceForGoal(onboardingGoal);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -395,6 +400,26 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   );
                 })}
               </View>
+              {suggestedStance && !stance ? (
+                <View style={styles.banner}>
+                  <View style={styles.bannerText}>
+                    <AppText style={styles.bannerTitle}>
+                      You picked a goal in onboarding. Set Team Situation to{' '}
+                      {TEAM_STANCE_OPTIONS.find((o) => o.value === suggestedStance)?.label}?
+                    </AppText>
+                    <AppText style={styles.caption}>{PLAIN_COPY.teamSituationSuggestion}</AppText>
+                  </View>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Set ${TEAM_STANCE_OPTIONS.find((o) => o.value === suggestedStance)?.label}`}
+                    onPress={() => setStance(suggestedStance)}
+                  >
+                    <AppText style={styles.stanceLabelActive}>
+                      Set {TEAM_STANCE_OPTIONS.find((o) => o.value === suggestedStance)?.label}
+                    </AppText>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
               <BeginnerHelp term="stanceRebuilding" />
               <BeginnerHelp term="stanceCompeting" />
               <BeginnerHelp term="stanceBalanced" />

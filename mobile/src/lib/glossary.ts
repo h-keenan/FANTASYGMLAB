@@ -38,6 +38,63 @@ export const GLOSSARY = {
   },
   ovr: { label: "OVR", definition: BEGINNER_HELP.overallRating },
   averageAge: { label: "Average Age", definition: BEGINNER_HELP.averageAge },
+  dynasty: {
+    label: "Dynasty",
+    definition:
+      "A fantasy format where you keep your players from year to year instead of starting over every season, so young players and draft picks matter.",
+  },
+  pqv: {
+    label: "PQV (Player Quick View)",
+    definition:
+      "The quick summary card for one player: his value, overall rating (OVR), tier and what the app suggests doing with him.",
+  },
+  value: { label: "Value", definition: BEGINNER_HELP.playerValue },
+  tier: { label: "Tier", definition: BEGINNER_HELP.playerTier },
+  picks: {
+    label: "Draft picks",
+    definition:
+      "Rookie draft picks you own can be traded like players. In dynasty they are worth real value, and they count toward your Franchise Rank.",
+  },
+  superflex: {
+    label: "Superflex",
+    definition:
+      "A lineup rule that lets you start a second quarterback in a flex spot. Quarterbacks become more valuable because every team wants two. Values here follow your league's lineup rules.",
+  },
+  tep: {
+    label: "TEP (Tight End Premium)",
+    definition:
+      "A scoring rule that gives tight ends extra points for each catch, which makes good tight ends worth more. Values here follow your league's scoring rules.",
+  },
+  faab: { label: "FAAB", definition: BEGINNER_HELP.faab },
+  taxi: {
+    label: "Taxi squad",
+    definition:
+      "A set of extra roster spots, in leagues that have them, for young players you want to stash without using a regular roster spot. Each league sets its own rules for who can go there.",
+  },
+  posture: {
+    label: "Team Situation (posture)",
+    definition:
+      "How you are building your team: rebuilding, competing, or balanced. Trade ideas weigh player age and draft picks to match. It is your call, and you can change it any time.",
+  },
+  buyLow: { label: "Buy Low", definition: BEGINNER_HELP.impactBuyLow },
+  sellHigh: { label: "Sell High", definition: BEGINNER_HELP.impactSellHigh },
 } as const;
+
+/** The jargon explained under Settings (web Account, mobile More), so the
+ * full glossary is reachable from one place on both platforms. */
+export const SETTINGS_GLOSSARY_TERMS: GlossaryKey[] = [
+  "dynasty",
+  "pqv",
+  "value",
+  "tier",
+  "picks",
+  "superflex",
+  "tep",
+  "faab",
+  "taxi",
+  "posture",
+  "buyLow",
+  "sellHigh",
+];
 
 export type GlossaryKey = keyof typeof GLOSSARY;

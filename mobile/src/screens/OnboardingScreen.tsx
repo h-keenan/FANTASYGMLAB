@@ -26,8 +26,15 @@ import Button from '../components/Button';
 import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import OnboardingAurora from '../components/OnboardingAurora';
-import type { ExperienceLevelValue } from '../lib/api';
-import { PLAIN_COPY } from '../lib/experienceCopy';
+import {
+  EXPERIENCE_TIERS,
+  PLAIN_COPY,
+  PRIMARY_GOALS,
+  levelForTier,
+  type ExperienceTier,
+  type PrimaryGoal,
+} from '../lib/experienceCopy';
+import { useAuth } from '../context/AuthContext';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -156,22 +163,17 @@ function ProgressDot({ active, color, activeColor }: { active: boolean; color: s
   );
 }
 
-const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: ColorKey; title: string; body: string }[] = [
-  {
-    value: 'beginner',
-    icon: 'leaf-outline',
-    color: 'success',
-    title: 'New to dynasty',
-    body: 'Explain the why behind every recommendation — trade logic, value, roster strategy.',
-  },
-  {
-    value: 'advanced',
-    icon: 'trophy-outline',
-    color: 'premium',
-    title: 'I know my stuff',
-    body: 'Skip the explanations — just the call, the value, and the confidence.',
-  },
-];
+const TIER_ICONS: Record<ExperienceTier, { icon: IconName; color: ColorKey }> = {
+  new_fantasy: { icon: 'sparkles-outline', color: 'accent' },
+  new_dynasty: { icon: 'leaf-outline', color: 'success' },
+  veteran: { icon: 'trophy-outline', color: 'premium' },
+};
+const TIER_OPTIONS = (Object.keys(EXPERIENCE_TIERS) as ExperienceTier[]).map((value) => ({
+  value,
+  ...EXPERIENCE_TIERS[value],
+  ...TIER_ICONS[value],
+}));
+const GOAL_OPTIONS = (Object.keys(PRIMARY_GOALS) as PrimaryGoal[]).map((value) => ({ value, ...PRIMARY_GOALS[value] }));
 
 /**
  * First-run intro carousel, shown once after sign-in (gated by
@@ -197,7 +199,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   // The value step adds a headline and preview controls above/below.
   const valuePhoneHeight = Math.max(200, Math.min(height * 0.44, 380));
   const { onboardingComplete, completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
-  const { setLevel: saveExperienceLevel } = useExperienceLevel();
+  const { setProfile } = useExperienceLevel();
+  // A guest session never stores onboarding answers on the server.
+  const { isGuest } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const prevIndex = useRef(0);
@@ -205,7 +209,8 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   useEffect(() => {
     prevIndex.current = index;
   }, [index]);
-  const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
+  const [tier, setTier] = useState<ExperienceTier | null>(null);
+  const [goal, setGoal] = useState<PrimaryGoal | null>(null);
   const [valueSlide, setValueSlide] = useState(0);
   const [valuePaused, setValuePaused] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -258,13 +263,13 @@ export default function OnboardingScreen({ navigation, route }: Props) {
       if (navigation.canGoBack()) navigation.goBack();
       return;
     }
-    if (!level) return;
-    trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(level) });
+    if (!tier) return;
+    trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(levelForTier(tier)) });
     setSaving(true);
-    // Applies the beginner/advanced copy immediately and saves it to
-    // /v1/preferences in the background. Best-effort, same as web: a failed
-    // preference write never blocks onboarding.
-    saveExperienceLevel(level);
+    // Applies the copy immediately and saves it to /v1/preferences in the
+    // background. Best-effort, same as web: a failed write rolls the choice
+    // back (ExperienceLevelContext) but never blocks onboarding.
+    setProfile({ tier, goal }, { persist: !isGuest }).catch(() => {});
     setSaving(false);
     if (isFirstRun) {
       navigation.navigate('Paywall', { fromOnboarding: 'getStarted' });
@@ -365,21 +370,21 @@ export default function OnboardingScreen({ navigation, route }: Props) {
           <>
             <AppText style={styles.eyebrow}>Last thing</AppText>
             <AppText style={styles.headlineSm}>
-              How much dynasty <AppText style={styles.headlineAccent}>experience</AppText> do you have?
+              How much <AppText style={styles.headlineAccent}>experience</AppText> do you have?
             </AppText>
             <AppText style={styles.body}>
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
             </AppText>
             <AppText style={styles.body}>{PLAIN_COPY.onboardingDynastyNote}</AppText>
-            <View style={styles.cards}>
-              {LEVEL_OPTIONS.map((option) => {
-                const selected = level === option.value;
+            <View style={styles.cards} accessibilityRole="radiogroup">
+              {TIER_OPTIONS.map((option) => {
+                const selected = tier === option.value;
                 return (
                   <TouchableOpacity
                     key={option.value}
                     onPress={() => {
-                      setLevel(option.value);
-                      trackOnboarding('experience_selected', { experience: experienceBucket(option.value) });
+                      setTier(option.value);
+                      trackOnboarding('experience_selected', { experience: experienceBucket(levelForTier(option.value)) });
                     }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
@@ -388,9 +393,28 @@ export default function OnboardingScreen({ navigation, route }: Props) {
                     <GlassPanel style={selected ? [styles.pickCard, styles.pickCardSelected] : styles.pickCard}>
                       <View style={styles.pickHeader}>
                         <Ionicons name={option.icon} size={22} color={colors[option.color]} />
-                        <AppText style={styles.rowTitle}>{option.title}</AppText>
+                        <AppText style={styles.rowTitle}>{option.label}</AppText>
                       </View>
-                      <AppText style={styles.rowBody}>{option.body}</AppText>
+                      <AppText style={styles.rowBody}>{option.description}</AppText>
+                    </GlassPanel>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <AppText style={styles.body}>{PLAIN_COPY.onboardingGoalTitle}</AppText>
+            <View style={styles.goalRow} accessibilityRole="radiogroup">
+              {GOAL_OPTIONS.map((option) => {
+                const selected = goal === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setGoal(selected ? null : option.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    activeOpacity={0.85}
+                  >
+                    <GlassPanel style={selected ? [styles.goalChip, styles.pickCardSelected] : styles.goalChip}>
+                      <AppText style={styles.rowTitle}>{option.label}</AppText>
                     </GlassPanel>
                   </TouchableOpacity>
                 );
@@ -402,7 +426,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   };
 
   const primaryLabel = !isLast ? 'Next' : isFirstRun ? 'Continue' : 'Done';
-  const primaryDisabled = isLast && !isReplay && (!level || saving);
+  const primaryDisabled = isLast && !isReplay && (!tier || saving);
 
   return (
     <View style={styles.root}>
@@ -543,6 +567,8 @@ function createStyles(colors: ThemeColors) {
     rowBody: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: 2 },
     pickCard: { padding: spacing.md, borderWidth: 1.5, borderColor: 'transparent' },
     pickCardSelected: { borderColor: colors.accent },
+    goalRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },
+    goalChip: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1.5, borderColor: 'transparent' },
     pickHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
     valueControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
     valueDotHit: { paddingVertical: 8, paddingHorizontal: 3 },

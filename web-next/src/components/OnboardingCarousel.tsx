@@ -9,7 +9,14 @@ import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { ONBOARDING_FEATURES, ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
 import { OnboardingValueSlides } from "@/components/OnboardingValueSlides";
-import { PLAIN_COPY, type ExperienceLevel } from "@/lib/experienceCopy";
+import {
+  EXPERIENCE_TIERS,
+  PLAIN_COPY,
+  PRIMARY_GOALS,
+  levelForTier,
+  type ExperienceTier,
+  type PrimaryGoal,
+} from "@/lib/experienceCopy";
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 
 /**
@@ -79,9 +86,25 @@ function usePortalRoot(): HTMLElement | null {
   return useSyncExternalStore(store.subscribe, store.getSnapshot, () => null);
 }
 
+const TIER_ICONS: Record<ExperienceTier, { icon: string; color: string }> = {
+  new_fantasy: { icon: "M12 3v18M5 10l7-7 7 7", color: "var(--color-accent)" },
+  new_dynasty: {
+    icon: "M12 21V11M12 11C12 7 9 5 5 5c0 4 2.5 6.5 7 6M12 11c0-3.5 2-5.5 6-5.5 0 3.5-2 5.5-6 5.5",
+    color: "var(--color-success)",
+  },
+  veteran: { icon: "M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z", color: "var(--color-premium)" },
+};
+const TIER_CARDS = (Object.keys(EXPERIENCE_TIERS) as ExperienceTier[]).map((value) => ({
+  value,
+  ...EXPERIENCE_TIERS[value],
+  ...TIER_ICONS[value],
+}));
+const GOAL_CHIPS = (Object.keys(PRIMARY_GOALS) as PrimaryGoal[]).map((value) => ({ value, ...PRIMARY_GOALS[value] }));
+
 export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => void; replay?: boolean }) {
   const [step, setStep] = useState(0);
-  const [level, setLevel] = useState<ExperienceLevel | null>(null);
+  const [tier, setTier] = useState<ExperienceTier | null>(null);
+  const [goal, setGoal] = useState<PrimaryGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -91,7 +114,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   // open every other <body> child is made inert + aria-hidden.
   const portalRoot = usePortalRoot();
   const [direction, setDirection] = useState<"next" | "back">("next");
-  const { setLevel: saveExperienceLevel } = useExperienceLevel();
+  const { setProfile } = useExperienceLevel();
 
   const featureCount = ONBOARDING_FEATURES.length;
   // Replay (Account > "Replay the tour"): all feature slides, nothing else.
@@ -114,14 +137,14 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   }, [step]);
 
   const finish = async () => {
-    if (!level) return;
-    trackOnboarding("completed", { step: "level", step_index: levelStep, experience: experienceBucket(level) });
+    if (!tier) return;
+    trackOnboarding("completed", { step: "level", step_index: levelStep, experience: experienceBucket(levelForTier(tier)) });
     setSaving(true);
     try {
       // Saved through ExperienceLevelContext so the answer takes effect
       // right away (lib/experienceCopy.ts beginner helper text), not only
       // after the next page load.
-      await saveExperienceLevel(level);
+      await setProfile({ tier, goal });
     } catch {
       // Best-effort — a failed preference write should never block
       // onboarding itself; the answer can be changed later on the Account
@@ -156,9 +179,9 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
     trackOnboarding("skipped", { step: stepName(step), step_index: step });
     onDone();
   };
-  const pickLevel = (value: ExperienceLevel) => {
-    setLevel(value);
-    trackOnboarding("experience_selected", { experience: experienceBucket(value) });
+  const pickTier = (value: ExperienceTier) => {
+    setTier(value);
+    trackOnboarding("experience_selected", { experience: experienceBucket(levelForTier(value)) });
   };
 
   const onTouchEnd = (clientX: number, clientY: number) => {
@@ -243,42 +266,49 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
           <div className="onboarding-section onboarding-section--center">
             <span className="onboarding-eyebrow">Last thing</span>
             <h1 className="onboarding-headline onboarding-headline--sm">
-              How much dynasty <span className="onboarding-gradient">experience</span> do you have?
+              How much <span className="onboarding-gradient">experience</span> do you have?
             </h1>
             <p className="onboarding-body onboarding-body--center">
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
             </p>
             <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingDynastyNote}</p>
-            <div className="onboarding-cards" style={{ marginTop: "var(--space-md)" }}>
-              <button
-                type="button"
-                onClick={() => pickLevel("beginner")}
-                className={`onboarding-glass onboarding-pick${level === "beginner" ? " onboarding-pick--selected" : ""}`}
-              >
-                <div className="onboarding-row">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2" aria-hidden="true">
-                    <path d="M12 21V11M12 11C12 7 9 5 5 5c0 4 2.5 6.5 7 6M12 11c0-3.5 2-5.5 6-5.5 0 3.5-2 5.5-6 5.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="onboarding-row-title">New to dynasty</span>
-                </div>
-                <span className="onboarding-row-body">
-                  Explain the why behind every recommendation — trade logic, value, roster strategy.
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => pickLevel("advanced")}
-                className={`onboarding-glass onboarding-pick${level === "advanced" ? " onboarding-pick--selected" : ""}`}
-              >
-                <div className="onboarding-row">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-premium)" strokeWidth="2" aria-hidden="true">
-                    <path d="M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M6 5H4a2 2 0 0 0 0 4h2M18 5h2a2 2 0 0 1 0 4h-2" strokeLinecap="round" />
-                  </svg>
-                  <span className="onboarding-row-title">I know my stuff</span>
-                </div>
-                <span className="onboarding-row-body">Skip the explanations — just the call, the value, and the confidence.</span>
-              </button>
+            <div className="onboarding-cards" role="radiogroup" aria-label="Your experience" style={{ marginTop: "var(--space-md)" }}>
+              {TIER_CARDS.map((card) => (
+                <button
+                  key={card.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={tier === card.value}
+                  onClick={() => pickTier(card.value)}
+                  className={`onboarding-glass onboarding-pick${tier === card.value ? " onboarding-pick--selected" : ""}`}
+                >
+                  <div className="onboarding-row">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={card.color} strokeWidth="2" aria-hidden="true">
+                      <path d={card.icon} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="onboarding-row-title">{card.label}</span>
+                  </div>
+                  <span className="onboarding-row-body">{card.description}</span>
+                </button>
+              ))}
+            </div>
+            <p className="onboarding-body onboarding-body--center" style={{ marginTop: "var(--space-md)" }}>
+              {PLAIN_COPY.onboardingGoalTitle}
+            </p>
+            <div className="onboarding-goal-chips" role="radiogroup" aria-label="Your goal" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)", justifyContent: "center" }}>
+              {GOAL_CHIPS.map((chip) => (
+                <button
+                  key={chip.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={goal === chip.value}
+                  onClick={() => setGoal((g) => (g === chip.value ? null : chip.value))}
+                  className={`onboarding-glass onboarding-pick${goal === chip.value ? " onboarding-pick--selected" : ""}`}
+                  style={{ width: "auto", padding: "var(--space-sm) var(--space-md)" }}
+                >
+                  <span className="onboarding-row-title">{chip.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         ) : null}
@@ -304,7 +334,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
           ) : null}
           <Button
             onClick={next}
-            disabled={(step === levelStep && !level) || saving}
+            disabled={(step === levelStep && !tier) || saving}
             className="flex-1"
             style={{ alignSelf: "auto" }}
           >

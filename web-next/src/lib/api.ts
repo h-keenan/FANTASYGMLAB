@@ -3319,6 +3319,10 @@ export interface DevicePreferencesResponse {
   ui_density: "guided" | "compact";
   theme_mode: "light" | "dark" | "auto";
   experience_level: "beginner" | "advanced" | null;
+  /** Additive fields: older servers omit them. */
+  experience_tier?: "new_fantasy" | "new_dynasty" | "veteran" | null;
+  primary_goal?: "win_now" | "rebuild" | "exploring" | null;
+  first_run_done?: string[];
   last_league: { league_id: string; league_name: string } | null;
 }
 
@@ -3338,6 +3342,23 @@ export const api = {
     authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
       method: "POST",
       jsonBody: { experience_level: level },
+    }),
+
+  /** The three-way onboarding/Settings answer. The server derives the legacy
+   * `experience_level` from the tier, so older app builds keep working. A
+   * null goal leaves any stored goal alone; pass clearGoal to remove it. */
+  setExperienceProfile: (profile: {
+    tier: "new_fantasy" | "new_dynasty" | "veteran";
+    goal?: "win_now" | "rebuild" | "exploring" | null;
+    clearGoal?: boolean;
+  }) =>
+    authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
+      method: "POST",
+      jsonBody: {
+        experience_tier: profile.tier,
+        ...(profile.goal ? { primary_goal: profile.goal } : {}),
+        ...(profile.clearGoal ? { clear_primary_goal: true } : {}),
+      },
     }),
 
   // Stripe web billing runs on Supabase Edge Functions (lib/billingClient.ts;

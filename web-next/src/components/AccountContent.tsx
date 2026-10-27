@@ -5,7 +5,14 @@ import { useState } from "react";
 import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
 import { ReferralCard } from "@/components/ReferralCard";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
-import type { ExperienceLevel } from "@/lib/experienceCopy";
+import { GlossaryNote } from "@/components/GlossaryNote";
+import {
+  EXPERIENCE_TIERS,
+  PRIMARY_GOALS,
+  type ExperienceTier,
+  type PrimaryGoal,
+} from "@/lib/experienceCopy";
+import { SETTINGS_GLOSSARY_TERMS } from "@/lib/glossary";
 import { trialEndLabel } from "@/lib/trialCopy";
 import { Button, ButtonLink } from "@/components/Button";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
@@ -124,38 +131,42 @@ function BillingSection({
   );
 }
 
-const EXPLANATION_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = [
-  {
-    value: "beginner",
-    label: "Beginner",
-    description: "Plain-language explanations of terms like value, tier and trade verdicts",
-  },
-  { value: "advanced", label: "Advanced", description: "The standard terse copy" },
-];
+const TIER_OPTIONS = (Object.keys(EXPERIENCE_TIERS) as ExperienceTier[]).map((value) => ({
+  value,
+  ...EXPERIENCE_TIERS[value],
+}));
+const GOAL_OPTIONS = (Object.keys(PRIMARY_GOALS) as PrimaryGoal[]).map((value) => ({
+  value,
+  ...PRIMARY_GOALS[value],
+}));
 
-/** The onboarding carousel's "How much dynasty experience do you have?"
- * answer, editable later. Reads/writes through ExperienceLevelContext (the
- * same /v1/preferences field), so the change applies across the app right
- * away. An unanswered account (null) shows Advanced, which is how it
- * already behaves. */
-function ExplanationsSetting() {
-  const { level, setLevel } = useExperienceLevel();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const active: ExperienceLevel = level ?? "advanced";
-
+function ChoiceList<T extends string>({
+  labelId,
+  title,
+  options,
+  active,
+  disabled,
+  onPick,
+}: {
+  labelId: string;
+  title: string;
+  options: Array<{ value: T; label: string; description: string }>;
+  active: T | null;
+  disabled: boolean;
+  onPick: (value: T) => void;
+}) {
   return (
     <div className="flex flex-col gap-2">
-      <span id="account-explanations-label" className="text-sm font-semibold">
-        Explanations
+      <span id={labelId} className="text-sm font-semibold">
+        {title}
       </span>
       <div
         role="radiogroup"
-        aria-labelledby="account-explanations-label"
+        aria-labelledby={labelId}
         className="flex flex-col"
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        {EXPLANATION_OPTIONS.map((option, index) => {
+        {options.map((option, index) => {
           const selected = active === option.value;
           return (
             <button
@@ -163,14 +174,9 @@ function ExplanationsSetting() {
               type="button"
               role="radio"
               aria-checked={selected}
-              disabled={saving}
+              disabled={disabled}
               onClick={() => {
-                if (selected) return;
-                setSaving(true);
-                setError(null);
-                setLevel(option.value)
-                  .catch(() => setError("Couldn't save this setting. Try again."))
-                  .finally(() => setSaving(false));
+                if (!selected) onPick(option.value);
               }}
               className="flex items-center justify-between gap-3 p-3 text-left"
               style={{
@@ -197,6 +203,66 @@ function ExplanationsSetting() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** The onboarding experience question (and optional goal), editable later.
+ * Same labels as onboarding (lib/experienceCopy EXPERIENCE_TIERS /
+ * PRIMARY_GOALS). Reads/writes through ExperienceLevelContext, so a change
+ * applies across the app right away. An unanswered account shows "Not set"
+ * (it still behaves like Dynasty veteran, today's copy). */
+function ExplanationsSetting() {
+  const { tier, goal, setProfile } = useExperienceLevel();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = (next: { tier: ExperienceTier; goal?: PrimaryGoal | null }) => {
+    setSaving(true);
+    setError(null);
+    setProfile(next)
+      .catch(() => setError("Couldn't save this setting. Try again."))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <ChoiceList
+        labelId="account-explanations-label"
+        title="Explanations"
+        options={TIER_OPTIONS}
+        active={tier}
+        disabled={saving}
+        onPick={(value) => save({ tier: value })}
+      />
+      {tier === null ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Not set. Until you pick one, you see the standard short copy.
+        </p>
+      ) : (
+        <>
+          <ChoiceList
+            labelId="account-goal-label"
+            title="Your goal (optional)"
+            options={GOAL_OPTIONS}
+            active={goal}
+            disabled={saving}
+            onPick={(value) => save({ tier, goal: value })}
+          />
+          {goal ? (
+            <button
+              type="button"
+              className="self-start text-xs underline"
+              style={{ color: "var(--color-text-muted)" }}
+              disabled={saving}
+              onClick={() => save({ tier, goal: null })}
+            >
+              Clear goal
+            </button>
+          ) : null}
+        </>
+      )}
+      <GlossaryNote terms={SETTINGS_GLOSSARY_TERMS} label="What do these terms mean?" />
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}

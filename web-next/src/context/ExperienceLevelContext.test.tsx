@@ -21,12 +21,16 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getDevicePreferences: vi.fn(),
       setExperienceLevel: vi.fn(),
+      setExperienceProfile: vi.fn(),
     },
   };
 });
 
-function preferences(experience_level: DevicePreferencesResponse["experience_level"]): DevicePreferencesResponse {
-  return { ok: true, ui_density: "guided", theme_mode: "dark", experience_level, last_league: null };
+function preferences(
+  experience_level: DevicePreferencesResponse["experience_level"],
+  extra: Partial<DevicePreferencesResponse> = {},
+): DevicePreferencesResponse {
+  return { ok: true, ui_density: "guided", theme_mode: "dark", experience_level, last_league: null, ...extra };
 }
 
 function withProvider(children: ReactNode) {
@@ -119,6 +123,7 @@ function renderAccount() {
 beforeEach(() => {
   vi.mocked(api.getDevicePreferences).mockReset();
   vi.mocked(api.setExperienceLevel).mockReset();
+  vi.mocked(api.setExperienceProfile).mockReset();
 });
 
 describe("experience level copy on Dashboard", () => {
@@ -171,31 +176,54 @@ describe("experience level copy on Trade Hub idea cards", () => {
 });
 
 describe("Account page Explanations setting", () => {
-  it("shows Advanced for an unset account and switches to Beginner, saving through /v1/preferences", async () => {
+  it("shows Not set (nothing selected) for an unanswered account and saves a tier through /v1/preferences", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
-    vi.mocked(api.setExperienceLevel).mockResolvedValue(preferences("beginner"));
+    vi.mocked(api.setExperienceProfile).mockResolvedValue(preferences("beginner", { experience_tier: "new_fantasy" }));
     renderAccount();
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    const advanced = screen.getByRole("radio", { name: /advanced/i });
-    const beginner = screen.getByRole("radio", { name: /beginner/i });
-    expect(advanced).toHaveAttribute("aria-checked", "true");
-    expect(beginner).toHaveAttribute("aria-checked", "false");
+    for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText(/^Not set\./)).toBeInTheDocument();
 
-    fireEvent.click(beginner);
-    await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
-    expect(screen.getByRole("radio", { name: /beginner/i })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("radio", { name: /new to fantasy/i }));
+    await waitFor(() =>
+      expect(api.setExperienceProfile).toHaveBeenCalledWith({ tier: "new_fantasy", goal: null, clearGoal: false }),
+    );
+    expect(screen.getByRole("radio", { name: /new to fantasy/i })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("uses the same labels as onboarding and derives the tier of a legacy beginner", async () => {
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner", { experience_tier: "new_dynasty" }));
+    renderAccount();
+    await waitFor(() => expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true"));
+    expect(screen.getByRole("radio", { name: /dynasty veteran/i })).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("saves and clears an optional goal without touching the tier", async () => {
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("advanced", { experience_tier: "veteran" }));
+    vi.mocked(api.setExperienceProfile).mockResolvedValue(preferences("advanced"));
+    renderAccount();
+    await waitFor(() => expect(screen.getByRole("radio", { name: /dynasty veteran/i })).toHaveAttribute("aria-checked", "true"));
+
+    fireEvent.click(screen.getByRole("radio", { name: /win now/i }));
+    await waitFor(() =>
+      expect(api.setExperienceProfile).toHaveBeenCalledWith({ tier: "veteran", goal: "win_now", clearGoal: false }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /clear goal/i }));
+    await waitFor(() =>
+      expect(api.setExperienceProfile).toHaveBeenLastCalledWith({ tier: "veteran", goal: null, clearGoal: true }),
+    );
   });
 
   it("restores the previous choice and shows an error when the save fails", async () => {
-    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
-    vi.mocked(api.setExperienceLevel).mockRejectedValue(new Error("network"));
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner", { experience_tier: "new_dynasty" }));
+    vi.mocked(api.setExperienceProfile).mockRejectedValue(new Error("network"));
     renderAccount();
 
-    await waitFor(() => expect(screen.getByRole("radio", { name: /beginner/i })).toHaveAttribute("aria-checked", "true"));
-    fireEvent.click(screen.getByRole("radio", { name: /advanced/i }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true"));
+    fireEvent.click(screen.getByRole("radio", { name: /dynasty veteran/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't save/i);
-    expect(screen.getByRole("radio", { name: /beginner/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true");
   });
 });

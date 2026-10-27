@@ -7,7 +7,7 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
     ...actual,
-    api: { ...actual.api, setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }) },
+    api: { ...actual.api, setExperienceProfile: vi.fn().mockResolvedValue({ ok: true }) },
   };
 });
 
@@ -43,7 +43,7 @@ describe("onboarding funnel analytics", () => {
   it("tracks experience_selected (new|expert) and completed with only allowlisted fixed props", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
     for (let i = 0; i < 2; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /dynasty veteran/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
     const all = calls();
     expect(all.find((c) => c.action === "experience_selected")).toMatchObject({ experience: "expert" });

@@ -11,7 +11,7 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     api: {
       ...actual.api,
-      setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }),
+      setExperienceProfile: vi.fn().mockResolvedValue({ ok: true }),
     },
   };
 });
@@ -53,17 +53,21 @@ describe("OnboardingCarousel", () => {
     expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
 
     clickNext(1); // -> experience level
-    expect(screen.getByRole("heading", { name: /how much dynasty experience/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /how much experience/i })).toBeInTheDocument();
 
     // Can't finish without picking a level.
     expect(screen.getByRole("button", { name: /^continue$/i })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
+    expect(screen.getAllByRole("radio")).toHaveLength(6);
+    fireEvent.click(screen.getByRole("radio", { name: /new to dynasty/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /build for the future/i }));
     expect(screen.getByRole("button", { name: /^continue$/i })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
-    await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
+    await waitFor(() =>
+      expect(api.setExperienceProfile).toHaveBeenCalledWith({ tier: "new_dynasty", goal: "rebuild" }),
+    );
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
@@ -92,16 +96,16 @@ describe("OnboardingCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     expect(onDone).toHaveBeenCalledTimes(1);
-    expect(api.setExperienceLevel).not.toHaveBeenCalled();
+    expect(api.setExperienceProfile).not.toHaveBeenCalled();
   });
 
   it("still calls onDone even when the preference write fails", async () => {
-    vi.mocked(api.setExperienceLevel).mockRejectedValueOnce(new Error("network error"));
+    vi.mocked(api.setExperienceProfile).mockRejectedValueOnce(new Error("network error"));
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
 
     clickNext(2);
-    fireEvent.click(screen.getByRole("button", { name: /i know my stuff/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /dynasty veteran/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
@@ -142,6 +146,6 @@ describe("OnboardingCarousel replay", () => {
     expect(screen.queryByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onDone).toHaveBeenCalledTimes(1);
-    expect(api.setExperienceLevel).not.toHaveBeenCalled();
+    expect(api.setExperienceProfile).not.toHaveBeenCalled();
   });
 });

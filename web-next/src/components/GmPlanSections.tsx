@@ -7,6 +7,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ValueRing } from "@/components/ValueRing";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
 import { TEAM_STANCE_OPTIONS, type TeamStance } from "@/lib/api";
+import { PLAIN_COPY } from "@/lib/experienceCopy";
 import type { DeadlineBanner, PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
 import { SkeletonBlock } from "@/components/Skeleton";
 
@@ -29,7 +30,11 @@ export function TeamSituationCard({
   banner,
   pastDeadline,
   tradeHubHref,
+  suggestedStance,
 }: {
+  /** From the onboarding goal. Only a suggestion: shown while no stance is
+   * declared, and never applied until the user taps it. */
+  suggestedStance?: TeamStance | null;
   stance: TeamStance | "";
   onPick: (value: string) => void;
   banner: DeadlineBanner;
@@ -52,6 +57,31 @@ export function TeamSituationCard({
         active={stance}
         onSelect={onPick}
       />
+      {suggestedStance && !stance ? (
+        <div
+          className="flex flex-col gap-2 p-3"
+          data-stance-suggestion={suggestedStance}
+          style={{
+            background: "color-mix(in srgb, var(--color-accent) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)",
+          }}
+        >
+          <span className="text-sm">
+            You picked a goal in onboarding. Want to set Team Situation to{" "}
+            <strong>{TEAM_STANCE_OPTIONS.find((o) => o.value === suggestedStance)?.label}</strong>?
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {PLAIN_COPY.teamSituationSuggestion}
+          </span>
+          <button
+            type="button"
+            className="self-start text-sm font-bold underline"
+            onClick={() => onPick(suggestedStance)}
+          >
+            Set {TEAM_STANCE_OPTIONS.find((o) => o.value === suggestedStance)?.label}
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-0.5">
         <BeginnerHelp term="stanceRebuilding" />
         <BeginnerHelp term="stanceCompeting" />

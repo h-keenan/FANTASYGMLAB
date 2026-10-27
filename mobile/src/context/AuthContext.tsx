@@ -30,7 +30,8 @@ import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotificati
 import { supabase } from '../lib/supabase';
 import { useDensity } from './DensityContext';
 import { useExperienceLevel } from './ExperienceLevelContext';
-import { normalizeExperienceLevel } from '../lib/experienceCopy';
+import { normalizeExperienceLevel, normalizeExperienceTier, normalizePrimaryGoal } from '../lib/experienceCopy';
+import { useOnboarding } from './OnboardingContext';
 import { useThemeMode } from './ThemeModeContext';
 
 interface AuthContextValue {
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { syncDensityFromServer } = useDensity();
   const { syncLevelFromServer } = useExperienceLevel();
+  const { completeOnboarding } = useOnboarding();
   const { syncModeFromServer } = useThemeMode();
   // Requirement 5 (auth session change hardening): the last authenticated
   // user id this provider has actually acted on, primed from AsyncStorage
@@ -105,7 +107,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Always applied, including null (unanswered), so a different
         // account signing in on this device never inherits the last one's
         // cached experience level.
-        syncLevelFromServer(normalizeExperienceLevel(result.experience_level));
+        const serverLevel = normalizeExperienceLevel(result.experience_level);
+        syncLevelFromServer(
+          serverLevel,
+          normalizeExperienceTier(result.experience_tier),
+          normalizePrimaryGoal(result.primary_goal),
+        );
+        // The account already answered the experience question (on the web or
+        // another device), so this install does not ask again.
+        if (serverLevel) completeOnboarding();
         syncModeFromServer(result.theme_mode);
         if (result.last_league) {
           await syncLastLeagueFromServer({

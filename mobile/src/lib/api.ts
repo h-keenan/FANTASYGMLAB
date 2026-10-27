@@ -2106,6 +2106,10 @@ export interface DevicePreferencesResponse {
   ui_density: UiDensityValue;
   theme_mode: ThemeModeValue;
   experience_level?: ExperienceLevelValue | null;
+  /** Additive fields: older servers omit them. */
+  experience_tier?: 'new_fantasy' | 'new_dynasty' | 'veteran' | null;
+  primary_goal?: 'win_now' | 'rebuild' | 'exploring' | null;
+  first_run_done?: string[];
   last_league: { league_id: string; league_name: string } | null;
 }
 
@@ -3380,6 +3384,18 @@ export const api = {
    * OnboardingCarousel (`api.setExperienceLevel`). */
   setExperienceLevel: (level: ExperienceLevelValue) =>
     authorizedPost<DevicePreferencesResponse>('/v1/preferences', { experience_level: level }),
+  /** Three-way Settings/onboarding answer; the server derives the legacy
+   * `experience_level` from the tier. */
+  setExperienceProfile: (profile: {
+    tier: 'new_fantasy' | 'new_dynasty' | 'veteran';
+    goal?: 'win_now' | 'rebuild' | 'exploring' | null;
+    clearGoal?: boolean;
+  }) =>
+    authorizedPost<DevicePreferencesResponse>('/v1/preferences', {
+      experience_tier: profile.tier,
+      ...(profile.goal ? { primary_goal: profile.goal } : {}),
+      ...(profile.clearGoal ? { clear_primary_goal: true } : {}),
+    }),
   updateDevicePreferences: (body: {
     uiDensity?: UiDensityValue;
     themeMode?: ThemeModeValue;

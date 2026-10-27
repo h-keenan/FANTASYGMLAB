@@ -9143,13 +9143,43 @@ def update_push_preference(
 
 UI_DENSITY_VALUES = {"guided", "compact"}
 THEME_MODE_VALUES = {"light", "dark", "auto"}
-# Set once during the new web onboarding carousel's last step ("How much
-# dynasty experience do you have?") — not yet consumed anywhere to actually
-# vary copy/explanation depth (that's separate, later work); this is just
-# the durable store for the answer. None/unset is a real third state (an
-# existing account from before this question existed, or one who skipped
-# onboarding), distinct from "beginner" — never defaulted to either value.
+# Set during onboarding's experience step and editable later in Settings
+# (web Account / mobile More). Clients consume it for copy only: it picks how
+# much explanation shows next to recommendations (web-next/src/lib/
+# experienceCopy.ts and the identical mobile copy). Nothing server-side reads
+# it. None/unset is a real third state (an account from before the question
+# existed, or one who skipped onboarding), never defaulted to either value.
+#
+# `experience_level` (beginner/advanced) is the legacy field that app builds
+# already in the wild read and write. `experience_tier` is the richer
+# three-way answer; it is additive. The two are kept consistent: writing a
+# tier derives the level, and writing only a level (old builds) re-derives the
+# tier so the two never disagree.
 EXPERIENCE_LEVEL_VALUES = {"beginner", "advanced"}
+EXPERIENCE_TIER_VALUES = ("new_fantasy", "new_dynasty", "veteran")
+PRIMARY_GOAL_VALUES = ("win_now", "rebuild", "exploring")
+FIRST_RUN_DONE_VALUES = ("connect_league", "game_plan", "trade", "team_situation")
+_TIER_TO_LEVEL = {"new_fantasy": "beginner", "new_dynasty": "beginner", "veteran": "advanced"}
+_LEVEL_TO_DEFAULT_TIER = {"beginner": "new_dynasty", "advanced": "veteran"}
+
+
+def _consistent_experience(settings: dict[str, Any]) -> tuple[str | None, str | None]:
+    """(level, tier) from a stored blob, always mutually consistent."""
+
+    level = settings.get("experience_level")
+    if level not in EXPERIENCE_LEVEL_VALUES:
+        level = None
+    tier = settings.get("experience_tier")
+    if tier not in EXPERIENCE_TIER_VALUES:
+        tier = None
+    if tier is not None and level is not None and _TIER_TO_LEVEL[tier] != level:
+        # An old build changed the level after the tier was stored.
+        tier = _LEVEL_TO_DEFAULT_TIER[level]
+    if tier is not None and level is None:
+        level = _TIER_TO_LEVEL[tier]
+    if level is not None and tier is None:
+        tier = _LEVEL_TO_DEFAULT_TIER[level]
+    return level, tier
 
 
 def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
@@ -9161,13 +9191,19 @@ def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any
         theme_mode = "dark"
     last_league_id = str(settings.get("last_league_id") or "")
     last_league_name = str(settings.get("last_league_name") or "")
-    experience_level = settings.get("experience_level")
-    if experience_level not in EXPERIENCE_LEVEL_VALUES:
-        experience_level = None
+    experience_level, experience_tier = _consistent_experience(settings)
+    primary_goal = settings.get("primary_goal")
+    if primary_goal not in PRIMARY_GOAL_VALUES:
+        primary_goal = None
+    raw_done = settings.get("first_run_done")
+    first_run_done = [v for v in FIRST_RUN_DONE_VALUES if isinstance(raw_done, list) and v in raw_done]
     return {
         "ui_density": density,
         "theme_mode": theme_mode,
         "experience_level": experience_level,
+        "experience_tier": experience_tier,
+        "primary_goal": primary_goal,
+        "first_run_done": first_run_done,
         "last_league": (
             {"league_id": last_league_id, "league_name": last_league_name} if last_league_id else None
         ),
@@ -9199,6 +9235,12 @@ class UpdateDevicePreferencesRequest(BaseModel):
     last_league_id: str | None = None
     last_league_name: str | None = None
     experience_level: str | None = None
+    experience_tier: str | None = None
+    primary_goal: str | None = None
+    # Checklist ids to add to the stored list (merged, never replaced).
+    first_run_done: list[str] | None = None
+    # True clears the stored goal (an optional answer can be taken back).
+    clear_primary_goal: bool = False
 
 
 @app.post("/v1/preferences")
@@ -9225,7 +9267,22 @@ def update_device_preferences(
     if body.experience_level is not None and body.experience_level not in EXPERIENCE_LEVEL_VALUES:
         raise HTTPException(
             status_code=422,
-            detail="experience_level must be one of: " + ", ".join(EXPERIENCE_LEVEL_VALUES),
+            detail="experience_level must be one of: " + ", ".join(sorted(EXPERIENCE_LEVEL_VALUES)),
+        )
+    if body.experience_tier is not None and body.experience_tier not in EXPERIENCE_TIER_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="experience_tier must be one of: " + ", ".join(EXPERIENCE_TIER_VALUES),
+        )
+    if body.primary_goal is not None and body.primary_goal not in PRIMARY_GOAL_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="primary_goal must be one of: " + ", ".join(PRIMARY_GOAL_VALUES),
+        )
+    if body.first_run_done is not None and any(v not in FIRST_RUN_DONE_VALUES for v in body.first_run_done):
+        raise HTTPException(
+            status_code=422,
+            detail="first_run_done entries must be one of: " + ", ".join(FIRST_RUN_DONE_VALUES),
         )
 
     config = auth_supabase.get_supabase_config()
@@ -9243,8 +9300,24 @@ def update_device_preferences(
         settings["last_league_id"] = body.last_league_id
     if body.last_league_name is not None:
         settings["last_league_name"] = body.last_league_name
-    if body.experience_level is not None:
+    if body.experience_tier is not None:
+        # The tier is authoritative; the legacy level is derived from it so old
+        # app builds keep reading a valid beginner/advanced value.
+        settings["experience_tier"] = body.experience_tier
+        settings["experience_level"] = _TIER_TO_LEVEL[body.experience_tier]
+    elif body.experience_level is not None:
         settings["experience_level"] = body.experience_level
+        # Old builds write only the level: keep the tier consistent with it.
+        _, existing_tier = _consistent_experience({**settings, "experience_tier": settings.get("experience_tier")})
+        settings["experience_tier"] = existing_tier
+    if body.primary_goal is not None:
+        settings["primary_goal"] = body.primary_goal
+    elif body.clear_primary_goal:
+        settings.pop("primary_goal", None)
+    if body.first_run_done is not None:
+        existing = settings.get("first_run_done")
+        merged = set(existing if isinstance(existing, list) else []) | set(body.first_run_done)
+        settings["first_run_done"] = [v for v in FIRST_RUN_DONE_VALUES if v in merged]
     payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
     ok, error = account_store.upsert_user_settings(config, access_token, payload)
     if not ok:

@@ -7246,6 +7246,9 @@ def test_get_device_preferences_defaults_to_guided_with_no_league(monkeypatch):
         "ui_density": "guided",
         "theme_mode": "dark",
         "experience_level": None,
+        "experience_tier": None,
+        "primary_goal": None,
+        "first_run_done": [],
         "last_league": None,
     }
 
@@ -7277,6 +7280,9 @@ def test_get_device_preferences_reflects_stored_values(monkeypatch):
         "ui_density": "compact",
         "theme_mode": "dark",
         "experience_level": "advanced",
+        "experience_tier": "veteran",
+        "primary_goal": None,
+        "first_run_done": [],
         "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
     }
 
@@ -7372,6 +7378,87 @@ def test_update_device_preferences_stores_experience_level(monkeypatch):
     assert upserted_settings["experience_level"] == "beginner"
 
 
+def _post_prefs(client, stored_settings, body):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": stored_settings}]
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=Mock(status_code=200)) as mock_post:
+            response = client.post("/v1/preferences", json=body, headers={"Authorization": "Bearer good-token"})
+    return response, mock_post.call_args.kwargs["json"]["settings"]
+
+
+def test_experience_tier_derives_legacy_level_and_keeps_other_keys(monkeypatch):
+    client = _client(monkeypatch)
+    stored = {"push_categories": {"watch": False}, "ui_density": "compact"}
+    for tier, level in (("new_fantasy", "beginner"), ("new_dynasty", "beginner"), ("veteran", "advanced")):
+        response, settings = _post_prefs(client, stored, {"experience_tier": tier})
+        assert response.status_code == 200
+        assert settings["experience_tier"] == tier
+        assert settings["experience_level"] == level
+        assert settings["push_categories"] == {"watch": False}
+        assert settings["ui_density"] == "compact"
+        assert response.json()["experience_tier"] == tier
+        assert response.json()["experience_level"] == level
+
+
+def test_experience_tier_wins_over_a_conflicting_level_in_the_same_request(monkeypatch):
+    client = _client(monkeypatch)
+    _, settings = _post_prefs(client, {}, {"experience_tier": "veteran", "experience_level": "beginner"})
+    assert settings["experience_level"] == "advanced"
+
+
+def test_old_build_level_write_keeps_tier_consistent(monkeypatch):
+    client = _client(monkeypatch)
+    # Old build, no tier stored: level maps to a default tier.
+    _, settings = _post_prefs(client, {}, {"experience_level": "beginner"})
+    assert settings["experience_tier"] == "new_dynasty"
+    # Old build flips a stored veteran to beginner: tier follows.
+    _, settings = _post_prefs(client, {"experience_tier": "veteran", "experience_level": "advanced"}, {"experience_level": "beginner"})
+    assert settings["experience_tier"] == "new_dynasty"
+    # Same level as the stored tier already implies: the finer tier is kept.
+    _, settings = _post_prefs(client, {"experience_tier": "new_fantasy", "experience_level": "beginner"}, {"experience_level": "beginner"})
+    assert settings["experience_tier"] == "new_fantasy"
+
+
+def test_get_preferences_derives_tier_for_legacy_blob_and_repairs_conflicts(monkeypatch):
+    client = _client(monkeypatch)
+    for stored, expected in (
+        ({"experience_level": "beginner"}, ("beginner", "new_dynasty")),
+        ({"experience_level": "advanced", "experience_tier": "new_fantasy"}, ("advanced", "veteran")),
+        ({"experience_tier": "new_fantasy"}, ("beginner", "new_fantasy")),
+        ({"experience_tier": "bogus"}, (None, None)),
+    ):
+        auth_user_response = Mock(status_code=200)
+        auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+        settings_response = Mock(status_code=200)
+        settings_response.json.return_value = [{"user_id": "user-123", "settings": stored}]
+        with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+            body = client.get("/v1/preferences", headers={"Authorization": "Bearer good-token"}).json()
+        assert (body["experience_level"], body["experience_tier"]) == expected
+
+
+def test_primary_goal_and_first_run_done_validate_merge_and_clear(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    with patch("requests.get", return_value=auth_user_response):
+        for bad in ({"primary_goal": "tank"}, {"experience_tier": "pro"}, {"first_run_done": ["nope"]}):
+            r = client.post("/v1/preferences", json=bad, headers={"Authorization": "Bearer good-token"})
+            assert r.status_code == 422
+    response, settings = _post_prefs(client, {"push_categories": {"watch": True}}, {"primary_goal": "rebuild"})
+    assert settings["primary_goal"] == "rebuild"
+    assert settings["push_categories"] == {"watch": True}
+    assert response.json()["primary_goal"] == "rebuild"
+    _, settings = _post_prefs(client, {"primary_goal": "rebuild"}, {"clear_primary_goal": True})
+    assert "primary_goal" not in settings
+    _, settings = _post_prefs(client, {"primary_goal": "rebuild"}, {"ui_density": "compact"})
+    assert settings["primary_goal"] == "rebuild"
+    _, settings = _post_prefs(client, {"first_run_done": ["trade"]}, {"first_run_done": ["connect_league"]})
+    assert settings["first_run_done"] == ["connect_league", "trade"]
+
+
 def test_update_device_preferences_merges_without_clobbering_push_categories(monkeypatch):
     client = _client(monkeypatch)
 
@@ -7397,6 +7484,9 @@ def test_update_device_preferences_merges_without_clobbering_push_categories(mon
         "ui_density": "compact",
         "theme_mode": "dark",
         "experience_level": None,
+        "experience_tier": None,
+        "primary_goal": None,
+        "first_run_done": [],
         "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
     }
     upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
@@ -7434,6 +7524,9 @@ def test_update_device_preferences_partial_update_only_touches_sent_fields(monke
         "ui_density": "compact",
         "theme_mode": "dark",
         "experience_level": None,
+        "experience_tier": None,
+        "primary_goal": None,
+        "first_run_done": [],
         "last_league": {"league_id": "xyz", "league_name": "New League"},
     }
 
