@@ -378,3 +378,52 @@ describe("LandingPage hero copy accuracy", () => {
     expect(screen.getByText(/Look around a full sample league free, no account or card needed\./)).toBeInTheDocument();
   });
 });
+
+describe("LandingPage onboarding progress persistence", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("does not replay the carousel for a signed-in account that already finished it", async () => {
+    window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [] });
+    render(<LandingPage />);
+    expect(await screen.findByText("OnboardingPaywall")).toBeInTheDocument();
+    expect(screen.queryByText("OnboardingCarousel")).toBeNull();
+  });
+
+  it("goes straight to league connect once carousel and trial offer were both done", async () => {
+    window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
+    window.localStorage.setItem("fgl:onboarding:paywall:user-1", "1");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [] });
+    render(<LandingPage />);
+    expect(await screen.findByText("SleeperImportForm")).toBeInTheDocument();
+  });
+
+  it("still shows the carousel to a different account on the same browser", async () => {
+    window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
+    mockAuth({ user: { id: "user-2" } });
+    mockSavedLeagues({ data: [] });
+    render(<LandingPage />);
+    expect(await screen.findByText("OnboardingCarousel")).toBeInTheDocument();
+  });
+});
+
+describe("LandingPage SEO metadata", () => {
+  it("has a descriptive title, a canonical, and no stale 'Paste your Sleeper username' promise", async () => {
+    const { metadata } = await import("./page");
+    expect(String(metadata.title)).toMatch(/dynasty trades/i);
+    expect(String(metadata.title)).not.toBe("FantasyDesk");
+    expect(metadata.alternates?.canonical).toBe("https://app.fantasygmlab.com/");
+    expect(String(metadata.description)).not.toMatch(/Paste your Sleeper username/);
+  });
+
+  it("states the card rule truthfully next to the trial line", () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    expect(screen.getByText(/The Premium trial needs a card/)).toBeInTheDocument();
+    expect(screen.getByText(/The free plan needs no card/)).toBeInTheDocument();
+  });
+});

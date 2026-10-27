@@ -43,6 +43,7 @@ describe("SignInForm", () => {
   const resetPassword = vi.fn();
 
   beforeEach(() => {
+    window.localStorage.clear();
     signIn.mockReset();
     signUp.mockReset();
     signInWithOAuth.mockReset();
@@ -75,6 +76,7 @@ describe("SignInForm", () => {
 
   // Google/Apple both enabled and verified working in Supabase, 2026-10-18.
   it("offers Google and Apple sign-in alongside email, on the very first screen", async () => {
+    window.localStorage.setItem("fgl:age-gate-passed", "true");
     signInWithOAuth.mockResolvedValue({ error: null });
     render(<SignInForm onSignedIn={vi.fn()} />);
 
@@ -83,6 +85,7 @@ describe("SignInForm", () => {
   });
 
   it("calls signInWithOAuth for Apple too", async () => {
+    window.localStorage.setItem("fgl:age-gate-passed", "true");
     signInWithOAuth.mockResolvedValue({ error: null });
     render(<SignInForm onSignedIn={vi.fn()} />);
 
@@ -90,7 +93,40 @@ describe("SignInForm", () => {
     await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("apple"));
   });
 
+  it("gates OAuth behind the age check and never redirects for an under-13 entry", async () => {
+    window.localStorage.removeItem("fgl:age-gate-passed");
+    render(<SignInForm onSignedIn={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    expect(signInWithOAuth).not.toHaveBeenCalled();
+    const year = String(new Date().getFullYear() - 5);
+    fireEvent.change(await screen.findByLabelText("Birth month"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Birth day"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Birth year"), { target: { value: year } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm date of birth" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/at least 13/);
+    expect(signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it("runs the age gate once, then redirects to the provider and remembers it", async () => {
+    window.localStorage.removeItem("fgl:age-gate-passed");
+    signInWithOAuth.mockResolvedValue({ error: null });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await fillAgeGate();
+    await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("google"));
+    expect(window.localStorage.getItem("fgl:age-gate-passed")).toBe("true");
+  });
+
+  it("skips the age gate for a browser that already passed it", async () => {
+    window.localStorage.setItem("fgl:age-gate-passed", "true");
+    signInWithOAuth.mockResolvedValue({ error: null });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("google"));
+  });
+
   it("re-enables the buttons when the user comes back from Apple without finishing", async () => {
+    window.localStorage.setItem("fgl:age-gate-passed", "true");
     signInWithOAuth.mockResolvedValue({ error: null });
     render(<SignInForm onSignedIn={vi.fn()} />);
 
@@ -107,6 +143,7 @@ describe("SignInForm", () => {
   });
 
   it("shows the OAuth error inline instead of silently failing", async () => {
+    window.localStorage.setItem("fgl:age-gate-passed", "true");
     signInWithOAuth.mockResolvedValue({ error: "Provider not configured" });
     render(<SignInForm onSignedIn={vi.fn()} />);
 
@@ -334,6 +371,7 @@ describe("SignInForm", () => {
     });
 
     it("asks before falling back to a plain OAuth sign-in when linking is unavailable", async () => {
+    window.localStorage.setItem("fgl:age-gate-passed", "true");
       signInWithOAuth.mockResolvedValueOnce({ error: null, fallback: "link-unavailable", notice: "WILL NOT BE CARRIED" });
       signInWithOAuth.mockResolvedValueOnce({ error: null });
       render(<SignInForm onSignedIn={vi.fn()} />);

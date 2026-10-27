@@ -26,3 +26,6 @@ export function trialEndLabel(iso: string | null | undefined, now: Date = new Da
   if (Number.isNaN(end.getTime()) || end.getTime() <= now.getTime()) return "";
   return `Trial ends ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }
+
+/** Honest card disclosure: the Stripe trial collects a card up front; the free plan never does. */
+export const TRIAL_CARD_NOTE = "The Premium trial needs a card and you can cancel anytime. The free plan needs no card.";

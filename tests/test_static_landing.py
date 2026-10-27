@@ -15,7 +15,11 @@ def test_static_landing_exists_with_brand_and_cta():
     assert 'data-fgl-shell-ready="1"' in html
     assert "FantasyDesk" in html
     assert "Founder Beta" not in html
-    assert "Import your league" in html
+    assert "Create your account" in html
+    # The first step is account creation, so the hero must not promise a
+    # username paste, and must not claim "no card" for the paid trial.
+    assert "Paste your Sleeper username" not in html
+    assert "Free to start, no card" not in html
     assert "utm_source=static_landing" in html
     assert "app.fantasygmlab.com" in html
     assert "www.fantasygmlab.com/?utm_source" not in html

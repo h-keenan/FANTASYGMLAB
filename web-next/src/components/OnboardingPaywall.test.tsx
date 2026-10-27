@@ -64,6 +64,7 @@ describe("OnboardingPaywall", () => {
 
     expect(await screen.findByRole("button", { name: "Start 3-day free trial" })).toBeInTheDocument();
     expect(screen.getByText("Then $59.99/year. Cancel anytime.")).toBeInTheDocument();
+    expect(screen.getByText(/A card is required to start the trial\. Skipping keeps the free plan, no card\./)).toBeInTheDocument();
     expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
     expect(screen.queryByText("Full League Pulse")).not.toBeInTheDocument();
   });

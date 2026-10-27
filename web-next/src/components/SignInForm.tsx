@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
+import { hasPassedAgeGate, setPassedAgeGate } from "@/lib/ageGateStorage";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 
@@ -73,6 +74,10 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const plainOAuth = plainOAuthChosen || Boolean(callbackNotice);
   const [step, setStep] = useState<"email" | "password" | "check-email">("email");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  // Provider waiting on the age gate (Google/Apple skip the password step, so
+  // they get the same date-of-birth gate before redirecting; parity with the
+  // mobile LoginScreen, which gates every auth path).
+  const [oauthAgePending, setOauthAgePending] = useState<"google" | "apple" | null>(null);
   // "Forgot password?" (P0 UX audit, 2026-10-27): a real password-auth user
   // with no way to recover a forgotten password was a hard lockout on both
   // platforms. Mirrors mobile's LoginScreen resetMode toggle exactly, same
@@ -92,11 +97,19 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [oauthBusy, setOauthBusy] = useState<"google" | "apple" | null>(null);
 
   // Google/Apple both enabled and verified working in Supabase, 2026-10-18.
-  // signInWithOAuth redirects away from this page entirely (Supabase
-  // handles the callback) — there's no intermediate step here to gate an
-  // age check behind the way the email flow does, same gap the original
-  // build of these buttons already accepted.
+  // signInWithOAuth redirects away from this page entirely, so the age gate
+  // runs BEFORE it (UX audit 2026-10-27: OAuth used to skip it). A browser
+  // that already cleared the gate once is not asked again.
   const handleOAuth = async (provider: "google" | "apple") => {
+    if (!ageConfirmed && !hasPassedAgeGate()) {
+      setError(null);
+      setOauthAgePending(provider);
+      return;
+    }
+    await handleOAuthConfirmed(provider);
+  };
+
+  const handleOAuthConfirmed = async (provider: "google" | "apple") => {
     setOauthBusy(provider);
     const result = plainOAuth ? await signInWithOAuth(provider, { plain: true }) : await signInWithOAuth(provider);
     if (result.fallback) {
@@ -277,6 +290,30 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     );
   }
 
+  if (step === "email" && oauthAgePending) {
+    const provider = oauthAgePending;
+    return (
+      <div className="glass-surface flex flex-col gap-3 p-4">
+        <AgeGate
+          onConfirmed={() => {
+            setAgeConfirmed(true);
+            setPassedAgeGate();
+            setOauthAgePending(null);
+            void handleOAuthConfirmed(provider);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setOauthAgePending(null)}
+          className="self-start text-xs inline-flex items-center min-h-[var(--touch-target-min)]"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
   if (step === "email") {
     return (
       <div id="get-started" className="glass-surface flex flex-col gap-3 p-4">
@@ -413,6 +450,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         <AgeGate
           onConfirmed={() => {
             setAgeConfirmed(true);
+            setPassedAgeGate();
             setNeedsAgeGate(false);
             setBusy(true);
             void finishSignUp();

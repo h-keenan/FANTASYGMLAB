@@ -77,6 +77,11 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
       <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
         {trialDays > 0 ? thenPriceLine(plan) : `${plan.price} ${plan.cadence}. Cancel anytime.`}
       </p>
+      {trialDays > 0 ? (
+        <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+          A card is required to start the trial. Skipping keeps the free plan, no card.
+        </p>
+      ) : null}
       {clientSecret ? (
         <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />
       ) : null}
