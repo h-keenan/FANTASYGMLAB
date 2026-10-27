@@ -179,6 +179,7 @@ from modules import (
     league_storylines,
     league_value_settings,
     league_display,
+    live_activity,
     live_draft,
     live_draft_trade_evaluator,
     manager_activity,
@@ -13117,6 +13118,21 @@ def _matchup_game_state(my_side: dict[str, Any], opponent_side: dict[str, Any]) 
     if all(status == "scheduled" for status in statuses):
         return "pregame"
     return "between_games"
+
+
+@app.get("/v1/leagues/{league_id}/live-activity")
+@_with_sleeper_as_of
+def get_league_live_activity(
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Compact real-score snapshot for the iOS Live Activity / widget.
+
+    Same data and not-ready contract as /matchup (200 + `reason`), trimmed to
+    what a lock-screen surface renders (modules.live_activity).
+    """
+
+    return live_activity.build_live_activity_snapshot(_build_matchup(league_id, "Dynasty", user))
 
 
 def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
