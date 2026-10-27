@@ -89,6 +89,10 @@ Deployment topology (Render):
                                                     stat line (Sleeper box score + PPR/half/standard)
   - GET  /v1/external/recap                     — (static API key) the week's real top performers and
                                                     notable stat lines — see docs/external-api-contract.md
+  - GET  /v1/external/trades/interesting        — (static API key) concrete 2-3 asset trades graded by
+                                                    the app's own evaluator, with a daily rotation — see
+                                                    docs/external-trades-interesting.md
+  - GET  /v1/external/trades/interesting/{id}/share-card.png — (static API key) branded PNG for one item
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -237,7 +241,7 @@ from modules import (
 )
 from modules import public_dynasty_values
 from modules import external_news_contract
-from modules import external_news_feed, news_identity, news_ingest
+from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import this_week
 from modules import team_defense
 from modules import idp_scoring
@@ -8475,6 +8479,108 @@ def get_external_week_recap(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _external_trades_args(format: str, lens: str) -> tuple[str, str]:
+    fmt, lens_key = str(format or "").strip().lower(), str(lens or "").strip().lower()
+    if fmt not in external_interesting_trades.FORMATS:
+        raise HTTPException(status_code=422, detail="format must be one of: " + ", ".join(external_interesting_trades.FORMATS))
+    if lens_key not in external_interesting_trades.LENSES:
+        raise HTTPException(status_code=422, detail="lens must be one of: " + ", ".join(external_interesting_trades.LENSES))
+    return fmt, lens_key
+
+
+@app.get(
+    "/v1/external/trades/interesting",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_interesting_trades(
+    format: str = "superflex",
+    lens: str = "ppr",
+    type: str | None = None,
+    limit: int = 5,
+    min_spice: int = 0,
+    exclude_ids: str | None = None,
+    since: str | None = None,
+) -> dict[str, Any]:
+    """Interesting, concrete trades for the ad/content bot (full contract:
+    docs/external-trades-interesting.md). Public player data only: no league,
+    roster or account is read. Each item is graded by the app's own Trade
+    Analyzer engine against a reference roster. Deterministic daily rotation;
+    `exclude_ids` / `since` keep the bot from repeating itself.
+    """
+
+    fmt, lens_key = _external_trades_args(format, lens)
+    if not 1 <= limit <= 25:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 25.")
+    if not 0 <= min_spice <= 100:
+        raise HTTPException(status_code=422, detail="min_spice must be between 0 and 100.")
+    types = [t.strip() for t in (type or "").split(",") if t.strip()]
+    unknown = [t for t in types if t not in external_interesting_trades.TYPES]
+    if unknown:
+        raise HTTPException(status_code=422, detail="type must be one of: " + ", ".join(external_interesting_trades.TYPES))
+    now = datetime.now(timezone.utc)
+    try:
+        since_day = external_interesting_trades.parse_since(since, now)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    excluded = [x.strip() for x in (exclude_ids or "").split(",") if x.strip()][:500]
+
+    pool, mtime = external_interesting_trades.get_pool(PLAYERS_DB_PATH, fmt, lens_key, now)
+    items = external_interesting_trades.select_items(
+        pool, now=now, limit=limit, types=types or None, min_spice=min_spice, exclude_ids=excluded, since=since_day
+    )
+    return {
+        "ok": True,
+        "format": fmt,
+        "lens": lens_key,
+        "format_label": external_interesting_trades.lens_label(fmt, lens_key),
+        "valuation": external_interesting_trades.VALUATION_LENS,
+        "rotation_date": now.date().isoformat(),
+        "generated_at": now.isoformat(),
+        "data_as_of": datetime.fromtimestamp(mtime, timezone.utc).isoformat() if mtime else None,
+        "verdict_basis": "Trade Analyzer engine (trade_analyzer_fit + trade_offer_analyzer) run against a league-median reference roster of real players; not any user's roster.",
+        "count": len(items),
+        "available_types": list(external_interesting_trades.TYPES),
+        "spice": external_interesting_trades.SPICE_DEFINITION,
+        "items": items,
+    }
+
+
+@app.get(
+    "/v1/external/trades/interesting/{item_id}/share-card.png",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_interesting_trade_share_card(
+    item_id: str,
+    format: str = "superflex",
+    lens: str = "ppr",
+) -> Response:
+    """Branded, QR-coded PNG for one feed item. Same renderer as the in-app
+    share cards (modules.share_card_renderer) but fed from the public feed
+    item, so no user token or roster is involved. The item must exist in the
+    current pool for this format/lens; ids that rotated out of the data are
+    a real 404, never a fabricated image."""
+
+    fmt, lens_key = _external_trades_args(format, lens)
+    pool, _ = external_interesting_trades.get_pool(PLAYERS_DB_PATH, fmt, lens_key)
+    item = next((i for i in pool if i["id"] == item_id), None)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired trade id for this format/lens.")
+    public_item = {k: v for k, v in item.items() if not k.startswith("_")}
+    card = share_recommendation_cards.build_trade_share_card(
+        external_interesting_trades.idea_for_share_card(public_item),
+        source_surface="external_trades",
+        scoring_format="PPR" if lens_key == "ppr" else "TEP",
+        my_team_name="Team A",
+    )
+    if not card.is_shareable:
+        raise HTTPException(status_code=404, detail=card.decline_reason or "This trade cannot be rendered.")
+    try:
+        png = share_card_renderer.render_share_card_png(card)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc) or "This trade cannot be rendered.") from exc
+    return Response(content=png, media_type="image/png")
 
 
 @app.get("/v1/players/{player_id}/career")
