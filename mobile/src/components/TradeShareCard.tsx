@@ -1,6 +1,7 @@
 import React, { forwardRef, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import AppText from './AppText';
 
 import type { DraftPickAsset, RankedPlayer, TradeVerdict } from '../lib/api';
@@ -12,6 +13,9 @@ import PositionBadge from './PositionBadge';
 import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './ShareCardChrome';
 import TeamAvatar from './TeamAvatar';
 import { buildPartnerPitch, type PitchAsset } from '../lib/tradePitch';
+import { formatTradeGain } from '../lib/liveDraft';
+import { LOW_CONFIDENCE_NOTE, TRADE_SHARE_COPY } from '../lib/tradeShareCopy';
+import { overallRatingColor } from '../lib/percentile';
 
 const CARD_HEIGHT = 620;
 // Safety net only — NOT the fix. If some avatar never fires onLoad/onError
@@ -19,6 +23,7 @@ const CARD_HEIGHT = 620;
 // real fix is waiting for PlayerAvatar's onLoadSettle below.
 const AVATAR_READY_TIMEOUT_MS = 4000;
 const MAX_ROWS = 3;
+const WARNING = '#F59E0B';
 
 /** Verdict word color by band, same fairness-band tones as web's share card
  * (favorable green, fair neutral, overpay warm, major overpay red). */
@@ -40,20 +45,59 @@ const HEADLINE_COLOR: Record<TradeVerdict['tone'], string> = {
   idea: colors.accent,
 };
 
+type Side = 'send' | 'get';
+const SIDE_COLOR: Record<Side, string> = { send: colors.danger, get: colors.success };
+const SIDE_TINT: Record<Side, string> = { send: colors.dangerMuted, get: colors.successMuted };
+
+/** Fixed-dark OVR ring (OvrGauge's look: tinted arc over a surface disc).
+ * Not CircularProgressRing/OvrGauge: those read the live theme, and an
+ * exported share image must look the same on every device and in light mode. */
+function ShareOvrRing({ rating, size = 28 }: { rating: number | null | undefined; size?: number }) {
+  if (rating == null || !Number.isFinite(rating)) return null;
+  const clamped = Math.max(0, Math.min(99, Math.round(rating)));
+  const tint = overallRatingColor(clamped, colors);
+  const stroke = Math.max(2.5, size * 0.11);
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.border} strokeWidth={stroke} fill={colors.surface} />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={tint}
+          strokeWidth={stroke}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${(clamped / 100) * c} ${c}`}
+          rotation={-90}
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      <AppText style={{ fontSize: size * 0.36, fontWeight: '900', color: tint }}>{clamped}</AppText>
+    </View>
+  );
+}
+
 function AssetRow({
   player,
+  side,
   trackKey,
   onAvatarSettle,
 }: {
   player: RankedPlayer;
+  side: Side;
   trackKey: string;
   onAvatarSettle: (key: string) => void;
 }) {
+  const meta = [player.team, player.age ? `Age ${player.age}` : null].filter(Boolean).join(' \u00b7 ');
   return (
-    <View style={styles.assetRow}>
+    <View style={[styles.assetRow, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
       <PlayerAvatar
         playerId={player.player_id}
-        size={30}
+        size={34}
         tier={player.tier}
         onLoadSettle={() => onAvatarSettle(trackKey)}
       />
@@ -62,9 +106,13 @@ function AssetRow({
         <View style={styles.assetMetaRow}>
           <PositionBadge position={player.position} />
           <AppText style={styles.assetMeta} numberOfLines={1}>
-            {player.team}
+            {meta}
           </AppText>
         </View>
+      </View>
+      <View style={styles.assetRight}>
+        <ShareOvrRing rating={player.overall_rating} />
+        {player.score != null ? <AppText style={styles.assetValue}>{Math.round(player.score).toLocaleString('en-US')}</AppText> : null}
       </View>
     </View>
   );
@@ -75,19 +123,17 @@ const pickPitchAsset = (p: DraftPickAsset): PitchAsset => ({ kind: 'pick', score
 const sumScores = (players: RankedPlayer[], picks: DraftPickAsset[]) =>
   [...players.map((p) => p.score), ...picks.map((p) => p.score)].reduce<number>((s, v) => s + (Number(v) || 0), 0);
 
-function ReceivesPanel({
-  teamName,
-  avatarId,
-  accent,
+function ExchangePanel({
+  label,
+  side,
   total,
   players,
   picks = [],
   keyPrefix,
   onAvatarSettle,
 }: {
-  teamName: string;
-  avatarId?: string | null;
-  accent: string;
+  label: string;
+  side: Side;
   total?: number;
   players: RankedPlayer[];
   picks?: DraftPickAsset[];
@@ -98,47 +144,48 @@ function ReceivesPanel({
   const shownPicks = picks.slice(0, Math.max(0, MAX_ROWS - shown.length));
   const hidden = players.length + picks.length - shown.length - shownPicks.length;
   return (
-    <ShareGlass style={[styles.panel, { borderColor: `${accent}8C` }]}>
+    <View style={styles.panel}>
       <View style={styles.panelHead}>
-        <TeamAvatar avatarId={avatarId} size={22} />
-        <AppText style={[styles.panelTeam, { color: accent }]} numberOfLines={1}>
-          {teamName.toUpperCase()}
-        </AppText>
-      </View>
-      <View style={styles.panelTotalRow}>
-        <AppText style={styles.panelReceives}>RECEIVES</AppText>
+        <View style={[styles.dot, { backgroundColor: SIDE_COLOR[side] }]} />
+        <AppText style={styles.panelLabel}>{label.toUpperCase()}</AppText>
         {total != null ? <AppText style={styles.panelTotal}>{Math.round(total).toLocaleString('en-US')}</AppText> : null}
       </View>
-      {shown.map((player, i) => (
-        <AssetRow
-          key={`${player.player_id}-${i}`}
-          player={player}
-          trackKey={`${keyPrefix}-${player.player_id ?? i}`}
-          onAvatarSettle={onAvatarSettle}
-        />
-      ))}
-      {shownPicks.map((pick) => (
-        <View key={pick.pick_id} style={styles.pickRow}>
-          <View style={styles.pickBadge}>
-            <AppText style={styles.pickBadgeText}>{pick.round ? `R${pick.round}` : 'PK'}</AppText>
+      {/* Rows share the column height, so a short side fills the same space as a long one. */}
+      <View style={styles.panelRows}>
+        {shown.map((player, i) => (
+          <AssetRow
+            key={`${player.player_id}-${i}`}
+            player={player}
+            side={side}
+            trackKey={`${keyPrefix}-${player.player_id ?? i}`}
+            onAvatarSettle={onAvatarSettle}
+          />
+        ))}
+        {shownPicks.map((pick) => (
+          <View key={pick.pick_id} style={[styles.assetRow, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
+            <View style={styles.pickBadge}>
+              <AppText style={styles.pickBadgeText}>{pick.round ? `R${pick.round}` : 'PK'}</AppText>
+            </View>
+            <View style={styles.assetTextGroup}>
+              <AppText style={styles.assetName} numberOfLines={2}>
+                {[pick.season, pick.round ? `Round ${pick.round}` : ''].filter(Boolean).join(' ') || pick.label || 'Draft pick'}
+              </AppText>
+              <AppText style={styles.assetMeta}>Draft pick</AppText>
+            </View>
+            {pick.score != null ? <AppText style={styles.assetValue}>{Math.round(pick.score).toLocaleString('en-US')}</AppText> : null}
           </View>
-          <View style={styles.assetTextGroup}>
-            <AppText style={styles.assetName} numberOfLines={1}>
-              {[pick.season, pick.round ? `Round ${pick.round}` : ''].filter(Boolean).join(' ') || pick.label || 'Draft pick'}
-            </AppText>
-            {pick.score != null ? <AppText style={styles.assetMeta}>{`${Math.round(pick.score).toLocaleString('en-US')} value`}</AppText> : null}
-          </View>
-        </View>
-      ))}
+        ))}
+      </View>
       {hidden > 0 ? <AppText style={styles.more}>{`+${hidden} more`}</AppText> : null}
-    </ShareGlass>
+    </View>
   );
 }
 
 /**
  * The literal graphic that gets captured + shared, laid out like web-next's
- * trade share card (lib/shareCard/tradeCard): header, two RECEIVES panels
- * with swap arrows, the verdict word + edge + confidence meter, WHY, and the
+ * trade share card (lib/shareCard/tradeCard) and the in-app Trade Hub card:
+ * header, YOU SEND (red) / YOU GET (green) columns, the verdict chip + Balance
+ * line + confidence meter, WHY, and the
  * shared ShareCardChrome footer. Built from the same TradeVerdict data the
  * on-screen card shows. Rendered at a fixed 360x620 logical size so
  * react-native-view-shot's capture is consistent across devices.
@@ -187,13 +234,8 @@ const TradeShareCard = forwardRef<View, {
   const sendSum = sendTotal ?? (pitchMode ? sumScores(sendPlayers, sendPicks) : undefined);
   const receiveSum = receiveTotal ?? (pitchMode ? sumScores(receivePlayers, receivePicks) : undefined);
   const verdictColor = bandColor(band, HEADLINE_COLOR[verdict.tone]);
-  const edge =
-    gain === 0
-      ? { text: 'Even value', color: colors.textSecondary }
-      : gain > 0
-        ? { text: `Edge: ${me} +${Math.round(gain).toLocaleString('en-US')}`, color: colors.successBright }
-        : { text: `Edge: ${partner} +${Math.round(Math.abs(gain)).toLocaleString('en-US')}`, color: colors.danger };
-
+  const balanceColor = gain > 0 ? colors.success : gain < 0 ? colors.danger : colors.textSecondary;
+  const lowConfidence = (verdict.confidence || '').trim().toLowerCase().startsWith('low');
   const sendShown = sendPlayers.slice(0, MAX_ROWS);
   const receiveShown = receivePlayers.slice(0, MAX_ROWS);
   const trackedKeys = useMemo(
@@ -241,38 +283,36 @@ const TradeShareCard = forwardRef<View, {
       }
     >
       <View style={styles.matchup}>
+        <TeamAvatar avatarId={null} size={20} />
         <AppText style={styles.matchupName} numberOfLines={1}>
           {me}
         </AppText>
         <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+        <TeamAvatar avatarId={partnerTeamAvatarUrl} size={20} />
         <AppText style={styles.matchupName} numberOfLines={1}>
           {partner}
         </AppText>
       </View>
 
       <View style={styles.panelsRow}>
-        <ReceivesPanel
-          teamName={me}
-          accent={colors.accent}
-          total={receiveSum}
-          players={receivePlayers}
-          picks={receivePicks}
-          keyPrefix="receive"
-          onAvatarSettle={handleAvatarSettle}
-        />
-        <ReceivesPanel
-          teamName={partner}
-          avatarId={partnerTeamAvatarUrl}
-          accent={colors.premium}
+        <ExchangePanel
+          label={pitchMode ? TRADE_SHARE_COPY.pitchSend : TRADE_SHARE_COPY.send}
+          side="send"
           total={sendSum}
           players={sendPlayers}
           picks={sendPicks}
           keyPrefix="send"
           onAvatarSettle={handleAvatarSettle}
         />
-        <View style={styles.swapDisc} pointerEvents="none">
-          <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
-        </View>
+        <ExchangePanel
+          label={pitchMode ? TRADE_SHARE_COPY.pitchGet : TRADE_SHARE_COPY.get}
+          side="get"
+          total={receiveSum}
+          players={receivePlayers}
+          picks={receivePicks}
+          keyPrefix="receive"
+          onAvatarSettle={handleAvatarSettle}
+        />
       </View>
 
       {pitch ? (
@@ -287,12 +327,17 @@ const TradeShareCard = forwardRef<View, {
         </ShareGlass>
       ) : (
       <ShareGlass style={styles.verdictBlock}>
-        <AppText style={[styles.verdictWord, { color: verdictColor }]} numberOfLines={1} adjustsFontSizeToFit>
-          {band || 'Trade idea'}
-        </AppText>
-        <AppText style={[styles.edge, { color: edge.color }]} numberOfLines={1}>
-          {edge.text}
-        </AppText>
+        {band ? (
+          <View style={[styles.bandChip, { borderColor: verdictColor, backgroundColor: `${verdictColor}1F` }]}>
+            <AppText style={[styles.bandChipText, { color: verdictColor }]} numberOfLines={1}>
+              {band.toUpperCase()}
+            </AppText>
+          </View>
+        ) : null}
+        <View style={styles.balanceRow}>
+          <AppText style={styles.balanceLabel}>{TRADE_SHARE_COPY.balance.toUpperCase()}</AppText>
+          <AppText style={[styles.balanceValue, { color: balanceColor }]}>{formatTradeGain(gain)}</AppText>
+        </View>
         {confidenceLabel ? (
           <View style={styles.meterWrap}>
             <ShareConfidenceBars
@@ -301,6 +346,7 @@ const TradeShareCard = forwardRef<View, {
             />
           </View>
         ) : null}
+        {lowConfidence ? <AppText style={styles.lowNote}>{LOW_CONFIDENCE_NOTE}</AppText> : null}
       </ShareGlass>
       )}
 
@@ -324,50 +370,43 @@ const styles = StyleSheet.create({
   leagueName: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6, maxWidth: 120 },
   pitchHeadline: { fontSize: 22, fontWeight: '900', letterSpacing: -0.3, color: colors.textPrimary },
   pitchLine: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 4, borderRadius: radii.sm, backgroundColor: 'rgba(255,255,255,0.045)' },
-  pickBadge: { width: 30, height: 30, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.accent}22`, borderWidth: 1, borderColor: `${colors.accent}80` },
+  pickBadge: { width: 34, height: 34, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.accent}22`, borderWidth: 1, borderColor: `${colors.accent}80` },
   pickBadgeText: { fontSize: 11, fontWeight: '800', color: colors.accent },
   matchup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
   matchupName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
-  panelsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
-  panel: { flex: 1, padding: spacing.sm, gap: 6, borderWidth: 1.5 },
+  panelsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm, alignItems: 'stretch' },
+  panel: { flex: 1, gap: 6 },
   panelHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  panelTeam: { flex: 1, fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
-  panelTotalRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  panelReceives: { fontSize: 8, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1.6 },
-  panelTotal: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  dot: { width: 7, height: 7, borderRadius: 4 },
+  panelLabel: { fontSize: 9, fontWeight: '800', color: colors.textSecondary, letterSpacing: 1.4 },
+  panelTotal: { flex: 1, textAlign: 'right', fontSize: 16, fontWeight: '800', color: colors.textSecondary },
+  panelRows: { flex: 1, gap: 6 },
   assetRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    padding: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    minHeight: 46,
     borderRadius: radii.sm,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderWidth: 1,
   },
   assetTextGroup: { flex: 1 },
-  assetName: { fontSize: 11, fontWeight: '700', color: colors.textPrimary },
-  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  assetMeta: { fontSize: 10, color: colors.textSecondary },
+  assetName: { fontSize: 11, fontWeight: '800', color: colors.textPrimary },
+  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  assetMeta: { fontSize: 9, color: colors.textTertiary, flexShrink: 1 },
+  assetRight: { alignItems: 'center', gap: 1 },
+  assetValue: { fontSize: 9, fontWeight: '800', color: colors.textPrimary },
   more: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
-  swapDisc: {
-    position: 'absolute',
-    alignSelf: 'center',
-    left: '50%',
-    top: '38%',
-    marginLeft: -15,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: `${colors.accent}80`,
-  },
-  verdictBlock: { marginTop: spacing.md, padding: spacing.md, gap: 4, borderColor: `${colors.accent}66` },
-  verdictWord: { fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
-  edge: { fontSize: 14, fontWeight: '800' },
-  meterWrap: { marginTop: 4 },
+  verdictBlock: { marginTop: spacing.md, padding: spacing.md, gap: 6, borderColor: `${colors.accent}66` },
+  bandChip: { alignSelf: 'flex-start', borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 3 },
+  bandChipText: { fontSize: 15, fontWeight: '900', letterSpacing: 1.2 },
+  balanceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  balanceLabel: { fontSize: 10, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1.4 },
+  balanceValue: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  lowNote: { fontSize: 10, fontWeight: '600', color: WARNING },
+  meterWrap: { marginTop: 2 },
   whyBlock: { marginTop: spacing.sm, padding: spacing.md, gap: 3 },
   whyLabel: { fontSize: 10, fontWeight: '800', color: colors.accent, letterSpacing: 2 },
   whyText: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
