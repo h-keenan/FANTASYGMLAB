@@ -1,4 +1,6 @@
 import { bridgeNotice, resolveBridgeTrade, type BridgeTrade } from "@/lib/tradeBridge";
+import { VerdictTrust } from "@/components/VerdictTrust";
+import type { VerdictAssumptions } from "@/lib/verdictTrust";
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -601,6 +603,7 @@ export function TradeAnalyzerContent({
   // Non-empty once the league's trade deadline has passed — the analyzer
   // stays open for offseason planning, this note just says so.
   const [planningNote, setPlanningNote] = useState("");
+  const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
 
   const selectedPlayerIds = useMemo(
     () => new Set([...sendPlayers, ...receivePlayers].map((p) => p.player_id)),
@@ -753,6 +756,7 @@ export function TradeAnalyzerContent({
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
       });
       setPlanningNote(result.planning_note ?? "");
+      setAssumptions(result.assumptions ?? null);
       trackUse("trade_analyzer", "evaluated", { leagueId, props: { result: result.verdict ? "verdict" : "no_verdict" } });
       if (result.verdict) {
         setVerdict(result.verdict);
@@ -963,6 +967,7 @@ export function TradeAnalyzerContent({
       ) : null}
 
       {verdict ? (
+        <>
         <VerdictCard
           verdict={verdict}
           sendAssets={sendAssets}
@@ -977,6 +982,23 @@ export function TradeAnalyzerContent({
             myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
           }}
         />
+        <VerdictTrust
+          assumptions={assumptions}
+          context={{
+            surface: "trade_analyzer",
+            platform: "web",
+            leagueId,
+            lens,
+            strategy: "retool",
+            sendIds: [...sendPlayers.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
+            receiveIds: [...receivePlayers.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
+            verdictLabel: verdict.ui_verdict,
+            confidence: verdict.confidence,
+            valueDelta: verdict.value_delta,
+            assumptionsLine: assumptions?.line ?? "",
+          }}
+        />
+        </>
       ) : hasAnyAssets ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           When both sides are ready, tap Analyze Trade for the verdict.
