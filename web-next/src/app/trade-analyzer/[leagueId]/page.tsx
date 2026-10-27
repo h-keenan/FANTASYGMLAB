@@ -17,6 +17,7 @@ import {
 import { idpTradePoolPlayers } from "@/lib/idpPresentation";
 import { TradeAnalyzerContent } from "@/components/TradeAnalyzerContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
+import { bridgeTradeFromSearch } from "@/lib/tradeBridge";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 interface LoadedData {
@@ -40,6 +41,8 @@ export default function TradeAnalyzerPage() {
   // convention Waivers/Trade Hub already read — TradeAnalyzerContent
   // resolves which roster owns it and pre-populates the builder on mount.
   const quickAddPlayerId = searchParams.get("playerId") || undefined;
+  // Public Trade Analyzer bridge: ?a=&b= carried through sign-up (lib/tradeBridge.ts).
+  const bridgeTrade = bridgeTradeFromSearch(`a=${searchParams.get("a") ?? ""}&b=${searchParams.get("b") ?? ""}`);
   const { lens } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
@@ -118,6 +121,7 @@ export default function TradeAnalyzerPage() {
       rosters={data.rosters}
       teamProfiles={data.teamProfiles}
       quickAddPlayerId={quickAddPlayerId}
+      bridgeTrade={bridgeTrade}
           lens={lens}
     />
   );

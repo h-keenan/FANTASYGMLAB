@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import TradeAnalyzerPublicPage, { metadata } from "./page";
+import TradeAnalyzerPublicPage, { generateMetadata } from "./page";
 import { TRADE_FAQ } from "@/lib/seo/tradeAnalyzer";
 
 vi.mock("@/lib/analytics", () => ({ trackUse: vi.fn() }));
@@ -10,11 +10,26 @@ vi.mock("@/lib/analytics", () => ({ trackUse: vi.fn() }));
 describe("/trade-analyzer public page", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("has crawlable SEO metadata: title, description, canonical, OG image", () => {
+  it("has crawlable SEO metadata: title, description, canonical, OG image", async () => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({}) });
     expect(String(metadata.title)).toMatch(/Trade Analyzer/);
     expect(String(metadata.description).length).toBeLessThanOrEqual(160);
     expect(metadata.alternates?.canonical).toBe("https://app.fantasygmlab.com/trade-analyzer");
     expect(JSON.stringify(metadata.openGraph)).toContain("og-image.png");
+  });
+
+  it("gives a shared trade link its own OG image and keeps the clean canonical", async () => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ a: "1", b: "2,3", f: "sf", utm_source: "share" }) });
+    const image = "https://app.fantasygmlab.com/share-card/public-trade?a=1&b=2,3&f=sf";
+    expect(JSON.stringify(metadata.openGraph)).toContain(image);
+    expect(JSON.stringify(metadata.twitter)).toContain(image);
+    expect(metadata.alternates?.canonical).toBe("https://app.fantasygmlab.com/trade-analyzer");
+  });
+
+  it("keeps the generic card for a link without a complete trade", async () => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ a: "1" }) });
+    expect(JSON.stringify(metadata.openGraph)).toContain("og-image.png");
+    expect(JSON.stringify(metadata.openGraph)).not.toContain("public-trade");
   });
 
   it("server-renders the H1, FAQ, FantasyCalc credit and internal links without JS", () => {

@@ -13,6 +13,7 @@ import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { setLandingPending } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
+import { analyzerBridgePath, bridgePickerPath, consumePendingBridge, pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
 import { supabase } from "@/lib/supabase";
 import { hasCompletedOnboardingStep, markOnboardingStepCompleted } from "@/lib/onboardingProgress";
@@ -141,6 +142,18 @@ export function LandingAuthIsland() {
         const { data } = await supabase.from("saved_leagues").select("league_id, league_name");
         const leagues = maskSavedLeagueRows(data ?? []);
         if (leagues.length >= 1) {
+          // Public Trade Analyzer bridge: a returning user who built a trade
+          // there lands in it (their only league, or a league picker), not
+          // on the generic home. Consumed once; see lib/tradeBridge.ts.
+          const bridge = consumePendingBridge();
+          if (bridge) {
+            router.replace(
+              leagues.length === 1
+                ? analyzerBridgePath(leagues[0].league_id, leagues[0].league_name || leagues[0].league_id, bridge)
+                : bridgePickerPath(bridge),
+            );
+            return;
+          }
           // P0 UX audit, 2026-10-27: an existing account (already past
           // onboarding, which is exactly what "leagues.length >= 1" means
           // here) that got signed out of /premium or /connect-league used
@@ -215,7 +228,9 @@ export function LandingAuthIsland() {
 
   const handleLeagueChosen = (leagueId: string, leagueName: string) => {
     // Dashboard for Sleeper, My Team for ESPN (no ESPN Dashboard yet).
-    router.push(leagueHomePath(leagueId, leagueName));
+    // A trade carried over from the public Trade Analyzer opens in this
+    // league's analyzer; otherwise the usual league home.
+    router.push(pathAfterLeagueChosen(leagueId, leagueName));
   };
 
   if (loading || checkingSavedLeagues) {

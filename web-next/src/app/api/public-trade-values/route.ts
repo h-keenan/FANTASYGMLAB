@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { fetchBoard } from "@/lib/seo/publicValues";
-import { mergeBoards } from "@/lib/seo/tradeAnalyzer";
+import { loadTradeBoard } from "@/lib/seo/tradeBoardServer";
 
 // Compact, anonymous, league-agnostic value payload for the public Trade
 // Analyzer's player search: 1QB/Superflex x with/without tight-end premium,
@@ -11,13 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [std1qb, stdSf, tep1qb, tepSf] = await Promise.all([
-      fetchBoard("1qb"),
-      fetchBoard("superflex"),
-      fetchBoard("1qb", true).catch(() => null),
-      fetchBoard("superflex", true).catch(() => null),
-    ]);
-    const body = mergeBoards({ std1qb, stdSf, tep1qb, tepSf });
+    const body = await loadTradeBoard();
     return NextResponse.json(body, {
       headers: { "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400" },
     });

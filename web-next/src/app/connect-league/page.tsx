@@ -8,7 +8,7 @@ import { FreeLeagueLimitNote } from "@/components/FreeLeagueLimitNote";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
-import { leagueHomePath } from "@/lib/leaguePlatform";
+import { pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
 
 // coridian_, screenshot of the league switcher: "how do i add leauges" —
@@ -55,7 +55,7 @@ export default function ConnectLeaguePage() {
       </div>
       <div className="w-full max-w-sm flex flex-col gap-3">
         <FreeLeagueLimitNote />
-        <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(leagueHomePath(leagueId, leagueName))} />
+        <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(pathAfterLeagueChosen(leagueId, leagueName))} />
         <SampleLeagueButton surface="connect_step" />
       </div>
     </main>
