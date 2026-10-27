@@ -43,6 +43,7 @@
         }
       ],
       "./plugins/withIosMinDeploymentTarget.js",
+      "./plugins/withLiveActivities.js",
       [
         "expo-splash-screen",
         {

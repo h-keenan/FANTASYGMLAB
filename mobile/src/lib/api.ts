@@ -930,6 +930,21 @@ export interface MatchupResponse {
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
+/** GET /v1/leagues/{id}/live-activity — compact real-score snapshot (modules/live_activity.py). */
+export interface LiveActivitySnapshot {
+  ok: true;
+  available: boolean;
+  reason: string;
+  week: number | null;
+  game_state: 'live' | 'final' | 'pregame' | 'between_games' | null;
+  /** Server verdict: true only while real games are running and both sides have live points. */
+  should_run: boolean;
+  me: { team_name: string; points: number | null };
+  opponent: { team_name: string; points: number | null };
+  margin: number | null;
+  win_probability: number | null;
+}
+
 export interface MatchupWhatIfSlot {
   slot: string;
   player_id: string | null;
@@ -3101,6 +3116,8 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/keeper-settings`,
       { round_penalty: roundPenalty },
     ),
+  getLiveActivity: (leagueId: string) =>
+    authorizedFetch<LiveActivitySnapshot>(`/v1/leagues/${encodeURIComponent(leagueId)}/live-activity`),
   getLeagueMatchup: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

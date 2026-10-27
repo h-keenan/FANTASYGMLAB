@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 
 import { AuthProvider } from './src/context/AuthContext';
+import { useLiveActivitySync } from './src/lib/useLiveActivitySync';
 import { CollegeInterestProvider } from './src/context/CollegeInterestContext';
 import { DensityProvider } from './src/context/DensityContext';
 import { ExperienceLevelProvider } from './src/context/ExperienceLevelContext';
@@ -106,6 +107,7 @@ export default function App() {
                     <OnboardingProvider>
                       <CollegeInterestProvider>
                         <AuthProvider>
+                          <LiveActivitySync />
                           <RootNavigator />
                         </AuthProvider>
                       </CollegeInterestProvider>
@@ -129,4 +131,10 @@ export default function App() {
 function ThemedStatusBar() {
   const { isDark } = useThemeMode();
   return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
+/** Renders nothing; drives the (flag-gated, iOS-only) Live Activity + widget refresh. */
+function LiveActivitySync() {
+  useLiveActivitySync();
+  return null;
 }
