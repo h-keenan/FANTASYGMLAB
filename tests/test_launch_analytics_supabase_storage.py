@@ -317,16 +317,42 @@ def test_build_report_with_explicit_path_never_contacts_supabase(tmp_path, monke
 
 def test_fetch_events_supabase_paginates_past_postgrest_max_rows():
     page1 = Mock(status_code=200)
-    page1.json.return_value = [{"event": "page_view", "ts": float(i)} for i in range(la.SUPABASE_PAGE_SIZE)]
+    page1.json.return_value = [{"event": "page_view", "ts": 5000.0 - i} for i in range(la.SUPABASE_PAGE_SIZE)]
     page2 = Mock(status_code=200)
-    page2.json.return_value = [{"event": "page_view", "ts": 5000.0}]
+    page2.json.return_value = [{"event": "page_view", "ts": 1.0}]
     with patch("requests.get", side_effect=[page1, page2]) as mock_get:
         rows, ok = la._fetch_events_supabase(_config())
     assert ok is True
     assert len(rows) == la.SUPABASE_PAGE_SIZE + 1
     assert mock_get.call_count == 2
     assert mock_get.call_args_list[1].kwargs["params"]["offset"] == str(la.SUPABASE_PAGE_SIZE)
-    assert mock_get.call_args_list[0].kwargs["params"]["order"] == "ts.asc,id.asc"
+    # Newest-first fetch (so a capped window drops the OLDEST rows), returned ascending.
+    assert mock_get.call_args_list[0].kwargs["params"]["order"] == "ts.desc,id.desc"
+    assert rows[0]["ts"] == 1.0
+    assert rows[-1]["ts"] == 5000.0
+
+
+def test_fetch_events_supabase_cap_keeps_newest_rows():
+    page = Mock(status_code=200)
+    page.json.return_value = [{"event": "page_view", "ts": float(t)} for t in (9, 8, 7)]
+    with patch("requests.get", return_value=page):
+        rows, ok = la._fetch_events_supabase(_config(), limit=3)
+    assert ok is True
+    assert [r["ts"] for r in rows] == [7.0, 8.0, 9.0]
+
+
+def test_canonical_route_slug_maps_dashboard_only():
+    assert la.canonical_route_slug("/dashboard/:id") == "dashboard"
+    assert la.canonical_route_slug("/my-team/:id") == "/my-team/:id"
+    assert la.ROUTE_EVENT_MAP[la.canonical_route_slug("/dashboard/:id")] == "dashboard_reached"
+    assert "onboarding_completed" in la.TRACKED_EVENTS
+
+
+def test_track_page_view_dedupe_false_does_not_use_server_memory(monkeypatch):
+    calls = []
+    monkeypatch.setattr(la, "track_event", lambda *a, **k: calls.append(k.get("once_key")) or True)
+    la.track_page_view("/news", state={}, dedupe=False)
+    assert calls == [""]
 
 
 def test_write_event_supabase_retries_once_on_5xx(monkeypatch):

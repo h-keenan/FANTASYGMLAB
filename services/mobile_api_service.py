@@ -1210,10 +1210,13 @@ def record_analytics_event(
             if not route:
                 return {"ok": False}
             launch_analytics.track_page_view(
-                route,
+                launch_analytics.canonical_route_slug(route),
                 state=state_shim,
                 source_surface=str(raw_props.get("source_surface") or "navigation"),
                 extra={"platform": raw_props["platform"]},
+                # Plain page_views are deduped per tab on the client; the
+                # server's in-memory marker resets on every deploy.
+                dedupe=False,
             )
             return {"ok": True}
 

@@ -12,6 +12,7 @@ function report(overrides: Partial<FounderAnalyticsReport> = {}): FounderAnalyti
     event_count: 128,
     sessions: 42,
     anonymous_users: 30,
+    bot_filtered_sessions: 7,
     hashed_accounts: 12,
     product_modules: [
       { module: "trade_hub", users: 10, sessions: 12, views: 20, meaningful_interactions: 5 },

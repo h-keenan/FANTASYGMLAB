@@ -216,6 +216,33 @@ function postEvent(input: AnalyticsEventBody): void {
   })();
 }
 
+const LAST_PAGE_VIEW_KEY = "fd_last_page_view";
+let lastPageViewInMemory = "";
+
+function isRepeatPageView(path: string): boolean {
+  let last = lastPageViewInMemory;
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      last = sessionStorage.getItem(LAST_PAGE_VIEW_KEY) ?? last;
+      sessionStorage.setItem(LAST_PAGE_VIEW_KEY, path);
+    }
+  } catch {
+    // storage blocked: fall back to the in-memory value
+  }
+  lastPageViewInMemory = path;
+  return last === path;
+}
+
+/** Test hook. */
+export function resetPageViewDedupe(): void {
+  lastPageViewInMemory = "";
+  try {
+    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(LAST_PAGE_VIEW_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * One call per real route change — wired from a shared navigation hook
  * (components/RouteAnalytics.tsx) in the root layout. Passes the raw
@@ -228,6 +255,10 @@ export function trackPageView(route: string): void {
   if (!trimmed) return;
   // Long/numeric path segments are league or user ids -- never ship them.
   const path = sanitizeRoute(trimmed);
+  // Per-tab dedupe (sessionStorage) so a reload / remount / StrictMode double
+  // effect of the SAME route is not a second view. This replaces the server's
+  // process-local once-marker, which reset on every deploy.
+  if (isRepeatPageView(path)) return;
   postEvent({
     event: "page_view",
     props: { route: path, source_surface: "navigation" },

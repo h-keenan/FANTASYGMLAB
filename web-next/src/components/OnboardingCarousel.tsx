@@ -17,6 +17,7 @@ import {
   type ExperienceGoal,
   type ExperienceLevel,
 } from "@/lib/experienceCopy";
+import { trackFeatureUse } from "@/lib/analytics";
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 
 const LEVEL_ICONS: Record<ExperienceLevel, { stroke: string; path: string }> = {
@@ -144,6 +145,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   const finish = async () => {
     if (!level) return;
     trackOnboarding("completed", { step: "level", step_index: levelStep, experience: experienceBucket(level) });
+    if (!replay) trackFeatureUse("onboarding_completed", { props: { experience: experienceBucket(level) } });
     setSaving(true);
     try {
       // Saved through ExperienceLevelContext so the answer takes effect
