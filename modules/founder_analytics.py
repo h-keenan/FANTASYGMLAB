@@ -55,6 +55,24 @@ PREMIUM_EVENTS: dict[str, str] = {
     "churned": "Churned (webhook)",
 }
 
+# Some decision-engagement surfaces are fired by web-next as the generic
+# cross-platform `feature_use` event (props.feature / props.action) instead
+# of their own literal event name -- DECISION_EVENTS' literal keys for those
+# rows (`trade_analyzer_analyzed`, `share_card_shared`, `share_card_opened`,
+# `notification_center_opened`) are never actually sent by any current
+# client, so those rows stayed at 0 forever. This maps the real (feature,
+# action) pairs web-next sends onto the SAME labels so the dashboard counts
+# what actually happens instead of a name nothing emits. See
+# docs/analytics-coverage-2026-10.md and web-next/src/lib/analytics.ts's
+# trackUse() call sites (TradeAnalyzerContent.tsx, TradeIdeaCard.tsx,
+# PlayerProfileContent.tsx, AlertsDropdown.tsx).
+FEATURE_USE_DECISION_EVENTS: dict[tuple[str, str], str] = {
+    ("trade_analyzer", "evaluated"): "Trade Analyzer ran",
+    ("trade_analyzer", "shared"): "Share card shared",
+    ("share_card", "shared"): "Share card shared",
+    ("alerts_dropdown", "opened"): "Alerts opened",
+}
+
 
 def window_since_ts(window_key: str, *, now: float | None = None) -> float | None:
     now_ts = float(now if now is not None else time.time())
@@ -81,6 +99,40 @@ def _count_named(rows: list[dict[str, Any]], names: Mapping[str, str]) -> list[d
         {"event": event, "label": names[event], "count": int(counts.get(event) or 0)}
         for event in names
     ]
+
+
+def _decision_engagement(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """DECISION_EVENTS' literal-event counts, folded together with the real
+    `feature_use` (feature, action) pairs that cover the same surfaces for
+    clients that only emit the generic event (see FEATURE_USE_DECISION_EVENTS).
+    Counts combine (not duplicate) when both a literal event and its
+    feature_use equivalent are seen for the same label."""
+
+    named = _count_named(rows, DECISION_EVENTS)
+    by_label = {row["label"]: row for row in named}
+    for row in rows:
+        if la.normalize_event_name(str(row.get("event") or "")) != "feature_use":
+            continue
+        props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+        key = (
+            str(props.get("feature") or "").strip(),
+            str(props.get("action") or "").strip(),
+        )
+        label = FEATURE_USE_DECISION_EVENTS.get(key)
+        if not label:
+            continue
+        existing = by_label.get(label)
+        if existing is not None:
+            existing["count"] += 1
+            continue
+        new_row = {
+            "event": f"feature_use:{key[0]}:{key[1]}",
+            "label": label,
+            "count": 1,
+        }
+        by_label[label] = new_row
+        named.append(new_row)
+    return named
 
 
 def _interval_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
@@ -323,6 +375,84 @@ def _unique_ids(rows: list[dict[str, Any]], *, field: str) -> int:
     return len(values)
 
 
+# Genuinely public, non-personalized, SEO-indexed routes -- the same "public
+# static routes" carve-out web-next/src/app/sitemap.ts already lists (plus
+# the per-position/per-player routes it generates from the same path
+# prefixes). A cold crawler hit lands on one of these by construction; a
+# real app surface (/dashboard, /trade-hub/<leagueId>, ...) never does,
+# since those are never in a sitemap and are mostly behind auth.
+SEO_ROUTE_PREFIXES: tuple[str, ...] = (
+    "/premium",
+    "/news",
+    "/college-scouting",
+    "/trade-history",
+    "/methodology",
+    "/dynasty-tools",
+    "/dynasty-rankings",
+    "/dynasty-trade-value-chart",
+    "/dynasty-players",
+    "/legal",
+)
+
+
+def _is_seo_route(route: str) -> bool:
+    path = str(route or "").strip().split("?")[0].split("#")[0]
+    if not path:
+        return False
+    if path == "/":
+        return True
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in SEO_ROUTE_PREFIXES)
+
+
+def _filter_bot_like_sessions(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int]:
+    """Drop identities whose ENTIRE window activity is one page_view, on a
+    public SEO/landing route, with no external referrer.
+
+    Heuristic, documented, and intentionally narrow in what it touches: a
+    real visitor who viewed exactly one public SEO page, arrived with no
+    referrer (``props.referrer_host`` empty -- direct navigation, not a link
+    click from another site), and took no further action in the window is
+    almost certainly an uninstrumented crawler/bot (search engine, SEO
+    auditor, AI content crawler, link-preview fetcher) rather than a human
+    -- this is the same pattern a known-bot User-Agent filter at ingestion
+    (``modules.launch_analytics.is_bot_user_agent``) catches for
+    self-identifying crawlers; this complements it for a crawler using a
+    generic/browser-like User-Agent. Accepted trade-off: a genuine single-
+    page human bounce with no referrer on one of these routes looks
+    identical and is excluded too -- there is no event-level signal that
+    distinguishes the two, and this only ever drops a session with exactly
+    one event and zero other activity, so it cannot touch anyone who did
+    anything else in the window.
+    """
+
+    identity = _identity_map(rows)
+    by_identity: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        uid = _row_user_id(row, identity)
+        if not uid:
+            continue
+        by_identity.setdefault(uid, []).append(row)
+    bot_ids: set[str] = set()
+    for uid, user_rows in by_identity.items():
+        if len(user_rows) != 1:
+            continue
+        row = user_rows[0]
+        if la.normalize_event_name(str(row.get("event") or "")) != "page_view":
+            continue
+        props = row.get("props") if isinstance(row.get("props"), Mapping) else {}
+        if str(props.get("referrer_host") or "").strip():
+            continue
+        if not _is_seo_route(str(props.get("route") or "")):
+            continue
+        bot_ids.add(uid)
+    if not bot_ids:
+        return rows, 0
+    kept = [r for r in rows if _row_user_id(r, identity) not in bot_ids]
+    return kept, len(bot_ids)
+
+
 BILLING_WEBHOOK_TABLE = "billing_webhook_events"
 _BILLING_DEDUPE_WINDOW_S = 300.0
 _PAID_ENTITLEMENTS = frozenset({"premium", "front_office"})
@@ -389,7 +519,7 @@ def _billing_lifecycle_rows(
     existing_ts: dict[tuple[str, str], list[float]] = {}
     for row in existing:
         name = la.normalize_event_name(str(row.get("event") or ""))
-        if name in {"trial_started", "subscribed", "churned"}:
+        if name in {"trial_started", "subscribed", "churned", "checkout_completed", "premium_entitlement_activated"}:
             key = (name, str(row.get("user_key") or row.get("account_hash") or ""))
             try:
                 existing_ts.setdefault(key, []).append(float(row.get("ts") or 0))
@@ -402,7 +532,15 @@ def _billing_lifecycle_rows(
     synthetic: list[dict[str, Any]] = []
     summary: dict[str, Any] = {
         "source": BILLING_WEBHOOK_TABLE,
-        "stripe": {"trial_started": 0, "subscribed": 0, "churned": 0, "trial_converted": 0, "trial_canceled": 0},
+        "stripe": {
+            "trial_started": 0,
+            "subscribed": 0,
+            "churned": 0,
+            "trial_converted": 0,
+            "trial_canceled": 0,
+            "checkout_completed": 0,
+            "premium_entitlement_activated": 0,
+        },
         "revenuecat": {"trial_started": 0, "trial_converted": 0, "trial_canceled": 0},
     }
     for raw in billing_rows:
@@ -443,6 +581,27 @@ def _billing_lifecycle_rows(
             if not _dupe(name, user_key, ts_epoch):
                 derived.append(_row(name, {"platform": "web", "tier": "pro" if entitlement == "premium" else entitlement}))
                 summary["stripe"][name] += 1
+        # checkout_completed / premium_entitlement_activated (PREMIUM_EVENTS)
+        # previously only existed as a webhook-emitted track_event call that
+        # no longer runs (billing moved to the Supabase edge functions, which
+        # only write this table) -- derive them here the same way
+        # trial_started/subscribed/churned already are, so the "Checkout
+        # completed (recorded)" / "Entitlement activated (recorded)" rows
+        # reflect real webhook activity instead of staying at 0 forever.
+        if event_type == "checkout.session.completed":
+            if not _dupe("checkout_completed", user_key, ts_epoch):
+                derived.append(_row("checkout_completed", {"platform": "web"}))
+                summary["stripe"]["checkout_completed"] += 1
+            if entitlement in _PAID_ENTITLEMENTS and not _dupe(
+                "premium_entitlement_activated", user_key, ts_epoch
+            ):
+                derived.append(
+                    _row(
+                        "premium_entitlement_activated",
+                        {"platform": "web", "tier": "pro" if entitlement == "premium" else entitlement},
+                    )
+                )
+                summary["stripe"]["premium_entitlement_activated"] += 1
         if transition in {"converted", "canceled"}:
             derived.append(_row("feature_use", {"platform": "web", "feature": "trial", "action": transition}))
             summary["stripe"][f"trial_{transition}"] += 1
@@ -503,6 +662,7 @@ def build_report(
     # Drop pytest/CI rows if a test run ever shared the durable table; legacy
     # rows with no environment stamp are kept.
     rows = [r for r in rows if str(r.get("environment") or "").strip().casefold() != "test"]
+    rows, bot_filtered_sessions = _filter_bot_like_sessions(rows)
     lifecycle_rows: list[dict[str, Any]] = []
     billing_lifecycle: dict[str, Any] | None = None
     if path is None and source == "supabase":
@@ -543,9 +703,10 @@ def build_report(
         "hashed_accounts": _unique_ids(rows, field="user_key")
         or _unique_ids(rows, field="account_hash"),
         "product_modules": modules,
-        "decision_engagement": _count_named(rows, DECISION_EVENTS),
+        "decision_engagement": _decision_engagement(rows),
         "premium": _count_named(rows + lifecycle_rows, PREMIUM_EVENTS),
         "billing_lifecycle": billing_lifecycle,
+        "bot_filtered_sessions": bot_filtered_sessions,
         "checkout_intervals": _interval_counts(rows),
         "platforms": _platform_counts(rows),
         "feature_use": _feature_use_table(rows + lifecycle_rows),
@@ -568,5 +729,12 @@ def build_report(
             ),
             "Conversion rates are omitted because these counts cannot represent all users.",
             "Enable DYNASTYGM_LAUNCH_ANALYTICS=1 on FANTASYGMLAB to record new events.",
+            (
+                f"Excluded {bot_filtered_sessions} likely bot/crawler session(s) from these counts "
+                "(single SEO-page view, no referrer, no further activity in this window); "
+                "known bot/crawler User-Agents are also excluded at write time -- see "
+                "modules.launch_analytics.is_bot_user_agent and "
+                "modules.founder_analytics._filter_bot_like_sessions."
+            ),
         ],
     }

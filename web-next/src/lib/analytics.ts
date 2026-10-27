@@ -36,6 +36,39 @@ function randomHex16(): string {
 }
 
 let cachedAnonId: string | null = null;
+let cachedSessionId: string | null = null;
+
+const SESSION_ID_STORAGE_KEY = "dynastygm_analytics_session_id";
+// 30 minutes of inactivity starts a new session (same convention most web
+// analytics tools use for "a session"). A sliding window: every event
+// extends the current session's expiry instead of letting it tick down to a
+// fixed wall-clock cutoff.
+const SESSION_TTL_MS = 30 * 60 * 1000;
+
+interface StoredSession {
+  id: string;
+  expiresAt: number;
+}
+
+function readStoredSession(): StoredSession | null {
+  try {
+    const raw = window.localStorage.getItem(SESSION_ID_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredSession>;
+    if (typeof parsed.id !== "string" || !parsed.id || typeof parsed.expiresAt !== "number") return null;
+    return { id: parsed.id, expiresAt: parsed.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSession(session: StoredSession): void {
+  try {
+    window.localStorage.setItem(SESSION_ID_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // best-effort only
+  }
+}
 
 /**
  * Stable per-browser anonymous id — same `anon_<hex16>` shape
@@ -74,6 +107,52 @@ interface AnalyticsEventBody {
   props?: Record<string, unknown>;
   anon_id: string;
   once_key?: string;
+  session_id?: string;
+}
+
+/**
+ * Real per-visit session id, distinct from the durable per-browser
+ * `anon_id` -- the Founder Analytics fix for "Sessions" actually being a
+ * second count of anonymous users (no session concept existed at all): a
+ * NEW session starts when more than SESSION_TTL_MS has passed since the
+ * last tracked event; every call extends the current session's expiry
+ * (sliding window). Stored in localStorage (not sessionStorage) with its
+ * own expiry so it survives a reload/new tab within the TTL instead of
+ * resetting every time a tab opens, while still rotating like a real
+ * session once the visitor goes away and comes back later. Exported for
+ * tests; real callers go through postEvent (every trackX call gets one
+ * automatically).
+ */
+export function getOrCreateSessionId(): string {
+  const now = Date.now();
+  if (cachedSessionId) {
+    writeStoredSession({ id: cachedSessionId, expiresAt: now + SESSION_TTL_MS });
+    return cachedSessionId;
+  }
+  try {
+    const existing = readStoredSession();
+    if (existing && existing.expiresAt > now) {
+      writeStoredSession({ id: existing.id, expiresAt: now + SESSION_TTL_MS });
+      cachedSessionId = existing.id;
+      return existing.id;
+    }
+  } catch {
+    // fall through to a fresh in-memory-only session id
+  }
+  const minted = `sess_${randomHex16()}`;
+  writeStoredSession({ id: minted, expiresAt: now + SESSION_TTL_MS });
+  cachedSessionId = minted;
+  return minted;
+}
+
+/** Test hook. */
+export function resetSessionId(): void {
+  cachedSessionId = null;
+  try {
+    window.localStorage.removeItem(SESSION_ID_STORAGE_KEY);
+  } catch {
+    // best-effort only
+  }
 }
 
 /**
@@ -95,12 +174,19 @@ function postEvent(input: AnalyticsEventBody): void {
   // The static /sample-league demo is fictional data: no analytics at all,
   // so it can never pollute real usage metrics.
   if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/sample-league")) return;
+  // The founder's own visits to the analytics dashboard must never count as
+  // product traffic -- the backend's internal-traffic exclusion
+  // (modules.launch_analytics.is_internal_analytics_traffic) is the
+  // authoritative filter; this is a defense-in-depth skip of the network
+  // call itself (same treatment as /design and /sample-league above).
+  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/founder-analytics")) return;
   // `platform` lets the founder dashboard split web vs mobile; the backend
   // also defaults a missing platform to "web".
   // First-touch acquisition props (utm_*, referrer_host, has_ref) ride on
   // every web event so the funnel can be cut by channel; see lib/attribution.ts.
   const body: AnalyticsEventBody = {
     ...input,
+    session_id: getOrCreateSessionId(),
     props: { platform: "web", ...getAttributionProps(), ...(input.props || {}) },
   };
   void (async () => {

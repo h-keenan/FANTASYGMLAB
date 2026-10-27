@@ -607,6 +607,12 @@ SESSION_SCOPE_KEY = "_launch_analytics_account_scope"
 SESSION_LEAGUE_KEY = "_launch_analytics_league_scope"
 SESSION_DEVICE_KEY = "_launch_analytics_device_class"
 SESSION_STARTED_KEY = "_launch_analytics_session_started"
+# A real per-visit session id (distinct from the durable per-browser
+# anon_id), when the caller has one -- see track_event's payload assembly
+# and mobile_api_service.record_analytics_event / web-next's
+# getOrCreateSessionId. Streamlit/mobile callers that never set this key
+# keep today's behavior unchanged: session_key falls back to anon_id.
+SESSION_REAL_ID_KEY = "_launch_analytics_session_id"
 INTERNAL_ANALYTICS_ROUTES = frozenset({"founder_labs", "founder_ops"})
 INTERNAL_SOURCE_SURFACES = frozenset(
     {
@@ -617,6 +623,25 @@ INTERNAL_SOURCE_SURFACES = frozenset(
         "founder_analytics",
     }
 )
+
+
+def _internal_traffic_key(value: str) -> str:
+    """Normalize a route/source_surface value for internal-traffic matching.
+
+    web-next passes the raw Next.js pathname as `route` -- e.g.
+    `/founder-analytics` (leading slash, hyphenated) -- while this module's
+    internal-route vocabulary has always been bare, underscored tokens like
+    `founder_analytics` (Streamlit's internal route names). Those two forms
+    never compared equal, so visiting /founder-analytics was never actually
+    excluded despite `founder_analytics` already being in
+    INTERNAL_SOURCE_SURFACES -- this normalization is the fix. Only the
+    first path segment is kept so a nested path (`/founder-analytics/x`)
+    still matches.
+    """
+
+    key = str(value or "").strip().casefold().strip("/")
+    key = key.split("/", 1)[0]
+    return key.replace("-", "_")
 
 
 def is_internal_analytics_traffic(
@@ -631,10 +656,85 @@ def is_internal_analytics_traffic(
     payload = extra if isinstance(extra, Mapping) else {}
     dest = str(payload.get("destination") or payload.get("route") or "")
     for value in (route, source_surface, dest):
-        key = str(value or "").strip().casefold()
-        if key in INTERNAL_ANALYTICS_ROUTES or key in INTERNAL_SOURCE_SURFACES:
+        key = _internal_traffic_key(value)
+        if key and (key in INTERNAL_ANALYTICS_ROUTES or key in INTERNAL_SOURCE_SURFACES):
             return True
     return False
+
+
+# --- Bot/crawler filtering --------------------------------------------------
+# Substring match against a lowercased User-Agent header. Deliberately broad
+# (generic "bot"/"spider"/"crawl" markers catch almost every search-engine,
+# SEO-audit, and AI-content crawler by construction, since a real browser's
+# UA never contains those words) plus an explicit list for well-known
+# clients that identify themselves without one of those words (link-preview
+# bots, uptime monitors, scripted HTTP clients, headless browsers). See
+# modules.founder_analytics._filter_bot_like_sessions for the complementary
+# report-time heuristic that catches a crawler using a generic/spoofed
+# browser-like User-Agent.
+BOT_USER_AGENT_SUBSTRINGS: frozenset[str] = frozenset(
+    {
+        # Generic catch-alls -- a real browser UA never contains these.
+        "bot",
+        "spider",
+        "crawl",
+        "slurp",
+        "archiver",
+        # Link-preview / chat-unfurl fetchers.
+        "facebookexternalhit",
+        "meta-externalagent",
+        "bingpreview",
+        "skypeuripreview",
+        "whatsapp",
+        "telegrambot",
+        "discordbot",
+        "slackbot",
+        "embedly",
+        "quora link preview",
+        # Uptime/synthetic monitors and site auditors.
+        "pingdom",
+        "uptimerobot",
+        "statuscake",
+        "site24x7",
+        "gtmetrix",
+        "lighthouse",
+        "pagespeed",
+        # Headless/scripted browsers and generic HTTP clients.
+        "headlesschrome",
+        "phantomjs",
+        "puppeteer",
+        "playwright",
+        "selenium",
+        "python-requests",
+        "python-urllib",
+        "curl/",
+        "wget/",
+        "libwww-perl",
+        "go-http-client",
+        "okhttp",
+        "scrapy",
+        "node-fetch",
+        "axios/",
+        "postmanruntime",
+    }
+)
+
+
+def is_bot_user_agent(user_agent: str) -> bool:
+    """Heuristic bot/crawler detection from a raw User-Agent header.
+
+    Case-insensitive substring match. A blank/missing User-Agent is NOT
+    treated as a bot by itself (some privacy-hardened real browsers/
+    extensions and this product's own mobile client under some proxies
+    strip or vary it) -- that weaker signal is combined with the no-
+    referrer/single-pageview/SEO-route heuristic in
+    modules.founder_analytics instead.
+    """
+
+    ua = str(user_agent or "").strip().casefold()
+    if not ua:
+        return False
+    return any(marker in ua for marker in BOT_USER_AGENT_SUBSTRINGS)
 
 
 def analytics_enabled(
@@ -923,6 +1023,7 @@ def track_event(
 
     anon = anonymous_id(state)
     account_hash = ""
+    session_key = anon
     if isinstance(state, Mapping):
         auth = state.get("auth_session") if isinstance(state.get("auth_session"), Mapping) else {}
         profile = (
@@ -933,6 +1034,11 @@ def track_event(
         account_hash = hash_account_id(
             _safe_text(auth.get("user_id") or profile.get("user_id"))
         )
+        # A real per-visit session id, when the caller supplied one (web-
+        # next's localStorage-backed, TTL'd session id) -- falls back to the
+        # durable anon_id otherwise, which is today's unchanged behavior for
+        # every other caller (Streamlit, mobile).
+        session_key = _safe_text(state.get(SESSION_REAL_ID_KEY)) or anon
 
     payload = {
         "event": name,
@@ -940,7 +1046,7 @@ def track_event(
         "ts": time.time(),
         "build": build_identity.resolve_build_identity().revision,
         "environment": resolve_environment(),
-        "session_key": anon,
+        "session_key": session_key,
         "anon_id": anon,
         "user_key": account_hash,
         "account_hash": account_hash,

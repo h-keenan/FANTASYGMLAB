@@ -3,21 +3,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const trackUse = vi.fn();
 const trackClientError = vi.fn();
+const trackFeatureUse = vi.fn();
 vi.mock("@/lib/analytics", () => ({
   trackUse: (...args: unknown[]) => trackUse(...args),
   trackClientError: (...args: unknown[]) => trackClientError(...args),
-  trackFeatureUse: vi.fn(),
+  trackFeatureUse: (...args: unknown[]) => trackFeatureUse(...args),
   trackPageView: vi.fn(),
 }));
 
 import { ErrorState } from "./ErrorState";
 import { PremiumUpsellCard } from "./PremiumUpsellCard";
+import { ReferralCard } from "./ReferralCard";
 import { TradeHubFilters } from "./TradeHubFilters";
 import GlobalError from "@/app/error";
+import type { ReferralStatusResponse } from "@/lib/api";
 
 beforeEach(() => {
   trackUse.mockClear();
   trackClientError.mockClear();
+  trackFeatureUse.mockClear();
 });
 
 describe("analytics call sites", () => {
@@ -61,5 +65,28 @@ describe("analytics call sites", () => {
       expect.objectContaining({ props: expect.objectContaining({ item_kind: "position", result: "all" }) }),
     );
     expect(onChange).toHaveBeenCalled();
+  });
+
+  it("ReferralCard records referral_sent when the invite link is copied", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const referral = {
+      link: "https://fantasydesk.app/r/abc123",
+      referrals_per_comp_month: 3,
+      connected_count: 0,
+      comp_months_granted: 0,
+      max_comp_months: 6,
+      comp_is_active: false,
+      comp_until: null,
+    } as ReferralStatusResponse;
+
+    render(<ReferralCard referral={referral} error={null} onRetry={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /Copy link/ }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(referral.link));
+
+    expect(trackFeatureUse).toHaveBeenCalledWith(
+      "referral_sent",
+      expect.objectContaining({ dedupe: false, props: expect.objectContaining({ source_surface: "account" }) }),
+    );
   });
 });

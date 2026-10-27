@@ -266,3 +266,78 @@ def test_contract_doc_covers_foundation():
         "Founder dashboard",
     ):
         assert needle in text
+
+
+# --- Bot/crawler User-Agent filter (2026-10-27 Founder Analytics audit) ----
+
+
+@pytest.mark.parametrize(
+    "ua",
+    [
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)",
+        "Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)",
+        "GPTBot/1.1",
+        "ClaudeBot/1.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "HeadlessChrome/120.0.0.0 Safari/537.36",
+        "facebookexternalhit/1.1",
+        "curl/8.4.0",
+        "python-requests/2.31.0",
+        "PostmanRuntime/7.36.0",
+    ],
+)
+def test_is_bot_user_agent_matches_known_crawlers(ua):
+    assert la.is_bot_user_agent(ua) is True
+
+
+@pytest.mark.parametrize(
+    "ua",
+    [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/129.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, "
+        "like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+        "",
+        "   ",
+    ],
+)
+def test_is_bot_user_agent_does_not_flag_real_browsers_or_blank(ua):
+    assert la.is_bot_user_agent(ua) is False
+
+
+# --- Internal-traffic route normalization (founder-analytics self-inflation) -
+
+
+def test_internal_traffic_excludes_the_real_web_next_founder_analytics_pathname():
+    # The real bug: web-next sends the raw Next.js pathname
+    # ("/founder-analytics", leading slash + hyphen) as `route`, with
+    # source_surface="navigation" -- neither ever equaled the underscored,
+    # slash-less tokens this module's internal-route sets used, so the
+    # exclusion silently never fired for any real request.
+    assert la.is_internal_analytics_traffic(route="/founder-analytics", source_surface="navigation") is True
+    assert (
+        la.is_internal_analytics_traffic(route="/founder-analytics/export", source_surface="navigation")
+        is True
+    )
+    assert la.is_internal_analytics_traffic(route="founder_analytics") is True
+    assert la.is_internal_analytics_traffic(route="/dashboard", source_surface="navigation") is False
+
+
+# --- Real per-visit session id (was: session_key always equaled anon_id) ---
+
+
+def test_track_event_uses_a_real_session_id_when_the_caller_supplies_one(analytics_path):
+    state = {la.SESSION_ANON_KEY: "anon_fixed0000000", la.SESSION_REAL_ID_KEY: "sess_fixed0000000"}
+    assert la.track_event("landing_viewed", state=state) is True
+    row = json.loads(analytics_path.read_text(encoding="utf-8").splitlines()[0])
+    assert row["anon_id"] == "anon_fixed0000000"
+    assert row["session_key"] == "sess_fixed0000000"
+    assert row["session_key"] != row["anon_id"]
+
+
+def test_track_event_session_key_falls_back_to_anon_id_when_no_session_supplied(analytics_path):
+    state = {la.SESSION_ANON_KEY: "anon_fixed1111111"}
+    assert la.track_event("landing_viewed", state=state) is True
+    row = json.loads(analytics_path.read_text(encoding="utf-8").splitlines()[0])
+    assert row["session_key"] == row["anon_id"] == "anon_fixed1111111"
