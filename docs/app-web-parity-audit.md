@@ -63,6 +63,8 @@ semantic palette, position hues, spacing or radii drift.
 | Settings / More | Identity card, Preferences card | Done in the 2026-10-24 follow-ups | none | - | Aligned |
 | News, Rankings/Values | Matched-player identity | Done in #1506; Values lists use `PlayerIdentityRow` | none | - | Aligned |
 
+Rows for section titles, page title, badges, card radius and Input ship in the second PR (typography and chrome), the rest in the first.
+
 ## Unverified visuals (need a device pass)
 
 - Section title at 17/900 in dense cards (one-line truncation) and in the Dashboard header at 24/900.
