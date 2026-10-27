@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -8,6 +9,7 @@ import { LandingShowcase } from "@/components/LandingShowcase";
 import { LandingTrialHeadline } from "@/components/LandingTrialHeadline";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
+import { absoluteUrl, OG_IMAGE } from "@/lib/seo/site";
 import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
 
 /**
@@ -30,6 +32,19 @@ import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
  * then keeps that flag in sync with the real auth result. See
  * lib/landingPending.ts.
  */
+const TITLE = "FantasyDesk: roster-aware dynasty trades, waivers and rankings";
+const DESCRIPTION =
+  "Roster-aware dynasty trades, waivers and a weekly Game Plan built from your real league. Try a full sample league with no account or card.";
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: absoluteUrl("/") },
+  // A page-level openGraph replaces the layout's wholesale, so repeat images.
+  openGraph: { title: TITLE, description: DESCRIPTION, url: absoluteUrl("/"), type: "website", siteName: "FantasyDesk", images: [OG_IMAGE] },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [OG_IMAGE.url] },
+};
+
 const BENEFITS = ["Know your move this week", "Trades your league will accept", "Waivers ranked for your roster"];
 
 export default function LandingPage() {

@@ -15,6 +15,7 @@ import { setLandingPending } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
 import { supabase } from "@/lib/supabase";
+import { hasCompletedOnboardingStep, markOnboardingStepCompleted } from "@/lib/onboardingProgress";
 import { maskSavedLeagueRows } from "@/lib/privacy";
 
 /**
@@ -70,13 +71,19 @@ export function LandingAuthIsland() {
   // checkout redirects back here, and showing the exact same trial offer
   // again to someone who just subscribed would be absurd.
   const returnedFromCheckout = isBillingReturn(searchParams.get("billing"));
-  const [paywallDismissed, setPaywallDismissed] = useState(() => returnedFromCheckout);
+  const [paywallDismissedState, setPaywallDismissed] = useState(() => returnedFromCheckout);
   // Same reasoning as paywallDismissed just above (and the same session-
   // only, not-persisted tradeoff that one already accepts) — the carousel
   // sits before the paywall in this flow, so returning from a completed
   // checkout means it was necessarily already seen or skipped this session.
-  const [carouselDone, setCarouselDone] = useState(() => returnedFromCheckout);
+  const [carouselDoneState, setCarouselDone] = useState(() => returnedFromCheckout);
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
+  // UX audit 2026-10-27: a signed-in account with no saved league yet used to
+  // replay the carousel and trial offer on every visit to "/". Steps already
+  // completed/skipped on this browser for this account stay done.
+  const userId = session?.user?.id ?? null;
+  const carouselSeen = carouselDoneState || hasCompletedOnboardingStep(userId, "carousel");
+  const paywallSeen = paywallDismissedState || hasCompletedOnboardingStep(userId, "paywall");
   // Checkout completion is no longer recorded server-side as a client-visible
   // event (billing webhooks moved to Supabase edge functions), so the return
   // itself is counted: feature_use billing/checkout_return. Once per page load.
@@ -216,9 +223,14 @@ export function LandingAuthIsland() {
   }
 
   return accountReady ? (
-    !carouselDone ? (
-      <OnboardingCarousel onDone={() => setCarouselDone(true)} />
-    ) : paywallDismissed ? (
+    !carouselSeen ? (
+      <OnboardingCarousel
+        onDone={() => {
+          markOnboardingStepCompleted(userId, "carousel");
+          setCarouselDone(true);
+        }}
+      />
+    ) : paywallSeen ? (
       <>
         {returnedFromCheckout ? (
           <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
@@ -238,7 +250,12 @@ export function LandingAuthIsland() {
         <SampleLeagueButton surface="connect_step" />
       </>
     ) : (
-      <OnboardingPaywall onSkip={() => setPaywallDismissed(true)} />
+      <OnboardingPaywall
+        onSkip={() => {
+          markOnboardingStepCompleted(userId, "paywall");
+          setPaywallDismissed(true);
+        }}
+      />
     )
   ) : (
     <SignInForm onSignedIn={() => setAccountReady(true)} />
