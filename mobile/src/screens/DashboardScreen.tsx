@@ -844,10 +844,7 @@ function TopPriorityTradeCard({
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</AppText>
         {isNew ? <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} style={{ marginLeft: 4 }} /> : null}
-        <View style={styles.tradeBadge}>
-          <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
-          <AppText style={styles.tradeBadgeText}>TRADE</AppText>
-        </View>
+        <ToneBadge label="Trade" icon="swap-horizontal" color={colors.textSecondary} style={styles.tradeBadge} />
       </View>
       <AppText style={styles.cardHeadline}>{presentation.partner_team_name}</AppText>
 
@@ -943,9 +940,7 @@ export function BriefingCard({
             not a fabricated confidence score, since that ladder is a strict
             step-function. See modules.dashboard_engine.NEED_TIER_LABELS. */}
         {item.tier_label ? (
-          <View style={styles.tradeBadge}>
-            <AppText style={styles.tradeBadgeText}>{item.tier_label.toUpperCase()}</AppText>
-          </View>
+          <ToneBadge label={item.tier_label} color={colors.textSecondary} style={styles.tradeBadge} />
         ) : null}
       </View>
       <AppText style={styles.cardHeadline}>{item.headline}</AppText>
@@ -1220,17 +1215,7 @@ function createStyles(colors: ThemeColors) {
   cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   cardHeadline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
   cardReason: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
-  tradeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 'auto',
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  tradeBadgeText: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 },
+  tradeBadge: { marginLeft: 'auto' },
   sidesStack: { gap: spacing.sm, marginTop: spacing.sm },
   valueRow: {
     flexDirection: 'row',

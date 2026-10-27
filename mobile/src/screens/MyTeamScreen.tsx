@@ -38,7 +38,7 @@ import { formatRank, percentileColor, percentileFromRank } from '../lib/percenti
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
@@ -384,9 +384,7 @@ function TeamSnapshot({
         />
         <View style={styles.analyticsHeaderText}>
           {outlook ? (
-            <View style={styles.outlookBadge}>
-              <AppText style={styles.outlookBadgeText}>{outlook.toUpperCase()}</AppText>
-            </View>
+            <ToneBadge solid label={outlook} color={colors.accent} textColor={colors.onAccent} style={styles.outlookBadge} />
           ) : null}
           <ValueStat label="Team value" value={teamValue > 0 ? teamValue : '—'} size="lg" />
         </View>
@@ -663,14 +661,7 @@ function createStyles(colors: ThemeColors) {
   // solid-accent-pill pattern LeagueDetailScreen's "YOU" badge already uses
   // (Magna Carta §3: cyan = GM intelligence/analytical emphasis, at its
   // strongest here since the archetype label is this card's headline call-out).
-  outlookBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-  },
-  outlookBadgeText: { fontSize: 11, fontWeight: '800', color: colors.onAccent, letterSpacing: 0.4 },
+  outlookBadge: { alignSelf: 'flex-start' },
   analyticsRankLine: { fontSize: 13, color: colors.textSecondary },
   analyticsMetricsRow: {
     flexDirection: 'row',
