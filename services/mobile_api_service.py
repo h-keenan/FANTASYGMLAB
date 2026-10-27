@@ -8521,14 +8521,14 @@ def get_external_interesting_trades(
         raise HTTPException(status_code=422, detail="type must be one of: " + ", ".join(external_interesting_trades.TYPES))
     now = datetime.now(timezone.utc)
     try:
-        since_day = external_interesting_trades.parse_since(since, now)
+        since_at = external_interesting_trades.parse_since(since, now)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     excluded = [x.strip() for x in (exclude_ids or "").split(",") if x.strip()][:500]
 
     pool, mtime = external_interesting_trades.get_pool(PLAYERS_DB_PATH, fmt, lens_key, now)
     items = external_interesting_trades.select_items(
-        pool, now=now, limit=limit, types=types or None, min_spice=min_spice, exclude_ids=excluded, since=since_day
+        pool, now=now, limit=limit, types=types or None, min_spice=min_spice, exclude_ids=excluded, since=since_at
     )
     return {
         "ok": True,
@@ -8538,6 +8538,7 @@ def get_external_interesting_trades(
         "valuation": external_interesting_trades.VALUATION_LENS,
         "rotation_date": now.date().isoformat(),
         "generated_at": now.isoformat(),
+        "since_applied": since_at.isoformat() if since_at else None,
         "data_as_of": datetime.fromtimestamp(mtime, timezone.utc).isoformat() if mtime else None,
         "verdict_basis": "Trade Analyzer engine (trade_analyzer_fit + trade_offer_analyzer) run against a league-median reference roster of real players; not any user's roster.",
         "count": len(items),
@@ -8577,7 +8578,11 @@ def get_external_interesting_trade_share_card(
     if not card.is_shareable:
         raise HTTPException(status_code=404, detail=card.decline_reason or "This trade cannot be rendered.")
     try:
-        png = share_card_renderer.render_share_card_png(card)
+        png = share_card_renderer.render_square_share_card_png(
+            card,
+            size=external_interesting_trades.SHARE_CARD_SIZE,
+            destination=external_interesting_trades.SHARE_CARD_DESTINATION,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc) or "This trade cannot be rendered.") from exc
     return Response(content=png, media_type="image/png")

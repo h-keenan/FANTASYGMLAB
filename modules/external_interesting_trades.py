@@ -23,8 +23,10 @@ Pure builders live here (no I/O); ``load_and_build`` is the cached front door.
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import os
+import re
 import threading
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -43,6 +45,8 @@ from modules import (
     trade_offer_analyzer,
     trade_ideas,
 )
+
+logger = logging.getLogger(__name__)
 
 FORMATS = ("1qb", "superflex")
 LENSES = ("ppr", "tep")
@@ -327,11 +331,12 @@ def gen_buy_low(ctx: Context) -> list[dict]:
                 dict(
                     type=TYPE_BUY_LOW, send=[p], receive=[r], signal=min(1.0, gap / 0.35),
                     facts=dict(ratio=ratio, trend=trend, price=price),
+                    figures=dict(market_price=price, gap_pct=int(round(gap * 100)), usage_trend=trend),
                     hook=f"{_text(r['name'])} is priced like a {_fmt(price)} asset, but the model has him at {_fmt(r['v'])} and his usage is climbing.",
                     why=[
-                        f"Market value ({_fmt(_num(r['market_score']))}) sits {int(round(gap * 100))}% below our model value for {_text(r['name'])} ({_fmt(_num(r['v_1qb_ppr']))} base).",
+                        f"Market price ({_fmt(price)}) sits {int(round(gap * 100))}% below our model value for {_text(r['name'])} ({_fmt(r['v'])}).",
                         f"Usage trend {trend:+.2f} vs his own baseline ({_text(r.get('workload_trend')) or 'n/a'} workload, {_text(r.get('opportunity_label')) or 'n/a'}).",
-                        f"{_text(p['name'])} ({_fmt(p['v'])}) is the price the market asks, at age {int(_num(p['age']))} vs {int(_num(r['age']))}.",
+                        f"{_text(p['name'])} ({_fmt(p['v'])}) is the closest match to that {_fmt(price)} market price, at age {int(_num(p['age']))} vs {int(_num(r['age']))}.",
                     ],
                 )
             )
@@ -361,6 +366,7 @@ def gen_sell_high(ctx: Context) -> list[dict]:
                     type=TYPE_SELL_HIGH, send=[s], receive=[p],
                     signal=min(1.0, (yrs + 1) / 4.0),
                     facts=dict(cliff=cliff, cooling=cooling),
+                    figures=dict(market_price=price, cliff_age=cliff, years_younger=int(age - _num(p["age"])), usage_trend=_num(s.get("recency_trend"))),
                     hook=f"Sell {_text(s['name'])} ({int(age)}) while the market still pays {_fmt(price)}; {_text(p['name'])} is {int(age - _num(p['age']))} years younger.",
                     why=[
                         f"{_text(s['name'])} is {int(age)}; {pos}s typically fall off around {cliff}. Our model value is {_fmt(s['v'])} vs a market price near {_fmt(price)}.",
@@ -385,6 +391,7 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
                     dict(
                         type=TYPE_ARBITRAGE, send=[w], receive=[q], signal=min(1.0, jump / 0.40),
                         facts=dict(kind="sf_qb", jump=jump),
+                        figures=dict(value_1qb=q["v_1qb_ppr"], jump_pct=int(round(jump * 100))),
                         hook=f"In Superflex, {_text(q['name'])} and {_text(w['name'])} cost the same, but only one fills a scarce QB2 slot.",
                         why=[
                             f"{_text(q['name'])} is worth {_fmt(q['v'])} in Superflex vs {_fmt(q['v_1qb_ppr'])} in 1QB (+{int(round(jump * 100))}%).",
@@ -402,6 +409,7 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
                     dict(
                         type=TYPE_ARBITRAGE, send=[q], receive=[w], signal=0.5,
                         facts=dict(kind="1qb_qb"),
+                        figures=dict(years_younger=int(_num(q["age"]) - _num(w["age"]))),
                         hook=f"In 1QB there is one QB slot: {_text(q['name'])} and {_text(w['name'])} are priced the same, but the {w['position']} is the harder starter to replace.",
                         why=[
                             f"Only one starting QB slot: {_text(q['name'])} is worth {_fmt(q['v'])}, {_text(w['name'])} {_fmt(w['v'])}.",
@@ -421,6 +429,7 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
                     dict(
                         type=TYPE_ARBITRAGE, send=[w], receive=[te], signal=min(1.0, jump / 0.20),
                         facts=dict(kind="tep", jump=jump),
+                        figures=dict(value_without_premium=te["v_fmt_ppr"], jump_pct=int(round(jump * 100))),
                         hook=f"TE premium turns {_text(te['name'])} into a {_fmt(te['v'])} asset; {_text(w['name'])} costs the same and gets no boost.",
                         why=[
                             f"{_text(te['name'])} is worth {_fmt(te['v'])} with TE premium vs {_fmt(te['v_fmt_ppr'])} without (+{int(round(jump * 100))}%).",
@@ -450,6 +459,7 @@ def gen_pick_for_player(ctx: Context) -> list[dict]:
                     type=TYPE_PICK, send=[("pick", year, rnd, tier)], receive=[p],
                     signal=min(1.0, (p["v"] / pv - 1) / 0.20),
                     facts=dict(pick_value=pv, direction="buy"),
+                    figures=dict(production_score=_num(p.get("production_score")), opportunity_score=_num(p.get("opportunity_score"))),
                     hook=f"A {year} round {rnd} pick buys {_text(p['name'])}, who is already producing.",
                     why=[
                         f"The app prices a {year} round {rnd} ({tier}) at {_fmt(pv)}; {_text(p['name'])} is {_fmt(p['v'])} at age {int(_num(p['age']))}.",
@@ -467,6 +477,7 @@ def gen_pick_for_player(ctx: Context) -> list[dict]:
                     type=TYPE_PICK, send=[s], receive=[("pick", year, rnd, tier)],
                     signal=min(1.0, (_num(s["age"]) - cliff + 2) / 4.0),
                     facts=dict(pick_value=pv, direction="sell"),
+                    figures=dict(cliff_age=cliff),
                     hook=f"Turn {_text(s['name'])} ({int(_num(s['age']))}) into a {year} round {rnd} pick while he still carries first-round value.",
                     why=[
                         f"{_text(s['name'])} is {_fmt(s['v'])}; the app prices a {year} round {rnd} ({tier}) at {_fmt(pv)}.",
@@ -532,6 +543,7 @@ def gen_injury_stash(ctx: Context) -> list[dict]:
                     type=TYPE_STASH, send=[p], receive=[r],
                     signal=min(1.0, absence.weeks / 8.0),
                     facts=dict(weeks=absence.weeks, status=status),
+                    figures=dict(estimated_weeks_out=int(absence.weeks)),
                     hook=f"{_text(r['name'])} is {status} ({_text(r.get('injury_body_part')) or 'injury'}); the discount is the buying window.",
                     why=[
                         f"{status} designation, estimated {int(absence.weeks)} weeks out ({absence.basis}; no return date is on record).",
@@ -615,6 +627,85 @@ def _spice(ctx: Context, cand: dict, assets: list[dict], rows: list[Mapping[str,
     }
 
 
+SHARE_CARD_SIZE = 1600
+SHARE_CARD_BRAND = "FantasyDesk"
+SHARE_CARD_DESTINATION = "https://fantasydesk.app"
+
+
+def share_card_descriptor(iid: str, fmt: str, lens: str) -> dict[str, Any]:
+    """The `share_card` block of an item. The PNG is exactly width x height,
+    all content sits inside `safe_area` (centered, 8% margins), `focus` is the
+    centre of that area for centered zoom/pan."""
+
+    from modules import share_card_renderer
+
+    size = SHARE_CARD_SIZE
+    return {
+        "available": True,
+        "path": f"/v1/external/trades/interesting/{iid}/share-card.png?format={fmt}&lens={lens}",
+        "content_type": "image/png",
+        "width": size,
+        "height": size,
+        "brand": SHARE_CARD_BRAND,
+        "destination": SHARE_CARD_DESTINATION,
+        "safe_area": share_card_renderer.square_safe_area(size),
+        "focus": {"x": 0.5, "y": 0.5},
+        "auth": "same static bearer API key as every /v1/external/* route",
+    }
+
+
+def _figure(value: Any) -> float:
+    """A derived number cited in the free text, rounded the way the text prints it."""
+
+    v = _num(value)
+    return float(int(round(v))) if abs(v) >= 10 else round(v, 2)
+
+
+_NUM_RE = re.compile(r"(?<![A-Za-z0-9.])[+-]?\d[\d,]*(?:\.\d+)?(?![A-Za-z0-9])")
+
+
+def structured_numbers(item: Mapping[str, Any]) -> set[float]:
+    """Every number an item's free text may cite: send/receive asset values,
+    ages, pick season/round, side totals, every `balance` field, and the
+    documented derived `text_figures`."""
+
+    allowed: set[float] = set()
+
+    def add(x: Any) -> None:
+        if x is None or isinstance(x, bool):
+            return
+        v = _num(x, float("nan"))
+        if math.isnan(v):
+            return
+        allowed.add(round(abs(v), 2))
+        allowed.add(float(int(round(abs(v)))))
+        allowed.add(float(int(abs(v))))
+
+    for side in ("send", "receive"):
+        add(item[side].get("total_value"))
+        for a in item[side]["assets"]:
+            for k in ("value", "age", "season", "round"):
+                add(a.get(k))
+    for k in ("send_value", "receive_value", "raw_delta", "value_delta", "fit_total"):
+        add(item["balance"].get(k))
+    for v in (item.get("text_figures") or {}).values():
+        add(v)
+    return allowed
+
+
+def unreconciled_numbers(item: Mapping[str, Any]) -> list[str]:
+    """Numbers printed in `hook`/`why` that match no structured field or
+    documented derived figure. Empty list == reconciled."""
+
+    allowed = structured_numbers(item)
+    bad = []
+    for line in [item.get("hook") or "", *(item.get("why") or [])]:
+        for tok in _NUM_RE.findall(line):
+            if round(abs(float(tok.replace(",", ""))), 2) not in allowed:
+                bad.append(tok)
+    return bad
+
+
 def build_candidates(ctx: Context, types: Sequence[str] = TYPES) -> list[dict[str, Any]]:
     """Generate, grade with the app's evaluator, and keep advertisable trades."""
 
@@ -673,15 +764,17 @@ def build_candidates(ctx: Context, types: Sequence[str] = TYPES) -> list[dict[st
                 },
                 "hook": cand["hook"],
                 "why": cand["why"][:3],
+                "text_figures": {k: _figure(v) for k, v in (cand.get("figures") or {}).items()},
                 **spice,
                 "generated_at": generated_at,
-                "share_card": {
-                    "available": True,
-                    "path": f"/v1/external/trades/interesting/{iid}/share-card.png?format={ctx.fmt}&lens={ctx.lens}",
-                    "auth": "same static bearer API key as every /v1/external/* route",
-                },
+                "share_card": share_card_descriptor(iid, ctx.fmt, ctx.lens),
                 "_players": [_text(r.get("player_id")) for r in rows],
             }
+            bad = unreconciled_numbers(items[iid])
+            if bad:  # single source of truth: never ship text that disagrees with the structure
+                logger.warning("interesting trade %s dropped: text numbers not in structure: %s", iid, bad)
+                del items[iid]
+                continue
             kept += 1
     return list(items.values())
 
@@ -720,21 +813,25 @@ def _rotation_order(items: list[dict], day: date) -> list[dict]:
     return ranked
 
 
-def parse_since(since: str | None, now: datetime) -> date | None:
-    if not since:
+def parse_since(since: str | None, now: datetime) -> datetime | None:
+    """Parse ``since``: ISO-8601, epoch seconds or epoch milliseconds (a
+    numeric value >= 1e11 is read as milliseconds). Clamped to at most
+    ``MAX_SINCE_DAYS`` back. Returns an aware UTC datetime (or None)."""
+
+    if since is None or not str(since).strip():
         return None
-    text = since.strip()
+    text = str(since).strip()
     try:
-        if text.replace(".", "", 1).isdigit():
-            moment = datetime.fromtimestamp(float(text), timezone.utc)
+        if re.fullmatch(r"\d+(?:\.\d+)?", text):
+            raw = float(text)
+            moment = datetime.fromtimestamp(raw / 1000.0 if raw >= 1e11 else raw, timezone.utc)
         else:
             moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
             if moment.tzinfo is None:
                 moment = moment.replace(tzinfo=timezone.utc)
     except (ValueError, OverflowError, OSError) as exc:
-        raise ValueError("since must be an ISO-8601 timestamp or epoch seconds.") from exc
-    earliest = now - timedelta(days=MAX_SINCE_DAYS)
-    return max(moment, earliest).astimezone(timezone.utc).date()
+        raise ValueError("since must be an ISO-8601 timestamp, epoch seconds or epoch milliseconds.") from exc
+    return max(moment.astimezone(timezone.utc), now - timedelta(days=MAX_SINCE_DAYS))
 
 
 def select_items(
@@ -745,20 +842,19 @@ def select_items(
     types: Sequence[str] | None = None,
     min_spice: int = 0,
     exclude_ids: Sequence[str] = (),
-    since: date | None = None,
+    since: datetime | None = None,
 ) -> list[dict]:
-    """Filter + rotate. ``since`` suppresses anything that would have been in
-    the top ``limit`` of an earlier day's rotation (back to that UTC date), so
-    a bot that polls daily with ``since=<last poll>`` never sees a repeat."""
+    """Filter + rotate. ``since`` keeps items whose ``generated_at`` is at or
+    after it (items are generated fresh from current data on every request, so
+    every item is stamped now: a past ``since`` never removes anything and a
+    future one returns nothing). It is a freshness filter, not a "have I seen
+    this" filter -- use ``exclude_ids`` for exact dedupe."""
 
     pool = [c for c in candidates if (not types or c["type"] in types) and c["spice_score"] >= min_spice]
+    if since is not None:
+        pool = [c for c in pool if datetime.fromisoformat(c["generated_at"]) >= since]
     skip = {str(x) for x in exclude_ids}
     today = now.astimezone(timezone.utc).date()
-    if since is not None:
-        d = since
-        while d < today:
-            skip.update(i["id"] for i in _rotation_order(list(pool), d)[:limit])
-            d += timedelta(days=1)
     ordered = [i for i in _rotation_order(list(pool), today) if i["id"] not in skip]
     return [{k: v for k, v in i.items() if not k.startswith("_")} for i in ordered[:limit]]
 
