@@ -264,8 +264,16 @@ export class UpstreamError extends Error {
 
 function apiBaseUrl(): string {
   // SHARE_CARD_API_BASE_URL lets a deployment point this server-side call
-  // at an internal address; otherwise it's the same API the browser uses.
-  return (process.env.SHARE_CARD_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+  // at an internal address. Otherwise use the compose-internal API
+  // (API_INTERNAL_URL, defaulting to the mobile-api service) like the SEO
+  // pages do: a container started without the env var used to fall through
+  // to localhost:8000, which is unreachable in-container, so every share
+  // card failed with a 502 "Could not reach the API."
+  return (
+    process.env.SHARE_CARD_API_BASE_URL ||
+    process.env.API_INTERNAL_URL ||
+    "http://mobile-api:8080"
+  ).replace(/\/$/, "");
 }
 
 /** GET an API path as the signed-in caller (their own bearer token, passed
