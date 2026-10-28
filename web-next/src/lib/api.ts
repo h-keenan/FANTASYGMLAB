@@ -2828,7 +2828,8 @@ export type TradeAnalyzerReason =
   | "no_player_data"
   | "empty_roster"
   | "assets_not_found"
-  | "fit_unavailable";
+  | "fit_unavailable"
+  | "weekly_limit_reached";
 
 export interface TradeAnalyzerResponse {
   ok: boolean;
@@ -2837,6 +2838,8 @@ export interface TradeAnalyzerResponse {
   /** Non-empty once the league's trade deadline has passed — the analyzer
    * stays usable for offseason planning, this just says so. */
   planning_note?: string;
+  /** Present with reason weekly_limit_reached: the Free allowance and when it resets. */
+  limit?: { limit: number; window: string; resets_at: string } | null;
   trade_window?: TradeWindow;
   /** What this verdict assumed (format, lens, posture, basis, injury timing). */
   assumptions?: VerdictAssumptions;

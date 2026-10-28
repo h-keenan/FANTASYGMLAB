@@ -16,6 +16,9 @@ import EmptyState from '../components/EmptyState';
 import Input from '../components/Input';
 import ErrorState from '../components/ErrorState';
 import Button from '../components/Button';
+import LimitWall from '../components/LimitWall';
+import { limitWallForReason, type LimitWallModel } from '../lib/limitWall';
+import { useAuth } from '../context/AuthContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -184,6 +187,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [limitWall, setLimitWall] = useState<LimitWallModel | null>(null);
+  const { isGuest } = useAuth();
   const [planningNote, setPlanningNote] = useState('');
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
 
@@ -433,6 +438,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const analyze = async () => {
     if (quickMode) return;
     setAnalyzeError(null);
+    setLimitWall(null);
     setAnalyzing(true);
     try {
       const result = await api.postTradeAnalyzer(leagueId, {
@@ -453,7 +459,9 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       if (result.verdict) {
         setVerdict(result.verdict);
       } else {
-        setAnalyzeError(NOT_READY_MESSAGES[result.reason] ?? 'Could not analyze this trade.');
+        const wall = limitWallForReason(result.reason, { info: result.limit, isGuest });
+        if (wall) setLimitWall(wall);
+        else setAnalyzeError(NOT_READY_MESSAGES[result.reason] ?? 'Could not analyze this trade.');
       }
     } catch (err) {
       setAnalyzeError(toUserErrorMessage(err, 'Could not analyze this trade.'));
@@ -603,6 +611,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         <>
           <Button label="Analyze Trade" onPress={analyze} disabled={!hasAnyAssets} loading={analyzing} style={styles.analyzeButton} />
 
+          {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
           {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
           {/* Past the trade deadline the analyzer stays open for offseason
               planning — this note just says the trade can't be sent yet. */}

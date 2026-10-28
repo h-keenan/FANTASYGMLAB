@@ -13,6 +13,8 @@ import { api } from "@/lib/api";
  * TradeAnalyzerContent.test.tsx's own pattern for the sibling builder.
  */
 
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isGuest: false }) }));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {

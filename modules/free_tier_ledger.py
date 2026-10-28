@@ -267,6 +267,18 @@ def claimed_leagues(user_id: str) -> set[str]:
 # --------------------------------------------------------------------------
 
 
+def next_weekly_reset(now: datetime | None = None) -> datetime:
+    """When the weekly allowance window rolls over: the next Monday 00:00 UTC.
+
+    Same window `_week()` keys the counter on, so what the wall tells a user
+    is exactly when the ledger resets.
+    """
+
+    current = now or _now()
+    monday = (current - timedelta(days=current.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    return monday + timedelta(days=7)
+
+
 def consume_weekly_trade_eval(user_id: str, limit: int) -> bool:
     """Atomically use one weekly evaluation; False once `limit` is spent."""
 

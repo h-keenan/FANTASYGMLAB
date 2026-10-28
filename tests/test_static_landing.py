@@ -105,3 +105,16 @@ def test_static_landing_search_crawler_contract():
     private_markers = ("league_id", "user_id", "access_token", "refresh_token")
     public_payload = "\n".join((html, robots, sitemap.read_text(encoding="utf-8"))).lower()
     assert all(marker not in public_payload for marker in private_markers)
+
+
+def test_apex_trade_analyzer_path_forwards_to_the_app_instead_of_404():
+    # Ads may link fantasygmlab.com/trade-analyzer; the apex is a static site,
+    # so this page forwards (query string kept) to the real Analyzer.
+    page = (LANDING / "trade-analyzer" / "index.html").read_text(encoding="utf-8")
+    target = "https://app.fantasygmlab.com/trade-analyzer"
+    assert f'http-equiv="refresh" content="0; url={target}"' in page
+    assert "window.location.search" in page and target in page
+    assert f'rel="canonical" href="{target}"' in page
+    assert "noindex" in page
+    index = (LANDING / "index.html").read_text(encoding="utf-8")
+    assert "app.fantasygmlab.com/trade-analyzer?utm_source=static_landing" in index
