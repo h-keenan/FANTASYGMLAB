@@ -5117,7 +5117,18 @@ def post_trade_analyzer(
         if not free_tier_ledger.consume_weekly_trade_eval(
             analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
         ):
-            return {"ok": True, "verdict": None, "reason": "weekly_limit_reached"}
+            return {
+                "ok": True,
+                "verdict": None,
+                "reason": "weekly_limit_reached",
+                # Numbers for the clients' shared limit wall (lib/limitWall.ts):
+                # the real constant and the real ledger reset, never copy.
+                "limit": {
+                    "limit": trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT,
+                    "window": "week",
+                    "resets_at": free_tier_ledger.next_weekly_reset().isoformat(),
+                },
+            }
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.

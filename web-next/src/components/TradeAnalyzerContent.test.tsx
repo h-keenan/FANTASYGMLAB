@@ -46,6 +46,8 @@ const VERDICT: TradeVerdict = {
   ],
 };
 
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isGuest: false }) }));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -174,6 +176,25 @@ describe("TradeAnalyzerContent", () => {
     fireEvent.click(screen.getByText("My RB"));
 
     expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
+  });
+
+  it("shows the limit wall (not the generic error) when the Free weekly limit is hit", async () => {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
+      ok: true,
+      verdict: null,
+      reason: "weekly_limit_reached",
+      limit: { limit: 3, window: "week", resets_at: "2026-11-02T00:00:00+00:00" },
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    fireEvent.click(screen.getByText("Their WR"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+    });
+    expect(await screen.findByText(/3 free trade checks/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Upgrade to Pro/ })).toHaveAttribute("href", "/premium");
+    expect(screen.queryByText("Could not analyze this trade.")).toBeNull();
   });
 
   it("shows what the verdict assumed and offers Report a bad verdict with the analyzed trade", async () => {

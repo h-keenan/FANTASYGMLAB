@@ -260,7 +260,23 @@ def test_analyzer_route_returns_weekly_limit_reached_for_free(free_env):
         "/v1/leagues/abc/trade-analyzer", headers=AUTH, json={"send_player_ids": ["my1"], "receive_player_ids": ["x"]}
     )
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "verdict": None, "reason": "weekly_limit_reached"}
+    body = response.json()
+    assert body["verdict"] is None and body["reason"] == "weekly_limit_reached"
+    assert body["limit"]["limit"] == trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
+    assert body["limit"]["window"] == "week"
+    assert body["limit"]["resets_at"] == free_tier_ledger.next_weekly_reset().isoformat()
+
+
+def test_next_weekly_reset_is_the_ledger_window_boundary():
+    from datetime import datetime, timezone
+
+    wed = datetime(2026, 10, 28, 15, 30, tzinfo=timezone.utc)
+    assert free_tier_ledger.next_weekly_reset(wed) == datetime(2026, 11, 2, tzinfo=timezone.utc)
+    mon = datetime(2026, 11, 2, 0, 0, tzinfo=timezone.utc)
+    assert free_tier_ledger.next_weekly_reset(mon) == datetime(2026, 11, 9, tzinfo=timezone.utc)
+    # Same week key just before the boundary, next key at it.
+    assert free_tier_ledger._week(datetime(2026, 11, 1, 23, 59, tzinfo=timezone.utc)) == "20261026"
+    assert free_tier_ledger._week(datetime(2026, 11, 2, tzinfo=timezone.utc)) == "20261102"
 
 
 def _exhaust_analyzer_quota():
@@ -279,7 +295,7 @@ def test_free_analyzer_quota_gate_is_enforced_server_side(free_env):
     # Free account is gated, so the web share card can never be a quota bypass.
     for headers in ({}, {"X-Share-Card-Token": "anything"}):
         r = client.post("/v1/leagues/abc/trade-analyzer", headers={**AUTH, **headers}, json=body)
-        assert r.json() == {"ok": True, "verdict": None, "reason": "weekly_limit_reached"}
+        assert r.json()["verdict"] is None and r.json()["reason"] == "weekly_limit_reached"
 
 
 # --------------------------------------------------------------------------

@@ -3,6 +3,9 @@ import { VerdictTrust } from "@/components/VerdictTrust";
 import type { VerdictAssumptions } from "@/lib/verdictTrust";
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
+import { LimitWall } from "@/components/LimitWall";
+import { useAuth } from "@/context/AuthContext";
+import { limitWallForReason, type LimitWallModel } from "@/lib/limitWall";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -627,6 +630,8 @@ export function TradeAnalyzerContent({
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [limitWall, setLimitWall] = useState<LimitWallModel | null>(null);
+  const { isGuest } = useAuth();
   // Non-empty once the league's trade deadline has passed — the analyzer
   // stays open for offseason planning, this note just says so.
   const [planningNote, setPlanningNote] = useState("");
@@ -773,6 +778,7 @@ export function TradeAnalyzerContent({
 
   async function analyze() {
     setAnalyzeError(null);
+    setLimitWall(null);
     setAnalyzing(true);
     try {
       const result = await api.postTradeAnalyzer(leagueId, {
@@ -788,7 +794,9 @@ export function TradeAnalyzerContent({
       if (result.verdict) {
         setVerdict(result.verdict);
       } else {
-        setAnalyzeError(analyzeFailureMessage(result.reason));
+        const wall = limitWallForReason(result.reason, { info: result.limit, isGuest });
+        if (wall) setLimitWall(wall);
+        else setAnalyzeError(analyzeFailureMessage(result.reason));
       }
     } catch (err) {
       setAnalyzeError(err instanceof Error ? err.message : "Could not analyze this trade.");
@@ -980,6 +988,7 @@ export function TradeAnalyzerContent({
         <Button onClick={analyze} disabled={!hasAnyAssets} loading={analyzing}>
           {analyzing ? "Analyzing…" : "Analyze Trade"}
         </Button>
+        {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
         {analyzeError ? (
           <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
             {analyzeError}
