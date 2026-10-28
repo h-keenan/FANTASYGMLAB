@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
@@ -119,13 +120,17 @@ def launch_week_active(*, now: datetime | None = None) -> bool:
 # unavailable (billing not configured, package missing, or the API call
 # fails). plan_display_details() always prefers the real Price objects when
 # it can reach them; this dict exists so a pricing-display hiccup never
-# breaks the Premium page. Keep these roughly in sync with the real Stripe
-# Dashboard prices, but they are not the source of truth for what is charged.
-DEFAULT_PLAN_DETAILS: dict[str, tuple[str, str, str]] = {
-    MONTHLY: ("Monthly", "$3.99", "per month"),
-    ANNUAL: ("Annual", "$19.99", "per year"),
-    FRONT_OFFICE_ANNUAL: ("Annual", "$99.99", "per year"),
-}
+# breaks the Premium page. Not the source of truth for what is charged.
+def _load_default_plan_details() -> dict[str, tuple[str, str, str]]:
+    """Fallback prices come from config/plan_prices.json, the one source the
+    edge function and web-next fallbacks are generated from too."""
+
+    path = Path(__file__).resolve().parent.parent / "config" / "plan_prices.json"
+    plans = json.loads(path.read_text(encoding="utf-8"))["plans"]
+    return {key: (row["label"], row["price"], row["cadence"]) for key, row in plans.items()}
+
+
+DEFAULT_PLAN_DETAILS: dict[str, tuple[str, str, str]] = _load_default_plan_details()
 
 _PRICE_DISPLAY_CACHE_TTL_SECONDS = 5 * 60
 _price_display_cache: dict[str, tuple[float, dict[str, tuple[str, str, str]]]] = {}

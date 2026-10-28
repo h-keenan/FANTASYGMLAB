@@ -1,5 +1,6 @@
 import type { BillingPlan } from "@/lib/api";
 import { env } from "@/lib/env";
+import { FALLBACK_PLAN_PRICES } from "@/lib/planPrices.generated";
 
 /**
  * Plans for a LOGGED-OUT visitor (P0 UX audit, 2026-10-27): /premium used to
@@ -48,38 +49,24 @@ export async function fetchPublicBillingPlans(signal?: AbortSignal): Promise<Bil
   }
 }
 
-/** Offline/error fallback only -- mirrors supabase/functions/billing-plans's
- * own DEFAULT_PLAN_DETAILS/PREMIUM_FEATURE_LINES. Keep in sync; the server
- * (live Stripe Price lookup) is the source of truth whenever it's reachable. */
-export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
-  {
-    tier: "pro",
-    interval: "monthly",
-    label: "Monthly",
-    price: "$3.99",
-    cadence: "per month",
-    features: [
-      "Your full Next Move briefing, not just the top 4",
-      "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
-      "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
-      "Every Trade Hub idea, not just the first 2",
-      "GM Targets watchlist up to 50 players (Free is capped at 3)",
-      "Portfolio — your record, rank, and top need across every saved league, not just one",
-    ],
-  },
-  {
-    tier: "pro",
-    interval: "annual",
-    label: "Annual",
-    price: "$19.99",
-    cadence: "per year",
-    features: [
-      "Your full Next Move briefing, not just the top 4",
-      "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
-      "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
-      "Every Trade Hub idea, not just the first 2",
-      "GM Targets watchlist up to 50 players (Free is capped at 3)",
-      "Portfolio — your record, rank, and top need across every saved league, not just one",
-    ],
-  },
+const FALLBACK_FEATURES = [
+  "Your full Next Move briefing, not just the top 4",
+  "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
+  "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
+  "Every Trade Hub idea, not just the first 2",
+  "GM Targets watchlist up to 50 players (Free is capped at 3)",
+  "Portfolio — your record, rank, and top need across every saved league, not just one",
 ];
+
+/** Offline/error fallback only. Prices come from config/plan_prices.json via
+ * the generated planPrices.generated.ts (the same file the edge function's
+ * fallback and modules/stripe_billing.py use); the server's live Stripe Price
+ * lookup is the source of truth whenever it's reachable. */
+export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = (["monthly", "annual"] as const).map((interval) => ({
+  tier: "pro",
+  interval,
+  label: FALLBACK_PLAN_PRICES[interval].label,
+  price: FALLBACK_PLAN_PRICES[interval].price,
+  cadence: FALLBACK_PLAN_PRICES[interval].cadence,
+  features: FALLBACK_FEATURES,
+}));

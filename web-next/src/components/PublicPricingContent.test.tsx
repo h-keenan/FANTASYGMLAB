@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublicPricingContent } from "./PublicPricingContent";
 import { readProtectedReturnPath } from "@/lib/protectedRouteReturn";
+import { FALLBACK_PLAN_PRICES } from "@/lib/planPrices.generated";
 
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -22,8 +23,8 @@ describe("PublicPricingContent", () => {
 
     expect(screen.getByRole("heading", { name: "Unlock the full GM toolkit" })).toBeInTheDocument();
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(screen.getByText("$3.99")).toBeInTheDocument();
-    expect(screen.getByText("$19.99")).toBeInTheDocument();
+    expect(screen.getByText(FALLBACK_PLAN_PRICES.monthly.price)).toBeInTheDocument();
+    expect(screen.getByText(FALLBACK_PLAN_PRICES.annual.price)).toBeInTheDocument();
   });
 
   it("swaps in live plan data when the public billing-plans function responds", async () => {
