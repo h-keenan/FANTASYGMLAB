@@ -72,10 +72,9 @@ const ValuationLensContext = createContext<ValuationLensContextValue | undefined
  * lens is wrong, not just imprecise (coridian_: "it should always check to
  * see if the league is a dynasty or not. If it's redraft, it should not
  * automatically input that as dynasty"). `ensureDetectedDefault` fetches
- * the league's own real Sleeper `settings.type` once per league (0 =
- * redraft, 1 = keeper, 2 = dynasty — same mapping
- * modules.league_value_settings.detect_league_value_settings_from_payload
- * uses server-side) and seeds the default accordingly; best-effort — a
+ * the league once per league and seeds the default from the
+ * server's `default_lens` (modules.league_value_settings.default_lens_for_league,
+ * the one league-format decision the app and push alerts also use); best-effort — a
  * failed fetch just leaves DEFAULT_LENS in place, same as before.
  */
 export function ValuationLensProvider({ children }: { children: ReactNode }) {
@@ -96,11 +95,11 @@ export function ValuationLensProvider({ children }: { children: ReactNode }) {
     const timer = setTimeout(settle, LENS_DETECTION_MAX_WAIT_MS);
     api
       .getLeague(leagueId)
-      .then(({ league }) => {
-        // Sleeper: 0 = redraft, 1 = keeper, 2 = dynasty. Keepers share
-        // dynasty horizon math (same as the server-side mapping), so only
-        // a real redraft league gets the Redraft default.
-        const detected: ValuationLens = league?.settings?.type === 0 ? "Non-Dynasty" : "Dynasty";
+      .then((response) => {
+        // The server decides (modules.league_value_settings.default_lens_for_league:
+        // redraft -> Non-Dynasty, dynasty/keeper -> Dynasty). The app reads the
+        // same field, so the two clients cannot disagree about a league.
+        const detected: ValuationLens = response.default_lens === "Non-Dynasty" ? "Non-Dynasty" : "Dynasty";
         writeStoredLens(leagueId, detected);
         setDetectedDefaults((prev) => (prev[leagueId] === detected ? prev : { ...prev, [leagueId]: detected }));
       })

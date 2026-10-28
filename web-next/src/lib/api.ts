@@ -3498,7 +3498,12 @@ export const api = {
   // modules.league_value_settings.detect_league_value_settings_from_payload's
   // exact same mapping.
   getLeague: (leagueId: string) =>
-    authorizedRequest<{ ok: boolean; league: { settings?: { type?: number } } }>(
+    authorizedRequest<{
+      ok: boolean;
+      league: { settings?: { type?: number } };
+      /** The server's one league-format decision (redraft -> "Non-Dynasty"). */
+      default_lens?: string;
+    }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}`,
     ),
 

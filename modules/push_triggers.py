@@ -112,7 +112,7 @@ PUSH_TITLE_BY_CATEGORY = {
     "waiver_reminder": "Waivers Process Soon",
     "trade_deadline": "Trade Deadline",
 }
-DEFAULT_LENS = "Dynasty"
+DEFAULT_LENS = league_value_settings.DEFAULT_VALUATION_LENS  # per-league lens: default_lens_for_league
 
 
 def _safe_text(value: Any, default: str = "") -> str:
@@ -1093,12 +1093,6 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
         if not sleeper_user_id:
             continue
 
-        if DEFAULT_LENS not in players_cache:
-            players_cache[DEFAULT_LENS] = load_valued_players(DEFAULT_LENS, None)
-        players_df, score_field = players_cache[DEFAULT_LENS]
-        if players_df.empty:
-            continue
-
         try:
             leagues = sleeper_leagues.get_user_leagues(sleeper_username)
         except Exception as exc:
@@ -1109,6 +1103,14 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
         for league in leagues:
             league_id = _safe_text(league.get("league_id"))
             if not league_id:
+                continue
+            # Each league is valued on ITS lens (redraft -> Non-Dynasty), the
+            # same one server-side decision the app and web open on.
+            league_lens = league_value_settings.default_lens_for_league(league)
+            if league_lens not in players_cache:
+                players_cache[league_lens] = load_valued_players(league_lens, None)
+            players_df, score_field = players_cache[league_lens]
+            if players_df.empty:
                 continue
             stats["leagues_checked"] += 1
             try:

@@ -2372,7 +2372,9 @@ def get_league(league_id: str = Depends(resolve_league_path_id), _user: dict[str
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
-    return {"ok": True, "league": league}
+    # `default_lens` is the one server-side format decision (redraft ->
+    # Non-Dynasty); both clients open on it instead of detecting it themselves.
+    return {"ok": True, "league": league, "default_lens": league_value_settings.default_lens_for_league(league)}
 
 
 @app.get("/v1/leagues/{league_id}/users")
