@@ -10,6 +10,7 @@
  */
 
 import { notReadyReasonMessage } from "./notReadyMessages";
+import { badgeTone, type ValueTone } from "./tradeValueBands.generated";
 import type { RecordTradeShareAsset, RecordTradeShareBody, TradeAsset, TradeIdea } from "./api";
 
 /** Byte-for-byte port of modules/trade_visual_language.py's confidence_level. */
@@ -45,15 +46,17 @@ export function levelColor(level: "high" | "medium" | "low"): string {
  * from the raw trade_gain sign so a marginally-positive "Fair" trade doesn't
  * read as success-green and a marginally-negative "Slight Overpay" doesn't
  * read as danger-red. */
-const FAIRNESS_BAND_TONE: Record<string, string> = {
-  favorable: "var(--color-success)",
-  fair: "var(--color-text-secondary)",
-  "slight overpay": "var(--color-warning)",
-  "major overpay": "var(--color-danger)",
+const TONE_CSS_VAR: Record<ValueTone, string> = {
+  success: "var(--color-success)",
+  neutral: "var(--color-text-secondary)",
+  warning: "var(--color-warning)",
+  danger: "var(--color-danger)",
 };
 
+/** Badge word -> color via the shared band table (tradeValueBands.generated.ts),
+ * the same table the verdict and mobile read, so no surface keeps its own map. */
 export function fairnessBandColor(band: string | null | undefined): string {
-  return FAIRNESS_BAND_TONE[(band || "").trim().toLowerCase()] ?? "var(--color-text-secondary)";
+  return TONE_CSS_VAR[badgeTone(band)];
 }
 
 /** trade_gain (signed int) -> the display delta string ("+150"/"-800"/"Even") —

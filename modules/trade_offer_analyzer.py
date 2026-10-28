@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from html import escape
 from typing import Any, Callable, Mapping, Sequence
 
-from modules import brand_identity
+from modules import brand_identity, trade_value_bands
 from modules.compact_fantasy_assets import compact_matchup_html
 from modules.trade_analyzer_fit import score_asset_value
 from modules.trade_visual_language import (
@@ -27,29 +27,31 @@ from modules.trade_visual_language import (
 from modules.trade_ideas import _is_core_or_protected_starter
 
 
-VERDICT_SMASH_ACCEPT = "SMASH ACCEPT"
-VERDICT_ACCEPT = "ACCEPT"
-VERDICT_FAIR = "FAIR / PREFERENCE"
-VERDICT_COUNTER = "COUNTER"
-VERDICT_DECLINE = "DECLINE"
-VERDICT_HARD_DECLINE = "HARD DECLINE"
+# Verdict vocabulary and every cut point live in modules.trade_value_bands (the
+# one definition the words, badge and colors also read).
+VERDICT_SMASH_ACCEPT = trade_value_bands.VERDICT_SMASH_ACCEPT
+VERDICT_ACCEPT = trade_value_bands.VERDICT_ACCEPT
+VERDICT_FAIR = trade_value_bands.VERDICT_FAIR
+VERDICT_COUNTER = trade_value_bands.VERDICT_COUNTER
+VERDICT_DECLINE = trade_value_bands.VERDICT_DECLINE
+VERDICT_HARD_DECLINE = trade_value_bands.VERDICT_HARD_DECLINE
 
-UI_VERDICT_ACCEPT = "ACCEPT"
-UI_VERDICT_DECLINE = "DECLINE"
-UI_VERDICT_COUNTER = "COUNTER"
-UI_VERDICT_FAIR = "FAIR"
+UI_VERDICT_ACCEPT = trade_value_bands.UI_VERDICT_ACCEPT
+UI_VERDICT_DECLINE = trade_value_bands.UI_VERDICT_DECLINE
+UI_VERDICT_COUNTER = trade_value_bands.UI_VERDICT_COUNTER
+UI_VERDICT_FAIR = trade_value_bands.UI_VERDICT_FAIR
 
 CONFIDENCE_HIGH = "High confidence"
 CONFIDENCE_MODERATE = "Moderate confidence"
 CONFIDENCE_CLOSE = "Close call"
 
 # Meaningful bands — tiny deltas must not look decisive.
-_VALUE_SMASH = 1500
-_VALUE_ACCEPT = 500
-_VALUE_CLOSE = 700
-_VALUE_COUNTER = -400
-_VALUE_DECLINE = -1200
-_VALUE_HARD = -2200
+_VALUE_SMASH = trade_value_bands.SMASH
+_VALUE_ACCEPT = trade_value_bands.ACCEPT
+_VALUE_CLOSE = 700  # legacy (no lineup model) close-call width only
+_VALUE_COUNTER = trade_value_bands.COUNTER
+_VALUE_DECLINE = trade_value_bands.DECLINE
+_VALUE_HARD = trade_value_bands.HARD
 
 
 @dataclass(frozen=True)
@@ -212,16 +214,10 @@ def _fit_total(fit: Mapping[str, Any] | None) -> int:
     return total
 
 
-def _value_direction_label(value_delta: int) -> str:
-    if value_delta >= _VALUE_ACCEPT:
-        return "You win on asset value"
-    if value_delta > 150:
-        return "Slight value edge to you"
-    if value_delta >= -150:
-        return "Value is essentially even"
-    if value_delta > _VALUE_DECLINE:
-        return "You're giving up more raw value"
-    return "Large value gap against you"
+def _value_direction_label(score: int) -> str:
+    """The sentence under the verdict: same ladder as the verdict itself."""
+
+    return trade_value_bands.direction_label(score)
 
 
 def build_counter_guidance(
@@ -244,7 +240,7 @@ def build_counter_guidance(
 
     if band not in {VERDICT_COUNTER, VERDICT_FAIR, VERDICT_DECLINE}:
         return "", None
-    if value_delta >= -150 and band == VERDICT_FAIR:
+    if value_delta >= -trade_value_bands.EDGE and band == VERDICT_FAIR:
         return "Preference call — counter only if you want a different shape, not because value is broken.", None
 
     gap = abs(min(0, int(value_delta)))
@@ -685,18 +681,8 @@ def decide_offer_verdict(
 
     if lineup_model is not None:
         # One number decides: the posture- and lineup-aware trade score.
-        if trade_score >= _VALUE_SMASH:
-            band, ui, tone = VERDICT_SMASH_ACCEPT, UI_VERDICT_ACCEPT, "accept"
-        elif trade_score >= _VALUE_ACCEPT:
-            band, ui, tone = VERDICT_ACCEPT, UI_VERDICT_ACCEPT, "accept"
-        elif trade_score <= _VALUE_HARD:
-            band, ui, tone = VERDICT_HARD_DECLINE, UI_VERDICT_DECLINE, "decline"
-        elif trade_score <= _VALUE_DECLINE:
-            band, ui, tone = VERDICT_DECLINE, UI_VERDICT_DECLINE, "decline"
-        elif trade_score <= _VALUE_COUNTER:
-            band, ui, tone = VERDICT_COUNTER, UI_VERDICT_COUNTER, "counter"
-        else:
-            band, ui, tone = VERDICT_FAIR, UI_VERDICT_FAIR, "fair"
+        scored = trade_value_bands.band_for_score(trade_score)
+        band, ui, tone = scored.verdict, scored.ui_verdict, scored.tone
     elif value_delta >= _VALUE_SMASH and fit_total >= 4:
         band = VERDICT_SMASH_ACCEPT
         ui = UI_VERDICT_ACCEPT
@@ -803,14 +789,10 @@ def decide_offer_verdict(
             counter = fix_text if not counter else f"{fix_text} Value-wise: {counter}"
             counter_action = fix_action or counter_action
 
-    # The label talks about raw asset value, so it reads the raw delta; the
-    # band above uses the posture-adjusted value_delta (consolidation,
-    # starter strength, injury availability -- see modules.trade_grade).
-    try:
-        raw_value_delta = int(fit.get("raw_value_delta", value_delta))
-    except (TypeError, ValueError):
-        raw_value_delta = value_delta
-    value_summary = _value_direction_label(raw_value_delta)
+    # Words, badge and colors read the SAME score the verdict was decided
+    # from (trade_score; the posture-adjusted value_delta when there is no
+    # lineup model), never the raw asset delta (audit C1b).
+    value_summary = _value_direction_label(trade_score)
     roster_summary = lineup_summary or (f"Roster fit: {roster_fit}." if roster_fit else "Roster impact is limited.")
     if not strategy_summary:
         strategy_summary = "Strategy fit is mixed for your current plan."
@@ -833,7 +815,7 @@ def decide_offer_verdict(
         tone=tone,
         counter_action=counter_action,
         lineup_warnings=lineup_warnings,
-        rationale_label=_rationale_label(tone, trade_score if lineup_model is not None else raw_value_delta),
+        rationale_label=_rationale_label(tone, trade_score),
         trade_score=trade_score,
         confidence_pct=confidence_pct,
         lineup_model=lineup_model,

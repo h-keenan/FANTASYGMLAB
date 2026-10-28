@@ -9,6 +9,8 @@ import re
 from html import escape
 from typing import Literal
 
+from modules import trade_value_bands
+
 CueKind = Literal["why", "risk", "fit", "evidence", "market", "action"]
 
 _EDGE_NUM = re.compile(r"([+\-]?\d+(?:\.\d+)?)")
@@ -136,20 +138,12 @@ def parse_signed_edge(value: object) -> tuple[str, str]:
 def trade_value_band(value: object) -> str:
     """Canonical presentation verdict for an existing delta.
 
-    These labels describe, but never alter, the underlying trade value.
+    These labels describe, but never alter, the underlying trade value. The
+    cut points are the verdict's own (modules.trade_value_bands.band_for_score),
+    so the badge can never disagree with the verdict band.
     """
 
-    match = _EDGE_NUM.search(str(value or "").replace(",", ""))
-    if not match:
-        return "Fair"
-    number = float(match.group(1))
-    if number >= 500:
-        return "Favorable"
-    if number >= -500:
-        return "Fair"
-    if number >= -1500:
-        return "Slight Overpay"
-    return "Major Overpay"
+    return trade_value_bands.trade_value_band(value)
 
 
 def confidence_level(label: object) -> str:
