@@ -1,4 +1,5 @@
 import { AppState } from 'react-native';
+import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 
 import { supabase } from './supabase';
 import { env } from './env';
@@ -1596,6 +1597,8 @@ export interface TradeAnalyzerResponse {
    * stays usable for offseason planning, this just says so. */
   planning_note?: string;
   trade_window?: TradeWindow;
+  /** What this verdict assumed (format, lens, posture, basis, injury timing). */
+  assumptions?: VerdictAssumptions;
 }
 
 export interface DraftPickAsset {
@@ -2135,7 +2138,8 @@ export type PushCategory =
   | 'team_situation'
   | 'trade_followup'
   | 'lineup_lock'
-  | 'waiver_reminder';
+  | 'waiver_reminder'
+  | 'trade_deadline';
 
 export interface PushPreferencesResponse {
   ok: boolean;
@@ -2301,6 +2305,10 @@ export interface DashboardResponse {
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
   trade_ideas_deferred?: boolean;
+  /** League trade-deadline state (additive; absent on older servers). */
+  trade_window?: TradeWindow | null;
+  /** Effective team strategy (contender/rebuild/retool/...); frames the deadline card as buy vs sell. */
+  team_strategy?: string;
   /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
   platform_notice?: string;
 }
@@ -2725,6 +2733,8 @@ export interface TradeHubResponse {
   /** reason === 'trade_deadline_passed' carries this user-facing copy. */
   message?: string;
   trade_window?: TradeWindow;
+  /** Effective team strategy these ideas were generated under. */
+  team_strategy?: string;
   hold?: TradeHubHold | null;
   posture_sentence?: string;
 }
@@ -3511,6 +3521,38 @@ export const api = {
       return acc;
     }, {});
   },
+  // "Report a bad verdict": one fixed reason, no free text; the server stores
+  // it anonymously (modules.verdict_feedback). Same body as web's api.postVerdictFeedback.
+  postVerdictFeedback: (
+    reason: VerdictFeedbackReason,
+    context: {
+      surface: string;
+      platform: string;
+      leagueId: string;
+      lens: string;
+      strategy: string;
+      sendIds: string[];
+      receiveIds: string[];
+      verdictLabel: string;
+      confidence: string;
+      valueDelta: number | null;
+      assumptionsLine: string;
+    },
+  ) =>
+    authorizedPost<{ ok: boolean; reason: string }>('/v1/feedback/verdict', {
+      reason,
+      surface: context.surface,
+      platform: context.platform,
+      league_id: context.leagueId,
+      lens: context.lens,
+      strategy: context.strategy,
+      send_ids: context.sendIds,
+      receive_ids: context.receiveIds,
+      verdict_label: context.verdictLabel,
+      confidence: context.confidence,
+      value_delta: context.valueDelta,
+      assumptions_line: context.assumptionsLine,
+    }),
   recordTradeShare: (
     leagueId: string,
     body: {

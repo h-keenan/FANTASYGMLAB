@@ -1,4 +1,5 @@
 import { env } from "./env";
+import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
@@ -427,6 +428,10 @@ export interface DashboardResponse {
    * (`defer_trade_ideas=true`): the Top Trade Opportunity tile was left out
    * and the full response is still to come. */
   trade_ideas_deferred?: boolean;
+  /** League trade-deadline state (additive; absent on older servers). */
+  trade_window?: TradeWindow | null;
+  /** Effective team strategy (contender/rebuild/retool/...); frames the deadline card as buy vs sell. */
+  team_strategy?: string;
   /** Imported (ESPN / Fleaflicker / MFL) leagues only: what this page leaves out and why. */
   platform_notice?: string;
 }
@@ -2833,6 +2838,8 @@ export interface TradeAnalyzerResponse {
    * stays usable for offseason planning, this just says so. */
   planning_note?: string;
   trade_window?: TradeWindow;
+  /** What this verdict assumed (format, lens, posture, basis, injury timing). */
+  assumptions?: VerdictAssumptions;
 }
 
 /** Trade History (Revision 18) — modules/trade_outcome_results.py's quiet
@@ -3078,7 +3085,8 @@ export type PushCategory =
   | "team_situation"
   | "trade_followup"
   | "lineup_lock"
-  | "waiver_reminder";
+  | "waiver_reminder"
+  | "trade_deadline";
 
 export interface PushPreferencesResponse {
   ok: boolean;
@@ -3916,6 +3924,26 @@ export const api = {
         },
       },
     ),
+  // "Report a bad verdict": one fixed reason, no free text; the server stores
+  // it anonymously (modules.verdict_feedback). Same body as mobile's api.postVerdictFeedback.
+  postVerdictFeedback: (reason: VerdictFeedbackReason, context: VerdictReportContext) =>
+    authorizedRequest<{ ok: boolean; reason: string }>("/v1/feedback/verdict", {
+      method: "POST",
+      jsonBody: {
+        reason,
+        surface: context.surface,
+        platform: context.platform,
+        league_id: context.leagueId,
+        lens: context.lens,
+        strategy: context.strategy,
+        send_ids: context.sendIds,
+        receive_ids: context.receiveIds,
+        verdict_label: context.verdictLabel,
+        confidence: context.confidence,
+        value_delta: context.valueDelta,
+        assumptions_line: context.assumptionsLine,
+      },
+    }),
   getPendingTradeOutcomes: () =>
     authorizedRequest<PendingTradeOutcomesResponse>("/v1/trade-outcomes/pending"),
   answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>

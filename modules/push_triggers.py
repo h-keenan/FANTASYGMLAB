@@ -46,7 +46,7 @@ TRADE_OUTCOMES_TABLE = "trade_outcomes"
 TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
 # Every push category a user can individually toggle off — the Notification
 # Settings screen (mobile) reads/writes exactly this key set.
-TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder")
+TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder", "trade_deadline")
 # push item category -> the preference key that gates it. Only the two
 # one-off pushes differ from their category name.
 PREFERENCE_KEY_BY_CATEGORY = {
@@ -58,6 +58,7 @@ PREFERENCE_KEY_BY_CATEGORY = {
 PUSH_PRIORITY_ORDER = (
     "injury",
     "lineup_lock",
+    "trade_deadline",
     "top_priority",
     "watch",
     "waiver_reminder",
@@ -66,7 +67,18 @@ PUSH_PRIORITY_ORDER = (
     "gm_stance_reminder",
 )
 # Time-critical categories that may use the last weekly-cap slot.
-CAP_RESERVED_CATEGORIES = frozenset({"injury", "lineup_lock"})
+# trade_deadline fires at most three times a season per league and is only
+# useful before the window closes, so it may also use the last slot.
+CAP_RESERVED_CATEGORIES = frozenset({"injury", "lineup_lock", "trade_deadline"})
+# Sleeper exposes the deadline as a WEEK, not a date, so the countdown pushes
+# are week-granular: two weeks out, one week out, and the deadline week
+# itself ("last call"). The sweep never guesses a calendar date.
+TRADE_DEADLINE_PUSH_WEEKS_LEFT = (2, 1, 0)
+TRADE_DEADLINE_PUSH_COPY = {
+    2: "Trade deadline is two weeks away. Review your trade ideas while there is time to deal.",
+    1: "Trade deadline is next week. Check your trade ideas before the market closes.",
+    0: "Last call: this is the trade deadline week. Make your final trades now.",
+}
 # Lineup-lock reminder fires when a flagged player's (or the next slate's)
 # kickoff is inside this window; the sweep runs every 30 minutes.
 LINEUP_LOCK_WINDOW = timedelta(hours=2)
@@ -98,6 +110,7 @@ PUSH_TITLE_BY_CATEGORY = {
     "trade_followup": "Did this trade happen?",
     "lineup_lock": "Lineup Lock",
     "waiver_reminder": "Waivers Process Soon",
+    "trade_deadline": "Trade Deadline",
 }
 DEFAULT_LENS = "Dynasty"
 
@@ -998,6 +1011,34 @@ def waiver_reminder_push_item(
     }
 
 
+def trade_deadline_push_item(
+    *,
+    league_id: str,
+    league_name: str,
+    league: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """A trade-deadline countdown push, only from the league's real deadline week.
+
+    Fires when the in-season league is 2 / 1 / 0 weeks from its Sleeper
+    ``trade_deadline`` week (modules.league_calendar.weeks_to_deadline). No
+    deadline, offseason, or a passed deadline yields None, so nothing is sent
+    once trades are closed. The recommendation_id carries the tier, so each
+    tier dedups against push_notification_log and sends once per league.
+    """
+
+    weeks_left = league_calendar.weeks_to_deadline(league)
+    deadline = league_calendar.trade_deadline_week(league)
+    if deadline is None or weeks_left not in TRADE_DEADLINE_PUSH_WEEKS_LEFT:
+        return None
+    return {
+        "league_id": league_id,
+        "league_name": league_name,
+        "category": "trade_deadline",
+        "headline": TRADE_DEADLINE_PUSH_COPY[weeks_left],
+        "recommendation_id": f"trade_deadline:{league_id}:{deadline}:{weeks_left}",
+    }
+
+
 def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
     """One sweep: check every registered account's leagues, push what's new.
 
@@ -1150,6 +1191,15 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                             push_items.append(waiver_item)
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: lineup/waiver reminder check failed ({exc})")
+
+            if league_payload:
+                deadline_item = trade_deadline_push_item(
+                    league_id=league_id,
+                    league_name=_safe_text(league_payload.get("name"), "Your league"),
+                    league=league_payload,
+                )
+                if deadline_item:
+                    push_items.append(deadline_item)
 
             try:
                 stance_item = gm_stance_reminder_push_item(

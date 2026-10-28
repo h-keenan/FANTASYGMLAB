@@ -14,7 +14,9 @@ import { formatRank } from "@/components/SnapshotTile";
 import { StatStrip } from "@/components/StatStrip";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
-import { useExperienceCopy } from "@/context/ExperienceLevelContext";
+import { DashboardMore, DashboardNowStrip, DashboardTradesBlock } from "@/components/DashboardBlocks";
+import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
+import { isTradeItem, nextMoveRowFilter } from "@/lib/dashboardLayout";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -66,9 +68,19 @@ export function DashboardContent({
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
+  const { goal } = useExperienceLevel();
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const Shell: "div" | "main" = sample ? "div" : "main";
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
+  // Module order: lib/dashboardLayout.ts DASHBOARD_MODULE_ORDER. The trade
+  // idea and the trade row live in the Trades block, a "lineup set" row in the
+  // Now strip; "Next moves" keeps only what is left, so nothing shows twice.
+  const tradeItems = data.items.filter((item) => item.category === "top_priority" && isTradeItem(item));
+  const nextMovesData: DashboardResponse = {
+    ...data,
+    items: data.items.filter((item) => !tradeItems.includes(item)),
+    this_week: data.this_week ? { ...data.this_week, rows: data.this_week.rows.filter(nextMoveRowFilter) } : data.this_week,
+  };
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -99,18 +111,31 @@ export function DashboardContent({
 
       {userId ? <StartHereCard userId={userId} accountCreatedAt={accountCreatedAt} leagueId={leagueId} leagueName={leagueName} /> : null}
 
-      <GuillotineCard data={guillotine} />
-
       {data.platform_notice ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-notice">
           {data.platform_notice}
         </p>
       ) : null}
 
-      <TodayModule data={data} leagueId={leagueId} leagueName={leagueName} />
+      <DashboardNowStrip data={data} leagueId={leagueId} leagueName={leagueName} />
+
+      <DashboardTradesBlock
+        data={data}
+        tradeItems={tradeItems}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        isBeginner={copy.isBeginner}
+        goal={goal}
+      />
+
+      <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} />
 
       {snapshot ? (
-        <section className="flex flex-col gap-2" aria-label="Team summary">
+        <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true" aria-label="Team summary">
+          <SectionHeading id="snapshot-heading" action={<ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />}>
+            My Team
+          </SectionHeading>
+          <BeginnerHelp term="dashboardSnapshot" />
           <StatStrip
             columns={4}
             items={[
@@ -134,35 +159,6 @@ export function DashboardContent({
               },
             ]}
           />
-          {/* Beginner term explanations as short lines under the strip, like
-              the mobile Dashboard. As per-tile captions inside four 390px-wide
-              columns they were ~450px tall and pushed Today below the fold. */}
-          <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
-          <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
-          <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
-          <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge"]} />
-        </section>
-      ) : null}
-
-      {watchItems.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
-          <SectionHeading id="watchlist-heading" action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" />}>
-            Watchlist &amp; Alerts
-          </SectionHeading>
-          <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
-        </section>
-      ) : null}
-
-      {/* League Activity and Guess the Player side by side (stacked on a
-          phone-narrow viewport, where the playable game needs the width).
-          Both self-fetch and render nothing on failure; a lone card takes
-          the full row. */}
-      <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
-
-      {snapshot ? (
-        <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true">
-          <SectionHeading id="snapshot-heading">Team Snapshot</SectionHeading>
-          <BeginnerHelp term="dashboardSnapshot" />
           <StatStrip
             columns={3}
             items={[
@@ -186,29 +182,47 @@ export function DashboardContent({
               },
             ]}
           />
+          {/* Beginner term explanations as short lines under the strips (as
+              per-tile captions inside narrow columns they pushed Today below the fold). */}
+          <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
+          <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
+          <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
           <BeginnerHelp text={copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null} />
           <BeginnerHelp text={copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null} />
-          <GlossaryNote terms={["starterStrength", "benchStrength"]} />
+          <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
         </section>
       ) : null}
-      {/* The two mini-games are play, not decisions: lowest on the page. */}
+
+      <GuillotineCard data={guillotine} />
+
+      {watchItems.length > 0 ? (
+        <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
+          <SectionHeading id="watchlist-heading" action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" />}>
+            Watchlist &amp; Alerts
+          </SectionHeading>
+          <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
+        </section>
+      ) : null}
+
+      <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
+
+      {/* Secondary modules (the two mini-games are play, not decisions) stay
+          collapsed behind "More" so they never push the actionable modules down. */}
       {sample ? null : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 [&>*:only-child]:sm:col-span-2">
-            <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
-          </div>
+        <DashboardMore>
+          <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
           <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
           <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />
-        </>
+        </DashboardMore>
       )}
     </Shell>
   );
 }
 
-function ViewAllLink({ href, label }: { href: string; label: string }) {
+function ViewAllLink({ href, label, label2 = "View All →" }: { href: string; label: string; label2?: string }) {
   return (
     <Link href={href} aria-label={label} className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
-      View All →
+      {label2}
     </Link>
   );
 }

@@ -1,3 +1,6 @@
+import { bridgeNotice, resolveBridgeTrade, type BridgeTrade } from "@/lib/tradeBridge";
+import { VerdictTrust } from "@/components/VerdictTrust";
+import type { VerdictAssumptions } from "@/lib/verdictTrust";
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -571,6 +574,7 @@ export function TradeAnalyzerContent({
   rosters,
   teamProfiles,
   quickAddPlayerId,
+  bridgeTrade,
   lens = "Dynasty",
 }: {
   leagueId: string;
@@ -583,6 +587,10 @@ export function TradeAnalyzerContent({
   /** See this component's own docstring (Revision 20) — a Players row's
    * "Add to Trade" deep-link, ?playerId=. */
   quickAddPlayerId?: string;
+  /** A trade entered on the public Trade Analyzer and carried through
+   * sign-up (?a=&b=, see lib/tradeBridge.ts). Applied once on mount to the
+   * builder, with a note for any player that does not fit this league. */
+  bridgeTrade?: BridgeTrade | null;
   /** Valuation lens recorded with a shared trade. */
   lens?: string;
 }) {
@@ -622,6 +630,7 @@ export function TradeAnalyzerContent({
   // Non-empty once the league's trade deadline has passed — the analyzer
   // stays open for offseason planning, this note just says so.
   const [planningNote, setPlanningNote] = useState("");
+  const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
 
   const selectedPlayerIds = useMemo(
     () => new Set([...sendPlayers, ...receivePlayers].map((p) => p.player_id)),
@@ -727,6 +736,22 @@ export function TradeAnalyzerContent({
     // else: missing/stale id, or not in this league's pool — fail open.
   }
 
+  // Public Trade Analyzer bridge: same render-time "apply once" pattern as the
+  // quick-add above (keyed on the trade's ids so it runs once per trade).
+  const bridgeKey = bridgeTrade ? `${bridgeTrade.a.join(",")}|${bridgeTrade.b.join(",")}` : null;
+  const [appliedBridgeKey, setAppliedBridgeKey] = useState<string | null>(null);
+  const [bridgeMessage, setBridgeMessage] = useState("");
+  if (bridgeTrade && bridgeKey !== appliedBridgeKey) {
+    setAppliedBridgeKey(bridgeKey);
+    const resolution = resolveBridgeTrade({ trade: bridgeTrade, rankings, myRosterIds, otherTeams });
+    setSendPlayers(resolution.send);
+    setReceivePlayers(resolution.receive);
+    if (resolution.partnerRosterId) setSelectedTeamId(resolution.partnerRosterId);
+    // Next thing to pick is whichever side is still empty.
+    setActiveSide(resolution.send.length === 0 ? "send" : "receive");
+    setBridgeMessage(bridgeNotice(resolution));
+  }
+
   function addPick(pick: DraftPickAsset) {
     if (activeSide === "send") setSendPicks((prev) => [...prev, pick]);
     else setReceivePicks((prev) => [...prev, pick]);
@@ -758,6 +783,7 @@ export function TradeAnalyzerContent({
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
       });
       setPlanningNote(result.planning_note ?? "");
+      setAssumptions(result.assumptions ?? null);
       trackUse("trade_analyzer", "evaluated", { leagueId, props: { result: result.verdict ? "verdict" : "no_verdict" } });
       if (result.verdict) {
         setVerdict(result.verdict);
@@ -834,6 +860,12 @@ export function TradeAnalyzerContent({
           Build an offer, get a verdict.
         </p>
       </header>
+
+      {bridgeMessage ? (
+        <p className="m-0 text-sm" role="status" data-testid="bridge-notice" style={{ color: "var(--color-text-secondary)" }}>
+          {bridgeMessage}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
         <TradeSidePanel
@@ -962,6 +994,7 @@ export function TradeAnalyzerContent({
       ) : null}
 
       {verdict ? (
+        <>
         <VerdictCard
           verdict={verdict}
           sendAssets={sendAssets}
@@ -976,6 +1009,23 @@ export function TradeAnalyzerContent({
             myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
           }}
         />
+        <VerdictTrust
+          assumptions={assumptions}
+          context={{
+            surface: "trade_analyzer",
+            platform: "web",
+            leagueId,
+            lens,
+            strategy: "retool",
+            sendIds: [...sendPlayers.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
+            receiveIds: [...receivePlayers.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
+            verdictLabel: verdict.ui_verdict,
+            confidence: verdict.confidence,
+            valueDelta: verdict.value_delta,
+            assumptionsLine: assumptions?.line ?? "",
+          }}
+        />
+        </>
       ) : hasAnyAssets ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           When both sides are ready, tap Analyze Trade for the verdict.

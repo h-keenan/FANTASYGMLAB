@@ -32,6 +32,8 @@ import TeamAvatar from '../components/TeamAvatar';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
+import VerdictTrust from '../components/VerdictTrust';
+import type { VerdictAssumptions } from '../lib/verdictTrust';
 import TradeValueHero from '../components/TradeValueHero';
 import {
   api,
@@ -183,6 +185,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [planningNote, setPlanningNote] = useState('');
+  const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
 
   const orbClearance = useOrbClearance();
 
@@ -442,6 +445,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
       setPlanningNote(result.planning_note ?? '');
+      setAssumptions(result.assumptions ?? null);
       trackUse('trade_analyzer', 'evaluated', {
         leagueId,
         props: { result: result.verdict ? 'verdict' : 'no_verdict' },
@@ -604,6 +608,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
               planning — this note just says the trade can't be sent yet. */}
           {planningNote ? <AppText style={styles.planningNote}>{planningNote}</AppText> : null}
           {verdict ? (
+            <>
             <VerdictCard
               verdict={verdict}
               sendIds={sendIds}
@@ -615,6 +620,23 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
               partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
               onBuildCounter={applyCounterAction}
             />
+            <VerdictTrust
+              assumptions={assumptions}
+              context={{
+                surface: 'trade_analyzer',
+                platform: Platform.OS === 'ios' ? 'ios' : 'android',
+                leagueId,
+                lens,
+                strategy,
+                sendIds: [...sendIds.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
+                receiveIds: [...receiveIds.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
+                verdictLabel: verdict.ui_verdict,
+                confidence: verdict.confidence,
+                valueDelta: verdict.value_delta,
+                assumptionsLine: assumptions?.line ?? '',
+              }}
+            />
+            </>
           ) : null}
         </>
       )}

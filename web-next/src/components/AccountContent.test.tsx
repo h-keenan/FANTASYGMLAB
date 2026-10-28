@@ -25,6 +25,7 @@ const ALL_CATEGORIES_ON: Record<PushCategory, boolean> = {
   trade_followup: true,
   lineup_lock: true,
   waiver_reminder: true,
+  trade_deadline: true,
 };
 
 function renderContent(overrides: Partial<Parameters<typeof AccountContent>[0]> = {}) {

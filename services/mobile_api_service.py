@@ -56,6 +56,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
   - GET  /v1/leagues/{id}/managers/{roster_id}/tendencies — one manager's full tendency profile + evidence (Premium)
   - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
+  - POST /v1/feedback/verdict                   — 'Report a bad verdict': one fixed reason, privacy-safe
   - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
   - GET  /v1/trade-outcomes/pending             — this user's shared trades ready to be asked about
   - POST /v1/trade-outcomes/{id}/answer         — record yes/no/didnt_send, or snooze with still_pending
@@ -236,6 +237,8 @@ from modules import (
     trade_ideas,
     trade_offer_analyzer,
     transaction_grades,
+    verdict_assumptions,
+    verdict_feedback,
     waivers_logic,
     weekly_box_scores,
 )
@@ -5390,12 +5393,24 @@ def post_trade_analyzer(
     # offseason-planning tool — but says so instead of implying the trade
     # can be sent today (modules.league_calendar).
     trade_window = league_calendar.trade_window(league)
+    verdict_public = verdict.to_public_dict()
     return {
         "ok": True,
-        "verdict": verdict.to_public_dict(),
+        "verdict": verdict_public,
         "reason": "",
         "keeper_adjusted": keeper_adjusted,
         "trade_window": trade_window,
+        # Read-only description of what this verdict assumed (format, lens,
+        # posture, projections vs values, injury timing); see
+        # modules.verdict_assumptions. Never feeds back into the verdict.
+        "assumptions": verdict_assumptions.build_verdict_assumptions(
+            lens=body.lens,
+            settings=settings,
+            strategy=body.strategy,
+            keeper_adjusted=keeper_adjusted,
+            has_picks=bool(send_pick_assets or receive_pick_assets),
+            lineup_model=verdict_public.get("lineup_model") if isinstance(verdict_public, dict) else None,
+        ),
         "planning_note": " ".join(
             note
             for note in (
@@ -6741,6 +6756,79 @@ def record_trade_share(
                 "partner_team_name": trade_summary["partner_team_name"],
                 "trade_summary": trade_summary,
             },
+            timeout=15,
+        )
+    except Exception:
+        return {"ok": False, "reason": "not_available"}
+    if response.status_code >= 400:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+class VerdictFeedbackRequest(BaseModel):
+    reason: str
+    surface: str = "trade_analyzer"
+    platform: str = ""
+    league_id: str = ""
+    lens: str = ""
+    strategy: str = ""
+    send_ids: list[str] = Field(default_factory=list)
+    receive_ids: list[str] = Field(default_factory=list)
+    # What the reporter was looking at, echoed so a reviewer can see it.
+    verdict_label: str = ""
+    confidence: str = ""
+    value_delta: float | None = None
+    assumptions_line: str = ""
+
+
+@app.post("/v1/feedback/verdict")
+def post_verdict_feedback(
+    body: VerdictFeedbackRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Store one "bad verdict" report (modules.verdict_feedback).
+
+    Signed-in only (the response is rate limited like every mutating call),
+    but the stored row carries no auth uid: it is inserted as an anonymous
+    ``feedback_reports`` row with a one-way account hash in its context, one of
+    a fixed set of reasons and no free text. Fails closed (ok: False) rather
+    than 500 when the table is not reachable.
+    """
+
+    if body.reason not in verdict_feedback.REASONS:
+        raise HTTPException(status_code=422, detail="reason must be one of: " + ", ".join(verdict_feedback.REASONS))
+    if body.surface not in verdict_feedback.SURFACES:
+        raise HTTPException(status_code=422, detail="surface must be one of: " + ", ".join(sorted(verdict_feedback.SURFACES)))
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+    row = verdict_feedback.build_feedback_row(
+        user_id=user_id,
+        reason=body.reason,
+        surface=body.surface,
+        platform=body.platform,
+        league_id=body.league_id,
+        lens=body.lens,
+        strategy=body.strategy,
+        send_ids=body.send_ids,
+        receive_ids=body.receive_ids,
+        verdict_label=body.verdict_label,
+        confidence=body.confidence,
+        value_delta=body.value_delta,
+        assumptions_line=body.assumptions_line,
+    )
+    if row is None:
+        raise HTTPException(status_code=422, detail="Unrecognised feedback.")
+    config = auth_supabase.get_supabase_config()
+    # Anonymous insert on purpose (no user bearer): the table's guest policy
+    # requires user_id is null, which is what keeps the reporter unidentified.
+    headers = auth_supabase.auth_headers(config, "")
+    headers["Prefer"] = "return=minimal"
+    try:
+        response = requests.post(
+            auth_supabase.rest_api_url(config, verdict_feedback.FEEDBACK_TABLE),
+            headers=headers,
+            json=row,
             timeout=15,
         )
     except Exception:
@@ -10185,6 +10273,12 @@ def get_league_dashboard(
             stance=declared_team_stance,
         ),
     }
+    # Additive: lets the Dashboard's "what matters now" strip show the real
+    # trade-deadline week (modules.league_calendar), never a guessed date.
+    response["trade_window"] = league_calendar.trade_window(league)
+    # Additive: the effective strategy (declared Team Situation, else retool)
+    # so the deadline card can frame buy vs sell without a second request.
+    response["team_strategy"] = team_strategy
     if trade_ideas_deferred:
         response["trade_ideas_deferred"] = True
     if is_external:
@@ -14983,11 +15077,11 @@ def get_public_content_feed():
 # (web-next /dynasty-rankings, /players/[slug], ...). Default 12-team PPR
 # dynasty settings only -- never reads a user, league, roster or account.
 @app.get("/v1/public/dynasty-values")
-def get_public_dynasty_values(format: str = "1qb") -> JSONResponse:
+def get_public_dynasty_values(format: str = "1qb", tep: bool = False) -> JSONResponse:
     fmt = str(format or "").strip().lower()
     if fmt not in public_dynasty_values.FORMATS:
         raise HTTPException(status_code=422, detail="format must be one of: " + ", ".join(public_dynasty_values.FORMATS))
-    payload = public_dynasty_values.get_public_dynasty_values(PLAYERS_DB_PATH, fmt)
+    payload = public_dynasty_values.get_public_dynasty_values(PLAYERS_DB_PATH, fmt, bool(tep))
     if payload is None:
         raise HTTPException(status_code=503, detail="Dynasty values are not available right now.")
     return JSONResponse(content=payload, headers={"Cache-Control": "public, max-age=300"})

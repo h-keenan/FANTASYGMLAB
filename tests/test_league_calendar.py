@@ -34,6 +34,8 @@ def test_deadline_passes_the_week_after_the_deadline_week():
         "trade_deadline_week": 11,
         "current_week": 12,
         "trade_deadline_passed": True,
+        "weeks_to_deadline": None,
+        "deadline_phase": "passed",
         "message": "Trade deadline has passed; trades reopen after the season.",
     }
 
@@ -108,3 +110,24 @@ def test_gm_plan_trade_focus_area_stops_pushing_trades_after_the_deadline():
     assert trade_area["watch_for"] == "Trade deadline has passed; trades reopen after the season."
     assert trade_area["trade_deadline_passed"] is True
     assert plan["season_phase_label"] == "Past the Trade Deadline"
+
+
+def test_weeks_to_deadline_counts_down_to_zero_in_the_deadline_week():
+    assert league_calendar.weeks_to_deadline(_league(trade_deadline=11, leg=8)) == 3
+    assert league_calendar.weeks_to_deadline(_league(trade_deadline=11, leg=11)) == 0
+
+
+def test_weeks_to_deadline_is_none_when_unknown_passed_or_offseason():
+    assert league_calendar.weeks_to_deadline(_league(trade_deadline=11, leg=12)) is None
+    assert league_calendar.weeks_to_deadline(_league(trade_deadline=99, leg=5)) is None
+    assert league_calendar.weeks_to_deadline(_league(trade_deadline=11)) is None
+    assert league_calendar.weeks_to_deadline(_league("complete", trade_deadline=13, leg=3)) is None
+    assert league_calendar.weeks_to_deadline(None) is None
+
+
+def test_deadline_phase_names_each_state_of_the_window():
+    assert league_calendar.deadline_phase(_league(trade_deadline=11, leg=8)) == "open"
+    assert league_calendar.deadline_phase(_league(trade_deadline=11, leg=11)) == "final_week"
+    assert league_calendar.deadline_phase(_league(trade_deadline=11, leg=12)) == "passed"
+    assert league_calendar.deadline_phase(_league(trade_deadline=99, leg=5)) == "none"
+    assert league_calendar.deadline_phase(_league("complete", trade_deadline=13, leg=17)) == "none"

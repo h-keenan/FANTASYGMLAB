@@ -2376,6 +2376,11 @@ def test_trade_analyzer_returns_real_verdict_for_lopsided_upgrade(monkeypatch):
     assert verdict["value_delta"] > 0
     for key in ("band", "ui_verdict", "confidence", "rationale", "value_summary", "roster_summary"):
         assert key in verdict
+    # What the verdict assumed rides along, read-only (modules.verdict_assumptions).
+    assumptions = body["assumptions"]
+    assert assumptions["line"].startswith("Assumed: ")
+    assert "Contender posture" in assumptions["line"]
+    assert {item["key"] for item in assumptions["items"]} >= {"format", "lens", "posture", "basis", "injury"}
 
 
 def test_trade_analyzer_returns_lineup_model_numbers_in_season(monkeypatch):
@@ -7327,7 +7332,7 @@ def test_get_push_preferences_defaults_all_categories_enabled(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert body["categories"] == {"top_priority": True, "watch": True, "recap": True, "injury": True, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True}
+    assert body["categories"] == {"top_priority": True, "watch": True, "recap": True, "injury": True, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True}
 
 
 def test_get_push_preferences_reflects_stored_overrides(monkeypatch):
@@ -7387,7 +7392,7 @@ def test_update_push_preference_upserts_merged_settings(monkeypatch):
     body = response.json()
     assert body == {
         "ok": True,
-        "categories": {"top_priority": True, "watch": False, "recap": True, "injury": False, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True},
+        "categories": {"top_priority": True, "watch": False, "recap": True, "injury": False, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True},
     }
     # Existing "watch": False override is preserved, not clobbered by the new write.
     upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
@@ -7400,6 +7405,7 @@ def test_update_push_preference_upserts_merged_settings(monkeypatch):
         "trade_followup": True,
         "lineup_lock": True,
         "waiver_reminder": True,
+        "trade_deadline": True,
     }
 
 
@@ -13281,6 +13287,69 @@ def test_record_trade_share_fails_closed_when_table_missing(monkeypatch):
     assert response.json() == {"ok": False, "reason": "not_available"}
 
 
+def test_verdict_feedback_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.post("/v1/feedback/verdict", json={"reason": "values_off"}).status_code == 401
+
+
+def test_verdict_feedback_stores_an_anonymous_hashed_row(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=Mock(status_code=201)) as mock_post:
+            response = client.post(
+                "/v1/feedback/verdict",
+                json={
+                    "reason": "lineup_wrong",
+                    "surface": "trade_analyzer",
+                    "platform": "web",
+                    "league_id": "abc",
+                    "lens": "Dynasty",
+                    "strategy": "retool",
+                    "send_ids": ["p1"],
+                    "receive_ids": ["p2"],
+                    "verdict_label": "ACCEPT",
+                    "confidence": "High confidence",
+                    "value_delta": -379,
+                    "assumptions_line": "Assumed: 1QB, PPR.",
+                },
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    kwargs = mock_post.call_args.kwargs
+    # Anonymous insert: the reporter's own bearer token is never sent.
+    assert kwargs["headers"].get("Authorization", "") != "Bearer good-token"
+    row = kwargs["json"]
+    assert row["user_id"] is None and row["email"] == "" and row["message"] == ""
+    assert row["feedback_type"] == "bad_verdict" and row["category"] == "lineup_wrong"
+    assert len(row["context"]["account_hash"]) == 16
+    serialized = str(row)
+    assert "user-123" not in serialized and "gm@example.com" not in serialized
+
+
+def test_verdict_feedback_rejects_unknown_reason_and_fails_closed(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        bad = client.post(
+            "/v1/feedback/verdict", json={"reason": "free text here"}, headers={"Authorization": "Bearer good-token"}
+        )
+        assert bad.status_code == 422
+        with patch("requests.post", return_value=Mock(status_code=404)):
+            down = client.post(
+                "/v1/feedback/verdict", json={"reason": "values_off"}, headers={"Authorization": "Bearer good-token"}
+            )
+    assert down.json() == {"ok": False, "reason": "not_available"}
+
+
 def test_pending_trade_outcomes_returns_real_rows(monkeypatch):
     client = _client(monkeypatch)
 
@@ -15698,6 +15767,9 @@ def test_dashboard_defer_trade_ideas_skips_the_search_and_the_full_call_is_uncha
     assert gm_targets_after_deferred == 0
     assert "trade_ideas_deferred" not in full.json()
     assert searches["n"] == 1
+    # Deadline card framing: the effective strategy rides on the dashboard (unset stance => retool).
+    assert full.json()["team_strategy"] == "retool"
+    assert full.json()["trade_window"]["deadline_phase"] in {"none", "open", "final_week", "passed"}
     assert not [i for i in deferred.json()["items"] if "trade_package" in (i.get("presentation") or {})]
     assert full.json()["team_snapshot"] == deferred.json()["team_snapshot"]
     # This week must not claim a "Hold: no trade improves your team" verdict
@@ -15842,6 +15914,30 @@ def test_public_dynasty_values_is_anonymous_and_league_agnostic(monkeypatch):
     sf_scores = {p["position"]: p["score"] for p in superflex.json()["players"]}
     og_scores = {p["position"]: p["score"] for p in body["players"]}
     assert sf_scores["QB"] >= og_scores["QB"]
+
+
+def test_public_dynasty_values_tep_flag_and_cache_isolation(monkeypatch):
+    from modules import public_dynasty_values
+
+    public_dynasty_values._cache.clear()
+    client = _client(monkeypatch)
+    with patch("modules.rankings.load_players", return_value=_public_values_frame()), patch(
+        "modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kw: df
+    ), patch("modules.public_dynasty_values.os.path.getmtime", return_value=1_700_000_000):
+        std = client.get("/v1/public/dynasty-values?format=1qb").json()
+        tep = client.get("/v1/public/dynasty-values?format=1qb&tep=true").json()
+        std_again = client.get("/v1/public/dynasty-values?format=1qb").json()
+    public_dynasty_values._cache.clear()
+
+    assert std["tep"] is False and std_again["tep"] is False
+    assert tep["tep"] is True
+    te_std = [p["score"] for p in std["players"] if p["position"] == "TE"]
+    te_tep = [p["score"] for p in tep["players"] if p["position"] == "TE"]
+    if te_std and te_tep:
+        assert max(te_tep) >= max(te_std)
+    wr_std = {p["player_id"]: p["score"] for p in std["players"] if p["position"] == "WR"}
+    wr_tep = {p["player_id"]: p["score"] for p in tep["players"] if p["position"] == "WR"}
+    assert wr_std == wr_tep  # TEP only moves tight ends
 
 
 def test_public_dynasty_values_rejects_unknown_format_and_empty_data(monkeypatch):

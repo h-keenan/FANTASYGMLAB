@@ -35,7 +35,7 @@ function player(over: Partial<PublicPlayer> = {}): PublicPlayer {
 }
 
 function board(players: PublicPlayer[]): PublicBoard {
-  return { format: "1qb", scoring: "PPR", teams: 12, generated_at: "2026-10-25T00:00:00Z", source_updated_at: "2026-10-25T00:00:00Z", players };
+  return { format: "1qb", tep: false, scoring: "PPR", teams: 12, generated_at: "2026-10-25T00:00:00Z", source_updated_at: "2026-10-25T00:00:00Z", players };
 }
 
 describe("slugs", () => {

@@ -3,13 +3,13 @@ import Link from "next/link";
 
 import { AppCta, SeoPageShell } from "@/components/seo/SeoChrome";
 import { itemListLd, webPageLd } from "@/lib/seo/jsonld";
-import { absoluteUrl, CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS, OG_IMAGE } from "@/lib/seo/site";
+import { absoluteUrl, CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS, OG_IMAGE, TRADE_ANALYZER_PUBLIC_PATH } from "@/lib/seo/site";
 
 export const revalidate = 86400; // daily ISR (segment config must be a literal)
 
 const TITLE = "Dynasty Fantasy Football Tools: Rankings and Trade Value Chart";
 const DESCRIPTION =
-  "Free dynasty fantasy football tools from FantasyDesk: positional dynasty rankings, a 1QB and Superflex trade value chart, and player value pages, refreshed daily.";
+  "Free dynasty fantasy football tools from FantasyDesk: positional dynasty rankings, a free trade analyzer, a 1QB and Superflex trade value chart, and player value pages, refreshed daily.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -20,6 +20,11 @@ export const metadata: Metadata = {
 };
 
 const TOOLS = [
+  {
+    href: TRADE_ANALYZER_PUBLIC_PATH,
+    name: "Fantasy football trade analyzer",
+    blurb: "Search players for both sides of a trade and get an instant value total and fair/winner verdict, for 1QB or Superflex, with or without tight end premium.",
+  },
   ...SEO_POSITIONS.map((p) => ({
     href: RANKINGS_PATH(p),
     name: `Dynasty ${POSITION_NAMES[p].upper} rankings`,

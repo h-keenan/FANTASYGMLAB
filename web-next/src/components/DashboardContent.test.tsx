@@ -61,7 +61,7 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
     expect(screen.getByText("Test Back")).toBeInTheDocument();
 
-    expect(screen.getByText("Team Snapshot")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "My Team" })).toBeInTheDocument();
     // The stat strip appears once at the top and is not repeated in Team Snapshot.
     expect(screen.getAllByText("Record")).toHaveLength(1);
     expect(screen.getAllByText("Power Rank")).toHaveLength(1);
@@ -132,27 +132,71 @@ describe("DashboardContent", () => {
     expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
   });
 
-  it("puts the Today hero above the rank strip and the mini-games below Team Snapshot", () => {
-    const { container } = render(
-      <DashboardContent
-        leagueId="abc"
-        leagueName="Dynasty Overlords"
-        data={{ ...FIXTURE, entitlement: { ...FIXTURE.entitlement, free_limit: 1 } }}
-      />,
-    );
+  it("orders modules: now strip, Trades, next moves, My Team, alerts, League Activity, More", () => {
+    const data: DashboardResponse = {
+      ...FIXTURE,
+      entitlement: { ...FIXTURE.entitlement, free_limit: 1 },
+      trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
+      this_week: {
+        mode: "in_season",
+        week: 9,
+        rows: [{ key: "lineup", status: "Set", tone: "positive", headline: "Lineup is set", why: "", cta_label: null, route: null, player_id: "" }],
+        next_action: null,
+      },
+      items: [
+        ...FIXTURE.items,
+        { ...FIXTURE.items[0], category: "watch", headline: "Watch item", recommendation_id: "rec-2" },
+      ],
+    };
+    const { container } = render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
     const html = container.innerHTML;
-    const today = html.indexOf("game-plan-heading");
-    const strip = html.indexOf("Team summary");
-    const snapshot = html.indexOf("snapshot-heading");
-    expect(today).toBeGreaterThan(-1);
-    expect(strip).toBeGreaterThan(today);
-    expect(snapshot).toBeGreaterThan(strip);
+    const at = (marker: string) => html.indexOf(marker);
+    const order = [
+      at("dashboard-now-strip"),
+      at("dashboard-trades-block"),
+      at("game-plan-heading"),
+      at("snapshot-heading"),
+      at("watchlist-heading"),
+      at("dashboard-more"),
+    ];
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
     // Free caps are announced up front, from the server's number.
     expect(screen.getByText("Free: showing 1 of 3 next moves")).toBeInTheDocument();
   });
 
-  it("offers the shared glossary for the rank labels", () => {
+  it("shows the real trade deadline and the one primary Trades action", () => {
+    const data: DashboardResponse = {
+      ...FIXTURE,
+      trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
+    };
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
+    expect(screen.getByText("2 wks left (Wk 11)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Analyze a trade" })).toHaveAttribute("href", "/trade-analyzer/abc?name=Dynasty%20Overlords");
+  });
+
+  it("never invents a deadline: no window means no deadline chip", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(2);
+    expect(screen.queryByText(/Trade deadline/i)).not.toBeInTheDocument();
+  });
+
+  it("says trades are closed after the deadline and hides the board link", () => {
+    const data: DashboardResponse = {
+      ...FIXTURE,
+      trade_window: { trade_deadline_week: 11, current_week: 12, trade_deadline_passed: true, message: "x" },
+    };
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
+    expect(screen.getByText(/Trade deadline has passed/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /More trade ideas/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the mini-games collapsed behind More", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expect(screen.getByTestId("dashboard-more")).not.toHaveAttribute("open");
+  });
+
+  it("offers one shared glossary for the rank labels", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(1);
   });
 });

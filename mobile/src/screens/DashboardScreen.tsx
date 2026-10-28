@@ -76,7 +76,9 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
-import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
+import { DashboardMore, DashboardNowStrip, DashboardTradesBlock } from '../components/DashboardBlocks';
+import { isTradeItem, nextMoveRowFilter } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -172,6 +174,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const { showExplanations } = useDensity();
+  const experienceCopy = useExperienceCopy();
+  const { goal } = useExperienceLevel();
   const queryClient = useQueryClient();
   // The persisted AsyncStorage cache restores asynchronously — gating on it
   // keeps a query from firing (and racing/overwriting) before last session's
@@ -398,33 +402,27 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // `items` whenever this is true.
   const showEmptyState = quiet || !items || items.length === 0;
   const grouped = groupDashboardItems(showEmptyState ? [] : items!);
+  const navigate = (name: string, params?: object) => (navigation.navigate as (name: string, params?: object) => void)(name, params);
+  // The trade idea lives in the Trades block and a "lineup set" row in the Now
+  // strip, so the Next moves list never repeats them (lib/dashboardLayout.ts).
+  const tradeItems = grouped.topPriority.filter(isTradeItem);
+  const nonTradeTopPriority = grouped.topPriority.filter((item) => !isTradeItem(item));
+  const nextMovesThisWeek = dashboardData?.this_week
+    ? { ...dashboardData.this_week, rows: dashboardData.this_week.rows.filter(nextMoveRowFilter) }
+    : dashboardData?.this_week;
   return (
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} title="Dashboard" onSearch={requestOrbSearch} />
-      <ScreenInfoNote
-        text={`Home base for ${leagueName}: today's game plan, your matchup, storylines and waiver suggestions, plus quick access to everything else.`}
-      />
-      <CollegeFootballInterestPrompt />
-      <PushPermissionPrompt leagueLoaded={!!session?.user?.id && !!dashboardData} />
-      {!isFirstVisit && newRecommendationIds.size > 0 ? (
-        <View style={styles.checkInBanner}>
-          <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
-          <AppText style={styles.checkInText}>
-            Since your last check-in: {newRecommendationIds.size} new{' '}
-            {newRecommendationIds.size === 1 ? 'item' : 'items'} below
-          </AppText>
-        </View>
-      ) : null}
-
+      {/* Module order: lib/dashboardLayout.ts DASHBOARD_MODULE_ORDER (same on web). */}
       {session?.user?.id ? (
         <StartHereCard
           userId={session.user.id}
           accountCreatedAt={session.user.created_at}
           leagueId={leagueId}
           leagueName={leagueName}
-          onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+          onNavigate={navigate}
         />
       ) : null}
 
@@ -432,17 +430,43 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
 
-      {/* HERO: the one schedule-aware answer to "what should I do now?"
-          (Magna Carta §33). This week's moves and the top-priority briefing
-          cards are one module: today's items first, rest of the week after.
-          Items that used to appear in both are shown once (lib/todayPlan). */}
+      {dashboardData ? (
+        <DashboardNowStrip data={dashboardData} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
+      ) : null}
+
+      {dashboardData ? (
+        <DashboardTradesBlock
+          data={dashboardData}
+          tradeItems={tradeItems}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          isBeginner={experienceCopy.isBeginner}
+          goal={goal}
+          onNavigate={navigate}
+          renderTradeCard={(item, index) => (
+            <BriefingCard
+              key={`trade-${index}`}
+              item={item}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+              isNew={newRecommendationIds.has(item.recommendation_id)}
+              showExplanations={showExplanations}
+              hideAction
+            />
+          )}
+        />
+      ) : null}
+
+      {/* Next moves: what is left of the week's plan once the trade idea (Trades
+          block) and a "lineup set" row (Now strip) are shown where they belong. */}
       <TodayHero
-        thisWeek={dashboardData?.this_week}
-        items={grouped.topPriority}
+        thisWeek={nextMovesThisWeek}
+        items={nonTradeTopPriority}
         leagueId={leagueId}
         leagueName={leagueName}
-        tradePending={Boolean(dashboardData?.trade_ideas_deferred)}
-        onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+        tradePending={false}
+        onNavigate={navigate}
         right={
           <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
             <AppText style={styles.viewAll}>View All ›</AppText>
@@ -470,19 +494,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
         }
       />
 
-      {teamSnapshot ? <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} /> : null}
-
-      {/* Watchlist & Alerts: urgent risks and opportunities in one list. */}
-      <WatchlistAlertsSection
-        snapshot={teamSnapshot}
-        items={[...grouped.watch, ...grouped.opportunity]}
-        leagueId={leagueId}
-        leagueName={leagueName}
-        navigation={navigation}
-        newRecommendationIds={newRecommendationIds}
-        showExplanations={showExplanations}
-      />
-
       {entitlement ? (
         <FreeLimitNote
           kind="window"
@@ -503,60 +514,52 @@ export default function DashboardScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      {/* Secondary context — useful, but not the answer to "what should I
-          do next," so it sits below the actionable feed rather than
-          pushing it under the fold. A new, unopened League Recap is a
-          one-off alert (coridian_: "should not be a button there... should
-          be a module... whenever it's new and has been unopened"), so it
-          renders here as the same proven ready-card AlertsScreen already
-          uses, not as a permanent nav tile — it disappears the moment this
-          device actually opens that recap (see recapOpened above) and
-          never dominates the Hero/Needs Attention/Opportunities tiers
-          above it (Magna Carta §33). */}
-      {readyRecap ? (
-        <View>
-          <SectionHeading title="Storylines" icon="newspaper-outline" />
-          <StorylineSummaryCard recap={readyRecap} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+      {teamSnapshot ? (
+        <View style={styles.snapshotSection}>
+          <SectionHeading
+            title="My Team"
+            right={
+              <TouchableOpacity onPress={() => navigation.navigate('MyTeam', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
+                <AppText style={styles.viewAll}>Open ›</AppText>
+              </TouchableOpacity>
+            }
+          />
+          <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+          <TeamSnapshotRow snapshot={teamSnapshot} />
         </View>
       ) : null}
+
+      {guillotine ? <GuillotineCard data={guillotine} /> : null}
+
+      {!isFirstVisit && newRecommendationIds.size > 0 ? (
+        <View style={styles.checkInBanner}>
+          <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
+          <AppText style={styles.checkInText}>
+            Since your last check-in: {newRecommendationIds.size} new {newRecommendationIds.size === 1 ? 'item' : 'items'}
+          </AppText>
+        </View>
+      ) : null}
+
+      {/* Watchlist & Alerts, then the Priority Adds the Waivers screen leads with. */}
+      <WatchlistAlertsSection
+        snapshot={teamSnapshot}
+        items={[...grouped.watch, ...grouped.opportunity]}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        navigation={navigation}
+        newRecommendationIds={newRecommendationIds}
+        showExplanations={showExplanations}
+      />
       <WaiverSuggestionsStrip
         adds={priorityAdds}
         onPressPlayer={(player) =>
           openQuickView(rankedPlayerFromWaiverPlayer(player), { leagueId, leagueName })
         }
       />
-      {showRecapModule && readyRecap ? (
-        <RecapReadyCard
-          week={readyRecap.week}
-          onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
-        />
-      ) : null}
-      {guillotine ? <GuillotineCard data={guillotine} /> : matchup ? (
-        <WeeklyMatchupCard
-          matchup={matchup}
-          onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
-        />
-      ) : null}
-      <View style={styles.quickActionsSection}>
-        <SectionHeading title="Quick Actions" icon="apps-outline" />
-        <DashboardQuickActions
-          leagueId={leagueId}
-          leagueName={leagueName}
-          navigation={navigation}
-          // Sleeper's current week off the matchup this screen already
-          // loads, bucketed by the same rule as the server's
-          // gm_plan.derive_season_phase (lib/seasonPhase.ts) — no dates.
-          inSeason={isInSeason(matchup?.week)}
-        />
-      </View>
-      <LeagueTypeControl
-        leagueId={leagueId}
-        data={guillotineQuery.data}
-        onChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.guillotine(leagueId) })}
-      />
-      <View style={styles.activityRow}>
-        {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
-          entitlement && !entitlement.is_premium ? (
+
+      {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
+        <View style={styles.activityRow}>
+          {entitlement && !entitlement.is_premium ? (
             <View style={styles.activityCell}>
               <PremiumLock
                 title="League Activity"
@@ -567,22 +570,60 @@ export default function DashboardScreen({ route, navigation }: Props) {
             <View style={styles.activityCell}>
               <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
             </View>
-          )
-        ) : null}
-      </View>
-      {teamSnapshot ? (
-        <TeamSnapshotRow snapshot={teamSnapshot} />
+          )}
+        </View>
       ) : null}
-      {/* The mini-game is play, not a decision: lowest module on the screen. */}
-      <View style={{ marginBottom: spacing.md }}>
-        <DashboardGuessCard />
-      </View>
-      <View style={styles.standingStrips}>
-        <LeagueStandingStrips
+
+      {/* Secondary modules stay collapsed behind "More" so the actionable ones
+          above are reachable without scrolling past them. */}
+      <DashboardMore>
+        {experienceCopy.isBeginner ? (
+          <ScreenInfoNote
+            text={`Home base for ${leagueName}: your trades, this week's moves, your team and waiver suggestions, plus quick access to everything else.`}
+          />
+        ) : null}
+        {readyRecap ? (
+          <View>
+            <SectionHeading title="Storylines" icon="newspaper-outline" />
+            <StorylineSummaryCard recap={readyRecap} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+          </View>
+        ) : null}
+        {showRecapModule && readyRecap ? (
+          <RecapReadyCard
+            week={readyRecap.week}
+            onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+          />
+        ) : null}
+        {!guillotine && matchup ? (
+          <WeeklyMatchupCard
+            matchup={matchup}
+            onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
+          />
+        ) : null}
+        <View>
+          <SectionHeading title="Quick Actions" icon="apps-outline" />
+          <DashboardQuickActions
+            leagueId={leagueId}
+            leagueName={leagueName}
+            navigation={navigation}
+            // Sleeper's current week off the matchup this screen already
+            // loads, bucketed by the same rule as the server's
+            // gm_plan.derive_season_phase (lib/seasonPhase.ts) — no dates.
+            inSeason={isInSeason(matchup?.week)}
+          />
+        </View>
+        <LeagueTypeControl
           leagueId={leagueId}
-          onNavigate={(name, params) => (navigation.navigate as (name: string, params?: object) => void)(name, params)}
+          data={guillotineQuery.data}
+          onChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.guillotine(leagueId) })}
         />
-      </View>
+        <DashboardGuessCard />
+        <LeagueStandingStrips leagueId={leagueId} onNavigate={navigate} />
+      </DashboardMore>
+
+      {/* One-off prompts last: they never sit between the user and the first action. */}
+      <CollegeFootballInterestPrompt />
+      <PushPermissionPrompt leagueLoaded={!!session?.user?.id && !!dashboardData} />
       </ScrollView>
     </View>
   );
@@ -761,8 +802,8 @@ export function DashboardStatStrip({
   );
 }
 
-/** Team Snapshot: Starter Strength, Bench Strength and Injuries only. The
- * record/rank/age strip lives once at the top of the screen. */
+/** Starter Strength, Bench Strength and Injuries only; renders under the
+ * "My Team" heading together with the record/rank/age strip. */
 export function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -776,7 +817,6 @@ export function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
     : [];
   return (
     <View style={styles.snapshotSection}>
-      <SectionHeading title="Team Snapshot" />
       <DashboardStatRow
         items={[
           {
@@ -812,6 +852,7 @@ function TopPriorityTradeCard({
   navigation,
   isNew,
   showExplanations,
+  hideAction = false,
 }: {
   item: DashboardItem;
   leagueId: string;
@@ -819,6 +860,8 @@ function TopPriorityTradeCard({
   navigation: DashboardNavigation;
   isNew: boolean;
   showExplanations: boolean;
+  /** The Trades block owns the block's one action; hide the card's own button. */
+  hideAction?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -880,7 +923,7 @@ function TopPriorityTradeCard({
       </View>
 
       {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
-      <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+      {hideAction ? null : <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />}
     </AccentCard>
   );
 }
@@ -898,6 +941,7 @@ export function BriefingCard({
   navigation,
   isNew,
   showExplanations,
+  hideAction = false,
 }: {
   item: DashboardItem;
   leagueId: string;
@@ -905,6 +949,7 @@ export function BriefingCard({
   navigation: DashboardNavigation;
   isNew: boolean;
   showExplanations: boolean;
+  hideAction?: boolean;
 }) {
   const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
@@ -918,6 +963,7 @@ export function BriefingCard({
         navigation={navigation}
         isNew={isNew}
         showExplanations={showExplanations}
+        hideAction={hideAction}
       />
     );
   }
