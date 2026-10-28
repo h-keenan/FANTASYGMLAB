@@ -32,6 +32,7 @@ import { useDensity } from './DensityContext';
 import { useExperienceLevel } from './ExperienceLevelContext';
 import { normalizeExperienceGoal, normalizeExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode } from './ThemeModeContext';
+import { deleteAccountOnServer } from '../lib/accountDeletion';
 
 interface AuthContextValue {
   session: Session | null;
@@ -274,8 +275,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // that elevated privilege. Deleting auth.users cascades to every
         // app table referencing it (profiles, gm_targets, saved_leagues,
         // trade_outcomes, etc.) — no separate per-table cleanup needed.
-        const { error } = await supabase.rpc('delete_user');
-        if (error) return { error: error.message };
+        // The delete-account Edge Function cancels any Stripe subscription
+        // first and only then runs delete_user(); on any failure nothing is
+        // deleted and the error comes back here (no sign-out).
+        const { error } = await deleteAccountOnServer(supabase);
+        if (error) return { error };
         // Same ordering/guarantee as signOut above: push-token unregister
         // first (needs the still-live session), then best-effort
         // sign-out/cache-teardown that always completes via `finally`.

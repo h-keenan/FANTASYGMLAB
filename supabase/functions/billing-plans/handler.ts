@@ -19,12 +19,20 @@ import { stripeRequest, trialEligible } from "../_shared/stripe_api.ts";
 import { fetchBillingProfile, FetchFn, verifyUserJwt } from "../_shared/supabase_rest.ts";
 import { errorResponse, isObj, Json, jsonResponse, pyInt, st } from "../_shared/util.ts";
 
+import { FALLBACK_PLAN_PRICES } from "../_shared/plan_prices.ts";
+
 type PlanDetail = [label: string, price: string, cadence: string];
 
-/** Fallback display values (modules/stripe_billing.py DEFAULT_PLAN_DETAILS). */
+/** Generated from config/plan_prices.json (scripts/sync_plan_prices.py). */
+function planDetail(key: string): PlanDetail {
+  const row = FALLBACK_PLAN_PRICES[key];
+  return [row.label, row.price, row.cadence];
+}
+
+/** Fallback display values (config/plan_prices.json, shared with modules/stripe_billing.py). */
 export const DEFAULT_PLAN_DETAILS: Record<string, PlanDetail> = {
-  [MONTHLY]: ["Monthly", "$3.99", "per month"],
-  [ANNUAL]: ["Annual", "$19.99", "per year"],
+  [MONTHLY]: planDetail(MONTHLY),
+  [ANNUAL]: planDetail(ANNUAL),
 };
 
 /** Plans offered to new signups (Front Office is intentionally not listed, as in FastAPI). */
@@ -43,7 +51,7 @@ export const PREMIUM_FEATURE_LINES: string[] = [
   "Portfolio — your record, rank, and top need across every saved league, not just one",
 ];
 
-/** Port of `_format_price_amount`: "$3.99", "EUR 3.99"; "" when unusable. */
+/** Port of `_format_price_amount`: like $9.99 or EUR 9.99; "" when unusable. */
 export function formatPriceAmount(unitAmount: unknown, currency: string): string {
   const n = pyInt(unitAmount);
   if (n === null) return "";

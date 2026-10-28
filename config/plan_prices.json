@@ -1,0 +1,8 @@
+{
+  "_comment": "ONE source for the OFFLINE fallback plan prices (display only, never what is charged). Live Stripe prices via the billing-plans function are the truth whenever reachable. Edit here, then run: python scripts/sync_plan_prices.py. Verified against the live billing-plans endpoint 2026-10-27.",
+  "plans": {
+    "monthly": { "label": "Monthly", "price": "$9.99", "cadence": "per month" },
+    "annual": { "label": "Annual", "price": "$59.99", "cadence": "per year" },
+    "front_office_annual": { "label": "Annual", "price": "$99.99", "cadence": "per year" }
+  }
+}
