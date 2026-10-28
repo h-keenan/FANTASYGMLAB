@@ -1,0 +1,89 @@
+name: Ops Health Check
+
+# External watchdog for the live stack. Runs scripts/ops_health_check.py:
+# public surfaces, deploy drift, TLS expiry, Supabase + billing-plans,
+# data freshness (news, rating snapshots) and the age of every other
+# scheduled workflow's last success. On failure it opens (or comments on)
+# one tracking issue titled "Ops health check is failing" and, if the
+# optional OPS_ALERT_WEBHOOK_URL secret is set (a Discord/Slack-compatible
+# incoming webhook), posts a short message. It closes the issue on recovery.
+#
+# GitHub-hosted schedules are best effort and are often delayed by hours, so
+# this is a second pair of eyes, not a paging system. Pair it with an
+# external uptime monitor (see docs/incident-runbook.md). The script only
+# prints check names and status, never environment values.
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: ops-health-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run health checks
+        id: check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python scripts/ops_health_check.py > ops-report.md
+          code=$?
+          cat ops-report.md
+          cat ops-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Open or update the alert issue
+        if: steps.check.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK_URL: ${{ secrets.OPS_ALERT_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Ops health check is failing"
+          failing=$(grep '^Failing:' ops-report.md | head -1)
+          [ -n "$failing" ] || failing="Failing: script error (see run log)"
+          body="$(cat ops-report.md)
+
+          Run: ${RUN_URL}"
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          notify=1
+          if [ -n "$num" ]; then
+            last=$(gh api "repos/$GITHUB_REPOSITORY/issues/$num/comments?per_page=1&direction=desc" --jq '.[0].body // ""' 2>/dev/null || true)
+            if printf '%s' "$last" | grep -qF "$failing"; then
+              notify=0   # same failing set as the last comment: stay quiet
+            else
+              gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+            fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+          if [ "$notify" = "1" ] && [ -n "$WEBHOOK_URL" ]; then
+            payload=$(printf '{"content": "FantasyDesk ops check FAILING. %s %s"}' "$failing" "$RUN_URL")
+            curl -fsS -m 15 -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK_URL" >/dev/null || true
+          fi
+      - name: Close the alert issue after recovery
+        if: steps.check.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for num in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search '"Ops health check is failing" in:title' --json number --jq '.[].number'); do
+            gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment "All checks passing again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done
