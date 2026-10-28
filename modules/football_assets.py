@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from html import escape
 from typing import Literal
 
+from modules import injury_tone
 from modules.player_tier_identity import PlayerTierIdentity, portrait_frame_classes
 
 
@@ -175,14 +176,9 @@ def injury_badge_html(
     label = _text(status).upper()
     if not label:
         return ""
-    tone = "caution" if label in {"Q", "QUESTIONABLE"} else "danger"
-    if label in {"ACTIVE", "HEALTHY"}:
-        tone = "success"
-    elif label not in {
-        "Q", "QUESTIONABLE", "D", "DOUBTFUL", "O", "OUT", "IR",
-        "PUP", "SUS", "SUSP", "SUSPENDED", "INACTIVE",
-    }:
-        tone = "neutral"
+    # The one injury tone map (modules.injury_tone): web and the app read the
+    # same table, so a status is the same color everywhere.
+    tone = {"warning": "caution"}.get(injury_tone.injury_tone(label), injury_tone.injury_tone(label))
     short = {
         "QUESTIONABLE": "Ques",
         "Q": "Ques",

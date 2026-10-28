@@ -78,6 +78,7 @@ function textRowColor(label: string, value: string | null, colors: ThemeColors):
     const tone = injuryTone(value);
     if (tone === 'success') return colors.success;
     if (tone === 'danger') return colors.danger;
+    if (tone === 'warning') return colors.warning;
   }
   return colors.textPrimary;
 }

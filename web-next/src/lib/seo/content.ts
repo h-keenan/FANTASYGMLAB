@@ -1,5 +1,6 @@
 import type { PublicBoard, PublicPlayer } from "./publicValues";
 import { playersAt, PLAYER_PAGE_LIMIT } from "./publicValues";
+import { tierTextLabel } from "../playerTier";
 import { POSITION_NAMES, parsePosition } from "./site";
 
 /** A rankings page needs at least this many players to be worth indexing. */
@@ -52,7 +53,8 @@ export function playerFacts(player: PublicPlayer, board: PublicBoard, superflex:
       `In Superflex his value is ${superflex.score.toLocaleString("en-US")} (#${superflex.position_rank} at the position, #${superflex.overall_rank} overall).`,
     );
   }
-  if (player.tier) facts.push(`Our model places him in the ${player.tier} tier.`);
+  const tierLabel = tierTextLabel(player.tier);
+  if (tierLabel) facts.push(`Our model places him in the ${tierLabel} tier.`);
   if (player.years_exp !== null && player.years_exp > 0) {
     facts.push(`He has ${player.years_exp} ${player.years_exp === 1 ? "year" : "years"} of NFL experience.`);
   }

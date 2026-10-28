@@ -112,6 +112,16 @@ function normalize(value: string | null | undefined): string {
     .join(" ");
 }
 
+/** Plain-text name for a stored tier ("Elite" -> "Generational"), or null when the
+ * string is not a tier name. The one place text labels come from on this side;
+ * mirrors modules/player_tier_identity.tier_display_label. */
+export function tierTextLabel(storedTier: string | null | undefined): string | null {
+  const key = normalize(storedTier);
+  if (!key || ROLE_OPPORTUNITY_LABELS.has(key)) return null;
+  const id = STORED_TIER_TO_ID[key];
+  return id ? (TIER_BY_ID.get(id as PlayerTierId)?.semanticLabel ?? null) : null;
+}
+
 export function resolvePlayerTier(storedTier: string | null | undefined): PlayerTierIdentity {
   const key = normalize(storedTier);
   if (!key || ROLE_OPPORTUNITY_LABELS.has(key)) return DEFAULT_TIER;

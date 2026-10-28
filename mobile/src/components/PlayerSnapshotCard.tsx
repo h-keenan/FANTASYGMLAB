@@ -13,7 +13,7 @@ export interface SnapshotItem {
   /** Small contextual read under the value — e.g. "of all players" / "of
    * RBs" — describing what the rank means, never a fabricated count. */
   descriptor?: string | null;
-  tone?: 'success' | 'danger' | 'neutral';
+  tone?: 'success' | 'warning' | 'danger' | 'neutral';
   /** 'supporting' renders at a smaller weight than the default 'primary' —
    * per coridian_'s hierarchy ask, Overall/Position Rank should read as the
    * card's second tier under Value Score, with Age/Status/Injury as
@@ -43,6 +43,7 @@ export default function PlayerSnapshotCard({
   const toneColor = (tone?: SnapshotItem['tone']) => {
     if (tone === 'success') return colors.success;
     if (tone === 'danger') return colors.danger;
+    if (tone === 'warning') return colors.warning;
     return colors.textPrimary;
   };
   return (

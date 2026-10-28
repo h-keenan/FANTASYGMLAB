@@ -12,7 +12,7 @@ from typing import Any, Callable, Mapping, MutableMapping
 import pandas as pd
 import requests
 
-from modules import performance
+from modules import performance, player_tier_identity, player_tiers
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.sleeper import SLEEPER_BASE
 
@@ -608,7 +608,6 @@ def build_live_draft_recommendations(
 
 
 
-LIVE_DRAFT_TIERS = ("Elite", "Star", "Core Starter", "Starter", "Upside", "Depth")
 
 
 def _setting_truthy(settings: dict[str, Any], *keys: str) -> bool:
@@ -670,27 +669,15 @@ def _age_strategy_adjustment(
 
 
 def _tier_for_rank(rank: int, total: int, existing: str = "") -> str:
-    normalized = safe_text(existing).casefold()
-    aliases = {
-        "elite": "Elite", "star": "Star", "core starter": "Core Starter",
-        "starter": "Starter", "upside": "Upside", "depth": "Depth",
-        "contributor": "Starter", "developmental": "Upside",
-    }
-    if normalized in aliases:
-        return aliases[normalized]
-    pct = rank / max(total, 1)
-    if pct <= 0.03:
-        return "Elite"
-    if pct <= 0.10:
-        return "Star"
-    if pct <= 0.25:
-        return "Core Starter"
-    if pct <= 0.50:
-        return "Starter"
-    if pct <= 0.78:
-        return "Upside"
-    return "Depth"
+    """Draft-board STORED tier name (clients resolve it like every other tier;
+    the text label is player_tier_identity.tier_display_label). A stored tier is kept as is; without
+    one, the pool percentile uses the stored profile's cut points."""
 
+    if player_tier_identity.is_known_stored_tier(existing):
+        text = safe_text(existing)
+        by_lower = {tier.casefold(): tier for tier in player_tiers.PLAYER_TIERS}
+        return by_lower.get(text.casefold(), text)
+    return player_tier_identity.stored_tier_for_pool_percentile(rank / max(total, 1))
 
 
 def resolve_draft_board_score_field(

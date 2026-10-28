@@ -17,6 +17,7 @@ import type {
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { tierTextLabel } from "@/lib/playerTier";
 import { PickPlate } from "@/components/PickRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LiveDraftTradeEvaluator } from "@/components/LiveDraftTradeEvaluator";
@@ -70,7 +71,7 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
               {rec.name || `Player ${rec.player_id}`}
             </span>
             <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-              {rec.team || "—"} · {rec.tier || "Board Value"}
+              {rec.team || "—"} · {tierTextLabel(rec.tier) ?? (rec.tier || "Board Value")}
             </span>
           </div>
         </PlayerIdentityTrigger>

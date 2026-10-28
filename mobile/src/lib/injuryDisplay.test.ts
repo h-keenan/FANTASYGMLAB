@@ -27,9 +27,16 @@ test('season-ending / out-of-action designations read as danger', () => {
   assert.equal(injuryTone('Doubtful'), 'danger');
 });
 
-test('day-to-day designations that are neither healthy nor ruled out read as neutral', () => {
-  assert.equal(injuryTone('Questionable'), 'neutral');
-  assert.equal(injuryTone('Probable'), 'neutral');
+test('day-to-day designations that are neither healthy nor ruled out read as warning (amber)', () => {
+  // Same table as web and the server badge (modules/injury_tone.py).
+  assert.equal(injuryTone('Questionable'), 'warning');
+  assert.equal(injuryTone('Probable'), 'warning');
+});
+
+test('matching is whole-status, never a substring', () => {
+  assert.equal(injuryTone('Hamstring'), 'neutral');
+  assert.equal(injuryTone('Bye'), 'neutral');
+  assert.equal(injuryTone('Inactive'), 'danger');
 });
 
 test('injuryAbbreviation maps common statuses to short pill codes', () => {
@@ -50,4 +57,10 @@ test('injuryAbbreviation never drops an unknown status and is empty for no statu
   assert.equal(injuryAbbreviation(''), '');
   assert.equal(injuryAbbreviation(null), '');
   assert.equal(injuryAbbreviation(undefined), '');
+});
+
+import { INJURY_TONE_GOLDEN } from './injuryTone.generated.ts';
+
+test('the TS tone map replays the Python golden rows', () => {
+  for (const { status, tone } of INJURY_TONE_GOLDEN) assert.equal(injuryTone(status), tone, status);
 });

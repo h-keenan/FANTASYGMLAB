@@ -5,6 +5,7 @@ import PlayerIdentityRow from './PlayerIdentityRow';
 import ValueStat from './ValueStat';
 import type { PresentationAsset } from '../lib/api';
 import { injuryShortCode } from '../lib/tradeAssetDisplay';
+import { injuryTone } from '../lib/injuryDisplay';
 
 /**
  * The one player-or-pick asset row for a trade package (Dashboard top
@@ -45,7 +46,7 @@ export default function TradeAssetRow({
       opportunityLabel={asset.role}
       onPress={onPressPlayer && asset.player_id ? () => onPressPlayer(asset) : undefined}
       injuryLabel={asset.injury_status ? injuryShortCode(asset.injury_status) : null}
-      injuryTone={asset.injury_status && /^(out|ir|injured reserve|sus)/i.test(asset.injury_status) ? 'risk' : 'watch'}
+      injuryTone={injuryTone(asset.injury_status) === 'danger' ? 'risk' : 'watch'}
       trailingExtra={<ValueStat value={asset.score != null ? Math.round(asset.score) : null} />}
     />
   );

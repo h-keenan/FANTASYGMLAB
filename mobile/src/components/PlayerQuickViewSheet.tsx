@@ -264,7 +264,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                   {injury ? (
                     <ToneBadge
                       label={`Health: ${injury}`}
-                      color={injuryTone(player.injury_status) === 'danger' ? colors.danger : colors.premium}
+                      color={injuryTone(player.injury_status) === 'danger' ? colors.danger : colors.warning}
                       size="xs"
                     />
                   ) : null}
