@@ -4984,24 +4984,34 @@ class TradeAnalyzerRequest(BaseModel):
     partner_roster_id: str = ""
 
 
-def _lineup_hole_waiver_options(
-    league_id: str, valued: pd.DataFrame, score_field: str, positions: set[str]
-) -> dict[str, list[str]]:
-    """Top real free agents (unrostered, healthy, waiver-actionable) per position."""
+def _league_waiver_pool(league_id: str, valued: pd.DataFrame) -> pd.DataFrame | None:
+    """The league's real free agents (unrostered, waiver-actionable), valued
+    like ``valued``. None when rosters cannot be read, so the lineup model
+    falls back to the market replacement level rather than assuming an empty
+    pool."""
 
-    roster_map = {
-        str(r.get("roster_id")): list(r.get("players") or []) for r in sleeper.get_rosters(league_id) or []
-    }
+    rosters = sleeper.get_rosters(league_id) or []
+    if not rosters:
+        return None
+    roster_map = {str(r.get("roster_id")): list(r.get("players") or []) for r in rosters}
     rostered = {str(pid) for players in roster_map.values() for pid in players}
     pool = valued[~valued["player_id"].astype(str).isin(rostered)]
     if pool.empty:
-        return {}
+        return pool
     from modules.player_state_authority import waiver_actionable_player_pool
+
+    return waiver_actionable_player_pool(pool, roster_map, surface="trade_analyzer_lineup_hole")
+
+
+def _lineup_hole_waiver_options(
+    pool: pd.DataFrame | None, score_field: str, positions: set[str]
+) -> dict[str, list[str]]:
+    """Top real free agents (healthy, waiver-actionable) per position."""
+
+    if pool is None or pool.empty or score_field not in pool.columns:
+        return {}
     from modules.rankings import injury_level
 
-    pool = waiver_actionable_player_pool(pool, roster_map, surface="trade_analyzer_lineup_hole")
-    if pool.empty or score_field not in pool.columns:
-        return {}
     pool = pool.sort_values(score_field, ascending=False)
     out: dict[str, list[str]] = {}
     for pos in positions:
@@ -5013,6 +5023,44 @@ def _lineup_hole_waiver_options(
         if names:
             out[pos] = names
     return out
+
+
+def _attach_projection_ppg(
+    valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids: set[str], score_field: str
+) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """Attach the walk-forward weekly baseline (``proj_ppg``/``proj_sd``, PPR,
+    availability not applied) to the players the lineup model will look at:
+    the user's roster, the package, the partner, and the top free agents per
+    position. Players with no usable weekly history simply get no column
+    value; the model then labels its fallback basis. Never raises."""
+
+    try:
+        ids = set(player_ids)
+        if pool is not None and not pool.empty and score_field in pool.columns:
+            top = pool.sort_values(score_field, ascending=False).groupby(
+                pool["position"].astype(str).str.upper(), sort=False
+            ).head(25)
+            ids |= {str(pid) for pid in top["player_id"].astype(str)}
+        wanted = valued[valued["player_id"].astype(str).isin(ids)]
+        baselines = player_projections.baseline_weekly_points(
+            [{"player_id": str(r["player_id"]), "position": r.get("position")} for _, r in wanted.iterrows()]
+        )
+        if not baselines:
+            return valued, pool
+
+        def apply(frame: pd.DataFrame | None) -> pd.DataFrame | None:
+            if frame is None or frame.empty:
+                return frame
+            frame = frame.copy()
+            pids = frame["player_id"].astype(str)
+            frame["proj_ppg"] = pids.map(lambda p: (baselines.get(p) or {}).get("ppg"))
+            frame["proj_sd"] = pids.map(lambda p: (baselines.get(p) or {}).get("sd"))
+            return frame
+
+        return apply(valued), apply(pool)
+    except Exception:
+        return valued, pool
+
 
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
 def post_trade_analyzer(
@@ -5131,6 +5179,27 @@ def post_trade_analyzer(
         idp_ids = idp_roster_rows.all_idp_ids(idp_result)
         trusted_idp = idp_roster_rows.trusted_idp_ids(idp_result)
         untrusted_idp = idp_ids - trusted_idp
+    # Trade engine v2 inputs: the league's real free-agent pool (what you
+    # could pick up instead) and the weekly projection baseline for every
+    # player the lineup model will look at. Both degrade to documented
+    # fallbacks (market replacement level, season average, value estimate).
+    try:
+        waiver_pool = _league_waiver_pool(league_id, valued)
+    except Exception:
+        waiver_pool = None
+    valued, waiver_pool = _attach_projection_ppg(
+        valued,
+        waiver_pool,
+        my_roster_ids
+        | {str(p) for p in body.send_player_ids + body.receive_player_ids}
+        | {
+            str(pid)
+            for roster in (sleeper.get_rosters(league_id) if body.partner_roster_id else [])
+            if str(roster.get("roster_id")) == str(body.partner_roster_id)
+            for pid in (roster.get("players") or [])
+        },
+        score_field,
+    )
     my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
     if my_team_df.empty:
         return {"ok": True, "verdict": None, "reason": "empty_roster"}
@@ -5218,6 +5287,7 @@ def post_trade_analyzer(
         strategy=body.strategy,
         lineup_settings=settings,
         score_field=score_field,
+        waiver_df=waiver_pool,
     )
     if not fit or not fit.get("available"):
         return {"ok": True, "verdict": None, "reason": "fit_unavailable"}
@@ -5230,11 +5300,11 @@ def post_trade_analyzer(
         for w in (fit.get("lineup_warnings") or [])
         if w.get("severity") == "critical" and w.get("position")
     }
-    if critical_positions:
+    model_hole = ((fit.get("lineup_model") or {}).get("worst_position")) or ""
+    hole_positions = set(critical_positions) | ({model_hole} if model_hole else set())
+    if hole_positions:
         try:
-            waiver_options = _lineup_hole_waiver_options(
-                league_id, valued, score_field, critical_positions
-            )
+            waiver_options = _lineup_hole_waiver_options(waiver_pool, score_field, hole_positions)
         except Exception:
             waiver_options = {}
 
@@ -5280,7 +5350,7 @@ def post_trade_analyzer(
             my_needs = trade_analyzer_fit.get_needed_positions(my_team_df, None, settings)
             # Positions the trade would leave empty this week rank first when
             # looking for a partner piece to ask for.
-            my_needs = list(dict.fromkeys([*sorted(critical_positions), *my_needs]))
+            my_needs = list(dict.fromkeys([*sorted(hole_positions), *my_needs]))
 
             def _regrade_counter_package(cand_send, cand_receive):
                 cand_fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
@@ -5292,6 +5362,7 @@ def post_trade_analyzer(
                     strategy=body.strategy,
                     lineup_settings=settings,
                     score_field=score_field,
+                    waiver_df=waiver_pool,
                 )
                 if not cand_fit or not cand_fit.get("available"):
                     return None
@@ -5305,7 +5376,7 @@ def post_trade_analyzer(
 
             alternate_packages = trade_offer_analyzer.build_counter_offer_packages(
                 band=verdict.band,
-                value_delta=verdict.value_delta,
+                value_delta=verdict.trade_score,
                 send_assets=send_assets,
                 receive_assets=receive_assets,
                 my_asset_pool=my_asset_pool,

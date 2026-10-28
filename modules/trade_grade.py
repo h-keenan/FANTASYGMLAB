@@ -578,6 +578,7 @@ def grade_trade_for_user(
     score_field: str,
     metrics: dict | None = None,
     current_context: dict | None = None,
+    waiver_df: pd.DataFrame | None = None,
 ):
     """The Trade Analyzer's own verdict for this package, from the user's side.
 
@@ -599,6 +600,7 @@ def grade_trade_for_user(
         lineup_settings=lineup_settings,
         score_field=score_field,
         current_context=current_context,
+        waiver_df=waiver_df,
     )
     if not fit or not fit.get("available"):
         return fit, None

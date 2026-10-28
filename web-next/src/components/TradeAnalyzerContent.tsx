@@ -424,6 +424,27 @@ function VerdictCard({
         <BeginnerHelp term="analyzerValueBalance" />
       </div>
 
+      {verdict.lineup_model ? (
+        <div className="flex flex-col gap-1" data-testid="lineup-model">
+          <span
+            className="text-xs uppercase font-bold"
+            style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+          >
+            Lineup impact
+          </span>
+          <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+            {formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts over Weeks {verdict.lineup_model.weeks.first}-
+            {verdict.lineup_model.weeks.last} ({formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week)
+          </p>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            {verdict.lineup_model.explanation}
+          </p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+            Trade score {formatTradeGain(verdict.lineup_model.trade_score)} = value balance plus lineup points under your posture.
+          </p>
+        </div>
+      ) : null}
+
       {verdict.rationale ? (
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
@@ -484,7 +505,7 @@ function VerdictCard({
 
       <ConfidenceMeter
         label="Confidence"
-        value={verdict.confidence}
+        value={verdict.confidence_pct != null ? `${verdict.confidence} (${Math.round(verdict.confidence_pct)}%)` : verdict.confidence}
         level={LEVEL_SEGMENTS[confidenceLvl]}
         color={levelColor(confidenceLvl)}
       />
@@ -536,6 +557,12 @@ function VerdictCard({
       </p>
     </AccentCard>
   );
+}
+
+/** Signed lineup points with one decimal under 10, none above: "+4.2", "-92". */
+function formatLineupPoints(points: number): string {
+  const rounded = Math.abs(points) < 10 ? Math.round(points * 10) / 10 : Math.round(points);
+  return `${rounded > 0 ? "+" : rounded < 0 ? "-" : ""}${Math.abs(rounded)}`;
 }
 
 export function TradeAnalyzerContent({

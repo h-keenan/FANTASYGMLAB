@@ -575,6 +575,38 @@ def cached_season_player_weekly(player_id: str, season: int | None = None) -> Li
     return rows
 
 
+def cached_season_weekly_map(season: int | None = None) -> Dict[str, List[Dict[str, Any]]]:
+    """Every player's weekly rows already on disk for a season, in ONE read.
+
+    Same contract as ``cached_season_player_weekly`` (never fetches, empty when
+    the cache is missing/unreadable/has no weekly retention), for callers that
+    need many players at once and must not re-read the cache file per player.
+    """
+
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    if not os.path.exists(cache_path):
+        return {}
+    try:
+        with open(cache_path, "r", encoding="utf-8") as handle:
+            cached = json.load(handle)
+    except Exception:
+        return {}
+    if not isinstance(cached, dict):
+        return {}
+    include_box = season_stats_cache_has_box_scores(cached)
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for identifier, record in cached.items():
+        weekly = record.get("weekly") if isinstance(record, dict) else None
+        if not isinstance(weekly, list):
+            continue
+        rows = [row for row in weekly if isinstance(row, dict)]
+        for row in rows:
+            _fill_played_zero_points(row, include_box_score_points=include_box)
+        out[str(identifier)] = rows
+    return out
+
+
 def get_season_player_stats(
     season: int | None = None,
     *,

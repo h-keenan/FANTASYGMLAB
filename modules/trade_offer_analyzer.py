@@ -81,6 +81,15 @@ class OfferVerdict:
     # Heading for `rationale` that matches the verdict's direction, so a
     # losing trade is never headlined "Why this works".
     rationale_label: str = "Why this works"
+    # Trade engine v2 (modules.trade_lineup_model). `trade_score` is the ONE
+    # number the band, confidence, risk text and counter search derive from:
+    # value balance + posture weighting + lineup-points context. Without the
+    # model (offseason) it equals `value_delta`. `confidence_pct` is
+    # P(the direction of the score is right); `lineup_model` carries the
+    # points/uncertainty numbers UI and bot text can cite.
+    trade_score: int = 0
+    confidence_pct: float | None = None
+    lineup_model: dict[str, Any] | None = None
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -100,6 +109,9 @@ class OfferVerdict:
             "alternate_packages": [dict(pkg) for pkg in self.alternate_packages],
             "lineup_warnings": [dict(w) for w in self.lineup_warnings],
             "rationale_label": self.rationale_label,
+            "trade_score": self.trade_score,
+            "confidence_pct": self.confidence_pct,
+            "lineup_model": self.lineup_model,
         }
 
     def with_alternate_packages(
@@ -378,6 +390,9 @@ def _package_entry(
         "ui_verdict": verdict.ui_verdict,
         "confidence": verdict.confidence,
         "value_delta": verdict.value_delta,
+        "trade_score": verdict.trade_score,
+        "confidence_pct": verdict.confidence_pct,
+        "lineup_points_delta": ((verdict.lineup_model or {}).get("points") or {}).get("ros_delta"),
     }
 
 
@@ -428,15 +443,32 @@ def build_counter_offer_packages(
 
     results: list[dict[str, Any]] = []
     seen_signatures: set[tuple[str, str]] = set()
+    # Trade engine v2: when candidates are graded by the lineup model, every
+    # candidate is scored (not just the first few that clear the bar) and the
+    # packages returned are the ones that maximize the same trade_score the
+    # verdict used, subject to the partner still seeing a roughly fair market
+    # balance. Legacy (no model) keeps the first-clear-the-bar behaviour.
+    state = {"model": False, "regrades": 0}
+    max_regrades = 20
+
+    def _cap() -> int:
+        return max_packages * 3 if state["model"] else max_packages
 
     def _record(candidate_send, candidate_receive, label) -> bool:
         sig = (
             ",".join(sorted(_asset_identity(a) for a in candidate_send)),
             ",".join(sorted(_asset_identity(a) for a in candidate_receive)),
         )
-        if sig in seen_signatures:
+        if sig in seen_signatures or state["regrades"] >= max_regrades:
             return False
+        state["regrades"] += 1
         verdict = regrade(candidate_send, candidate_receive)
+        if verdict is not None and getattr(verdict, "lineup_model", None):
+            state["model"] = True
+            if verdict.value_delta > _VALUE_ACCEPT:
+                # The partner would be giving up clearly more market value
+                # than they get: not a package they can say yes to.
+                return False
         if verdict is None or verdict.tone not in _FAVORABLE_TONES:
             return False
         seen_signatures.add(sig)
@@ -458,7 +490,7 @@ def build_counter_offer_packages(
     if len(send_list) > 1:
         by_score = sorted(send_list, key=_asset_score)
         for weakest in by_score[:2]:
-            if len(results) >= max_packages:
+            if len(results) >= _cap():
                 break
             candidate_send = [a for a in send_list if _asset_identity(a) != _asset_identity(weakest)]
             if not candidate_send:
@@ -477,7 +509,7 @@ def build_counter_offer_packages(
     # cheaper replacement (the point is reducing outgoing value, not
     # restructuring it), drawn strictly from `my_asset_pool` (real, owned
     # assets only) and never a protected/untouchable one.
-    if len(results) < max_packages and send_list and my_asset_pool:
+    if len(results) < _cap() and send_list and my_asset_pool:
         weakest = min(send_list, key=_asset_score)
         weakest_score = _asset_score(weakest)
         bench_candidates = _rank_addition_candidates(
@@ -488,7 +520,7 @@ def build_counter_offer_packages(
             limit=6,
         )
         for candidate in bench_candidates:
-            if len(results) >= max_packages:
+            if len(results) >= _cap():
                 break
             if _asset_score(candidate) >= weakest_score:
                 continue
@@ -504,7 +536,7 @@ def build_counter_offer_packages(
     # Strategy 2: ask for one real sweetener from the partner's actual
     # roster — ranked toward filling one of your real needs, never a
     # protected/untouchable partner asset.
-    if len(results) < max_packages:
+    if len(results) < _cap():
         candidates = _rank_addition_candidates(
             partner_asset_pool or (),
             exclude_identities=receive_ids,
@@ -513,7 +545,7 @@ def build_counter_offer_packages(
             limit=6,
         )
         for candidate in candidates:
-            if len(results) >= max_packages:
+            if len(results) >= _cap():
                 break
             candidate_receive = receive_list + [candidate]
             _record(send_list, candidate_receive, f"Ask for {_asset_label(candidate)} too")
@@ -534,7 +566,7 @@ def build_counter_offer_packages(
                 limit=4,
             )
             for candidate in candidates:
-                if len(results) >= max_packages:
+                if len(results) >= _cap():
                     break
                 candidate_receive = receive_list + [candidate]
                 _record(
@@ -543,6 +575,8 @@ def build_counter_offer_packages(
                     f"Remove {_asset_label(trimmed_asset)}, ask for {_asset_label(candidate)}",
                 )
 
+    if state["model"]:
+        results.sort(key=lambda entry: -int(entry.get("trade_score") or 0))
     return results[:max_packages]
 
 
@@ -588,8 +622,10 @@ def lineup_fix_guidance(
     *,
     partner_assets: Sequence[Mapping[str, Any]] | None = None,
     waiver_options: Mapping[str, Sequence[str]] | None = None,
+    pickup: Mapping[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
-    """Concrete ways to close a critical this-week lineup hole."""
+    """Concrete ways to close a lineup hole (the model's worst position, or a
+    this-week critical warning)."""
 
     critical = [w for w in warnings if w.get("severity") == "critical"]
     if not critical:
@@ -612,6 +648,9 @@ def lineup_fix_guidance(
     else:
         parts.append(f"Ask for a startable {pos} back in the deal")
     waiver = [n for n in (waiver_options or {}).get(pos, ()) if n][:3]
+    if pickup and str(pickup.get("position") or "") == pos and pickup.get("name"):
+        name = str(pickup["name"])
+        waiver = [name] + [n for n in waiver if n != name]
     if waiver:
         parts.append(f"or pick up a free-agent {pos} first ({', '.join(waiver)})")
     parts.append(f"or hold off until you have another {pos} you can start")
@@ -637,11 +676,28 @@ def decide_offer_verdict(
     risk_summary = str(fit.get("injury_summary") or "Risk context stays close to neutral.").strip()
     roster_fit = str(fit.get("roster_fit_verdict") or "").strip()
 
+    lineup_model = fit.get("lineup_model") if isinstance(fit.get("lineup_model"), Mapping) else None
+    lineup_model = dict(lineup_model) if lineup_model else None
+    trade_score = int(fit.get("trade_score", value_delta)) if lineup_model else value_delta
     # Close band first — tiny edges should not scream ACCEPT/DECLINE.
     close_value = abs(value_delta) < _VALUE_CLOSE
     close_fit = -1 <= fit_total <= 2
 
-    if value_delta >= _VALUE_SMASH and fit_total >= 4:
+    if lineup_model is not None:
+        # One number decides: the posture- and lineup-aware trade score.
+        if trade_score >= _VALUE_SMASH:
+            band, ui, tone = VERDICT_SMASH_ACCEPT, UI_VERDICT_ACCEPT, "accept"
+        elif trade_score >= _VALUE_ACCEPT:
+            band, ui, tone = VERDICT_ACCEPT, UI_VERDICT_ACCEPT, "accept"
+        elif trade_score <= _VALUE_HARD:
+            band, ui, tone = VERDICT_HARD_DECLINE, UI_VERDICT_DECLINE, "decline"
+        elif trade_score <= _VALUE_DECLINE:
+            band, ui, tone = VERDICT_DECLINE, UI_VERDICT_DECLINE, "decline"
+        elif trade_score <= _VALUE_COUNTER:
+            band, ui, tone = VERDICT_COUNTER, UI_VERDICT_COUNTER, "counter"
+        else:
+            band, ui, tone = VERDICT_FAIR, UI_VERDICT_FAIR, "fair"
+    elif value_delta >= _VALUE_SMASH and fit_total >= 4:
         band = VERDICT_SMASH_ACCEPT
         ui = UI_VERDICT_ACCEPT
         tone = "accept"
@@ -684,12 +740,18 @@ def decide_offer_verdict(
 
     lineup_warnings = tuple(dict(w) for w in (fit.get("lineup_warnings") or ()) if isinstance(w, Mapping))
     has_critical_hole = any(w.get("severity") == "critical" for w in lineup_warnings)
-    if has_critical_hole and tone in {"accept", "fair"}:
+    if has_critical_hole and lineup_model is None and tone in {"accept", "fair"}:
         # Leaving a starting slot empty this week is never an "accept as
         # offered" or a coin-flip: it needs a fix first.
         band, ui, tone = VERDICT_COUNTER, UI_VERDICT_COUNTER, "counter"
 
-    if band in {VERDICT_SMASH_ACCEPT, VERDICT_HARD_DECLINE}:
+    confidence_pct = None
+    if lineup_model is not None:
+        # Computed from the score's own uncertainty (injury timing, projection
+        # spread, market-value noise), not from fixed steps.
+        confidence = str(lineup_model.get("confidence_label") or CONFIDENCE_MODERATE)
+        confidence_pct = lineup_model.get("confidence_pct")
+    elif band in {VERDICT_SMASH_ACCEPT, VERDICT_HARD_DECLINE}:
         confidence = CONFIDENCE_HIGH
     elif band == VERDICT_FAIR or (close_value and abs(fit_total) <= 2):
         confidence = CONFIDENCE_CLOSE
@@ -698,7 +760,9 @@ def decide_offer_verdict(
     else:
         confidence = CONFIDENCE_MODERATE
 
-    if has_critical_hole and confidence == CONFIDENCE_CLOSE:
+    if lineup_model is not None:
+        pass
+    elif has_critical_hole and confidence == CONFIDENCE_CLOSE:
         confidence = CONFIDENCE_MODERATE
     elif has_critical_hole and confidence == CONFIDENCE_HIGH and tone == "counter":
         confidence = CONFIDENCE_MODERATE
@@ -716,15 +780,24 @@ def decide_offer_verdict(
 
     counter, counter_action = build_counter_guidance(
         band=band,
-        value_delta=value_delta,
+        value_delta=trade_score,
         send_assets=send_assets or (),
         partner_assets=partner_assets,
     )
     if band == VERDICT_FAIR and not counter:
         counter = ""
-    if has_critical_hole:
+    hole_warnings = list(lineup_warnings) if has_critical_hole else []
+    if lineup_model is not None:
+        hole_warnings = []
+        worst = lineup_model.get("worst_position")
+        if worst and tone in {"counter", "decline"}:
+            hole_warnings = [{"severity": "critical", "position": worst}]
+    if hole_warnings:
         fix_text, fix_action = lineup_fix_guidance(
-            lineup_warnings, partner_assets=partner_assets, waiver_options=waiver_options
+            hole_warnings,
+            partner_assets=partner_assets,
+            waiver_options=waiver_options,
+            pickup=(lineup_model or {}).get("pickup"),
         )
         if fix_text:
             counter = fix_text if not counter else f"{fix_text} Value-wise: {counter}"
@@ -760,7 +833,10 @@ def decide_offer_verdict(
         tone=tone,
         counter_action=counter_action,
         lineup_warnings=lineup_warnings,
-        rationale_label=_rationale_label(tone, raw_value_delta),
+        rationale_label=_rationale_label(tone, trade_score if lineup_model is not None else raw_value_delta),
+        trade_score=trade_score,
+        confidence_pct=confidence_pct,
+        lineup_model=lineup_model,
     )
 
 

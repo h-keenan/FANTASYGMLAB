@@ -3790,6 +3790,23 @@ def build_trade_ideas(
         profile.emit()
 
 
+def _hub_waiver_pool(df_players: pd.DataFrame, roster_players_map: Mapping[Any, Any]) -> pd.DataFrame | None:
+    """The league's real free agents (unrostered, waiver-actionable), or None
+    when rosters are unknown so the lineup model falls back to the market
+    replacement level instead of pretending the pool is empty."""
+
+    if df_players is None or df_players.empty or not roster_players_map or "player_id" not in df_players.columns:
+        return None
+    try:
+        from modules.player_state_authority import waiver_actionable_player_pool
+
+        rostered = {str(pid) for players in roster_players_map.values() for pid in players}
+        pool = df_players[~df_players["player_id"].astype(str).isin(rostered)]
+        return waiver_actionable_player_pool(pool, roster_players_map, surface="trade_hub_gate")
+    except Exception:
+        return None
+
+
 class _UserSideAnalyzerGate:
     """Trade Analyzer verdict for a Hub idea, from the user's side, cached per idea.
 
@@ -3801,7 +3818,8 @@ class _UserSideAnalyzerGate:
     silently dropped, matching the Analyzer returning no verdict.
     """
 
-    def __init__(self, *, my_team_df, all_players_df, strategy, league_settings, score_field):
+    def __init__(self, *, my_team_df, all_players_df, strategy, league_settings, score_field, waiver_df=None):
+        self._waiver_df = waiver_df
         self._my_team_df = my_team_df
         self._all_players_df = all_players_df
         self._strategy = strategy
@@ -3832,12 +3850,16 @@ class _UserSideAnalyzerGate:
             lineup_settings=self._league_settings,
             score_field=self._score_field,
             current_context=self._current_context or None,
+            waiver_df=self._waiver_df,
         )
         if verdict is None:
             self._results[key] = True
             return True
         idea["analyzer_verdict"] = verdict.ui_verdict
         idea["analyzer_value_delta"] = int(verdict.value_delta)
+        # Same single number the Analyzer's verdict is decided on (value
+        # balance + posture + expected lineup points); see modules.trade_lineup_model.
+        idea["analyzer_trade_score"] = int(verdict.trade_score)
         passed = verdict.ui_verdict in trade_grade.PASSING_UI_VERDICTS
         self._results[key] = passed
         return passed
@@ -4632,6 +4654,7 @@ def _build_trade_ideas_impl(
         strategy=active_strategy,
         league_settings=league_settings,
         score_field=score_field,
+        waiver_df=_hub_waiver_pool(df_players, roster_players_map),
     )
     selected: List[Dict[str, Any]] = []
     tag_counts: Dict[str, int] = {}

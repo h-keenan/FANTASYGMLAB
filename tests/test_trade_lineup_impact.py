@@ -66,10 +66,30 @@ def _shaky_rb_roster(extra_rb=None):
     return _roster(rows)
 
 
-def _grade(roster, send, receive, strategy="retool", partner=None, waiver=None):
-    pool = roster
+def _stat_row(pid, pos, value, ppg):
+    return {**_row(pid, pos, value), "ppg": ppg, "games_played": 7, "receptions": 0}
+
+
+def _universe():
+    """A league-wide pool with real season PPG, so the model can calibrate."""
+
+    rows = []
+    for pos, n, top, bottom in (("QB", 20, 24, 12), ("RB", 50, 24, 3), ("WR", 70, 22, 3), ("TE", 25, 14, 2)):
+        for i in range(n):
+            rows.append(_stat_row(f"U_{pos}{i}", pos, 9000 * (1 - i / n) + 200, top - (top - bottom) * i / (n - 1)))
+    return pd.DataFrame(rows)
+
+
+def _free_agents(*items):
+    """Real free agents: (position, ppg) pairs."""
+
+    return pd.DataFrame([_stat_row(f"FA_{pos}{i}", pos, 300, ppg) for i, (pos, ppg) in enumerate(items)])
+
+
+def _grade(roster, send, receive, strategy="retool", partner=None, waiver=None, waiver_df=None):
+    pool = pd.concat([roster, _universe()], ignore_index=True)
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
-        roster, pool, send, receive, None, strategy, SETTINGS, "dynasty_score"
+        roster, pool, send, receive, None, strategy, SETTINGS, "dynasty_score", waiver_df=waiver_df
     )
     verdict = trade_offer_analyzer.decide_offer_verdict(
         fit, send_assets=send, receive_assets=receive, partner_assets=partner, waiver_options=waiver
@@ -80,7 +100,11 @@ def _grade(roster, send, receive, strategy="retool", partner=None, waiver=None):
 def test_screenshot_scenario_flags_no_startable_rb():
     roster = _shaky_rb_roster()
     send = [_asset(roster.set_index("player_id").loc["Jones"].to_dict() | {"player_id": "Jones"})]
-    fit, verdict = _grade(roster, send, [_pick(4800)])
+    # Real waiver pool: the best free-agent RB is a 3-point scrap, so the open
+    # RB slot costs far more than the market's replacement-level assumption.
+    fit, verdict = _grade(
+        roster, send, [_pick(4800)], waiver_df=_free_agents(("RB", 3.5), ("RB", 3.0), ("WR", 5.0), ("TE", 3.0))
+    )
 
     warning = next(w for w in fit["lineup_warnings"] if w["position"] == "RB")
     assert warning["severity"] == "critical"
@@ -104,7 +128,10 @@ def test_fix_guidance_names_partner_rb_and_waiver_options():
         {**_asset(_row("PartnerRB", "RB", 3000)), "owner_roster_id": "2"},
         {**_asset(_row("PartnerInjRB", "RB", 3500, injury="Questionable")), "owner_roster_id": "2"},
     ]
-    _fit, verdict = _grade(roster, send, [_pick(4800)], partner=partner, waiver={"RB": ["Free Agent RB"]})
+    _fit, verdict = _grade(
+        roster, send, [_pick(4800)], partner=partner, waiver={"RB": ["Free Agent RB"]},
+        waiver_df=_free_agents(("RB", 3.5), ("RB", 3.0)),
+    )
     assert "PartnerRB" in verdict.counter_guidance
     assert "PartnerInjRB" not in verdict.counter_guidance  # an injured RB is not a fix
     assert "Free Agent RB" in verdict.counter_guidance
