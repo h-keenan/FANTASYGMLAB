@@ -37,6 +37,7 @@ import { TRADE_FINDER_MAX_PICKS, ownedPicksForRoster, toggleCappedSelection } fr
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import { valueEdgeBandColor } from '../lib/valueBandColor';
 
 // Prop-driven now (TradesScreen owns the single `Trades` route and hosts
 // this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
@@ -56,15 +57,6 @@ interface Props {
 
 const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
-
-function valueEdgeBandColor(colors: ThemeColors): Record<string, string> {
-  return {
-    Favorable: colors.success,
-    Fair: colors.textSecondary,
-    'Slight Overpay': colors.premium,
-    'Major Overpay': colors.danger,
-  };
-}
 
 // Same shape adapters Trade Hub's idea feed uses to hand a lean
 // PresentationAsset off to PlayerDetail/PickDetail — kept local to this
@@ -298,7 +290,7 @@ function ResultCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
-  const bandColor = valueEdgeBandColor(colors)[idea.value_edge_band] ?? colors.textSecondary;
+  const bandColor = valueEdgeBandColor(colors, idea.value_edge_band);
 
   return (
     <AnimatedCard style={styles.resultCard}>

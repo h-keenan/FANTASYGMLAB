@@ -12,10 +12,9 @@ import PlayerIdentityRow from './PlayerIdentityRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { WaiverPriorityAdd } from '../lib/api';
 import { waiverReasonChips } from '../lib/waiverChips';
+import { injuryTone } from '../lib/injuryDisplay';
 import { radii, spacing, type ThemeColors } from '../theme';
 
-const INJURY_RISK_STATUSES = new Set(['out', 'ir', 'doubtful', 'pup', 'suspended']);
-const INJURY_WATCH_STATUSES = new Set(['questionable', 'sus']);
 
 /** Same risk-vs-watch split WaiversScreen has always used, just relocated
  * next to the card that now owns injury presentation — "Out"-caliber
@@ -28,8 +27,11 @@ export function waiverInjuryDisplay(status: string | null): { label: string | nu
   const normalized = (status ?? '').trim().toLowerCase();
   if (!normalized) return { label: null, tone: 'risk', ruledOut: false };
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : null;
-  if (INJURY_RISK_STATUSES.has(normalized)) return { label, tone: 'risk', ruledOut: true };
-  if (INJURY_WATCH_STATUSES.has(normalized)) return { label, tone: 'watch', ruledOut: false };
+  // The shared injury tone map decides: danger is the solid "ruled out" pill,
+  // warning the amber watch pill, everything else no pill.
+  const tone = injuryTone(normalized);
+  if (tone === 'danger') return { label, tone: 'risk', ruledOut: true };
+  if (tone === 'warning') return { label, tone: 'watch', ruledOut: false };
   return { label: null, tone: 'risk', ruledOut: false };
 }
 

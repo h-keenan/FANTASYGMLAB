@@ -111,10 +111,10 @@ describe("PublicTradeAnalyzer", () => {
     await renderLoaded();
     addPlayer("You send", "allen", "Josh Allen");
     addPlayer("You get", "chase", "Ja'Marr Chase");
-    expect(screen.getByTestId("trade-result")).toHaveTextContent("You win this trade on value");
+    expect(screen.getByTestId("trade-result")).toHaveTextContent("Lopsided in your favor");
 
     fireEvent.click(screen.getByRole("button", { name: "Superflex" }));
-    expect(screen.getByTestId("trade-result")).toHaveTextContent("Fair trade on value");
+    expect(screen.getByTestId("trade-result")).toHaveTextContent("Slight edge to them");
 
     expect(trackUse).toHaveBeenCalledWith(
       "public_trade_analyzer",

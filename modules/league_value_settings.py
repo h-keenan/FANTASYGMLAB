@@ -113,6 +113,26 @@ DEFAULT_LEAGUE_VALUE_SETTINGS = {
 }
 
 
+LENS_DYNASTY = "Dynasty"
+LENS_NON_DYNASTY = "Non-Dynasty"
+DEFAULT_VALUATION_LENS = LENS_DYNASTY
+
+
+def default_lens_for_league(league: dict | None) -> str:
+    """The valuation lens a league should open on: ONE server-side decision.
+
+    Sleeper redraft leagues (settings.type == 0) value players on the
+    current-season ("Non-Dynasty") scale; dynasty and keeper leagues (keepers
+    share dynasty horizon math) and anything undetectable use Dynasty. Web,
+    the app (via the league payload's ``default_lens``), the push sweep and
+    the trade-outcome sweep all call this, so a redraft league can never be
+    valued as Dynasty on one surface and Redraft on another (audit C6).
+    """
+
+    league_format = detect_league_value_settings_from_payload(league).get("league_format")
+    return LENS_NON_DYNASTY if league_format == "Redraft" else DEFAULT_VALUATION_LENS
+
+
 def valuation_score_field(valuation_lens: str) -> str:
     return VALUATION_LENS_TO_SCORE_FIELD.get(valuation_lens, "dynasty_score")
 

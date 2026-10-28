@@ -94,7 +94,7 @@ export function priorityNeedNote(neededPositions: string[]): string {
  * the label that function expects, instead of a second status->tone map. */
 export function waiverInjuryDisplay(status: string | null | undefined): {
   label: string | null;
-  tone: "warning" | "danger" | "neutral";
+  tone: "warning" | "danger" | "neutral" | "success";
 } {
   const trimmed = (status ?? "").trim();
   if (!trimmed) return { label: null, tone: "neutral" };

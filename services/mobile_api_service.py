@@ -2372,7 +2372,9 @@ def get_league(league_id: str = Depends(resolve_league_path_id), _user: dict[str
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
-    return {"ok": True, "league": league}
+    # `default_lens` is the one server-side format decision (redraft ->
+    # Non-Dynasty); both clients open on it instead of detecting it themselves.
+    return {"ok": True, "league": league, "default_lens": league_value_settings.default_lens_for_league(league)}
 
 
 @app.get("/v1/leagues/{league_id}/users")
@@ -4976,7 +4978,7 @@ class TradeAnalyzerRequest(BaseModel):
     receive_pick_ids: list[str] = Field(default_factory=list)
     # Any unrecognized value falls back to "retool" — see
     # modules.team_eval.normalize_team_strategy — so this is never rejected.
-    strategy: str = "retool"
+    strategy: str = trade_hub_engine.DEFAULT_ANALYZER_STRATEGY
     lens: str = "Dynasty"
     # Optional: the proposing partner's roster_id. When given, verdict.counter_action
     # can suggest a specific verified partner asset to ask for instead of just

@@ -173,6 +173,16 @@ export function tierGlowIntensity(tierId: string): TierGlowIntensity {
   return GLOW_INTENSITY_BY_TIER[tierId] ?? null;
 }
 
+/** Plain-text name for a stored tier ("Elite" -> "Generational"), or null when the
+ * string is not a tier name. The one place text labels come from on this side;
+ * mirrors modules/player_tier_identity.tier_display_label. */
+export function tierTextLabel(storedTier: string | null | undefined): string | null {
+  const key = normalize(storedTier);
+  if (!key || ROLE_OPPORTUNITY_LABELS.has(key)) return null;
+  const id = STORED_TIER_TO_ID[key];
+  return id ? (TIER_BY_ID.get(id)?.semanticLabel ?? null) : null;
+}
+
 export function resolvePlayerTier(storedTier: string | null | undefined, isDark = true): PlayerTierIdentity {
   const key = normalize(storedTier);
   const base =

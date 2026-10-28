@@ -320,9 +320,9 @@ class TestLiveDraftRankingsTierAndMovementAvoidFullIterrows(unittest.TestCase):
         pool = players().drop(columns=["name"], errors="ignore")
         result = board(pool=pool)
         self.assertIn("tier", result.columns)
-        self.assertTrue(result["tier"].isin(
-            {"Elite", "Star", "Core Starter", "Starter", "Upside", "Depth"}
-        ).all())
+        from modules import player_tiers
+
+        self.assertTrue(result["tier"].isin(set(player_tiers.PLAYER_TIERS)).all())
 
     def test_tier_and_movement_do_not_iterrows_the_full_pool(self):
         real_iterrows = pd.DataFrame.iterrows

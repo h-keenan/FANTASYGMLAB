@@ -76,15 +76,8 @@ export function pickToTradeAsset(pick: DraftPickAsset): TradeAsset {
   };
 }
 
-/** value_delta (signed int) -> the plain-English direction line —
- * byte-for-byte port of modules/trade_offer_analyzer.py's
- * _value_direction_label. Only used as a fallback: the server already sends
- * `value_summary` pre-computed on the verdict, so this never runs for a real
- * result, only documents the same thresholds for anyone reading this file. */
-export function valueDirectionLabel(valueDelta: number): string {
-  if (valueDelta >= 500) return "You win on asset value";
-  if (valueDelta > 150) return "Slight value edge to you";
-  if (valueDelta >= -150) return "Value is essentially even";
-  if (valueDelta > -1200) return "You're giving up more raw value";
-  return "Large value gap against you";
-}
+/** Score -> the plain-English direction line. Re-exported from the shared
+ * band table (generated from modules/trade_value_bands.py): the server already
+ * sends `value_summary` on the verdict, and this is the same ladder the
+ * verdict itself is decided on, so a fallback can never disagree with it. */
+export { valueDirectionLabel } from "./tradeValueBands.generated";

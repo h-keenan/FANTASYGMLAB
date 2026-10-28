@@ -314,8 +314,11 @@ def test_offseason_injury_barely_matters():
     assert offseason["season_week"]["in_season"] is False
 
 
-def test_raw_value_label_still_reads_the_raw_delta():
+def test_value_words_read_the_same_score_as_the_verdict_not_the_raw_delta():
+    # Audit C1b: the sentence used to read raw_value_delta (+300 -> "slight
+    # edge to you") under a score that decides DECLINE.
     fit = {"value_delta": -1300, "raw_value_delta": 300, "component_scores": {}}
     verdict = trade_offer_analyzer.decide_offer_verdict(fit)
     assert verdict.value_delta == -1300
-    assert verdict.value_summary == "Slight value edge to you"
+    assert verdict.value_summary == "Large value gap against you"
+    assert verdict.ui_verdict == "DECLINE"

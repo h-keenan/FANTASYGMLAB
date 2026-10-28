@@ -24,6 +24,7 @@ import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeV
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import { valueEdgeBandColor } from '../lib/valueBandColor';
 
 type TradeHubNavigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -143,15 +144,6 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
 
 
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
-
-function valueEdgeBandColor(colors: ThemeColors): Record<string, string> {
-  return {
-    Favorable: colors.success,
-    Fair: colors.textSecondary,
-    'Slight Overpay': colors.premium,
-    'Major Overpay': colors.danger,
-  };
-}
 
 // modules/trade_hub_ui.py's trade_hub_display_section() taxonomy — mapped
 // to the app's existing semantic palette (not a new color per category)
@@ -276,7 +268,7 @@ export default function TradeIdeaCard({
   const openPick = (asset: PresentationAsset) =>
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 
-  const bandColor = valueEdgeBandColor(colors)[idea.value_edge_band] ?? colors.textSecondary;
+  const bandColor = valueEdgeBandColor(colors, idea.value_edge_band);
 
   const categoryAccent = categoryColor(idea.category, colors);
   const impactConfig = impactTagConfig(colors)[idea.impact_tag];

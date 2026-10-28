@@ -14,6 +14,7 @@ import {
   type TradeBoardPlayer,
   type TradeSettings,
 } from "./tradeAnalyzer";
+import { bandForScore, TRADE_VALUE_GOLDEN } from "../tradeValueBands.generated";
 import { faqLd } from "./jsonld";
 import { parseAttribution } from "../attribution";
 
@@ -60,8 +61,9 @@ describe("evaluateTrade", () => {
   });
 
   it("calls near-equal totals fair", () => {
-    const e = evaluateTrade([BOARD[3]], [BOARD[0]], STD, BOARD); // 8800 vs 9000
+    const e = evaluateTrade([p("20", "Even A", "WR", 5000)], [p("21", "Even B", "WR", 5100)], STD, BOARD);
     expect(e.band).toBe("fair");
+    expect(e.badge).toBe("Fair");
     expect(e.winner).toBe("even");
     expect(e.balancer).toBeNull();
   });
@@ -81,7 +83,7 @@ describe("evaluateTrade", () => {
   it("suggests the real board player closest to the gap, never one already in the deal", () => {
     // gap 2000 (6000 vs 4000): closest unused is Tank Dell 2500
     const e = evaluateTrade([BOARD[4]], [BOARD[5]], STD, BOARD);
-    expect(e.band).toBe("lopsided"); // 2000 of 6000 = 33%
+    expect(e.band).toBe("lopsided"); // -2000: a "decline" on the shared ladder
     expect(e.balancer?.id).toBe("7");
     // no suggestion when nothing on the board is within 25% of the gap
     expect(evaluateTrade([BOARD[4]], [BOARD[5]], STD, [p("9", "Far", "WR", 90000)]).balancer).toBeNull();
@@ -100,6 +102,31 @@ describe("evaluateTrade", () => {
     expect(valueOf(te, STD)).toBe(6500);
     expect(valueOf(te, SF)).toBe(7000);
     expect(valueOf(te, TEP)).toBe(6900);
+  });
+});
+
+describe("public verdict uses the shared band ladder (audit C1/C2)", () => {
+  it("every golden score lands in the same band, badge and tone the in-app verdict uses", () => {
+    for (const { score, id } of TRADE_VALUE_GOLDEN) {
+      const e = evaluateTrade([p("a", "A", "WR", 20000)], [p("b", "B", "WR", 20000 + score)], STD);
+      expect(e.badge, String(score)).toBe(bandForScore(score).badge);
+      expect(e.diff).toBe(score);
+      expect(e.winner).toBe(id === "even" ? "even" : score > 0 ? "b" : "a");
+    }
+  });
+
+  it("prices trades with trade_score (the age-curved value), not the rankings score", () => {
+    const player = (id: string, score: number, trade_score?: number) => ({
+      player_id: id, name: id, position: "WR", team: "KC", age: 30, years_exp: 8, status: null, injury_status: null,
+      score, trade_score, overall_rank: 1, position_rank: 1, tier: null, overall_rating: null, trend: null,
+    });
+    const board = (s: number, t?: number): PublicBoard => ({
+      format: "1qb", tep: false, scoring: "PPR", teams: 12, generated_at: "", source_updated_at: "2026-10-27", players: [player("x", s, t)],
+    });
+    const merged = mergeBoards({ std1qb: board(9000, 8000), stdSf: board(9000, 8000), tep1qb: null, tepSf: null });
+    expect(merged.players[0].v[0]).toBe(8000);
+    const legacy = mergeBoards({ std1qb: board(9000), stdSf: board(9000), tep1qb: null, tepSf: null });
+    expect(legacy.players[0].v[0]).toBe(9000);
   });
 });
 

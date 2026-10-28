@@ -6,6 +6,8 @@
  * stateless, so the screen diffs two consecutive polls itself.
  */
 
+import { badgeTone } from './tradeValueBands.generated.ts';
+
 interface RankRow {
   player_id: string;
   overall_rank: number | null;
@@ -105,16 +107,7 @@ export function liveDraftDraftedPlayerOptions(
 /** Fairness band (server-computed) -> semantic tone name. */
 export type FairnessTone = 'success' | 'neutral' | 'warning' | 'danger';
 export function fairnessBandTone(band: string | null | undefined): FairnessTone {
-  switch ((band || '').trim().toLowerCase()) {
-    case 'favorable':
-      return 'success';
-    case 'slight overpay':
-      return 'warning';
-    case 'major overpay':
-      return 'danger';
-    default:
-      return 'neutral';
-  }
+  return badgeTone(band);
 }
 
 /** trade_gain (signed) -> "+150" / "-800" / "Even". */

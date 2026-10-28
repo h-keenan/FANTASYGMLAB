@@ -23,6 +23,7 @@
  * playerCardBackStats.test.ts.
  */
 
+import { injuryTone as sharedInjuryTone } from './injuryTone.generated.ts';
 import type { PresentationAsset } from './api.ts';
 
 export interface PlayerCardBackStat {
@@ -44,11 +45,9 @@ export interface PlayerCardBackContent {
  * `PlayerIdentityRow`'s `injuryTone` already draws, just derived here from
  * the status text itself since this module has no access to that prop. */
 function injuryTone(injuryStatus: string): 'negative' | 'warning' {
-  const normalized = injuryStatus.toLowerCase();
-  if (normalized.includes('out') || normalized.includes('ir') || normalized.includes('doubtful')) {
-    return 'negative';
-  }
-  return 'warning';
+  // Shared map (injuryTone.generated.ts): danger reads negative, every other
+  // flagged status stays an amber watch.
+  return sharedInjuryTone(injuryStatus) === 'danger' ? 'negative' : 'warning';
 }
 
 export function presentationAssetBackStats(asset: PresentationAsset): PlayerCardBackContent {

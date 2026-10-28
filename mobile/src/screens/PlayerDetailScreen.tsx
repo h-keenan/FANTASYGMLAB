@@ -1107,13 +1107,9 @@ function ModelSection({ model }: { model: QuickViewModel }) {
  * purely a color hint over the same `player.status` string every list
  * screen already shows verbatim; never a second status computation. */
 function statusTone(status: string | null | undefined): SnapshotItem['tone'] {
-  const normalized = (status ?? '').toLowerCase();
-  if (!normalized) return 'neutral';
-  if (normalized.includes('active')) return 'success';
-  if (normalized.includes('injured') || normalized.includes('out') || normalized.includes('ir') || normalized.includes('suspend')) {
-    return 'danger';
-  }
-  return 'neutral';
+  // Whole-status match through the shared tone map (Active green; Inactive,
+  // Injured Reserve, Suspended red) instead of substring checks like "ir".
+  return injuryTone(status);
 }
 
 // injuryTone (Injury Status cell color) now lives in ../lib/injuryDisplay —

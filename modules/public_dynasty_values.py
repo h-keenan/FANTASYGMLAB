@@ -26,7 +26,14 @@ from typing import Any
 
 import pandas as pd
 
-from modules import canonical_player_ranking, league_value_settings, player_eligibility, player_quick_view, rankings
+from modules import (
+    canonical_player_ranking,
+    league_value_settings,
+    player_eligibility,
+    player_quick_view,
+    rankings,
+    trade_hub_engine,
+)
 
 FORMATS = ("1qb", "superflex")
 POSITIONS = ("QB", "RB", "WR", "TE")
@@ -80,6 +87,11 @@ def _text_or_none(value: Any) -> str | None:
     return text or None
 
 
+def _trade_score_or(value: Any, fallback: int) -> int:
+    parsed = _int_or_none(value)
+    return fallback if parsed is None else parsed
+
+
 def build_public_dynasty_values(
     players_df: pd.DataFrame | None, fmt: str, *, source_updated_at: float | None = None, tep: bool = False
 ) -> dict[str, Any] | None:
@@ -104,6 +116,14 @@ def build_public_dynasty_values(
         valued, scoring_format=context.scoring_format, score_field=score_field, context=context
     )
     ranked["_ovr"] = player_quick_view.overall_ratings_for_pool(ranked, score_column=score_field)
+    # The Analyzer's price: the same neutral-posture strategy age curve the
+    # signed-in Analyzer, Trade Hub and the content bot apply (audit C2).
+    # `score` stays the un-curved rankings value; `trade_score` is what a trade
+    # is priced with, so the public Analyzer totals what the app totals.
+    curved = trade_hub_engine.apply_strategy_age_curve(
+        valued, trade_hub_engine.DEFAULT_ANALYZER_STRATEGY, score_field
+    )
+    ranked["_trade_score"] = curved[score_field].reindex(ranked.index)
     ranked = ranked.sort_values(score_field, ascending=False)
 
     rows: list[dict[str, Any]] = []
@@ -128,6 +148,7 @@ def build_public_dynasty_values(
                 "status": _text_or_none(row.get("status")),
                 "injury_status": _text_or_none(row.get("injury_status")),
                 "score": score,
+                "trade_score": _trade_score_or(row.get("_trade_score"), score),
                 "overall_rank": overall,
                 "position_rank": pos_rank,
                 "tier": _text_or_none(row.get("player_tier")),
@@ -152,6 +173,7 @@ def build_public_dynasty_values(
         "scoring": "PPR",
         "teams": 12,
         "lens": LENS,
+        "trade_strategy": trade_hub_engine.DEFAULT_ANALYZER_STRATEGY,
         "generated_at": now.isoformat(),
         "source_updated_at": updated.isoformat(),
         "players": rows,

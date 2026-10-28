@@ -80,7 +80,7 @@ from modules import app_config, league_value_settings, player_eligibility, ranki
 
 PLAYERS_DB_PATH = "data/players.db"
 TRADE_OUTCOMES_TABLE = "trade_outcomes"
-DEFAULT_LENS = "Dynasty"
+DEFAULT_LENS = league_value_settings.DEFAULT_VALUATION_LENS
 
 # "A few weeks", per the brief — long enough for real production data to
 # exist, short enough that the user still remembers the trade when they see
@@ -465,6 +465,7 @@ def run_trade_outcome_result_sweep(*, environ: dict | None = None, secrets: Any 
 
     season_stats: Mapping[str, Any] | None = None
     valued_cache: dict[tuple[str, str], tuple[pd.DataFrame, str]] = {}
+    league_payloads: dict[str, Any] = {}
 
     for row in pending:
         stats["outcomes_checked"] += 1
@@ -489,16 +490,25 @@ def run_trade_outcome_result_sweep(*, environ: dict | None = None, secrets: Any 
                 season_stats = sleeper.get_season_player_stats(retain_weekly=True) or {}
 
             league_id = _safe_text(row.get("league_id"))
-            lens = _safe_text(trade_summary.get("valuation_lens")) or DEFAULT_LENS
+            if league_id not in league_payloads:
+                try:
+                    league_payloads[league_id] = sleeper.get_league(league_id) if league_id else None
+                except Exception:
+                    league_payloads[league_id] = None
+            league = league_payloads[league_id]
+            # A stored lens wins; otherwise the league's own default (redraft
+            # leagues grade on the Non-Dynasty scale), never a blanket Dynasty.
+            lens = _safe_text(trade_summary.get("valuation_lens")) or (
+                league_value_settings.default_lens_for_league(league) if league else DEFAULT_LENS
+            )
             cache_key = (league_id, lens)
             if cache_key not in valued_cache:
                 league_settings: dict[str, Any] = {}
-                try:
-                    league = sleeper.get_league(league_id) if league_id else None
-                    if league:
+                if league:
+                    try:
                         league_settings = league_value_settings.detect_league_value_settings_from_payload(league)
-                except Exception:
-                    league_settings = {}
+                    except Exception:
+                        league_settings = {}
                 valued_cache[cache_key] = load_valued_players_for_result(lens, league_settings)
             valued_df, score_field = valued_cache[cache_key]
             current_value_by_player = _current_value_by_player(valued_df, score_field)

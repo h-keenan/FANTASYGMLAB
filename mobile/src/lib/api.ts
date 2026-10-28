@@ -271,6 +271,8 @@ export interface MyRosterResponse {
 export interface LeagueResponse {
   ok: true;
   league: Record<string, unknown>;
+  /** The server's one league-format decision (redraft -> 'Non-Dynasty'); the app opens on it. */
+  default_lens?: ValuationLens;
 }
 
 export interface LeagueUsersResponse {

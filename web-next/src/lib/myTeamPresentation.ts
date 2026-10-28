@@ -197,16 +197,11 @@ export function buildPositionGroupItems({
     .filter((item): item is PositionGroupItem => item !== null);
 }
 
-/** Injury pill tone — mirrors modules/football_assets.py's
- * injury_badge_html tone resolution (applied to the already-resolved
- * `injury_label` display string, e.g. "Questionable"/"Out"/"IR", rather
- * than a raw Sleeper status code). */
-export function injuryTone(label: string | null | undefined): "warning" | "danger" | "neutral" {
-  const normalized = (label || "").trim().toLowerCase();
-  if (!normalized) return "neutral";
-  if (normalized.includes("quest") || normalized.includes("doubt")) return "warning";
-  return "danger";
-}
+/** Injury pill tone: re-exported from the one shared map
+ * (injuryTone.generated.ts, generated from modules/injury_tone.py, which
+ * modules/football_assets.py's injury_badge_html also reads), so web, the app
+ * and server-rendered badges color a status identically. */
+export { injuryTone } from "./injuryTone.generated";
 
 /** Short code for an injury status, for the compact status pill that
  * sits on a player row's secondary line (PlayerInjuryBadge). A full word

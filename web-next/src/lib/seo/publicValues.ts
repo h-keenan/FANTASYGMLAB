@@ -16,7 +16,11 @@ export interface PublicPlayer {
   years_exp: number | null;
   status: string | null;
   injury_status: string | null;
+  /** Rankings value (no age curve). */
   score: number;
+  /** What a trade is priced with: `score` with the same neutral-posture age curve the
+   * in-app Analyzer applies (modules/public_dynasty_values.py). Absent on older API builds. */
+  trade_score?: number;
   overall_rank: number;
   position_rank: number;
   tier: string | null;

@@ -182,6 +182,45 @@ def resolve_player_tier_identity(
     return DEFAULT_PLAYER_TIER
 
 
+def is_known_stored_tier(stored_tier: object) -> bool:
+    """True when the string is one of the tier names (stored or display), not
+    a role/opportunity descriptor or noise."""
+
+    return _norm(stored_tier) in STORED_PLAYER_TIER_TO_ID
+
+
+def tier_display_label(stored_tier: object) -> str:
+    """The ONE user-facing name for a stored valuation tier ("Elite" -> "Generational").
+
+    Every surface that prints a tier as text (SEO pages, live draft board,
+    cards) goes through this vocabulary: Generational, Elite, Impact Starter,
+    Starter, Contributor, Committee / Role, Depth / Developmental. The word
+    "Elite" therefore means one tier everywhere (audit C4).
+
+    Takes the STORED name only: "Elite" is both a stored name (the top tier)
+    and a display label (the second tier), so a display label must never be
+    fed back in. APIs send the stored `tier` for clients that resolve it
+    (playerTier.ts) and this label as `tier_label` for plain text.
+    """
+
+    return resolve_player_tier_identity(stored_tier=stored_tier).semantic_label
+
+
+def stored_tier_for_pool_percentile(pct: float) -> str:
+    """Stored tier name for a player ranked at `pct` (0-1, 0 = best) in a pool,
+    using the stored tier profile's own cut points (player_tiers), so a draft
+    board can never invent its own ladder. Pass the result through
+    ``tier_display_label`` for text."""
+
+    from modules import player_tiers
+
+    share = 1.0 - max(0.0, min(1.0, float(pct)))
+    for stored, cut in player_tiers.DEFAULT_PLAYER_TIER_PROFILE["thresholds"]:
+        if share >= cut:
+            return stored
+    return player_tiers.PLAYER_TIERS[-1]
+
+
 def portrait_frame_classes(
     identity: PlayerTierIdentity | None,
     *,

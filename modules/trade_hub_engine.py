@@ -55,6 +55,12 @@ def _safe_text(value: object, default: str = "") -> str:
     return text if text else default
 
 
+# The neutral posture every "no team context" valuation uses: the signed-in
+# Analyzer's default (POST .../trade-analyzer `strategy`), the bot's interesting
+# trades and the public Analyzer's board. One name so they cannot drift apart.
+DEFAULT_ANALYZER_STRATEGY = "retool"
+
+
 def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) -> pd.DataFrame:
     """Faithful port of app.py's apply_strategy_age_curve — see module docstring.
 

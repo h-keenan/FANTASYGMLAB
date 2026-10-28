@@ -72,12 +72,12 @@ export function buildPublicTradeCard(
     market_realism_label: "",
     reasoning_tags: [],
     category: "",
-    value_edge_band: result.band,
+    value_edge_band: result.badge,
     impact_tag: "",
     landed_gm_target_player_ids: [],
     send_score: result.totalA,
     receive_score: result.totalB,
-    package: { send, receive, value_edge: result.band, confidence: "" },
+    package: { send, receive, value_edge: result.badge, confidence: "" },
   };
   const pitch: TradePitch = {
     eyebrow: "Value check",

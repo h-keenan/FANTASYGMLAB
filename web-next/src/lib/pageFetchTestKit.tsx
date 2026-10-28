@@ -28,7 +28,11 @@ export function deferred<T>(): Deferred<T> {
 
 /** Sleeper's settings.type: 0 redraft, 1 keeper, 2 dynasty. */
 export function mockLeagueType(type: number) {
-  vi.mocked(api.getLeague).mockResolvedValue({ league: { settings: { type } } } as never);
+  // Mirrors the server's one decision (default_lens_for_league): redraft -> Non-Dynasty.
+  vi.mocked(api.getLeague).mockResolvedValue({
+    league: { settings: { type } },
+    default_lens: type === 0 ? "Non-Dynasty" : "Dynasty",
+  } as never);
 }
 
 export function renderWithLens(ui: ReactElement) {

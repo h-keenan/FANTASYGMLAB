@@ -1,24 +1,21 @@
-export type InjuryTone = 'success' | 'danger' | 'neutral';
+import { injuryTone as sharedInjuryTone, type InjuryToneName } from './injuryTone.generated.ts';
+
+export type InjuryTone = InjuryToneName;
 
 /**
- * Coarse good/neutral/bad color read for a player's injury status cell.
+ * Coarse good/warn/bad color read for a player's injury status cell: the one
+ * shared map (injuryTone.generated.ts, from modules/injury_tone.py) that web
+ * and the server badge also use. Doubtful/Out/IR are danger, Questionable is
+ * warning, Healthy is success.
  *
- * A null/absent `injuryStatus` means we have NO injury data for this
- * player — e.g. a push-notification deep link that only ever carries
- * player_id/name (see pushNotifications.ts's hand-built RankedPlayer), or
- * a player lookup that never resolved (quick-view `reason: 'not_found'`).
- * That must read as neutral/unknown, never the same green "success" tone
- * a player we've actually verified as healthy gets — conflating "no data"
- * with "confirmed healthy" is exactly the P0 bug this guards against
- * (a real out-for-season player showed a green "Healthy" pill because the
- * old code did `player.injury_status ?? 'Healthy'`).
+ * A null/absent `injuryStatus` means we have NO injury data for this player
+ * (a push deep link, an unresolved lookup). That reads neutral, never the
+ * green "success" a verified-healthy player gets: conflating "no data" with
+ * "confirmed healthy" was the P0 bug where an out-for-season player showed a
+ * green "Healthy" pill.
  */
 export function injuryTone(injuryStatus: string | null | undefined): InjuryTone {
-  if (!injuryStatus) return 'neutral';
-  const normalized = injuryStatus.toLowerCase();
-  if (normalized.includes('healthy')) return 'success';
-  if (normalized.includes('out') || normalized.includes('ir') || normalized.includes('doubtful')) return 'danger';
-  return 'neutral';
+  return sharedInjuryTone(injuryStatus);
 }
 
 const INJURY_ABBREVIATIONS: Record<string, string> = {

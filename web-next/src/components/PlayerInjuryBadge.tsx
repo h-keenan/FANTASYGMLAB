@@ -24,7 +24,13 @@ export function PlayerInjuryBadge({ status }: { status: string | null | undefine
   if (!label) return null;
   const tone = injuryTone(label);
   const color =
-    tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)";
+    tone === "danger"
+      ? "var(--color-danger)"
+      : tone === "warning"
+        ? "var(--color-warning)"
+        : tone === "success"
+          ? "var(--color-success)"
+          : "var(--color-text-muted)";
   return (
     <ToneBadge
       testId="player-injury-badge"
