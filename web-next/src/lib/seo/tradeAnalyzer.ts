@@ -2,14 +2,20 @@
  * Pure logic for the public, logged-out Trade Analyzer (/trade-analyzer).
  *
  * Everything here runs on the anonymous public value board
- * (GET /v1/public/dynasty-values), the same numbers behind the rankings and
- * trade value chart pages. There is no roster, league or account input, so
+ * (GET /v1/public/dynasty-values). Trades are priced with each player's
+ * `trade_score`: the board value after the SAME neutral-posture age curve the
+ * signed-in Analyzer and the content bot apply, so the total here matches the
+ * total after sign-up (the rankings pages show the un-curved `score`). The
+ * verdict words come from the shared band ladder (tradeValueBands.generated),
+ * the one the in-app verdict is decided on. There is no roster, league or
+ * account input, so
  * the verdict is deliberately VALUE-ONLY and labeled as such: it sums each
  * side's value. The in-app Trade Analyzer additionally weighs lineup impact,
  * roster needs, byes/injuries and consolidation, which is the soft gate the
  * page promotes.
  */
 import type { PublicBoard, ValueFormat } from "./publicValues";
+import { bandForScore, TRADE_VALUE_CUTS } from "../tradeValueBands.generated";
 import { TRADE_ANALYZER_PUBLIC_PATH } from "./site";
 
 export const TRADE_ANALYZER_PATH = TRADE_ANALYZER_PUBLIC_PATH;
@@ -47,6 +53,12 @@ export function valueOf(player: TradeBoardPlayer, settings: TradeSettings): numb
   return player.v[valueIndex(settings)] ?? 0;
 }
 
+/** The value a trade is priced with; falls back to `score` only for an API build
+ * that predates `trade_score`. */
+function tradePrice(player: { score: number; trade_score?: number }): number {
+  return typeof player.trade_score === "number" ? player.trade_score : player.score;
+}
+
 /** Merge the four fetched boards into the compact client payload. Players
  * missing from any board are dropped so every format has a real value. */
 export function mergeBoards(boards: {
@@ -79,7 +91,7 @@ export function mergeBoards(boards: {
       team: p.team,
       age: p.age,
       inj: p.injury_status && !/^(na|n\/a)$/i.test(p.injury_status) ? p.injury_status : null,
-      v: [p.score, s.score, a!.score, b!.score],
+      v: [tradePrice(p), tradePrice(s), tradePrice(a!), tradePrice(b!)],
     });
   }
   players.sort((x, y) => y.v[0] - x.v[0]);
@@ -181,6 +193,8 @@ export interface TradeEvaluation {
   diff: number;
   winner: TradeWinner;
   band: TradeBand;
+  /** Shared edge-badge word (Favorable / Fair / Slight Overpay / Major Overpay), "" when empty. */
+  badge: string;
   headline: string;
   detail: string;
   caveats: string[];
@@ -188,9 +202,21 @@ export interface TradeEvaluation {
   balancer: TradeBoardPlayer | null;
 }
 
-export const FAIR_PCT = 0.06;
-export const SLIGHT_PCT = 0.15;
-export const CLEAR_PCT = 0.3;
+/** Shared ladder id -> the public page's coarse band (and share-card word). */
+const PUBLIC_BAND_BY_ID: Record<string, Exclude<TradeBand, "empty">> = {
+  even: "fair",
+  edge_you: "slight",
+  edge_them: "slight",
+  accept: "clear",
+  counter: "clear",
+  smash: "lopsided",
+  decline: "lopsided",
+  hard: "lopsided",
+};
+
+function bandForScoreEdge(): number {
+  return TRADE_VALUE_CUTS.edge;
+}
 
 export function evaluateTrade(
   sideA: readonly TradeBoardPlayer[],
@@ -207,6 +233,7 @@ export function evaluateTrade(
     diff,
     winner: "even",
     band: "empty",
+    badge: "",
     headline: "Add players to both sides",
     detail: "Search for the players you would send and the players you would get back.",
     caveats: [],
@@ -214,22 +241,26 @@ export function evaluateTrade(
   };
   if (sideA.length === 0 || sideB.length === 0) return base;
 
-  const larger = Math.max(totalA, totalB);
-  const pct = larger > 0 ? Math.abs(diff) / larger : 0;
-  const band: TradeBand = pct < FAIR_PCT ? "fair" : pct < SLIGHT_PCT ? "slight" : pct < CLEAR_PCT ? "clear" : "lopsided";
-  const winner: TradeWinner = band === "fair" ? "even" : diff > 0 ? "b" : "a";
+  // Same ladder the in-app verdict is decided on, applied to the value gap.
+  const scored = bandForScore(diff);
+  const band: TradeBand = PUBLIC_BAND_BY_ID[scored.id] ?? "fair";
+  const winner: TradeWinner = scored.id === "even" ? "even" : diff > 0 ? "b" : "a";
 
-  let headline: string;
-  if (band === "fair") headline = "Fair trade on value";
-  else if (winner === "b") {
-    headline = band === "slight" ? "Slight edge to you" : band === "clear" ? "You win this trade on value" : "Lopsided in your favor";
-  } else {
-    headline = band === "slight" ? "Slight edge to them" : band === "clear" ? "You lose this trade on value" : "Lopsided against you";
-  }
+  const HEADLINES: Record<string, string> = {
+    even: "Fair trade on value",
+    edge_you: "Slight edge to you",
+    edge_them: "Slight edge to them",
+    accept: "You win this trade on value",
+    smash: "Lopsided in your favor",
+    counter: "You lose this trade on value",
+    decline: "Lopsided against you",
+    hard: "Lopsided against you",
+  };
+  const headline = HEADLINES[scored.id];
   const gap = Math.abs(Math.round(diff)).toLocaleString();
   const detail =
     band === "fair"
-      ? `Both sides are within ${Math.round(FAIR_PCT * 100)}% of each other (${Math.round(totalA).toLocaleString()} vs ${Math.round(totalB).toLocaleString()}).`
+      ? `Both sides are within ${bandForScoreEdge().toLocaleString()} points of each other (${Math.round(totalA).toLocaleString()} vs ${Math.round(totalB).toLocaleString()}).`
       : `${winner === "b" ? "You get" : "They get"} ${gap} more value than ${winner === "b" ? "you send" : "they send"} (${Math.round(totalA).toLocaleString()} sent vs ${Math.round(totalB).toLocaleString()} received).`;
 
   const caveats: string[] = [];
@@ -262,7 +293,7 @@ export function evaluateTrade(
     if (balancer && best > target * 0.25) balancer = null;
   }
 
-  return { totalA, totalB, diff, winner, band, headline, detail, caveats, balancer };
+  return { totalA, totalB, diff, winner, band, badge: scored.badge, headline, detail, caveats, balancer };
 }
 
 // ------------------------------------------------------------------ CTAs
@@ -286,7 +317,7 @@ export function ctaHref(cta: TradeCta): string {
 export const TRADE_FAQ: readonly { q: string; a: string }[] = [
   {
     q: "How does this fantasy football trade analyzer work?",
-    a: "Search for the players you would send and the players you would get, add them to each side, and the tool totals each side's FantasyDesk dynasty value and tells you whether the trade is fair or which side wins. Values update daily and are the same numbers used in our rankings and trade value chart.",
+    a: "Search for the players you would send and the players you would get, add them to each side, and the tool totals each side's FantasyDesk dynasty value and tells you whether the trade is fair or which side wins. Values update daily. Trades are priced the way the FantasyDesk app prices them (the same player values with the same neutral age adjustment), so the totals match what you see after you connect a league. The rankings and trade value chart pages show the unadjusted values.",
   },
   {
     q: "Is it for dynasty or redraft leagues?",

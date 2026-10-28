@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 FORMATS = ("1qb", "superflex")
 LENSES = ("ppr", "tep")
 VALUATION_LENS = "Dynasty"
-STRATEGY = "retool"  # the neutral strategy the Analyzer defaults to
+STRATEGY = trade_hub_engine.DEFAULT_ANALYZER_STRATEGY  # the neutral strategy the Analyzer defaults to
 POSITIONS = ("QB", "RB", "WR", "TE")
 TEAMS = 12
 

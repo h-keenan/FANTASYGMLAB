@@ -4976,7 +4976,7 @@ class TradeAnalyzerRequest(BaseModel):
     receive_pick_ids: list[str] = Field(default_factory=list)
     # Any unrecognized value falls back to "retool" — see
     # modules.team_eval.normalize_team_strategy — so this is never rejected.
-    strategy: str = "retool"
+    strategy: str = trade_hub_engine.DEFAULT_ANALYZER_STRATEGY
     lens: str = "Dynasty"
     # Optional: the proposing partner's roster_id. When given, verdict.counter_action
     # can suggest a specific verified partner asset to ask for instead of just
