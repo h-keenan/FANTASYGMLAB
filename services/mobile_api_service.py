@@ -5329,6 +5329,7 @@ def post_trade_analyzer(
         waiver_options=waiver_options,
     )
 
+    counter_search_status = ""
     if getattr(verdict, "band", None) in trade_offer_analyzer.COUNTER_PACKAGE_BANDS:
         # Real alternate packages only get built for an unfavorable verdict,
         # and only reuse assets the two rosters actually hold — never a
@@ -5396,17 +5397,33 @@ def post_trade_analyzer(
                 partner_asset_pool=partner_asset_pool,
                 regrade=_regrade_counter_package,
                 my_needs=my_needs,
+                baseline_lineup_points=(
+                    ((verdict.lineup_model or {}).get("points") or {}).get("ros_delta")
+                ),
             )
             if alternate_packages:
                 verdict = verdict.with_alternate_packages(alternate_packages)
+            counter_search_status = "found" if alternate_packages else "none"
         except Exception:
-            pass
+            logger.exception("counter package search failed")
+            counter_search_status = "error"
 
     # Trade Analyzer stays fully usable after the trade deadline — it's the
     # offseason-planning tool — but says so instead of implying the trade
     # can be sent today (modules.league_calendar).
     trade_window = league_calendar.trade_window(league)
     verdict_public = verdict.to_public_dict()
+    if counter_search_status:
+        # Lets clients say "No better package found" instead of showing a
+        # COUNTER verdict with nothing concrete beneath it.
+        verdict_public["counter_search"] = {
+            "status": counter_search_status,
+            "message": (
+                "No better package found from the assets on both rosters."
+                if counter_search_status == "none"
+                else ""
+            ),
+        }
     return {
         "ok": True,
         "verdict": verdict_public,

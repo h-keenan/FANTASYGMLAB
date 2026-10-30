@@ -581,3 +581,59 @@ def test_result_card_omits_try_this_instead_when_no_packages():
         receive_assets=[{"asset_type": "player", "name": "Recv B", "position": "WR", "team": "BUF", "age": 24}],
     )
     assert "Try this instead" not in html
+
+
+def test_build_counter_offer_packages_falls_back_to_honest_closer_package():
+    # Nothing clears the Fair bar, but trimming the weakest piece is a real
+    # improvement that still grades Counter: shown flagged, not as "fair".
+    send = [
+        {"asset_type": "player", "player_id": "a", "name": "Big A", "score": 6000, "position": "WR"},
+        {"asset_type": "player", "player_id": "b", "name": "Big B", "score": 5000, "position": "RB"},
+    ]
+    receive = [{"asset_type": "player", "player_id": "r", "name": "Pick R", "score": 3000, "position": "WR"}]
+    packages = toa.build_counter_offer_packages(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-8000,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=[],
+        regrade=_regrade_factory(decline_floor=-3000),
+    )
+    assert packages
+    assert all(p["clears_bar"] is False and p["why"] for p in packages)
+
+
+def test_build_counter_offer_packages_returns_empty_when_nothing_improves():
+    send = [{"asset_type": "player", "player_id": "a", "name": "A", "score": 6000, "position": "WR"}]
+    receive = [{"asset_type": "player", "player_id": "r", "name": "R", "score": 100, "position": "WR"}]
+    packages = toa.build_counter_offer_packages(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-5900,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=[],
+        regrade=_regrade_factory(),
+    )
+    assert packages == []
+
+
+def test_build_counter_offer_packages_searches_when_value_delta_not_negative():
+    # A COUNTER driven by lineup fit has value_delta >= 0; must still search.
+    send = [
+        {"asset_type": "player", "player_id": "a", "name": "A", "score": 6000, "position": "WR"},
+        {"asset_type": "player", "player_id": "b", "name": "B", "score": 400, "position": "RB"},
+    ]
+    receive = [{"asset_type": "player", "player_id": "r", "name": "R", "score": 5500, "position": "WR"}]
+    regrade = _regrade_factory()
+    toa.build_counter_offer_packages(
+        band=toa.VERDICT_COUNTER,
+        value_delta=0,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=[],
+        regrade=regrade,
+    )
+    assert regrade.calls

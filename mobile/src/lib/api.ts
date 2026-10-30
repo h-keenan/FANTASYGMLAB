@@ -1544,6 +1544,24 @@ export interface TradeVerdict {
   // P(the direction of trade_score is right), 50-100.
   confidence_pct?: number | null;
   lineup_model?: TradeLineupModel | null;
+  // Real counter packages (modules/trade_offer_analyzer.py), verbatim.
+  alternate_packages?: TradeAlternatePackage[];
+  // Outcome of the counter search; 'none' = nothing better exists.
+  counter_search?: { status: 'found' | 'none' | 'error'; message: string };
+}
+
+export interface TradeAlternatePackage {
+  label: string;
+  send_assets: PresentationAsset[];
+  receive_assets: PresentationAsset[];
+  band: string;
+  ui_verdict: string;
+  value_delta: number;
+  why?: string;
+  // false = closer than the original offer but still not Fair.
+  clears_bar?: boolean;
+  trade_score?: number;
+  lineup_points_delta?: number | null;
 }
 
 // modules/trade_lineup_model.py's `lineup_model` block, verbatim. Additive:

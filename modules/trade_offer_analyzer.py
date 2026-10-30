@@ -377,8 +377,19 @@ def _package_entry(
     send_assets: Sequence[Mapping[str, Any]],
     receive_assets: Sequence[Mapping[str, Any]],
     verdict: "OfferVerdict",
+    clears_bar: bool = True,
+    baseline_points: float | None = None,
 ) -> dict[str, Any]:
+    points = ((verdict.lineup_model or {}).get("points") or {}).get("ros_delta")
+    why = f"Grades {verdict.ui_verdict}"
+    if isinstance(points, (int, float)):
+        why += f" with {points:+.1f} lineup pts over the rest of the season"
+        if isinstance(baseline_points, (int, float)) and points > baseline_points:
+            why += f" (up from {baseline_points:+.1f})"
+    why += "." if clears_bar else ", closer than your offer but not yet fair."
     return {
+        "why": why,
+        "clears_bar": clears_bar,
         "label": label,
         "send_assets": [dict(a) for a in send_assets],
         "receive_assets": [dict(a) for a in receive_assets],
@@ -405,6 +416,7 @@ def build_counter_offer_packages(
     ],
     my_needs: Sequence[str] | None = None,
     max_packages: int = 3,
+    baseline_lineup_points: float | None = None,
 ) -> list[dict[str, Any]]:
     """Generate 2-3 concrete alternate packages for an unfavorable offer.
 
@@ -429,9 +441,13 @@ def build_counter_offer_packages(
     if band not in COUNTER_PACKAGE_BANDS or regrade is None:
         return []
 
-    gap = abs(min(0, int(value_delta)))
-    if gap <= 0:
-        return []
+    # A COUNTER can come from lineup/roster fit even when raw value is not
+    # negative; still search, with a minimal gap for sweetener sizing.
+    gap = max(abs(min(0, int(value_delta))), 1)
+    baseline_points = (
+        baseline_lineup_points if isinstance(baseline_lineup_points, (int, float)) else None
+    )
+    near: list[dict[str, Any]] = []
 
     send_list = [dict(a) for a in (send_assets or ())]
     receive_list = [dict(a) for a in (receive_assets or ())]
@@ -465,7 +481,23 @@ def build_counter_offer_packages(
                 # The partner would be giving up clearly more market value
                 # than they get: not a package they can say yes to.
                 return False
-        if verdict is None or verdict.tone not in _FAVORABLE_TONES:
+        if verdict is None:
+            return False
+        if verdict.tone not in _FAVORABLE_TONES:
+            # Not acceptable as-is, but remember it when it is a real
+            # improvement on the original offer (honest fallback).
+            if verdict.tone == "counter" and verdict.trade_score > int(value_delta):
+                seen_signatures.add(sig)
+                near.append(
+                    _package_entry(
+                        label=label,
+                        send_assets=candidate_send,
+                        receive_assets=candidate_receive,
+                        verdict=verdict,
+                        clears_bar=False,
+                        baseline_points=baseline_points,
+                    )
+                )
             return False
         seen_signatures.add(sig)
         results.append(
@@ -474,6 +506,7 @@ def build_counter_offer_packages(
                 send_assets=candidate_send,
                 receive_assets=candidate_receive,
                 verdict=verdict,
+                baseline_points=baseline_points,
             )
         )
         return True
@@ -573,6 +606,9 @@ def build_counter_offer_packages(
 
     if state["model"]:
         results.sort(key=lambda entry: -int(entry.get("trade_score") or 0))
+    if not results and near:
+        near.sort(key=lambda entry: -int(entry.get("trade_score") or 0))
+        return near[:2]
     return results[:max_packages]
 
 

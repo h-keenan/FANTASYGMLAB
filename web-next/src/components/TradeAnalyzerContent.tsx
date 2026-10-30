@@ -46,6 +46,7 @@ import {
   playerToTradeAsset,
   tradeAnalyzerReasonMessage,
 } from "@/lib/tradeAnalyzerPresentation";
+import { dropRepeatedSentences, shortSummary } from "@/lib/verdictText";
 import { ShareToCommunityToggle } from "@/components/ShareToCommunityToggle";
 import { ValuesCredit } from "@/components/ValuesCredit";
 
@@ -339,6 +340,15 @@ function VerdictCard({
   const receiveTotal = receiveAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const alternatePackages = verdict.alternate_packages ?? [];
   const copy = useExperienceCopy();
+  // The lineup sentence used to print twice (lineup explanation + rationale).
+  // Show a one-sentence summary by default; the rest sits behind "Read more".
+  const lineupExplanation = verdict.lineup_model?.explanation ?? "";
+  const summary = shortSummary(verdict.rationale || lineupExplanation);
+  const rationaleRest = dropRepeatedSentences(verdict.rationale ?? "", [summary]);
+  const lineupRest = dropRepeatedSentences(lineupExplanation, [summary, verdict.rationale ?? ""]);
+  const hasMore = Boolean(
+    rationaleRest || lineupRest || verdict.lineup_model || verdict.roster_summary || verdict.strategy_summary,
+  );
 
   return (
     <AccentCard accent={toneColor} as="section">
@@ -439,22 +449,16 @@ function VerdictCard({
             {formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts over Weeks {verdict.lineup_model.weeks.first}-
             {verdict.lineup_model.weeks.last} ({formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week)
           </p>
-          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            {verdict.lineup_model.explanation}
-          </p>
-          <p className="text-xs" style={{ color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums" }}>
-            Trade score {formatTradeGain(verdict.lineup_model.trade_score)} = value balance plus lineup points under your posture.
-          </p>
         </div>
       ) : null}
 
-      {verdict.rationale ? (
+      {summary ? (
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
             {verdict.rationale_label || "Why this works"}
           </span>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            {verdict.rationale}
+            {summary}
           </p>
         </div>
       ) : null}
@@ -486,7 +490,7 @@ function VerdictCard({
             className="text-xs uppercase font-bold"
             style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
           >
-            Try this instead
+            {alternatePackages.every((pkg) => pkg.clears_bar === false) ? "Closest counter" : "Try this instead"}
           </span>
           {alternatePackages.map((pkg, index) => (
             <div
@@ -500,10 +504,22 @@ function VerdictCard({
                   {pkg.ui_verdict || pkg.band}
                 </span>
               </div>
+              {pkg.why ? (
+                <p className="text-xs mb-2" style={{ color: "var(--color-text-secondary)" }}>
+                  {pkg.why}
+                </p>
+              ) : null}
               <TradeMatchup sendAssets={pkg.send_assets} receiveAssets={pkg.receive_assets} />
+              <p className="text-xs mt-2" style={{ color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                Value balance {formatTradeGain(pkg.value_delta)}
+              </p>
             </div>
           ))}
         </div>
+      ) : verdict.counter_search?.status === "none" ? (
+        <p className="text-sm font-bold" data-testid="no-counter-found" style={{ color: "var(--color-text-secondary)" }}>
+          {verdict.counter_search.message || "No better package found."}
+        </p>
       ) : null}
 
       <ConfidenceMeter
@@ -525,15 +541,22 @@ function VerdictCard({
         </div>
       ) : null}
 
-      {verdict.roster_summary || verdict.strategy_summary ? (
-        <details>
+      {hasMore ? (
+        <details data-testid="verdict-read-more">
           <summary
             className="cursor-pointer text-xs uppercase font-bold"
             style={{ color: "var(--color-text-muted)" }}
           >
-            More detail
+            Read more
           </summary>
           <div className="flex flex-col gap-2 pt-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            {rationaleRest ? <p>{rationaleRest}</p> : null}
+            {lineupRest ? <p>{lineupRest}</p> : null}
+            {verdict.lineup_model ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                Trade score {formatTradeGain(verdict.lineup_model.trade_score)} = value balance plus lineup points under your posture.
+              </p>
+            ) : null}
             {verdict.roster_summary ? (
               <p>
                 <strong>Roster impact:</strong> {verdict.roster_summary}
