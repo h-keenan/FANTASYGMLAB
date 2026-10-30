@@ -2747,6 +2747,12 @@ export interface TradeAlternatePackage {
   ui_verdict: string;
   confidence: string;
   value_delta: number;
+  /** One-line reason this package is suggested. */
+  why?: string;
+  /** false = closer than the original offer but still not Fair. */
+  clears_bar?: boolean;
+  trade_score?: number;
+  lineup_points_delta?: number | null;
 }
 
 /** modules/trade_offer_analyzer.py's OfferVerdict.to_public_dict(), verbatim
@@ -2770,6 +2776,8 @@ export interface TradeVerdict {
   tone: "accept" | "counter" | "decline" | "fair";
   counter_action?: TradeCounterAction | null;
   alternate_packages?: TradeAlternatePackage[];
+  /** Outcome of the counter search ("none" = nothing better exists). */
+  counter_search?: { status: "found" | "none" | "error"; message: string };
   /** This-week lineup holes the evaluator found (modules/trade_lineup_impact.py);
    * "critical" = leaves a starting position with no startable player. */
   lineup_warnings?: TradeLineupWarning[];

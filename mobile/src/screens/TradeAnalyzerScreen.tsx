@@ -1,4 +1,6 @@
 import { TRADE_SIDE_LABEL } from '../lib/tradeSideLabels';
+import ExchangeSide from '../components/ExchangeSide';
+import { dropRepeatedSentences, shortSummary } from '../lib/verdictText';
 import ShareToCommunityToggle from '../components/ShareToCommunityToggle';
 import type { SharedTradeAssetInput } from '../lib/sharedTrades';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -54,7 +56,6 @@ import { valueDirectionLabel } from '../lib/tradeValue';
 import { formatTradeGain } from '../lib/liveDraft';
 import { idpTradePoolPlayers, tradePositionOptions } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
-import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
 import ValuesCredit from '../components/ValuesCredit';
@@ -801,11 +802,18 @@ function VerdictCard({
   onBuildCounter: () => void;
 }) {
   const { colors } = useThemeMode();
-  const { showExplanations } = useDensity();
   const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
+  const [readMore, setReadMore] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
+  // The lineup sentence used to print twice (lineup explanation + rationale).
+  // Default view shows a one-sentence summary; the rest is behind Read more.
+  const lineupExplanation = verdict.lineup_model?.explanation ?? '';
+  const summary = shortSummary(verdict.rationale || lineupExplanation);
+  const rationaleRest = dropRepeatedSentences(verdict.rationale ?? '', [summary]);
+  const lineupRest = dropRepeatedSentences(lineupExplanation, [summary, verdict.rationale ?? '']);
+  const alternatePackages = verdict.alternate_packages ?? [];
   // trade_offer_analyzer.py's decide_offer_verdict already separates a
   // routine ACCEPT/DECLINE from a genuinely lopsided one into its own named
   // band (VERDICT_SMASH_ACCEPT / VERDICT_HARD_DECLINE) — that split only
@@ -907,20 +915,63 @@ function VerdictCard({
             {verdict.lineup_model.weeks.first}-{verdict.lineup_model.weeks.last} (
             {formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week)
           </AppText>
-          <AppText style={styles.lineupWarningDetail}>{verdict.lineup_model.explanation}</AppText>
-          <AppText style={styles.lineupModelFootnote}>
-            Trade score {formatTradeGain(verdict.lineup_model.trade_score)} = value balance plus lineup points under
-            your posture.
-          </AppText>
         </View>
       ) : null}
-      {showExplanations ? (
+      {summary ? (
         <>
           <AppText style={[styles.verdictLabel, { color: toneColor }]}>
             {verdict.rationale_label || 'Why this works'}
           </AppText>
-          <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
-
+          <AppText style={[styles.verdictText, styles.verdictRationale]}>{summary}</AppText>
+        </>
+      ) : null}
+      {alternatePackages.length > 0 ? (
+        <View testID="alternate-packages" style={styles.lineupModel}>
+          <AppText style={styles.lineupModelLabel}>
+            {alternatePackages.every((pkg) => pkg.clears_bar === false) ? 'CLOSEST COUNTER' : 'TRY THIS INSTEAD'}
+          </AppText>
+          {alternatePackages.map((pkg, index) => (
+            <View key={`${pkg.label}-${index}`} style={styles.lineupWarning}>
+              <AppText style={styles.lineupWarningHeadline}>
+                {pkg.label} ({pkg.ui_verdict || pkg.band})
+              </AppText>
+              {pkg.why ? <AppText style={styles.lineupWarningDetail}>{pkg.why}</AppText> : null}
+              <ExchangeSide side="send" assets={pkg.send_assets} />
+              <ExchangeSide side="get" assets={pkg.receive_assets} />
+              <AppText style={styles.lineupModelFootnote}>Value balance {formatTradeGain(pkg.value_delta)}</AppText>
+            </View>
+          ))}
+        </View>
+      ) : verdict.counter_search?.status === 'none' ? (
+        <AppText testID="no-counter-found" style={styles.verdictText}>
+          {verdict.counter_search.message || 'No better package found.'}
+        </AppText>
+      ) : null}
+      {verdict.counter_action ? (
+        <TouchableOpacity accessibilityRole="button" style={styles.counterButton} onPress={onBuildCounter}>
+          <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+          <AppText style={styles.counterButtonText}>Build the counter</AppText>
+        </TouchableOpacity>
+      ) : null}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{ expanded: readMore }}
+        testID="verdict-read-more"
+        onPress={() => setReadMore((v) => !v)}
+        hitSlop={8}
+      >
+        <AppText style={styles.lineupModelLabel}>{readMore ? 'READ LESS' : 'READ MORE'}</AppText>
+      </TouchableOpacity>
+      {readMore ? (
+        <>
+          {rationaleRest ? <AppText style={[styles.verdictText, styles.verdictRationale]}>{rationaleRest}</AppText> : null}
+          {lineupRest ? <AppText style={styles.lineupWarningDetail}>{lineupRest}</AppText> : null}
+          {verdict.lineup_model ? (
+            <AppText style={styles.lineupModelFootnote}>
+              Trade score {formatTradeGain(verdict.lineup_model.trade_score)} = value balance plus lineup points under
+              your posture.
+            </AppText>
+          ) : null}
           <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
           <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
           <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={toneColor} />
@@ -934,12 +985,6 @@ function VerdictCard({
             />
           ) : null}
         </>
-      ) : null}
-      {verdict.counter_action ? (
-        <TouchableOpacity accessibilityRole="button" style={styles.counterButton} onPress={onBuildCounter}>
-          <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
-          <AppText style={styles.counterButtonText}>Build the counter</AppText>
-        </TouchableOpacity>
       ) : null}
 
       <ShareToCommunityToggle

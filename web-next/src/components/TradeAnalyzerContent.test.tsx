@@ -330,9 +330,83 @@ describe("TradeAnalyzerContent", () => {
 
     const block = await screen.findByTestId("lineup-model");
     expect(block).toHaveTextContent("-76 lineup pts over Weeks 8-17 (-6 this week)");
-    expect(block).toHaveTextContent("pick up Waiver Runner");
-    expect(block).toHaveTextContent("Trade score");
+    // Secondary copy sits behind a default-collapsed "Read more".
+    expect(block).not.toHaveTextContent("Trade score");
+    const more = screen.getByTestId("verdict-read-more") as HTMLDetailsElement;
+    expect(more.open).toBe(false);
+    expect(more).toHaveTextContent("pick up Waiver Runner");
+    expect(more).toHaveTextContent("Trade score");
     expect(screen.getByText("High confidence (93%)")).toBeInTheDocument();
+  });
+
+  async function analyzeWith(verdictExtra: Record<string, unknown>) {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
+      ok: true,
+      verdict: { ...VERDICT, band: "COUNTER", ui_verdict: "COUNTER", tone: "counter", ...verdictExtra },
+      reason: "",
+    } as never);
+    renderPage();
+    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    fireEvent.click(screen.getByText("Their WR"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Analyze Trade" }));
+    });
+  }
+
+  it("shows a concrete counter package with its one-line why", async () => {
+    await analyzeWith({
+      alternate_packages: [
+        {
+          label: "Remove Depth Piece from your side",
+          send_assets: [{ asset_type: "player", player_id: "a", name: "Counter Send", position: "WR", score: 5000 }],
+          receive_assets: [{ asset_type: "player", player_id: "b", name: "Counter Get", position: "WR", score: 4900 }],
+          band: "FAIR",
+          ui_verdict: "FAIR",
+          confidence: "Close call",
+          value_delta: -100,
+          why: "Grades FAIR with +3.0 lineup pts over the rest of the season.",
+          clears_bar: true,
+        },
+      ],
+    });
+    expect(await screen.findByText("Try this instead")).toBeInTheDocument();
+    expect(screen.getByText("Counter Send")).toBeInTheDocument();
+    expect(screen.getByText("Counter Get")).toBeInTheDocument();
+    expect(screen.getByText(/Grades FAIR with \+3.0 lineup pts/)).toBeInTheDocument();
+  });
+
+  it("says so plainly when no better package exists", async () => {
+    await analyzeWith({
+      alternate_packages: [],
+      counter_search: { status: "none", message: "No better package found from the assets on both rosters." },
+    });
+    expect(await screen.findByTestId("no-counter-found")).toHaveTextContent("No better package found");
+  });
+
+  it("does not repeat the lineup sentence between summary and Read more", async () => {
+    const sentence = "You lose about 12.4 pts/week at RB.";
+    await analyzeWith({
+      rationale: `${sentence} Your side gives up more value.`,
+      lineup_model: {
+        trade_score: -100,
+        confidence_pct: 80,
+        confidence_label: "High confidence",
+        explanation: sentence,
+        posture: "retool",
+        weights: { now: 1, future: 1 },
+        weeks: { first: 8, last: 17, count: 10 },
+        points: { ros_before: 1, ros_after: 0, ros_delta: -12.4, per_week_delta: -1, this_week_delta: -1, future_delta: 0 },
+        worst_position: "RB",
+        pickup: null,
+        waiver_pool_used: false,
+        uncertainty: { sigma_points: 1, estimate_sigma_points: 1 },
+        win_now_delta: 0,
+        future_delta: 0,
+      },
+    });
+    await screen.findByTestId("verdict-read-more");
+    expect(screen.getAllByText(new RegExp(sentence.replace(/\./g, "\\.").replace("/", "\\/"))).length).toBe(1);
   });
 
   describe("Players' Add to Trade quick-add (quickAddPlayerId)", () => {
