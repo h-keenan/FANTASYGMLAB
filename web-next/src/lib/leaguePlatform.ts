@@ -66,6 +66,7 @@ const LEAGUE_SCOPED_SEGMENTS = new Set([
   "draft-center",
   "live-draft",
   "league-recaps",
+  "commissioner",
   "guess-the-player-leaderboard",
 ]);
 

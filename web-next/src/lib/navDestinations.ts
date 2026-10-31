@@ -1,4 +1,8 @@
+import { useEffect, useState } from "react";
+
 import type { NavGlyphName } from "@/components/NavDestinationGlyph";
+import { api } from "@/lib/api";
+import { showCommissionerEntry } from "@/lib/commissionerIntegrity";
 
 export interface NavDestination {
   label: string;
@@ -16,6 +20,32 @@ export interface NavDestination {
   color: string;
 }
 
+// Per-league commissioner flag, fetched once per page load (Sleeper marks the
+// commissioner on the league users list; see docs/commissioner-tools.md).
+const commissionerFlags = new Map<string, boolean>();
+
+/** True once the server confirmed the signed-in user is this league's commissioner. */
+export function useIsCommissioner(leagueId: string | null): boolean {
+  const [resolved, setResolved] = useState<{ leagueId: string; value: boolean } | null>(null);
+  useEffect(() => {
+    if (!leagueId || commissionerFlags.has(leagueId)) return;
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => api.getCommissionerStatus(leagueId))
+      .then((status) => showCommissionerEntry(status))
+      .catch(() => false)
+      .then((value) => {
+        commissionerFlags.set(leagueId, value);
+        if (!cancelled) setResolved({ leagueId, value });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+  if (!leagueId) return false;
+  return commissionerFlags.get(leagueId) ?? (resolved?.leagueId === leagueId ? resolved.value : false);
+}
+
 /**
  * Shared source for every league-scoped + general nav destination —
  * GmOrb.tsx and DesktopSidebar.tsx both render from this one list instead
@@ -24,6 +54,7 @@ export interface NavDestination {
  */
 export function useNavDestinations(leagueId: string | null, leagueName: string) {
   const query = leagueId ? `?name=${encodeURIComponent(leagueName)}` : "";
+  const isCommissioner = useIsCommissioner(leagueId);
 
   const coreLeagueDestinations: NavDestination[] = leagueId
     ? [
@@ -70,6 +101,11 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
         { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: "var(--color-danger)" },
         { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: "var(--color-information)" },
         { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: "var(--color-opportunity)" },
+        // Commissioner-only (Sleeper's is_owner flag, confirmed by the server);
+        // other members never see this entry.
+        ...(isCommissioner
+          ? [{ label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: "var(--color-diagnostic)" }]
+          : []),
       ]
     : [];
 
@@ -138,6 +174,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "live-draft": "Live Draft",
   "league-recaps": "League Recaps",
   games: "Games",
+  commissioner: "Commissioner",
   portfolio: "Portfolio",
   news: "News",
   "trade-history": "Trade History",

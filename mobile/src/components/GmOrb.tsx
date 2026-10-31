@@ -37,6 +37,7 @@ import { api, type RankedPlayer } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { queryKeys } from '../lib/queryKeys';
+import { showCommissionerEntry } from '../lib/commissionerIntegrity';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
@@ -159,7 +160,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
   ];
 }
 
-function gmToolsDestinations(colors: ThemeColors): Destination[] {
+function gmToolsDestinations(colors: ThemeColors, isCommissioner = false): Destination[] {
   return [
     // Trade Hub / Trade Finder / Trade Analyzer consolidated into one
     // Madden-style Trades entry point (coridian_-approved) — see
@@ -226,6 +227,20 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.violet,
       subtitle: "Season simulator and weekly pick'em",
     },
+    // Commissioner-only (Sleeper's is_owner flag, confirmed by the server);
+    // other members never see this entry. Mirrors web-next's nav.
+    ...(isCommissioner
+      ? [
+          {
+            label: 'Commissioner',
+            route: 'Commissioner',
+            icon: 'shield-checkmark-outline',
+            needsLeague: true,
+            color: colors.violet,
+            subtitle: 'League integrity: lineups, tanking signals, trades',
+          } as Destination,
+        ]
+      : []),
   ];
 }
 
@@ -564,6 +579,16 @@ export default function GmOrb() {
   });
   const recapReady = Boolean(recapQuery.data?.recap && !recapQuery.data.recap.incomplete);
 
+  // Commissioner entry: shown only once the server confirms Sleeper's is_owner
+  // flag for this user in this league (docs/commissioner-tools.md).
+  const commissionerQuery = useQuery({
+    queryKey: queryKeys.commissionerStatus(league?.leagueId ?? ''),
+    queryFn: () => api.getCommissionerStatus(league!.leagueId),
+    enabled: !isRestoring && open && Boolean(league?.leagueId) && !isEspnLeagueId(league?.leagueId),
+    staleTime: 10 * 60 * 1000,
+  });
+  const isCommissioner = showCommissionerEntry(commissionerQuery.data);
+
   // Lightweight destination search — substring match against label +
   // subtitle across the same three static destination lists the
   // categorized sections below already render through NavRow, nothing
@@ -575,10 +600,10 @@ export default function GmOrb() {
   const searchableDestinations = useMemo(
     () => [
       ...(league ? coreLeagueDestinations(colors) : []),
-      ...(league ? gmToolsDestinations(colors) : []),
+      ...(league ? gmToolsDestinations(colors, isCommissioner) : []),
       ...generalDestinations(colors, storeSubscriber, founder),
     ],
-    [colors, league, storeSubscriber, founder],
+    [colors, league, storeSubscriber, founder, isCommissioner],
   );
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const searchResults = useMemo(() => {
@@ -984,7 +1009,7 @@ export default function GmOrb() {
                     </NavSection>
 
                     <NavSection label="GM Tools">
-                      {gmToolsDestinations(colors).map((destination) => (
+                      {gmToolsDestinations(colors, isCommissioner).map((destination) => (
                         <NavRow
                           key={destination.route}
                           destination={destination}
