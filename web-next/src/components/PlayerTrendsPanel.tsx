@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 import { api, type WeeklyStatPoint } from "@/lib/api";
-import { CHART_HEIGHT, WeeklyPointsPanel } from "@/components/WeeklyPointsChart";
+import { usePreloadWeeklyPointsChart, WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
+import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { SkeletonBlock } from "@/components/Skeleton";
 
 /**
@@ -33,6 +34,7 @@ export function PlayerTrendsPanel({
    * for why two panels can't share one gradient id. */
   gradientId?: string;
 }) {
+  usePreloadWeeklyPointsChart();
   const [weeklyStats, setWeeklyStats] = useState<{ season: number; weeks: WeeklyStatPoint[] } | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [currentSeasonAnchor, setCurrentSeasonAnchor] = useState<number | null>(null);

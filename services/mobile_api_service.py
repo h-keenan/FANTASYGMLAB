@@ -12375,7 +12375,11 @@ def get_league_guillotine(
     except (TypeError, ValueError):
         week = 0
     in_season = str(league.get("status") or "") == "in_season" and week > 0
-    past_weeks = {w: sleeper.get_matchups(league_id, w) or [] for w in range(1, week)} if in_season else {}
+    past_weeks = (
+        {w: m or [] for w, m in sleeper.get_matchups_for_weeks(league_id, range(1, week)).items()}
+        if in_season
+        else {}
+    )
     detected = guillotine_module.detect(league, rosters, override, past_weeks)
     if not detected["is_guillotine"]:
         return {**not_gl, "reason": "not_guillotine", "league_type_override": override}

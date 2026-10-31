@@ -785,14 +785,21 @@ def build_league_playoff_odds(
 
     current_week, regular_season_end, _max_history_week = league_recaps.league_history_window(league)
 
+    # One concurrent prefetch of every week this scan reads (cached per week, so
+    # the loops below are pure lookups) instead of ~17 serial Sleeper round trips.
+    matchups_by_week = sleeper.get_matchups_for_weeks(
+        league_id,
+        [*range(1, max(current_week, 1)), *range(max(current_week, 1), regular_season_end + 1)],
+    )
+
     completed_games: list[tuple[str, str, str]] = []
     for week in range(1, max(current_week, 1)):
-        completed_games.extend(_group_completed_week_games(sleeper.get_matchups(league_id, week)))
+        completed_games.extend(_group_completed_week_games(matchups_by_week[week]))
 
     remaining_games: list[tuple[str, str]] = []
     remaining_weeks: list[list[tuple[str, str]]] = []
     for week in range(max(current_week, 1), regular_season_end + 1):
-        week_pairs = _group_remaining_week_pairs(sleeper.get_matchups(league_id, week))
+        week_pairs = _group_remaining_week_pairs(matchups_by_week[week])
         remaining_games.extend(week_pairs)
         remaining_weeks.append(week_pairs)
 

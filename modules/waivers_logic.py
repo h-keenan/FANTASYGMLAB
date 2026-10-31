@@ -2,6 +2,7 @@ import time
 from typing import Any, Mapping
 import pandas as pd
 from modules import league_maturity
+from modules.frame_records import frame_records
 from modules import league_display
 from modules import player_eligibility
 from modules import player_quick_view
@@ -102,7 +103,11 @@ def _build_waiver_free_agent_pool_cached(
         return valued, free_agents
 
     free_agents = free_agents.copy()
-    free_agents["stale_free_agent"] = free_agents.apply(rankings.is_probably_stale_free_agent, axis=1)
+    free_agents["stale_free_agent"] = pd.Series(
+        [rankings.is_probably_stale_free_agent(row) for row in frame_records(free_agents)],
+        index=free_agents.index,
+        dtype=bool,
+    )
     free_agents.loc[free_agents["stale_free_agent"], ["dynasty_score", "value_score"]] = 0
     free_agents = free_agents.sort_values(["stale_free_agent", score_field], ascending=[True, False])
     # Sleeper's global trending-add signal (cross-league, last 24h — see

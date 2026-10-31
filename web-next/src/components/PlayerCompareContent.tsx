@@ -7,7 +7,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
-import { WeeklyPointsChart } from "@/components/WeeklyPointsChart";
+import { usePreloadWeeklyPointsChart, WeeklyPointsChart } from "@/components/WeeklyPointsChartLazy";
 import {
   buildModelRows,
   buildNarrativePair,
@@ -271,6 +271,7 @@ export function PlayerCompareContent({
   initialPlayerB: RankedPlayer | null;
   pool: RankedPlayer[];
 }) {
+  usePreloadWeeklyPointsChart();
   const [playerB, setPlayerB] = useState<RankedPlayer | null>(initialPlayerB);
   const [modelA, setModelA] = useState<QuickViewModel | null>(null);
   const [modelB, setModelB] = useState<QuickViewModel | null>(null);

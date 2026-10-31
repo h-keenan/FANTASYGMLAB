@@ -198,6 +198,19 @@ def _install_profiler(fastapi_app, prof_dir: str) -> None:
 
         @functools.wraps(original)
         def wrapped(*a, __orig=original, __path=path, **kw):
+            if os.environ.get("LT_PROFILER") == "pyinstrument":
+                # cProfile is interpreter-global on 3.12+ (sys.monitoring) and mixes threads;
+                # pyinstrument samples only the calling thread.
+                from pyinstrument import Profiler
+
+                name = __path.strip("/").replace("/", "_").replace("{", "").replace("}", "")
+                prof = Profiler(interval=0.002)
+                prof.start()
+                try:
+                    return __orig(*a, **kw)
+                finally:
+                    prof.stop()
+                    (Path(prof_dir) / f"{name}.{os.getpid()}.{next(counter)}.txt").write_text(prof.output_text(unicode=False, color=False, show_all=False))
             pr = cProfile.Profile()
             try:
                 return pr.runcall(__orig, *a, **kw)
@@ -237,6 +250,7 @@ async def user_session(client, n, results, errors, delay=0.0):
                 if r.status_code < 400:
                     results["ux_first_paint"].append((time.perf_counter() - t_session) * 1000)
                 if r.status_code >= 400:
+                    print("ERRBODY", r.status_code, r.text[:300], file=sys.stderr)
                     errors[f"dashboard_first_paint {r.status_code}"] += 1
             except Exception as exc:
                 errors[f"dashboard_first_paint {type(exc).__name__}"] += 1
@@ -336,6 +350,8 @@ def main():
     finally:
         proc.terminate()
         redis_proc.terminate()
+        if os.environ.get('LT_KEEP_LOG'):
+            shutil.copy(work / 'api.log', os.environ['LT_KEEP_LOG'])
         shutil.rmtree(work, ignore_errors=True)
         sys.stdout.flush()
         os._exit(0)
