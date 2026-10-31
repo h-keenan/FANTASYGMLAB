@@ -137,14 +137,14 @@ describe("MyTeamContent", () => {
     expect(screen.getByText("Test Running Back")).toBeInTheDocument();
     // Bench and IR players live behind their own tabs.
     expect(screen.queryByText("Test Bench Receiver")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Bench" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Bench" }));
     expect(screen.getByText("Test Bench Receiver")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "IR" }));
+    fireEvent.click(screen.getByRole("tab", { name: "IR" }));
     expect(screen.getByText("Test IR Tight End")).toBeInTheDocument();
 
     // Circular OVR gauges render a real rating, never a fabricated one for
     // the null case (the IR tight end's overall_rating is null above).
-    fireEvent.click(screen.getByRole("button", { name: "Starters" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Starters" }));
     expect(screen.getByText("95")).toBeInTheDocument();
     expect(screen.getByText("88")).toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe("MyTeamContent", () => {
       <MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "IR" }));
+    fireEvent.click(screen.getByRole("tab", { name: "IR" }));
     expect(container.querySelector(".value-ring-placeholder")).toBeInTheDocument();
   });
 
@@ -179,7 +179,7 @@ describe("MyTeamContent", () => {
       <MyTeamContent leagueName="Dynasty Overlords" myTeam={mixedOrderTeam} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Bench" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Bench" }));
     const text = container.textContent || "";
     const names = ["Bench Quarterback", "Bench Running Back", "Bench Receiver", "Bench Kicker"];
     const indices = names.map((name) => text.indexOf(name));
@@ -316,7 +316,7 @@ describe("MyTeamContent", () => {
     };
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={weekly} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Bench" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Bench" }));
     expect(screen.getByText("· BYE")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Open slot this week: TE");
     expect(screen.getByText(/Week 7\. This week's lineup/)).toBeInTheDocument();
@@ -346,12 +346,12 @@ describe("MyTeamContent best ball", () => {
       />,
     );
     expect(screen.getByText("Best ball league: Sleeper sets your lineup automatically.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Starters" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Roster" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Starters" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Roster" })).toBeInTheDocument();
     // Suggested starters and active bench share the one roster list.
     expect(screen.getByText("Test Quarterback")).toBeInTheDocument();
     expect(screen.getByText("Test Bench Receiver")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "IR" }));
+    fireEvent.click(screen.getByRole("tab", { name: "IR" }));
     expect(screen.getByText("Test IR Tight End")).toBeInTheDocument();
   });
 
@@ -363,7 +363,7 @@ describe("MyTeamContent best ball", () => {
     render(
       <MyTeamContent leagueName="IDP League" myTeam={{ ...MY_TEAM, idp_players: idp }} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "IDP" }));
+    fireEvent.click(screen.getByRole("tab", { name: "IDP" }));
     expect(screen.getByText("Test Edge")).toBeInTheDocument();
     expect(screen.getByText("Test Backer")).toBeInTheDocument();
     expect(screen.getByText("900")).toBeInTheDocument();

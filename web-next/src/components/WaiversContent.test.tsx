@@ -257,7 +257,7 @@ describe("WaiversContent", () => {
   it("Explore tab shows the searchable free-agent list", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
     expect(screen.queryByPlaceholderText("Search free agents")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.getByPlaceholderText("Search free agents")).toBeInTheDocument();
   });
 
@@ -271,7 +271,7 @@ describe("WaiversContent", () => {
       players: [player({ player_id: "fa1", name: "Target Guy" }), player({ player_id: "fa2", name: "Other Guy" })],
     };
     render(<WaiversContent leagueName="Dynasty Overlords" data={data} leagueId="L1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Watchlist" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Watchlist" }));
     expect(await screen.findByText("Target Guy")).toBeInTheDocument();
     expect(screen.queryByText("Other Guy")).not.toBeInTheDocument();
     spy.mockRestore();
@@ -280,14 +280,14 @@ describe("WaiversContent", () => {
   it("Explore lists free-agent defenders under DL/LB/DB only in IDP leagues", () => {
     const idp = [player({ player_id: "dl9", name: "Free Edge", position: "DL", score: 640, overall_rating: null })];
     const { unmount } = render(<WaiversContent leagueName="IDP" data={{ ...BASE_RESPONSE, idp_players: idp }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.queryByText("Free Edge")).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "DL" } });
     expect(screen.getByText("Free Edge")).toBeInTheDocument();
     unmount();
 
     render(<WaiversContent leagueName="Std" data={BASE_RESPONSE} />);
-    fireEvent.click(screen.getByRole("button", { name: "Explore" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.queryByRole("option", { name: "DL" })).not.toBeInTheDocument();
   });
 });

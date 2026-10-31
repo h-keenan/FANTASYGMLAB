@@ -53,7 +53,7 @@ const PREVIEW: EspnLeaguePreviewResponse = {
 
 function openEspn() {
   render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-  fireEvent.click(screen.getByRole("button", { name: "ESPN" }));
+  fireEvent.click(screen.getByRole("tab", { name: "ESPN" }));
 }
 
 const onLeagueChosen = vi.fn();
@@ -73,7 +73,7 @@ describe("ESPN import in the Connect League flow", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
     expect(screen.getByPlaceholderText("Sleeper username")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "ESPN" }));
+    fireEvent.click(screen.getByRole("tab", { name: "ESPN" }));
     expect(screen.getByLabelText(/espn league id/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/swid|espn_s2/i)).toBeNull();
     expect(screen.getByText(/private espn leagues aren't supported yet/i)).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("ESPN import in the Connect League flow", () => {
     });
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 1 });
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-    fireEvent.click(screen.getByRole("button", { name: "MFL" }));
+    fireEvent.click(screen.getByRole("tab", { name: "MFL" }));
     fireEvent.change(screen.getByLabelText(/mfl league id/i), { target: { value: "10015" } });
     fireEvent.click(screen.getByRole("button", { name: /find my mfl league/i }));
 

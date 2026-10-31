@@ -620,6 +620,20 @@ export function DesignSystemContent() {
           </div>
         </Spec>
         <Spec name="PillRow (tab bar / segmented control)" path="components/PillRow.tsx" note="The only tab bar. Compact or fullWidth; options with href render as route tabs (TradesTabBar wraps it).">
+          <Variant label="PillRow (scroll, single-row filter strip)">
+            <PillRow
+              variant="scroll"
+              options={[
+                { label: "All", value: "a" },
+                { label: "Trades", value: "b" },
+                { label: "Waivers / Free Agents", value: "c" },
+                { label: "Draft Picks", value: "d" },
+                { label: "Other Moves", value: "e" },
+              ]}
+              active={pill}
+              onSelect={setPill}
+            />
+          </Variant>
           <Variant label="PillRow (compact)">
             <PillRow options={pillOptions} active={pill} onSelect={setPill} />
           </Variant>

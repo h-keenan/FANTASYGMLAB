@@ -68,7 +68,7 @@ describe("OnboardingCarousel", () => {
     expect(screen.getByRole("button", { name: /^continue$/i })).not.toBeDisabled();
 
     // The goal chip is optional: picking a level alone is enough to continue.
-    fireEvent.click(screen.getByRole("button", { name: /^win now$/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^win now$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
@@ -95,8 +95,8 @@ describe("OnboardingCarousel", () => {
     clickNext(2);
 
     fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^rebuilding$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^rebuilding$/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^rebuilding$/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^rebuilding$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));

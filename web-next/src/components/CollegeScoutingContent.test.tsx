@@ -90,7 +90,7 @@ describe("CollegeScoutingContent", () => {
     const data = response([prospect({ name: "Not Followed", on_watchlist: false })]);
     render(<CollegeScoutingContent data={data} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "My Watchlist" }));
+    fireEvent.click(screen.getByRole("tab", { name: "My Watchlist" }));
 
     expect(screen.queryByText("Not Followed")).not.toBeInTheDocument();
     expect(screen.getByText("No prospects followed yet")).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("CollegeScoutingContent", () => {
     render(<CollegeScoutingContent data={data} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Scout Grade Me" }));
-    fireEvent.click(screen.getByRole("button", { name: "4" }));
+    fireEvent.click(screen.getByRole("tab", { name: "4" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit grade" }));
 
     expect(api.submitScoutingReport).toHaveBeenCalledWith("pr1", {

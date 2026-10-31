@@ -39,9 +39,9 @@ describe("SampleLeagueContent", () => {
   it("browses roster, game plan and trade with the banner persistent and no network", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     render(<SampleLeagueContent />);
-    fireEvent.click(screen.getByRole("button", { name: "Roster" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Roster" }));
     expect(screen.getByText("Alex Sampleton")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Game Plan" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Game Plan" }));
     expect(screen.getByText(/Sell Casey Placeholder/)).toBeTruthy();
     expect(screen.getByTestId("sample-banner")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Open sample trade/ }));

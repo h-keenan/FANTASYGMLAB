@@ -87,7 +87,7 @@ describe("PercentileExplorerSheet", () => {
     mocked.mockResolvedValue(response());
     renderSheet();
     await waitFor(() => screen.getByTestId("pe-chart"));
-    fireEvent.click(screen.getByRole("button", { name: "All Players" }));
+    fireEvent.click(screen.getByRole("tab", { name: "All Players" }));
     await waitFor(() => expect(mocked).toHaveBeenLastCalledWith("me", "ppr_ppg", "all"));
   });
 

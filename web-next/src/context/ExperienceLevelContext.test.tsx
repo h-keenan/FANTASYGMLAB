@@ -224,14 +224,14 @@ describe("Account page goal setting", () => {
     renderAccount();
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    const winNow = screen.getByRole("button", { name: /^win now$/i });
-    expect(winNow).toHaveAttribute("aria-pressed", "false");
+    const winNow = screen.getByRole("tab", { name: /^win now$/i });
+    expect(winNow).toHaveAttribute("aria-selected", "false");
 
     fireEvent.click(winNow);
     await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith("win_now"));
-    await waitFor(() => expect(screen.getByRole("button", { name: /^win now$/i })).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(screen.getByRole("tab", { name: /^win now$/i })).toHaveAttribute("aria-selected", "true"));
 
-    fireEvent.click(screen.getByRole("button", { name: /^win now$/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^win now$/i }));
     await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith(null));
   });
 });

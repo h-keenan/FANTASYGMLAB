@@ -213,14 +213,14 @@ describe("MatchupContent", () => {
   it("pre-game with no posted lineups: suggested tab by default, honest odds and moves copy", () => {
     render(<MatchupContent leagueName="My League" matchup={PREGAME} />);
 
-    expect(screen.getByRole("button", { name: "Suggested Lineup" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Suggested Lineup" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Win probability appears once Sleeper posts both lineups.")).toBeInTheDocument();
     expect(screen.getByText("Suggested moves appear once Sleeper has your lineup for this week.")).toBeInTheDocument();
     expect(screen.getByText(/projections for each team's suggested lineup/)).toBeInTheDocument();
     // Suggested starters show their projection in the table.
     expect(screen.getAllByText("13.1").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Actual Lineup" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Actual Lineup" }));
     expect(screen.getByText("Sleeper hasn't posted lineups for this week yet.")).toBeInTheDocument();
   });
 
@@ -274,7 +274,7 @@ describe("MatchupContent", () => {
   it("actual tab (default once Sleeper has a lineup): slot rows, real points, empty slot", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse()} />);
 
-    expect(screen.getByRole("button", { name: "Actual Lineup" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Actual Lineup" })).toHaveAttribute("aria-selected", "true");
     const table = screen.getByRole("table", { name: "Actual lineups" });
     expect(within(table).getByText("Ashton Jeanty")).toBeInTheDocument();
     expect(within(table).getByText("Chase Brown")).toBeInTheDocument();
