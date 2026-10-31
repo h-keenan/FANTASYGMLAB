@@ -3,25 +3,22 @@
 Request (coridian_): "a commissioner section where you can see if teams are
 purposefully tanking and stuff". Engine: `modules/league_integrity.py` (pure,
 testable). Data gathering and cache: `modules/league_integrity_data.py`.
-Endpoints: `GET /v1/leagues/{id}/commissioner/status` and
-`.../commissioner/integrity?draft_order=unknown|record|lottery`. Web:
+Endpoints: `GET /v1/leagues/{id}/commissioner/integrity?draft_order=unknown|record|lottery`. Web:
 `/commissioner/[leagueId]`. App: `Commissioner` screen. Shared presentation:
 `lib/commissionerIntegrity.ts` (SHARED block byte-identical on web and app,
 checked by a mobile test).
 
-## Who sees it (honest limit)
+## Who sees it
 
-Sleeper's public league users list marks the commissioner(s) with
-`is_owner: true` (verified against a public league: several co-commissioners
-can carry it). The server matches that to the signed-in user's own roster
-owner. Only then does the nav entry appear (web sidebar and GM Orb, app GM
-Orb) and the integrity endpoint return data. Everyone else gets reason
-`not_commissioner` and no teams. We deliberately did not offer a read-only
-view for every member: tanking accusations about named managers belong with
-the person who can act on them. ESPN/MFL/other imported leagues are not
-supported (`unsupported_platform`). Tier: Pro, like Playoff Odds and the other
-advanced league tools (`_is_pro_caller`; trialing counts as Pro). The status
-check is ungated so a Free commissioner still sees the entry and the upsell.
+Owner decision (coridian_): the section is Pro-only and does NOT depend on
+being the league's commissioner. Any Pro user can open it for any Sleeper
+league they can access (same league-access and `_is_pro_caller` gating as
+Playoff Odds; trialing counts as Pro; Free gets the upsell and no data).
+There is no commissioner detection. It is framed honestly as a league-integrity
+view over public Sleeper data: signals to check, not accusations. ESPN/MFL and
+other imported leagues are not supported (`unsupported_platform`). Endpoint:
+`GET /v1/leagues/{id}/commissioner/integrity`. Nav entry "Commissioner" sits
+under GM Tools on web (sidebar, GM Orb) and the app (GM Orb).
 
 ## What it reads
 
@@ -106,7 +103,7 @@ flagged card lists the evidence lines and "Could be innocent" explanations.
 - Sleeper does not expose past injuries/inactives. We exclude bye weeks and
   zero-point players; a late scratch can still look like a mistake. The
   league-median adjustment and the persistence requirement are the guard.
-- The draft-order rule is not published, so the commissioner states it (page
+- The draft-order rule is not published, so the user states it (page
   control, default "Not sure"); it only changes interpretation text and the
   context factor, not the lineup math.
 - IR/taxi exclusion uses the current roster, not that week's.

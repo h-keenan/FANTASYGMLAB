@@ -7,7 +7,6 @@ import {
   bandTone,
   integrityReasonMessage,
   integritySummaryLine,
-  showCommissionerEntry,
   splitTeams,
   type CommissionerIntegrityResponse,
   type IntegrityTeam,
@@ -30,7 +29,7 @@ function team(band: IntegrityTeam['band'], id = 1): IntegrityTeam {
 }
 
 function resp(teams: IntegrityTeam[]): CommissionerIntegrityResponse {
-  return { ok: true, reason: '', is_commissioner: true, teams, collusion: [], inactive: [], weeks_evaluated: 5 };
+  return { ok: true, reason: '', teams, collusion: [], inactive: [], weeks_evaluated: 5 };
 }
 
 test('web and app share one league-integrity presentation block', () => {
@@ -54,10 +53,7 @@ test('summary is calm and flagged teams come first', () => {
   assert.match(integritySummaryLine(resp([team('fine')])), /No team stands out/);
 });
 
-test('commissioner entry needs server confirmation; reasons have honest copy', () => {
-  assert.equal(showCommissionerEntry(undefined), false);
-  assert.equal(showCommissionerEntry({ ok: true, is_commissioner: false, reason: '' }), false);
-  assert.equal(showCommissionerEntry({ ok: true, is_commissioner: true, reason: '' }), true);
+test('reasons have honest copy', () => {
   assert.match(integrityReasonMessage('not_enough_weeks'), /three completed/);
   assert.match(integrityReasonMessage('weird'), /not available/);
 });

@@ -4,7 +4,6 @@ import {
   bandTone,
   integrityReasonMessage,
   integritySummaryLine,
-  showCommissionerEntry,
   splitTeams,
   type CommissionerIntegrityResponse,
   type IntegrityTeam,
@@ -19,7 +18,7 @@ function team(band: IntegrityTeam["band"], id = 1): IntegrityTeam {
 }
 
 function resp(teams: IntegrityTeam[], extra: Partial<CommissionerIntegrityResponse> = {}): CommissionerIntegrityResponse {
-  return { ok: true, reason: "", is_commissioner: true, teams, collusion: [], inactive: [], weeks_evaluated: 5, ...extra };
+  return { ok: true, reason: "", teams, collusion: [], inactive: [], weeks_evaluated: 5, ...extra };
 }
 
 describe("commissioner integrity presentation", () => {
@@ -37,12 +36,6 @@ describe("commissioner integrity presentation", () => {
     expect(rest.map((t) => t.roster_id)).toEqual([2, 4]);
     expect(integritySummaryLine(resp(teams))).toBe("After 5 weeks: 2 teams worth a look. These are prompts to check, not conclusions.");
     expect(integritySummaryLine(resp([team("fine")]))).toContain("No team stands out");
-  });
-
-  it("only shows the entry once the server confirmed commissioner status", () => {
-    expect(showCommissionerEntry(null)).toBe(false);
-    expect(showCommissionerEntry({ ok: true, is_commissioner: false, reason: "" })).toBe(false);
-    expect(showCommissionerEntry({ ok: true, is_commissioner: true, reason: "" })).toBe(true);
   });
 
   it("explains every empty-state reason, with an honest fallback", () => {

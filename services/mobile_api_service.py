@@ -12419,37 +12419,11 @@ def get_league_guillotine(
 _COMMISSIONER_UPSELL = {
     "title": "Spot tanking and lineup problems early",
     "body": (
-        "League integrity is a Pro feature for commissioners: per-team lineup efficiency, tanking signals "
+        "League integrity is a Pro feature: per-team lineup efficiency, tanking signals "
         "with the evidence behind them, repeated lopsided trades and inactive managers. Start your free "
         "trial to unlock it."
     ),
 }
-
-
-def _commissioner_state(user: dict[str, Any], league_id: str) -> tuple[str, bool]:
-    """(reason, is_commissioner). Sleeper marks the commissioner(s) with
-    `is_owner` on the league users list; we match it to the signed-in user's
-    own roster owner. reason is "" when the answer is real."""
-
-    if external_leagues.is_external_league_key(league_id):
-        return "unsupported_platform", False
-    my_roster, reason = _resolve_my_roster(user, league_id)
-    if my_roster is None:
-        return reason or "no_roster", False
-    users = sleeper.get_users(league_id) or []
-    return "", league_integrity_data.is_commissioner(users, str(my_roster.get("owner_id") or ""))
-
-
-@app.get("/v1/leagues/{league_id}/commissioner/status")
-def get_commissioner_status(
-    league_id: str = Depends(require_league_access),
-    user: dict[str, Any] = Depends(require_user),
-) -> dict[str, Any]:
-    """Cheap flag the clients use to decide whether to show the Commissioner
-    entry. Not tier-gated (the page itself is Pro)."""
-
-    reason, flag = _commissioner_state(user, league_id)
-    return {"ok": True, "is_commissioner": flag, "reason": reason}
 
 
 @app.get("/v1/leagues/{league_id}/commissioner/integrity")
@@ -12458,30 +12432,25 @@ def get_commissioner_integrity(
     draft_order: str = "unknown",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    """League integrity report for the league's commissioner (see
-    modules.league_integrity and docs/commissioner-tools.md).
+    """League integrity view (see modules.league_integrity and
+    docs/commissioner-tools.md).
 
-    Commissioner-only: a member who is not marked `is_owner` by Sleeper gets
-    reason "not_commissioner" and no teams. Pro-gated like the other advanced
-    league tools. Public Sleeper data only; `draft_order` is the commissioner's
-    own statement of the league's draft-order rule (Sleeper does not publish
-    it): record | lottery | unknown.
+    Available to any Pro user for any of their leagues (owner decision:
+    commissioner status is not checked). Public Sleeper data only; signals,
+    not accusations. `draft_order` is the user's own statement of the league's
+    draft-order rule (Sleeper does not publish it): record | lottery | unknown.
     """
 
     if draft_order not in league_integrity.DRAFT_RULES:
         raise HTTPException(status_code=422, detail="draft_order must be one of: " + ", ".join(league_integrity.DRAFT_RULES))
     if not _is_pro_caller(user):
-        return {"ok": True, "reason": "premium_required", "is_premium": False, "is_commissioner": None,
+        return {"ok": True, "reason": "premium_required", "is_premium": False,
                 "teams": [], "collusion": [], "inactive": [], "upsell": _COMMISSIONER_UPSELL}
-    reason, flag = _commissioner_state(user, league_id)
-    if reason:
-        return {"ok": True, "reason": reason, "is_premium": True, "is_commissioner": False, "teams": [],
+    if external_leagues.is_external_league_key(league_id):
+        return {"ok": True, "reason": "unsupported_platform", "is_premium": True, "teams": [],
                 "collusion": [], "inactive": [], "upsell": None}
-    if not flag:
-        return {"ok": True, "reason": "not_commissioner", "is_premium": True, "is_commissioner": False,
-                "teams": [], "collusion": [], "inactive": [], "upsell": None}
     report = league_integrity_data.build_cached(league_id, draft_order, PLAYERS_DB_PATH)
-    return {**report, "is_premium": True, "is_commissioner": True, "upsell": None}
+    return {**report, "is_premium": True, "upsell": None}
 
 
 class LeagueTypeRequest(BaseModel):

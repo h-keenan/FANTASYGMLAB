@@ -48,8 +48,6 @@ export const queryKeys = {
     [...userScopeKey(), 'league', leagueId, 'league-rosters'] as const,
   leagueInfo: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'info'] as const,
   playoffOdds: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'playoff-odds'] as const,
-  commissionerStatus: (leagueId: string) =>
-    [...userScopeKey(), 'league', leagueId, 'commissioner-status'] as const,
   commissionerIntegrity: (leagueId: string, draftOrder: string) =>
     [...userScopeKey(), 'league', leagueId, 'commissioner-integrity', draftOrder] as const,
   waivers: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'waivers'] as const,

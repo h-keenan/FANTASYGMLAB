@@ -22,7 +22,7 @@ const tanker: IntegrityTeam = {
 const fine: IntegrityTeam = { ...tanker, roster_id: 1, team_name: "Alpha", band: "fine", band_label: "Lineup looks fine", interpretation: "none", score: 0.03 };
 
 function body(overrides: Partial<CommissionerIntegrityResponse> = {}): CommissionerIntegrityResponse {
-  return { ok: true, reason: "", is_premium: true, is_commissioner: true, upsell: null, weeks_evaluated: 6, teams: [tanker, fine], collusion: [], inactive: [], limits: ["Sleeper does not say who was injured."], ...overrides };
+  return { ok: true, reason: "", is_premium: true, upsell: null, weeks_evaluated: 6, teams: [tanker, fine], collusion: [], inactive: [], limits: ["Sleeper does not say who was injured."], ...overrides };
 }
 
 describe("CommissionerContent", () => {
@@ -48,14 +48,14 @@ describe("CommissionerContent", () => {
     await waitFor(() => expect(api.getCommissionerIntegrity).toHaveBeenLastCalledWith("L1", "record"));
   });
 
-  it("is honest in early season and for non-commissioners", async () => {
+  it("is honest in early season and for unsupported platforms", async () => {
     vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body({ reason: "not_enough_weeks", teams: [] }));
     const { unmount } = render(<CommissionerContent leagueId="L1" leagueName="My League" />);
     expect(await screen.findByText(/at least three completed/)).toBeTruthy();
     unmount();
-    vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body({ reason: "not_commissioner", teams: [], is_commissioner: false }));
+    vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body({ reason: "unsupported_platform", teams: [] }));
     render(<CommissionerContent leagueId="L2" leagueName="Other" />);
-    expect(await screen.findByText(/only shown to the league's commissioner/)).toBeTruthy();
+    expect(await screen.findByText(/only available for Sleeper leagues/)).toBeTruthy();
   });
 
   it("shows the upsell for a Free account", async () => {

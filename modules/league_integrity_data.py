@@ -21,14 +21,6 @@ INTEGRITY_TTL_SECONDS = 30 * 60
 _LOCK_TIMEOUT_SECONDS = 20.0
 
 
-def is_commissioner(users: list[dict[str, Any]], owner_id: str) -> bool:
-    """Sleeper's league users list marks the commissioner(s) with is_owner."""
-
-    return bool(owner_id) and any(
-        str(u.get("user_id") or "") == str(owner_id) and u.get("is_owner") is True for u in users or []
-    )
-
-
 def _bye_checker(season: int) -> Callable[[str, int], bool]:
     cache: dict[str, int | None] = {}
 

@@ -9,7 +9,6 @@ import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap
 import type { PercentileExplorerResponse } from './percentileExplorer';
 import type {
   CommissionerIntegrityResponse,
-  CommissionerStatusResponse,
   DraftOrderRule,
 } from './commissionerIntegrity';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
@@ -3142,10 +3141,6 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds${query ? `?${query}` : ''}`,
     );
   },
-  getCommissionerStatus: (leagueId: string) =>
-    authorizedFetch<CommissionerStatusResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/status`,
-    ),
   getCommissionerIntegrity: (leagueId: string, draftOrder: DraftOrderRule = 'unknown') =>
     authorizedFetch<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,

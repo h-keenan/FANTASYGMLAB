@@ -1,5 +1,5 @@
 /**
- * League integrity (Commissioner) presentation, shared by web and the app.
+ * League integrity (Commissioner section) presentation, shared by web and the app.
  * The block between the SHARED markers is byte-identical to
  * web-next/src/lib/commissionerIntegrity.ts (a mobile test compares them): edit
  * both together. Pure TS, no imports, so node --test can run it. Engine and
@@ -61,17 +61,10 @@ export interface IntegrityInactiveManager {
   innocent_explanations: string[];
 }
 
-export interface CommissionerStatusResponse {
-  ok: boolean;
-  is_commissioner: boolean;
-  reason: string;
-}
-
 export interface CommissionerIntegrityResponse {
   ok: boolean;
   reason: string;
   is_premium?: boolean;
-  is_commissioner: boolean | null;
   upsell?: { title: string; body: string } | null;
   draft_order_rule?: DraftOrderRule;
   weeks_evaluated?: number;
@@ -109,7 +102,6 @@ export const BAND_LABEL: Record<IntegrityBand, string> = {
 
 /** Reason codes the server returns instead of teams, in plain words. */
 const REASON_MESSAGES: Record<string, string> = {
-  not_commissioner: "League integrity is only shown to the league's commissioner.",
   unsupported_platform: "League integrity is only available for Sleeper leagues for now.",
   offseason: "League integrity needs played weeks. It opens once the regular season is under way.",
   not_enough_weeks: "Not enough weeks yet. Signals need at least three completed regular-season weeks.",
@@ -156,10 +148,5 @@ export function integritySummaryLine(resp: CommissionerIntegrityResponse): strin
   if (resp.collusion.length) parts.push(`${resp.collusion.length} repeated lopsided trade pair${resp.collusion.length === 1 ? "" : "s"}`);
   if (resp.inactive.length) parts.push(`${resp.inactive.length} possibly inactive manager${resp.inactive.length === 1 ? "" : "s"}`);
   return `After ${weeks} week${weeks === 1 ? "" : "s"}: ${parts.join(", ")}. These are prompts to check, not conclusions.`;
-}
-
-/** Show the Commissioner entry only once the server confirmed commissioner status. */
-export function showCommissionerEntry(status: CommissionerStatusResponse | null | undefined): boolean {
-  return Boolean(status && status.ok && status.is_commissioner);
 }
 // SHARED END

@@ -36,9 +36,3 @@ def test_build_reads_weeks_before_current_leg_only():
 
 def test_offseason_league_reports_offseason():
     assert _run(status="pre_draft", leg=0)["reason"] == "offseason"
-
-
-def test_is_commissioner_requires_is_owner_true():
-    users = [{"user_id": "a", "is_owner": True}, {"user_id": "b", "is_owner": None}, {"user_id": "c"}]
-    assert data.is_commissioner(users, "a") and not data.is_commissioner(users, "b")
-    assert not data.is_commissioner(users, "c") and not data.is_commissioner(users, "")
