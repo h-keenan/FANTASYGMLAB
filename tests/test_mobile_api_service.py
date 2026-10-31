@@ -15948,3 +15948,50 @@ def test_public_dynasty_values_rejects_unknown_format_and_empty_data(monkeypatch
     assert client.get("/v1/public/dynasty-values?format=nope").status_code == 422
     with patch("modules.rankings.load_players", return_value=pd.DataFrame()):
         assert client.get("/v1/public/dynasty-values?format=1qb").status_code == 503
+
+
+def _mv_noproj(pid, pos, slot):
+    row = _mv(pid, pos, slot, 0)
+    row["projection"] = {"status": "insufficient_player_data", "point_estimate": None}
+    return row
+
+
+def test_suggested_moves_never_start_an_unprojected_player_over_a_projected_one():
+    """Owner case: 'Start Jaydon Blue over Michael Carter (Proj 1.5)' where Blue
+    has no projection. A placeholder estimate is not evidence of a better week."""
+
+    from services import mobile_api_service as svc
+
+    actual = [_mv("carter", "RB", "RB", 1.5), _mv("rb1", "RB", "RB", 12)]
+    suggested = [_mv_noproj("blue", "RB", "RB"), _mv("rb1", "RB", "RB", 12)]
+    assert svc._suggested_lineup_moves(_moves_side(suggested, actual)) == []
+
+
+def test_suggested_moves_never_start_a_bye_or_ruled_out_player():
+    from services import mobile_api_service as svc
+
+    actual = [_mv("a", "RB", "RB", 5)]
+    bye = _mv("b", "RB", "RB", 9)
+    bye["projection"] = {"status": "bye_week", "point_estimate": None}
+    assert svc._suggested_lineup_moves(_moves_side([bye], actual)) == []
+    out = _mv("c", "RB", "RB", 9)
+    out["injury_status"] = "Out"
+    assert svc._suggested_lineup_moves(_moves_side([out], actual)) == []
+
+
+def test_suggested_moves_keep_legit_swap_and_flag_unprojected_fill_for_empty_slot():
+    from services import mobile_api_service as svc
+
+    moves = svc._suggested_lineup_moves(
+        _moves_side([_mv("wr_new", "WR", "WR", 11)], [_mv("wr_old", "WR", "WR", 5)])
+    )
+    assert len(moves) == 1 and moves[0]["gain"] == 6.0 and moves[0]["start_note"] is None
+
+    filler = svc._suggested_lineup_moves(_moves_side([_mv_noproj("blue", "RB", "RB")], [], empty=["RB"]))
+    assert len(filler) == 1
+    assert filler[0]["gain"] is None and filler[0]["start_note"]
+
+    bye = _mv("bye", "RB", "RB", 0)
+    bye["projection"] = {"status": "bye_week", "point_estimate": None}
+    over_bye = svc._suggested_lineup_moves(_moves_side([_mv_noproj("blue", "RB", "RB")], [bye]))
+    assert len(over_bye) == 1 and over_bye[0]["over_reason"] == "bye_week"

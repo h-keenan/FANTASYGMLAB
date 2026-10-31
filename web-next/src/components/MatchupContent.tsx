@@ -584,7 +584,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
           <span className="flex items-center gap-2">
             <PositionBadge position={move.slot} label={slotLabel} />
             <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : "No projection yet"}
+              {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : move.start_note || "No projection yet"}
             </span>
           </span>
           <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
@@ -657,7 +657,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
         </ul>
       )}
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        The suggested lineup ranks by season-long value; gains are this week&apos;s projected points. FantasyDesk
+        The suggested lineup ranks by this week&apos;s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk
         can&apos;t change your Sleeper lineup, so make any swap in Sleeper.
       </p>
     </section>

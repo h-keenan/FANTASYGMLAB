@@ -1405,6 +1405,8 @@ export interface MatchupSuggestedMove {
   over: MatchupMovePlayer | null;
   over_reason: "bye_week" | "ruled_out" | "empty_slot" | null;
   gain: number | null;
+  /** Set when X has no projection and is shown only because the slot has no modeled alternative. */
+  start_note?: string | null;
   /** True once either player's game has kicked off (Sleeper locks it). */
   locked: boolean;
 }

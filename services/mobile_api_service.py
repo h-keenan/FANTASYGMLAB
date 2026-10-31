@@ -13421,7 +13421,10 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
     `gain` is the difference in the two players' expected points (see
     matchup_win_probability.starter_expected_points). A bye-week or
     ruled-out starter counts as 0 because he cannot score; a player with no
-    modeled number leaves `gain` None rather than guessed. Gains are exact
+    modeled number leaves `gain` None rather than guessed. A swap is dropped
+    when the incoming player is unavailable, or has no projection while the
+    player he would replace does (see `swap_is_justified`); a no-projection
+    player recommended for an empty/unplayable slot carries `start_note`. Gains are exact
     differences (no double counting), so the shown moves sum to suggested
     total minus actual total, to within 0.05 per move of rounding.
     `locked` is True once either player's own game has kicked off, because
@@ -13505,14 +13508,38 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
             "gain": gain,
             "locked": starter.get("game_started") is True
             or (over is not None and over.get("game_started") is True),
+            # Honest uncertainty: set only when a no-projection player is
+            # recommended because the slot has no modeled alternative.
+            "start_note": "No projection yet — role unclear" if start_points is None else None,
         }
         if chain_id is not None:
             move["chain_id"] = chain_id
         return move
 
+    def swap_is_justified(starter: dict[str, Any], over: dict[str, Any] | None, *, empty: bool) -> bool:
+        """A swap needs a reason this week, never a guess.
+
+        The incoming player must be available (not bye / ruled out). With no
+        modeled points of his own he may only fill a slot that has nothing
+        better: an empty slot, or a current starter who cannot score
+        (bye / ruled out) or is equally unmodeled. A projected starter is
+        never benched for a player with no projection, since the lineup
+        engine's value-matched placeholder is not evidence of a better week.
+        """
+
+        if _benched_reason(starter) is not None:
+            return False
+        if matchup_win_probability.starter_expected_points(starter) is not None:
+            return True
+        if empty or over is None or _benched_reason(over) is not None:
+            return True
+        return matchup_win_probability.starter_expected_points(over) is None
+
     groups: list[list[dict[str, Any]]] = []
     for i, t in matched_in.items():
         target = targets[t]
+        if not swap_is_justified(ins[i], target["player"], empty=target["player"] is None):
+            continue
         groups.append(
             [build(target["slot"], ins[i], target["player"], empty=target["player"] is None)]
         )
@@ -13530,6 +13557,8 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
                 sid = str(stayer.get("player_id") or "")
                 s_slot = str(stayer.get("slot") or "")
                 if sid in used_stayers or not eligible(ins[i], s_slot) or not eligible(stayer, target["slot"]):
+                    continue
+                if not swap_is_justified(ins[i], stayer, empty=False):
                     continue
                 chain_id += 1
                 used_stayers.add(sid)
