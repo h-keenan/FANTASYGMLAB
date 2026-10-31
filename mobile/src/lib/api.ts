@@ -877,6 +877,8 @@ export interface MatchupSuggestedMove {
   start: MatchupMovePlayer;
   over: MatchupMovePlayer | null;
   over_reason: 'bye_week' | 'ruled_out' | 'empty_slot' | null;
+  /** Set when X has no projection and is shown only because the slot has no modeled alternative. */
+  start_note?: string | null;
   gain: number | null;
   locked: boolean;
 }
