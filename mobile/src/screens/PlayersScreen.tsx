@@ -439,7 +439,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
+  container: { flex: 1, backgroundColor: 'transparent' },
   discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position/Age/Status/Availability now render as one wrapping row of
   // compact dropdown buttons (FilterDropdownButton) instead of four full
@@ -485,12 +485,12 @@ function createStyles(colors: ThemeColors) {
   },
   positionRankText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
   // Grid (2-up compact card) mode — see PlayerRankRow's `grid` branch.
-  // `width: '48%'` + `columnWrapperStyle`'s `justifyContent: 'space-between'`
-  // (rather than `flex: 1` + a `gap`) is the deliberate choice: it keeps an
-  // unpaired last card (odd total count) from stretching to double width
-  // instead of sitting flush left like every other card.
-  gridRow: { justifyContent: 'space-between', marginBottom: spacing.sm },
-  gridCell: { width: '48%' },
+  // `flex: 1` + a `spacing.sm` column gap so the 2-up gutter matches the
+  // vertical gap (the old `width: '48%'` left a ~14pt gutter at phone
+  // width); `maxWidth: '50%'` keeps an unpaired last card (odd total count)
+  // from stretching to double width.
+  gridRow: { gap: spacing.sm, marginBottom: spacing.sm },
+  gridCell: { flex: 1, maxWidth: '50%' },
   gridFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -159,7 +159,7 @@ function PlayerRow({
   const injury = waiverInjuryDisplay(player.injury_status);
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3 py-3"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
       <PlayerIdentity
@@ -169,12 +169,11 @@ function PlayerRow({
         position={player.position}
         tier={player.tier}
         injuryStatus={injury.label}
-        className="flex-1 basis-48 min-w-0"
+        className="flex-1 basis-full sm:basis-48 min-w-0"
       >
         {player.team || "—"}
       </PlayerIdentity>
-      <div className="contents">
-      <div className="flex items-center gap-2 max-sm:w-full max-sm:justify-end">
+      <div className="flex items-center gap-2">
         <SortedStatTile player={player} sortOption={sortOption} sortMode={sortMode} />
         {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
             should say in small print value above it so its not glaring
@@ -195,11 +194,11 @@ function PlayerRow({
           <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league or your roster.`} />
         ) : null}
       </div>
-      <div className="flex items-center gap-2 max-sm:w-full">
+      <div className="flex items-center gap-2">
         {idpConfidence ? null : (
           <a
             href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold max-sm:flex-1"
+            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold "
             style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
           >
             Compare
@@ -217,13 +216,12 @@ function PlayerRow({
         {idpConfidence ? null : (
           <a
             href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
-            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold max-sm:flex-1"
+            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold "
             style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
           >
             Add to Trade
           </a>
         )}
-      </div>
       </div>
     </div>
   );
@@ -342,18 +340,18 @@ export function PlayersContent({
 
       {view === "players" ? (
         <>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search players"
-              className="filter-input px-3 py-2 text-sm flex-1 min-w-[10rem]"
+              className="filter-input col-span-2 px-3 py-2 text-sm sm:flex-1 sm:min-w-[10rem]"
             />
             <select
               value={position}
               onChange={(event) => setPosition(event.target.value)}
-              className="filter-select px-3 py-2 text-sm"
+              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
             >
               {positionOptions.map((pos) => (
                 <option key={pos} value={pos}>
@@ -364,7 +362,7 @@ export function PlayersContent({
             <select
               value={ageFilter}
               onChange={(event) => setAgeFilter(event.target.value as PlayersAgeFilter)}
-              className="filter-select px-3 py-2 text-sm"
+              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
             >
               {PLAYERS_AGE_FILTERS.map((option) => (
                 <option key={option} value={option}>
@@ -375,7 +373,7 @@ export function PlayersContent({
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as PlayersStatusFilter)}
-              className="filter-select px-3 py-2 text-sm"
+              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
             >
               {PLAYERS_STATUS_FILTERS.map((option) => (
                 <option key={option} value={option}>
@@ -386,7 +384,7 @@ export function PlayersContent({
             <select
               value={availabilityFilter}
               onChange={(event) => setAvailabilityFilter(event.target.value as PlayersAvailabilityFilter)}
-              className="filter-select px-3 py-2 text-sm"
+              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
             >
               {PLAYERS_AVAILABILITY_FILTERS.map((option) => (
                 <option key={option} value={option}>
@@ -398,7 +396,7 @@ export function PlayersContent({
               <select
                 value={rosterFilter}
                 onChange={(event) => setRosterFilter(event.target.value as PlayersRosterFilter)}
-                className="filter-select px-3 py-2 text-sm"
+                className="filter-select col-span-2 w-full px-3 py-2 text-sm sm:col-span-1 sm:w-auto"
               >
                 {PLAYERS_ROSTER_FILTERS.map((option) => (
                   <option key={option} value={option}>
