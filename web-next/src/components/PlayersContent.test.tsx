@@ -327,4 +327,15 @@ describe("PlayersContent", () => {
       expect(screen.queryByRole("link", { name: "Add to Trade" })).not.toBeInTheDocument();
     });
   });
+  it("lays out the filter bar as an aligned grid and keeps row stats/actions in one wrapping flow", () => {
+    const { container } = render(<PlayersContent leagueId="L1" leagueName="Test League" data={DATA} rosters={[{ players: ["p1"] }]} />);
+    const search = screen.getByPlaceholderText("Search players");
+    const bar = search.parentElement as HTMLElement;
+    expect(bar.className).toContain("grid-cols-2");
+    expect(search.className).toContain("col-span-2");
+    for (const select of bar.querySelectorAll("select")) expect(select.className).toContain("w-full");
+    // No nested `contents` wrapper / forced full-width stacking on rows.
+    expect(container.querySelector(".contents")).toBeNull();
+    expect(container.innerHTML).not.toContain("max-sm:w-full");
+  });
 });
