@@ -33,6 +33,7 @@ const KEEP_SCREEN_ROUTES = new Set([
   'Teams',
   'PlayoffOdds',
   'Games',
+  'Commissioner',
   'DraftCenter',
   'MyTeam',
   'Matchup',

@@ -226,6 +226,14 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.violet,
       subtitle: "Season simulator and weekly pick'em",
     },
+    {
+            label: 'Commissioner',
+            route: 'Commissioner',
+            icon: 'shield-checkmark-outline',
+            needsLeague: true,
+            color: colors.violet,
+            subtitle: 'League integrity: lineups, tanking signals, trades',
+          },
   ];
 }
 

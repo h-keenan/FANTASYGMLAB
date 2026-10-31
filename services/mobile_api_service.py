@@ -177,6 +177,8 @@ from modules import (
     league_format_context,
     league_history,
     league_glance,
+    league_integrity_data,
+    league_integrity,
     league_rankings,
     league_warmup,
     league_recaps,
@@ -12412,6 +12414,43 @@ def get_league_guillotine(
         **status,
         "chop_line": chop,
     }
+
+
+_COMMISSIONER_UPSELL = {
+    "title": "Spot tanking and lineup problems early",
+    "body": (
+        "League integrity is a Pro feature: per-team lineup efficiency, tanking signals "
+        "with the evidence behind them, repeated lopsided trades and inactive managers. Start your free "
+        "trial to unlock it."
+    ),
+}
+
+
+@app.get("/v1/leagues/{league_id}/commissioner/integrity")
+def get_commissioner_integrity(
+    league_id: str = Depends(require_league_access),
+    draft_order: str = "unknown",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """League integrity view (see modules.league_integrity and
+    docs/commissioner-tools.md).
+
+    Available to any Pro user for any of their leagues (owner decision:
+    commissioner status is not checked). Public Sleeper data only; signals,
+    not accusations. `draft_order` is the user's own statement of the league's
+    draft-order rule (Sleeper does not publish it): record | lottery | unknown.
+    """
+
+    if draft_order not in league_integrity.DRAFT_RULES:
+        raise HTTPException(status_code=422, detail="draft_order must be one of: " + ", ".join(league_integrity.DRAFT_RULES))
+    if not _is_pro_caller(user):
+        return {"ok": True, "reason": "premium_required", "is_premium": False,
+                "teams": [], "collusion": [], "inactive": [], "upsell": _COMMISSIONER_UPSELL}
+    if external_leagues.is_external_league_key(league_id):
+        return {"ok": True, "reason": "unsupported_platform", "is_premium": True, "teams": [],
+                "collusion": [], "inactive": [], "upsell": None}
+    report = league_integrity_data.build_cached(league_id, draft_order, PLAYERS_DB_PATH)
+    return {**report, "is_premium": True, "upsell": None}
 
 
 class LeagueTypeRequest(BaseModel):

@@ -7,6 +7,10 @@ import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from
 import { withBackgroundRetry } from './backgroundRetry';
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap';
 import type { PercentileExplorerResponse } from './percentileExplorer';
+import type {
+  CommissionerIntegrityResponse,
+  DraftOrderRule,
+} from './commissionerIntegrity';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
 import type {
   ManagerTendenciesDetailResponse,
@@ -3137,6 +3141,10 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds${query ? `?${query}` : ''}`,
     );
   },
+  getCommissionerIntegrity: (leagueId: string, draftOrder: DraftOrderRule = 'unknown') =>
+    authorizedFetch<CommissionerIntegrityResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
+    ),
   getGamesSeasonSim: (leagueId: string) =>
     authorizedFetch<GamesSeasonSimResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim`),
   postGamesWhatIf: (leagueId: string, body: { add: string[]; drop: string[] }) =>

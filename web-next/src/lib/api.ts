@@ -3,6 +3,10 @@ import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } 
 import { supabase } from "./supabase";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
+import type {
+  CommissionerIntegrityResponse,
+  DraftOrderRule,
+} from "./commissionerIntegrity";
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 import { billingRequest, type BillingFunction } from "./billingClient";
@@ -3608,6 +3612,11 @@ export const api = {
   getLeaguePlayoffOdds: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<PlayoffOddsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getCommissionerIntegrity: (leagueId: string, draftOrder: DraftOrderRule = "unknown") =>
+    authorizedRequest<CommissionerIntegrityResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ),
 
   getGamesSeasonSim: (leagueId: string, lens: string = "Dynasty") =>

@@ -70,6 +70,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
         { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: "var(--color-danger)" },
         { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: "var(--color-information)" },
         { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: "var(--color-opportunity)" },
+        { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: "var(--color-diagnostic)" },
       ]
     : [];
 
@@ -138,6 +139,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "live-draft": "Live Draft",
   "league-recaps": "League Recaps",
   games: "Games",
+  commissioner: "Commissioner",
   portfolio: "Portfolio",
   news: "News",
   "trade-history": "Trade History",

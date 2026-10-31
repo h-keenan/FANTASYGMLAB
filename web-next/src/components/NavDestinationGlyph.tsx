@@ -22,6 +22,7 @@ export type NavGlyphName =
   | "teamSituation"
   | "community"
   | "games"
+  | "commissioner"
   | "founderAnalytics";
 
 /**
@@ -243,6 +244,14 @@ export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; s
           <circle cx="176" cy="176" r="16" fill="currentColor" />
           <circle cx="256" cy="256" r="16" fill="currentColor" />
           <circle cx="336" cy="336" r="16" fill="currentColor" />
+        </svg>
+      );
+    case "commissioner":
+      // A shield with a check: league integrity / rules oversight.
+      return (
+        <svg {...common}>
+          <path d="M256 64 96 120v120c0 100 68 172 160 208 92-36 160-108 160-208V120Z" {...stroke} />
+          <path d="m184 256 52 52 96-104" {...stroke} />
         </svg>
       );
     case "founderAnalytics":
