@@ -871,7 +871,7 @@ export function TradeAnalyzerContent({
     ...receivePicks.map(pickToTradeAsset),
   ];
 
-  const canAnalyze = sendAssets.length > 0 && receiveAssets.length > 0;
+  const canAnalyze = hasAnyAssets;
   const analyzeLabel = canAnalyze
     ? `Analyze Trade (${sendAssets.length} for ${receiveAssets.length})`
     : "Analyze Trade";
@@ -932,7 +932,7 @@ export function TradeAnalyzerContent({
         </Button>
         {!canAnalyze ? (
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Add at least one asset to each side, then Analyze.
+            Add players or picks to analyze.
           </p>
         ) : null}
         {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}

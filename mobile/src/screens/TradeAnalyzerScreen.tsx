@@ -438,7 +438,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
   const sendCount = sendIds.length + sendPicks.length;
   const receiveCount = receiveIds.length + receivePicks.length;
-  const canAnalyze = sendCount > 0 && receiveCount > 0;
+  const canAnalyze = hasAnyAssets;
   const analyzeLabel = canAnalyze ? `Analyze Trade (${sendCount} for ${receiveCount})` : 'Analyze Trade';
 
   const analyze = async () => {
@@ -545,7 +545,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       {!quickMode ? (
         <>
           <Button label={analyzeLabel} onPress={analyze} disabled={!canAnalyze} loading={analyzing} style={styles.analyzeButton} />
-          {!canAnalyze ? <AppText style={styles.analyzeHint}>Add at least one asset to each side, then Analyze.</AppText> : null}
+          {!canAnalyze ? <AppText style={styles.analyzeHint}>Add players or picks to analyze.</AppText> : null}
 
           {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
           {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}

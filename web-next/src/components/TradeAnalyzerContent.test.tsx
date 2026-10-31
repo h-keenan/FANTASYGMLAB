@@ -470,7 +470,7 @@ describe("TradeAnalyzerContent", () => {
         />,
       );
 
-      expect(screen.getByText("Add at least one asset to each side, then Analyze.")).toBeInTheDocument();
+      expect(screen.getByText("Add players or picks to analyze.")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
     });
   });
@@ -549,10 +549,6 @@ describe("TradeAnalyzerContent", () => {
       fireEvent.click(screen.getByRole("button", { name: "Picks" }));
       fireEvent.click(screen.getByText("2027 Round 1"));
       expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Players" }));
-      fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-      fireEvent.click(screen.getByText(/Rival Team/));
-      fireEvent.click(screen.getByText("Their WR"));
 
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
