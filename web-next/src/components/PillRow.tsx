@@ -55,8 +55,11 @@ export function PillRow({
     if (!el) return;
     const selected = el.querySelector<HTMLElement>('[aria-selected="true"]');
     if (selected && el.scrollWidth > el.clientWidth) {
-      const target = selected.offsetLeft - (el.clientWidth - selected.offsetWidth) / 2;
-      el.scrollLeft = Math.max(0, target);
+      // Scroll the minimum needed so the selected tab is fully visible.
+      const left = selected.offsetLeft;
+      const right = left + selected.offsetWidth;
+      if (left < el.scrollLeft) el.scrollLeft = left;
+      else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth;
     }
     measure();
   }, [active, options.length, measure]);
@@ -87,8 +90,8 @@ export function PillRow({
   }
 
   const hasActive = options.some((option) => option.value === active);
-  const mask = `linear-gradient(to right, ${fade.left ? "transparent 0, #000 var(--space-lg)" : "#000 0"}, ${
-    fade.right ? "#000 calc(100% - var(--space-lg)), transparent 100%" : "#000 100%"
+  const mask = `linear-gradient(to right, ${fade.left ? "transparent 0, #000 var(--space-xl)" : "#000 0"}, ${
+    fade.right ? "#000 calc(100% - var(--space-xl)), transparent 100%" : "#000 100%"
   })`;
   const segment = mode === "fill" ? "flex-1 min-w-0" : mode === "scroll" ? "shrink-0" : "shrink-0";
 
