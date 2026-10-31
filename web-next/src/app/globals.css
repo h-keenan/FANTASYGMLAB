@@ -248,6 +248,12 @@
   --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
   --control-min-height: 44px;
   --touch-target-min: 44px;
+  /* Shared segmented/tab control tokens (PillRow, TabStack). */
+  --segmented-height: var(--touch-target-min);
+  --segmented-padding-x: var(--space-md);
+  --segmented-gap: 0px;
+  --segmented-font-size: 0.75rem;
+  --segmented-stack-gap: var(--space-md);
   --motion-fast: 120ms;
   --motion-standard: 180ms;
 

@@ -37,7 +37,7 @@ describe("/design reference page", () => {
     render(<DesignPage />);
     const page = screen.getByTestId("design-page");
     expect(page.getAttribute("data-frame")).toBe("fluid");
-    fireEvent.click(screen.getByRole("button", { name: "390px" }));
+    fireEvent.click(screen.getByRole("tab", { name: "390px" }));
     expect(screen.getByTestId("design-page").getAttribute("data-frame")).toBe("390");
   });
 });

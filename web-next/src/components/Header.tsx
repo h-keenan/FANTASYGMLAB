@@ -29,6 +29,9 @@ export interface SavedLeagueRow {
   league_name: string | null;
 }
 
+/** Shared look for the league / evaluation-lens chips in the header's second row. */
+const HEADER_CHIP_CLASS = "inline-flex items-center gap-1.5 px-3 text-xs font-bold min-h-[var(--touch-target-min)]";
+
 export function LeagueSwitcherButton({
   leagueId,
   leagueName,
@@ -43,13 +46,13 @@ export function LeagueSwitcherButton({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 max-w-[60%]">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-2.5 text-xs font-bold max-w-[9rem] truncate min-h-[var(--touch-target-min)]"
+        className={`${HEADER_CHIP_CLASS} max-w-full`}
         style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
         {/* coridian_, 2026-10-18: "where it says dashboard and revivalary...
@@ -58,7 +61,8 @@ export function LeagueSwitcherButton({
             itself now names the current league instead of a generic
             "Switch league" label — the league-name span this replaced was
             hidden below sm width anyway, so mobile never showed it at all. */}
-        {leagueName || "Switch league"} ▾
+        <span className="truncate">{leagueName || "Switch league"}</span>
+        <span aria-hidden>▾</span>
       </button>
       {open ? (
         <>
@@ -162,10 +166,11 @@ export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
         onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-2.5 text-xs font-bold min-h-[var(--touch-target-min)]"
+        className={`${HEADER_CHIP_CLASS} shrink-0`}
         style={{ color: "var(--color-premium)", border: "var(--border-width-default) solid var(--color-premium)" }}
       >
-        {current?.label ?? "Dynasty"} ▾
+        <span>{current?.label ?? "Dynasty"}</span>
+        <span aria-hidden>▾</span>
       </button>
       {open ? (
         <>
@@ -457,7 +462,7 @@ export function Header() {
         </div>
       </div>
       </div>
-      <div className="flex items-center gap-2 flex-wrap empty:hidden">
+      <div className="flex items-center gap-2 min-w-0 empty:hidden">
         <Suspense fallback={null}>
           <HeaderLeagueControls />
         </Suspense>

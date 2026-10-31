@@ -311,7 +311,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
-      expect(screen.getByRole("button", { name: "Rebuilding", pressed: true })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Rebuilding", selected: true })).toBeInTheDocument();
       expect(screen.getByText("Prioritize youth and future draft capital")).toBeInTheDocument();
     });
 
@@ -328,7 +328,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
-      fireEvent.click(screen.getByRole("button", { name: "Competing" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Competing" }));
 
       expect(api.setTeamStance).toHaveBeenCalledWith("league-1", "competing");
     });
@@ -531,10 +531,10 @@ describe("GmPlanContent concept structure", () => {
 
   it("switches between the four tabs", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} {...props} />);
-    expect(screen.getByRole("button", { name: "Overview", pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
     for (const name of ["Trades", "Core", "Watching"]) {
-      fireEvent.click(screen.getByRole("button", { name }));
-      expect(screen.getByRole("button", { name, pressed: true })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name }));
+      expect(screen.getByRole("tab", { name, selected: true })).toBeInTheDocument();
     }
     expect(screen.getByRole("heading", { name: "Watching" })).toBeInTheDocument();
   });
@@ -573,7 +573,7 @@ describe("GmPlanContent concept structure", () => {
     const locked: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [], is_premium: false, upsell: { title: "Locked plan", body: "Upgrade." } };
     render(<GmPlanContent leagueName="L" data={locked} {...props} />);
     expect(screen.getAllByRole("heading", { name: "Locked plan" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Competing" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Competing" })).toBeInTheDocument();
   });
 
   it("shows an empty state with a next step when there are no trade ideas", () => {

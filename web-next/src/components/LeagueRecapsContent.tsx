@@ -16,7 +16,7 @@ import type {
   StorylineTeam,
   StorylinesResponse,
 } from "@/lib/api";
-import { PillRow } from "@/components/PillRow";
+import { PillRow, TabStack } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -246,10 +246,12 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
   const groups = groupRecapStories(stories.slice(1));
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {archive.pills.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        <TabStack>
           <PillRow
+            ariaLabel="Recap week"
+            variant="scroll"
             options={archive.pills.map((pill) => ({ label: pill.label, value: String(pill.week) }))}
             active={String(selectedWeek)}
             onSelect={(value) => loadWeek(Number(value))}
@@ -271,7 +273,7 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
               ))}
             </select>
           ) : null}
-        </div>
+        </TabStack>
       ) : null}
 
       <header className="flex flex-col gap-1" style={{ opacity: loading ? 0.6 : 1 }}>
@@ -617,14 +619,24 @@ function HistoryTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <TabStack>
       {data.seasons.length > 1 ? (
         <PillRow
+          ariaLabel="Season"
+          variant="compact"
           options={data.seasons.map((season) => ({ label: season.season || season.name, value: season.league_id }))}
           active={selectedSeasonLeagueId}
           onSelect={setSelectedSeasonLeagueId}
         />
       ) : null}
-      <PillRow options={HISTORY_FILTERS.map((label) => ({ label, value: label }))} active={filter} onSelect={setFilter} />
+      <PillRow
+        ariaLabel="Filter history"
+        variant="scroll"
+        options={HISTORY_FILTERS.map((label) => ({ label, value: label }))}
+        active={filter}
+        onSelect={setFilter}
+      />
+      </TabStack>
       {visible.length === 0 ? (
         <p className="text-sm max-w-md" style={{ color: "var(--color-text-secondary)" }}>
           {emptyFilterNote(filter)}
@@ -1025,13 +1037,16 @@ export function LeagueRecapsContent({
           What mattered this week, and what happened. History remains the source record.
         </p>
       </header>
-      <PillRow
-        fullWidth
-        options={MEMORY_VIEWS.map((v) => ({ label: v, value: v }))}
-        active={view}
-        onSelect={(value) => setView(value as MemoryView)}
-      />
-      {body}
+      <div className="flex flex-col gap-4">
+        <PillRow
+          variant="fill"
+          ariaLabel="League memory view"
+          options={MEMORY_VIEWS.map((v) => ({ label: v, value: v }))}
+          active={view}
+          onSelect={(value) => setView(value as MemoryView)}
+        />
+        {body}
+      </div>
     </main>
   );
 }

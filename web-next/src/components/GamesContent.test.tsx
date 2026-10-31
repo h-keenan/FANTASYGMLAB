@@ -135,7 +135,7 @@ describe("GamesContent pick'em", () => {
   async function openPickem() {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
     render(<GamesContent leagueId="9" leagueName="Test League" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Pick'em" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Pick'em" }));
   }
 
   it("saves a pick optimistically", async () => {

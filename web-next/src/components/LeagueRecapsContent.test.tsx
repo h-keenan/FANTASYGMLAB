@@ -252,7 +252,7 @@ describe("LeagueRecapsContent", () => {
     // Deep-linking from a waiver story should land on the "Waivers / Free
     // Agents" pill (modules/league_recaps.py's FILTER_WAIVERS maps there,
     // not onto its own unrendered pill) — shown pressed.
-    expect(screen.getByRole("button", { name: "Waivers / Free Agents" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Waivers / Free Agents" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("loads real season storyline awards on the Storylines tab and routes Biggest Trade into History", async () => {
@@ -261,7 +261,7 @@ describe("LeagueRecapsContent", () => {
 
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Storylines" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Storylines" }));
 
     expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1");
     await waitFor(() => expect(screen.getByText("2026 storylines")).toBeInTheDocument());
@@ -288,7 +288,7 @@ describe("LeagueRecapsContent", () => {
 
     fireEvent.click(screen.getByText("Biggest Trade"));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Trades" })).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByRole("tab", { name: "Trades" })).toHaveAttribute("aria-selected", "true"),
     );
   });
 });
