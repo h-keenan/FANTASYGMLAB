@@ -1,11 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
 import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { ModelRadarChart } from "@/components/ModelRadarChart";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
@@ -13,7 +13,7 @@ import { PercentileExplorerSheet } from "@/components/PercentileExplorerSheet";
 import { SheetHandle } from "@/components/SheetHandle";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
-import { CHART_HEIGHT } from "@/components/WeeklyPointsChart";
+import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
@@ -27,6 +27,14 @@ import {
 } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { SkeletonBlock } from "@/components/Skeleton";
+
+// The radar is the only thing here that needs recharts (~110 KB gzip); this file
+// is also imported statically by the full Player Profile page. The placeholder
+// is the chart's exact footprint, so the swap does not move anything.
+const ModelRadarChart = dynamic(() => import("@/components/ModelRadarChart").then((m) => m.ModelRadarChart), {
+  ssr: false,
+  loading: () => <div style={{ width: "100%", maxWidth: "15rem", height: 220, margin: "0 auto" }} aria-hidden="true" />,
+});
 
 /**
  * Player Quick View (Revision 22) — the web port of app.py's Player Quick

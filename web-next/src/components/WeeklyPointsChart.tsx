@@ -27,7 +27,9 @@ import { buildWeeklyPointsSummary, fillWeeklyPointGaps } from "@/lib/playerCompa
 // exact footprint instead of a second, independently-guessed number that
 // could drift from this one and reintroduce a layout jump when the real
 // chart swaps in.
-export const CHART_HEIGHT = 160;
+import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
+
+export { CHART_HEIGHT };
 
 function formatPoints(value: number): string {
   return value.toFixed(1);

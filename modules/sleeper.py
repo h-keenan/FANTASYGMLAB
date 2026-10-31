@@ -1,9 +1,11 @@
+import concurrent.futures
+import contextvars
 import json
 import os
 import threading
 import time
 from functools import lru_cache
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Iterable, List, Optional
 from urllib.parse import quote
 
 import requests
@@ -508,14 +510,7 @@ def ensure_season_idp_stats(season: int | None = None) -> Dict[str, Dict[str, An
         if isinstance(row, dict)
     }
     cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
-    weekly_payloads: List[Any] = []
-    for week in range(1, 19):
-        try:
-            payload = _request_json("sleeper_player_stats_week", f"{SLEEPER_BASE}/stats/nfl/regular/{selected}/{week}", timeout=20)
-        except Exception:
-            continue
-        if isinstance(payload, dict):
-            weekly_payloads.append((week, payload))
+    weekly_payloads = _fetch_weekly_stat_payloads(selected, range(1, 19))
     if not weekly_payloads or len(weekly_payloads) < len(prior_weeks):
         return cached
     rebuilt = _aggregate_player_week_stats(weekly_payloads, selected, retain_weekly=True)
@@ -607,6 +602,45 @@ def cached_season_weekly_map(season: int | None = None) -> Dict[str, List[Dict[s
     return out
 
 
+_WEEKLY_STATS_FETCH_WORKERS = 6
+
+
+def _fetch_weekly_stat_payloads(season: int, weeks: Iterable[int]) -> List[Any]:
+    """``[(week, payload), ...]`` for every week whose Sleeper stats call returned a dict.
+
+    A cold season-stats build needs up to 18 independent ``/stats/nfl/regular``
+    calls.  They used to run back to back on the request that happened to miss
+    the cache (18 x one network round trip); they now run on a small thread
+    pool.  Same calls, same failure handling (a failed week is skipped), and the
+    result keeps week order, so aggregation sees exactly what the serial loop
+    produced.  Each task runs in a copy of the caller's context so the Sleeper
+    budget's priority / last-known-data tracking still applies to every call.
+    """
+
+    week_list = list(weeks)
+
+    def _one(week: int) -> Any:
+        url = f"{SLEEPER_BASE}/stats/nfl/regular/{season}/{week}"
+        try:
+            payload = _request_json("sleeper_player_stats_week", url, timeout=20)
+        except Exception:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    if len(week_list) <= 1:
+        payloads = [_one(week) for week in week_list]
+    else:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(_WEEKLY_STATS_FETCH_WORKERS, len(week_list)),
+            thread_name_prefix="dgm-season-stats",
+        ) as executor:
+            # Context copies are taken here, on the calling thread (a pool thread's
+            # own context is empty); a Context can only be entered once at a time.
+            jobs = [(contextvars.copy_context(), week) for week in week_list]
+            payloads = list(executor.map(lambda job: job[0].run(_one, job[1]), jobs))
+    return [(week, payload) for week, payload in zip(week_list, payloads) if payload is not None]
+
+
 def get_season_player_stats(
     season: int | None = None,
     *,
@@ -669,15 +703,7 @@ def get_season_player_stats(
         except Exception:
             pass
 
-    weekly_payloads: List[Any] = []
-    for week in range(1, max(1, int(max_week)) + 1):
-        url = f"{SLEEPER_BASE}/stats/nfl/regular/{selected_season}/{week}"
-        try:
-            payload = _request_json("sleeper_player_stats_week", url, timeout=20)
-            if isinstance(payload, dict):
-                weekly_payloads.append((week, payload))
-        except Exception:
-            continue
+    weekly_payloads = _fetch_weekly_stat_payloads(selected_season, range(1, max(1, int(max_week)) + 1))
 
     if weekly_payloads:
         aggregated = _aggregate_player_week_stats(
@@ -1588,6 +1614,27 @@ def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
     process has no other invalidation hook for this endpoint.
     """
     return _get_matchups_cached(league_id, round_num, _live_league_cache_bucket())
+
+
+def get_matchups_for_weeks(league_id: str, weeks: Iterable[int]) -> Dict[int, List[Dict[str, Any]]]:
+    """``{week: get_matchups(league_id, week)}`` with the cache misses fetched concurrently.
+
+    Callers that scan a season (playoff odds, guillotine history) used to call
+    ``get_matchups`` once per week in a loop: up to ~17 serial Sleeper round
+    trips on a cold cache.  Same per-week function and cache, same results,
+    keyed in the order requested; only the waiting overlaps.  The caller's
+    context (Sleeper budget priority / stale tracking) is carried into each task.
+    """
+
+    week_list = list(dict.fromkeys(weeks))
+    if len(week_list) <= 1:
+        return {week: get_matchups(league_id, week) for week in week_list}
+    jobs = [(contextvars.copy_context(), week) for week in week_list]
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(week_list)), thread_name_prefix="dgm-matchups"
+    ) as executor:
+        fetched = list(executor.map(lambda job: job[0].run(get_matchups, league_id, job[1]), jobs))
+    return dict(zip(week_list, fetched))
 
 
 def get_user_roster_id(league_id: str, username: str) -> Optional[int]:

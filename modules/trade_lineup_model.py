@@ -42,6 +42,7 @@ from typing import Any, Iterable, Mapping, Sequence
 import pandas as pd
 
 from modules import nfl_schedule, player_projections
+from modules.frame_records import frame_records
 from modules.rankings import age_multiplier, injury_level, is_ruled_out
 from modules.team_eval import _lineup_slots, normalize_team_strategy
 from modules.trade_grade import (
@@ -272,7 +273,7 @@ def _active_rows(frame: pd.DataFrame, score_column: str, scoring: Mapping[str, f
     out: dict[str, list[tuple[float, float]]] = {pos: [] for pos in SCORED_POSITIONS}
     if frame is None or frame.empty or "ppg" not in frame.columns or score_column not in frame.columns:
         return out
-    for row in frame.to_dict("records"):
+    for row in frame_records(frame):
         pos = _text(row.get("position")).upper()
         if pos not in out:
             continue
@@ -444,7 +445,7 @@ def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = Fa
         return out
     params = ctx.params
     seen: set[str] = set()
-    for row in df.to_dict("records"):
+    for row in frame_records(df):
         pid = _text(row.get("player_id"))
         if not pid or pid in seen:
             continue

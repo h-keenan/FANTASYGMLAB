@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 import pandas as pd
 
+from modules.frame_records import frame_records
 from modules.player_eligibility import (
     FREE_AGENT_TEAM_MARKERS,
     filter_current_fantasy_players,
@@ -157,7 +158,14 @@ def filter_waiver_actionable_players(players: pd.DataFrame) -> pd.DataFrame:
 
     if players is None or players.empty:
         return players.copy() if players is not None else pd.DataFrame()
-    decisions = players.apply(waiver_actionability, axis=1)
+    # Plain row dicts instead of ``DataFrame.apply(axis=1)``: the latter builds a
+    # full pandas Series per row (about half of this function's cost on the
+    # 7-8k-row pool).  ``waiver_actionability`` only ever calls ``.get`` on the row.
+    decisions = pd.Series(
+        [waiver_actionability(row) for row in frame_records(players)],
+        index=players.index,
+        dtype=object,
+    )
     actionable = decisions.map(lambda item: bool(item["actionable"]))
     result = players.loc[actionable].copy()
     result["waiver_actionable"] = True
