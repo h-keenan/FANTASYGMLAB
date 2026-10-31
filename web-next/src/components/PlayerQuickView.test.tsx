@@ -202,7 +202,8 @@ describe("PlayerQuickView", () => {
     // All 5 Model ratings present -> the radar chart renders (coridian_,
     // 2026-10-18: "have that multi-axis thing") instead of the flat chip
     // row; its accessible summary carries the same real numbers.
-    expect(screen.getByText(/MKT 91, OPP 84, SCR 62, ROLE 73, DUR 58/)).toBeInTheDocument();
+    // The radar is a lazy chunk (next/dynamic), so await it rather than assume it is mounted.
+    expect(await screen.findByText(/MKT 91, OPP 84, SCR 62, ROLE 73, DUR 58/)).toBeInTheDocument();
     expect(screen.getByText("Targets")).toBeInTheDocument();
     expect(screen.getByText("140")).toBeInTheDocument();
     expect(screen.getByText(/88th pct/)).toBeInTheDocument();
