@@ -436,6 +436,11 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
     [sendIds, receiveIds],
   );
 
+  const sendCount = sendIds.length + sendPicks.length;
+  const receiveCount = receiveIds.length + receivePicks.length;
+  const canAnalyze = hasAnyAssets;
+  const analyzeLabel = canAnalyze ? `Analyze Trade (${sendCount} for ${receiveCount})` : 'Analyze Trade';
+
   const analyze = async () => {
     if (quickMode) return;
     setAnalyzeError(null);
@@ -538,6 +543,50 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       </View>
 
       {!quickMode ? (
+        <>
+          <Button label={analyzeLabel} onPress={analyze} disabled={!canAnalyze} loading={analyzing} style={styles.analyzeButton} />
+          {!canAnalyze ? <AppText style={styles.analyzeHint}>Add players or picks to analyze.</AppText> : null}
+
+          {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
+          {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
+          {/* Past the trade deadline the analyzer stays open for offseason
+              planning — this note just says the trade can't be sent yet. */}
+          {planningNote ? <AppText style={styles.planningNote}>{planningNote}</AppText> : null}
+          {verdict ? (
+            <>
+            <VerdictCard
+              verdict={verdict}
+              sendIds={sendIds}
+              receiveIds={receiveIds}
+              sendPicks={sendPicks}
+              receivePicks={receivePicks}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
+              onBuildCounter={applyCounterAction}
+            />
+            <VerdictTrust
+              assumptions={assumptions}
+              context={{
+                surface: 'trade_analyzer',
+                platform: Platform.OS === 'ios' ? 'ios' : 'android',
+                leagueId,
+                lens,
+                strategy,
+                sendIds: [...sendIds.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
+                receiveIds: [...receiveIds.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
+                verdictLabel: verdict.ui_verdict,
+                confidence: verdict.confidence,
+                valueDelta: verdict.value_delta,
+                assumptionsLine: assumptions?.line ?? '',
+              }}
+            />
+            </>
+          ) : null}
+        </>
+      ) : null}
+
+      {!quickMode ? (
         <View style={styles.assetTypeRow}>
           <TouchableOpacity accessibilityRole="button"
             style={[styles.pill, assetType === 'players' && styles.pillActive]}
@@ -610,44 +659,6 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         ) : null
       ) : (
         <>
-          <Button label="Analyze Trade" onPress={analyze} disabled={!hasAnyAssets} loading={analyzing} style={styles.analyzeButton} />
-
-          {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
-          {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
-          {/* Past the trade deadline the analyzer stays open for offseason
-              planning — this note just says the trade can't be sent yet. */}
-          {planningNote ? <AppText style={styles.planningNote}>{planningNote}</AppText> : null}
-          {verdict ? (
-            <>
-            <VerdictCard
-              verdict={verdict}
-              sendIds={sendIds}
-              receiveIds={receiveIds}
-              sendPicks={sendPicks}
-              receivePicks={receivePicks}
-              leagueId={leagueId}
-              leagueName={leagueName}
-              partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
-              onBuildCounter={applyCounterAction}
-            />
-            <VerdictTrust
-              assumptions={assumptions}
-              context={{
-                surface: 'trade_analyzer',
-                platform: Platform.OS === 'ios' ? 'ios' : 'android',
-                leagueId,
-                lens,
-                strategy,
-                sendIds: [...sendIds.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
-                receiveIds: [...receiveIds.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
-                verdictLabel: verdict.ui_verdict,
-                confidence: verdict.confidence,
-                valueDelta: verdict.value_delta,
-                assumptionsLine: assumptions?.line ?? '',
-              }}
-            />
-            </>
-          ) : null}
         </>
       )}
 
@@ -1160,7 +1171,8 @@ function createStyles(colors: ThemeColors) {
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: colors.onAccent },
-  analyzeButton: { marginBottom: spacing.md },
+  analyzeButton: { marginBottom: spacing.sm },
+  analyzeHint: { color: colors.textTertiary, fontSize: 12, marginBottom: spacing.md },
   // Quick Compare's instant readout — same label + bar shape as the full
   // verdict's value strip (below), just driven by a client-computed delta.
   quickCompareSection: { marginBottom: spacing.md },

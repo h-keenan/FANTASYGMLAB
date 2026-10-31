@@ -871,6 +871,11 @@ export function TradeAnalyzerContent({
     ...receivePicks.map(pickToTradeAsset),
   ];
 
+  const canAnalyze = hasAnyAssets;
+  const analyzeLabel = canAnalyze
+    ? `Analyze Trade (${sendAssets.length} for ${receiveAssets.length})`
+    : "Analyze Trade";
+
   const activeTeamLabel = otherTeams.find((t) => t.rosterId === selectedTeamId)?.label ?? "team";
   const searchPlaceholder =
     activeSide === "send"
@@ -921,6 +926,67 @@ export function TradeAnalyzerContent({
         />
       </div>
 
+      <div className="flex flex-col gap-2">
+        <Button onClick={analyze} disabled={!canAnalyze} loading={analyzing}>
+          {analyzing ? "Analyzing…" : analyzeLabel}
+        </Button>
+        {!canAnalyze ? (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Add players or picks to analyze.
+          </p>
+        ) : null}
+        {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
+        {analyzeError ? (
+          <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
+            {analyzeError}
+          </p>
+        ) : null}
+      </div>
+
+      {planningNote ? (
+        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
+          {planningNote}
+        </p>
+      ) : null}
+
+      {verdict ? (
+        <>
+        <VerdictCard
+          verdict={verdict}
+          sendAssets={sendAssets}
+          receiveAssets={receiveAssets}
+          onBuildCounter={applyCounterAction}
+          leagueId={leagueId}
+          partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
+          lens={lens}
+          cardTeams={{
+            partnerAvatarUrl: selectedTeamId === ALL_TEAMS_ID ? null : (teamProfiles[selectedTeamId]?.avatar_url ?? null),
+            myTeamName: teamProfiles[myRosterId]?.team_name ?? null,
+            myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
+          }}
+        />
+        <VerdictTrust
+          assumptions={assumptions}
+          context={{
+            surface: "trade_analyzer",
+            platform: "web",
+            leagueId,
+            lens,
+            strategy: "retool",
+            sendIds: [...sendPlayers.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
+            receiveIds: [...receivePlayers.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
+            verdictLabel: verdict.ui_verdict,
+            confidence: verdict.confidence,
+            valueDelta: verdict.value_delta,
+            assumptionsLine: assumptions?.line ?? "",
+          }}
+        />
+        </>
+      ) : hasAnyAssets ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          When both sides are ready, tap Analyze Trade for the verdict.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2 items-center">
           <PillRow
@@ -1002,67 +1068,6 @@ export function TradeAnalyzerContent({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {!hasAnyAssets ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Queue send and receive assets, then Analyze.
-          </p>
-        ) : null}
-        <Button onClick={analyze} disabled={!hasAnyAssets} loading={analyzing}>
-          {analyzing ? "Analyzing…" : "Analyze Trade"}
-        </Button>
-        {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
-        {analyzeError ? (
-          <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
-            {analyzeError}
-          </p>
-        ) : null}
-      </div>
-
-      {planningNote ? (
-        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
-          {planningNote}
-        </p>
-      ) : null}
-
-      {verdict ? (
-        <>
-        <VerdictCard
-          verdict={verdict}
-          sendAssets={sendAssets}
-          receiveAssets={receiveAssets}
-          onBuildCounter={applyCounterAction}
-          leagueId={leagueId}
-          partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
-          lens={lens}
-          cardTeams={{
-            partnerAvatarUrl: selectedTeamId === ALL_TEAMS_ID ? null : (teamProfiles[selectedTeamId]?.avatar_url ?? null),
-            myTeamName: teamProfiles[myRosterId]?.team_name ?? null,
-            myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
-          }}
-        />
-        <VerdictTrust
-          assumptions={assumptions}
-          context={{
-            surface: "trade_analyzer",
-            platform: "web",
-            leagueId,
-            lens,
-            strategy: "retool",
-            sendIds: [...sendPlayers.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
-            receiveIds: [...receivePlayers.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
-            verdictLabel: verdict.ui_verdict,
-            confidence: verdict.confidence,
-            valueDelta: verdict.value_delta,
-            assumptionsLine: assumptions?.line ?? "",
-          }}
-        />
-        </>
-      ) : hasAnyAssets ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          When both sides are ready, tap Analyze Trade for the verdict.
-        </p>
-      ) : null}
       <ValuesCredit />
     </main>
   );
