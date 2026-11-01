@@ -39,9 +39,11 @@ export function SectionHeading({
   );
   if (action) {
     return (
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         {title}
-        {action}
+        {/* .section-heading-action gives a bare link/button here the 44px
+            touch target (globals.css) without each caller adding padding. */}
+        <div className="section-heading-action shrink-0">{action}</div>
       </div>
     );
   }

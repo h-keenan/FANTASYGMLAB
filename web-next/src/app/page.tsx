@@ -120,17 +120,17 @@ export default function LandingPage() {
                 "Coming soon" until lib/appStoreLinks.ts has a URL. */}
             <AppStoreModules />
             {/* Crawlable internal links into the public SEO pages. */}
-            <nav aria-label="Dynasty tools" className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-              <Link href="/dynasty-tools" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+            <nav aria-label="Dynasty tools" className="flex flex-wrap gap-x-4 text-xs">
+              <Link href="/dynasty-tools" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
                 Dynasty tools
               </Link>
-              <Link href="/dynasty-rankings/qb" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+              <Link href="/dynasty-rankings/qb" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
                 Dynasty rankings
               </Link>
-              <Link href="/trade-analyzer" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+              <Link href="/trade-analyzer" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
                 Free trade analyzer
               </Link>
-              <Link href="/dynasty-trade-value-chart" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+              <Link href="/dynasty-trade-value-chart" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
                 Trade value chart
               </Link>
             </nav>
