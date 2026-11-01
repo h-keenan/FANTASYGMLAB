@@ -46,6 +46,14 @@ export function PublicPricingContent() {
     return () => controller.abort();
   }, []);
 
+  // Monthly and annual carry the same feature list, so list it once under the
+  // prices instead of repeating six bullets per card (390px phone: the page
+  // was two identical screens tall).
+  const sharedFeatures =
+    plans.length > 1 && plans.every((plan) => plan.features.join("\n") === plans[0].features.join("\n"))
+      ? plans[0].features
+      : null;
+
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-6 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
@@ -74,23 +82,18 @@ export function PublicPricingContent() {
               <span style={{ font: "var(--type-primary-metric)" }}>
                 {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
               </span>
-              <ul className="flex flex-col gap-1.5">
-                {plan.features.map((feature) => (
-                  <li
-                    key={feature}
-                    className="text-sm flex items-start gap-2"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    <span style={{ color: "var(--color-success)", marginTop: "0.1rem", flexShrink: 0 }}>
-                      <FeatureIncludedGlyph />
-                    </span>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              {sharedFeatures ? null : <FeatureList features={plan.features} />}
             </div>
           ))}
         </div>
+        {sharedFeatures ? (
+          <div className="glass-surface p-4 flex flex-col gap-2">
+            <span className="text-xs font-bold uppercase" style={{ color: "var(--color-premium)" }}>
+              Included in every plan
+            </span>
+            <FeatureList features={sharedFeatures} />
+          </div>
+        ) : null}
         <Button
           variant="premium"
           type="button"
@@ -103,12 +106,27 @@ export function PublicPricingContent() {
         </Button>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Already have an account?{" "}
-          <Link href="/" className="underline" style={{ color: "var(--color-text-secondary)" }}>
+          <Link href="/" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
             Sign in
           </Link>
           .
         </p>
       </section>
     </main>
+  );
+}
+
+function FeatureList({ features }: { features: string[] }) {
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {features.map((feature) => (
+        <li key={feature} className="text-sm flex items-start gap-2" style={{ color: "var(--color-text-secondary)" }}>
+          <span style={{ color: "var(--color-success)", marginTop: "0.1rem", flexShrink: 0 }}>
+            <FeatureIncludedGlyph />
+          </span>
+          <span>{feature}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
