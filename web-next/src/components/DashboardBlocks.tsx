@@ -42,7 +42,7 @@ export function DashboardNowStrip({
   const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount);
   if (chips.length === 0) return null;
   return (
-    <section aria-label="What matters now" data-testid="dashboard-now-strip" className="grid grid-cols-2 gap-2">
+    <section aria-label="What matters now" data-testid="dashboard-now-strip" className="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2">
       {chips.map((chip) => (
         <Link
           key={chip.key}
@@ -138,7 +138,10 @@ export function DashboardMore({ children }: { children: ReactNode }) {
         className="flex items-center justify-between px-4 text-sm font-bold uppercase cursor-pointer"
         style={{ minHeight: "var(--touch-target-min)", letterSpacing: "0.02em" }}
       >
-        More
+        <span>More</span>
+        <span className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
+          League activity, games, settings
+        </span>
       </summary>
       <div className="flex flex-col gap-6 px-4 pb-4 pt-2">{children}</div>
     </details>

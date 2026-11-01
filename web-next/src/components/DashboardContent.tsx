@@ -204,12 +204,14 @@ export function DashboardContent({
         </section>
       ) : null}
 
-      <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
+      {/* The sample preview has no More section, so it keeps League Activity inline. */}
+      {sample ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}
 
       {/* Secondary modules (the two mini-games are play, not decisions) stay
           collapsed behind "More" so they never push the actionable modules down. */}
       {sample ? null : (
         <DashboardMore>
+          <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
           <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
           <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
           <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />

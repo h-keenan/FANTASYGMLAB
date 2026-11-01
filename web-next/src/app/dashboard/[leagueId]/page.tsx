@@ -9,9 +9,8 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
 import { ErrorState } from "@/components/ErrorState";
-import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { SkeletonBlock } from "@/components/Skeleton";
+import { SkeletonBlock, SkeletonCard } from "@/components/Skeleton";
 
 export default function DashboardPage() {
   const params = useParams<{ leagueId: string }>();
@@ -106,10 +105,17 @@ export default function DashboardPage() {
     return (
       <main className="flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto" aria-busy="true">
         <h1 className="sr-only">{leagueName}</h1>
-        <SkeletonBlock height={120} />
-        <SkeletonBlock height={160} />
-        {teamRankings ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}
-        <SkeletonBlock height={120} />
+        {/* Same shape and order as the loaded page (Now strip, Trades, Next
+            moves, My Team, More) so nothing jumps when the data lands. */}
+        <div className="grid grid-cols-2 gap-2">
+          {[0, 1, 2, 3].map((index) => (
+            <SkeletonBlock key={index} height={52} radius="var(--radius-card, 12px)" />
+          ))}
+        </div>
+        <SkeletonCard lines={5} />
+        <SkeletonCard lines={4} />
+        <SkeletonCard lines={3} />
+        <SkeletonBlock height={44} radius="var(--radius-card, 12px)" />
       </main>
     );
   }

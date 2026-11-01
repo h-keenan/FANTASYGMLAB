@@ -160,6 +160,7 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
         style={styles.moreHeader}
       >
         <AppText style={styles.moreTitle}>MORE</AppText>
+        <AppText style={styles.moreHint}>League activity, games, settings</AppText>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
       </Pressable>
       {open ? <View style={styles.moreBody}>{children}</View> : null}
@@ -198,6 +199,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
+    moreHint: { flex: 1, textAlign: 'right', marginRight: spacing.sm, fontSize: 11, color: colors.textTertiary },
     moreTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5, color: colors.textPrimary },
     moreBody: { gap: spacing.md, paddingTop: spacing.md },
   });

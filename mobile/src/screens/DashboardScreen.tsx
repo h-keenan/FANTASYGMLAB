@@ -12,7 +12,7 @@ import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query'
 import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
 import Button from '../components/Button';
-import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard } from '../components/SkeletonBlock';
 import ErrorState from '../components/ErrorState';
 import PushPermissionPrompt from '../components/PushPermissionPrompt';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
@@ -358,12 +358,18 @@ export default function DashboardScreen({ route, navigation }: Props) {
           contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
           scrollEnabled={false}
         >
+          {/* Same order as the loaded screen: Now chips, Trades, Next moves, My Team, More. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {[0, 1, 2, 3].map((index) => (
+              <View key={index} style={{ flexBasis: '48%', flexGrow: 1 }}>
+                <SkeletonBlock height={52} radius={radii.md} />
+              </View>
+            ))}
+          </View>
+          <SkeletonCard rows={5} />
           <SkeletonCard rows={4} />
-          <SkeletonCard rows={2} />
-          <AnimatedCard style={styles.groupCard}>
-            <SkeletonRows count={4} />
-          </AnimatedCard>
-          <SkeletonCard rows={2} />
+          <SkeletonCard rows={3} />
+          <SkeletonBlock height={44} radius={radii.md} />
         </ScrollView>
       </View>
     );
@@ -557,26 +563,25 @@ export default function DashboardScreen({ route, navigation }: Props) {
         }
       />
 
-      {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
-        <View style={styles.activityRow}>
-          {entitlement && !entitlement.is_premium ? (
-            <View style={styles.activityCell}>
-              <PremiumLock
-                title="League Activity"
-                description="See contender, rebuilder, draft-capital, and activity leaders across the whole league."
-              />
-            </View>
-          ) : (
-            <View style={styles.activityCell}>
-              <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
-            </View>
-          )}
-        </View>
-      ) : null}
-
       {/* Secondary modules stay collapsed behind "More" so the actionable ones
           above are reachable without scrolling past them. */}
       <DashboardMore>
+        {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
+          <View style={styles.activityRow}>
+            {entitlement && !entitlement.is_premium ? (
+              <View style={styles.activityCell}>
+                <PremiumLock
+                  title="League Activity"
+                  description="See contender, rebuilder, draft-capital, and activity leaders across the whole league."
+                />
+              </View>
+            ) : (
+              <View style={styles.activityCell}>
+                <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+              </View>
+            )}
+          </View>
+        ) : null}
         {experienceCopy.isBeginner ? (
           <ScreenInfoNote
             text={`Home base for ${leagueName}: your trades, this week's moves, your team and waiver suggestions, plus quick access to everything else.`}
