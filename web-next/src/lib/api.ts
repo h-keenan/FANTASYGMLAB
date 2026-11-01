@@ -1237,6 +1237,41 @@ export interface WaiversResponse {
   reason: string;
 }
 
+/** Why a projection is what it is with respect to weather (modules.game_weather).
+ * Present for an upcoming game inside the forecast window; absent means show nothing. */
+export type WeatherStatus = "outdoor" | "retractable" | "dome" | "unavailable";
+
+export interface PlayerWeekWeather {
+  status: WeatherStatus;
+  /** Ready-to-show status text, e.g. "Weather: heavy rain, 18 mph wind (outdoor) \u2192 passing outlook \u22126%",
+   * "Dome: no weather effect", "Weather unavailable: no adjustment". */
+  label: string;
+  applied: boolean;
+  multiplier: number;
+  /** Short reason, e.g. "Heavy rain forecast: passing outlook lowered"; null when nothing was applied. */
+  reason: string | null;
+  forecast: {
+    source: string;
+    wind_mph: number;
+    gust_mph: number | null;
+    precip_mm: number;
+    precip_prob_pct: number | null;
+    temp_f: number;
+    label: string;
+  } | null;
+  points_before?: number | null;
+}
+
+/** The weather status behind one start/sit move, per player. */
+export interface MatchupWeatherNote {
+  role: "start" | "over";
+  player: string | null;
+  status: WeatherStatus | null;
+  applied: boolean;
+  label: string;
+  reason: string | null;
+}
+
 /** This week's per-game projection (modules.player_projections.
  * project_player_week, trimmed server-side by _projection_summary_dict) —
  * mirrors mobile's PlayerWeekProjection (mobile/src/lib/api.ts), the
@@ -1259,6 +1294,8 @@ export interface PlayerWeekProjection {
   high: number | null;
   confidence: "low" | "medium" | "high" | null;
   opponent: string | null;
+  /** Forecast weather and its adjustment; absent when no forecast is available. */
+  weather?: PlayerWeekWeather | null;
 }
 
 /**
@@ -1394,6 +1431,7 @@ export interface MatchupMovePlayer {
   points: number | null;
   projection_status: PlayerWeekProjection["status"] | null;
   injury_label: string;
+  weather_reason?: string | null;
 }
 
 /** One "start X over Y" change turning the actual Sleeper lineup into the
@@ -1407,6 +1445,8 @@ export interface MatchupSuggestedMove {
   gain: number | null;
   /** Set when X has no projection and is shown only because the slot has no modeled alternative. */
   start_note?: string | null;
+  /** Forecast-weather reasons behind this move (empty/absent: show nothing). */
+  weather_notes?: MatchupWeatherNote[];
   /** True once either player's game has kicked off (Sleeper locks it). */
   locked: boolean;
 }

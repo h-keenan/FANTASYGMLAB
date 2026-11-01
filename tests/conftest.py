@@ -265,3 +265,17 @@ def committed_fantasycalc(monkeypatch):
     cache = Path(__file__).resolve().parents[1] / "data/fantasycalc_values.csv"
     values = pd.read_csv(cache)
     monkeypatch.setattr(rankings, "get_dynasty_values", lambda: values.copy(deep=True))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_weather_network(monkeypatch):
+    """modules.game_weather would call Open-Meteo for any not-yet-played game
+    in a fixture. Tests never hit the real network: weather is off unless a
+    test explicitly re-enables it (and mocks requests.get)."""
+
+    monkeypatch.setenv("FANTASYDESK_WEATHER_DISABLED", "1")
+    from modules import game_weather
+
+    game_weather.clear_cache()
+    yield
+    game_weather.clear_cache()

@@ -1,5 +1,6 @@
 "use client";
 
+import { ProjectionWeatherChip } from "@/components/WeatherReasonChip";
 import { useEffect, useState } from "react";
 
 import { api, type ScheduleWeek } from "@/lib/api";
@@ -88,6 +89,7 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
             Line not posted yet
           </span>
         )}
+        <ProjectionWeatherChip weather={week.projection?.weather} />
       </div>
       {projection.value ? (
         <div className="flex flex-col items-end shrink-0">

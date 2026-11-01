@@ -22,6 +22,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip } from "@/components/StatStrip";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
+import { WeatherReasonChip } from "@/components/WeatherReasonChip";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import {
   edgeExplanation,
@@ -593,6 +594,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {moveOverLine(move)}
           </span>
+          <WeatherReasonChip notes={move.weather_notes} />
         </div>
       </PlayerIdentityTrigger>
       <div className="flex flex-col items-center gap-1 shrink-0">

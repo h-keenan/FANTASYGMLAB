@@ -869,6 +869,7 @@ export interface MatchupMovePlayer {
   points: number | null;
   projection_status: PlayerWeekProjection['status'] | null;
   injury_label: string;
+  weather_reason?: string | null;
 }
 
 /** One "start X over Y" change from the Sleeper lineup to the suggested one. Planner only. */
@@ -880,6 +881,8 @@ export interface MatchupSuggestedMove {
   /** Set when X has no projection and is shown only because the slot has no modeled alternative. */
   start_note?: string | null;
   gain: number | null;
+  /** Forecast-weather reasons behind this move (empty/absent: show nothing). */
+  weather_notes?: MatchupWeatherNote[];
   locked: boolean;
 }
 
@@ -1975,6 +1978,41 @@ export interface CareerResponse {
  * `"unsupported_position"` (K/DEF/IDP — no defense-by-position signal
  * exists for them), `"unknown_player"` / `"no_team"`.
  */
+/** Why a projection is what it is with respect to weather (modules.game_weather).
+ * Present for an upcoming game inside the forecast window; absent means show nothing. */
+export type WeatherStatus = 'outdoor' | 'retractable' | 'dome' | 'unavailable';
+
+export interface PlayerWeekWeather {
+  status: WeatherStatus;
+  /** Ready-to-show status text, e.g. "Weather: heavy rain, 18 mph wind (outdoor) \u2192 passing outlook \u22126%",
+   * "Dome: no weather effect", "Weather unavailable: no adjustment". */
+  label: string;
+  applied: boolean;
+  multiplier: number;
+  /** Short reason, e.g. "Heavy rain forecast: passing outlook lowered"; null when nothing was applied. */
+  reason: string | null;
+  forecast: {
+    source: string;
+    wind_mph: number;
+    gust_mph: number | null;
+    precip_mm: number;
+    precip_prob_pct: number | null;
+    temp_f: number;
+    label: string;
+  } | null;
+  points_before?: number | null;
+}
+
+/** The weather status behind one start/sit move, per player. */
+export interface MatchupWeatherNote {
+  role: 'start' | 'over';
+  player: string | null;
+  status: WeatherStatus | null;
+  applied: boolean;
+  label: string;
+  reason: string | null;
+}
+
 export interface PlayerWeekProjection {
   status:
     | 'ok'
@@ -1990,6 +2028,8 @@ export interface PlayerWeekProjection {
   high: number | null;
   confidence: 'low' | 'medium' | 'high' | null;
   opponent: string | null;
+  /** Forecast weather and its adjustment; absent when no forecast is available. */
+  weather?: PlayerWeekWeather | null;
 }
 
 export interface ScheduleWeek {
