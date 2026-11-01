@@ -244,6 +244,31 @@ def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
     }
 
 
+_STADIUM_BY_GAME_ID: dict[int, tuple[weakref.ReferenceType, dict[str, str]]] = {}
+
+
+def stadium_id_for_game(game_id: str | None, *, games: pd.DataFrame | None = None) -> str | None:
+    """nflverse's ``stadium_id`` for one game (neutral-site games resolve to
+    their real venue), or None when unknown. Used only to look up weather;
+    indexed once per games frame, like the schedule index above."""
+
+    if not game_id:
+        return None
+    df = games if games is not None else load_games()
+    if df is None or df.empty or "game_id" not in df.columns or "stadium_id" not in df.columns:
+        return None
+    key = id(df)
+    entry = _STADIUM_BY_GAME_ID.get(key)
+    if entry is None or entry[0]() is not df:
+        for dead in [k for k, (ref, _m) in _STADIUM_BY_GAME_ID.items() if ref() is None]:
+            _STADIUM_BY_GAME_ID.pop(dead, None)
+        valid = df.dropna(subset=["game_id", "stadium_id"])
+        mapping = dict(zip(valid["game_id"].astype(str), valid["stadium_id"].astype(str)))
+        entry = (weakref.ref(df), mapping)
+        _STADIUM_BY_GAME_ID[key] = entry
+    return entry[1].get(str(game_id))
+
+
 def team_schedule(
     team: str,
     season: int,

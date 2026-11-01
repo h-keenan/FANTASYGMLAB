@@ -248,6 +248,7 @@ from modules import public_dynasty_values
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import this_week
+from modules import game_weather
 from modules import team_defense
 from modules import idp_scoring
 from modules import guillotine as guillotine_module
@@ -7680,7 +7681,26 @@ def _weekly_projection_for_player(
         defense_strength=defense_strength,
         team_qb_pass_attempts_by_team=team_qb_pass_attempts_by_team,
     )
-    return _projection_summary_dict(result)
+    summary = _projection_summary_dict(result)
+    return _with_game_weather(summary, result)
+
+
+def _with_game_weather(summary: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    """Scale a weekly projection for a real kickoff-window forecast and attach
+    the `weather` block (see modules.game_weather). Fails soft: any problem
+    leaves the projection exactly as the model produced it."""
+
+    if summary.get("status") != "ok":
+        return summary
+    try:
+        return game_weather.apply_weather(
+            summary,
+            position=result.get("position"),
+            stadium_id=nfl_schedule.stadium_id_for_game(result.get("game_id")),
+            kickoff_at=result.get("kickoff_at"),
+        )
+    except Exception:
+        return summary
 
 
 @app.get("/v1/players/{player_id}/schedule")
@@ -12971,6 +12991,15 @@ class _ProjectionContext:
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None
 
 
+def _games_and_warm_weather() -> pd.DataFrame:
+    """The games table, plus a non-blocking background warm of the weather
+    forecast cache for every stadium playing inside the forecast horizon."""
+
+    games = nfl_schedule.load_games()
+    game_weather.prefetch_for_games(games)
+    return games
+
+
 def _build_projection_context(week: int) -> "_ProjectionContext | None":
     """The shared per-request projection inputs for one NFL week, or None
     when there's no week or anything fails to load (fails soft: callers
@@ -12993,7 +13022,7 @@ def _build_projection_context(week: int) -> "_ProjectionContext | None":
                 weekly_stats=weekly_stats,
                 players=players_lookup,
             ),
-            games=nfl_schedule.load_games(),
+            games=_games_and_warm_weather(),
             # Built ONCE per request: every projected player would otherwise
             # redo the same full players_lookup scan. See
             # team_qb_pass_attempts_by_week's own docstring.
@@ -13384,7 +13413,50 @@ def _move_player_fields(player: dict[str, Any]) -> dict[str, Any]:
         "points": matchup_win_probability.starter_expected_points(player),
         "projection_status": (player.get("projection") or {}).get("status"),
         "injury_label": player.get("injury_label") or "",
+        "weather_reason": _weather_reason(player),
     }
+
+
+def _weather_reason(player: dict[str, Any] | None) -> str | None:
+    """The reason this player's projection was lowered for forecast weather
+    (modules.game_weather), or None when no adjustment was applied."""
+
+    weather = _weather_block(player)
+    if weather and weather.get("applied") and weather.get("reason"):
+        return str(weather["reason"])
+    return None
+
+
+def _weather_block(player: dict[str, Any] | None) -> dict[str, Any] | None:
+    weather = ((player or {}).get("projection") or {}).get("weather")
+    return weather if isinstance(weather, dict) and weather.get("label") else None
+
+
+def _move_weather_notes(
+    starter: dict[str, Any], over: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    """The weather status behind one start/sit move, per player: why the
+    projection is what it is ("Weather: heavy rain ... -> passing outlook
+    -6%", "Dome: no weather effect", "Weather unavailable: no adjustment").
+    Empty when no weather block exists (e.g. game beyond the forecast
+    window), and the client then shows nothing."""
+
+    notes: list[dict[str, Any]] = []
+    for role, player in (("start", starter), ("over", over)):
+        weather = _weather_block(player)
+        if weather is None:
+            continue
+        notes.append(
+            {
+                "role": role,
+                "player": (player or {}).get("name"),
+                "status": weather.get("status"),
+                "applied": bool(weather.get("applied")),
+                "label": weather.get("label"),
+                "reason": weather.get("reason"),
+            }
+        )
+    return notes
 
 
 def _benched_reason(player: dict[str, Any]) -> str | None:
@@ -13511,6 +13583,7 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
             # Honest uncertainty: set only when a no-projection player is
             # recommended because the slot has no modeled alternative.
             "start_note": "No projection yet — role unclear" if start_points is None else None,
+            "weather_notes": _move_weather_notes(starter, over),
         }
         if chain_id is not None:
             move["chain_id"] = chain_id

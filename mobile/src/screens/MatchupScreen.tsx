@@ -27,6 +27,7 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
+import WeatherReasonChip from '../components/WeatherReasonChip';
 import ValuesCredit from '../components/ValuesCredit';
 import {
   api,
@@ -680,6 +681,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         <AppText style={styles.moveSub} numberOfLines={2}>
           {moveOverLine(move)}
         </AppText>
+        <WeatherReasonChip notes={move.weather_notes} />
       </View>
       <View style={[styles.gainBox, { borderColor: gainColor }]}>
         <AppText style={[styles.gainValue, { color: gainColor }]}>

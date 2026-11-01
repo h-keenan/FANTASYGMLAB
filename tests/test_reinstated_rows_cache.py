@@ -12,6 +12,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 from modules import league_value_settings, rankings
 from services import mobile_api_service as svc
@@ -39,6 +40,26 @@ _LOOKUP = {
     },
 }
 _SETTINGS = {"scoring_settings": {}}
+
+
+@pytest.fixture(autouse=True)
+def _stable_disk_cache_versions():
+    """Pin the disk-cache versions that are part of the cache key.
+
+    The real versions are the mtime/size of data/fantasycalc_values.csv and
+    data/sleeper_player_stats_<season>.json in the shared repo checkout. Under
+    pytest-xdist every worker shares that directory, and other tests (plus the
+    conftest guard that reverts leaked writes) create, rewrite or remove those
+    files, so the version could legitimately change between two calls inside
+    one test and turn an expected cache hit into a rescore. These tests are
+    about the cache semantics, not about those files, so the versions are
+    fixed here; test_any_changed_input_is_scored_again still bumps them
+    explicitly.
+    """
+
+    pinned = (("fantasycalc", 1, 10), ("stats_current", 1, 10), ("stats_prior", 1, 10))
+    with patch("modules.rankings.reconciled_valuation_cache_versions", return_value=pinned):
+        yield
 
 
 def _pool() -> pd.DataFrame:

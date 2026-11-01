@@ -1,3 +1,4 @@
+import { ProjectionWeatherChip } from '../components/WeatherReasonChip';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -805,6 +806,7 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
         ) : (
           <AppText style={styles.scheduleDetailMuted}>Line not posted yet</AppText>
         )}
+        <ProjectionWeatherChip weather={week.projection?.weather} />
       </View>
       {projection.value ? (
         <View style={styles.scheduleProjectionCol}>
