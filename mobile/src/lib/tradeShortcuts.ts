@@ -85,3 +85,12 @@ export function quickAddPlacement(
   if (!owner) return null;
   return { side: 'receive', partnerRosterId: owner.rosterId, focusSide: 'send' };
 }
+
+/**
+ * True when the current route is the Trade Analyzer itself (the Trades host
+ * on its "Make a Trade" tab), where "Add to Trade" on a quick view would be
+ * redundant. The Trade Finder tab ("search") keeps it.
+ */
+export function isTradeAnalyzerRoute(routeName: string | null | undefined, initialTab?: string | null): boolean {
+  return routeName === 'Trades' && initialTab !== 'search';
+}

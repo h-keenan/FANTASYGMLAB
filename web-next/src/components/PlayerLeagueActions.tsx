@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
+import { trackFeatureUse } from "@/lib/analytics";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
+import { rosterOwnershipFrom, tradeShortcutsFor, type RosterOwnership } from "@/lib/tradeShortcuts";
 
 /**
  * The contextual trade actions on Player Quick View and the Player Profile
@@ -19,8 +21,11 @@ import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
  *   as mobile's Player Detail (☆ Add / ★ Watching), on the existing GM
  *   Targets endpoints, with the same "GM Targets is full" message.
  *
- * Roster membership comes from GET .../my-roster. Until it answers (or if
- * it fails) only "Add to Trade" shows, since that one works either way.
+ * Ownership comes from GET .../my-roster plus .../rosters (the same pair
+ * mobile's useRosterOwnership reads). Until it answers, or if my-roster fails,
+ * nothing shows: never a button on a guess. A failed /rosters degrades to
+ * "my players only". `hideAddToTrade` is for a quick view opened inside the
+ * Trade Analyzer itself.
  * Rendered inside the caller's existing `.pqv-actions` row.
  */
 export function PlayerLeagueActions({
@@ -28,6 +33,7 @@ export function PlayerLeagueActions({
   leagueName,
   playerId,
   sourceSurface,
+  hideAddToTrade = false,
 }: {
   leagueId: string;
   leagueName: string;
@@ -35,8 +41,10 @@ export function PlayerLeagueActions({
   /** GM Targets provenance, e.g. "player_quick_view" (mobile sends
    * "player_detail"). */
   sourceSurface: string;
+  hideAddToTrade?: boolean;
 }) {
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [ownership, setOwnership] = useState<RosterOwnership | null>(null);
   const [onMyRoster, setOnMyRoster] = useState<boolean | null>(null);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
@@ -48,8 +56,15 @@ export function PlayerLeagueActions({
     // Promise.resolve().then(...) so a synchronous throw from the API layer
     // is a rejection here, never a crash of the whole sheet.
     Promise.resolve()
-      .then(() => api.getMyRoster(leagueId))
-      .then(async (result) => {
+      .then(() =>
+        Promise.all([
+          api.getMyRoster(leagueId),
+          Promise.resolve()
+            .then(() => api.getLeagueRosters(leagueId))
+            .catch(() => null),
+        ]),
+      )
+      .then(async ([result, rostersResult]) => {
         if (cancelled) return;
         const players = Array.isArray(result?.roster?.players) ? (result.roster!.players as unknown[]) : [];
         const mine = players.map(String).includes(playerId);
@@ -58,6 +73,7 @@ export function PlayerLeagueActions({
           return;
         }
         setOnMyRoster(mine);
+        setOwnership(rosterOwnershipFrom(result.roster ?? null, rostersResult?.rosters ?? []));
         if (!mine) {
           try {
             const targets = await api.getGmTargets(leagueId);
@@ -104,19 +120,24 @@ export function PlayerLeagueActions({
   }
 
   const ready = loadedFor === key;
+  const shortcuts = ready ? tradeShortcutsFor(playerId, ownership) : { canAddToTrade: false, canFindTrades: false };
 
   return (
     <>
-      <a
-        className="pqv-action-link pqv-action-link--primary"
-        href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, playerId)}
-      >
-        Add to Trade
-      </a>
-      {ready && onMyRoster === true ? (
+      {shortcuts.canAddToTrade && !hideAddToTrade ? (
+        <a
+          className="pqv-action-link pqv-action-link--primary"
+          href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, playerId)}
+          onClick={() => trackFeatureUse("pqv_add_to_trade", { leagueId, dedupe: false })}
+        >
+          Add to Trade
+        </a>
+      ) : null}
+      {ready && shortcuts.canFindTrades ? (
         <a
           className="pqv-action-link pqv-action-link--primary"
           href={gamePlanTileHref("trade-finder", leagueId, leagueName, playerId)}
+          onClick={() => trackFeatureUse("pqv_find_trades", { leagueId, dedupe: false })}
         >
           Find trades
         </a>

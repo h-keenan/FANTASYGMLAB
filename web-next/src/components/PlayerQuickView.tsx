@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
@@ -72,6 +73,7 @@ export function PlayerQuickView({
   identity: PlayerQuickViewIdentity;
   onClose: () => void;
 }) {
+  const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
@@ -303,6 +305,7 @@ export function PlayerQuickView({
               leagueName={identity.leagueName || ""}
               playerId={identity.player_id}
               sourceSurface="player_quick_view"
+              hideAddToTrade={(pathname ?? "").startsWith("/trade-analyzer")}
             />
             {/* coridian_, 2026-10-19: "the pqv on the app has tabs that the
                 site doesnt. Thats a consistency error" — this is the real

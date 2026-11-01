@@ -11,6 +11,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       getMyRoster: vi.fn(),
+      getLeagueRosters: vi.fn(),
       getGmTargets: vi.fn(),
       addGmTarget: vi.fn(),
       removeGmTarget: vi.fn(),
@@ -18,15 +19,29 @@ vi.mock("@/lib/api", async () => {
   };
 });
 
-function renderActions(playerId: string) {
+function renderActions(playerId: string, hideAddToTrade = false) {
   return render(
-    <PlayerLeagueActions leagueId="L1" leagueName="Dynasty Overlords" playerId={playerId} sourceSurface="player_quick_view" />,
+    <PlayerLeagueActions
+      leagueId="L1"
+      leagueName="Dynasty Overlords"
+      playerId={playerId}
+      sourceSurface="player_quick_view"
+      hideAddToTrade={hideAddToTrade}
+    />,
   );
 }
 
 describe("PlayerLeagueActions", () => {
   beforeEach(() => {
     vi.mocked(api.getMyRoster).mockReset();
+    vi.mocked(api.getLeagueRosters).mockReset();
+    vi.mocked(api.getLeagueRosters).mockResolvedValue({
+      ok: true,
+      rosters: [
+        { roster_id: 1, players: ["mine-1"] },
+        { roster_id: 2, players: ["other-1"] },
+      ],
+    });
     vi.mocked(api.getGmTargets).mockReset();
     vi.mocked(api.addGmTarget).mockReset();
     vi.mocked(api.removeGmTarget).mockReset();
@@ -41,6 +56,32 @@ describe("PlayerLeagueActions", () => {
       "href",
       "/trade-analyzer/L1?name=Dynasty+Overlords&playerId=other-1",
     );
+  });
+
+  it("shows no Add to Trade for a free agent or before ownership is known", async () => {
+    renderActions("free-1");
+    expect(screen.queryByRole("link", { name: "Add to Trade" })).toBeNull();
+    await act(async () => {});
+    expect(screen.queryByRole("link", { name: "Add to Trade" })).toBeNull();
+  });
+
+  it("hides Add to Trade when opened inside the Trade Analyzer", async () => {
+    renderActions("other-1", true);
+    await act(async () => {});
+    expect(screen.queryByRole("link", { name: "Add to Trade" })).toBeNull();
+  });
+
+  it("shows nothing when my-roster fails, and my players only when /rosters fails", async () => {
+    vi.mocked(api.getMyRoster).mockResolvedValue({ ok: false, roster: null, reason: "no_roster" });
+    const { unmount } = renderActions("other-1");
+    await act(async () => {});
+    expect(screen.queryByRole("link", { name: "Add to Trade" })).toBeNull();
+    unmount();
+    vi.mocked(api.getMyRoster).mockResolvedValue({ ok: true, roster: { roster_id: 1, players: ["mine-1"] }, reason: "" });
+    vi.mocked(api.getLeagueRosters).mockRejectedValue(new Error("down"));
+    renderActions("mine-1");
+    await act(async () => {});
+    expect(screen.getByRole("link", { name: "Add to Trade" })).toBeInTheDocument();
   });
 
   it("offers Find trades (not GM Targets) for a player on my roster", async () => {
@@ -96,11 +137,11 @@ describe("PlayerLeagueActions", () => {
     expect(screen.getByRole("button", { name: "☆ Add to GM Targets" })).toBeInTheDocument();
   });
 
-  it("falls back to Add to Trade only when the roster can't be loaded", async () => {
+  it("shows no trade actions when the roster can't be loaded", async () => {
     vi.mocked(api.getMyRoster).mockRejectedValue(new Error("offline"));
     renderActions("other-1");
     await act(async () => {});
-    expect(screen.getByRole("link", { name: "Add to Trade" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Add to Trade" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Find trades" })).toBeNull();
     expect(screen.queryByRole("button", { name: /GM Targets/ })).toBeNull();
   });

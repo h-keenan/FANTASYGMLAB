@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 
 // Perf audit 2026-10: this provider wraps every page from the root layout, so a
 // static import dragged recharts (~114 KB gz) onto the landing page and every
@@ -59,14 +60,35 @@ const PlayerQuickViewContext = createContext<PlayerQuickViewContextValue | undef
 export function PlayerQuickViewProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<PlayerQuickViewIdentity | null>(null);
 
-  const openPlayer = useCallback((next: PlayerQuickViewIdentity) => {
-    if (!next?.player_id) return;
-    setIdentity(next);
-    // Every real open is its own meaningful interaction (not a reached-
-    // once-ever milestone), so no dedup here — see lib/analytics.ts's
-    // trackFeatureUse doc.
-    trackFeatureUse("pqv_opened", { leagueId: next.leagueId, dedupe: false });
-  }, []);
+  // Callers on league-scoped pages (/news/[leagueId], /alerts/[leagueId], ...)
+  // often pass a bare player row. Fall back to the league in the route so the
+  // quick view's league actions (Add to Trade, Find trades, Compare, Full
+  // Profile) show everywhere it opens, not only where a caller remembered to
+  // thread leagueId through. Pages with no league in the route stay league-less.
+  const params = useParams<{ leagueId?: string }>();
+  const routeLeagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
+
+  const openPlayer = useCallback(
+    (given: PlayerQuickViewIdentity) => {
+      if (!given?.player_id) return;
+      let next = given;
+      if (!given.leagueId && routeLeagueId) {
+        let nameParam = "";
+        try {
+          nameParam = new URLSearchParams(window.location.search).get("name") || "";
+        } catch {
+          nameParam = "";
+        }
+        next = { ...given, leagueId: routeLeagueId, leagueName: given.leagueName || nameParam || routeLeagueId };
+      }
+      setIdentity(next);
+      // Every real open is its own meaningful interaction (not a reached-
+      // once-ever milestone), so no dedup here — see lib/analytics.ts's
+      // trackFeatureUse doc.
+      trackFeatureUse("pqv_opened", { leagueId: next.leagueId, dedupe: false });
+    },
+    [routeLeagueId],
+  );
   const closePlayer = useCallback(() => setIdentity(null), []);
 
   const value = useMemo<PlayerQuickViewContextValue>(() => ({ openPlayer, closePlayer }), [openPlayer, closePlayer]);

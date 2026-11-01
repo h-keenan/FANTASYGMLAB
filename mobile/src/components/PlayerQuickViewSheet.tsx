@@ -24,6 +24,7 @@ import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { api, type QuickViewStatItem } from '../lib/api';
 import { injuryAbbreviation, injuryTone } from '../lib/injuryDisplay';
 import { getLastLeague } from '../lib/lastLeague';
+import { isTradeAnalyzerRoute } from '../lib/tradeShortcuts';
 import { explorerStatKey, type ExplorerPlayer } from '../lib/percentileExplorer';
 import { overallRatingColor } from '../lib/percentile';
 import { resolvePlayerTier } from '../lib/playerTier';
@@ -97,6 +98,12 @@ function StatTiles({
  * shows league-independent fields only, and "Full profile" falls back to the
  * last-used league for navigation.
  */
+function insideTradeAnalyzer(): boolean {
+  if (!navigationRef.isReady()) return false;
+  const route = navigationRef.getCurrentRoute();
+  return isTradeAnalyzerRoute(route?.name, (route?.params as { initialTab?: string } | undefined)?.initialTab);
+}
+
 export default function PlayerQuickViewSheet({ request, onClose }: { request: QuickViewRequest; onClose: () => void }) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -164,6 +171,9 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
   const overallRating = player.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
   const injury = injuryAbbreviation(player.injury_status);
   const target = fullProfileTarget(request, fallback);
+  // League-less opens (News) borrow the last-used league for the trade
+  // shortcuts too, same as Full Profile; none known means no actions.
+  const actionsLeague = request.league ?? fallback;
   const loading = detailQuery.isPending;
 
   const openWaivers = () => {
@@ -338,12 +348,13 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
             {/* Actions row (web .pqv-actions): league actions, then the
                 profile / waivers destinations. */}
             <View style={styles.actions}>
-              {request.league ? (
+              {actionsLeague ? (
                 <PlayerLeagueActions
                   player={player}
-                  leagueId={request.league.leagueId}
-                  leagueName={request.league.leagueName}
+                  leagueId={actionsLeague.leagueId}
+                  leagueName={actionsLeague.leagueName}
                   onNavigate={onClose}
+                  hideAddToTrade={insideTradeAnalyzer()}
                 />
               ) : null}
               {onWaivers ? (

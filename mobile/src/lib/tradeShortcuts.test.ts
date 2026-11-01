@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { quickAddPlacement, rosterOwnershipFrom, tradeShortcutsFor } from './tradeShortcuts.ts';
+import { isTradeAnalyzerRoute, quickAddPlacement, rosterOwnershipFrom, tradeShortcutsFor } from './tradeShortcuts.ts';
 
 const ownership = rosterOwnershipFrom({ players: ['1', 2] }, [
   { roster_id: 1, players: ['1', '2'] },
@@ -55,4 +55,12 @@ test("quickAddPlacement: another team's player goes to receive, selects the owne
 test('quickAddPlacement: unrostered or empty id fails open', () => {
   assert.equal(quickAddPlacement('99', ownership.myPlayerIds, teams), null);
   assert.equal(quickAddPlacement('', ownership.myPlayerIds, teams), null);
+});
+
+test('isTradeAnalyzerRoute: only the Analyzer tab of the Trades host', () => {
+  assert.equal(isTradeAnalyzerRoute('Trades', 'make'), true);
+  assert.equal(isTradeAnalyzerRoute('Trades', undefined), true);
+  assert.equal(isTradeAnalyzerRoute('Trades', 'search'), false);
+  assert.equal(isTradeAnalyzerRoute('Waivers', 'make'), false);
+  assert.equal(isTradeAnalyzerRoute(undefined), false);
 });
