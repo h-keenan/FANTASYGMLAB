@@ -42,7 +42,7 @@ export function DashboardNowStrip({
   const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount);
   if (chips.length === 0) return null;
   return (
-    <section aria-label="What matters now" data-testid="dashboard-now-strip" className="grid grid-cols-2 gap-2">
+    <section aria-label="What matters now" data-testid="dashboard-now-strip" className="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2">
       {chips.map((chip) => (
         <Link
           key={chip.key}
