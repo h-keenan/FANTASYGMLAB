@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import os
 import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -40,7 +41,6 @@ from modules import nfl_stadiums
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 FORECAST_TTL_SECONDS = 45 * 60
 FAILURE_TTL_SECONDS = 10 * 60
-REQUEST_TIMEOUT_SECONDS = 4.0
 # Forecasts further out than this are not trusted (Open-Meteo hourly skill
 # falls off quickly past about a week) and are not even requested.
 MAX_HORIZON = timedelta(days=7)
@@ -86,7 +86,15 @@ RAIN_HEAVY_MM = 4.0
 COLD_F = 32.0
 
 _lock = threading.Lock()
-_cache: dict[str, tuple[float, dict[str, Any] | None]] = {}
+# stadium_id -> {"expires": ts, "hourly": dict|None, "retry_at": ts}
+_cache: dict[str, dict[str, Any]] = {}
+_inflight: set[str] = set()
+_pending: list[Future] = []
+_executor: ThreadPoolExecutor | None = None
+REFRESH_WORKERS = 8
+# Background refreshes use a shorter timeout than the old inline fetch; no
+# request ever waits on the network (see _hourly_for_stadium).
+REQUEST_TIMEOUT_SECONDS = 2.0
 
 
 def _disabled() -> bool:
@@ -96,6 +104,17 @@ def _disabled() -> bool:
 def clear_cache() -> None:
     with _lock:
         _cache.clear()
+        _inflight.clear()
+        _pending.clear()
+
+
+def wait_for_refreshes(timeout: float = 5.0) -> None:
+    """Block until queued background refreshes finish (tests only)."""
+
+    with _lock:
+        futures = list(_pending)
+    for f in futures:
+        f.result(timeout=timeout)
 
 
 def _fetch_hourly(stadium: nfl_stadiums.Stadium) -> dict[str, Any] | None:
@@ -120,20 +139,100 @@ def _fetch_hourly(stadium: nfl_stadiums.Stadium) -> dict[str, Any] | None:
     return hourly
 
 
-def _hourly_for_stadium(stadium_id: str, stadium: nfl_stadiums.Stadium) -> dict[str, Any] | None:
+def _refresh(stadium_id: str, stadium: nfl_stadiums.Stadium) -> None:
+    """Background worker: fetch one stadium and store it. A failure keeps any
+    older data being served and backs the next attempt off (no stampede)."""
+
     now = time.time()
-    with _lock:
-        hit = _cache.get(stadium_id)
-        if hit is not None and hit[0] > now:
-            return hit[1]
     try:
         hourly = _fetch_hourly(stadium)
-        ttl = FORECAST_TTL_SECONDS if hourly else FAILURE_TTL_SECONDS
     except Exception:
-        hourly, ttl = None, FAILURE_TTL_SECONDS
+        hourly = None
     with _lock:
-        _cache[stadium_id] = (now + ttl, hourly)
-    return hourly
+        entry = _cache.get(stadium_id) or {"expires": 0.0, "hourly": None, "retry_at": 0.0}
+        if hourly:
+            entry = {"expires": now + FORECAST_TTL_SECONDS, "hourly": hourly, "retry_at": 0.0}
+        else:
+            entry["retry_at"] = now + FAILURE_TTL_SECONDS
+        _cache[stadium_id] = entry
+        _inflight.discard(stadium_id)
+
+
+def _schedule_refresh(stadium_id: str, stadium: nfl_stadiums.Stadium) -> None:
+    """Queue ONE background refresh per stadium; a no-op while one is running."""
+
+    global _executor
+    with _lock:
+        if stadium_id in _inflight:
+            return
+        _inflight.add(stadium_id)
+        if _executor is None:
+            _executor = ThreadPoolExecutor(max_workers=REFRESH_WORKERS, thread_name_prefix="weather")
+        try:
+            future = _executor.submit(_refresh, stadium_id, stadium)
+        except Exception:
+            _inflight.discard(stadium_id)
+            return
+        _pending[:] = [f for f in _pending if not f.done()] + [future]
+
+
+def _hourly_for_stadium(
+    stadium_id: str, stadium: nfl_stadiums.Stadium
+) -> tuple[dict[str, Any] | None, str]:
+    """(hourly data, state) with ZERO network on the caller's path.
+
+    Stale-while-revalidate: cached data is served even when expired while a
+    background refresh runs. A cold stadium returns (None, "loading") and
+    queues a refresh. A stadium whose last fetch failed returns
+    (None, "unavailable") until its backoff passes.
+    """
+
+    now = time.time()
+    with _lock:
+        entry = _cache.get(stadium_id)
+        due = entry is None or (entry["expires"] <= now and entry["retry_at"] <= now)
+    if due:
+        _schedule_refresh(stadium_id, stadium)
+    if entry is None:
+        return None, "loading"
+    if entry["hourly"]:
+        return entry["hourly"], "ok"
+    return None, "unavailable"
+
+
+def prefetch_stadium_ids(stadium_ids: list[str]) -> None:
+    """Warm the cache for these stadiums in parallel in the background.
+    Never blocks and never raises."""
+
+    if _disabled():
+        return
+    for sid in sorted({str(x).upper() for x in stadium_ids if x}):
+        stadium = nfl_stadiums.stadium_for(sid)
+        if stadium is None or stadium.roof == "dome":
+            continue
+        now = time.time()
+        with _lock:
+            entry = _cache.get(sid)
+            due = entry is None or (entry["expires"] <= now and entry["retry_at"] <= now)
+        if due:
+            _schedule_refresh(sid, stadium)
+
+
+def prefetch_for_games(games: Any, *, now: datetime | None = None) -> None:
+    """Warm every outdoor/retractable stadium with a game in the forecast
+    horizon, from the nflverse games frame. Cheap, non-blocking, fail soft."""
+
+    try:
+        if _disabled() or games is None or getattr(games, "empty", True):
+            return
+        current = now or datetime.now(timezone.utc)
+        lo = (current - timedelta(days=1)).strftime("%Y-%m-%d")
+        hi = (current + MAX_HORIZON).strftime("%Y-%m-%d")
+        day = games["gameday"].astype(str)
+        window = games[(day >= lo) & (day <= hi)]
+        prefetch_stadium_ids(window["stadium_id"].dropna().astype(str).tolist())
+    except Exception:
+        return
 
 
 def _mean(values: list[float]) -> float | None:
@@ -154,8 +253,11 @@ def forecast_for_game(
     *,
     now: datetime | None = None,
     allow_retractable: bool = False,
+    state_out: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
-    """The kickoff-window forecast for one game, or None.
+    """The kickoff-window forecast for one game, or None. Never touches the
+    network: see _hourly_for_stadium. ``state_out["state"]`` reports "ok",
+    "loading" (cold cache, refresh queued) or "unavailable".
 
     None for: no stadium / unknown stadium, a fixed dome (or a retractable
     roof unless ``allow_retractable``), no kickoff time, a game that has already kicked off or is beyond the
@@ -176,7 +278,9 @@ def forecast_for_game(
         current = now or datetime.now(timezone.utc)
         if kickoff <= current or kickoff - current > MAX_HORIZON:
             return None
-        hourly = _hourly_for_stadium(str(stadium_id).upper(), stadium)
+        hourly, state = _hourly_for_stadium(str(stadium_id).upper(), stadium)
+        if state_out is not None:
+            state_out["state"] = state
         if not hourly:
             return None
         start = kickoff.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
@@ -323,8 +427,10 @@ def apply_weather(
     - ``outdoor``: forecast used (``applied`` says whether it moved the number)
     - ``retractable``: forecast used at reduced weight, roof status unknown
     - ``dome``: fixed roof, no weather effect
+    - ``loading``: forecast cache still cold (a background fetch is queued);
+      no adjustment, the next request has it
     - ``unavailable``: outdoor/retractable game inside the forecast window but
-      no forecast could be fetched; no adjustment
+      the forecast could not be fetched; no adjustment
 
     Only an ``ok`` projection for a not-yet-started game with a known stadium
     inside the forecast window gets a block at all; otherwise the summary is
@@ -359,12 +465,16 @@ def apply_weather(
         return summary
 
     retractable = stadium.roof == "retractable"
-    forecast = forecast_for_game(stadium_id, kickoff_at, now=now, allow_retractable=retractable)
+    fstate: dict[str, str] = {}
+    forecast = forecast_for_game(
+        stadium_id, kickoff_at, now=now, allow_retractable=retractable, state_out=fstate
+    )
     roof_note = " (retractable roof, status unknown, reduced weight)" if retractable else " (outdoor)"
     if forecast is None:
+        loading = fstate.get("state") == "loading"
         summary["weather"] = {
-            "status": "unavailable",
-            "label": "Weather unavailable: no adjustment",
+            "status": "loading" if loading else "unavailable",
+            "label": "Weather loading: no adjustment" if loading else "Weather unavailable: no adjustment",
             "applied": False,
             "multiplier": 1.0,
             "reason": None,

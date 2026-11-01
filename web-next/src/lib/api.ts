@@ -1239,7 +1239,7 @@ export interface WaiversResponse {
 
 /** Why a projection is what it is with respect to weather (modules.game_weather).
  * Present for an upcoming game inside the forecast window; absent means show nothing. */
-export type WeatherStatus = "outdoor" | "retractable" | "dome" | "unavailable";
+export type WeatherStatus = "outdoor" | "retractable" | "dome" | "unavailable" | "loading";
 
 export interface PlayerWeekWeather {
   status: WeatherStatus;

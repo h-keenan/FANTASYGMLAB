@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
@@ -45,6 +47,12 @@ def _hourly(wind=5.0, rain=0.0, prob=0, temp=60.0):
         "precipitation": [rain] * n,
         "precipitation_probability": [prob] * n,
     }
+
+
+def _warm(stadium="BUF00"):
+    """Run the background refresh to completion (inside the caller's patch)."""
+    gw.prefetch_stadium_ids([stadium])
+    gw.wait_for_refreshes()
 
 
 def _resp(hourly):
@@ -110,6 +118,7 @@ def test_calibrated_table_is_sane():
 
 def test_forecast_parses_kickoff_window(weather_on):
     with patch.object(gw.requests, "get", return_value=_resp(_hourly(wind=22, rain=2.0, prob=80, temp=41))) as get:
+        _warm()
         f = gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)
     assert get.call_count == 1
     assert f["wind_mph"] == 22.0 and f["precip_mm"] == 8.0 and f["precip_prob_pct"] == 80 and f["temp_f"] == 41
@@ -117,9 +126,90 @@ def test_forecast_parses_kickoff_window(weather_on):
 
 def test_forecast_is_cached_per_stadium(weather_on):
     with patch.object(gw.requests, "get", return_value=_resp(_hourly())) as get:
+        _warm()
         gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)
         gw.forecast_for_game("BUF00", (KICKOFF + timedelta(hours=3)).isoformat(), now=NOW)
+        gw.wait_for_refreshes()
     assert get.call_count == 1
+
+
+def test_cold_cache_returns_immediately_without_network_then_background_populates(weather_on):
+    release = threading.Event()
+
+    def slow_get(*a, **k):
+        release.wait(5)
+        return _resp(_hourly(wind=22))
+
+    state = {}
+    with patch.object(gw.requests, "get", side_effect=slow_get) as get:
+        t0 = time.monotonic()
+        out = gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW, state_out=state)
+        summary = gw.apply_weather(_summary(), position="QB", stadium_id="BUF00", kickoff_at=KICKOFF.isoformat(), now=NOW)
+        assert time.monotonic() - t0 < 0.5  # the blocked fetch never held the caller
+        assert out is None and state["state"] == "loading"
+        assert summary["weather"]["label"] == "Weather loading: no adjustment"
+        assert summary["weather"]["status"] == "loading" and summary["point_estimate"] == 20.0
+        release.set()
+        gw.wait_for_refreshes()
+    assert get.call_count == 1  # queued once, not once per caller
+    assert gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)["wind_mph"] == 22.0
+
+
+def test_expired_cache_is_served_while_refreshing(weather_on):
+    with patch.object(gw.requests, "get", return_value=_resp(_hourly(wind=10))):
+        _warm()
+    gw._cache["BUF00"]["expires"] = time.time() - 1  # expired
+    release = threading.Event()
+
+    def slow_get(*a, **k):
+        release.wait(5)
+        return _resp(_hourly(wind=30))
+
+    with patch.object(gw.requests, "get", side_effect=slow_get) as get:
+        stale = gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)
+        again = gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)
+        assert stale["wind_mph"] == 10.0 and again["wind_mph"] == 10.0  # stale, instantly
+        release.set()
+        gw.wait_for_refreshes()
+    assert get.call_count == 1  # one in-flight refresh despite two callers
+    assert gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)["wind_mph"] == 30.0
+
+
+def test_failed_refresh_keeps_stale_data_and_does_not_stampede(weather_on):
+    with patch.object(gw.requests, "get", return_value=_resp(_hourly(wind=10))):
+        _warm()
+    gw._cache["BUF00"]["expires"] = time.time() - 1
+    with patch.object(gw.requests, "get", side_effect=OSError("down")) as get:
+        for _ in range(5):
+            f = gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW)
+            gw.wait_for_refreshes()
+            assert f["wind_mph"] == 10.0
+    assert get.call_count == 1
+
+
+def test_parallel_prefetch_warms_each_stadium_once(weather_on):
+    with patch.object(gw.requests, "get", return_value=_resp(_hourly())) as get:
+        gw.prefetch_stadium_ids(["BUF00", "GNB00", "BUF00", "DET00", "NOPE", None])
+        gw.wait_for_refreshes()
+        gw.prefetch_stadium_ids(["BUF00", "GNB00"])
+        gw.wait_for_refreshes()
+    assert get.call_count == 2  # dome and unknown skipped, warm cache not refetched
+
+
+def test_prefetch_for_games_reads_horizon_stadiums(weather_on):
+    import pandas as pd
+
+    games = pd.DataFrame(
+        [
+            {"gameday": "2026-11-02", "stadium_id": "BUF00"},
+            {"gameday": "2026-11-03", "stadium_id": "GNB00"},
+            {"gameday": "2027-02-01", "stadium_id": "SEA00"},
+        ]
+    )
+    with patch.object(gw.requests, "get", return_value=_resp(_hourly())) as get:
+        gw.prefetch_for_games(games, now=NOW)
+        gw.wait_for_refreshes()
+    assert get.call_count == 2
 
 
 @pytest.mark.parametrize("stadium_id", ["DET00", "LAX01", "DAL00", "IND00", "NOPE99", None])
@@ -138,13 +228,16 @@ def test_started_or_far_future_games_get_no_forecast(weather_on):
 
 def test_network_failure_fails_soft_and_is_negative_cached(weather_on):
     with patch.object(gw.requests, "get", side_effect=OSError("down")) as get:
+        _warm()
         assert gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW) is None
         assert gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW) is None
+        gw.wait_for_refreshes()
     assert get.call_count == 1
 
 
 def test_malformed_payload_fails_soft(weather_on):
     with patch.object(gw.requests, "get", return_value=_resp({"time": ["x"]})):
+        _warm()
         assert gw.forecast_for_game("BUF00", KICKOFF.isoformat(), now=NOW) is None
 
 
@@ -167,6 +260,7 @@ def _apply(position="QB", stadium="BUF00", summary=None):
 
 def test_outdoor_forecast_scales_projection_and_states_why(effects, weather_on):
     with patch.object(gw.requests, "get", return_value=_resp(_hourly(wind=18, rain=2.0, prob=100))):
+        _warm()
         out = _apply()
     w = out["weather"]
     assert w["status"] == "outdoor" and w["applied"]
@@ -177,6 +271,7 @@ def test_outdoor_forecast_scales_projection_and_states_why(effects, weather_on):
 
 def test_total_reduction_is_modest_and_capped(effects, weather_on):
     with patch.object(gw.requests, "get", return_value=_resp(_hourly(wind=25, rain=2.0, prob=100, temp=20))):
+        _warm()
         out = _apply()
     assert out["weather"]["multiplier"] == pytest.approx(0.90)
     assert out["point_estimate"] == 18.0
@@ -192,6 +287,7 @@ def test_dome_gets_status_and_no_adjustment(effects, weather_on):
 
 def test_retractable_roof_uses_reduced_weight_and_says_so(effects, weather_on):
     with patch.object(gw.requests, "get", return_value=_resp(_hourly(wind=5, rain=2.0, prob=100))):
+        _warm("HOU00")
         out = _apply(stadium="HOU00")
     w = out["weather"]
     assert w["status"] == "retractable" and w["applied"]
@@ -202,6 +298,7 @@ def test_retractable_roof_uses_reduced_weight_and_says_so(effects, weather_on):
 
 def test_unavailable_forecast_states_no_adjustment(effects, weather_on):
     with patch.object(gw.requests, "get", side_effect=OSError):
+        _warm()
         out = _apply()
     assert out["point_estimate"] == 20.0
     assert out["weather"]["status"] == "unavailable"
@@ -210,6 +307,7 @@ def test_unavailable_forecast_states_no_adjustment(effects, weather_on):
 
 def test_calm_forecast_reports_but_does_not_change(effects, weather_on):
     with patch.object(gw.requests, "get", return_value=_resp(_hourly())):
+        _warm()
         out = _apply()
     assert out["point_estimate"] == 20.0 and out["weather"]["applied"] is False
     assert out["weather"]["label"].endswith("(outdoor): no adjustment")

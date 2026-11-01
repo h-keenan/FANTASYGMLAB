@@ -12991,6 +12991,15 @@ class _ProjectionContext:
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None
 
 
+def _games_and_warm_weather() -> pd.DataFrame:
+    """The games table, plus a non-blocking background warm of the weather
+    forecast cache for every stadium playing inside the forecast horizon."""
+
+    games = nfl_schedule.load_games()
+    game_weather.prefetch_for_games(games)
+    return games
+
+
 def _build_projection_context(week: int) -> "_ProjectionContext | None":
     """The shared per-request projection inputs for one NFL week, or None
     when there's no week or anything fails to load (fails soft: callers
@@ -13013,7 +13022,7 @@ def _build_projection_context(week: int) -> "_ProjectionContext | None":
                 weekly_stats=weekly_stats,
                 players=players_lookup,
             ),
-            games=nfl_schedule.load_games(),
+            games=_games_and_warm_weather(),
             # Built ONCE per request: every projected player would otherwise
             # redo the same full players_lookup scan. See
             # team_qb_pass_attempts_by_week's own docstring.

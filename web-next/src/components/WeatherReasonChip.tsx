@@ -6,6 +6,7 @@ const BADGE: Record<WeatherStatus, string> = {
   retractable: "Roof?",
   dome: "Dome",
   unavailable: "No data",
+  loading: "Loading",
 };
 
 /**
