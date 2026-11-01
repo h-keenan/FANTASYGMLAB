@@ -34,6 +34,7 @@ cached lookup; a failed lookup reads as "no bye", never a guess).
 from __future__ import annotations
 
 import math
+from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import product
@@ -288,13 +289,33 @@ def _active_rows(frame: pd.DataFrame, score_column: str, scoring: Mapping[str, f
     return out
 
 
+_CURVE_INDEX_CACHE: list[tuple[list, int, tuple[list[float], list[float]]]] = []
+_CURVE_INDEX_CACHE_MAX = 16
+
+
+def _curve_index(pairs: list[tuple[float, float]]) -> tuple[list[float], list[float]]:
+    """(ascending negated values, descending ppgs) for one position's curve.
+
+    Built once per curve list instead of once per looked-up player. The list
+    is held in the cache so its ``id`` cannot be reused while the entry
+    lives (same pattern as ``get_context``)."""
+
+    for cached_pairs, cached_len, index in _CURVE_INDEX_CACHE:
+        if cached_pairs is pairs and cached_len == len(pairs):
+            return index
+    index = (sorted(-v for v, _ in pairs), sorted((p for _, p in pairs), reverse=True))
+    _CURVE_INDEX_CACHE.append((pairs, len(pairs), index))
+    del _CURVE_INDEX_CACHE[:-_CURVE_INDEX_CACHE_MAX]
+    return index
+
+
 def _value_curve_ppg(ctx_curves: Mapping[str, list[tuple[float, float]]], pos: str, value: float) -> tuple[float, bool]:
     """Rank-match a value to a PPG. Returns (ppg, from_data)."""
 
     pairs = ctx_curves.get(pos) or []
     if len(pairs) >= 6:
-        ppgs = sorted((p for _, p in pairs), reverse=True)
-        rank = sum(1 for v, _ in pairs if v > value)  # players that out-value him
+        neg_values, ppgs = _curve_index(pairs)
+        rank = bisect_left(neg_values, -value)  # players that out-value him
         idx = min(rank, len(ppgs) - 1)
         return float(ppgs[idx]), True
     top, repl = STATIC_ANCHORS.get(pos, (15.0, 4.0))
@@ -735,6 +756,28 @@ def run_weeks(
 # --- the public evaluation ---------------------------------------------------
 
 
+_BEFORE_SIDE_CACHE: list[tuple[Any, Any, int, list[PlayerPoints], dict[int, list[PlayerPoints]]]] = []
+_BEFORE_SIDE_CACHE_MAX = 4
+
+
+def _before_side(before_df: pd.DataFrame, ctx: ModelContext) -> tuple[list[PlayerPoints], dict[int, list[PlayerPoints]]]:
+    """``profile_roster(before_df, ctx)`` plus its per-year aged copies, memoized.
+
+    Every candidate trade for one roster shares the same "before" frame, so its
+    profile (and age-curved projection) is a per-roster cost, not a per-trade
+    one. ``PlayerPoints`` is frozen, so sharing the objects is safe; the
+    frame and context are held so their ``id`` cannot be reused."""
+
+    for cached_df, cached_ctx, cached_len, profiles, aged in _BEFORE_SIDE_CACHE:
+        if cached_df is before_df and cached_ctx is ctx and cached_len == len(before_df):
+            return profiles, aged
+    profiles = profile_roster(before_df, ctx)
+    aged: dict[int, list[PlayerPoints]] = {}
+    _BEFORE_SIDE_CACHE.append((before_df, ctx, len(before_df), profiles, aged))
+    del _BEFORE_SIDE_CACHE[:-_BEFORE_SIDE_CACHE_MAX]
+    return profiles, aged
+
+
 def _aged(p: PlayerPoints, years: int) -> PlayerPoints:
     if p.ppg is None or p.age is None:
         return p
@@ -795,7 +838,7 @@ def evaluate_trade(
     rem = len(weeks)
     k = ctx.value_per_point
 
-    before = profile_roster(before_df, ctx)
+    before, before_aged = _before_side(before_df, ctx)
     after = profile_roster(after_df, ctx)
     b, a, meta = run_weeks(before, after, ctx)
     b0, a0, _ = run_weeks(before, after, ctx, fill="market", ignore_availability=True)
@@ -823,7 +866,9 @@ def evaluate_trade(
     # market's own (already age-curved and posture-priced upstream).
     fut_delta_pts = 0.0
     for y in range(1, params.future_years + 1):
-        fb = [_aged(p, y) for p in before]
+        if y not in before_aged:
+            before_aged[y] = [_aged(p, y) for p in before]
+        fb = before_aged[y]
         fa = [_aged(p, y) for p in after]
         yb, ya, _ = run_weeks(fb, fa, ctx, fill="market", weeks=[1], ignore_availability=True)
         fut_delta_pts += (params.future_discount ** y) * FANTASY_SEASON_WEEKS * (ya.expected - yb.expected)
