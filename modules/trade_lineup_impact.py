@@ -112,6 +112,41 @@ def _multiset_new(after: Iterable[str], before: Iterable[str]) -> list[str]:
     return new
 
 
+_BEFORE_STATE_CACHE: list[tuple[tuple, pd.DataFrame, dict[str, Any]]] = []
+_BEFORE_STATE_CACHE_MAX = 4
+
+
+def _before_state(
+    before_df: pd.DataFrame,
+    settings: dict[str, Any] | None,
+    current_week: int,
+    score_field: str,
+    season: int | None,
+) -> dict[str, Any]:
+    """The before-trade half of the comparison, memoized per roster frame.
+
+    Grading many packages for one roster (Trade Hub's gate) repeats exactly
+    this half for every package; it depends only on the roster, the league
+    settings, the week and the score column. The frame is held so its ``id``
+    cannot be reused while the entry lives. Callers must treat the result as
+    read-only."""
+
+    key = (id(before_df), len(before_df), int(current_week), score_field, season, repr(sorted((str(k), repr(v)) for k, v in (settings or {}).items())))
+    for entry_key, _frame, state in _BEFORE_STATE_CACHE:
+        if entry_key == key:
+            return state
+    byes = bye_player_ids(before_df, current_week, season)
+    lineup = suggest_optimal_lineup(before_df, settings, score_field=score_field, bye_player_ids=byes)
+    state = {
+        "byes": byes,
+        "open": lineup_open_slots(lineup, settings),
+        "pool": _position_pool(before_df, byes),
+    }
+    _BEFORE_STATE_CACHE.append((key, before_df, state))
+    del _BEFORE_STATE_CACHE[:-_BEFORE_STATE_CACHE_MAX]
+    return state
+
+
 def weekly_lineup_impact(
     before_df: pd.DataFrame,
     after_df: pd.DataFrame,
@@ -129,22 +164,19 @@ def weekly_lineup_impact(
 
     settings = dict(lineup_settings) if lineup_settings else None
     slots = _lineup_slots(settings)
-    byes_before = bye_player_ids(before_df, current_week, season)
+    before_state = _before_state(before_df, settings, current_week, score_field, season)
     byes_after = bye_player_ids(after_df, current_week, season)
-    before_lineup = suggest_optimal_lineup(
-        before_df, settings, score_field=score_field, bye_player_ids=byes_before
-    )
     after_lineup = suggest_optimal_lineup(
         after_df if after_df is not None else before_df.iloc[0:0],
         settings,
         score_field=score_field,
         bye_player_ids=byes_after,
     )
-    open_before = lineup_open_slots(before_lineup, settings)
+    open_before = list(before_state["open"])
     open_after = lineup_open_slots(after_lineup, settings)
     new_open = _multiset_new(open_after, open_before)
 
-    pool_before = _position_pool(before_df, byes_before)
+    pool_before = before_state["pool"]
     pool_after = _position_pool(after_df, byes_after)
 
     warnings: list[dict[str, Any]] = []
