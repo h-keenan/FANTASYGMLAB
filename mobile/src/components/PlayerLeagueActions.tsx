@@ -23,16 +23,20 @@ export default function PlayerLeagueActions({
   leagueId,
   leagueName,
   onNavigate,
+  hideAddToTrade = false,
 }: {
   player: RankedPlayer;
   leagueId: string;
   leagueName: string;
   onNavigate: () => void;
+  /** Quick view opened inside the Trade Analyzer itself. */
+  hideAddToTrade?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const ownership = useRosterOwnership(leagueId);
   const shortcuts = tradeShortcutsFor(player.player_id, ownership);
+  const showAddToTrade = shortcuts.canAddToTrade && !hideAddToTrade;
   const onMyRoster = ownership?.myPlayerIds.has(player.player_id) ?? null;
   const [watching, setWatching] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,10 +91,10 @@ export default function PlayerLeagueActions({
     }
   };
 
-  if (!shortcuts.canAddToTrade && watching === null) return null;
+  if (!showAddToTrade && !shortcuts.canFindTrades && watching === null) return null;
   return (
     <View style={styles.row}>
-      {shortcuts.canAddToTrade ? (
+      {showAddToTrade ? (
         <TouchableOpacity
           style={styles.chip}
           onPress={() => goTrades('make')}
@@ -136,6 +140,7 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs + 2,
+      minHeight: 44,
       borderRadius: radii.pill,
       borderWidth: 1,
       borderColor: colors.accentMuted,

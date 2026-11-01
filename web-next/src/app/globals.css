@@ -1631,6 +1631,9 @@ a {
   flex-wrap: wrap;
 }
 .pqv-action-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--color-accent);
