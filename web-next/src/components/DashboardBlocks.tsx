@@ -138,7 +138,10 @@ export function DashboardMore({ children }: { children: ReactNode }) {
         className="flex items-center justify-between px-4 text-sm font-bold uppercase cursor-pointer"
         style={{ minHeight: "var(--touch-target-min)", letterSpacing: "0.02em" }}
       >
-        More
+        <span>More</span>
+        <span className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
+          League activity, games, settings
+        </span>
       </summary>
       <div className="flex flex-col gap-6 px-4 pb-4 pt-2">{children}</div>
     </details>

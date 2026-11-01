@@ -15,8 +15,7 @@ export const DASHBOARD_MODULE_ORDER = [
   "next_moves", // other urgent actions (lineup risk, waiver, offseason next step)
   "my_team", // record / ranks / strengths / injuries in one section
   "alerts_waivers", // news and waivers that affect my players
-  "league_pulse", // league activity
-  "more", // collapsed: recap, matchup, quick actions, league type, games
+  "more", // collapsed: league activity, recap, matchup, quick actions, league type, games
 ] as const;
 
 export type DashboardModuleKey = (typeof DASHBOARD_MODULE_ORDER)[number];
