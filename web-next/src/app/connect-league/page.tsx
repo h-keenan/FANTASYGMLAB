@@ -55,7 +55,7 @@ export default function ConnectLeaguePage() {
       </div>
       <div className="w-full max-w-sm flex flex-col gap-3">
         <FreeLeagueLimitNote />
-        <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(pathAfterLeagueChosen(leagueId, leagueName))} />
+        <SleeperImportForm sampleCtaBelow onLeagueChosen={(leagueId, leagueName) => router.push(pathAfterLeagueChosen(leagueId, leagueName))} />
         <SampleLeagueButton surface="connect_step" />
       </div>
     </main>

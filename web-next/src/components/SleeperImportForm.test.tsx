@@ -123,6 +123,15 @@ describe("SleeperImportForm", () => {
     });
   });
 
+  it("skips its own sample button when the page already renders one below", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
+    render(<SleeperImportForm sampleCtaBelow onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
+  });
+
   it("does not show the no-account CTA for an unrelated lookup failure", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
       ok: false,
