@@ -261,7 +261,7 @@ export function LandingAuthIsland() {
             You&apos;re in. Premium is unlocked. Connect your league to get started.
           </p>
         ) : null}
-        <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+        <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
         <SampleLeagueButton surface="connect_step" />
       </>
     ) : (

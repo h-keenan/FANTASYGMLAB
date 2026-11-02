@@ -23,7 +23,7 @@ import { destinationCtaLabel } from "@/lib/destinationLabels";
  * the item carries a real figure (today: the usage-drop percentage of a
  * Value Trend item). Rows without data show just the chevron; nothing is
  * drawn or labelled as a placeholder. Beginner mode shows the full reason,
- * advanced clamps it to one line.
+ * advanced clamps it to two lines (one line cut the reason to "Usage..." at 390px).
  */
 export function WatchListCard({
   items,
@@ -77,7 +77,7 @@ export function WatchListCard({
                   color: "var(--color-text-secondary)",
                   ...(copy.isBeginner
                     ? {}
-                    : { display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
+                    : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
                 }}
               >
                 {item.reason}

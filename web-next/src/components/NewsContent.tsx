@@ -62,7 +62,7 @@ function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
         team: identity.matched_player_team,
         sourceLabel: "News",
       }}
-      className="flex items-center gap-2 relative z-10"
+      className="flex items-center gap-2 relative z-10 tap-link"
     >
       {row}
     </PlayerIdentityTrigger>

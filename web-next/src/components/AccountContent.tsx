@@ -356,7 +356,7 @@ function AccountActionsSection({
           setReplaying(true);
         }}
         className="px-4 py-2 text-sm font-bold self-start"
-        style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
+        style={{ minHeight: "var(--touch-target-min)", border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
       >
         Replay the tour
       </button>

@@ -173,7 +173,7 @@ function TradeSidePanel({
       className="glass-surface flex flex-col gap-2 p-3 min-w-0"
       style={active ? { borderColor: "var(--color-accent)" } : undefined}
     >
-      <button type="button" onClick={onSelect} className="flex items-center gap-1.5 self-start">
+      <button type="button" onClick={onSelect} className="tap-link gap-1.5 self-start">
         <span className="inline-block" style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor }} />
         <span
           className="uppercase text-xs font-bold"

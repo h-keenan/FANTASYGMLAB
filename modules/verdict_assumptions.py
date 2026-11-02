@@ -73,6 +73,7 @@ def build_verdict_assumptions(
     keeper_adjusted: bool = False,
     has_picks: bool = False,
     lineup_model: Mapping[str, Any] | None = None,
+    model_status: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """JSON-ready ``{"line": str, "items": [{key, label, value}]}``.
 
@@ -97,5 +98,10 @@ def build_verdict_assumptions(
         items.append({"key": "keepers", "label": "Keepers", "value": "estimated keeper surplus included"})
     if has_picks:
         items.append({"key": "picks", "label": "Draft picks", "value": "valued at your league's projected pick position"})
+    degraded = [str(r.get("message") or "") for r in (model_status or {}).get("reasons") or () if r.get("message")]
+    if degraded:
+        items.append({"key": "limited_data", "label": "Limited data", "value": " ".join(degraded)})
     line = f"Assumed: {format_text}, {_clean(lens) or 'Dynasty'} values, {posture} posture; {basis}; injury timing {injury}."
+    if degraded:
+        line += " Limited data: " + " ".join(degraded)
     return {"line": line, "items": items}

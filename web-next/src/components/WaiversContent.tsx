@@ -180,7 +180,7 @@ function ViewDetailsButton({ player }: { player: WaiverPlayer }) {
         color: "var(--color-accent)",
         border: "1px solid var(--color-accent)",
         background: "transparent",
-        minHeight: "2.25rem",
+        minHeight: "var(--touch-target-min)",
       }}
     >
       View details <span aria-hidden="true">→</span>

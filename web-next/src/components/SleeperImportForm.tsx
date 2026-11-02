@@ -54,7 +54,15 @@ const PLATFORM_OPTIONS: { label: string; value: LeaguePlatform }[] = [
  * lib/leaguePlatform.ts). Same component, same callers, so ESPN lives in
  * the existing onboarding and /connect-league flow rather than a new page.
  */
-export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueId: string, leagueName: string) => void }) {
+export function SleeperImportForm({
+  onLeagueChosen,
+  sampleCtaBelow = false,
+}: {
+  onLeagueChosen: (leagueId: string, leagueName: string) => void;
+  /** The caller already renders its own "Try a sample league" button under this
+   * form; skip the one the error state would add so the user never sees two. */
+  sampleCtaBelow?: boolean;
+}) {
   const [platform, setPlatform] = useState<LeaguePlatform>("sleeper");
   return (
     <div className="flex flex-col gap-3">
@@ -68,13 +76,19 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
         // key: switching platform resets the form (league id, preview, team pick).
         <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
       ) : (
-        <SleeperUsernameImport onLeagueChosen={onLeagueChosen} />
+        <SleeperUsernameImport onLeagueChosen={onLeagueChosen} sampleCtaBelow={sampleCtaBelow} />
       )}
     </div>
   );
 }
 
-function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: string, leagueName: string) => void }) {
+function SleeperUsernameImport({
+  onLeagueChosen,
+  sampleCtaBelow,
+}: {
+  onLeagueChosen: (leagueId: string, leagueName: string) => void;
+  sampleCtaBelow: boolean;
+}) {
   const { signInAsGuest, session } = useAuth();
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -333,7 +347,7 @@ function SleeperUsernameImport({ onLeagueChosen }: { onLeagueChosen: (leagueId: 
               , join or start a league, then come back here.
             </p>
           ) : null}
-          {connectError.offerSample ? <SampleLeagueButton surface="connect_error" /> : null}
+          {connectError.offerSample && !sampleCtaBelow ? <SampleLeagueButton surface="connect_error" /> : null}
         </div>
       ) : message ? (
         <div role="alert" className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-warning)" }}>

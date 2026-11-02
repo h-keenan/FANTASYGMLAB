@@ -25,7 +25,7 @@ export function ValuesCredit({ className = "" }: { className?: string }) {
         href={FANTASYCALC_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="underline"
+        className="underline tap-link"
         style={{ color: "var(--color-text-secondary)" }}
       >
         FantasyCalc

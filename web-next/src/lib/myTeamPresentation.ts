@@ -213,7 +213,7 @@ export { injuryTone } from "./injuryTone.generated";
 const INJURY_ABBREVIATIONS: Record<string, string> = {
   questionable: "Q",
   doubtful: "D",
-  out: "O",
+  out: "OUT",
   ir: "IR",
   "injured reserve": "IR",
   suspended: "SUS",
