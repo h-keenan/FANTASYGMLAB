@@ -6,6 +6,7 @@ from typing import Any, Iterable
 
 import pandas as pd
 
+from modules import injury_status as injury_table
 from modules import league_format_context, sleeper
 from modules.league_value_settings import _safe_positive_int
 from modules.platforms.sleeper import get_sleeper_adapter
@@ -1009,11 +1010,9 @@ def _player_note(row: pd.Series | dict, *, bucket: str, room_note: str = "") -> 
 
 
 def _is_injury_flag(row: pd.Series | dict) -> bool:
-    text = " ".join(
-        _safe_text(row.get(field)).lower()
-        for field in ("status", "injury_status", "injury_level")
-    )
-    return any(term in text for term in ("out", "ir", "pup", "questionable", "doubtful", "injur"))
+    if injury_table.category(_safe_text(row.get("status")), _safe_text(row.get("injury_status"))) != "healthy":
+        return True
+    return _safe_text(row.get("injury_level")).lower() in {"minor", "moderate", "major"}
 
 
 def _effective_need_positions(needs: list[str], rooms: dict[str, dict[str, Any]]) -> list[str]:

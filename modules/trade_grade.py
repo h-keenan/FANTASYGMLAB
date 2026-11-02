@@ -82,6 +82,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
+from modules import injury_status as injury_table
 from modules import model_status
 from modules.player_state_authority import is_suspended
 from modules.rankings import (
@@ -242,23 +243,12 @@ def season_window(
 
 # --- injury availability -----------------------------------------------------
 
-# Conservative documented defaults (weeks) for how long each Sleeper status
-# keeps a player out. None of these are return dates: Sleeper's
-# injury_start_date is empty for every rostered player, and no return
-# estimate exists anywhere in the players table.
-INJURY_STATUS_DEFAULT_WEEKS: dict[str, float] = {
-    "questionable": 0.25,
-    "doubtful": 1.0,
-    "out": 2.0,
-    "ir": 4.0,
-    "injured reserve": 4.0,
-    "pup": 4.0,
-    "physically unable to perform": 4.0,
-    "nfi": 4.0,
-    "non-football injury": 4.0,
-    "non football injury": 4.0,
-    "suspended": 3.0,
-}
+# Default weeks out per designation come from the one injury table
+# (modules.injury_status): none of these are return dates (Sleeper's
+# injury_start_date is empty for every rostered player and no return estimate
+# exists in the players table). For a single-game designation the weeks are
+# 1 - P(plays), the same fact the projections use as a play probability.
+INJURY_STATUS_DEFAULT_WEEKS: dict[str, float] = injury_table.default_weeks_by_key()
 SURGERY_MIN_WEEKS = 6.0
 SEASON_ENDING_TERMS = (
     "acl",
@@ -314,30 +304,24 @@ def estimate_injury_absence(
 
     status_text = _text(status)
     injury_text = _text(injury_status)
-    level = injury_level(status_text, injury_text)
-    if level == "healthy":
+    cls = injury_table.classify(status_text, injury_text)
+    if cls.category == "healthy":
         return None
-    if is_suspended(status_text, injury_text):
-        key, label = "suspended", "Suspended"
-    else:
-        key = injury_text.casefold() or status_text.casefold()
-        label = injury_text or status_text
-        if key not in INJURY_STATUS_DEFAULT_WEEKS:
-            if not injury_text:
-                # A bare roster status such as "Inactive" or "Practice
-                # Squad" is an indefinite, non-medical absence with no
-                # recovery window to price; the existing valuation handles it.
-                return None
-            # A real injury tag that is not one of the statuses above (e.g.
-            # "Reserve", "DNR"): use the default for its severity bucket.
-            key = {"major": "ir", "moderate": "out", "minor": "questionable"}.get(level, "")
-            if not key:
-                return None
-    weeks = INJURY_STATUS_DEFAULT_WEEKS[key]
+    if cls.weeks_out is None:
+        # A bare roster status such as "Inactive" or "Practice Squad" is an
+        # indefinite, non-medical absence with no recovery window to price;
+        # the existing valuation handles it.
+        return None
+    suspended = cls.suspended
+    # Show Sleeper's own wording for the field that decided the row.
+    label = "Suspended" if suspended else (
+        (injury_text if cls.source == "injury_status" else status_text) or cls.row.label
+    )
+    weeks = cls.weeks_out
     basis = f"default for {label}"
     detail = " ".join(_text(part).casefold() for part in (body_part, notes, injury_text))
     window = window or season_window()
-    season_ending = key != "suspended" and any(term in detail for term in SEASON_ENDING_TERMS)
+    season_ending = not suspended and any(term in detail for term in SEASON_ENDING_TERMS)
     if season_ending:
         weeks = float(window.remaining_weeks)
         basis = f"{_text(body_part) or 'injury'} reads season-ending"

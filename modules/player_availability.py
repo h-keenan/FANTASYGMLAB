@@ -13,26 +13,16 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
+from modules import injury_status
 from modules.news_signal import EVENT_INJURY
 
-# raw (lowercase) -> (label, severity). severity: "out" = not playing,
-# "doubt" = likely out, "question" = game-time, "other".
-_STATUSES: dict[str, tuple[str, str]] = {
-    "ir": ("Injured Reserve", "out"),
-    "injured reserve": ("Injured Reserve", "out"),
-    "out": ("Out", "out"),
-    "pup": ("Physically Unable to Perform", "out"),
-    "sus": ("Suspended", "out"),
-    "suspended": ("Suspended", "out"),
-    "doubtful": ("Doubtful", "doubt"),
-    "questionable": ("Questionable", "question"),
-    "dnr": ("Did Not Report", "out"),
-    "cov": ("COVID-19 list", "out"),
-    "na": ("Not Active", "other"),
-}
-
-_HEALTHY = {"", "none", "healthy", "active", "nan", "null"}
 NO_RETURN_DATE = "No return date reported"
+# Table ``kind`` -> the availability block's severity: "out" = not playing,
+# "doubt" = likely out, "question" = game-time, "other".
+_SEVERITY_BY_KIND = {
+    "reserve": "out", "season_ending": "out", "suspended": "out", "out": "out",
+    "game_time": "question", "not_active": "other",
+}
 
 
 def _text(value: Any) -> str:
@@ -50,10 +40,18 @@ def build_availability(
     """None for a healthy / unknown status, else the availability block."""
 
     raw = _text(status)
-    key = raw.lower()
-    if key in _HEALTHY:
+    if not raw:
         return None
-    label, severity = _STATUSES.get(key, (raw if len(raw) <= 40 else "", "other"))
+    row = injury_status.designation(raw)
+    if row is not None and not row.designation:
+        return None  # Healthy / Active
+    if row is not None:
+        label, severity = row.label, _SEVERITY_BY_KIND.get(row.kind, "other")
+        if row.kind == "game_time" and row.p_play <= injury_status.LIKELY_OUT_P_PLAY:
+            severity = "doubt"
+    else:
+        # A tag the table has no row for: show Sleeper's own words, never parsed.
+        label, severity = (raw if len(raw) <= 40 else ""), "other"
     if not label:
         return None
     return {

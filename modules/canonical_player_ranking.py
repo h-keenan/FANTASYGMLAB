@@ -14,6 +14,8 @@ from typing import Any, Iterable, Mapping, MutableMapping
 
 import pandas as pd
 
+from modules import injury_status as injury_table
+
 # Customer-facing format ids. Half-PPR is supported because league settings
 # and valuation multipliers already resolve it from Sleeper reception scoring.
 FORMAT_PPR = "PPR"
@@ -253,10 +255,9 @@ def _eligible_mask(frame: pd.DataFrame) -> pd.Series:
         .astype(str)
         .str.casefold()
     )
-    reserve_injury = injury.isin(
-        {"ir", "pup", "nfi", "out", "injured reserve", "physically unable to perform",
-         "non football injury", "non-football injury"}
-    )
+    reserve_injury = injury.map(
+        lambda tag: injury_table.classify("", tag).kind in ("reserve", "season_ending", "out")
+    ).astype(bool)
     eligible = eligible & (
         ~status.isin({"retired", "inactive", "not active", "excused"}) | reserve_injury
     )

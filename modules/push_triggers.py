@@ -31,6 +31,7 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
+from modules import injury_status as injury_table
 from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
 
 
@@ -791,7 +792,7 @@ def injury_status_push_items(
     """Push items for roster players carrying a real availability-risk status.
 
     Reuses the exact same Out/Doubtful/IR/etc. classification the Alerts
-    feed uses (modules.alert_presentation.UNAVAILABLE_INJURY_STATUSES) —
+    feed uses (modules.injury_status.is_unavailable) —
     "Questionable" is deliberately excluded (too common to be push-worthy;
     it stays visible in-app via Alerts, same as today). No history is
     stored: recommendation_id is keyed on (player, status), so the durable
@@ -812,7 +813,7 @@ def injury_status_push_items(
     for _, row in rows.iterrows():
         status_raw = _safe_text(row.get("injury_status"))
         status_norm = status_raw.strip().casefold()
-        if status_norm not in alert_presentation.UNAVAILABLE_INJURY_STATUSES:
+        if not injury_table.is_unavailable("", status_raw):
             continue
         player_id = _safe_text(row.get("player_id"))
         name = _safe_text(row.get("name"), "A player on your roster")
@@ -910,7 +911,7 @@ def lineup_lock_push_items(
             continue
         status_raw = _safe_text(row.get("injury_status"))
         status_norm = status_raw.casefold()
-        if status_norm in alert_presentation.UNAVAILABLE_INJURY_STATUSES and in_window(
+        if injury_table.is_unavailable("", status_raw) and in_window(
             _parse_dt(game.get("kickoff_at"))
         ):
             name = _safe_text(row.get("name"), "A starter")

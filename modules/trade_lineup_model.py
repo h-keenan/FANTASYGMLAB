@@ -44,7 +44,8 @@ import pandas as pd
 
 from modules import nfl_schedule, player_projections
 from modules.frame_records import frame_records
-from modules.rankings import age_multiplier, injury_level, is_ruled_out
+from modules.injury_status import category as injury_level, is_ruled_out
+from modules.rankings import age_multiplier
 from modules.team_eval import _lineup_slots, normalize_team_strategy
 from modules.trade_grade import (
     CURRENT_SEASON_VALUE_SHARE,

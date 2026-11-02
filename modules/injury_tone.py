@@ -17,18 +17,11 @@ replays these rows through it.
 
 from __future__ import annotations
 
-DANGER = (
-    "out", "o", "ir", "injured reserve", "doubtful", "d", "pup", "sus", "susp", "suspended",
-    "inactive", "nfi", "non-football injury", "covid", "covid-19",
-)
-WARNING = ("questionable", "q", "probable", "p", "day-to-day", "day to day", "dtd")
-SUCCESS = ("active", "healthy")
+from modules import injury_status
 
-TONE_BY_STATUS: dict[str, str] = {
-    **{s: "danger" for s in DANGER},
-    **{s: "warning" for s in WARNING},
-    **{s: "success" for s in SUCCESS},
-}
+# Derived from the one injury table (modules.injury_status): each row carries
+# its tone and the exact strings that map to it.
+TONE_BY_STATUS: dict[str, str] = dict(injury_status.TONE_BY_STATUS)
 
 GOLDEN = (
     ("Out", "danger"), ("OUT", "danger"), ("IR", "danger"), ("Injured Reserve", "danger"),

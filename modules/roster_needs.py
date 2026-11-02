@@ -4,6 +4,7 @@ from typing import Any
 
 import pandas as pd
 
+from modules import injury_status as injury_table
 from modules import runtime_trace
 
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
@@ -34,15 +35,6 @@ DEVELOPMENTAL_LABELS = {
     "prospect",
     "stash",
     "backup with upside",
-}
-UNAVAILABLE_STATUS_TERMS = {
-    "ir",
-    "out",
-    "inactive",
-    "pup",
-    "nfi",
-    "suspended",
-    "injured reserve",
 }
 
 
@@ -186,20 +178,7 @@ def _text(row, *fields: str) -> str:
 
 
 def _is_unavailable(row) -> bool:
-    status = _text(row, "status", "injury_status")
-    tokens = set(status.replace("/", " ").replace("-", " ").split())
-    return bool(
-        tokens.intersection({"ir", "pup", "nfi"})
-        or any(
-            term in status
-            for term in {
-                "out",
-                "inactive",
-                "suspended",
-                "injured reserve",
-            }
-        )
-    )
+    return injury_table.is_ruled_out(row.get("status"), row.get("injury_status"))
 
 
 def _is_developmental(row, position: str) -> bool:

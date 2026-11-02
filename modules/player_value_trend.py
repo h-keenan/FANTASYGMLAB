@@ -20,6 +20,8 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from modules import injury_status
+
 MIN_SIGNAL_SPAN_DAYS = 7
 SIGNAL_WINDOW_DAYS = 30
 # Rating points (0-99 badge) the value must have moved to count as a trend.
@@ -33,7 +35,6 @@ BUY_LOW_MAX_AGE = 29
 MIN_POSITION_POOL = 10
 MAX_PER_LIST = 10
 ELIGIBLE_POSITIONS = ("QB", "RB", "WR", "TE")
-OUT_STATUSES = {"out", "ir", "pup", "sus", "suspended"}
 
 METHOD_NOTE = (
     "Buy low: the value rating fell at least "
@@ -160,8 +161,7 @@ def compute_signals(
         trend = latest[pid] - baseline[pid]
         gap = float(row["_prod_pct"]) - float(row["_value_pct"])
         age = pd.to_numeric(row.get("age"), errors="coerce")
-        status = str(row.get("injury_status") or "").strip().lower()
-        if status in OUT_STATUSES:
+        if injury_status.is_ruled_out(row.get("status"), row.get("injury_status")):
             continue
         if trend <= -MIN_TREND_POINTS and gap >= MIN_GAP_PERCENTILE:
             signal = "buy_low"

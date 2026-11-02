@@ -12,6 +12,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
+from modules import injury_status as injury_table
 from modules import trust_enforcement as _trust_enforcement
 from modules import trust_engine as _trust_engine
 from modules.trust_enforcement import EnforcementLevel, enforce_player_record
@@ -56,15 +57,7 @@ CURRENT_STATUS_TERMS = {
 # "fall through instead of auto-disqualifying" intent silently never fires
 # for them (coridian_, 2026-10-19: "fix player identity joins... no
 # mismatched profiles" — this was one real cause).
-RESERVE_STATUS_TERMS = {
-    "injured reserve",
-    "ir",
-    "pup",
-    "nfi",
-    "physically unable to perform",
-    "non football injury",
-    "non-football injury",
-}
+RESERVE_STATUS_TERMS = set(injury_table.terms_for_kinds(("reserve",)))
 # Sleeper reports some rostered injured players as `status: "Inactive"` with
 # `injury_status: "IR"` (and `active: true`). The injury designation is the
 # reserve signal; a bare Inactive with no injury status stays excluded.
