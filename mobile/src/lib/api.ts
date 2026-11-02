@@ -1515,6 +1515,38 @@ export interface SharedCommunityTrade {
   mine: boolean;
 }
 
+/** modules/trade_posture.py: who the verdict thinks the user's team is. */
+export interface TradePosture {
+  key: "contender" | "fringe_contender" | "retool" | "rebuild" | "tank";
+  group: "contender" | "retool" | "rebuild";
+  label: string;
+  /** declared = Team Situation; auto = roster strength + record + age; client = default lens. */
+  source: "declared" | "auto" | "client";
+  confidence: number;
+  confidence_label: "high" | "medium" | "low";
+  rank: number | null;
+  league_size: number | null;
+  record: string;
+  standing: string;
+  /** One line: where this posture came from. */
+  why: string;
+}
+
+/** The posture's competitive-window and direction terms, in trade-score units. */
+export interface TradePostureAssessment {
+  available: boolean;
+  window_term: number;
+  direction_term: number;
+  present_term: number;
+  adjustment: number;
+  wins_delta: number;
+  lineup_points: number;
+  lineup_share: number;
+  lineup_costly: boolean;
+  direction: "toward_present" | "toward_future" | "neutral";
+  direction_misaligned: boolean;
+}
+
 /** available=false: storage not set up, hide the feed and the toggle. */
 export interface SharedCommunityTradesResponse {
   ok: boolean;
@@ -1553,6 +1585,11 @@ export interface TradeVerdict {
   // P(the direction of trade_score is right), 50-100.
   confidence_pct?: number | null;
   lineup_model?: TradeLineupModel | null;
+  /** Additive: absent on older servers. */
+  posture?: TradePosture | null;
+  /** One sentence naming the posture and the trade-off ("You're a contender (#2 of 12, 4-2): this costs ~90 lineup points..."). */
+  posture_note?: string;
+  posture_assessment?: TradePostureAssessment | null;
   // Real counter packages (modules/trade_offer_analyzer.py), verbatim.
   alternate_packages?: TradeAlternatePackage[];
   // Outcome of the counter search; 'none' = nothing better exists.

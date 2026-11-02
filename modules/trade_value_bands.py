@@ -32,6 +32,16 @@ VERDICT_COUNTER = "COUNTER"
 VERDICT_DECLINE = "DECLINE"
 VERDICT_HARD_DECLINE = "HARD DECLINE"
 
+# Posture-aware labels (modules.trade_posture). They are NOT rungs of the score
+# ladder: they replace an ACCEPT-looking market value when the team's posture
+# cost pulls the verdict score below an accept. ui_verdict/tone come from the
+# score band the trade actually lands in (FAIR or COUNTER), so old clients that
+# only know the four UI verdicts degrade to those and show this as the band note.
+VERDICT_VALUE_COSTS_LINEUP = "GOOD VALUE, COSTS YOUR LINEUP"
+VERDICT_VALUE_MOVES_REBUILD = "VALUE WIN, MOVES YOU TOWARD A REBUILD"
+VERDICT_VALUE_AGAINST_REBUILD = "VALUE WIN, AGAINST YOUR REBUILD"
+POSTURE_VERDICTS = (VERDICT_VALUE_COSTS_LINEUP, VERDICT_VALUE_MOVES_REBUILD, VERDICT_VALUE_AGAINST_REBUILD)
+
 UI_VERDICT_ACCEPT = "ACCEPT"
 UI_VERDICT_DECLINE = "DECLINE"
 UI_VERDICT_COUNTER = "COUNTER"

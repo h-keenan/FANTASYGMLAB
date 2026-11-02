@@ -32,7 +32,7 @@ import pandas as pd
 from modules import runtime_trace
 from modules.frame_records import frame_records
 from modules import trade_grade
-from modules import trade_lineup_impact, trade_lineup_model
+from modules import trade_lineup_impact, trade_lineup_model, trade_posture
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_display import _format_score
@@ -476,8 +476,10 @@ def evaluate_trade_analyzer_fit(
     *,
     current_context: dict | None = None,
     waiver_df: pd.DataFrame | None = None,
+    posture: dict | None = None,
 ) -> dict | None:
-    """``waiver_df``: the league's real free-agent pool (unrostered, valued
+    """``posture``: the team's resolved posture (``trade_posture.resolve_posture``);
+    defaults to the one implied by ``strategy`` alone. ``waiver_df``: the league's real free-agent pool (unrostered, valued
     like ``all_players_df``). Optional; without it the lineup model fills
     holes at the market replacement level and says so."""
 
@@ -514,7 +516,7 @@ def evaluate_trade_analyzer_fit(
     raw_value_delta = int(sum(score_asset_value(asset) for asset in receive_assets) - sum(score_asset_value(asset) for asset in send_assets))
     lineup_delta = int(round(float(post_snapshot["starter_score"]) - float(current_snapshot["starter_score"])))
 
-    strategy_key = normalize_team_strategy(strategy)
+    strategy_key = normalize_team_strategy((posture or {}).get("key") or strategy)
 
     # This-week lineup check on the REAL roster (byes + Out/IR honored): the
     # healthy-equivalent snapshot above deliberately ignores both, so it can
@@ -617,11 +619,24 @@ def evaluate_trade_analyzer_fit(
             )
         except Exception:
             lineup_model = None
+    team_posture = dict(posture) if posture else trade_posture.posture_from_strategy(strategy_key)
+    posture_assessment = trade_posture.assess(team_posture, lineup_model) if lineup_model is not None else None
     if lineup_model is not None:
         injury_value_adjustment = 0
         starter_adjustment = 0
         weekly_lineup_component = 0
-        trade_score = int(lineup_model["trade_score"])
+        # Competitive-window and direction terms (modules.trade_posture) sit on
+        # top of the lineup model's score; the components stay inspectable.
+        trade_score = int(lineup_model["trade_score"]) + int(posture_assessment["adjustment"])
+        lineup_model["components"]["posture_window"] = posture_assessment["window_term"]
+        lineup_model["components"]["posture_direction"] = posture_assessment["direction_term"]
+        lineup_model["components"]["posture_present"] = posture_assessment["present_term"]
+        lineup_model["trade_score_before_posture"] = int(lineup_model["trade_score"])
+        lineup_model["trade_score"] = trade_score
+        if posture_assessment["adjustment"]:
+            conf_pct, conf_label = trade_posture.adjusted_confidence(lineup_model, trade_score)
+            lineup_model["confidence_pct"] = conf_pct
+            lineup_model["confidence_label"] = conf_label
         value_delta = int(raw_value_delta + consolidation_adjustment)
         injury_value_adjustment = int(lineup_model["components"]["injury_value_restore"])
     else:
@@ -970,6 +985,15 @@ def evaluate_trade_analyzer_fit(
         net_positive = (
             trade_score >= 150 if lineup_model is not None else (value_delta >= 0 and fit_total >= 1)
         )
+        # Never "Helps" when the lineup cost is the contender's problem.
+        if posture_assessment and (
+            posture_assessment.get("lineup_costly")
+            or (
+                trade_posture.WINDOW_WIN_VALUE.get(strategy_key, 0) > 0
+                and posture_assessment.get("lineup_points", 0) <= -5
+            )
+        ):
+            net_positive = False
         if (critical_warnings and not (lineup_model is not None and trade_score >= 150)) or net_negative:
             # Net-negative: lead with the cost, never "Helps because" over a
             # negative value balance.
@@ -993,6 +1017,18 @@ def evaluate_trade_analyzer_fit(
         )
         lineup_summary = (warning_prefix + lineup_model["explanation"]).strip()
         explanation = f"{explanation} {lineup_model['explanation']}"
+    wk = (lineup_model or {}).get("weeks") or {}
+    posture_note = (
+        trade_posture.posture_sentence(
+            team_posture,
+            posture_assessment,
+            weeks_text=f"over Weeks {wk['first']}-{wk['last']}" if wk.get("count") else "",
+        )
+        if posture_assessment
+        else ""
+    )
+    if posture_note:
+        explanation = f"{posture_note} {explanation}"
 
     injury_summary_parts = []
     if injury_reinforcements:
@@ -1050,6 +1086,9 @@ def evaluate_trade_analyzer_fit(
         "value_delta": value_delta,
         "trade_score": trade_score,
         "lineup_model": lineup_model,
+        "posture": team_posture,
+        "posture_assessment": posture_assessment,
+        "posture_note": posture_note,
         "confidence_pct": (lineup_model or {}).get("confidence_pct"),
         "raw_value_delta": raw_value_delta,
         "value_adjustments": {
