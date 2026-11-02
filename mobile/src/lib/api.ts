@@ -480,6 +480,62 @@ export interface GamesWhatIfResponse {
   factors?: { label: string; detail: string }[];
 }
 
+export interface RatingHistoryPoint {
+  date: string;
+  rating: number;
+}
+
+export interface RatingHistoryResponse {
+  ok: boolean;
+  /** ok = 2+ real days; insufficient_history = 0-1 so far; unavailable = storage not readable. */
+  status: 'ok' | 'insufficient_history' | 'unavailable';
+  points: RatingHistoryPoint[];
+  span_days: number;
+  first_date?: string | null;
+  last_date?: string | null;
+  current_rating?: number | null;
+  /** First to last stored day. */
+  change?: { days: number; delta: number } | null;
+  /** 7/30-day changes, present only when a snapshot that old really exists. */
+  changes?: { days: number; delta: number; from_date: string }[];
+}
+
+export interface ValueSignalFactor {
+  label: string;
+  detail: string;
+}
+
+export interface ValueSignalItem {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  rating: number;
+  rating_change: number;
+  ppg: number | null;
+  games_played: number;
+  production_percentile: number;
+  value_percentile: number;
+  gap: number;
+  injury_status: string | null;
+  signal: 'buy_low' | 'sell_high';
+  factors: ValueSignalFactor[];
+}
+
+export interface ValueSignalsResponse {
+  ok: boolean;
+  /** history_building = fewer than min_span_days of snapshots; lists are empty. */
+  status: 'ok' | 'history_building' | 'unavailable';
+  span_days?: number;
+  min_span_days?: number;
+  latest_date?: string;
+  baseline_date?: string;
+  method?: string;
+  buy_low: ValueSignalItem[];
+  sell_high: ValueSignalItem[];
+}
+
 export interface TradeOddsPackageRequest {
   send_player_ids: string[];
   receive_player_ids: string[];
@@ -3566,6 +3622,9 @@ export const api = {
     const query = season != null ? `?season=${encodeURIComponent(String(season))}` : '';
     return authorizedFetch<WeeklyStatsResponse>(`/v1/players/${encodeURIComponent(playerId)}/weekly-stats${query}`);
   },
+  getPlayerRatingHistory: (playerId: string, days: number = 90) =>
+    authorizedFetch<RatingHistoryResponse>(`/v1/players/${encodeURIComponent(playerId)}/rating-history?days=${days}`),
+  getPlayerValueSignals: () => authorizedFetch<ValueSignalsResponse>('/v1/players/value-signals'),
   getPlayerCareer: (playerId: string) =>
     authorizedFetch<CareerResponse>(`/v1/players/${encodeURIComponent(playerId)}/career`),
   getPlayerSchedule: (playerId: string) =>

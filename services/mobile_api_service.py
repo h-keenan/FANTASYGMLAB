@@ -212,6 +212,7 @@ from modules import (
     player_availability,
     player_quick_view,
     player_rating_history,
+    player_value_trend,
     player_state_authority,
     players_refresh_flight,
     playoff_simulator,
@@ -9387,6 +9388,102 @@ def get_player_career(
             for season in resume.seasons
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Player value history (gap analysis #6): the daily 0-99 rating snapshots
+# (modules.player_rating_history, previously only the external bot's) read back
+# for signed-in users. Real stored days only; a short history is reported as
+# short (`span_days`), never padded.
+# ---------------------------------------------------------------------------
+
+_VALUE_SIGNALS_TTL_SECONDS = 3600
+
+
+@app.get("/v1/players/{player_id}/rating-history")
+def get_player_rating_history(
+    player_id: str,
+    days: int = 90,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Stored daily overall-rating snapshots for one player (ascending), the
+    series behind Player Quick View's value chart. `status`:
+    `ok` (2+ real days), `insufficient_history` (0-1 days so far) or
+    `unavailable` (snapshot storage not configured or unreadable)."""
+
+    if not 7 <= days <= 365:
+        raise HTTPException(status_code=422, detail="days must be between 7 and 365.")
+    config = player_rating_history.load_rating_snapshot_config()
+    if not config.configured:
+        return {"ok": True, "status": "unavailable", "points": [], "span_days": 0}
+    since = (datetime.now(timezone.utc).date() - timedelta(days=days)).isoformat()
+    rows = player_rating_history.fetch_rating_history(config, str(player_id), limit=days + 5)
+    points = player_value_trend.history_points(
+        [row for row in rows if str(row.get("snapshot_date") or "") >= since]
+    )
+    return {"ok": True, **player_value_trend.history_summary(points), "window_days": days}
+
+
+def _compute_value_signals() -> dict[str, Any]:
+    config = player_rating_history.load_rating_snapshot_config()
+    if not config.configured:
+        return {"ok": True, "status": "unavailable", "buy_low": [], "sell_high": []}
+    bounds = player_rating_history.fetch_snapshot_date_bounds(config)
+    if bounds is None:
+        return {"ok": True, "status": "history_building", "span_days": 0, "buy_low": [], "sell_high": []}
+    earliest, latest = bounds
+    latest_day = date.fromisoformat(latest)
+    available_span = (latest_day - date.fromisoformat(earliest)).days
+    building = {
+        "ok": True,
+        "status": "history_building",
+        "span_days": available_span,
+        "latest_date": latest,
+        "min_span_days": player_value_trend.MIN_SIGNAL_SPAN_DAYS,
+        "buy_low": [],
+        "sell_high": [],
+    }
+    baseline_date = player_rating_history.fetch_baseline_date(
+        config,
+        not_after=(latest_day - timedelta(days=player_value_trend.MIN_SIGNAL_SPAN_DAYS)).isoformat(),
+        not_before=(latest_day - timedelta(days=player_value_trend.SIGNAL_WINDOW_DAYS)).isoformat(),
+    )
+    if not baseline_date:
+        return building
+    latest_ratings = player_rating_history.fetch_snapshot_day(config, latest)
+    baseline_ratings = player_rating_history.fetch_snapshot_day(config, baseline_date)
+    if not latest_ratings or not baseline_ratings:
+        return {**building, "status": "unavailable"}
+    frame = player_rating_history.load_global_rating_pool(PLAYERS_DB_PATH)
+    signals = player_value_trend.compute_signals(
+        frame, latest_ratings, baseline_ratings, latest_date=latest, baseline_date=baseline_date
+    )
+    return {
+        "ok": True,
+        "status": "ok",
+        "latest_date": latest,
+        "baseline_date": baseline_date,
+        "span_days": (latest_day - date.fromisoformat(baseline_date)).days,
+        "method": player_value_trend.METHOD_NOTE,
+        **signals,
+    }
+
+
+@app.get("/v1/players/value-signals")
+def get_player_value_signals(_user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Buy-low / sell-high lists: value rating trend (stored snapshots) against
+    this season's production percentile. `status` `history_building` reports
+    the real span collected so far; the lists are empty until a snapshot at
+    least 7 days old exists. Cached for an hour (one shared computation)."""
+
+    return redis_cache.redis_single_flight_cache(
+        cache_key=redis_cache.build_cache_key(
+            "player_value_signals", datetime.now(timezone.utc).strftime("%Y%m%d%H")
+        ),
+        ttl_seconds=_VALUE_SIGNALS_TTL_SECONDS,
+        compute=_compute_value_signals,
+        lock_timeout_seconds=20.0,
+    )
 
 
 class AddGmTargetRequest(BaseModel):

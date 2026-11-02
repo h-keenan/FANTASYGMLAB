@@ -17,6 +17,8 @@ import PlayerTrendsPanel from './PlayerTrendsPanel';
 import SectionHeading from './SectionHeading';
 import SkeletonBlock, { SkeletonChart } from './SkeletonBlock';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
+import PlayerValueHistory from './PlayerValueHistory';
+import { ratingHistoryCaption } from '../lib/valueHistoryPresentation';
 import SubRatingRow from './SubRatingRow';
 import ToneBadge from './ToneBadge';
 import ValuesCredit from './ValuesCredit';
@@ -122,6 +124,15 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
     queryKey: [...queryKeys.playerQuickView(player.player_id), 'awards'],
     queryFn: () => api.getPlayerAwards(player.player_id),
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Value history (daily rating snapshots) is lazy and never gates the sheet.
+  const historyQuery = useQuery({
+    queryKey: queryKeys.playerRatingHistory(player.player_id),
+    queryFn: () => api.getPlayerRatingHistory(player.player_id),
+    enabled: detailQuery.isSuccess,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
   });
 
   // News is lazy and independent: it starts once the quick view has loaded
@@ -371,6 +382,11 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                 ) : null}
                 {/* Model is the last section, as on web: radar when every
                     axis has a rating, chip row otherwise. */}
+                {historyQuery.data && ratingHistoryCaption(historyQuery.data) ? (
+                  <Section title="Value history">
+                    <PlayerValueHistory history={historyQuery.data} />
+                  </Section>
+                ) : null}
                 {hasSubRatings ? (
                   <Section title="Model">
                     <ModelRadarChart ratings={subRatings} />
