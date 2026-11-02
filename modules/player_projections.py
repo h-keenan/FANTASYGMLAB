@@ -135,7 +135,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from modules import nfl_schedule, rankings, redis_cache, sleeper
+from modules import injury_status, nfl_schedule, rankings, redis_cache, sleeper
 
 # Positions with a real opponent-defense-strength-by-position signal (see
 # ``team_defense_points_allowed_by_position``). Kickers are deliberately
@@ -1016,14 +1016,15 @@ _V2_INTERVAL_Z_KNOTS: Dict[str, tuple] = {
     "TE": ((0.04, 1.04, 2.42, 5.08, 9.93), (-0.399, -0.717, -0.967, -1.178, -1.319), (1.0, 1.184, 1.152, 1.449, 1.276)),
     "K": ((7.19, 7.5, 7.69, 7.88, 8.19), (-1.105, -1.211, -0.989, -1.25, -1.271), (1.508, 1.215, 1.382, 1.35, 1.155)),
 }
-# Availability multipliers for the player's NEXT game. Out/IR/PUP/NFI/
-# Suspended are certain zeros; Doubtful/Questionable are prior-based play
-# probabilities (NOT backtested: Sleeper does not publish point-in-time injury
-# history, so these two cannot be validated and are flagged ``calibrated: False``).
-_V2_DOUBTFUL_MULTIPLIER = 0.15
-_V2_QUESTIONABLE_MULTIPLIER = 0.85
-# NFL injured reserve keeps a player out at least four games.
-_V2_RESERVE_MIN_GAMES_OUT = 4
+# Availability multipliers for the player's NEXT game come from the one injury
+# table (modules.injury_status): Out/IR/PUP/NFI/Suspended are certain zeros;
+# Doubtful/Questionable/Probable are prior-based play probabilities (NOT
+# backtested: Sleeper does not publish point-in-time injury history, so those
+# rows are flagged ``calibrated=False``). A reserve list keeps a player out at
+# least ``injury_status.RESERVE_MIN_GAMES_OUT`` games.
+_V2_DOUBTFUL_MULTIPLIER = injury_status.ROWS_BY_KEY["doubtful"].p_play
+_V2_QUESTIONABLE_MULTIPLIER = injury_status.ROWS_BY_KEY["questionable"].p_play
+_V2_RESERVE_MIN_GAMES_OUT = injury_status.RESERVE_MIN_GAMES_OUT
 
 
 def _interp(x: float, xs: tuple, ys: tuple) -> float:
@@ -1147,29 +1148,25 @@ def _availability_adjustment(player: Dict[str, Any], games_ahead: int) -> Dict[s
     status = str(player.get("status") or "")
     injury = str(player.get("injury_status") or "")
     label = rankings.injury_display_label(status, injury) or None
+    cls = injury_status.classify(status, injury)
     multiplier = 1.0
     reason = None
-    level = rankings.injury_level(status, injury)
-    suspended = rankings.is_suspended(status, injury)
-    reserve = level == "major" and not suspended
-    if rankings.is_ruled_out(status, injury):
-        if reserve:
-            if games_ahead < _V2_RESERVE_MIN_GAMES_OUT:
+    if cls.ruled_out:
+        if cls.kind in ("reserve", "season_ending", "inactive"):
+            if games_ahead < injury_status.RESERVE_MIN_GAMES_OUT:
                 multiplier, reason = 0.0, "reserve_list"
         elif games_ahead == 0:
-            multiplier, reason = 0.0, "suspended" if suspended else "ruled_out"
-    elif games_ahead == 0 and level == "moderate":
-        multiplier, reason = _V2_DOUBTFUL_MULTIPLIER, "doubtful"
-    elif games_ahead == 0 and injury.strip().casefold() == "questionable":
-        multiplier, reason = _V2_QUESTIONABLE_MULTIPLIER, "questionable"
+            multiplier, reason = 0.0, "suspended" if cls.suspended else "ruled_out"
+    elif games_ahead == 0 and cls.p_play < 1.0:
+        multiplier, reason = cls.p_play, cls.row.key if cls.row.key != "unknown" else "questionable"
     return {
         "injury_label": label,
         "multiplier": multiplier,
         "reason": reason,
         "applied": multiplier != 1.0,
-        # Zeros for confirmed-out statuses are certain; Doubtful/Questionable
+        # Zeros for confirmed-out statuses are certain; game-time probabilities
         # are priors that could not be backtested (no point-in-time injury data).
-        "calibrated": reason in (None, "reserve_list", "ruled_out", "suspended"),
+        "calibrated": reason is None or cls.row.calibrated,
     }
 
 

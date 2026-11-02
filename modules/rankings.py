@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Sequence
 import numpy as np
 import pandas as pd
 
+from modules import injury_status as injury_status_table
 from modules import performance
 from modules import player_hydrate_stages
 from modules import public_player_snapshot
@@ -38,7 +39,7 @@ from modules.player_eligibility import (
     filter_current_fantasy_players,
     player_eligibility,
 )
-from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES, is_suspended
+from modules.player_state_authority import is_suspended
 from modules.sleeper import (
     get_players,
     get_prior_season_player_stats,
@@ -2631,124 +2632,29 @@ def injury_level(status: str, injury_status: str = "") -> str:
     )
 
 
-# Sleeper roster-level `status` values that player_state_authority.py's
-# NFL_NON_ACTIONABLE_STATUSES also treats as fully non-actionable, reused
-# here (rather than re-invented) so this value column and waiver_actionability
-# never disagree about which literal status strings mean "can't play."
-# Deliberately a narrow subset of that set, not the whole thing:
-# - "out" is excluded on purpose: is_ruled_out() below already gives a
-#   literal "Out" token a hard ruling via its own token check, while
-#   grouping it with "Doubtful" at the "moderate" severity bucket here is
-#   intentional (see is_ruled_out()'s docstring) — promoting it to "major"
-#   would silently change that designed split.
-# - "retired"/"historical"/"historical only"/"deceased" describe players no
-#   longer in the league (filter_current_fantasy_players already excludes
-#   them upstream), which is a different question from injury severity.
-_MAJOR_NFL_STATUS_VALUES = {"inactive", "practice squad"}
-assert _MAJOR_NFL_STATUS_VALUES <= NFL_NON_ACTIONABLE_STATUSES, (
-    "rankings._MAJOR_NFL_STATUS_VALUES drifted from player_state_authority's "
-    "canonical NFL_NON_ACTIONABLE_STATUSES"
-)
-
-
 @lru_cache(maxsize=4096)
 def _injury_level_cached(status: str, injury_status: str) -> str:
-    # "na"/"n/a" are Sleeper's real `injury_status` spelling for "no injury
-    # designation" (confirmed against data/sleeper_players.json: 96 real
-    # rostered players, e.g. Kaleb McGary, carry literal injury_status "NA"
-    # with no injury_notes/injury_start_date) — not a severity level. Without
-    # this, these genuinely healthy players fell through to the "minor"
-    # catch-all below.
-    healthy_markers = {"", "none", "healthy", "active", "na", "n/a"}
-    major_terms = {
-        "injured reserve",
-        "ir",
-        "reserve",
-        "pup",
-        "nfi",
-        "physically unable to perform",
-        "non-football injury",
-        "non football injury",
-        "season-ending",
-        "season ending",
-        "out for season",
-        "out for the season",
-        "torn acl",
-        "torn achilles",
-    }
-    moderate_terms = {"out", "doubtful"}
-    minor_terms = {"questionable", "probable", "limited", "day-to-day"}
-
-    def has_term(text: str, terms: set[str]) -> bool:
-        return any(term in text for term in terms if term)
-
-    if status in _MAJOR_NFL_STATUS_VALUES:
-        return "major"
-    if status in major_terms or has_term(status, major_terms) or has_term(injury_status, major_terms):
-        return "major"
-    if status in moderate_terms or has_term(status, moderate_terms) or has_term(injury_status, moderate_terms):
-        return "moderate"
-    if status in minor_terms or has_term(status, minor_terms) or has_term(injury_status, minor_terms):
-        return "minor"
-    # Suspension (Sleeper's real `injury_status` "Sus" — confirmed against
-    # data/sleeper_players.json, 2026-10-19 valuation-system audit) is
-    # scheduled, known-duration unavailability, not injury-recovery
-    # uncertainty — functionally the same "fully out for a known/bounded
-    # time" fact as the IR/PUP/NFI statuses in major_terms above, so it gets
-    # the same "major" severity for every numeric/boolean consumer here
-    # (injury_multiplier's discount, is_ruled_out(), risk_multiplier(),
-    # waiver_actionability()'s sibling check in player_state_authority.py).
-    # It is deliberately NOT folded into major_terms itself, because that set
-    # is reused verbatim as free-text injury wording in several callers
-    # (trade_hub_presentation.py's trade_asset_injury_context(), player_cards.py's
-    # injury_value_impact(), chat.py's trade narrative) — those call
-    # is_suspended() directly to say "Suspended" instead of "injury", and
-    # injury_display_label() below does the same for its raw tag. Without
-    # this check "Sus" fell through to the generic "minor" catch-all,
-    # alongside things like day-to-day soreness.
-    if is_suspended(status, injury_status):
-        return "major"
-    if injury_status and injury_status not in healthy_markers:
-        return "minor"
-    return "healthy"
-
-
-def _has_out_token(text: str) -> bool:
-    """True when `text` contains "out" as a whole word.
-
-    Token-level, not substring: "Doubtful" must not read as ruled out, and
-    neither must any future status string that merely spells "out" inside a
-    longer word.
-    """
-
-    return "out" in str(text or "").lower().replace("-", " ").replace("/", " ").split()
+    # Severity bucket from the one injury table (modules.injury_status):
+    # whole-word matching, one row per Sleeper designation, "Sus" / "NA" / "DNR"
+    # and the roster statuses all decided there rather than here.
+    return injury_status_table.category(status, injury_status)
 
 
 def is_ruled_out(status: str, injury_status: str = "") -> bool:
     """True when a player is confirmed unavailable, not merely uncertain.
 
-    Built on injury_level() so the app keeps ONE injury vocabulary rather
-    than growing a second, rival classification:
-
-    - "major" (IR / PUP / NFI / season-ending) is always ruled out.
-    - injury_level groups a flat "Out" with "Doubtful" as "moderate", but
-      only the first is an actual ruling — so a literal "Out" token in
-      either status field is ruled out, and "Doubtful" is not.
-    - "Questionable" / "Probable" / "Doubtful" stay startable: they are
-      genuinely uncertain, and auto-benching them would take a real
-      judgement call away from the GM.
+    Straight from the injury table's ``ruled_out`` column (IR / PUP / NFI /
+    suspended / inactive / a flat "Out" are; "Doubtful", "Questionable" and
+    "Probable" are not): they stay startable because they are genuinely
+    uncertain, and auto-benching them would take a real judgement call away
+    from the GM.
 
     This is the availability question ("can they play at all this week?"),
     deliberately separate from the value question every score column
     answers.
     """
 
-    level = injury_level(status, injury_status)
-    if level == "major":
-        return True
-    if level != "moderate":
-        return False
-    return _has_out_token(status) or _has_out_token(injury_status)
+    return injury_status_table.is_ruled_out(status, injury_status)
 
 
 def injury_display_label(status: str, injury_status: str = "") -> str:
@@ -2777,14 +2683,7 @@ def injury_display_label(status: str, injury_status: str = "") -> str:
 
 
 def injury_multiplier(status: str, injury_status: str = "") -> float:
-    level = injury_level(status, injury_status)
-    if level == "major":
-        return 0.68
-    if level == "moderate":
-        return 0.80
-    if level == "minor":
-        return 0.95
-    return 1.0
+    return injury_status_table.DYNASTY_VALUE_MULTIPLIER.get(injury_level(status, injury_status), 1.0)
 
 
 # Dynasty-aware injury discount: a season-ending injury costs a 23-year-old
@@ -2813,12 +2712,7 @@ def injury_multiplier_for_age(status: str, injury_status: str = "", age=None) ->
 
 
 def injury_risk_score(status: str, injury_status: str = "") -> float:
-    level = injury_level(status, injury_status)
-    if level == "major":
-        return 2.0
-    if level in {"moderate", "minor"}:
-        return 1.0
-    return 0.0
+    return injury_status_table.RISK_SCORE.get(injury_level(status, injury_status), 0.0)
 
 
 def non_injury_risk_multiplier(status: str, team: str, search_rank) -> float:
@@ -2875,15 +2769,7 @@ def current_availability_multiplier(status: str, team: str, search_rank, injury_
     if rank >= UNRANKED_SEARCH_RANK:
         base_risk = min(base_risk, 0.80)
 
-    level = injury_level(status, injury_status)
-    if level == "major":
-        injury_risk = 0.42
-    elif level == "moderate":
-        injury_risk = 0.72
-    elif level == "minor":
-        injury_risk = 0.93
-    else:
-        injury_risk = 1.0
+    injury_risk = injury_status_table.CURRENT_SEASON_MULTIPLIER.get(injury_level(status, injury_status), 1.0)
     return min(base_risk, injury_risk)
 
 
@@ -5596,21 +5482,7 @@ def is_probably_stale_free_agent(row) -> bool:
         return False
 
     status = str(row.get("status") or "").strip().lower()
-    if status and status not in {
-        "active",
-        "questionable",
-        "probable",
-        "doubtful",
-        "out",
-        "injured reserve",
-        "ir",
-        "pup",
-        "nfi",
-        "physically unable to perform",
-        "non-football injury",
-        "non football injury",
-        "practice squad",
-    }:
+    if status and status not in PLAYABLE_OR_INJURED_STATUSES:
         return True
 
     age = row.get("age")

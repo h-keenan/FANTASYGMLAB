@@ -11,6 +11,7 @@ import time
 from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+from modules import injury_status as injury_table
 from modules import news_intelligence as ni
 from modules import news_signal
 
@@ -27,19 +28,8 @@ TOAST_HIGH = "high"
 TOAST_IMPORTANT = "important"
 TOAST_INFORMATIONAL = "informational"
 
-UNAVAILABLE_INJURY_STATUSES = frozenset(
-    {
-        "ir",
-        "pup",
-        "nfi",
-        "out",
-        "injured reserve",
-        "injured_reserve",
-        "doubtful",
-        "suspension",
-        "suspended",
-    }
-)
+# "Unavailable" (Out / Doubtful / IR / PUP / NFI / Suspended / ...) is decided
+# by the one injury table, not a local word list.
 _MY_REL = frozenset({"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"})
 
 
@@ -564,9 +554,8 @@ def relevance_score(row: Mapping[str, Any]) -> int:
     return score
 
 
-def _status_unavailable(value: object) -> bool:
-    text = str(value or "").strip().casefold()
-    return any(token in text for token in UNAVAILABLE_INJURY_STATUSES)
+def _status_unavailable(status: object, injury_status: object = "") -> bool:
+    return injury_table.is_unavailable(status, injury_status)
 
 
 def _player_row(frame: Any, player_id: str) -> Any | None:
@@ -631,13 +620,10 @@ def teammate_opportunity_from_structured(
         ni.FT_INJURY_SEVERITY_UPDATE,
     }
     if event_row is not None and not event_unavailable:
-        blob = " ".join(
-            (
-                str(event_row.get(injury_col) or "") if injury_col else "",
-                str(event_row.get(status_col) or "") if status_col else "",
-            )
+        event_unavailable = _status_unavailable(
+            str(event_row.get(status_col) or "") if status_col else "",
+            str(event_row.get(injury_col) or "") if injury_col else "",
         )
-        event_unavailable = _status_unavailable(blob)
     peers = players_df[
         (players_df["player_id"].astype(str).isin(mine))
         & (players_df[team_col].astype(str).str.upper() == team.upper())
@@ -825,13 +811,10 @@ def structured_roster_impact(
             injury_col = "injury_status" if "injury_status" in frame.columns else ""
             status_col = "status" if "status" in frame.columns else ""
             for _, row in peers.iterrows():
-                blob = " ".join(
-                    (
-                        str(row.get(injury_col) or "") if injury_col else "",
-                        str(row.get(status_col) or "") if status_col else "",
-                    )
-                )
-                if _status_unavailable(blob):
+                if _status_unavailable(
+                    str(row.get(status_col) or "") if status_col else "",
+                    str(row.get(injury_col) or "") if injury_col else "",
+                ):
                     unavailable += 1
         if unavailable:
             pos_label = my_pos or "position"

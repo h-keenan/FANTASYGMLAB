@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 import pandas as pd
 
+from modules import injury_status as _injury_table
 from modules.frame_records import frame_records
 from modules.player_eligibility import (
     FREE_AGENT_TEAM_MARKERS,
@@ -80,7 +81,9 @@ _NFL_NON_ACTIONABLE_STATUSES = NFL_NON_ACTIONABLE_STATUSES  # internal alias, ke
 # "Suspended", even though _NFL_ACTIONABLE_STATUSES above already lists it
 # defensively. is_suspended() below checks both fields so this stays correct
 # if that ever changes.
-SUSPENDED_INJURY_STATUS_TERMS = frozenset({"sus", "suspended", "suspension"})
+SUSPENDED_INJURY_STATUS_TERMS = frozenset(
+    alias for row in _injury_table.ROWS if row.kind == "suspended" for alias in row.aliases
+)
 
 
 def is_suspended(status: object, injury_status: object = "") -> bool:
@@ -92,10 +95,7 @@ def is_suspended(status: object, injury_status: object = "") -> bool:
     never drift apart on what counts.
     """
 
-    return (
-        _text(injury_status).casefold() in SUSPENDED_INJURY_STATUS_TERMS
-        or _text(status).casefold() in SUSPENDED_INJURY_STATUS_TERMS
-    )
+    return _injury_table.is_suspended(_text(status), _text(injury_status))
 
 
 def _text(value: object) -> str:

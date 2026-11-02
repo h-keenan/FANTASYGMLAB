@@ -34,6 +34,7 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from modules import injury_status as injury_table
 from modules import (
     league_value_settings,
     player_eligibility,
@@ -528,7 +529,7 @@ def gen_injury_stash(ctx: Context) -> list[dict]:
     window = trade_grade.season_window(ctx.settings)
     for _, r in pool[(pool["v"] >= 2000) & (pool["age"] <= 27)].iterrows():
         status = _text(r.get("injury_status"))
-        if status not in ("IR", "Out", "PUP"):
+        if injury_table.classify("", status).kind not in ("reserve", "out"):
             continue
         absence = trade_grade.estimate_injury_absence(
             r.get("status"), status, body_part=r.get("injury_body_part"), notes=r.get("injury_notes"), window=window

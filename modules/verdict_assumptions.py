@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from modules import team_eval, trade_grade
+from modules import injury_status, team_eval, trade_grade
 
 # Display order and labels for the lineup model's per-player estimate sources
 # (modules.trade_lineup_model basis_counts keys).
@@ -51,7 +51,7 @@ def _weeks(value: float) -> str:
 
 
 def _injury_timing() -> str:
-    defaults = trade_grade.INJURY_STATUS_DEFAULT_WEEKS
+    defaults = injury_status.default_weeks_by_key()
     shown = [f"{label} {_weeks(defaults[key])}" for key, label in _INJURY_DISPLAY if key in defaults]
     return f"estimated by designation ({', '.join(shown)} weeks), not from return dates"
 

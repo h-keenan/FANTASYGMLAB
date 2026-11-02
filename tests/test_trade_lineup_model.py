@@ -13,7 +13,7 @@ from dataclasses import replace
 import pandas as pd
 import pytest
 
-from modules import nfl_schedule, trade_analyzer_fit, trade_grade, trade_lineup_model as model, trade_offer_analyzer
+from modules import injury_status, nfl_schedule, trade_analyzer_fit, trade_grade, trade_lineup_model as model, trade_offer_analyzer
 
 SETTINGS = {
     "league_format": "Dynasty",
@@ -175,7 +175,8 @@ def test_injured_starter_prices_missed_weeks_in_points():
 
 
 def test_questionable_starter_is_enumerated_exactly_not_rounded():
-    # One Questionable RB (0.25 expected weeks missed => 75% to play Week 8).
+    # One Questionable RB: the injury table's P(plays) (0.85) is the same fact as
+    # its expected weeks missed (0.15), so Week 8 availability is that probability.
     roster = [_row("QB1", "QB", 6000, ppg=20), _row("RBq", "RB", 5000, ppg=15, injury="Questionable"),
               _row("RBb", "RB", 3000, ppg=9), _row("WR1", "WR", 6000, ppg=16), _row("WR2", "WR", 5000, ppg=13),
               _row("WR3", "WR", 4000, ppg=11), _row("TE1", "TE", 4000, ppg=9)]
@@ -186,14 +187,15 @@ def test_questionable_starter_is_enumerated_exactly_not_rounded():
     players = model.profile_roster(df, ctx)
     b, _a, meta = model.run_weeks(players, players, ctx, weeks=[8])
     rbq = next(p for p in players if p.player_id == "RBq")
-    assert rbq.availability(8, 8) == pytest.approx(0.75)
+    assert rbq.availability(8, 8) == pytest.approx(injury_status.ROWS_BY_KEY["questionable"].p_play)
     healthy = [replace(p, absence=None) for p in players]
     plays = model.run_weeks(healthy, healthy, ctx, weeks=[8])[0].expected
     sits_roster = [p for p in players if p.player_id != "RBq"]
     sits = model.run_weeks(sits_roster, sits_roster, ctx, weeks=[8])[0].expected
     assert sits < plays
     # Exactly the probability-weighted mix of the two real lineups.
-    assert b.expected == pytest.approx(0.75 * plays + 0.25 * sits)
+    p_play = injury_status.ROWS_BY_KEY["questionable"].p_play
+    assert b.expected == pytest.approx(p_play * plays + (1 - p_play) * sits)
     # Identical rosters: the delta is exactly 0 in every scenario.
     assert meta["avail_variance"] == pytest.approx(0.0)
 
