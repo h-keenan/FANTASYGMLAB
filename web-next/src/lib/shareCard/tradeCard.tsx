@@ -27,7 +27,7 @@ import {
   glassStyle,
   initials,
 } from "./frame";
-import { TRADE_SHARE_COPY } from "./tradeCopy";
+import { TRADE_SHARE_COPY, plainTradeWhy } from "./tradeCopy";
 import { SHARE_TOKEN_HEX as T, resolveTokenColor, shareRadius, withAlpha } from "./tokens";
 import { BRAND_DOMAIN, BRAND_NAME } from "@/lib/brand";
 
@@ -61,14 +61,6 @@ export function confidenceBars(label: string | null | undefined): 1 | 2 | 3 | nu
   return null;
 }
 
-/** Trim the rationale at a word boundary so the clamp never cuts mid-word. */
-export function clampText(text: string, max: number): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  const cut = clean.slice(0, max);
-  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20)).replace(/[\s,.;:-]+$/, "")}…`;
-}
-
 function PickPlate({ asset, size }: { asset: TradeAsset; size: number }) {
   // Same plate as the in-app pick tile: accent-soft square, round label.
   return (
@@ -98,10 +90,10 @@ type Side = "send" | "get";
 const SIDE_COLOR: Record<Side, string> = { send: T["--color-danger"], get: T["--color-success"] };
 const SIDE_TINT: Record<Side, string> = { send: T["--color-danger-soft"], get: T["--color-success-soft"] };
 
-function AssetRow({ asset, side, size, headshot, compact }: { asset: TradeAsset; side: Side; size: number; headshot: string | null; compact: boolean }) {
+function AssetRow({ asset, side, size, headshot, compact, tall }: { asset: TradeAsset; side: Side; size: number; headshot: string | null; compact: boolean; tall: boolean }) {
   const isPick = asset.asset_type === "pick";
-  const nameSize = compact ? Math.round(size * 0.3) : size >= 180 ? 36 : size >= 130 ? 31 : 25;
-  const metaSize = compact ? Math.round(size * 0.24) : size >= 130 ? 22 : 18;
+  const nameSize = tall ? 40 : compact ? Math.round(size * 0.3) : size >= 180 ? 36 : size >= 130 ? 31 : 25;
+  const metaSize = tall ? 26 : compact ? Math.round(size * 0.24) : size >= 130 ? 22 : 18;
   const value = formatValue(asset.score);
   const meta: string[] = [];
   if (isPick) {
@@ -111,27 +103,46 @@ function AssetRow({ asset, side, size, headshot, compact }: { asset: TradeAsset;
     meta.push(asset.team || "FA");
     if (asset.age) meta.push(`Age ${asset.age}`);
   }
-  const avatar = compact ? Math.round(size * 0.7) : Math.min(92, Math.round(size * 0.55));
+  const avatar = tall ? 150 : compact ? Math.round(size * 0.7) : Math.min(size >= 180 ? 112 : 92, Math.round(size * 0.55));
   const nameText = isPick ? pickTitle(asset) : asset.name || "Unknown player";
+  const ringSize = tall ? 84 : compact ? Math.round(size * 0.5) : size >= 130 ? 68 : size >= 112 ? 56 : 46;
+  const frame = {
+    display: "flex",
+    flexGrow: 1,
+    minHeight: size,
+    borderRadius: shareRadius("--radius-md"),
+    backgroundColor: SIDE_TINT[side],
+    border: `1.5px solid ${withAlpha(SIDE_COLOR[side], 0.35)}`,
+  } as const;
+  const lead = isPick ? <PickPlate asset={asset} size={avatar} /> : <ShareAvatar src={headshot} tier={asset.tier} size={avatar} fallbackText={initials(asset.name)} />;
+  const badge = isPick ? null : <SharePositionBadge position={asset.position} size={Math.round(metaSize * 0.85)} />;
+  if (tall) {
+    // One player on a side: a centered portrait card that fills the column.
+    return (
+      <div style={{ ...frame, flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "26px 18px" }}>
+        {lead}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, minWidth: 0, maxWidth: "100%" }}>
+          <div style={{ display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.1, textAlign: "center", lineClamp: 2 }}>{nameText}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: metaSize, fontWeight: 600, color: T["--color-text-muted"] }}>
+            {badge}
+            <span style={{ display: "block", whiteSpace: "nowrap" }}>{meta.join(" \u00b7 ")}</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          {isPick ? null : <ShareOvrRing rating={asset.overall_rating} size={ringSize} />}
+          {value ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              <div style={{ ...eyebrowStyle(T["--color-text-muted"], 15), letterSpacing: "0.14em" }}>{TRADE_SHARE_COPY.value}</div>
+              <div style={{ display: "flex", fontSize: 40, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        flexGrow: 1,
-        minHeight: size,
-        padding: `0 ${compact ? 12 : 14}px`,
-        borderRadius: shareRadius("--radius-md"),
-        backgroundColor: SIDE_TINT[side],
-        border: `1.5px solid ${withAlpha(SIDE_COLOR[side], 0.35)}`,
-      }}
-    >
-      {isPick ? (
-        <PickPlate asset={asset} size={avatar} />
-      ) : (
-        <ShareAvatar src={headshot} tier={asset.tier} size={avatar} fallbackText={initials(asset.name)} />
-      )}
+    <div style={{ ...frame, alignItems: "center", gap: 14, padding: `0 ${compact ? 12 : 16}px` }}>
+      {lead}
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 6 }}>
         <div
           style={
@@ -143,16 +154,16 @@ function AssetRow({ asset, side, size, headshot, compact }: { asset: TradeAsset;
           {nameText}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: metaSize, fontWeight: 600, color: T["--color-text-muted"] }}>
-          {isPick ? null : <SharePositionBadge position={asset.position} size={Math.round(metaSize * 0.85)} />}
+          {badge}
           <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.join(" \u00b7 ")}</span>
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
-        {isPick ? null : <ShareOvrRing rating={asset.overall_rating} size={compact ? Math.round(size * 0.5) : size >= 130 ? 68 : size >= 112 ? 56 : 46} />}
+        {isPick ? null : <ShareOvrRing rating={asset.overall_rating} size={ringSize} />}
         {compact || !value ? null : (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
             <div style={{ ...eyebrowStyle(T["--color-text-muted"], 13), letterSpacing: "0.14em" }}>{TRADE_SHARE_COPY.value}</div>
-            <div style={{ display: "flex", fontSize: 24, fontWeight: 800, lineHeight: 1.05 }}>{value}</div>
+            <div style={{ display: "flex", fontSize: 26, fontWeight: 800, lineHeight: 1.05 }}>{value}</div>
           </div>
         )}
       </div>
@@ -173,6 +184,7 @@ function ExchangePanel({
   maxRows,
   headshots,
   compact,
+  tall,
 }: {
   label: string;
   side: Side;
@@ -182,6 +194,7 @@ function ExchangePanel({
   maxRows: number;
   headshots: Record<string, string | null>;
   compact: boolean;
+  tall: boolean;
 }) {
   const shown = assets.slice(0, maxRows);
   const hidden = assets.length - shown.length;
@@ -192,7 +205,7 @@ function ExchangePanel({
           <div style={{ display: "flex", width: compact ? 12 : 16, height: compact ? 12 : 16, borderRadius: 16, backgroundColor: SIDE_COLOR[side] }} />
           <div style={{ ...eyebrowStyle(T["--color-text-secondary"], compact ? 18 : 24), letterSpacing: "0.16em" }}>{label}</div>
         </div>
-        <div style={{ display: "flex", fontSize: compact ? 28 : 40, fontWeight: 900, lineHeight: 1, color: T["--color-text-secondary"] }}>{formatValue(total) || "0"}</div>
+        <div style={{ display: "flex", fontSize: compact ? 28 : 44, fontWeight: 900, lineHeight: 1, color: T["--color-text-primary"] }}>{formatValue(total) || "0"}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, gap: compact ? 8 : 12 }}>
         {shown.map((asset, index) => (
@@ -202,6 +215,7 @@ function ExchangePanel({
             side={side}
             size={rowSize}
             compact={compact}
+            tall={tall}
             headshot={asset.player_id ? headshots[asset.player_id] ?? null : null}
           />
         ))}
@@ -256,29 +270,58 @@ function VerdictBlock({ idea, compact, includeWhy, why }: { idea: TradeIdea; com
   const balanceColor = gain > 0 ? T["--color-success"] : gain < 0 ? T["--color-danger"] : T["--color-text-secondary"];
   const lowConfidence = (idea.confidence_label || "").trim().toLowerCase() === "low";
   const hasWhy = includeWhy && Boolean(why);
+  if (!compact) {
+    // One verdict block: chip + confidence on the left, the Balance number
+    // on the right, then the plain-English why across the full width.
+    return (
+      <div style={{ ...glassStyle(), flexDirection: "column", flexShrink: 0, minWidth: 0, padding: "24px 34px", gap: 18, border: `2px solid ${withAlpha(T["--color-accent"], 0.4)}` }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 16 }}>
+            {band ? <ShareChip label={band} color={bandColor} size={38} /> : null}
+            <ConfidenceMeter label={idea.confidence_label} size={20} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <div style={{ ...eyebrowStyle(T["--color-text-muted"], 22), letterSpacing: "0.16em" }}>{TRADE_SHARE_COPY.balance}</div>
+            <div style={{ display: "flex", fontSize: 84, fontWeight: 900, lineHeight: 1, color: balanceColor }}>{formatTradeGain(gain)}</div>
+          </div>
+        </div>
+        {hasWhy ? (
+          <>
+            <div style={{ display: "flex", height: 2, backgroundColor: T["--color-border"] }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ ...eyebrowStyle(T["--color-accent"], 22), letterSpacing: "0.18em" }}>Why</div>
+              <div style={{ display: "block", fontSize: 30, fontWeight: 600, lineHeight: 1.22, color: T["--color-text-primary"] }}>{why}</div>
+              {lowConfidence ? <div style={{ display: "block", fontSize: 22, fontWeight: 600, lineHeight: 1.2, color: T["--color-warning"] }}>{LOW_CONFIDENCE_USER_NOTE}</div> : null}
+            </div>
+          </>
+        ) : lowConfidence ? (
+          <div style={{ display: "block", fontSize: 22, fontWeight: 600, lineHeight: 1.2, color: T["--color-warning"] }}>{LOW_CONFIDENCE_USER_NOTE}</div>
+        ) : null}
+      </div>
+    );
+  }
   return (
-    <div style={{ ...glassStyle(), flexGrow: compact ? 1 : 0, flexShrink: 1, flexBasis: compact ? 0 : "auto", minWidth: 0, alignItems: "stretch", padding: compact ? "14px 22px" : "26px 30px", gap: compact ? 22 : 28, border: `2px solid ${withAlpha(T["--color-accent"], 0.4)}` }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 14, flexShrink: 0, width: hasWhy ? (compact ? 330 : 400) : "100%" }}>
+    <div style={{ ...glassStyle(), flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, alignItems: "stretch", padding: "14px 22px", gap: 22, border: `2px solid ${withAlpha(T["--color-accent"], 0.4)}` }}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, flexShrink: 0, width: hasWhy ? 330 : "100%" }}>
         {band ? (
           <div style={{ display: "flex" }}>
-            <ShareChip label={band} color={bandColor} size={compact ? 22 : 34} />
+            <ShareChip label={band} color={bandColor} size={22} />
           </div>
         ) : null}
         <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-          <div style={{ ...eyebrowStyle(T["--color-text-muted"], compact ? 16 : 22), letterSpacing: "0.14em" }}>{TRADE_SHARE_COPY.balance}</div>
-          <div style={{ display: "flex", fontSize: compact ? 40 : 64, fontWeight: 900, lineHeight: 1, color: balanceColor }}>{formatTradeGain(gain)}</div>
+          <div style={{ ...eyebrowStyle(T["--color-text-muted"], 16), letterSpacing: "0.14em" }}>{TRADE_SHARE_COPY.balance}</div>
+          <div style={{ display: "flex", fontSize: 40, fontWeight: 900, lineHeight: 1, color: balanceColor }}>{formatTradeGain(gain)}</div>
         </div>
         <div style={{ display: "flex" }}>
-          <ConfidenceMeter label={idea.confidence_label} size={compact ? 16 : 20} />
+          <ConfidenceMeter label={idea.confidence_label} size={16} />
         </div>
       </div>
       {hasWhy ? (
         <>
           <div style={{ display: "flex", width: 2, backgroundColor: T["--color-border"] }} />
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: compact ? 8 : 12, flexShrink: 0, width: compact ? 300 : 430, overflow: "hidden" }}>
-            <div style={{ ...eyebrowStyle(T["--color-accent"], compact ? 18 : 24), letterSpacing: "0.18em" }}>Why</div>
-            <div style={{ display: "block", fontSize: compact ? 19 : 25, fontWeight: 500, lineHeight: 1.25, color: T["--color-text-secondary"], lineClamp: compact ? 3 : lowConfidence ? 4 : 5 }}>{why}</div>
-            {lowConfidence && !compact ? <div style={{ display: "block", fontSize: 21, fontWeight: 600, lineHeight: 1.2, color: T["--color-warning"] }}>{LOW_CONFIDENCE_USER_NOTE}</div> : null}
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, flexShrink: 0, width: 300, overflow: "hidden" }}>
+            <div style={{ ...eyebrowStyle(T["--color-accent"], 18), letterSpacing: "0.18em" }}>Why</div>
+            <div style={{ display: "block", fontSize: 19, fontWeight: 500, lineHeight: 1.25, color: T["--color-text-secondary"] }}>{why}</div>
           </div>
         </>
       ) : null}
@@ -339,19 +382,26 @@ export function TradeShareCard({
   const send = idea.package.send ?? [];
   const maxRows = maxRowsFor(compact);
   const shownRows = Math.min(maxRows, Math.max(send.length, receive.length));
-  const rowSize = compact ? 84 : shownRows <= 2 ? 196 : shownRows === 3 ? 136 : 104;
-  const rationale = (idea.rationale || "").trim() || (idea.reasoning_tags ?? []).join(" \u00b7 ");
-  const why = clampText(rationale, compact ? 125 : 200);
-  const avatarSize = compact ? 34 : 46;
+  const tall = !compact && shownRows <= 1;
+  const rowSize = compact ? 84 : shownRows <= 2 ? 196 : shownRows === 3 ? 106 : 96;
+  // Engine reasons rewritten to plain English, whole sentences only.
+  const why = plainTradeWhy(idea.rationale, partnerTeam, compact ? 90 : undefined);
+  const avatarSize = compact ? 34 : 72;
   const nameStyle = { display: "block", maxWidth: compact ? 230 : 330, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } as const;
-  const matchup = (
+  const matchup = compact ? (
     <>
       <ShareAvatar src={images.myAvatar ?? null} size={avatarSize} fallbackText={initials(myTeam)} />
       <span style={nameStyle}>{myTeam}</span>
-      <SwapArrows size={compact ? 30 : 40} />
+      <SwapArrows size={30} />
       <ShareAvatar src={images.partnerAvatar} size={avatarSize} fallbackText={initials(partnerTeam)} />
       <span style={nameStyle}>{partnerTeam}</span>
     </>
+  ) : null;
+  const teamHalf = (src: string | null, name: string) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 18, flexGrow: 1, flexBasis: 0, minWidth: 0 }}>
+      <ShareAvatar src={src} size={avatarSize} fallbackText={initials(name)} />
+      <div style={{ display: "block", flexShrink: 1, minWidth: 0, fontSize: name.length > 24 ? 27 : 34, fontWeight: 800, lineHeight: 1.1, lineClamp: 2 }}>{name}</div>
+    </div>
   );
   const sendLabel = pitch ? TRADE_SHARE_COPY.pitchSend : TRADE_SHARE_COPY.send;
   const getLabel = pitch ? TRADE_SHARE_COPY.pitchGet : TRADE_SHARE_COPY.get;
@@ -366,13 +416,15 @@ export function TradeShareCard({
       headerRight={compact ? matchup : undefined}
     >
       {compact ? null : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 34, fontWeight: 700 }}>{matchup}</div>
+        <div style={{ ...glassStyle(), alignItems: "center", gap: 20, padding: "18px 26px", flexShrink: 0 }}>
+          {teamHalf(images.myAvatar ?? null, myTeam)}
+          <SwapArrows size={48} />
+          {teamHalf(images.partnerAvatar, partnerTeam)}
         </div>
       )}
-      <div style={{ display: "flex", gap: compact ? 24 : 28 }}>
-        <ExchangePanel label={sendLabel} side="send" total={idea.send_score} assets={send} rowSize={rowSize} maxRows={maxRows} headshots={images.headshots} compact={compact} />
-        <ExchangePanel label={getLabel} side="get" total={idea.receive_score} assets={receive} rowSize={rowSize} maxRows={maxRows} headshots={images.headshots} compact={compact} />
+      <div style={{ display: "flex", gap: compact ? 24 : 28, flexGrow: 1 }}>
+        <ExchangePanel label={sendLabel} side="send" total={idea.send_score} assets={send} rowSize={rowSize} maxRows={maxRows} headshots={images.headshots} compact={compact} tall={tall} />
+        <ExchangePanel label={getLabel} side="get" total={idea.receive_score} assets={receive} rowSize={rowSize} maxRows={maxRows} headshots={images.headshots} compact={compact} tall={tall} />
       </div>
 
       {compact ? (

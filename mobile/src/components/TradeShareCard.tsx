@@ -14,7 +14,7 @@ import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './
 import TeamAvatar from './TeamAvatar';
 import { buildPartnerPitch, type PitchAsset } from '../lib/tradePitch';
 import { formatTradeGain } from '../lib/liveDraft';
-import { LOW_CONFIDENCE_NOTE, TRADE_SHARE_COPY } from '../lib/tradeShareCopy';
+import { LOW_CONFIDENCE_NOTE, TRADE_SHARE_COPY, plainTradeWhy } from '../lib/tradeShareCopy';
 import { overallRatingColor } from '../lib/percentile';
 
 const CARD_HEIGHT = 620;
@@ -86,13 +86,34 @@ function AssetRow({
   side,
   trackKey,
   onAvatarSettle,
+  tall,
 }: {
   player: RankedPlayer;
   side: Side;
   trackKey: string;
   onAvatarSettle: (key: string) => void;
+  tall: boolean;
 }) {
   const meta = [player.team, player.age ? `Age ${player.age}` : null].filter(Boolean).join(' \u00b7 ');
+  if (tall) {
+    // One player on a side: a centered portrait card that fills the column.
+    return (
+      <View style={[styles.assetRow, styles.assetTall, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
+        <PlayerAvatar playerId={player.player_id} size={58} tier={player.tier} onLoadSettle={() => onAvatarSettle(trackKey)} />
+        <PlayerNameText name={player.name ?? 'Unknown'} style={styles.assetNameTall} />
+        <View style={styles.assetMetaRow}>
+          <PositionBadge position={player.position} />
+          <AppText style={styles.assetMeta} numberOfLines={1}>
+            {meta}
+          </AppText>
+        </View>
+        <View style={styles.tallBottom}>
+          <ShareOvrRing rating={player.overall_rating} size={34} />
+          {player.score != null ? <AppText style={styles.assetValueTall}>{Math.round(player.score).toLocaleString('en-US')}</AppText> : null}
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={[styles.assetRow, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
       <PlayerAvatar
@@ -131,6 +152,7 @@ function ExchangePanel({
   picks = [],
   keyPrefix,
   onAvatarSettle,
+  tall = false,
 }: {
   label: string;
   side: Side;
@@ -139,6 +161,7 @@ function ExchangePanel({
   picks?: DraftPickAsset[];
   keyPrefix: string;
   onAvatarSettle: (key: string) => void;
+  tall?: boolean;
 }) {
   const shown = players.slice(0, MAX_ROWS);
   const shownPicks = picks.slice(0, Math.max(0, MAX_ROWS - shown.length));
@@ -159,10 +182,11 @@ function ExchangePanel({
             side={side}
             trackKey={`${keyPrefix}-${player.player_id ?? i}`}
             onAvatarSettle={onAvatarSettle}
+            tall={tall}
           />
         ))}
         {shownPicks.map((pick) => (
-          <View key={pick.pick_id} style={[styles.assetRow, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
+          <View key={pick.pick_id} style={[styles.assetRow, tall && styles.assetTall, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
             <View style={styles.pickBadge}>
               <AppText style={styles.pickBadgeText}>{pick.round ? `R${pick.round}` : 'PK'}</AppText>
             </View>
@@ -269,7 +293,9 @@ const TradeShareCard = forwardRef<View, {
   }, [ready]);
 
   const confidenceLabel = (verdict.confidence || '').trim();
-  const why = (verdict.rationale || '').trim();
+  // Engine reasons rewritten to plain English, whole sentences only (never an ellipsis).
+  const why = plainTradeWhy(verdict.rationale, partner);
+  const tall = sendPlayers.length + sendPicks.length <= 1 && receivePlayers.length + receivePicks.length <= 1;
 
   return (
     <ShareCardChrome
@@ -282,17 +308,21 @@ const TradeShareCard = forwardRef<View, {
         </AppText>
       }
     >
-      <View style={styles.matchup}>
-        <TeamAvatar avatarId={null} size={20} />
-        <AppText style={styles.matchupName} numberOfLines={1}>
-          {me}
-        </AppText>
-        <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
-        <TeamAvatar avatarId={partnerTeamAvatarUrl} size={20} />
-        <AppText style={styles.matchupName} numberOfLines={1}>
-          {partner}
-        </AppText>
-      </View>
+      <ShareGlass style={styles.matchup}>
+        <View style={styles.matchupSide}>
+          <TeamAvatar avatarId={null} name={me} size={30} />
+          <AppText style={styles.matchupName} numberOfLines={2}>
+            {me}
+          </AppText>
+        </View>
+        <Ionicons name="swap-horizontal" size={20} color={colors.accent} />
+        <View style={styles.matchupSide}>
+          <TeamAvatar avatarId={partnerTeamAvatarUrl} name={partner} size={30} />
+          <AppText style={styles.matchupName} numberOfLines={2}>
+            {partner}
+          </AppText>
+        </View>
+      </ShareGlass>
 
       <View style={styles.panelsRow}>
         <ExchangePanel
@@ -303,6 +333,7 @@ const TradeShareCard = forwardRef<View, {
           picks={sendPicks}
           keyPrefix="send"
           onAvatarSettle={handleAvatarSettle}
+          tall={tall}
         />
         <ExchangePanel
           label={pitchMode ? TRADE_SHARE_COPY.pitchGet : TRADE_SHARE_COPY.get}
@@ -312,6 +343,7 @@ const TradeShareCard = forwardRef<View, {
           picks={receivePicks}
           keyPrefix="receive"
           onAvatarSettle={handleAvatarSettle}
+          tall={tall}
         />
       </View>
 
@@ -327,37 +359,37 @@ const TradeShareCard = forwardRef<View, {
         </ShareGlass>
       ) : (
       <ShareGlass style={styles.verdictBlock}>
-        {band ? (
-          <View style={[styles.bandChip, { borderColor: verdictColor, backgroundColor: `${verdictColor}1F` }]}>
-            <AppText style={[styles.bandChipText, { color: verdictColor }]} numberOfLines={1}>
-              {band.toUpperCase()}
-            </AppText>
+        <View style={styles.verdictTop}>
+          <View style={styles.verdictLeft}>
+            {band ? (
+              <View style={[styles.bandChip, { borderColor: verdictColor, backgroundColor: `${verdictColor}1F` }]}>
+                <AppText style={[styles.bandChipText, { color: verdictColor }]} numberOfLines={1}>
+                  {band.toUpperCase()}
+                </AppText>
+              </View>
+            ) : null}
+            {confidenceLabel ? (
+              <ShareConfidenceBars
+                level={confidenceLevelFor(confidenceLabel)}
+                label={`${confidenceLabel.replace(/ confidence$/i, '')} confidence`}
+              />
+            ) : null}
           </View>
-        ) : null}
-        <View style={styles.balanceRow}>
-          <AppText style={styles.balanceLabel}>{TRADE_SHARE_COPY.balance.toUpperCase()}</AppText>
-          <AppText style={[styles.balanceValue, { color: balanceColor }]}>{formatTradeGain(gain)}</AppText>
+          <View style={styles.balanceCol}>
+            <AppText style={styles.balanceLabel}>{TRADE_SHARE_COPY.balance.toUpperCase()}</AppText>
+            <AppText style={[styles.balanceValue, { color: balanceColor }]}>{formatTradeGain(gain)}</AppText>
+          </View>
         </View>
-        {confidenceLabel ? (
-          <View style={styles.meterWrap}>
-            <ShareConfidenceBars
-              level={confidenceLevelFor(confidenceLabel)}
-              label={`${confidenceLabel.replace(/ confidence$/i, '')} confidence`}
-            />
+        {why || lowConfidence ? <View style={styles.verdictDivider} /> : null}
+        {why ? (
+          <View style={styles.whyWrap}>
+            <AppText style={styles.whyLabel}>WHY</AppText>
+            <AppText style={styles.whyText}>{why}</AppText>
           </View>
         ) : null}
         {lowConfidence ? <AppText style={styles.lowNote}>{LOW_CONFIDENCE_NOTE}</AppText> : null}
       </ShareGlass>
       )}
-
-      {why && !pitch ? (
-        <ShareGlass style={styles.whyBlock}>
-          <AppText style={styles.whyLabel}>WHY</AppText>
-          <AppText style={styles.whyText} numberOfLines={5}>
-            {why}
-          </AppText>
-        </ShareGlass>
-      ) : null}
     </ShareCardChrome>
   );
 });
@@ -372,9 +404,10 @@ const styles = StyleSheet.create({
   pitchLine: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pickBadge: { width: 34, height: 34, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.accent}22`, borderWidth: 1, borderColor: `${colors.accent}80` },
   pickBadgeText: { fontSize: 11, fontWeight: '800', color: colors.accent },
-  matchup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
-  matchupName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
-  panelsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm, alignItems: 'stretch' },
+  matchup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  matchupSide: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  matchupName: { flex: 1, fontSize: 13, fontWeight: '800', color: colors.textPrimary, lineHeight: 15 },
+  panelsRow: { flex: 1, flexDirection: 'row', gap: spacing.md, marginTop: spacing.md, alignItems: 'stretch' },
   panel: { flex: 1, gap: 6 },
   panelHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
@@ -392,22 +425,28 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     borderWidth: 1,
   },
+  assetTall: { flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 },
+  assetNameTall: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+  tallBottom: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  assetValueTall: { fontSize: 16, fontWeight: '900', color: colors.textPrimary },
   assetTextGroup: { flex: 1 },
-  assetName: { fontSize: 11, fontWeight: '800', color: colors.textPrimary },
+  assetName: { fontSize: 12, fontWeight: '800', color: colors.textPrimary },
   assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   assetMeta: { fontSize: 9, color: colors.textTertiary, flexShrink: 1 },
   assetRight: { alignItems: 'center', gap: 1 },
-  assetValue: { fontSize: 9, fontWeight: '800', color: colors.textPrimary },
+  assetValue: { fontSize: 10, fontWeight: '800', color: colors.textPrimary },
   more: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
-  verdictBlock: { marginTop: spacing.md, padding: spacing.md, gap: 6, borderColor: `${colors.accent}66` },
+  verdictBlock: { marginTop: spacing.md, marginBottom: spacing.md, padding: spacing.md, gap: 8, borderColor: `${colors.accent}66` },
+  verdictTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  verdictLeft: { gap: 6, alignItems: 'flex-start', flexShrink: 1 },
+  balanceCol: { alignItems: 'flex-end' },
+  verdictDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  whyWrap: { gap: 3 },
   bandChip: { alignSelf: 'flex-start', borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 3 },
   bandChipText: { fontSize: 15, fontWeight: '900', letterSpacing: 1.2 },
-  balanceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   balanceLabel: { fontSize: 10, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1.4 },
-  balanceValue: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  balanceValue: { fontSize: 34, fontWeight: '900', letterSpacing: -0.5 },
   lowNote: { fontSize: 10, fontWeight: '600', color: WARNING },
-  meterWrap: { marginTop: 2 },
-  whyBlock: { marginTop: spacing.sm, padding: spacing.md, gap: 3 },
   whyLabel: { fontSize: 10, fontWeight: '800', color: colors.accent, letterSpacing: 2 },
-  whyText: { fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
+  whyText: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, lineHeight: 16 },
 });
