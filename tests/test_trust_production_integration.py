@@ -101,14 +101,38 @@ def test_retired_player_is_excluded_from_actionable_pool():
     assert result.iloc[0]["trust_enforcement"] == EnforcementLevel.BLOCKED.value
 
 
-def test_optional_metadata_degrades_but_does_not_block():
+def test_missing_bye_week_never_degrades_a_current_player():
+    # The players table has no bye_week column (byes are derived from the NFL
+    # schedule), so its absence must not cap every player's trust.
+    player = _player(bye_week=None)
+    player.pop("bye_week", None)
     result = enforce_player_record(
-        _player(age=None, bye_week=None),
+        player, eligible=True, canonical_player_ids=frozenset({"p1"})
+    )
+    assert result.level is EnforcementLevel.PASS
+    assert result.actionable
+
+
+def test_missing_age_degrades_only_a_valued_player_and_does_not_block():
+    valued = enforce_player_record(
+        _player(age=None, fantasycalc_value=3000),
         eligible=True,
         canonical_player_ids=frozenset({"p1"}),
     )
-    assert result.level is EnforcementLevel.DEGRADED
-    assert result.actionable
+    assert valued.level is EnforcementLevel.DEGRADED
+    assert valued.actionable
+    nan_age = enforce_player_record(
+        _player(age=float("nan"), fantasycalc_value=3000),
+        eligible=True,
+        canonical_player_ids=frozenset({"p1"}),
+    )
+    assert nan_age.level is EnforcementLevel.DEGRADED
+    valueless = enforce_player_record(
+        _player(age=None, fantasycalc_value=0, value=0),
+        eligible=True,
+        canonical_player_ids=frozenset({"p1"}),
+    )
+    assert valueless.level is EnforcementLevel.PASS
 
 
 def test_weak_secondary_conflict_does_not_override_canonical_identity():
@@ -193,7 +217,7 @@ def test_validator_never_mutates_package():
 
 def test_effective_confidence_is_capped_and_model_label_is_preserved():
     degraded = enforce_player_record(
-        _player("p2", age=None),
+        _player("p2", age=None, fantasycalc_value=3000),
         eligible=True,
         canonical_player_ids=frozenset({"p1", "p2"}),
     )

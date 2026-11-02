@@ -245,7 +245,8 @@ def test_cache_hit_and_miss_equivalence_fingerprints_match():
 
 
 def test_no_football_logic_modules_modified_for_this_pr():
-    """Trade Hub first-useful presentation must not touch Trust engines.
+    """Trade Hub first-useful presentation must not touch the Trust engine (trust_enforcement.py is
+    deliberately editable: PR fix/trust-missing-bye-age corrected its optional-metadata rule).
 
     Valuation calibration audits may intentionally edit rankings / trade_ideas.
     """
@@ -263,7 +264,6 @@ def test_no_football_logic_modules_modified_for_this_pr():
     }
     forbidden = {
         "modules/trust_engine.py",
-        "modules/trust_enforcement.py",
     }
     assert not diff_names.intersection(forbidden)
 
