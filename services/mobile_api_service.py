@@ -18,6 +18,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
+  - GET  /v1/leagues/{id}/teams/{roster_id}/profile — opponent card: rooms, depth, picks, direction, trade angle
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
   - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset + its full valuation breakdown
   - GET  /v1/leagues/{id}/live-draft           — discover this league's Sleeper drafts (status/season/rounds)
@@ -223,6 +224,7 @@ from modules import (
     record_signal,
     redis_cache,
     referrals,
+    opponent_profile,
     roster_needs,
     saved_leagues,
     share_card_renderer,
@@ -250,6 +252,7 @@ from modules import public_dynasty_values
 from modules import trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
+from modules import start_sit_range
 from modules import this_week
 from modules import game_weather
 from modules import team_defense
@@ -2742,6 +2745,179 @@ def get_league_team_rankings(
     }
 
 
+def _room_context(
+    valued: pd.DataFrame,
+    roster: Mapping[str, Any],
+    settings: dict[str, Any],
+    score_field: str,
+    df_summary: pd.DataFrame,
+) -> dict[str, Any]:
+    """Lineup, bench candidates and per-room need classifications for one
+    roster, built exactly the way GET .../my-team-needs builds the user's own."""
+
+    player_ids = {str(pid) for pid in (roster.get("players") or [])}
+    roster_df = valued[valued["player_id"].astype(str).isin(player_ids)].copy()
+    if roster_df.empty:
+        return {"empty": True, "classifications": {}, "bench": {}}
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    metrics = None
+    try:
+        metrics = get_team_vs_league(df_summary, roster.get("roster_id"))
+    except Exception:
+        metrics = None
+    assessment = trade_analyzer_fit.build_team_needs_assessment(
+        roster_df, metrics, settings, lineup_df=lineup_df, score_field=score_field
+    )
+    return {
+        "empty": False,
+        "classifications": {item.position: item.classification for item in assessment.positions},
+        "bench": opponent_profile.bench_candidates(lineup_df, score_field),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/teams/{roster_id}/profile")
+def get_league_team_profile(
+    roster_id: int,
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Opponent profile card for one roster: strongest/weakest room, starter
+    strength vs. bench depth, surplus and needs, future pick capital, team
+    direction, and (when the signed-in user's roster is known and the two
+    rosters fit) a trade angle with a player to prefill the Trade Analyzer.
+
+    Composition only: room ranks come from the cached league summary frame,
+    starter/bench/draft-capital ranks from the cached rankings frame, needs
+    from modules.roster_needs via trade_analyzer_fit (same call as
+    GET .../my-team-needs), direction from trade_hub_engine.roster_posture
+    (the opponent's declared Team Situation is private, so only the
+    auto-classification is ever used). Anything that cannot be computed is
+    null/empty and the client hides it.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    def _empty(reason: str) -> dict[str, Any]:
+        return {"ok": True, "reason": reason, "roster_id": str(roster_id)}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    rosters = sleeper.get_rosters(league_id)
+    their_roster = next((r for r in rosters if str(r.get("roster_id")) == str(roster_id)), None)
+    if their_roster is None:
+        raise HTTPException(status_code=404, detail="Roster not found in this league.")
+
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if valued.empty:
+        return _empty("no_player_data")
+    df_summary, _draft_capital = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if df_summary.empty or rankings_frame.empty:
+        return _empty("no_rankings_data")
+    size = len(rankings_frame)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    rank_rows = rankings_frame[rankings_frame["roster_id"].astype(str) == str(roster_id)]
+    if rank_rows.empty:
+        return _empty("no_rankings_data")
+    row = rank_rows.iloc[0]
+
+    theirs = _room_context(valued, their_roster, settings, score_field, df_summary)
+    ranks = opponent_profile.position_ranks(df_summary, roster_id)
+    rooms, surplus, needs = opponent_profile.room_reads(ranks, theirs["classifications"])
+    strongest, weakest = opponent_profile.strongest_weakest(rooms)
+
+    posture = trade_hub_engine.roster_posture(
+        league_id=league_id,
+        roster=their_roster,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        declared_stance="",
+        rankings_frame=rankings_frame,
+    )
+    direction = {
+        "key": posture.get("key"),
+        "label": posture.get("label"),
+        "rank": posture.get("rank"),
+        "league_size": posture.get("league_size"),
+        "record": posture.get("record"),
+        "confidence_label": posture.get("confidence_label"),
+    }
+
+    try:
+        flow = pick_flow.league_pick_flow_counts_cached(league_id).get(int(roster_id), {})
+    except Exception:
+        flow = {}
+    try:
+        tendency = team_trade_history.league_trade_tendencies_cached(league_id, PLAYERS_DB_PATH).get(
+            int(roster_id), {}
+        )
+    except Exception:
+        tendency = {}
+    trade_tendency = None
+    if tendency.get("tendency") and tendency.get("tendency") != team_trade_history.NEUTRAL:
+        trade_tendency = {
+            "label": tendency.get("tendency"),
+            "sell_count": int(tendency.get("sell_count") or 0),
+            "buy_count": int(tendency.get("buy_count") or 0),
+            "min_trades": team_trade_history.MIN_SIGNAL_TRADES,
+        }
+
+    angle = None
+    is_me = False
+    my_roster, _reason = _resolve_my_roster(user, league_id)
+    if my_roster is not None:
+        is_me = str(my_roster.get("roster_id")) == str(roster_id)
+        if not is_me:
+            mine = _room_context(valued, my_roster, settings, score_field, df_summary)
+            if not mine["empty"] and not theirs["empty"]:
+                my_rooms, my_surplus, my_needs = opponent_profile.room_reads(
+                    opponent_profile.position_ranks(df_summary, my_roster.get("roster_id")),
+                    mine["classifications"],
+                )
+                angle = opponent_profile.trade_angle(
+                    my_needs=my_needs,
+                    my_surplus=my_surplus,
+                    their_needs=needs,
+                    their_surplus=surplus,
+                    their_bench=theirs["bench"],
+                    my_bench=mine["bench"],
+                    my_ranks={r["position"]: r["rank"] for r in my_rooms},
+                    their_ranks={r["position"]: r["rank"] for r in rooms},
+                )
+
+    return {
+        "ok": True,
+        "reason": "",
+        "roster_id": str(roster_id),
+        "is_me": is_me,
+        "direction": direction,
+        "rooms": rooms,
+        "strongest": strongest,
+        "weakest": weakest,
+        "surplus": surplus,
+        "needs": needs,
+        "starter_bench": opponent_profile.starter_bench_read(row.get("starter_rank"), row.get("bench_rank"), size),
+        "picks": opponent_profile.pick_capital(row, flow, size),
+        "trade_tendency": trade_tendency,
+        "trade_angle": angle,
+    }
+
+
 @app.get("/v1/leagues/{league_id}/playoff-odds")
 @_with_sleeper_as_of
 def get_league_playoff_odds(
@@ -3031,6 +3207,263 @@ def post_games_what_if(
             games_used_for_fit=int(base_run.get("games_used_for_fit") or 0),
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# Trade effect on playoff/title odds (gap analysis #1). Reuses the Season
+# Simulator what-if above: the caller's Roster Power is recomputed for the
+# post-trade roster and the same shared playoff simulation is re-run against an
+# equally seeded baseline, so the two differ only by that input. Lazy by
+# design (its own endpoint the clients call after the verdict renders) so the
+# analyzer's p95 is untouched; baseline and scenarios are cached per TTL bucket.
+# ---------------------------------------------------------------------------
+
+_TRADE_ODDS_UPSELL = {
+    "title": "See how a trade moves your odds",
+    "body": (
+        "Premium shows the change in your playoff and championship odds for any "
+        "trade, from the same season simulation as the Games tab."
+    ),
+}
+_TRADE_ODDS_MAX_PACKAGES = 6
+_TRADE_ODDS_MAX_SIDE = 8
+
+
+class TradeOddsPackage(BaseModel):
+    send_player_ids: list[str] = Field(default_factory=list, max_length=_TRADE_ODDS_MAX_SIDE)
+    receive_player_ids: list[str] = Field(default_factory=list, max_length=_TRADE_ODDS_MAX_SIDE)
+    # Draft picks are not part of Roster Power; the response says so instead of
+    # silently pricing them at zero.
+    has_picks: bool = False
+
+
+class TradeOddsEffectRequest(BaseModel):
+    packages: list[TradeOddsPackage] = Field(default_factory=list, max_length=_TRADE_ODDS_MAX_PACKAGES)
+    lens: str = "Dynasty"
+
+
+def _trade_odds_margin_points(base_p: float, scen_p: float, trials: int) -> float:
+    """Conservative 95% margin (percentage points) on a change between two
+    simulated probabilities, treating the runs as independent. The runs share a
+    seed so the true error is smaller; we report the wider, honest bound."""
+
+    import math
+
+    if trials <= 0:
+        return 100.0
+    pb = min(max(base_p / 100.0, 0.0), 1.0)
+    ps = min(max(scen_p / 100.0, 0.0), 1.0)
+    return round(1.96 * math.sqrt((pb * (1 - pb) + ps * (1 - ps)) / trials) * 100.0, 1)
+
+
+def _trade_odds_effect_for_package(
+    *,
+    league_id: str,
+    lens: str,
+    my_rid: str,
+    current_ids: list[str],
+    players_df: pd.DataFrame,
+    settings: dict[str, Any],
+    score_field: str,
+    my_power: float,
+    base_run: dict[str, Any],
+    base_team: dict[str, Any],
+    package: TradeOddsPackage,
+) -> dict[str, Any]:
+    import zlib
+
+    import numpy as np
+
+    send = [str(pid) for pid in package.send_player_ids]
+    receive = [str(pid) for pid in package.receive_player_ids]
+    out: dict[str, Any] = {
+        "send_player_ids": send,
+        "receive_player_ids": receive,
+        "reason": "",
+        "picks_excluded": bool(package.has_picks),
+    }
+    if not send and not receive:
+        return {**out, "reason": "no_player_change"}
+    mine = set(current_ids)
+    known = {str(pid) for pid in players_df["player_id"]}
+    if any(pid not in mine for pid in send) or any(pid in mine for pid in receive) or any(
+        pid not in known for pid in receive
+    ):
+        return {**out, "reason": "invalid_package"}
+    if len(set(send)) != len(send) or len(set(receive)) != len(receive):
+        return {**out, "reason": "invalid_package"}
+
+    def compute() -> dict[str, Any]:
+        before = games.score_roster(players_df, current_ids, score_field, settings)
+        after = games.score_roster(
+            players_df, games.apply_roster_change(current_ids, receive, send), score_field, settings
+        )
+        seed = zlib.crc32(f"{league_id}:{lens}".encode()) & 0xFFFFFFFF
+        scenario_run = playoff_simulator.build_league_playoff_odds(
+            league_id,
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            rng=np.random.default_rng(seed),
+            power_overrides={my_rid: my_power + (after["total_score"] - before["total_score"])},
+        )
+        team = next((t for t in scenario_run.get("teams") or [] if t["roster_id"] == my_rid), None)
+        return {
+            "reason": scenario_run.get("reason") or ("" if team else "unavailable"),
+            "team": team,
+            "power_delta": round(after["total_score"] - before["total_score"], 1),
+            "starter_delta": round(after.get("starter_score", 0.0) - before.get("starter_score", 0.0), 1),
+        }
+
+    roster_sig = hashlib.sha1(",".join(sorted(current_ids)).encode()).hexdigest()[:12]
+    cache_key = redis_cache.build_cache_key(
+        "trade_odds_effect",
+        league_id,
+        lens,
+        my_rid,
+        roster_sig,
+        ",".join(sorted(send)),
+        ",".join(sorted(receive)),
+        playoff_simulator._playoff_odds_cache_bucket(),
+    )
+    computed = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS,
+        compute=compute,
+        lock_timeout_seconds=10.0,
+    )
+    if computed.get("reason") or not computed.get("team"):
+        return {**out, "reason": computed.get("reason") or "unavailable"}
+    scen = computed["team"]
+    trials = int(base_run.get("trials") or 0)
+    base_p = float(base_team.get("playoff_probability") or 0.0)
+    scen_p = float(scen.get("playoff_probability") or 0.0)
+    change = games.compare_odds(base_team, scen)
+    margin = _trade_odds_margin_points(base_p, scen_p, trials)
+    change["within_noise"] = abs(change["playoff_probability"]) < max(games.NOISE_POINTS, margin)
+    base_title = base_team.get("title_probability")
+    scen_title = scen.get("title_probability")
+    change["title_probability"] = (
+        round(float(scen_title) - float(base_title), 1)
+        if base_title is not None and scen_title is not None
+        else None
+    )
+    change["title_within_noise"] = (
+        True
+        if change["title_probability"] is None
+        else abs(change["title_probability"])
+        < max(1.0, _trade_odds_margin_points(float(base_title), float(scen_title), trials))
+    )
+    return {
+        **out,
+        "baseline": _games_odds_row(base_team),
+        "scenario": _games_odds_row(scen),
+        "change": change,
+        "margin_points": margin,
+        "power_delta": computed["power_delta"],
+        "starter_delta": computed["starter_delta"],
+        "trials": trials,
+        "slope_fitted": bool(base_run.get("slope_fitted")),
+        "games_used_for_fit": int(base_run.get("games_used_for_fit") or 0),
+        "weeks_remaining": int(base_run.get("weeks_remaining") or 0),
+        "remaining_games": int(base_team.get("remaining_games") or 0),
+    }
+
+
+@app.post("/v1/leagues/{league_id}/trade-odds-effect")
+@_with_sleeper_as_of
+def post_trade_odds_effect(
+    body: TradeOddsEffectRequest,
+    league_id: str = Depends(require_league_access),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Premium. For each trade package, how the caller's playoff and title odds
+    would change, from the shared Season Simulator. Honest degradation: any
+    not-ready state (offseason, no games left, no playoff format, simulator
+    unavailable) comes back as a top-level `reason` with no results, and each
+    result carries its own margin of error and sample size."""
+
+    _games_check_lens(body.lens)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {"ok": True, "reason": "premium_required", "is_premium": False, "upsell": _TRADE_ODDS_UPSELL, "results": []}
+
+    def not_ready(reason: str) -> dict[str, Any]:
+        return {"ok": True, "reason": reason, "is_premium": True, "upsell": None, "results": []}
+
+    if not body.packages:
+        return not_ready("no_packages")
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return not_ready(roster_reason or "no_roster")
+    my_rid = str(my_roster.get("roster_id"))
+    current_ids = [str(pid) for pid in (my_roster.get("players") or []) if pid is not None]
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if players_df.empty or "player_id" not in players_df.columns:
+        return not_ready("no_rankings_data")
+    league = sleeper.get_league(league_id)
+    if not league:
+        return not_ready("unavailable")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(body.lens)
+
+    # The paired baseline: same fixed seed as every scenario below (not the
+    # shared cache's bucket seed), cached per TTL bucket.
+    def _paired_baseline() -> dict[str, Any]:
+        import zlib
+
+        import numpy as np
+
+        seed = zlib.crc32(f"{league_id}:{body.lens}".encode()) & 0xFFFFFFFF
+        return playoff_simulator.build_league_playoff_odds(
+            league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH, rng=np.random.default_rng(seed)
+        )
+
+    base_run = redis_cache.redis_single_flight_cache(
+        cache_key=redis_cache.build_cache_key(
+            "trade_odds_baseline", league_id, body.lens, playoff_simulator._playoff_odds_cache_bucket()
+        ),
+        ttl_seconds=playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS,
+        compute=_paired_baseline,
+        lock_timeout_seconds=10.0,
+    )
+    if base_run.get("reason"):
+        return not_ready(str(base_run["reason"]))
+    frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
+    )
+    my_power = None
+    if not frame.empty:
+        match = frame[frame["roster_id"].astype(str) == my_rid]
+        if not match.empty:
+            my_power = float(match.iloc[0].get("power_score") or 0.0)
+    base_team = next((t for t in base_run.get("teams") or [] if t["roster_id"] == my_rid), None)
+    if my_power is None or not base_team:
+        return not_ready("no_rankings_data")
+    if int(base_team.get("remaining_games") or 0) <= 0:
+        return not_ready("no_games_left")
+
+    results = [
+        _trade_odds_effect_for_package(
+            league_id=league_id,
+            lens=body.lens,
+            my_rid=my_rid,
+            current_ids=current_ids,
+            players_df=players_df,
+            settings=settings,
+            score_field=score_field,
+            my_power=my_power,
+            base_run=base_run,
+            base_team=base_team,
+            package=package,
+        )
+        for package in body.packages
+    ]
+    return {"ok": True, "reason": "", "is_premium": True, "upsell": None, "results": results}
 
 
 def _pickem_context(league_id: str) -> tuple[dict[str, Any] | None, str, int, dict[str, Any]]:
@@ -13634,7 +14067,30 @@ def _benched_reason(player: dict[str, Any]) -> str | None:
     return None
 
 
-def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | None:
+def _move_range_block(
+    starter: dict[str, Any],
+    start_points: float | None,
+    over: dict[str, Any] | None,
+    over_points: float | None,
+    win_probability: dict[str, Any] | None,
+    *,
+    locked: bool,
+) -> dict[str, Any]:
+    """Projected / low / high for both sides of a start/sit move, plus the
+    stance-aware lean from this matchup's real win probability
+    (modules.start_sit_range). A locked move (a game has kicked off) cannot be
+    changed in Sleeper, so it never carries a lean."""
+
+    result = start_sit_range.compare(starter, start_points, over, over_points, win_probability)
+    lean = None if locked else result["lean"]
+    if lean is not None:
+        lean = {**lean, "favors": "start" if lean["favors"] == "first" else "over"}
+    return {"start": result["first"], "over": result["second"], "stance": result["stance"], "lean": lean}
+
+
+def _suggested_lineup_moves(
+    my_side: dict[str, Any], win_probability: dict[str, Any] | None = None
+) -> list[dict[str, Any]] | None:
     """The changes that turn this roster's ACTUAL Sleeper lineup into its
     suggested one, as real one-for-one swaps: "start X (slot) over Y", where
     Y is the player CURRENTLY in that slot and X is eligible for it.
@@ -13734,18 +14190,28 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
             if start_points is not None and over_points is not None
             else None
         )
+        move_locked = starter.get("game_started") is True or (
+            over is not None and over.get("game_started") is True
+        )
         move = {
             "slot": slot,
             "start": start_fields,
             "over": over_fields,
             "over_reason": reason,
             "gain": gain,
-            "locked": starter.get("game_started") is True
-            or (over is not None and over.get("game_started") is True),
+            "locked": move_locked,
             # Honest uncertainty: set only when a no-projection player is
             # recommended because the slot has no modeled alternative.
             "start_note": "No projection yet — role unclear" if start_points is None else None,
             "weather_notes": _move_weather_notes(starter, over),
+            "range": _move_range_block(
+                starter,
+                start_points,
+                over if reason not in {"bye_week", "ruled_out", "empty_slot"} else None,
+                over_points,
+                win_probability,
+                locked=move_locked,
+            ),
         }
         if chain_id is not None:
             move["chain_id"] = chain_id
@@ -14145,7 +14611,7 @@ def _build_matchup(
             ),
             "suggested": _position_edges(my_side["starters"], opponent_side["starters"]),
         },
-        "suggested_moves": None if league_calendar.is_best_ball(league) else _suggested_lineup_moves(my_side),
+        "suggested_moves": None if league_calendar.is_best_ball(league) else _suggested_lineup_moves(my_side, win_probability),
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": "",

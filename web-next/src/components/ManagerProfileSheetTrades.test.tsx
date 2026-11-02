@@ -30,7 +30,7 @@ const trade = {
 async function mountWith(recent_trades: unknown[]) {
   vi.resetModules();
   vi.doMock("@/lib/api", () => ({
-    api: { getManagerTendencyDetail: () => Promise.resolve({ ...baseDetail, recent_trades }) },
+    api: { getManagerTendencyDetail: () => Promise.resolve({ ...baseDetail, recent_trades }), getTeamProfile: () => new Promise(() => {}) },
   }));
   const { ManagerProfileSheet } = await import("./ManagerProfileSheet");
   render(<ManagerProfileSheet leagueId="1" rosterId={3} teamName="Big Dogs" onClose={() => {}} />);

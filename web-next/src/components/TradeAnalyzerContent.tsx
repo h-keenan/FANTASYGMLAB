@@ -7,6 +7,7 @@ import { LimitWall } from "@/components/LimitWall";
 import { useAuth } from "@/context/AuthContext";
 import { limitWallForReason, type LimitWallModel } from "@/lib/limitWall";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 
 import {
   api,
@@ -459,6 +460,8 @@ function VerdictCard({
           </p>
         </div>
       ) : null}
+
+      <TradeOddsEffect leagueId={leagueId} send={sendAssets} receive={receiveAssets} lens={lens} />
 
       {summary ? (
         <div className="flex flex-col gap-1">

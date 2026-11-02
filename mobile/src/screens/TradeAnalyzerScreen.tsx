@@ -37,6 +37,7 @@ import MeterRow from '../components/ConfidenceMeter';
 import TeamAvatar from '../components/TeamAvatar';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
+import TradeOddsEffect from '../components/TradeOddsEffect';
 import TradeValueBar from '../components/TradeValueBar';
 import VerdictTrust from '../components/VerdictTrust';
 import type { VerdictAssumptions } from '../lib/verdictTrust';
@@ -935,6 +936,12 @@ function VerdictCard({
           </AppText>
         </View>
       ) : null}
+      <TradeOddsEffect
+        leagueId={leagueId}
+        send={sendIds}
+        receive={receiveIds}
+        hasPicks={sendPicks.length > 0 || receivePicks.length > 0}
+      />
       {summary ? (
         <>
           <AppText style={[styles.verdictLabel, { color: toneColor }]}>

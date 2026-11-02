@@ -14,6 +14,7 @@ import Button from './Button';
 import ToneBadge from './ToneBadge';
 import IdeaPosture from './IdeaPosture';
 import TradeSharePreviewModal from './TradeSharePreviewModal';
+import TradeOddsEffect, { type OddsAsset } from './TradeOddsEffect';
 import TradeValueBar from './TradeValueBar';
 import TradeValueHero from './TradeValueHero';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
@@ -209,11 +210,17 @@ function RationaleDetailModal({
   onClose,
   partnerTeamName,
   rationale,
+  leagueId,
+  send,
+  receive,
 }: {
   visible: boolean;
   onClose: () => void;
   partnerTeamName: string;
   rationale: string;
+  leagueId: string;
+  send: OddsAsset[];
+  receive: OddsAsset[];
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -234,6 +241,7 @@ function RationaleDetailModal({
           </AppText>
           <SheetScrollView style={styles.rationaleSheetBody}>
             <AppText style={styles.rationaleSheetText}>{rationale}</AppText>
+            {visible ? <TradeOddsEffect leagueId={leagueId} send={send} receive={receive} /> : null}
           </SheetScrollView>
         </SwipeDismissCard>
       </Pressable>
@@ -453,6 +461,9 @@ export default function TradeIdeaCard({
         onClose={() => setRationaleOpen(false)}
         partnerTeamName={idea.partner_team_name}
         rationale={idea.rationale ?? ''}
+        leagueId={leagueId}
+        send={idea.package.send}
+        receive={idea.package.receive}
       />
 
       <View style={styles.footerRow}>

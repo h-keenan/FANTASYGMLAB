@@ -226,3 +226,33 @@ def test_bench_players_are_listed_before_other_starters():
     first_starter = flags.index(True)
     assert all(flags[first_starter:])
     assert not flags[0]
+
+
+def test_candidates_carry_ranges_side_by_side_with_a_ceiling_lean_for_an_underdog():
+    # Strong opponent so the user is a heavy underdog; benchwr has the big ceiling.
+    strong_opp = [p("o1", "QB", 30), p("o2", "RB", 25), p("o3", "WR", 24), p("o4", "WR", 24)]
+    out = wi.candidates_for_slot(base_pool(), LINEUP, 3, strong_opp, ELIG)
+    by_id = {c["player"]["player_id"]: c for c in out["candidates"]}
+    compare = by_id["benchwr"]["compare"]
+    assert compare["candidate"]["high"] == 26.0 and compare["candidate"]["low"] == 8.0
+    assert compare["current"]["name"] == "WR2"
+    assert compare["stance"]["kind"] == "underdog"
+    assert compare["lean"]["favors"] == "candidate" and compare["lean"]["kind"] == "ceiling"
+
+
+def test_blocked_candidates_have_no_range_and_no_lean():
+    strong_opp = [p("o1", "QB", 30), p("o2", "RB", 25), p("o3", "WR", 24), p("o4", "WR", 24)]
+    out = wi.candidates_for_slot(base_pool(), LINEUP, 3, strong_opp, ELIG)
+    by_id = {c["player"]["player_id"]: c for c in out["candidates"]}
+    for blocked_id in ("byewr", "outwr"):
+        compare = by_id[blocked_id]["compare"]
+        assert compare["candidate"] is None and compare["lean"] is None
+
+
+def test_heavy_favorite_gets_no_ceiling_lean():
+    weak_opp = [p("o1", "QB", 5), p("o2", "RB", 4), p("o3", "WR", 3), p("o4", "WR", 3)]
+    out = wi.candidates_for_slot(base_pool(), LINEUP, 3, weak_opp, ELIG)
+    by_id = {c["player"]["player_id"]: c for c in out["candidates"]}
+    compare = by_id["benchwr"]["compare"]
+    assert compare["stance"]["kind"] == "favorite"
+    assert compare["lean"] is None or compare["lean"]["kind"] == "floor"

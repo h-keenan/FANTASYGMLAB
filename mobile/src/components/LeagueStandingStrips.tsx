@@ -9,6 +9,7 @@ import ToneBadge from './ToneBadge';
 import IconCircle from './IconCircle';
 import TeamAvatar from './TeamAvatar';
 import { api } from '../lib/api';
+import { seasonOddsLine } from '../lib/gamesPresentation';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
@@ -54,8 +55,8 @@ export default function LeagueStandingStrips({
     enabled: !isRestoring,
   });
   const oddsQuery = useQuery({
-    queryKey: queryKeys.playoffOdds(leagueId),
-    queryFn: () => api.getLeaguePlayoffOdds(leagueId),
+    queryKey: queryKeys.seasonSim(leagueId),
+    queryFn: () => api.getGamesSeasonSim(leagueId),
     enabled: !isRestoring,
   });
 
@@ -76,9 +77,8 @@ export default function LeagueStandingStrips({
   const myTeam = roster && profilesQuery.data ? { teamName: profile?.team_name || 'Your team', avatarId: profile?.avatar_id || '' } : null;
 
   const odds = oddsQuery.data;
-  const myOdds =
-    rosterId && odds && !odds.reason ? odds.teams.find((team) => String(team.roster_id) === rosterId) : undefined;
-  const myPlayoffOdds = myOdds ? myOdds.playoff_probability : null;
+  const myOdds = odds && !odds.reason ? odds.my_team : null;
+  const oddsLine = seasonOddsLine(odds);
 
   const leagueName = (league?.name as string | undefined) ?? '';
 
@@ -118,10 +118,13 @@ export default function LeagueStandingStrips({
         </AnimatedCard>
       ) : null}
 
-      {myPlayoffOdds !== null ? (
-        <AnimatedCard style={styles.stripCard} onPress={() => onNavigate('PlayoffOdds', { leagueId, leagueName })}>
+      {myOdds && oddsLine ? (
+        <AnimatedCard style={styles.stripCard} onPress={() => onNavigate('Games', { leagueId, leagueName })}>
           <IconCircle name="podium-outline" color={colors.violet} size={36} />
-          <AppText style={styles.stripTextGroup2}>Your simulated playoff odds: {Math.round(myPlayoffOdds)}%</AppText>
+          <View style={styles.stripTextGroup}>
+            <AppText style={styles.stripTextGroup2}>{oddsLine.headline}</AppText>
+            {oddsLine.caption ? <AppText style={styles.oddsCaption}>{oddsLine.caption}</AppText> : null}
+          </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}
@@ -139,6 +142,7 @@ function createStyles(colors: ThemeColors) {
     stripName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
     stripValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
+    oddsCaption: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
     stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   });
 }

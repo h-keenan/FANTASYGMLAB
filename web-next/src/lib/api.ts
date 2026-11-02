@@ -1,8 +1,10 @@
 import { env } from "./env";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
+import type { CandidateCompare, MoveRange } from "./startSitRange";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
+import type { OpponentProfileResponse } from "./opponentProfile";
 import type {
   CommissionerIntegrityResponse,
   DraftOrderRule,
@@ -1006,6 +1008,43 @@ export interface ValueSignalsResponse {
   sell_high: ValueSignalItem[];
 }
 
+export interface TradeOddsPackageRequest {
+  send_player_ids: string[];
+  receive_player_ids: string[];
+  has_picks?: boolean;
+}
+
+export interface TradeOddsEffectItem {
+  send_player_ids: string[];
+  receive_player_ids: string[];
+  reason: string;
+  picks_excluded?: boolean;
+  baseline?: GamesOddsRow;
+  scenario?: GamesOddsRow;
+  change?: {
+    playoff_probability: number;
+    title_probability?: number | null;
+    median_final_wins: number;
+    median_seed: number;
+    within_noise: boolean;
+    title_within_noise?: boolean;
+  };
+  margin_points?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+  weeks_remaining?: number;
+}
+
+export interface TradeOddsEffectResponse {
+  ok: boolean;
+  /** Top-level not-ready state: premium_required, offseason, no_games_left, ... */
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  results: TradeOddsEffectItem[];
+}
+
 export interface GamesPickemTeam {
   roster_id: string;
   team_name: string;
@@ -1554,6 +1593,8 @@ export interface MatchupSuggestedMove {
   weather_notes?: MatchupWeatherNote[];
   /** True once either player's game has kicked off (Sleeper locks it). */
   locked: boolean;
+  /** Projected / low / high for both players plus the win-probability lean. */
+  range?: MoveRange | null;
 }
 
 export type MatchupGameState = "pregame" | "live" | "between_games" | "final";
@@ -1650,6 +1691,8 @@ export interface MatchupWhatIfCandidate {
   win_probability_delta: number | null;
   win_probability_after: MatchupWinProbability | null;
   bullets: MatchupWhatIfBullet[];
+  /** Projected / low / high vs the current occupant plus the win-probability lean. */
+  compare?: CandidateCompare | null;
 }
 
 export interface MatchupWhatIfResponse {
@@ -3814,6 +3857,11 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
     ),
 
+  getTeamProfile: (leagueId: string, rosterId: string | number) =>
+    authorizedRequest<OpponentProfileResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/teams/${encodeURIComponent(String(rosterId))}/profile`,
+    ),
+
   getLeaguePlayoffOdds: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<PlayoffOddsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds?lens=${encodeURIComponent(lens)}`,
@@ -3833,6 +3881,11 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim/what-if?lens=${encodeURIComponent(lens)}`,
       { method: "POST", jsonBody: body },
     ),
+  postTradeOddsEffect: (leagueId: string, packages: TradeOddsPackageRequest[], lens: string = "Dynasty") =>
+    authorizedRequest<TradeOddsEffectResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/trade-odds-effect`, {
+      method: "POST",
+      jsonBody: { packages, lens },
+    }),
   getGamesPickem: (leagueId: string, week?: number) =>
     authorizedRequest<GamesPickemResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem${week ? `?week=${week}` : ""}`,

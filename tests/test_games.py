@@ -282,3 +282,103 @@ def test_pick_when_not_a_league_member_is_refused(client, monkeypatch):
     monkeypatch.setattr(svc, "_resolve_my_roster", lambda *_a, **_k: (None, "not_a_member_of_league"))
     body = c.post("/v1/leagues/999/games/pickem/pick", json={"week": 5, "matchup_id": "1", "roster_id": "2"}).json()
     assert body["ok"] is False and body["reason"] == "not_a_member_of_league"
+
+
+# --- trade effect on odds ----------------------------------------------------
+
+
+def test_trade_odds_effect_requires_auth_and_premium(client, monkeypatch):
+    c, svc = client
+    monkeypatch.setattr(svc, "_fetch_profile_fields", lambda *_a, **_k: {"entitlement": "free"})
+    body = c.post(
+        "/v1/leagues/999/trade-odds-effect",
+        json={"packages": [{"send_player_ids": ["1"], "receive_player_ids": ["2"]}]},
+    ).json()
+    assert body["reason"] == "premium_required" and body["upsell"]["title"] and body["results"] == []
+
+
+def test_trade_odds_margin_is_wider_than_zero_and_shrinks_with_trials():
+    from services import mobile_api_service as svc
+
+    wide = svc._trade_odds_margin_points(50.0, 55.0, 500)
+    narrow = svc._trade_odds_margin_points(50.0, 55.0, 5000)
+    assert wide > narrow > 0
+    assert svc._trade_odds_margin_points(0.0, 0.0, 3000) == 0.0
+    assert svc._trade_odds_margin_points(50.0, 50.0, 0) == 100.0
+
+
+def _odds_effect_setup(svc, monkeypatch, *, remaining=6, reason=""):
+    players = pd.DataFrame(
+        [
+            {"player_id": "1", "name": "A", "position": "RB", "value_score": 80.0},
+            {"player_id": "2", "name": "B", "position": "WR", "value_score": 90.0},
+        ]
+    )
+    monkeypatch.setattr(svc, "_fetch_profile_fields", lambda *_a, **_k: {"entitlement": "pro"})
+    monkeypatch.setattr(svc, "_resolve_my_roster", lambda *_a, **_k: ({"roster_id": 1, "players": ["1"]}, ""))
+    monkeypatch.setattr(svc.league_value_settings, "build_valued_players_frame_cached", lambda **_k: players)
+    monkeypatch.setattr(svc.league_value_settings, "detect_league_value_settings_from_payload", lambda _l: {})
+    monkeypatch.setattr(svc.sleeper, "get_league", lambda _id: {"settings": {}})
+    monkeypatch.setattr(svc.redis_cache, "redis_single_flight_cache", lambda **k: k["compute"]())
+    monkeypatch.setattr(
+        svc.league_rankings,
+        "build_league_rankings_frame_cached",
+        lambda **_k: pd.DataFrame([{"roster_id": "1", "power_score": 100.0}]),
+    )
+    base = {
+        "ok": True,
+        "reason": reason,
+        "trials": 3000,
+        "slope_fitted": False,
+        "games_used_for_fit": 0,
+        "weeks_remaining": 6,
+        "teams": [
+            {"roster_id": "1", "playoff_probability": 40.0, "title_probability": 5.0, "median_final_wins": 7,
+             "median_final_losses": 6, "median_seed": 6, "remaining_games": remaining}
+        ],
+    }
+
+    def fake_build(league_id, **kw):
+        if kw.get("power_overrides"):
+            team = dict(base["teams"][0], playoff_probability=52.0, title_probability=8.0, median_seed=4)
+            return {**base, "teams": [team]}
+        return base
+
+    monkeypatch.setattr(svc.playoff_simulator, "build_league_playoff_odds", fake_build)
+    monkeypatch.setattr(
+        svc.games,
+        "score_roster",
+        lambda df, ids, field, s: {"total_score": float(sum(df[df.player_id.isin(ids)][field])), "starter_score": 1.0, "bench_score": 0.0},
+    )
+    monkeypatch.setattr(svc.league_value_settings, "valuation_score_field", lambda _l: "value_score")
+
+
+def test_trade_odds_effect_reports_change_margin_and_trials(client, monkeypatch):
+    c, svc = client
+    _odds_effect_setup(svc, monkeypatch)
+    body = c.post(
+        "/v1/leagues/999/trade-odds-effect",
+        json={"packages": [{"send_player_ids": ["1"], "receive_player_ids": ["2"], "has_picks": True}]},
+    ).json()
+    result = body["results"][0]
+    assert body["reason"] == "" and result["reason"] == ""
+    assert result["change"]["playoff_probability"] == 12.0 and result["change"]["title_probability"] == 3.0
+    assert result["change"]["within_noise"] is False
+    assert result["trials"] == 3000 and result["margin_points"] > 0 and result["picks_excluded"] is True
+    assert result["power_delta"] == 10.0
+
+
+def test_trade_odds_effect_omits_when_no_games_left_or_invalid(client, monkeypatch):
+    c, svc = client
+    _odds_effect_setup(svc, monkeypatch, remaining=0)
+    body = c.post(
+        "/v1/leagues/999/trade-odds-effect",
+        json={"packages": [{"send_player_ids": ["1"], "receive_player_ids": ["2"]}]},
+    ).json()
+    assert body["reason"] == "no_games_left" and body["results"] == []
+    _odds_effect_setup(svc, monkeypatch)
+    bad = c.post(
+        "/v1/leagues/999/trade-odds-effect",
+        json={"packages": [{"send_player_ids": ["9"], "receive_player_ids": ["2"]}]},
+    ).json()
+    assert bad["results"][0]["reason"] == "invalid_package" and "change" not in bad["results"][0]

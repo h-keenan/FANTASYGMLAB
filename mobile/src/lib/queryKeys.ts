@@ -31,6 +31,8 @@ export const queryKeys = {
     [...userScopeKey(), 'league', leagueId, 'manager-tendencies'] as const,
   managerTendencyDetail: (leagueId: string, rosterId: string | number) =>
     [...userScopeKey(), 'league', leagueId, 'manager-tendencies', String(rosterId)] as const,
+  teamProfile: (leagueId: string, rosterId: string | number) =>
+    [...userScopeKey(), 'league', leagueId, 'team-profile', String(rosterId)] as const,
   guillotine: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'guillotine'] as const,
   matchup: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'matchup'] as const,
   // Dashboard's "new recap ready" module — also shared by Alerts,
@@ -47,6 +49,10 @@ export const queryKeys = {
   leagueRosters: (leagueId: string) =>
     [...userScopeKey(), 'league', leagueId, 'league-rosters'] as const,
   leagueInfo: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'info'] as const,
+  // GET .../games/season-sim: the free season-odds baseline (playoff + title).
+  seasonSim: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'season-sim'] as const,
+  tradeOddsEffect: (leagueId: string, send: string, receive: string, hasPicks: boolean) =>
+    [...userScopeKey(), 'league', leagueId, 'trade-odds-effect', send, receive, hasPicks] as const,
   playoffOdds: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'playoff-odds'] as const,
   commissionerIntegrity: (leagueId: string, draftOrder: string) =>
     [...userScopeKey(), 'league', leagueId, 'commissioner-integrity', draftOrder] as const,

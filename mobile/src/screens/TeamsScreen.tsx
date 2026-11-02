@@ -406,6 +406,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
           visible
           onClose={() => setProfileTeam(null)}
           leagueId={leagueId}
+          leagueName={leagueName}
           rosterId={profileTeam.rosterId}
           teamName={profileTeam.teamName}
           ownerName={profileTeam.ownerName}
