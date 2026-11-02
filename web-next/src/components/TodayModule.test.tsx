@@ -81,4 +81,10 @@ describe("TodayModule", () => {
     render(<TodayModule data={data({ items: [], this_week: null })} leagueId="a" leagueName="L" now={THURSDAY} />);
     expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
   });
+
+  it("never says nothing is urgent while moves are hidden behind Premium", () => {
+    render(<TodayModule data={data({ items: [], this_week: null, entitlement: { is_premium: false, visible_count: 0, hidden_count: 1 } })} leagueId="a" leagueName="L" now={THURSDAY} />);
+    expect(screen.queryByText("No urgent roster issues right now.")).toBeNull();
+    expect(screen.getByText(/1 more move available on Premium/)).toBeInTheDocument();
+  });
 });
