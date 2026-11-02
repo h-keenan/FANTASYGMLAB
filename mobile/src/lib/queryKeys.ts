@@ -49,6 +49,10 @@ export const queryKeys = {
   leagueRosters: (leagueId: string) =>
     [...userScopeKey(), 'league', leagueId, 'league-rosters'] as const,
   leagueInfo: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'info'] as const,
+  // GET .../games/season-sim: the free season-odds baseline (playoff + title).
+  seasonSim: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'season-sim'] as const,
+  tradeOddsEffect: (leagueId: string, send: string, receive: string, hasPicks: boolean) =>
+    [...userScopeKey(), 'league', leagueId, 'trade-odds-effect', send, receive, hasPicks] as const,
   playoffOdds: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'playoff-odds'] as const,
   commissionerIntegrity: (leagueId: string, draftOrder: string) =>
     [...userScopeKey(), 'league', leagueId, 'commissioner-integrity', draftOrder] as const,

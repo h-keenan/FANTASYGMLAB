@@ -6,6 +6,7 @@ import {
   gamesReasonAction,
   gamesReasonMessage,
   recordLabel,
+  tradeOddsView,
   seedChangeLabel,
   whatIfSummary,
   whatIfTone,
@@ -59,5 +60,46 @@ describe("gamesPresentation", () => {
   it("shows a record from graded picks", () => {
     expect(recordLabel({ correct: 7, graded: 10 })).toBe("7-3");
     expect(recordLabel(undefined)).toBe("0-0");
+  });
+});
+
+describe("tradeOddsView", () => {
+  const base = {
+    reason: "",
+    baseline: { playoff_probability: 40, title_probability: 5 },
+    scenario: { playoff_probability: 52, title_probability: 8 },
+    change: { playoff_probability: 12, title_probability: 3, within_noise: false, title_within_noise: false },
+    margin_points: 2.5,
+    trials: 3000,
+    slope_fitted: true,
+    weeks_remaining: 6,
+  };
+
+  it("states the change with its margin and sample size", () => {
+    const view = tradeOddsView(base)!;
+    expect(view.tone).toBe("positive");
+    expect(view.headline).toBe("Playoff odds 40% to 52% (+12.0 pts)");
+    expect(view.titleLine).toBe("Title odds 5% to 8% (+3.0 pts)");
+    expect(view.detail).toContain("3,000 simulated seasons");
+    expect(view.detail).toContain("2.5");
+    expect(view.notes).toEqual([]);
+  });
+
+  it("says no measurable change inside the margin and omits unavailable title odds", () => {
+    const view = tradeOddsView({
+      ...base,
+      scenario: { playoff_probability: 41, title_probability: null },
+      change: { playoff_probability: 1, title_probability: null, within_noise: true },
+    })!;
+    expect(view.tone).toBe("neutral");
+    expect(view.headline).toContain("no measurable change");
+    expect(view.titleLine).toBeNull();
+  });
+
+  it("flags excluded picks and an uncalibrated model, and returns null for any reason", () => {
+    const view = tradeOddsView({ ...base, picks_excluded: true, slope_fitted: false })!;
+    expect(view.notes).toHaveLength(2);
+    expect(tradeOddsView({ ...base, reason: "no_games_left" })).toBeNull();
+    expect(tradeOddsView(null)).toBeNull();
   });
 });

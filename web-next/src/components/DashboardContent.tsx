@@ -14,6 +14,7 @@ import { formatRank } from "@/components/SnapshotTile";
 import { StatStrip } from "@/components/StatStrip";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
+import { DashboardOddsStrip } from "@/components/DashboardOddsStrip";
 import { DashboardMore, DashboardNowStrip, DashboardTradesBlock } from "@/components/DashboardBlocks";
 import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { isTradeItem, nextMoveRowFilter } from "@/lib/dashboardLayout";
@@ -182,6 +183,7 @@ export function DashboardContent({
               },
             ]}
           />
+          {sample ? null : <DashboardOddsStrip leagueId={leagueId} leagueName={leagueName} />}
           {/* Beginner term explanations as short lines under the strips (as
               per-tile captions inside narrow columns they pushed Today below the fold). */}
           <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />

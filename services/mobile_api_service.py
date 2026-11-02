@@ -3208,6 +3208,263 @@ def post_games_what_if(
     }
 
 
+# ---------------------------------------------------------------------------
+# Trade effect on playoff/title odds (gap analysis #1). Reuses the Season
+# Simulator what-if above: the caller's Roster Power is recomputed for the
+# post-trade roster and the same shared playoff simulation is re-run against an
+# equally seeded baseline, so the two differ only by that input. Lazy by
+# design (its own endpoint the clients call after the verdict renders) so the
+# analyzer's p95 is untouched; baseline and scenarios are cached per TTL bucket.
+# ---------------------------------------------------------------------------
+
+_TRADE_ODDS_UPSELL = {
+    "title": "See how a trade moves your odds",
+    "body": (
+        "Premium shows the change in your playoff and championship odds for any "
+        "trade, from the same season simulation as the Games tab."
+    ),
+}
+_TRADE_ODDS_MAX_PACKAGES = 6
+_TRADE_ODDS_MAX_SIDE = 8
+
+
+class TradeOddsPackage(BaseModel):
+    send_player_ids: list[str] = Field(default_factory=list, max_length=_TRADE_ODDS_MAX_SIDE)
+    receive_player_ids: list[str] = Field(default_factory=list, max_length=_TRADE_ODDS_MAX_SIDE)
+    # Draft picks are not part of Roster Power; the response says so instead of
+    # silently pricing them at zero.
+    has_picks: bool = False
+
+
+class TradeOddsEffectRequest(BaseModel):
+    packages: list[TradeOddsPackage] = Field(default_factory=list, max_length=_TRADE_ODDS_MAX_PACKAGES)
+    lens: str = "Dynasty"
+
+
+def _trade_odds_margin_points(base_p: float, scen_p: float, trials: int) -> float:
+    """Conservative 95% margin (percentage points) on a change between two
+    simulated probabilities, treating the runs as independent. The runs share a
+    seed so the true error is smaller; we report the wider, honest bound."""
+
+    import math
+
+    if trials <= 0:
+        return 100.0
+    pb = min(max(base_p / 100.0, 0.0), 1.0)
+    ps = min(max(scen_p / 100.0, 0.0), 1.0)
+    return round(1.96 * math.sqrt((pb * (1 - pb) + ps * (1 - ps)) / trials) * 100.0, 1)
+
+
+def _trade_odds_effect_for_package(
+    *,
+    league_id: str,
+    lens: str,
+    my_rid: str,
+    current_ids: list[str],
+    players_df: pd.DataFrame,
+    settings: dict[str, Any],
+    score_field: str,
+    my_power: float,
+    base_run: dict[str, Any],
+    base_team: dict[str, Any],
+    package: TradeOddsPackage,
+) -> dict[str, Any]:
+    import zlib
+
+    import numpy as np
+
+    send = [str(pid) for pid in package.send_player_ids]
+    receive = [str(pid) for pid in package.receive_player_ids]
+    out: dict[str, Any] = {
+        "send_player_ids": send,
+        "receive_player_ids": receive,
+        "reason": "",
+        "picks_excluded": bool(package.has_picks),
+    }
+    if not send and not receive:
+        return {**out, "reason": "no_player_change"}
+    mine = set(current_ids)
+    known = {str(pid) for pid in players_df["player_id"]}
+    if any(pid not in mine for pid in send) or any(pid in mine for pid in receive) or any(
+        pid not in known for pid in receive
+    ):
+        return {**out, "reason": "invalid_package"}
+    if len(set(send)) != len(send) or len(set(receive)) != len(receive):
+        return {**out, "reason": "invalid_package"}
+
+    def compute() -> dict[str, Any]:
+        before = games.score_roster(players_df, current_ids, score_field, settings)
+        after = games.score_roster(
+            players_df, games.apply_roster_change(current_ids, receive, send), score_field, settings
+        )
+        seed = zlib.crc32(f"{league_id}:{lens}".encode()) & 0xFFFFFFFF
+        scenario_run = playoff_simulator.build_league_playoff_odds(
+            league_id,
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            rng=np.random.default_rng(seed),
+            power_overrides={my_rid: my_power + (after["total_score"] - before["total_score"])},
+        )
+        team = next((t for t in scenario_run.get("teams") or [] if t["roster_id"] == my_rid), None)
+        return {
+            "reason": scenario_run.get("reason") or ("" if team else "unavailable"),
+            "team": team,
+            "power_delta": round(after["total_score"] - before["total_score"], 1),
+            "starter_delta": round(after.get("starter_score", 0.0) - before.get("starter_score", 0.0), 1),
+        }
+
+    roster_sig = hashlib.sha1(",".join(sorted(current_ids)).encode()).hexdigest()[:12]
+    cache_key = redis_cache.build_cache_key(
+        "trade_odds_effect",
+        league_id,
+        lens,
+        my_rid,
+        roster_sig,
+        ",".join(sorted(send)),
+        ",".join(sorted(receive)),
+        playoff_simulator._playoff_odds_cache_bucket(),
+    )
+    computed = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS,
+        compute=compute,
+        lock_timeout_seconds=10.0,
+    )
+    if computed.get("reason") or not computed.get("team"):
+        return {**out, "reason": computed.get("reason") or "unavailable"}
+    scen = computed["team"]
+    trials = int(base_run.get("trials") or 0)
+    base_p = float(base_team.get("playoff_probability") or 0.0)
+    scen_p = float(scen.get("playoff_probability") or 0.0)
+    change = games.compare_odds(base_team, scen)
+    margin = _trade_odds_margin_points(base_p, scen_p, trials)
+    change["within_noise"] = abs(change["playoff_probability"]) < max(games.NOISE_POINTS, margin)
+    base_title = base_team.get("title_probability")
+    scen_title = scen.get("title_probability")
+    change["title_probability"] = (
+        round(float(scen_title) - float(base_title), 1)
+        if base_title is not None and scen_title is not None
+        else None
+    )
+    change["title_within_noise"] = (
+        True
+        if change["title_probability"] is None
+        else abs(change["title_probability"])
+        < max(1.0, _trade_odds_margin_points(float(base_title), float(scen_title), trials))
+    )
+    return {
+        **out,
+        "baseline": _games_odds_row(base_team),
+        "scenario": _games_odds_row(scen),
+        "change": change,
+        "margin_points": margin,
+        "power_delta": computed["power_delta"],
+        "starter_delta": computed["starter_delta"],
+        "trials": trials,
+        "slope_fitted": bool(base_run.get("slope_fitted")),
+        "games_used_for_fit": int(base_run.get("games_used_for_fit") or 0),
+        "weeks_remaining": int(base_run.get("weeks_remaining") or 0),
+        "remaining_games": int(base_team.get("remaining_games") or 0),
+    }
+
+
+@app.post("/v1/leagues/{league_id}/trade-odds-effect")
+@_with_sleeper_as_of
+def post_trade_odds_effect(
+    body: TradeOddsEffectRequest,
+    league_id: str = Depends(require_league_access),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Premium. For each trade package, how the caller's playoff and title odds
+    would change, from the shared Season Simulator. Honest degradation: any
+    not-ready state (offseason, no games left, no playoff format, simulator
+    unavailable) comes back as a top-level `reason` with no results, and each
+    result carries its own margin of error and sample size."""
+
+    _games_check_lens(body.lens)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {"ok": True, "reason": "premium_required", "is_premium": False, "upsell": _TRADE_ODDS_UPSELL, "results": []}
+
+    def not_ready(reason: str) -> dict[str, Any]:
+        return {"ok": True, "reason": reason, "is_premium": True, "upsell": None, "results": []}
+
+    if not body.packages:
+        return not_ready("no_packages")
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return not_ready(roster_reason or "no_roster")
+    my_rid = str(my_roster.get("roster_id"))
+    current_ids = [str(pid) for pid in (my_roster.get("players") or []) if pid is not None]
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if players_df.empty or "player_id" not in players_df.columns:
+        return not_ready("no_rankings_data")
+    league = sleeper.get_league(league_id)
+    if not league:
+        return not_ready("unavailable")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(body.lens)
+
+    # The paired baseline: same fixed seed as every scenario below (not the
+    # shared cache's bucket seed), cached per TTL bucket.
+    def _paired_baseline() -> dict[str, Any]:
+        import zlib
+
+        import numpy as np
+
+        seed = zlib.crc32(f"{league_id}:{body.lens}".encode()) & 0xFFFFFFFF
+        return playoff_simulator.build_league_playoff_odds(
+            league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH, rng=np.random.default_rng(seed)
+        )
+
+    base_run = redis_cache.redis_single_flight_cache(
+        cache_key=redis_cache.build_cache_key(
+            "trade_odds_baseline", league_id, body.lens, playoff_simulator._playoff_odds_cache_bucket()
+        ),
+        ttl_seconds=playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS,
+        compute=_paired_baseline,
+        lock_timeout_seconds=10.0,
+    )
+    if base_run.get("reason"):
+        return not_ready(str(base_run["reason"]))
+    frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
+    )
+    my_power = None
+    if not frame.empty:
+        match = frame[frame["roster_id"].astype(str) == my_rid]
+        if not match.empty:
+            my_power = float(match.iloc[0].get("power_score") or 0.0)
+    base_team = next((t for t in base_run.get("teams") or [] if t["roster_id"] == my_rid), None)
+    if my_power is None or not base_team:
+        return not_ready("no_rankings_data")
+    if int(base_team.get("remaining_games") or 0) <= 0:
+        return not_ready("no_games_left")
+
+    results = [
+        _trade_odds_effect_for_package(
+            league_id=league_id,
+            lens=body.lens,
+            my_rid=my_rid,
+            current_ids=current_ids,
+            players_df=players_df,
+            settings=settings,
+            score_field=score_field,
+            my_power=my_power,
+            base_run=base_run,
+            base_team=base_team,
+            package=package,
+        )
+        for package in body.packages
+    ]
+    return {"ok": True, "reason": "", "is_premium": True, "upsell": None, "results": results}
+
+
 def _pickem_context(league_id: str) -> tuple[dict[str, Any] | None, str, int, dict[str, Any]]:
     """(league, season, current_week, roster profiles); league None if unknown."""
 

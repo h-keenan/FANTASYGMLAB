@@ -119,3 +119,98 @@ export function matchPlayersByName<T extends { name: string | null }>(players: r
   }
   return [...starts, ...wordStarts, ...contains].slice(0, limit);
 }
+
+// ---------------------------------------------------------------------------
+// Trade effect on odds (POST .../trade-odds-effect). Mirrored on web and mobile.
+// ---------------------------------------------------------------------------
+
+export interface TradeOddsEffectResult {
+  reason: string;
+  picks_excluded?: boolean;
+  baseline?: { playoff_probability: number; title_probability?: number | null };
+  scenario?: { playoff_probability: number; title_probability?: number | null };
+  change?: {
+    playoff_probability: number;
+    title_probability?: number | null;
+    within_noise: boolean;
+    title_within_noise?: boolean;
+  };
+  margin_points?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  weeks_remaining?: number;
+}
+
+export interface TradeOddsView {
+  tone: WhatIfTone;
+  headline: string;
+  titleLine: string | null;
+  detail: string;
+  notes: string[];
+}
+
+/** Everything the odds row shows, or null when there is nothing real to show
+ * (offseason, no games left, invalid package, simulator unavailable): the row
+ * is omitted rather than filled with a guess. */
+export function tradeOddsView(result: TradeOddsEffectResult | null | undefined): TradeOddsView | null {
+  if (!result || result.reason || !result.baseline || !result.scenario || !result.change) return null;
+  const { baseline, scenario, change } = result;
+  const move = change.within_noise ? 'no measurable change' : `${formatDelta(change.playoff_probability)} pts`;
+  const headline = `Playoff odds ${formatOdds(baseline.playoff_probability)} to ${formatOdds(scenario.playoff_probability)} (${move})`;
+  let titleLine: string | null = null;
+  if (baseline.title_probability != null && scenario.title_probability != null) {
+    const titleMove =
+      change.title_within_noise || change.title_probability == null
+        ? 'no measurable change'
+        : `${formatDelta(change.title_probability)} pts`;
+    titleLine = `Title odds ${formatTitleOdds(baseline.title_probability)} to ${formatTitleOdds(scenario.title_probability)} (${titleMove})`;
+  }
+  const parts: string[] = [];
+  if (result.margin_points != null) parts.push(`margin of error about ${result.margin_points.toFixed(1)} pts`);
+  if (result.trials) parts.push(`${result.trials.toLocaleString('en-US')} simulated seasons`);
+  if (result.weeks_remaining) parts.push(`${result.weeks_remaining} weeks left`);
+  const notes: string[] = [];
+  if (result.picks_excluded) notes.push('Draft picks are not counted in these odds.');
+  if (result.slope_fitted === false) notes.push('Early-season estimate: too few games played to calibrate to this league.');
+  return { tone: whatIfTone(change), headline, titleLine, detail: parts.join(', '), notes };
+}
+
+/** Season-odds line for the Dashboard strip (GET .../games/season-sim, free).
+ * Title odds are included only when the simulator says they are available;
+ * returns null (strip hidden) whenever there is nothing real to show. */
+export function seasonOddsLine(
+  data:
+    | {
+        reason?: string;
+        my_team?: {
+          playoff_probability: number;
+          title_probability?: number | null;
+          clinched?: boolean;
+          eliminated?: boolean;
+        } | null;
+        title_odds?: { available: boolean; reason: string };
+        weeks_remaining?: number;
+        trials?: number;
+        slope_fitted?: boolean;
+      }
+    | null
+    | undefined,
+): { headline: string; caption: string } | null {
+  if (!data || data.reason || !data.my_team) return null;
+  const mine = data.my_team;
+  const playoff = mine.clinched
+    ? 'Playoffs clinched'
+    : mine.eliminated
+      ? 'Out of playoff contention'
+      : `Playoff odds ${formatOdds(mine.playoff_probability)}`;
+  const titleAvailable = data.title_odds?.available === true && mine.title_probability != null;
+  const headline = titleAvailable ? `${playoff} · Title odds ${formatTitleOdds(mine.title_probability)}` : playoff;
+  const caption = [
+    data.weeks_remaining ? `${data.weeks_remaining} weeks left` : null,
+    data.trials ? `${data.trials.toLocaleString('en-US')} simulated seasons` : null,
+    data.slope_fitted === false ? 'early-season estimate' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return { headline, caption: caption ? `Rest-of-season simulation: ${caption}.` : '' };
+}
