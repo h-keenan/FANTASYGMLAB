@@ -408,10 +408,14 @@ body {
     --glass-input-border: rgba(10, 30, 45, 0.12);
   }
 }
+/* Write backdrop-filter WITHOUT a hand-written -webkit- twin: with both, the
+   production CSS optimizer kept only the -webkit- one, so Chrome/Firefox/
+   Android got no blur and every glass menu, sheet and card was see-through
+   with the page text ghosting through (2026-11-02 audit). The build adds the
+   prefix itself where Safari needs it. */
 .glass-surface {
   background: var(--glass-bg);
   backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--glass-shadow);
@@ -498,7 +502,6 @@ body {
 [style*="var(--color-surface-secondary)"],
 [style*="var(--color-surface-raised)"] {
   backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 
 /* coridian_, 2026-10-18: "Add that moving background from signup to be
@@ -582,7 +585,6 @@ body {
   overflow: hidden;
   background: rgba(31, 34, 38, 0.72);
   backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   /* Liquid-glass pass, 2026-10-19: rounded top corners only — this is a
      bottom sheet flush with the screen edge, not a floating card, so the
@@ -976,7 +978,6 @@ a {
      doesn't assume. */
   background: linear-gradient(165deg, rgba(50, 54, 60, 0.55), rgba(24, 26, 30, 0.78));
   backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-panel);
   box-shadow:
@@ -2088,7 +2089,6 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-glass {
   background: rgba(255, 255, 255, 0.045);
   backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 36px rgba(0, 0, 0, 0.45);
   border-radius: var(--radius-panel);
