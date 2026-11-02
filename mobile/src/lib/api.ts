@@ -2808,6 +2808,42 @@ export interface TradeHubResponse {
   posture_sentence?: string;
 }
 
+/** Why a Trade Finder "closest option" is NOT a realistic trade yet
+ * (modules.trade_ideas.finder_closest_note). */
+export interface TradeFinderNote {
+  stage: string;
+  /** Always 'Stretch': a near miss is never presented as realistic. */
+  label: string;
+  reason: string;
+  value_gap: number;
+}
+
+export interface TradeFinderSearchReason {
+  code: string;
+  count: number;
+  text: string;
+}
+
+/** GET .../trade-finder `search` block. `error` means the search crashed,
+ * which is not the same as "no trades exist". */
+export interface TradeFinderSearch {
+  status: 'found' | 'closest' | 'none' | 'error';
+  found: number;
+  closest: number;
+  headline?: string;
+  selection?: { labels: string[]; value: number };
+  reasons?: TradeFinderSearchReason[];
+  partners_checked?: number;
+}
+
+export type TradeFinderClosestIdea = TradeIdea & { finder_note?: TradeFinderNote };
+
+export interface TradeFinderResponse extends TradeHubResponse {
+  /** Labelled near misses, only when `ideas` is empty. Older servers omit it. */
+  closest?: TradeFinderClosestIdea[];
+  search?: TradeFinderSearch;
+}
+
 export interface AllTradesEntitlement {
   is_premium: boolean;
   free_limit: number;
@@ -3365,7 +3401,7 @@ export const api = {
      * only packages that bring a partner pick back. */
     options: { pickIds?: string[]; returnPicks?: boolean } = {},
   ) =>
-    authorizedFetch<TradeHubResponse>(
+    authorizedFetch<TradeFinderResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(','))}&strategy=${strategy}&lens=${encodeURIComponent(lens)}${options.pickIds && options.pickIds.length > 0 ? `&pick_ids=${encodeURIComponent(options.pickIds.join(','))}` : ''}${options.returnPicks ? '&return_picks=true' : ''}`,
     ),
   getAllTrades: (

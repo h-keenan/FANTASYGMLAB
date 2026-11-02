@@ -278,6 +278,79 @@ describe("TradeFinderContent", () => {
     expect(screen.getByText(/No realistic trades found for this selection/)).toBeInTheDocument();
   });
 
+  it("explains a dead end and shows labelled stretch options instead of a bare empty state", async () => {
+    const response: TradeFinderResponse = {
+      ok: true,
+      ideas: [],
+      reason: "",
+      is_premium: true,
+      upsell: null,
+      search: {
+        status: "closest",
+        found: 0,
+        closest: 1,
+        headline: "9 packages near that value were dropped because the other team has no roster reason to want them.",
+        selection: { labels: ["2029 Round 4"], value: 600 },
+        reasons: [
+          { code: "partner_fit", count: 9, text: "9 packages near that value were dropped because the other team has no roster reason to want them." },
+          { code: "roster_full", count: 0, text: "Your roster is full, so any deal that adds a player means dropping one." },
+        ],
+      },
+      closest: [
+        {
+          ...idea({ partner_team_name: "Near Miss GM", trade_gain: -50, value_edge_band: "Fair" }),
+          finder_note: {
+            stage: "value_band",
+            label: "Stretch",
+            reason: "You would need to add about 600 more value to reach this.",
+            value_gap: 600,
+          },
+        },
+      ],
+    };
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(screen.getByText(/No realistic trades found for this selection/)).toBeInTheDocument();
+    expect(screen.getAllByText(/no roster reason to want them/)).toHaveLength(1);
+    expect(screen.getByText(/Your roster is full/)).toBeInTheDocument();
+    expect(screen.getByText("Closest options (stretch)")).toBeInTheDocument();
+    expect(screen.getByText("Stretch")).toBeInTheDocument();
+    expect(screen.getByText(/add about 600 more value/)).toBeInTheDocument();
+    expect(screen.getByText("Near Miss GM")).toBeInTheDocument();
+  });
+
+  it("reports a failed search as a problem with a retry, not as zero trades", async () => {
+    const response: TradeFinderResponse = {
+      ok: true,
+      ideas: [],
+      reason: "",
+      is_premium: true,
+      upsell: null,
+      closest: [],
+      search: { status: "error", found: 0, closest: 0, headline: "The search hit a problem on our side." },
+    };
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(screen.queryByText(/No realistic trades found/)).not.toBeInTheDocument();
+    expect(screen.getByText("The search hit a problem.")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledTimes(2);
+  });
+
   it("shows the premium upsell instead of the builder once a Free caller searches", async () => {
     const response: TradeFinderResponse = {
       ok: true,

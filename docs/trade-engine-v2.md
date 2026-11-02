@@ -228,3 +228,70 @@ retool 3.5-PPG package is -3892; contender (w_now 1.50) -5113; rebuild (1.05) -3
   players read as worth more points per value than they produce this season).
 - Verdict bands and confidence cut points are product choices layered on the number, not
   fitted to outcomes.
+
+## Trade Finder: shopping picks (and saying why nothing was found)
+
+Owner report (coridian_, 2026-11-01, mobile screenshot): one pick ticked, "Any return",
+"No realistic trades found for this selection right now" ("still no realistic trade").
+Code: `modules/trade_ideas.py` (pattern 5, `FinderSearchTrace`, `finder_value_band`,
+`finder_search_payload`, `finder_closest_note`), `modules/trade_hub_engine.py`
+(`generate_trade_finder_records(finder_trace=...)`), `services/mobile_api_service.py`
+(`GET /v1/leagues/{id}/trade-finder`), tests in `tests/test_trade_finder_pick_search.py`.
+
+### Root causes (reproduced on the 12-team synthetic league, full 26-man roster)
+
+Before the fix every one of the user's 8 picks, in contender / retool / rebuild, returned zero
+ideas (24 of 24). Four independent causes stacked, each one enough to empty the list:
+
+1. **Roster-full penalty.** A pick-for-player trade adds a roster spot, and
+   `evaluate_trade_market_realism` docked 16 + 4n points whenever the roster was at its limit.
+   Dynasty rosters are normally full, so every pick-for-player package fell below the 54
+   acceptance bar (best candidate scored 52). The user chose what to shop, so adding a player is
+   the purpose of the trade: it is now `4 + 2n`, never a veto, and the idea says "Your roster is
+   full, so you would need to drop a player to fit this."
+2. **Fixed target pool.** Targets came from the top 14 partner assets by roster fit, capped to 8,
+   with a 1500 value floor and a fixed -1500/+1200 band. A 600-3000 pick was therefore matched
+   against 5000+ players and failed the value band for every partner (88 of 88 candidates in the
+   traced run). Targets are now every partner asset inside `finder_value_band(send_value)`
+   (low = -clamp(30% of value, 400, 1500), high = clamp(40%, 400, 1200)), ranked by roster fit,
+   then closeness.
+3. **Posture veto.** `_fit_priority` (-7 per pick sold) and `_team_fit_assessment` (-12 rebuild,
+   -16 tank) penalize selling picks. For a pick the user explicitly ticked those terms are added
+   back (`_pick_send_posture_terms`); the partner's side and the market check are unchanged.
+4. **"Any return" never tried pick-for-pick.** Pick swaps (move up, move down, consolidate two
+   picks into one, spread one into two) only ran with "Picks back". They now run for every
+   explicit pick selection (value within +/-20%, never a like-for-like swap), and send packages go
+   up to 3 picks (14 packages from 4 picks).
+
+After: contender and retool find options for every pick (1-9 ideas each), rebuild finds options
+for the R1s and some late picks, and the rest are honest dead ends (below). Unchanged: Trust
+enforcement, the Trade Analyzer FAIR gate, partner roster-fit (`partner_score > 0` for pick-for-
+player, `> -4` for pick-for-pick because a swap carries no positional signal), market realism
+hard fails (cornerstone, scarcity, protected assets).
+
+### When there is still nothing: why, and the closest options
+
+`FinderSearchTrace` counts where candidates died: `candidates`, `value_band` (nothing priced near
+the selection), `my_fit`, `partner_fit`, `reasoning`, `market`, `market_hard`, `analyzer`,
+`trust`, plus the nearest asset's value gap. `finder_search_payload` turns that into
+`search = {status, headline, selection, reasons[], funnel, partners_checked}`. It only states
+causes the funnel measured.
+
+- `status`: `found`, `closest` (nothing realistic, near misses attached), `none`, or `error`.
+  A crashed search used to surface as a 500 or an empty list, indistinguishable from "no trades
+  exist"; it is now `error` ("not a real no-trades result, try again").
+- `closest[]`: up to 3 near misses, one per partner, ranked analyzer-rejected (the partner may
+  take it but it grades as a loss for you) < market-thin < weak-fit < partner-fit < value-gap.
+  Trust hard-fails are never offered, and the near misses go through the same
+  `enforce_generated_trade_ideas` as real results. Each carries
+  `finder_note = {label: "Stretch", reason, value_gap, stage}`, for example "You would need to add
+  about 580 more value to reach this." The list is only sent when `ideas` is empty, so an old
+  client that ignores the new fields just shows its old empty state.
+- Clients: web `TradeFinderNoResults.tsx` and mobile `TradeFinderNoResults.tsx` render the
+  headline, the measured reasons, the "Closest options (stretch)" cards with a Stretch
+  `ToneBadge`, and a retry for `error`.
+
+Limits, stated plainly: "partner would likely take it" is inferred from roster fit and market
+realism, not from manager behavior beyond the existing trade-style hints; value gaps use the
+engine's pick values (posture-adjusted), not market consensus; the synthetic league has a smooth
+value ladder, so real leagues will show different mixes of reasons.

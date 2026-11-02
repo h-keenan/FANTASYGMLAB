@@ -10355,6 +10355,108 @@ def test_trade_finder_accepts_a_picks_only_selection_and_return_picks(monkeypatc
     assert mock_generate.call_args.kwargs["require_receive_picks"] is True
 
 
+def _trade_finder_call(client, query, generate):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.sleeper.get_league_roster_profiles", return_value={}):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                with patch("modules.trade_hub_engine.generate_trade_idea_records", **generate):
+                                    return client.get(
+                                        f"/v1/leagues/abc/trade-finder?{query}",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+
+def test_trade_finder_search_failure_is_reported_as_an_error_not_as_zero_trades(monkeypatch):
+    """A crashed search used to be indistinguishable from "nothing exists"."""
+
+    client = _client(monkeypatch)
+    response = _trade_finder_call(client, "pick_ids=2027:1:1", {"side_effect": RuntimeError("boom")})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ideas"] == [] and body["closest"] == []
+    assert body["search"]["status"] == "error"
+    assert "not a real" in body["search"]["headline"]
+
+
+def test_trade_finder_dead_end_returns_why_and_labelled_closest_options(monkeypatch):
+    from modules import trade_ideas as trade_ideas_module
+
+    near_miss = {
+        "partner_team_name": "Rival GM",
+        "rationale": "Closest player value to the picks you chose to shop.",
+        "trade_gain": -5,
+        "trade_confidence_label": "Low",
+        "market_realism_label": "Thin",
+        "reasoning_tags": [],
+        "finder_stretch_stage": "value_band",
+        "send_assets": [
+            {"asset_type": "pick", "label": "2027 Round 4", "season": 2027, "round": 4,
+             "original_roster_id": 1, "owner_roster_id": 1, "score": 500},
+        ],
+        "receive_assets": [
+            {"asset_type": "pick", "label": "2027 Round 3", "season": 2027, "round": 3,
+             "original_roster_id": 2, "owner_roster_id": 2, "score": 1100},
+        ],
+    }
+
+    def fake_generate(**kwargs):
+        trace = kwargs["finder_trace"]
+        trace.send_value = 500
+        trace.send_labels = ["2027 Round 4"]
+        trace.partners = 11
+        trace.count("partner_fit", 9)
+        trace.count("candidates", 12)
+        trace.enforced_closest = [near_miss]
+        return []
+
+    client = _client(monkeypatch)
+    response = _trade_finder_call(client, "pick_ids=2027:4:1", {"side_effect": fake_generate})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ideas"] == []
+    assert body["search"]["status"] == "closest"
+    assert body["search"]["selection"] == {"labels": ["2027 Round 4"], "value": 500}
+    assert "no roster reason to want" in body["search"]["headline"]
+    assert len(body["closest"]) == 1
+    note = body["closest"][0]["finder_note"]
+    assert note["label"] == "Stretch"
+    assert "add about 600 more value" in note["reason"]
+    assert trade_ideas_module.finder_closest_note(near_miss)["value_gap"] == 600
+
+
+def test_trade_finder_found_results_report_found_and_no_closest(monkeypatch):
+    fake_record = {
+        "partner_team_name": "Rival GM",
+        "rationale": "x",
+        "trade_gain": 5,
+        "trade_confidence_label": "Moderate",
+        "market_realism_label": "Plausible",
+        "reasoning_tags": [],
+        "send_assets": [],
+        "receive_assets": [],
+    }
+    client = _client(monkeypatch)
+    response = _trade_finder_call(client, "pick_ids=2027:1:1", {"return_value": [fake_record]})
+    body = response.json()
+    assert body["search"]["status"] == "found"
+    assert body["closest"] == []
+
+
 def test_all_trades_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/all-trades")
