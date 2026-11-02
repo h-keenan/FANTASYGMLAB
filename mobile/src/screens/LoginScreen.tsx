@@ -218,6 +218,7 @@ export default function LoginScreen() {
 
             {mode === 'signIn' ? (
               <TouchableOpacity accessibilityRole="button"
+                hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}
                 onPress={() => {
                   setResetMode(true);
                   setError(null);

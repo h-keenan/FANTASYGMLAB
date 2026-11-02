@@ -148,8 +148,8 @@ export function GuessThePlayerCard({
           type="button"
           aria-label="Dismiss Guess the Player"
           onClick={dismiss}
-          className="shrink-0 text-sm"
-          style={{ color: "var(--color-text-muted)" }}
+          className="tap-link justify-center shrink-0 text-sm"
+          style={{ minWidth: "var(--touch-target-min)", color: "var(--color-text-muted)" }}
         >
           ✕
         </button>
