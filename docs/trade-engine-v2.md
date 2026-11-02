@@ -163,8 +163,8 @@ present   = PRESENT_ADJUST[posture] * k * ros_delta
 
 | posture | WIN_WEIGHT (x market price of one win's points) | orientation (+1 present, -1 future) | PRESENT_ADJUST | net weight on lineup points |
 | --- | --- | --- | --- | --- |
-| contender | 0.50 | +1.0 | 0 | 1.50 plus the wins term |
-| fringe contender | 0.35 | +0.6 | 0 | 1.35 plus the wins term |
+| contender | 1.00 | +1.0 | 0 | 1.50 plus the wins term |
+| fringe contender | 0.70 | +0.6 | 0 | 1.35 plus the wins term |
 | retool | 0.15 | 0 | 0 | 1.15 |
 | rebuild | 0 | -0.8 | -0.40 | 0.65 |
 | tank | 0 | -1.0 | -0.60 | 0.40 |
@@ -180,35 +180,41 @@ present   = PRESENT_ADJUST[posture] * k * ros_delta
   its lineup for the future is charged.
 - Rebuild/tank take less credit for lineup points (and less penalty for losing them): "short-term
   lineup loss weighs little" is the PRESENT_ADJUST column, not a rule.
-- `lineup_costly` (what the card words) is: posture WIN_WEIGHT >= 0.35 (contender / fringe) and (>= 0.35 expected wins
+- `lineup_costly` (what the card words) is: posture WIN_WEIGHT >= 0.70 (contender / fringe) and (>= 0.35 expected wins
   or >= 3% of the roster's projected points over the remaining weeks) lost. Relative to the
   margin, not a fixed number of points.
 
-**No cap and no special case.** The score moves and the verdict is the ladder band of the new
-score. When the market value alone says accept (value balance >= +500) but the posture terms
-pulled the score below an accept, `band` is an honest label while `ui_verdict`/`tone` stay the
-ladder's (so older clients still render a valid card):
+**One number, no relabel.** The window, direction and present terms are part of `trade_score`,
+and `band`, `ui_verdict`, `tone`, the Hub/Finder suggestion bar (`clears_suggestion_bar`) and
+counter search all read that one score against the one ladder (`trade_value_bands`). Nothing is
+relabelled or demoted after the score (the earlier `verdict_label_override` and the forced FAIR UI
+verdict were presentation patches on a score that still said accept: removed). The weights are what
+make this honest: `WINDOW_WIN_WEIGHT` was doubled for the window postures (contender 0.5 -> 1.0,
+fringe 0.35 -> 0.7; retool stays 0.15) so the cost of a lost win is large enough to move the score
+itself. Calibration, 4 public leagues, "sell the top skill player for two R1s": a fringe contender
+costing ~156 lineup points (~2 wins, +5.6k market value) scored +1269 at the old weights, +456 at
+x1.5, -357 at x2, -1984 at x3; a contender selling for +4.2k and costing 107 points went +252 ->
+-1601. Rebuild/tank are unchanged (window weight 0).
 
-| label (`band`) | when |
+What is reported, not decided: when the market value alone says accept (value balance >= +500) but
+the posture terms pulled the score below an accept (`trade_posture.window_overrules_value`), the
+verdict is the score's rung, the line under it keeps saying what the market says, the heading is
+"The trade-off", and cards carry a descriptive `posture_label` tag (`trade_posture.tradeoff_tag`):
+
+| tag (`posture_label`) | when |
 | --- | --- |
-| `GOOD VALUE, COSTS YOUR LINEUP` | win-now posture, material lineup cost |
-| `VALUE WIN, MOVES YOU TOWARD A REBUILD` | contender, direction toward the future |
-| `VALUE WIN, AGAINST YOUR REBUILD` | rebuild/tank, direction toward the present |
+| `Costs your lineup` | win-now posture, material lineup cost (`lineup_costly`) |
+| `Moves you toward a rebuild` | contender, direction toward the future |
+| `Against your rebuild` | rebuild/tank, direction toward the present |
 
-The window cost is a multiple of the league's own price scale (`value_per_point`), not an
-absolute number of value units. The old fixed 700/win was a rounding error where first-round
-picks price at 5.5-9.8k: a contender selling its best player for two R1s (about 156 lineup
-points, 2 expected wins) still graded SMASH ACCEPT. Beyond the scaled window cost, a win-now
-posture (contender / fringe contender) with a material lineup cost (`lineup_costly`) is never
-shown a clean ACCEPT / SMASH ACCEPT: when the score is still an accept the label becomes
-`GOOD VALUE, COSTS YOUR LINEUP` and the UI verdict degrades to the neutral FAIR rung (a SMASH
-that converts the present into the future, without a material cost, becomes `VALUE WIN, MOVES
-YOU TOWARD A REBUILD`). The score is untouched; only the wording and rung report the
-disagreement. `trade_hub_ideas`/Finder drop these (posture labels are not suggested).
+A tag is a fact next to the verdict, never a verdict: a trade can legitimately still clear the
+bar with a tag (a small lineup cost against a very large value gain), and `lineup_costly` plus the
+`posture_note` sentence say so. Hub/Finder drop what does not clear the bar by score alone
+(Finder offers it as a Stretch option).
 
-The line under the verdict keeps saying what the market says ("You win big on value"), the
-heading becomes "The trade-off", counter search (`score_band`) treats it as the ladder band and
-never offers another posture-labelled package as an improvement, and the rationale starts with
+When the window overrules the market, the line under the verdict keeps saying what the market says
+("You win big on value"), the heading becomes "The trade-off", counter search reads the score's
+rung (`score_band` always equals `band` now), and the rationale starts with
 `posture_note`: "You're a contender (#2 of 12, 4-2): this costs ~83 lineup points over Weeks
 8-17 (about 1.1 fewer wins) and trades your present for future value, a step toward a
 rebuild." The "Helps because" lead is not used when the lineup cost is material for a team
@@ -218,8 +224,8 @@ with a competitive window. `verdict.posture_assessment` exposes every term;
 the model's own sigma.
 
 The owner's trade (synthetic, same shape, 2028 R1 priced to a +3,535 balance): contender
-GOOD VALUE, COSTS YOUR LINEUP (ladder FAIR, score -391); fringe contender GOOD VALUE, COSTS
-YOUR LINEUP (FAIR, 476); retool ACCEPT (1,441); rebuild SMASH ACCEPT (3,039). Before: retool and
+(score -391 at the old weights, lower now; ladder FAIR or worse); fringe contender
+(FAIR, 476 at the old weights); retool ACCEPT (1,441); rebuild SMASH ACCEPT (3,039). Before: retool and
 rebuild SMASH ACCEPT, contender ACCEPT. Test:
 `tests/test_trade_posture.py`.
 
@@ -228,8 +234,9 @@ rebuild SMASH ACCEPT, contender ACCEPT. Test:
 `test_calibration_grid_*` grades 11 trade shapes on 2 rosters (deep, thin) under all 5 postures
 (100 cases) with the posture terms on and off:
 
-- UI verdict changes: contender 3/20, fringe 0/20, retool 2/20, rebuild 7/20, tank 9/20 (21
-  of 100); label-only changes add 8 more (29 total).
+- UI verdict changes: contender 3/20, fringe 3/20, retool 2/20, rebuild 7/20, tank 9/20 (24
+  of 100); band-only changes (ACCEPT <-> SMASH ACCEPT) add 6 more (30 total). Band and UI
+  verdict are both the rung of the score; there is no separate label.
 - Every win-now change is a lower score (the grid has no case where a contender gains standing).
   Even swaps, upgrades, 2-for-1 consolidation and overpays keep their verdict for contender,
   fringe contender and retool.
@@ -392,9 +399,10 @@ still be shown ideas that cost lineup. Now one function owns the posture:
     its picks ignored records and differed from the same pick resolved by pick_id.
   - the card's `trade_gain` is the Analyzer's `value_delta` for that package; the engine's raw
     asset-score difference is kept as `engine_trade_gain`.
-- Filtering: an idea whose Analyzer label is a posture trade-off ("GOOD VALUE, COSTS YOUR
-  LINEUP", "VALUE WIN, MOVES YOU TOWARD A REBUILD", "VALUE WIN, AGAINST YOUR REBUILD") is not
-  suggested. In Trade Finder it comes back as a Stretch option that says so.
+- Filtering: the suggestion bar is the score alone (`clears_suggestion_bar`), so a trade whose
+  window or direction cost pulls its score under the "essentially even" rung is not suggested. In
+  Trade Finder it comes back as a Stretch option that says so (the Analyzer's grade plus the
+  `posture_note`). There is no label check.
 - Ranking: `trade_posture.sort_rank` leads the presentation key: `aligned` (a contender gaining
   >= 5 lineup points, a rebuild moving toward the future) first, `neutral` next, `costly`
   (material lineup cost, or a conversion against the posture) last; within aligned, the Analyzer

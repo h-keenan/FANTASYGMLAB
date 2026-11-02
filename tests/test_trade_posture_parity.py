@@ -19,6 +19,7 @@ from modules import (
     trade_hub_engine,
     trade_hub_presentation,
     trade_ideas,
+    trade_grade,
     trade_offer_analyzer,
     trade_posture,
     trade_value_bands,
@@ -100,12 +101,15 @@ def test_hub_finder_and_dashboard_ideas_read_like_the_analyzer_for_each_posture(
             assert idea["analyzer_verdict"] == verdict.ui_verdict, where
             assert idea["analyzer_trade_score"] == verdict.trade_score, where
             assert idea["analyzer_label"] == verdict.band, where
-            assert idea["posture_label"] == (verdict.band if verdict.band in trade_value_bands.POSTURE_VERDICTS else ""), where
+            assert idea["posture_label"] == trade_posture.tradeoff_tag(verdict.posture, verdict.posture_assessment), where
             # What the card shows (after stamping the user's real posture) is the Analyzer's note, word for word.
             assert record["posture"]["key"] == verdict.posture["key"] == posture_key, where
             assert record["posture_note"] == verdict.posture_note, where
-            # Everything surfaced is something the Analyzer would not call a trade-off.
-            assert verdict.band not in trade_value_bands.POSTURE_VERDICTS, where
+            # One number: everything surfaced clears the bar the Analyzer's own
+            # score sets, and the Analyzer's band is the rung of that same score.
+            assert trade_grade.clears_suggestion_bar(verdict), where
+            rung = trade_value_bands.band_for_score(verdict.trade_score)
+            assert (verdict.band, verdict.ui_verdict, verdict.tone) == (rung.verdict, rung.ui_verdict, rung.tone), where
             assert verdict.ui_verdict in {"FAIR", "ACCEPT"}, where
             # Dashboard: the tile's headline is one of these ideas and carries the same facts.
             card = trade_hub_engine.project_trade_idea_card(record).to_dict()
@@ -126,7 +130,9 @@ def test_each_posture_changes_what_a_costly_trade_grades_like_in_every_surface()
     for key in ("contender", "rebuild"):
         fit, verdict = TP._higgins(key, posture=_resolved(key))
         verdicts[key] = verdict
-    assert verdicts["contender"].band == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
+    # No relabel: the contender's cost is in the score, so the rung is just lower.
+    assert verdicts["contender"].trade_score < trade_value_bands.ACCEPT
+    assert verdicts["contender"].band == trade_value_bands.band_for_score(verdicts["contender"].trade_score).verdict
     assert verdicts["rebuild"].ui_verdict == "ACCEPT"
     # The gate Hub, Finder and the Dashboard share drops the contender's version, keeps the rebuild's.
     for key, expected in (("contender", False), ("rebuild", True)):
@@ -138,7 +144,8 @@ def test_each_posture_changes_what_a_costly_trade_grades_like_in_every_surface()
         with patch("modules.trade_grade.grade_trade_for_user", return_value=({}, verdicts[key])):
             idea = {"send_assets": [], "receive_assets": []}
             assert gate.passes(idea) is expected
-        assert idea["posture_label"] == (verdicts[key].band if not expected else "")
+        assert idea["posture_label"] == trade_posture.tradeoff_tag(verdicts[key].posture, verdicts[key].posture_assessment)
+        assert bool(idea["posture_label"]) is (not expected)
         assert idea["posture_alignment"] == trade_posture.alignment(verdicts[key].posture, verdicts[key].posture_assessment)
 
 
@@ -182,11 +189,11 @@ def test_alignment_is_posture_specific():
 def test_finder_stretch_says_why_when_the_posture_made_it_a_trade_off():
     note = trade_ideas.finder_closest_note({
         "finder_stretch_stage": "analyzer", "partner_team_name": "Rival",
-        "posture_label": trade_value_bands.VERDICT_VALUE_COSTS_LINEUP,
+        "analyzer_verdict": "COUNTER", "posture_label": "Costs your lineup",
         "posture_note": "You're a contender: this costs ~60 lineup points.",
         "send_assets": [], "receive_assets": [],
     })
-    assert "good value, costs your lineup" in note["reason"] and "contender" in note["reason"]
+    assert "grades it COUNTER for you" in note["reason"] and "contender" in note["reason"]
 
 
 def test_stamp_records_never_mutates_the_cached_entry():

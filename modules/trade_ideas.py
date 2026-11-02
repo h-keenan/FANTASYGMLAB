@@ -47,7 +47,7 @@ from modules.player_state_authority import (
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import model_status, runtime_trace
-from modules import trade_grade, trade_posture, trade_value_bands
+from modules import trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
 BASE_PICK_VALUES = {
@@ -1088,14 +1088,12 @@ def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
     stage = str(idea.get("finder_stretch_stage") or "")
     partner = str(idea.get("partner_team_name") or "The other team")
     gap = _idea_asset_value(idea.get("receive_assets")) - _idea_asset_value(idea.get("send_assets"))
-    if stage == "analyzer" and idea.get("posture_label"):
-        reason = (
-            f"{partner} might take it, but the Trade Analyzer says \"{str(idea['posture_label']).lower()}\" "
-            f"for your team. {str(idea.get('posture_note') or '').strip()}"
-        ).strip()
-    elif stage == "analyzer":
+    if stage == "analyzer":
         verdict = str(idea.get("analyzer_verdict") or "a loss").strip()
-        reason = f"{partner} might take it, but the Trade Analyzer grades it {verdict} for you."
+        reason = (
+            f"{partner} might take it, but the Trade Analyzer grades it {verdict} for you. "
+            f"{str(idea.get('posture_note') or '').strip()}"
+        ).strip()
     elif stage == "market":
         reason = str(idea.get("market_realism_summary") or "").strip() or (
             f"{partner} is unlikely to see this as a balanced offer."
@@ -4148,12 +4146,12 @@ class _UserSideAnalyzerGate:
         # the same package show one number. The engine's raw figure is kept.
         idea.setdefault("engine_trade_gain", int(idea.get("trade_gain") or 0))
         idea["trade_gain"] = int(verdict.value_delta)
-        # A trade the Analyzer headlines as "good value, costs your lineup"
-        # (or the rebuild equivalents) is a trade-off to weigh, not an idea to
-        # suggest: it is hidden here and offered as a Finder stretch instead.
+        # The suggestion bar reads the same trade score the verdict is decided
+        # on, window and direction cost included, so a trade that costs the
+        # team's window simply does not clear it (it is offered as a Finder
+        # stretch instead); there is no separate label to filter on.
         passed = (
             trade_grade.clears_suggestion_bar(verdict)
-            and verdict.band not in trade_value_bands.POSTURE_VERDICTS
             # In season the Analyzer's own engine failed for this package, so
             # the verdict above came from the value-only fallback ladder:
             # do not recommend an idea on a verdict the Analyzer would flag

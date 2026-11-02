@@ -98,9 +98,8 @@ class OfferVerdict:
     posture: dict[str, Any] | None = None
     posture_note: str = ""
     posture_assessment: dict[str, Any] | None = None
-    # The score-ladder band behind `band` (differs only when `band` is a
-    # posture label such as "GOOD VALUE, COSTS YOUR LINEUP"). Counter search
-    # keys off this one.
+    # The score-ladder band. Always equal to `band` now that nothing relabels
+    # the verdict after the score; kept for clients that already read it.
     score_band: str = ""
 
     def to_public_dict(self) -> dict[str, Any]:
@@ -497,7 +496,7 @@ def build_counter_offer_packages(
                 return False
         if verdict is None:
             return False
-        if verdict.tone not in _FAVORABLE_TONES or verdict.band in trade_value_bands.POSTURE_VERDICTS:
+        if verdict.tone not in _FAVORABLE_TONES:
             # Not acceptable as-is, but remember it when it is a real
             # improvement on the original offer (honest fallback).
             if verdict.tone == "counter" and verdict.trade_score > int(value_delta):
@@ -728,8 +727,7 @@ def decide_offer_verdict(
     posture = dict(posture) if posture else None
     posture_assessment = fit.get("posture_assessment") if isinstance(fit.get("posture_assessment"), Mapping) else None
     posture_assessment = dict(posture_assessment) if posture_assessment else None
-    posture_label = ""
-    score_band = ""
+    window_overrules = False
     trade_score = int(fit.get("trade_score", value_delta)) if lineup_model else value_delta
     # Close band first — tiny edges should not scream ACCEPT/DECLINE.
     close_value = abs(value_delta) < _VALUE_CLOSE
@@ -739,24 +737,11 @@ def decide_offer_verdict(
         # One number decides: the posture- and lineup-aware trade score.
         scored = trade_value_bands.band_for_score(trade_score)
         band, ui, tone = scored.verdict, scored.ui_verdict, scored.tone
-        # The market says accept but the posture cost pulled the score below
-        # an accept: keep the score's UI verdict/tone, but say honestly why.
-        posture_label = trade_posture.verdict_label_override(
-            value_band_id=trade_value_bands.band_for_score(value_delta).id,
-            final_band_id=scored.id,
-            posture=posture,
-            assessment=posture_assessment,
-        ) if posture and posture_assessment else ""
-        score_band = band
-        if posture_label:
-            band = posture_label
-            if scored.id in {"smash", "accept"}:
-                # The score is still an accept, but the posture says the window
-                # pays for it (a win-now team's material lineup cost). Old
-                # clients that only know the four UI verdicts must not show a
-                # green ACCEPT for it: it degrades to the neutral FAIR rung,
-                # the same way the label-below-accept case lands on FAIR/COUNTER.
-                ui, tone = trade_value_bands.UI_VERDICT_FAIR, "fair"
+        # The posture cost is already a term of trade_score, so band, UI verdict
+        # and tone are the rung it lands in, nothing is relabelled afterwards.
+        # Whether the market value alone would have said accept is reported
+        # separately (words only), see trade_posture.window_overrules_value.
+        window_overrules = trade_posture.window_overrules_value(value_delta, trade_score, posture_assessment)
     elif value_delta >= _VALUE_SMASH and fit_total >= 4:
         band = VERDICT_SMASH_ACCEPT
         ui = UI_VERDICT_ACCEPT
@@ -839,14 +824,14 @@ def decide_offer_verdict(
         rationale = "This is a preference call — either side can be right."
 
     counter, counter_action = build_counter_guidance(
-        band=score_band or band,
+        band=band,
         value_delta=trade_score,
         send_assets=send_assets or (),
         partner_assets=partner_assets,
     )
     if band == VERDICT_FAIR and not counter:
         counter = ""
-    if posture_label:
+    if window_overrules:
         counter, counter_action = (
             "Keep the value without the lineup hit: ask for a player who starts for you in place of the "
             "pick or prospect, or keep your top lineup piece out of the deal.",
@@ -873,7 +858,7 @@ def decide_offer_verdict(
     # from (trade_score; the posture-adjusted value_delta when there is no
     # lineup model), never the raw asset delta (audit C1b).
     value_summary = _value_direction_label(trade_score)
-    if posture_label or (
+    if window_overrules or (
         posture_assessment
         and posture_assessment.get("adjustment", 0) < 0
         and trade_value_bands.band_for_score(value_delta).id in {"smash", "accept", "edge_you"}
@@ -904,14 +889,14 @@ def decide_offer_verdict(
         tone=tone,
         counter_action=counter_action,
         lineup_warnings=lineup_warnings,
-        rationale_label="The trade-off" if posture_label else _rationale_label(tone, trade_score),
+        rationale_label="The trade-off" if window_overrules else _rationale_label(tone, trade_score),
         trade_score=trade_score,
         confidence_pct=confidence_pct,
         lineup_model=lineup_model,
         posture=posture,
         posture_note=str(fit.get("posture_note") or ""),
         posture_assessment=posture_assessment,
-        score_band=score_band or band,
+        score_band=band,
     )
 
 
