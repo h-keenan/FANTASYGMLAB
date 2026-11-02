@@ -3,6 +3,7 @@ import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 
 import { supabase } from './supabase';
 import type { CandidateCompare, MoveRange } from './startSitRange';
+import type { OpponentProfileResponse } from './opponentProfile';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
@@ -3289,6 +3290,10 @@ export const api = {
   getManagerTendencyDetail: (leagueId: string, rosterId: string | number) =>
     authorizedFetch<ManagerTendenciesDetailResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
+    ),
+  getTeamProfile: (leagueId: string, rosterId: string | number) =>
+    authorizedFetch<OpponentProfileResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/teams/${encodeURIComponent(String(rosterId))}/profile`,
     ),
   getLeaguePlayoffOdds: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();

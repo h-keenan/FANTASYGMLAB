@@ -18,6 +18,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
+  - GET  /v1/leagues/{id}/teams/{roster_id}/profile — opponent card: rooms, depth, picks, direction, trade angle
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
   - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset + its full valuation breakdown
   - GET  /v1/leagues/{id}/live-draft           — discover this league's Sleeper drafts (status/season/rounds)
@@ -222,6 +223,7 @@ from modules import (
     record_signal,
     redis_cache,
     referrals,
+    opponent_profile,
     roster_needs,
     saved_leagues,
     share_card_renderer,
@@ -2739,6 +2741,179 @@ def get_league_team_rankings(
         "season": _clean_json_value(standings_bundle.get("season")) or "",
         "week_label": _clean_json_value(standings_bundle.get("week_label")) or "",
         "playoff_teams": _clean_json_value(standings_bundle.get("playoff_teams")),
+    }
+
+
+def _room_context(
+    valued: pd.DataFrame,
+    roster: Mapping[str, Any],
+    settings: dict[str, Any],
+    score_field: str,
+    df_summary: pd.DataFrame,
+) -> dict[str, Any]:
+    """Lineup, bench candidates and per-room need classifications for one
+    roster, built exactly the way GET .../my-team-needs builds the user's own."""
+
+    player_ids = {str(pid) for pid in (roster.get("players") or [])}
+    roster_df = valued[valued["player_id"].astype(str).isin(player_ids)].copy()
+    if roster_df.empty:
+        return {"empty": True, "classifications": {}, "bench": {}}
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    metrics = None
+    try:
+        metrics = get_team_vs_league(df_summary, roster.get("roster_id"))
+    except Exception:
+        metrics = None
+    assessment = trade_analyzer_fit.build_team_needs_assessment(
+        roster_df, metrics, settings, lineup_df=lineup_df, score_field=score_field
+    )
+    return {
+        "empty": False,
+        "classifications": {item.position: item.classification for item in assessment.positions},
+        "bench": opponent_profile.bench_candidates(lineup_df, score_field),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/teams/{roster_id}/profile")
+def get_league_team_profile(
+    roster_id: int,
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Opponent profile card for one roster: strongest/weakest room, starter
+    strength vs. bench depth, surplus and needs, future pick capital, team
+    direction, and (when the signed-in user's roster is known and the two
+    rosters fit) a trade angle with a player to prefill the Trade Analyzer.
+
+    Composition only: room ranks come from the cached league summary frame,
+    starter/bench/draft-capital ranks from the cached rankings frame, needs
+    from modules.roster_needs via trade_analyzer_fit (same call as
+    GET .../my-team-needs), direction from trade_hub_engine.roster_posture
+    (the opponent's declared Team Situation is private, so only the
+    auto-classification is ever used). Anything that cannot be computed is
+    null/empty and the client hides it.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    def _empty(reason: str) -> dict[str, Any]:
+        return {"ok": True, "reason": reason, "roster_id": str(roster_id)}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    rosters = sleeper.get_rosters(league_id)
+    their_roster = next((r for r in rosters if str(r.get("roster_id")) == str(roster_id)), None)
+    if their_roster is None:
+        raise HTTPException(status_code=404, detail="Roster not found in this league.")
+
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if valued.empty:
+        return _empty("no_player_data")
+    df_summary, _draft_capital = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if df_summary.empty or rankings_frame.empty:
+        return _empty("no_rankings_data")
+    size = len(rankings_frame)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    rank_rows = rankings_frame[rankings_frame["roster_id"].astype(str) == str(roster_id)]
+    if rank_rows.empty:
+        return _empty("no_rankings_data")
+    row = rank_rows.iloc[0]
+
+    theirs = _room_context(valued, their_roster, settings, score_field, df_summary)
+    ranks = opponent_profile.position_ranks(df_summary, roster_id)
+    rooms, surplus, needs = opponent_profile.room_reads(ranks, theirs["classifications"])
+    strongest, weakest = opponent_profile.strongest_weakest(rooms)
+
+    posture = trade_hub_engine.roster_posture(
+        league_id=league_id,
+        roster=their_roster,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        declared_stance="",
+        rankings_frame=rankings_frame,
+    )
+    direction = {
+        "key": posture.get("key"),
+        "label": posture.get("label"),
+        "rank": posture.get("rank"),
+        "league_size": posture.get("league_size"),
+        "record": posture.get("record"),
+        "confidence_label": posture.get("confidence_label"),
+    }
+
+    try:
+        flow = pick_flow.league_pick_flow_counts_cached(league_id).get(int(roster_id), {})
+    except Exception:
+        flow = {}
+    try:
+        tendency = team_trade_history.league_trade_tendencies_cached(league_id, PLAYERS_DB_PATH).get(
+            int(roster_id), {}
+        )
+    except Exception:
+        tendency = {}
+    trade_tendency = None
+    if tendency.get("tendency") and tendency.get("tendency") != team_trade_history.NEUTRAL:
+        trade_tendency = {
+            "label": tendency.get("tendency"),
+            "sell_count": int(tendency.get("sell_count") or 0),
+            "buy_count": int(tendency.get("buy_count") or 0),
+            "min_trades": team_trade_history.MIN_SIGNAL_TRADES,
+        }
+
+    angle = None
+    is_me = False
+    my_roster, _reason = _resolve_my_roster(user, league_id)
+    if my_roster is not None:
+        is_me = str(my_roster.get("roster_id")) == str(roster_id)
+        if not is_me:
+            mine = _room_context(valued, my_roster, settings, score_field, df_summary)
+            if not mine["empty"] and not theirs["empty"]:
+                my_rooms, my_surplus, my_needs = opponent_profile.room_reads(
+                    opponent_profile.position_ranks(df_summary, my_roster.get("roster_id")),
+                    mine["classifications"],
+                )
+                angle = opponent_profile.trade_angle(
+                    my_needs=my_needs,
+                    my_surplus=my_surplus,
+                    their_needs=needs,
+                    their_surplus=surplus,
+                    their_bench=theirs["bench"],
+                    my_bench=mine["bench"],
+                    my_ranks={r["position"]: r["rank"] for r in my_rooms},
+                    their_ranks={r["position"]: r["rank"] for r in rooms},
+                )
+
+    return {
+        "ok": True,
+        "reason": "",
+        "roster_id": str(roster_id),
+        "is_me": is_me,
+        "direction": direction,
+        "rooms": rooms,
+        "strongest": strongest,
+        "weakest": weakest,
+        "surplus": surplus,
+        "needs": needs,
+        "starter_bench": opponent_profile.starter_bench_read(row.get("starter_rank"), row.get("bench_rank"), size),
+        "picks": opponent_profile.pick_capital(row, flow, size),
+        "trade_tendency": trade_tendency,
+        "trade_angle": angle,
     }
 
 

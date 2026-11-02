@@ -16217,3 +16217,93 @@ def test_suggested_moves_have_ranges_but_no_lean_without_a_win_probability_or_wh
     )[0]
     assert locked["locked"] is True and locked["range"]["lean"] is None
     assert locked["range"]["over"] is None  # a started game's pregame range no longer applies
+
+
+def test_team_profile_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/leagues/abc/teams/2/profile").status_code == 401
+
+
+def test_team_profile_composes_rooms_picks_direction_and_angle(monkeypatch):
+    client = _client(monkeypatch)
+    positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR", "RB"]
+
+    rows = []
+    for prefix, score in (("mine", 2000), ("opp", 1000)):
+        for i, position in enumerate(positions, start=1):
+            rows.append(
+                {
+                    "player_id": f"{prefix}{i}",
+                    "name": f"{prefix} {i}",
+                    "position": position,
+                    "team": "KC",
+                    "age": 26,
+                    "years_exp": 4,
+                    "status": "Active",
+                    "injury_status": None,
+                    "score": score - i,
+                    "dynasty_score": score - i,
+                    "value_score": score - i,
+                }
+            )
+    frame = pd.DataFrame(rows)
+    summary = pd.DataFrame(
+        [
+            {"roster_id": 1, "qb_score": 100, "rb_score": 100, "wr_score": 900, "te_score": 500},
+            {"roster_id": 2, "qb_score": 800, "rb_score": 900, "wr_score": 100, "te_score": 400},
+            {"roster_id": 3, "qb_score": 300, "rb_score": 500, "wr_score": 500, "te_score": 300},
+            {"roster_id": 4, "qb_score": 200, "rb_score": 400, "wr_score": 400, "te_score": 200},
+        ]
+    )
+    ranking = pd.DataFrame(
+        [
+            {
+                "roster_id": i,
+                "starter_rank": i,
+                "bench_rank": 5 - i,
+                "draft_capital_rank": i,
+                "pick_count": 4,
+                "first_rounders": 1,
+                "strategy": "retool",
+                "power_rank": i,
+            }
+            for i in range(1, 5)
+        ]
+    )
+    rosters = [
+        {"roster_id": 1, "owner_id": "sleeper-user-1", "players": [f"mine{i}" for i in range(1, 11)], "settings": {"wins": 3, "losses": 1}},
+        {"roster_id": 2, "owner_id": "sleeper-user-2", "players": [f"opp{i}" for i in range(1, 11)], "settings": {"wins": 2, "losses": 2}},
+    ]
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_matchup_auth_mocks()))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=rosters))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_MATCHUP_LEAGUE))
+        stack.enter_context(patch("modules.league_value_settings.build_valued_players_frame_cached", return_value=frame))
+        stack.enter_context(
+            patch(
+                "modules.league_rankings.build_league_summary_and_draft_capital_cached",
+                return_value=(summary, pd.DataFrame()),
+            )
+        )
+        stack.enter_context(patch("modules.league_rankings.build_league_rankings_frame_cached", return_value=ranking))
+        stack.enter_context(
+            patch("modules.pick_flow.league_pick_flow_counts_cached", return_value={2: {"firsts_acquired": 2, "firsts_sent": 0}})
+        )
+        stack.enter_context(patch("modules.team_trade_history.league_trade_tendencies_cached", return_value={}))
+        response = client.get("/v1/leagues/abc/teams/2/profile", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True and body["reason"] == ""
+    assert body["is_me"] is False
+    rooms = {r["position"]: r for r in body["rooms"]}
+    assert rooms["RB"]["rank"] == 1 and rooms["WR"]["rank"] == 4
+    assert body["strongest"]["rank"] == 1
+    assert body["weakest"]["rank"] == 4
+    assert body["starter_bench"]["of"] == 4
+    assert body["picks"]["firsts_acquired"] == 2
+    assert body["trade_tendency"] is None
+    assert body["direction"]["key"]
+    assert body["trade_angle"] is not None
+    assert body["trade_angle"]["target"]["player_id"].startswith("opp")

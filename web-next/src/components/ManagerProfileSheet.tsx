@@ -14,6 +14,8 @@ import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tenden
 import { SheetHandle } from "@/components/SheetHandle";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PickPlate } from "@/components/PickRow";
+import { OpponentProfileCard } from "@/components/OpponentProfileCard";
+import type { OpponentProfileResponse } from "@/lib/opponentProfile";
 
 function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
   if (asset.kind === "pick") {
@@ -86,6 +88,7 @@ function RecentTrades({ trades }: { trades: NonNullable<ManagerTendenciesDetailR
  * evidence line. Loaded only when opened. Reuses the quick-view sheet shell. */
 export function ManagerProfileSheet({
   leagueId,
+  leagueName = "",
   rosterId,
   teamName,
   ownerName,
@@ -93,6 +96,8 @@ export function ManagerProfileSheet({
   onClose,
 }: {
   leagueId: string;
+  /** For the "Offer this" Trade Analyzer link. */
+  leagueName?: string;
   rosterId: string | number;
   teamName: string;
   ownerName?: string | null;
@@ -101,6 +106,22 @@ export function ManagerProfileSheet({
 }) {
   const [data, setData] = useState<ManagerTendenciesDetailResponse | null>(null);
   const [failed, setFailed] = useState(false);
+  const [profile, setProfile] = useState<OpponentProfileResponse | null>(null);
+
+  // The roster profile is free and independent of the Premium tendencies
+  // below; a failure just hides the card.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTeamProfile(leagueId, rosterId)
+      .then((result) => {
+        if (!cancelled) setProfile(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, rosterId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +181,7 @@ export function ManagerProfileSheet({
               ) : null}
             </div>
           </div>
+          <OpponentProfileCard profile={profile} leagueId={leagueId} leagueName={leagueName} />
           {failed ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               Couldn&apos;t load this profile.
