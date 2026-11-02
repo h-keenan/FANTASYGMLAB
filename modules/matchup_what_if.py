@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from modules import matchup_win_probability as wp
+from modules import start_sit_range
 
 MAX_BULLETS = 4
 # Below these, a difference is rounding noise and no bullet is shown.
@@ -218,6 +219,7 @@ def candidates_for_slot(
                 "win_probability_delta": win_delta,
                 "win_probability_after": new_win,
                 "bullets": _bullets(player, occupant, points_delta, win_delta, kind, label, blocked),
+                "compare": _compare_block(player, cand_points, kind, occupant, base_points, base, blocked),
             }
         )
 
@@ -233,6 +235,33 @@ def candidates_for_slot(
         )
     )
     return {"slot": slot, "slot_locked": slot_locked, "current_player_id": occupant_id, "candidates": out}
+
+
+def _compare_block(
+    candidate: Mapping[str, Any],
+    candidate_points: float | None,
+    candidate_kind: str | None,
+    occupant: Mapping[str, Any] | None,
+    occupant_points: float | None,
+    base_win_probability: Mapping[str, Any],
+    blocked: str | None,
+) -> dict[str, Any]:
+    """Projected / low / high for the candidate and the current occupant side
+    by side, plus the stance-aware lean (modules.start_sit_range). A bye,
+    ruled-out or locked player has no range and never gets a lean."""
+
+    occupant_kind = availability(occupant)[0] if occupant is not None else None
+    result = start_sit_range.compare(
+        candidate if candidate_kind is None else None,
+        candidate_points,
+        occupant if occupant_kind is None else None,
+        occupant_points,
+        base_win_probability,
+    )
+    lean = result["lean"] if blocked is None else None
+    if lean is not None:
+        lean = {**lean, "favors": "candidate" if lean["favors"] == "first" else "current"}
+    return {"candidate": result["first"], "current": result["second"], "stance": result["stance"], "lean": lean}
 
 
 def _bullets(

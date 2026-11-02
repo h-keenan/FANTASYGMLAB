@@ -13,6 +13,7 @@ import {
 import { trackUse } from "@/lib/analytics";
 import { Button } from "@/components/Button";
 import { PlayerRow } from "@/components/PlayerRow";
+import { RangeCompare } from "@/components/RangeCompare";
 import { SheetHandle } from "@/components/SheetHandle";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
@@ -24,6 +25,7 @@ import {
   type PlannerSource,
 } from "@/lib/matchupPlanner";
 import { slotDisplayLabel } from "@/lib/matchupPresentation";
+import { rangeDisplayRows } from "@/lib/startSitRange";
 
 /**
  * Lineup swap planner for Matchup. Planner only: FantasyDesk can't change a
@@ -239,6 +241,16 @@ function CandidateRow({ candidate, onPick }: { candidate: MatchupWhatIfCandidate
             ))}
           </ul>
         ) : null}
+        <RangeCompare
+          rows={rangeDisplayRows(
+            [
+              { key: "candidate", label: "Option", range: candidate.compare?.candidate ?? null },
+              { key: "current", label: "Current", range: candidate.compare?.current ?? null },
+            ],
+            candidate.compare?.lean?.favors ?? null,
+          )}
+          lean={candidate.compare?.lean ?? null}
+        />
       </button>
     </li>
   );

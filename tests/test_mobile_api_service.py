@@ -16167,3 +16167,53 @@ def test_player_news_exposes_injury_item_from_full_matched_pool(monkeypatch):
     # The injury item is found even though it is older than the newest `limit`.
     if body["injury_item"] is not None:
         assert "injured reserve" in body["injury_item"]["title"].lower()
+
+
+def _mv_range(pid, pos, slot, pts, low, high):
+    row = _mv(pid, pos, slot, pts)
+    row["projection"].update(low=low, high=high)
+    return row
+
+
+def test_suggested_moves_carry_ranges_and_a_ceiling_lean_for_a_heavy_underdog():
+    from services import mobile_api_service as svc
+
+    actual = [_mv_range("safe", "WR", "WR", 12.0, 9, 15)]
+    suggested = [_mv_range("boom", "WR", "WR", 12.5, 4, 26)]
+    underdog = {"available": True, "probability": 0.2}
+    move = svc._suggested_lineup_moves(_moves_side(suggested, actual), underdog)[0]
+
+    assert move["range"]["start"] == {"name": "boom", "projected": 12.5, "low": 4.0, "high": 26.0}
+    assert move["range"]["over"]["high"] == 15.0
+    assert move["range"]["stance"] == {"kind": "underdog", "win_pct": 20}
+    assert move["range"]["lean"]["favors"] == "start"
+    assert move["range"]["lean"]["kind"] == "ceiling"
+    assert "20% underdog" in move["range"]["lean"]["why"]
+
+
+def test_suggested_moves_floor_lean_for_a_heavy_favorite_can_favor_the_benched_player():
+    from services import mobile_api_service as svc
+
+    actual = [_mv_range("safe", "WR", "WR", 12.0, 10, 14)]
+    suggested = [_mv_range("boom", "WR", "WR", 12.5, 3, 26)]
+    move = svc._suggested_lineup_moves(
+        _moves_side(suggested, actual), {"available": True, "probability": 0.85}
+    )[0]
+    assert move["range"]["lean"]["kind"] == "floor"
+    assert move["range"]["lean"]["favors"] == "over"
+
+
+def test_suggested_moves_have_ranges_but_no_lean_without_a_win_probability_or_when_locked():
+    from services import mobile_api_service as svc
+
+    actual = [_mv_range("safe", "WR", "WR", 12.0, 9, 15)]
+    suggested = [_mv_range("boom", "WR", "WR", 12.5, 4, 26)]
+    move = svc._suggested_lineup_moves(_moves_side(suggested, actual))[0]
+    assert move["range"]["start"]["high"] == 26.0 and move["range"]["lean"] is None and move["range"]["stance"] is None
+
+    locked_actual = [{**_mv_range("safe", "WR", "WR", 12.0, 9, 15), "game_started": True}]
+    locked = svc._suggested_lineup_moves(
+        _moves_side(suggested, locked_actual), {"available": True, "probability": 0.2}
+    )[0]
+    assert locked["locked"] is True and locked["range"]["lean"] is None
+    assert locked["range"]["over"] is None  # a started game's pregame range no longer applies

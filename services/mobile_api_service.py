@@ -249,6 +249,7 @@ from modules import public_dynasty_values
 from modules import trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
+from modules import start_sit_range
 from modules import this_week
 from modules import game_weather
 from modules import team_defense
@@ -13537,7 +13538,30 @@ def _benched_reason(player: dict[str, Any]) -> str | None:
     return None
 
 
-def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | None:
+def _move_range_block(
+    starter: dict[str, Any],
+    start_points: float | None,
+    over: dict[str, Any] | None,
+    over_points: float | None,
+    win_probability: dict[str, Any] | None,
+    *,
+    locked: bool,
+) -> dict[str, Any]:
+    """Projected / low / high for both sides of a start/sit move, plus the
+    stance-aware lean from this matchup's real win probability
+    (modules.start_sit_range). A locked move (a game has kicked off) cannot be
+    changed in Sleeper, so it never carries a lean."""
+
+    result = start_sit_range.compare(starter, start_points, over, over_points, win_probability)
+    lean = None if locked else result["lean"]
+    if lean is not None:
+        lean = {**lean, "favors": "start" if lean["favors"] == "first" else "over"}
+    return {"start": result["first"], "over": result["second"], "stance": result["stance"], "lean": lean}
+
+
+def _suggested_lineup_moves(
+    my_side: dict[str, Any], win_probability: dict[str, Any] | None = None
+) -> list[dict[str, Any]] | None:
     """The changes that turn this roster's ACTUAL Sleeper lineup into its
     suggested one, as real one-for-one swaps: "start X (slot) over Y", where
     Y is the player CURRENTLY in that slot and X is eligible for it.
@@ -13637,18 +13661,28 @@ def _suggested_lineup_moves(my_side: dict[str, Any]) -> list[dict[str, Any]] | N
             if start_points is not None and over_points is not None
             else None
         )
+        move_locked = starter.get("game_started") is True or (
+            over is not None and over.get("game_started") is True
+        )
         move = {
             "slot": slot,
             "start": start_fields,
             "over": over_fields,
             "over_reason": reason,
             "gain": gain,
-            "locked": starter.get("game_started") is True
-            or (over is not None and over.get("game_started") is True),
+            "locked": move_locked,
             # Honest uncertainty: set only when a no-projection player is
             # recommended because the slot has no modeled alternative.
             "start_note": "No projection yet — role unclear" if start_points is None else None,
             "weather_notes": _move_weather_notes(starter, over),
+            "range": _move_range_block(
+                starter,
+                start_points,
+                over if reason not in {"bye_week", "ruled_out", "empty_slot"} else None,
+                over_points,
+                win_probability,
+                locked=move_locked,
+            ),
         }
         if chain_id is not None:
             move["chain_id"] = chain_id
@@ -14048,7 +14082,7 @@ def _build_matchup(
             ),
             "suggested": _position_edges(my_side["starters"], opponent_side["starters"]),
         },
-        "suggested_moves": None if league_calendar.is_best_ball(league) else _suggested_lineup_moves(my_side),
+        "suggested_moves": None if league_calendar.is_best_ball(league) else _suggested_lineup_moves(my_side, win_probability),
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": "",

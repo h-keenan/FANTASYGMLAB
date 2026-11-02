@@ -2,6 +2,7 @@ import { AppState } from 'react-native';
 import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 
 import { supabase } from './supabase';
+import type { CandidateCompare, MoveRange } from './startSitRange';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
@@ -884,6 +885,8 @@ export interface MatchupSuggestedMove {
   /** Forecast-weather reasons behind this move (empty/absent: show nothing). */
   weather_notes?: MatchupWeatherNote[];
   locked: boolean;
+  /** Projected / low / high for both players plus the win-probability lean. */
+  range?: MoveRange | null;
 }
 
 export type MatchupGameState = 'pregame' | 'live' | 'between_games' | 'final';
@@ -981,6 +984,8 @@ export interface MatchupWhatIfCandidate {
   win_probability_delta: number | null;
   win_probability_after: MatchupWinProbability | null;
   bullets: MatchupWhatIfBullet[];
+  /** Projected / low / high vs the current occupant plus the win-probability lean. */
+  compare?: CandidateCompare | null;
 }
 
 export interface MatchupWhatIfResponse {

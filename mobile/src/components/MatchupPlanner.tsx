@@ -6,6 +6,8 @@ import AppText from './AppText';
 import Button from './Button';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
+import RangeCompare from './RangeCompare';
+import { rangeDisplayRows } from '../lib/startSitRange';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
@@ -198,6 +200,16 @@ function CandidateRow({ candidate, onPick }: { candidate: MatchupWhatIfCandidate
           <AppText style={styles.bulletText}>{bullet.text}</AppText>
         </View>
       ))}
+      <RangeCompare
+        rows={rangeDisplayRows(
+          [
+            { key: 'candidate', label: 'Option', range: candidate.compare?.candidate ?? null },
+            { key: 'current', label: 'Current', range: candidate.compare?.current ?? null },
+          ],
+          candidate.compare?.lean?.favors ?? null,
+        )}
+        lean={candidate.compare?.lean ?? null}
+      />
     </View>
   );
 }
