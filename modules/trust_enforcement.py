@@ -129,6 +129,39 @@ def _evidence(
     )
 
 
+def _material_missing_metadata(player: Mapping[str, Any]) -> list[str]:
+    """Optional metadata whose absence genuinely weakens trust in this player.
+
+    ``bye_week`` never counts: it is schedule data derived on demand from
+    ``modules.nfl_schedule.team_bye_week`` (the players table has no such
+    column), so its absence says nothing about the player record. ``age``
+    counts only for a player carrying a market valuation, because age drives
+    the dynasty age curve for valued assets; a valueless fringe player's
+    missing age cannot move any trade, and the valuation layer already treats
+    an unknown age neutrally.
+    """
+
+    if _numeric(player.get("age")) is not None:
+        return []
+    if not _has_market_value(player):
+        return []
+    return ["age"]
+
+
+def _numeric(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None
+
+
+def _has_market_value(player: Mapping[str, Any]) -> bool:
+    return any(
+        (_numeric(player.get(key)) or 0) > 0 for key in ("fantasycalc_value", "value")
+    )
+
+
 def enforce_player_record(
     player: Mapping[str, Any],
     *,
@@ -188,11 +221,7 @@ def enforce_player_record(
             historical,
         )
 
-    optional_missing = [
-        name
-        for name in ("age", "bye_week")
-        if player.get(name) in (None, "")
-    ]
+    optional_missing = _material_missing_metadata(player)
     if (
         freshness in {Freshness.AGING, Freshness.STALE, Freshness.UNKNOWN}
         or optional_missing
