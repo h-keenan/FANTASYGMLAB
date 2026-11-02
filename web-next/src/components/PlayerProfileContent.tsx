@@ -12,6 +12,7 @@ import {
 import { AwardsStrip, BioGrid, StatGroup, SubRatingRow } from "@/components/PlayerQuickView";
 import { PillRow } from "@/components/PillRow";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
+import { PlayerUsageBlock } from "@/components/PlayerUsageBlock";
 import { PlayerCareerTab } from "@/components/PlayerCareerTab";
 import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
@@ -232,6 +233,7 @@ export function PlayerProfileContent({
             />
 
             <div className="flex flex-col gap-4">
+              {tab === "stats" ? <PlayerUsageBlock profile={model?.usage_profile} /> : null}
               {tab === "stats" ? <StatsTab stats={stats} playerId={player.player_id} /> : null}
               {tab === "trends" ? (
                 <PlayerTrendsPanel playerId={player.player_id} name={name} gradientId="profile-weekly-fill" />

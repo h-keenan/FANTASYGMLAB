@@ -1425,6 +1425,7 @@ a {
 }
 .pqv-model-row,
 .pqv-stat-season,
+.pqv-usage,
 .pqv-awards,
 .pqv-bio {
   border-top: var(--border-width-default) solid var(--color-border);
@@ -1432,6 +1433,7 @@ a {
 }
 .pqv-model-row h3,
 .pqv-stat-season h3,
+.pqv-usage h3,
 .pqv-awards h3,
 .pqv-bio h3 {
   font-size: 0.78rem;
@@ -2947,3 +2949,91 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 a.pqv-news-title { text-decoration: underline; text-underline-offset: 2px; }
 .pqv-news-meta { font-size: 0.72rem; color: var(--color-text-muted); }
 .pqv-news-summary { font-size: 0.78rem; color: var(--color-text-secondary); }
+
+/* Usage block (rolling last-4/last-8 usage + role flags), shared by PQV and the
+   full profile. Rows use the same tokens as the stat tiles. */
+.pqv-usage-flag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: flex-start;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: var(--border-width-default) solid var(--color-border);
+  background: var(--color-surface-secondary);
+}
+.pqv-usage-flag--positive {
+  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
+}
+.pqv-usage-flag--negative {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
+}
+.pqv-usage-flag p,
+.pqv-usage-note {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+.pqv-usage-note {
+  margin-top: var(--space-sm);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.pqv-usage-table {
+  display: flex;
+  flex-direction: column;
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.pqv-usage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) repeat(3, minmax(0, 0.8fr));
+  gap: var(--space-sm);
+  align-items: baseline;
+  padding: var(--space-sm);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  background: var(--color-surface-secondary);
+}
+.pqv-usage-row + .pqv-usage-row {
+  border-top: var(--border-width-default) solid var(--color-border);
+}
+.pqv-usage-row > span:not(:first-child) {
+  text-align: right;
+}
+.pqv-usage-row--head {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-muted);
+  background: transparent;
+}
+.pqv-usage-label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+}
+.pqv-usage-delta {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.pqv-usage-delta--up {
+  color: var(--color-success);
+}
+.pqv-usage-delta--down {
+  color: var(--color-danger);
+}
+.pqv-usage-credit {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.7rem;
+}
+.pqv-usage-credit a {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}

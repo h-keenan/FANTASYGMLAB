@@ -34,6 +34,7 @@ import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonRow } from '../components/SkeletonBlock';
 import SubRatingRow from '../components/SubRatingRow';
+import UsageBlock from '../components/UsageBlock';
 import ValuesCredit from '../components/ValuesCredit';
 import PlayerTrendsPanel from '../components/PlayerTrendsPanel';
 import { injuryTone } from '../lib/injuryDisplay';
@@ -1862,6 +1863,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
       content.push(
         <View key="stats-tab">
+          <UsageBlock profile={model?.usage_profile} />
           <AppText style={styles.seasonLabel}>{season.label}</AppText>
           {/* coridian_'s percentile concern: "there's probably 900+ players
            * in the NFL ... that can drastically sway percentiles." Verified

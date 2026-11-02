@@ -2253,6 +2253,48 @@ export interface UsageTrend {
   detail?: string;
 }
 
+/** One rolling usage metric from modules/usage_trends.py. Shares are fractions of 1;
+ * count metrics are per-game averages. `direction` is decided server-side (tested
+ * thresholds), so clients only render it. */
+export interface UsageMetric {
+  key: string;
+  label: string;
+  unit: "pct" | "count";
+  source: "sleeper" | "nflverse";
+  last4: number | null;
+  last8: number | null;
+  prior: number | null;
+  season: number | null;
+  delta_last4_vs_prior: number | null;
+  direction: "up" | "down" | "flat" | "unknown";
+  games_with_data: number;
+  season_total?: number;
+  last4_total?: number | null;
+}
+
+export interface UsageFlag {
+  key: "role_expanding" | "role_shrinking" | "positive_regression" | "unsustainable";
+  label: string;
+  tone: "positive" | "negative";
+  explanation: string;
+  evidence_metrics: string[];
+}
+
+/** model.usage_profile — shared rolling-usage read (modules/usage_trends.py). */
+export interface UsageProfile {
+  status: "ok" | "building_sample" | "low_usage" | "no_data" | "not_covered" | "unavailable";
+  status_note?: string | null;
+  reason?: string;
+  season?: number;
+  games_played?: number;
+  metrics: UsageMetric[];
+  flags: UsageFlag[];
+  headline?: string | null;
+  advanced?: { available: boolean; reason?: string | null; through_week?: number | null; as_of?: string | null };
+  not_available?: Array<{ key: string; label: string; reason: string }>;
+  attribution?: { text: string; url: string; license: string };
+}
+
 /** GET /v1/players/{id}/weekly-stats — per-week PPR points + snap share for
  * one player/season, mirrors mobile/src/lib/api.ts's identically-named
  * types byte-for-byte (same `services/mobile_api_service.py` response both
@@ -2292,6 +2334,8 @@ export interface QuickViewModel {
   opportunity_confidence: number | null;
   workload_trend: string | null;
   usage_trend: UsageTrend | null;
+  /** Rolling last-4/last-8 usage and role flags; always present from the server, optional for older cached payloads. */
+  usage_profile?: UsageProfile | null;
   /** coridian_, 2026-10-19: predicting a role change before it's obvious
    * from games played/injury status — a plain-language note when this
    * player's Sleeper depth_chart_order moved at least one spot since the

@@ -51,7 +51,6 @@ MOVE_THRESHOLD = {
 }
 OPPS_REL_THRESHOLD = 0.25
 OPPS_ABS_THRESHOLD = 2.0
-STRONG_MULTIPLE = 1.5
 # Below this season PPR average a player's role is not fantasy-relevant, so a
 # "role expanding/shrinking" call would only be noise; metrics still show.
 MIN_RELEVANT_PPG = 4.0
@@ -204,11 +203,13 @@ def _metric_block(key: str, values: Sequence[tuple[int, float | None]]) -> dict[
     return block
 
 
-def _direction(key: str, block: Mapping[str, Any] | None) -> tuple[str, bool]:
-    """('up'|'down'|'flat'|'unknown', strong) for one primary metric."""
+def _direction(key: str, block: Mapping[str, Any] | None) -> str:
+    """'up' | 'down' | 'flat' | 'unknown' for one metric."""
 
     if not block or block.get("delta_last4_vs_prior") is None:
-        return "unknown", False
+        return "unknown"
+    if key not in MOVE_THRESHOLD and key != "opportunities":
+        return "unknown"  # shown for context; no tested threshold, so no direction
     delta = float(block["delta_last4_vs_prior"])
     if key == "opportunities":
         prior = float(block["prior"] or 0.0)
@@ -216,10 +217,10 @@ def _direction(key: str, block: Mapping[str, Any] | None) -> tuple[str, bool]:
     else:
         threshold = MOVE_THRESHOLD[key]
     if delta >= threshold:
-        return "up", delta >= STRONG_MULTIPLE * threshold
+        return "up"
     if delta <= -threshold:
-        return "down", -delta >= STRONG_MULTIPLE * threshold
-    return "flat", False
+        return "down"
+    return "flat"
 
 
 def _describe(key: str, block: Mapping[str, Any]) -> str:
@@ -261,16 +262,18 @@ def _flags(position: str, blocks: Mapping[str, Mapping[str, Any]], points: Mappi
     if position == "RB" and "opportunity_share" not in blocks:
         primary = ["snap_share", "opportunities"]
     directions = {k: _direction(k, blocks.get(k)) for k in primary}
-    measured = [k for k, (d, _) in directions.items() if d != "unknown"]
+    measured = [k for k, d in directions.items() if d != "unknown"]
     if not measured or points.get("direction") in (None, "unknown"):
         return []
-    ups = [k for k in measured if directions[k][0] == "up"]
-    downs = [k for k in measured if directions[k][0] == "down"]
+    ups = [k for k in measured if directions[k] == "up"]
+    downs = [k for k in measured if directions[k] == "down"]
 
     def decided(side: list[str], other: list[str]) -> bool:
         if other or not side:
             return False
-        return len(side) >= 2 or len(measured) == 1 or any(directions[k][1] for k in side)
+        # A role call needs corroboration: two independent usage metrics moving
+        # the same way, or the only metric we could measure.
+        return len(side) >= 2 or len(measured) == 1
 
     usage = "up" if decided(ups, downs) else "down" if decided(downs, ups) else "steady"
     pts_dir = points["direction"]
@@ -349,6 +352,7 @@ def build_usage_profile(
             continue
         block = _metric_block(key, series[key])
         if block:
+            block["direction"] = _direction(key, block)
             blocks[key] = block
     games = len(played)
     short_stale = _window_stat(series["points"], SHORT_WINDOW)["stale"]
@@ -384,4 +388,6 @@ def profile_for_player(sleeper_id: Any, position: str, *, season: int | None = N
     selected = int(season or sleeper.default_player_stats_season())
     weeks = sleeper.cached_season_player_weekly(str(sleeper_id or ""), selected)
     advanced = adv_stats.weekly_for_sleeper_id(sleeper_id, selected)
-    return build_usage_profile(position, weeks, advanced)
+    profile = build_usage_profile(position, weeks, advanced)
+    profile["season"] = selected
+    return profile

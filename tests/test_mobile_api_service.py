@@ -4832,6 +4832,50 @@ def test_quick_view_model_sends_no_usage_trend_below_the_display_gate(monkeypatc
         assert response.json()["model"]["usage_trend"] is None
 
 
+def test_quick_view_model_carries_the_usage_profile_with_explicit_states(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    weeks = [
+        {"week": w, "games_played": 1, "fantasy_points_ppr": 11.0, "snap_share": 0.5 if w <= 4 else 0.8,
+         "rush_attempts": 8 if w <= 4 else 16, "targets": 1 if w <= 4 else 3}
+        for w in range(1, 9)
+    ]
+    frame = _usage_trend_frame("9008")
+
+    def fetch(profile_player_id):
+        with patch("requests.get", return_value=auth_user_response):
+            with patch("modules.rankings.load_players", return_value=frame):
+                with patch("modules.sleeper.cached_season_player_weekly", return_value=weeks):
+                    with patch("modules.nflverse_advanced_stats.load_season", return_value=None):
+                        response = client.get(
+                            f"/v1/players/{profile_player_id}/quick-view",
+                            headers={"Authorization": "Bearer good-token"},
+                        )
+        assert response.status_code == 200
+        return response.json()["model"]["usage_profile"]
+
+    profile = fetch("9008")
+    assert profile["status"] == "ok"
+    assert profile["flags"][0]["key"] == "role_expanding"
+    # The advanced file is absent here: said explicitly, never silently zero.
+    assert profile["advanced"] == {"available": False, "reason": "advanced_stats_file_unavailable", "through_week": None, "as_of": None}
+    assert profile["not_available"][0]["key"] == "routes_run"
+    assert profile["attribution"]["license"] == "CC BY 4.0"
+
+
+def test_quick_view_usage_profile_failure_is_reported_not_hidden(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_usage_trend_frame("9009")):
+            with patch("modules.usage_trends.profile_for_player", side_effect=RuntimeError("boom")):
+                response = client.get("/v1/players/9009/quick-view", headers={"Authorization": "Bearer good-token"})
+    assert response.status_code == 200
+    assert response.json()["model"]["usage_profile"]["status"] == "unavailable"
+
+
 def test_rankings_rows_carry_the_usage_trend_beside_opportunity_label(monkeypatch):
     client = _client(monkeypatch)
 

@@ -8,6 +8,7 @@ import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse 
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
+import { PlayerUsageBlock } from "@/components/PlayerUsageBlock";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerValueHistory } from "@/components/PlayerValueHistory";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
@@ -307,6 +308,8 @@ export function PlayerQuickView({
                 name={identity.name || "This player"}
                 gradientId="pqv-weekly-fill"
               />
+
+              <PlayerUsageBlock profile={model?.usage_profile} />
 
               {stats?.seasons.map((season) => (
                 <section key={season.label} className="pqv-stat-season">
