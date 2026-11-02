@@ -108,3 +108,58 @@ export function recordLabel(record: { correct: number; graded: number } | undefi
   if (!record || record.graded === 0) return "0-0";
   return `${record.correct}-${record.graded - record.correct}`;
 }
+
+// ---------------------------------------------------------------------------
+// Trade effect on odds (POST .../trade-odds-effect). Mirrored on web and mobile.
+// ---------------------------------------------------------------------------
+
+export interface TradeOddsEffectResult {
+  reason: string;
+  picks_excluded?: boolean;
+  baseline?: { playoff_probability: number; title_probability?: number | null };
+  scenario?: { playoff_probability: number; title_probability?: number | null };
+  change?: {
+    playoff_probability: number;
+    title_probability?: number | null;
+    within_noise: boolean;
+    title_within_noise?: boolean;
+  };
+  margin_points?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  weeks_remaining?: number;
+}
+
+export interface TradeOddsView {
+  tone: WhatIfTone;
+  headline: string;
+  titleLine: string | null;
+  detail: string;
+  notes: string[];
+}
+
+/** Everything the odds row shows, or null when there is nothing real to show
+ * (offseason, no games left, invalid package, simulator unavailable): the row
+ * is omitted rather than filled with a guess. */
+export function tradeOddsView(result: TradeOddsEffectResult | null | undefined): TradeOddsView | null {
+  if (!result || result.reason || !result.baseline || !result.scenario || !result.change) return null;
+  const { baseline, scenario, change } = result;
+  const move = change.within_noise ? "no measurable change" : `${formatDelta(change.playoff_probability)} pts`;
+  const headline = `Playoff odds ${formatOdds(baseline.playoff_probability)} to ${formatOdds(scenario.playoff_probability)} (${move})`;
+  let titleLine: string | null = null;
+  if (baseline.title_probability != null && scenario.title_probability != null) {
+    const titleMove =
+      change.title_within_noise || change.title_probability == null
+        ? "no measurable change"
+        : `${formatDelta(change.title_probability)} pts`;
+    titleLine = `Title odds ${formatTitleOdds(baseline.title_probability)} to ${formatTitleOdds(scenario.title_probability)} (${titleMove})`;
+  }
+  const parts: string[] = [];
+  if (result.margin_points != null) parts.push(`margin of error about ${result.margin_points.toFixed(1)} pts`);
+  if (result.trials) parts.push(`${result.trials.toLocaleString("en-US")} simulated seasons`);
+  if (result.weeks_remaining) parts.push(`${result.weeks_remaining} weeks left`);
+  const notes: string[] = [];
+  if (result.picks_excluded) notes.push("Draft picks are not counted in these odds.");
+  if (result.slope_fitted === false) notes.push("Early-season estimate: too few games played to calibrate to this league.");
+  return { tone: whatIfTone(change), headline, titleLine, detail: parts.join(", "), notes };
+}

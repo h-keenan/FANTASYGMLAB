@@ -341,9 +341,19 @@ retool 3.5-PPG package is -3892; contender (w_now 1.50) -5113; rebuild (1.05) -3
   `trade_score`. Future value in the score is the market's (already age-curved, posture-priced).
 - The waiver pool is "who is unrostered and actionable today"; FAAB, waiver priority and what
   other managers will claim are not modeled beyond the 0.90 reliability discount.
-- Playoff odds are not read (the repo has no per-team playoff probability here); the team
-  context input is the posture (see "Team posture"), whose competitive-window term uses an
+- Playoff odds are not read by the verdict or its score (they do not enter `trade_score`); the
+  team context input is the posture (see "Team posture"), whose competitive-window term uses an
   expected-wins conversion of lineup points instead.
+- Effect on your odds is shown next to the verdict, never inside it. `POST
+  /v1/leagues/{id}/trade-odds-effect` (Premium, lazy: clients call it after the verdict renders,
+  so analyzer latency is unchanged) recomputes the caller's Roster Power for the post-trade
+  roster (same scorer as the Games what-if), re-runs the shared playoff/title simulation with
+  the same fixed seed as a cached baseline, and returns the change with a conservative 95%
+  margin and the simulation size. Inside the margin it says "no measurable change"; with no
+  games left, offseason, no playoff format or an unavailable simulator it returns nothing.
+  Draft picks are not part of Roster Power and are flagged as not counted. It measures this
+  season's lineup strength only, so a rebuild-posture ACCEPT can legitimately show lower odds:
+  the two answers are different questions and both are shown.
 - D/ST and IDP slots are outside the model (no points data for defenses, IDP value-only).
 - `k` is one rate for all positions, calibrated from the market's own value/points relationship
   for starters; it is only as good as that relationship (dynasty value includes age, so young

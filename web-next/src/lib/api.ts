@@ -950,6 +950,43 @@ export interface GamesWhatIfResponse {
   factors?: { label: string; detail: string }[];
 }
 
+export interface TradeOddsPackageRequest {
+  send_player_ids: string[];
+  receive_player_ids: string[];
+  has_picks?: boolean;
+}
+
+export interface TradeOddsEffectItem {
+  send_player_ids: string[];
+  receive_player_ids: string[];
+  reason: string;
+  picks_excluded?: boolean;
+  baseline?: GamesOddsRow;
+  scenario?: GamesOddsRow;
+  change?: {
+    playoff_probability: number;
+    title_probability?: number | null;
+    median_final_wins: number;
+    median_seed: number;
+    within_noise: boolean;
+    title_within_noise?: boolean;
+  };
+  margin_points?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+  weeks_remaining?: number;
+}
+
+export interface TradeOddsEffectResponse {
+  ok: boolean;
+  /** Top-level not-ready state: premium_required, offseason, no_games_left, ... */
+  reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+  results: TradeOddsEffectItem[];
+}
+
 export interface GamesPickemTeam {
   roster_id: string;
   team_name: string;
@@ -3777,6 +3814,11 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim/what-if?lens=${encodeURIComponent(lens)}`,
       { method: "POST", jsonBody: body },
     ),
+  postTradeOddsEffect: (leagueId: string, packages: TradeOddsPackageRequest[], lens: string = "Dynasty") =>
+    authorizedRequest<TradeOddsEffectResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/trade-odds-effect`, {
+      method: "POST",
+      jsonBody: { packages, lens },
+    }),
   getGamesPickem: (leagueId: string, week?: number) =>
     authorizedRequest<GamesPickemResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem${week ? `?week=${week}` : ""}`,

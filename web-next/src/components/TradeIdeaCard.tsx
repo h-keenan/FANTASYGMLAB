@@ -7,6 +7,7 @@ import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
 import { IdeaPosture } from "@/components/IdeaPosture";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
@@ -319,6 +320,9 @@ export function TradeIdeaCardView({
           ) : null}
           <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
           <BeginnerHelp term="ideaBalance" />
+          {leagueId ? (
+            <TradeOddsEffect leagueId={leagueId} send={idea.package.send} receive={idea.package.receive} lens={lens} />
+          ) : null}
           <div className="flex items-center gap-4 flex-wrap">
             <ConfidenceMeter
               label="Confidence"
