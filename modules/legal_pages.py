@@ -338,6 +338,9 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                     # FantasyCalc's Terms of Usage (fantasycalc.com/terms-of-usage)
                     # require attribution wherever their values or derivatives are
                     # shown; the in-app credit is ValuesCredit (web-next + mobile).
+                    # nflverse data is CC BY 4.0: attribution and a licence link are required
+                    # wherever advanced usage figures are shown (docs/advanced-stats-licensing-2026-11.md).
+                    f"Usage statistics in {brand_identity.PRODUCT_NAME} (target share, air-yards share, red-zone looks, opportunity share) are aggregated from nflverse (nflverse.com) data, licensed CC BY 4.0 (creativecommons.org/licenses/by/4.0), and combined with Sleeper data. We compute rolling averages and role flags from those figures. nflverse does not endorse or sponsor {brand_identity.PRODUCT_NAME}.",
                     f"Player values in {brand_identity.PRODUCT_NAME} are informed by market values from FantasyCalc (fantasycalc.com), combined with our own model and league settings. FantasyCalc does not endorse or sponsor {brand_identity.PRODUCT_NAME}.",
                 ),
             ),

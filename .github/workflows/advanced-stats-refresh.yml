@@ -1,0 +1,68 @@
+name: Advanced Stats Refresh
+
+# Rebuilds data/nflverse_advanced_stats_<season>.json (weekly target share,
+# air-yards share, red-zone looks, opportunity share) from nflverse's public
+# release assets (CC BY 4.0, https://www.nflverse.com/) and pushes it to main
+# only when the content changed and validated. Same commit/push contract and
+# auth model as players-db-refresh.yml (built-in GITHUB_TOKEN, no new secrets,
+# no paid service). If nflverse is down or serves a bad file the script exits
+# non-zero, the committed file is left alone (readers keep serving it with its
+# "through week" stamp) and the failure step opens a tracking issue.
+#
+# Two runs a day: nflverse publishes weekly stats after games finish, so more
+# frequent runs would only find nothing new; a no-change run commits nothing.
+
+on:
+  schedule:
+    - cron: "25 10,22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: advanced-stats-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Refresh and commit advanced stats
+        env:
+          GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
+        run: python scripts/refresh_advanced_stats.py
+      - name: Alert on refresh failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Advanced stats refresh is failing"
+          body="Scheduled Advanced Stats Refresh failed: ${RUN_URL} ($(date -u +%FT%TZ)). Usage stats are not being updated; the app keeps serving the last committed file."
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+      - name: Close alert issue after recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for num in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search '"Advanced stats refresh is failing" in:title' --json number --jq '.[].number'); do
+            gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment "Refresh succeeded again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done
