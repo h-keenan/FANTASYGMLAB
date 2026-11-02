@@ -21,6 +21,7 @@ import PlayerValueHistory from './PlayerValueHistory';
 import { ratingHistoryCaption } from '../lib/valueHistoryPresentation';
 import SubRatingRow from './SubRatingRow';
 import ToneBadge from './ToneBadge';
+import UsageBlock from './UsageBlock';
 import ValuesCredit from './ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
@@ -346,6 +347,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                 <View style={styles.section}>
                   <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
                 </View>
+                <UsageBlock profile={model?.usage_profile} />
                 {(stats?.seasons ?? []).map((seasonItem) => (
                   <View key={seasonItem.label} style={styles.section}>
                     <SectionHeading
