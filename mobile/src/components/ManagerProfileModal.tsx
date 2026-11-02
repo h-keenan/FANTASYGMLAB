@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import DashboardStatRow from './DashboardStatRow';
+import OpponentProfileCard from './OpponentProfileCard';
 import PickPlate from './PickPlate';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
@@ -16,6 +17,7 @@ import ToneBadge from './ToneBadge';
 import { api } from '../lib/api';
 import { gradeToneSlug, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel, type ManagerRecentTradeAsset } from '../lib/managerTendencies';
 import { queryKeys } from '../lib/queryKeys';
+import type { OpponentTradeTarget } from '../lib/opponentProfile';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -24,6 +26,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   leagueId: string;
+  /** For the "Offer this" Trade Analyzer prefill. */
+  leagueName?: string;
   rosterId: string | number;
   teamName: string;
   ownerName?: string | null;
@@ -32,7 +36,7 @@ interface Props {
 
 /** Manager profile (League Rankings): every readable signal with its
  * evidence line. Fetches only while open. */
-export default function ManagerProfileModal({ visible, onClose, leagueId, rosterId, teamName, ownerName, avatarId }: Props) {
+export default function ManagerProfileModal({ visible, onClose, leagueId, leagueName = '', rosterId, teamName, ownerName, avatarId }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -42,6 +46,39 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, roster
     enabled: visible,
     staleTime: 5 * 60 * 1000,
   });
+  // Free roster profile, independent of the Premium tendencies below; a
+  // failure just hides the card.
+  const profileQuery = useQuery({
+    queryKey: queryKeys.teamProfile(leagueId, rosterId),
+    queryFn: () => api.getTeamProfile(leagueId, rosterId),
+    enabled: visible,
+    staleTime: 5 * 60 * 1000,
+  });
+  const offer = (target: OpponentTradeTarget) => {
+    onClose();
+    // A lean RankedPlayer is enough: the Analyzer resolves the id against the
+    // league's loaded rankings and only falls back to this row.
+    navigation.navigate('Trades', {
+      leagueId,
+      leagueName,
+      initialTab: 'make',
+      tradePlayer: {
+        player_id: target.player_id,
+        name: target.name,
+        position: target.position,
+        team: target.team,
+        age: null,
+        status: null,
+        injury_status: null,
+        tier: null,
+        score: null,
+        overall_rank: null,
+        position_rank: null,
+        rank_unavailable_reason: null,
+        opportunity_label: null,
+      },
+    });
+  };
   const data = query.data;
   const signals = data?.manager?.signals ?? {};
   const sample = data?.manager?.sample ?? null;
@@ -69,6 +106,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, roster
             </Pressable>
           </View>
           <ScrollView style={styles.body}>
+            <OpponentProfileCard profile={profileQuery.data} onOffer={offer} />
             {query.isError ? (
               <AppText style={styles.muted}>Couldn&apos;t load this profile.</AppText>
             ) : !data ? (

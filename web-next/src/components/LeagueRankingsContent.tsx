@@ -389,6 +389,7 @@ export function LeagueRankingsContent({
       {profile ? (
         <ManagerProfileSheet
           leagueId={leagueId}
+          leagueName={leagueName}
           rosterId={profile.rosterId}
           teamName={profile.teamName}
           ownerName={profile.ownerName}
