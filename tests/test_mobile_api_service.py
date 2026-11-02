@@ -729,7 +729,7 @@ def test_analytics_event_is_fail_soft_when_track_event_raises(monkeypatch):
     client = _client(monkeypatch)
     from services import mobile_api_service
 
-    with patch.object(mobile_api_service.launch_analytics, "track_event", side_effect=RuntimeError("boom")):
+    with patch.object(mobile_api_service.launch_analytics, "track_event", side_effect=OSError("disk gone")):
         response = client.post(
             "/v1/analytics/event",
             json={"event": "pqv_opened", "anon_id": "anon_abc123"},
@@ -4870,7 +4870,7 @@ def test_quick_view_usage_profile_failure_is_reported_not_hidden(monkeypatch):
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     with patch("requests.get", return_value=auth_user_response):
         with patch("modules.rankings.load_players", return_value=_usage_trend_frame("9009")):
-            with patch("modules.usage_trends.profile_for_player", side_effect=RuntimeError("boom")):
+            with patch("modules.usage_trends.profile_for_player", side_effect=OSError("disk gone")):
                 response = client.get("/v1/players/9009/quick-view", headers={"Authorization": "Bearer good-token"})
     assert response.status_code == 200
     assert response.json()["model"]["usage_profile"]["status"] == "unavailable"
@@ -12980,7 +12980,7 @@ def test_matchup_real_lineup_projection_fails_soft_on_error(monkeypatch):
     ]
 
     with _matchup_world(matchups):
-        with patch("modules.sleeper.get_players", side_effect=RuntimeError("boom")):
+        with patch("modules.sleeper.get_players", side_effect=OSError("disk gone")):
             response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200

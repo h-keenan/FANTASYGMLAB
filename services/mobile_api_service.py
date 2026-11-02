@@ -4951,14 +4951,17 @@ def _project_usage_profile(row: pd.Series) -> dict[str, Any]:
 
     Always a dict so clients can render an explicit state: ``status`` is
     ``ok`` / ``building_sample`` / ``low_usage`` / ``no_data`` /
-    ``not_covered``, or ``unavailable`` when the computation itself failed
-    (logged, never swallowed into a fake "no trend").
+    ``not_covered``, or ``unavailable`` when an input lookup failed (logged and
+    reported, never swallowed into a fake "no trend"; programming errors
+    propagate, see modules.model_status).
     """
 
     player_id = str(row.get("player_id") or "")
     try:
         return usage_trends.profile_for_player(player_id, str(row.get("position") or ""))
-    except Exception:
+    except model_status.LOOKUP_ERRORS:
+        # Bad/unavailable input (file, parse, lookup): reported, not hidden.
+        # Anything else is a programming error and propagates.
         logger.exception("usage profile failed for player %s", player_id)
         return {"status": "unavailable", "reason": "usage_profile_error", "flags": [], "metrics": []}
 
