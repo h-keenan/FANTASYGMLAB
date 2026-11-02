@@ -989,7 +989,7 @@ def evaluate_trade_analyzer_fit(
         if posture_assessment and (
             posture_assessment.get("lineup_costly")
             or (
-                trade_posture.WINDOW_WIN_VALUE.get(strategy_key, 0) > 0
+                trade_posture.WINDOW_WIN_WEIGHT.get(strategy_key, 0) > 0
                 and posture_assessment.get("lineup_points", 0) <= -5
             )
         ):

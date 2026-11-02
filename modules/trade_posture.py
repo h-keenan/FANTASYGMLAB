@@ -17,7 +17,7 @@ rather than patched:
    *direction*. ``assess`` adds exactly those two terms, derived from numbers
    the lineup model already produced (docs/trade-engine-v2.md, "Team posture").
 
-Everything here is a consequence of two small tables (``WINDOW_WIN_VALUE`` and
+Everything here is a consequence of two small tables (``WINDOW_WIN_WEIGHT`` and
 ``ORIENTATION``) plus a win-probability slope. There is no per-position or
 per-player rule, and no hard cap on a verdict: the score moves, and the label
 simply reports when the score and the market value disagree.
@@ -29,17 +29,25 @@ import math
 from typing import Any, Mapping
 
 from modules.team_eval import normalize_team_strategy, team_strategy_label
+from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
 
 # --- parameters (all approximate; see docs/trade-engine-v2.md) ----------------
 
-# Value units one EXPECTED REGULAR-SEASON WIN is worth to a team in each
-# posture: what a contender pays to keep its playoff odds (seed, bye, title
-# window), what a rebuilder does not care about. Same scale as the trade score
-# (value units; the lineup model's k converts points to these).
-WINDOW_WIN_VALUE: dict[str, float] = {
-    "contender": 700.0,
-    "fringe_contender": 450.0,
-    "retool": 200.0,
+# What one EXPECTED REGULAR-SEASON WIN is worth to a team in each posture, as a
+# multiple of the market price of the lineup points that make one win: what a
+# contender pays to keep its playoff odds (seed, bye, title window), what a
+# rebuilder does not care about. It is a multiple of the league's OWN price
+# scale -- ``win_value = weight * value_per_point / WIN_PROB_PER_POINT`` (value
+# units per point x points per win), not an absolute number of value units. The
+# old absolute 700/win was calibrated on a market where a first-round pick was
+# ~3k; in a league whose R1 picks price at 5.5-9.8k it was a rounding error, so a
+# contender could be told SMASH ACCEPT for selling its best player for picks
+# while losing ~156 lineup points. Scaling by k keeps the window cost
+# proportional to what the same market charges for the points themselves.
+WINDOW_WIN_WEIGHT: dict[str, float] = {
+    "contender": 0.5,
+    "fringe_contender": 0.35,
+    "retool": 0.15,
     "rebuild": 0.0,
     "tank": 0.0,
 }
@@ -252,10 +260,12 @@ def assess(posture: Mapping[str, Any], lineup_model: Mapping[str, Any] | None) -
     ros_delta = _num(pts.get("ros_delta"))
     ros_before = max(_num(pts.get("ros_before")), 1.0)
     wins_delta = ros_delta * WIN_PROB_PER_POINT
-    win_value = WINDOW_WIN_VALUE.get(key, WINDOW_WIN_VALUE["retool"])
+    win_weight = WINDOW_WIN_WEIGHT.get(key, WINDOW_WIN_WEIGHT["retool"])
+    k = _num(lineup_model.get("value_per_point"))
+    # Value units per expected win in THIS league's price scale.
+    win_value = win_weight * (k or STATIC_VALUE_PER_POINT) / WIN_PROB_PER_POINT
     window_term = win_value * (wins_delta if wins_delta < 0 else GAIN_CREDIT * wins_delta)
 
-    k = _num(lineup_model.get("value_per_point"))
     present_term = PRESENT_ADJUST.get(key, 0.0) * k * ros_delta
 
     present = _num(lineup_model.get("win_now_delta"))
@@ -268,7 +278,7 @@ def assess(posture: Mapping[str, Any], lineup_model: Mapping[str, Any] | None) -
     direction = "toward_present" if conversion > DIRECTION_MIN_VALUE else "toward_future" if conversion < -DIRECTION_MIN_VALUE else "neutral"
 
     share = max(0.0, -ros_delta) / ros_before
-    costly = win_value >= WINDOW_WIN_VALUE["fringe_contender"] and (
+    costly = win_weight >= WINDOW_WIN_WEIGHT["fringe_contender"] and (
         wins_delta <= -MATERIAL_WINS or share >= MATERIAL_LINEUP_SHARE
     ) and ros_delta < 0
     out.update(
@@ -336,11 +346,25 @@ def verdict_label_override(
 
     from modules import trade_value_bands as bands
 
-    if value_band_id not in {"smash", "accept"} or final_band_id in {"smash", "accept"}:
+    if value_band_id not in {"smash", "accept"}:
         return ""
     if assessment.get("adjustment", 0) >= 0:
         return ""
     group = posture.get("group")
+    if final_band_id in {"smash", "accept"}:
+        # Still an accept after the posture terms. A win-now team whose lineup
+        # takes a material hit (selling its best player for picks) is never told
+        # "you win": the clean ACCEPT / SMASH ACCEPT is reserved for trades that
+        # do not cost the window. It reads as the honest trade-off instead, so no
+        # surface (Analyzer, Hub, Finder) presents it as a clean win. A SMASH
+        # that moves a contender's present into the future is held to the same
+        # standard. Structural, not a cap on the number: the score is untouched
+        # and the label only reports that market value and window disagree.
+        if group == "contender" and assessment.get("lineup_costly"):
+            return bands.VERDICT_VALUE_COSTS_LINEUP
+        if final_band_id == "smash" and group == "contender" and assessment.get("direction") == "toward_future":
+            return bands.VERDICT_VALUE_MOVES_REBUILD
+        return ""
     if group == "contender" and assessment.get("lineup_costly"):
         return bands.VERDICT_VALUE_COSTS_LINEUP
     if group == "contender" and assessment.get("direction") == "toward_future":

@@ -4142,11 +4142,17 @@ class _UserSideAnalyzerGate:
             )
         )
         idea["analyzer_label"] = verdict.band
+        # The card's gain is the Analyzer's own value delta (raw value plus the
+        # consolidation / injury adjustments it applies), not the engine's bare
+        # sum of asset scores, so a Hub card, the Finder and an Analyzer run of
+        # the same package show one number. The engine's raw figure is kept.
+        idea.setdefault("engine_trade_gain", int(idea.get("trade_gain") or 0))
+        idea["trade_gain"] = int(verdict.value_delta)
         # A trade the Analyzer headlines as "good value, costs your lineup"
         # (or the rebuild equivalents) is a trade-off to weigh, not an idea to
         # suggest: it is hidden here and offered as a Finder stretch instead.
         passed = (
-            verdict.ui_verdict in trade_grade.PASSING_UI_VERDICTS
+            trade_grade.clears_suggestion_bar(verdict)
             and verdict.band not in trade_value_bands.POSTURE_VERDICTS
         )
         self._results[key] = passed
@@ -5065,13 +5071,33 @@ def _build_trade_ideas_impl(
     # Every surfaced idea must grade at least FAIR in the Trade Analyzer for
     # the user's side. Graded lazily in surface order, so only the ideas the
     # selection actually reaches pay for an Analyzer run.
+    # The Analyzer grades on a frame carrying the walk-forward weekly projection
+    # baselines (proj_ppg / proj_sd) for the user's roster, the package and the top
+    # free agents. The gate must grade on the same inputs or it passes packages
+    # the Analyzer then scores as losses, so attach them the same way.
+    gate_pool = _hub_waiver_pool(df_players, roster_players_map)
+    gate_player_ids = {str(pid) for pid in my_player_ids} | {
+        str(asset.get("player_id"))
+        for idea in ideas
+        for side in ("send_assets", "receive_assets")
+        for asset in idea.get(side) or ()
+        if isinstance(asset, dict) and asset.get("player_id")
+    }
+    gate_players, gate_pool = trade_grade.attach_projection_baselines(
+        df_players, gate_pool, gate_player_ids, score_field
+    )
+    gate_team_df = (
+        gate_players[gate_players["player_id"].astype(str).isin({str(pid) for pid in my_player_ids})].copy()
+        if "player_id" in gate_players.columns and not my_team_df.empty
+        else my_team_df
+    )
     analyzer_gate = _UserSideAnalyzerGate(
-        my_team_df=my_team_df,
-        all_players_df=df_players,
+        my_team_df=gate_team_df,
+        all_players_df=gate_players,
         strategy=active_strategy,
         league_settings=league_settings,
         score_field=score_field,
-        waiver_df=_hub_waiver_pool(df_players, roster_players_map),
+        waiver_df=gate_pool,
     )
     selected: List[Dict[str, Any]] = []
     analyzer_rejected: List[Dict[str, Any]] = []
