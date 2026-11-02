@@ -47,7 +47,7 @@ from modules.player_state_authority import (
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
-from modules import trade_grade
+from modules import trade_grade, trade_posture, trade_value_bands
 from modules import team_stance as team_stance_module
 
 BASE_PICK_VALUES = {
@@ -1088,7 +1088,12 @@ def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
     stage = str(idea.get("finder_stretch_stage") or "")
     partner = str(idea.get("partner_team_name") or "The other team")
     gap = _idea_asset_value(idea.get("receive_assets")) - _idea_asset_value(idea.get("send_assets"))
-    if stage == "analyzer":
+    if stage == "analyzer" and idea.get("posture_label"):
+        reason = (
+            f"{partner} might take it, but the Trade Analyzer says \"{str(idea['posture_label']).lower()}\" "
+            f"for your team. {str(idea.get('posture_note') or '').strip()}"
+        ).strip()
+    elif stage == "analyzer":
         verdict = str(idea.get("analyzer_verdict") or "a loss").strip()
         reason = f"{partner} might take it, but the Trade Analyzer grades it {verdict} for you."
     elif stage == "market":
@@ -1584,6 +1589,14 @@ def _trade_surface_sort_key(idea: Dict[str, Any]) -> tuple[int, int, int, int, i
         int(idea.get("strategy_fit_score") or 0),
         int(idea.get("priority") or 0),
     )
+
+
+def posture_surface_sort_key(idea: Dict[str, Any]) -> tuple:
+    """Surface order with team posture in front: ideas that fit the team's
+    status (a contender's lineup gains, a rebuild's future value) first, ideas
+    that cost it last. Ungraded ideas rank neutral, i.e. the plain surface key."""
+
+    return (*trade_posture.sort_rank(idea), *_trade_surface_sort_key(idea))
 
 
 def evaluate_trade_market_realism(
@@ -4100,7 +4113,7 @@ class _UserSideAnalyzerGate:
             self._current_context = prepare_current_roster_context(
                 self._my_team_df, None, self._strategy, self._league_settings, self._score_field
             ) or {}
-        _fit, verdict = trade_grade.grade_trade_for_user(
+        fit, verdict = trade_grade.grade_trade_for_user(
             my_team_df=self._my_team_df,
             all_players_df=self._all_players_df,
             send_assets=list(idea.get("send_assets") or []),
@@ -4119,7 +4132,23 @@ class _UserSideAnalyzerGate:
         # Same single number the Analyzer's verdict is decided on (value
         # balance + posture + expected lineup points); see modules.trade_lineup_model.
         idea["analyzer_trade_score"] = int(verdict.trade_score)
-        passed = verdict.ui_verdict in trade_grade.PASSING_UI_VERDICTS
+        # Team posture (modules.trade_posture): carry what the Analyzer's own
+        # verdict says about the user's status onto the idea, for ranking and
+        # the card. No extra modelling; these are the verdict's numbers.
+        wk = ((fit or {}).get("lineup_model") or {}).get("weeks") or {}
+        idea.update(
+            trade_posture.idea_fields_from_verdict(
+                verdict, weeks_text=f"over Weeks {wk['first']}-{wk['last']}" if wk.get("count") else ""
+            )
+        )
+        idea["analyzer_label"] = verdict.band
+        # A trade the Analyzer headlines as "good value, costs your lineup"
+        # (or the rebuild equivalents) is a trade-off to weigh, not an idea to
+        # suggest: it is hidden here and offered as a Finder stretch instead.
+        passed = (
+            verdict.ui_verdict in trade_grade.PASSING_UI_VERDICTS
+            and verdict.band not in trade_value_bands.POSTURE_VERDICTS
+        )
         self._results[key] = passed
         return passed
 
@@ -5078,7 +5107,7 @@ def _build_trade_ideas_impl(
     # Diversity may skip a higher-ranked idea then append it during fill,
     # which would place it after lower-ranked survivors. Restore surface
     # rank among the selected set without changing membership or scores.
-    selected.sort(key=_trade_surface_sort_key, reverse=True)
+    selected.sort(key=posture_surface_sort_key, reverse=True)
     return _finish_finder_trace(trace, selected, analyzer_rejected)
 
 

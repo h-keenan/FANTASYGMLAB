@@ -32,6 +32,11 @@ def _daytime_no_history(monkeypatch):
     monkeypatch.setattr(
         push_triggers, "_utcnow", lambda: datetime(2026, 10, 21, 17, 0, tzinfo=timezone.utc)
     )
+    # Trade-idea alerts resolve the team posture from the shared rankings (own
+    # tests below); here it must not consume the mocked request sequence.
+    from modules import trade_hub_engine
+
+    monkeypatch.setattr(trade_hub_engine, "roster_posture", lambda **kw: {"key": "retool"})
 
 
 def _config() -> push_triggers.PushTriggerConfig:

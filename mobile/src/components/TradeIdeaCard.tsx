@@ -12,6 +12,7 @@ import ExchangeSide from './ExchangeSide';
 import TeamAvatar from './TeamAvatar';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
+import IdeaPosture from './IdeaPosture';
 import TradeSharePreviewModal from './TradeSharePreviewModal';
 import TradeValueBar from './TradeValueBar';
 import TradeValueHero from './TradeValueHero';
@@ -312,6 +313,13 @@ export default function TradeIdeaCard({
           ) : null}
         </View>
       ) : null}
+      {/* Team posture this idea was graded and ranked under: the same chip, label and
+          one-line trade-off the Trade Analyzer shows for this package. */}
+      {idea.posture ? (
+        <View style={styles.postureBlock}>
+          <IdeaPosture idea={idea} />
+        </View>
+      ) : null}
       {/* Header hierarchy: recommendation type (the category/impact badges
           above) -> team name + share action on one line -> value-change
           number prominently, paired with the fairness pill on its own row
@@ -495,6 +503,7 @@ function createStyles(colors: ThemeColors) {
   // of a heavy fill/shadow that keeps it quiet, not the absence of a border.
   contextBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, gap: 2 },
   landedTargetRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  postureBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   landedTargetText: { fontSize: 11, fontWeight: '600', color: colors.premium, flexShrink: 1 },
   sourceTeamLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
   categoryBadge: {

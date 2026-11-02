@@ -15869,8 +15869,11 @@ def test_dashboard_defer_trade_ideas_skips_the_search_and_the_full_call_is_uncha
     assert gm_targets_after_deferred == 0
     assert "trade_ideas_deferred" not in full.json()
     assert searches["n"] == 1
-    # Deadline card framing: the effective strategy rides on the dashboard (unset stance => retool).
-    assert full.json()["team_strategy"] == "retool"
+    # Deadline card framing: the effective strategy rides on the dashboard. With no declared
+    # stance it is the shared auto classification (this fixture's roster ranks as a contender),
+    # the same posture the Analyzer, Trade Hub and Finder use.
+    assert full.json()["team_strategy"] == "contender"
+    assert full.json()["posture"]["key"] == "contender" and full.json()["posture"]["source"] == "auto"
     assert full.json()["trade_window"]["deadline_phase"] in {"none", "open", "final_week", "passed"}
     assert not [i for i in deferred.json()["items"] if "trade_package" in (i.get("presentation") or {})]
     assert full.json()["team_snapshot"] == deferred.json()["team_snapshot"]

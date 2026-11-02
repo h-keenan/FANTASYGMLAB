@@ -363,7 +363,7 @@ export interface BriefingItem {
   // than in the single route_player_* fields above — GamePlanCard reads
   // trade_package to render the same ExchangeSide give/get cards Trade Hub
   // uses, not a generic avatar row.
-  presentation: { trade_package?: TradePackage } & Record<string, unknown> | null;
+  presentation: ({ trade_package?: TradePackage } & Partial<Pick<TradeIdea, "posture" | "posture_label" | "posture_note" | "posture_alignment">> & Record<string, unknown>) | null;
   recommendation_id: string;
   tier_label: string;
 }
@@ -1065,6 +1065,17 @@ export interface TradeIdea {
    * ShareTradeButton uses it to ask GET .../trade-hub/{id}/share-card.png
    * for a branded PNG of precisely this idea. */
   recommendation_id?: string;
+  /** Team posture the idea was graded and ranked under (modules/trade_posture.py);
+   * the same one the Trade Analyzer uses. Additive: absent on older servers. */
+  posture?: TradePosture | null;
+  /** Honest Analyzer label when the idea is a trade-off ("GOOD VALUE, COSTS YOUR LINEUP"). */
+  posture_label?: string;
+  /** One sentence naming the posture and the trade-off, when it changes the story. */
+  posture_note?: string;
+  /** Whether the idea fits the posture: aligned (e.g. adds lineup points for a contender), neutral, or costly. */
+  posture_alignment?: "aligned" | "neutral" | "costly" | "";
+  /** Expected lineup points the idea moves over the remaining weeks. */
+  lineup_points?: number | null;
 }
 
 export interface TradeHubEntitlement {
@@ -1101,6 +1112,8 @@ export interface TradeHubResponse {
   hold?: TradeHubHold | null;
   /** Plain-English line for the effective strategy. */
   posture_sentence?: string;
+  /** The resolved team posture these ideas were graded and ranked under. */
+  posture?: TradePosture | null;
   trade_window?: TradeWindow;
 }
 
@@ -1158,6 +1171,7 @@ export interface TradeFinderResponse {
   upsell: PremiumUpsell | null;
   message?: string;
   trade_window?: TradeWindow;
+  posture?: TradePosture | null;
 }
 
 // player_id/name/position/team/age/status/injury_status/tier/score mirror

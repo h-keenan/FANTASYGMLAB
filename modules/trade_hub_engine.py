@@ -35,7 +35,9 @@ from modules import league_value_settings
 from modules import player_quick_view
 from modules import redis_cache
 from modules import sleeper
+from modules import team_stance as team_stance_module
 from modules import trade_hub_presentation
+from modules import trade_posture as trade_posture_module
 from modules import trade_ideas as trade_ideas_module
 from modules import trade_trust
 from modules import trade_visual_language
@@ -323,6 +325,15 @@ class TradeIdeaCard:
     # contents (the server re-derives the idea from its own cached search
     # instead of trusting a client payload — see that endpoint's docstring).
     recommendation_id: str = ""
+    # Team posture the idea was graded and ranked under (modules.trade_posture):
+    # the user's resolved posture, the Analyzer's honest label when it is a
+    # trade-off ("GOOD VALUE, COSTS YOUR LINEUP"), the one-line note, whether
+    # the idea fits the posture, and the lineup points it moves. Additive.
+    posture: dict[str, Any] | None = None
+    posture_label: str = ""
+    posture_note: str = ""
+    posture_alignment: str = ""
+    lineup_points: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -340,6 +351,11 @@ class TradeIdeaCard:
             "send_score": self.send_score,
             "receive_score": self.receive_score,
             "recommendation_id": self.recommendation_id,
+            "posture": self.posture,
+            "posture_label": self.posture_label,
+            "posture_note": self.posture_note,
+            "posture_alignment": self.posture_alignment,
+            "lineup_points": self.lineup_points,
         }
 
 
@@ -377,6 +393,11 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         send_score=int(idea.get("my_score") or 0),
         receive_score=int(idea.get("their_score") or 0),
         recommendation_id=trade_hub_presentation.idea_recommendation_id(idea),
+        posture=dict(idea["posture"]) if isinstance(idea.get("posture"), Mapping) else None,
+        posture_label=_safe_text(idea.get("posture_label")),
+        posture_note=_safe_text(idea.get("posture_note")),
+        posture_alignment=_safe_text(idea.get("posture_alignment")),
+        lineup_points=idea.get("posture_lineup_points"),
     )
 
 
@@ -777,6 +798,7 @@ def generate_trade_idea_records_cached(
     gm_target_player_ids: tuple[str, ...] = (),
     team_stance: str = "",
     keeper_round_penalty: int = 0,
+    posture: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Cached front door for `generate_trade_idea_records` — resolves its
     own players_df/settings/rosters from just (league_id, lens) rather than
@@ -817,7 +839,75 @@ def generate_trade_idea_records_cached(
         compute=lambda: _generate_trade_idea_records_cached(*key),
         lock_timeout_seconds=_TRADE_HUB_IDEAS_LOCK_TIMEOUT_SECONDS,
     )
-    return trade_ideas_module.apply_team_stance_framing(records, team_stance)
+    # `posture` (the caller's resolved team posture) is stamped OUTSIDE the
+    # cache boundary like the stance framing: the search itself is keyed on the
+    # posture's strategy key (callers pass posture["key"] as `strategy`).
+    return trade_posture_module.stamp_records(
+        trade_ideas_module.apply_team_stance_framing(records, team_stance), posture
+    )
+
+
+def roster_posture(
+    *,
+    league_id: str,
+    roster: Mapping[str, Any] | None,
+    lens: str,
+    players_db_path: str,
+    declared_stance: Any = "",
+    client_strategy: str = "",
+    rankings_frame: pd.DataFrame | None = None,
+) -> dict[str, Any]:
+    """The ONE posture for a roster, for every surface that generates, ranks or
+    grades trades (Analyzer, Hub, Finder, Dashboard, GM Plan, glance, alerts).
+
+    Declared Team Situation > the league rankings' auto classification (roster
+    strength blended with the real record, age curve, draft capital) > the
+    client's value (``trade_posture.resolve_posture``). Reads one already-cached
+    rankings row (pass ``rankings_frame`` when the caller has it); every lookup
+    fails open to the next source."""
+
+    roster = roster or {}
+    declared = ""
+    if declared_stance:
+        try:
+            declared = team_stance_module.team_strategy_for_stance(declared_stance)
+        except Exception:
+            declared = ""
+    auto = ""
+    power_rank = None
+    league_size = None
+    try:
+        frame = rankings_frame
+        if frame is None:
+            frame = league_rankings.build_league_rankings_frame_cached(
+                league_id=league_id, lens=lens, players_db_path=players_db_path
+            )
+        if frame is not None and not frame.empty:
+            league_size = len(frame)
+            match = frame[frame["roster_id"].astype(str) == str(roster.get("roster_id") or "")]
+            if not match.empty:
+                row = match.iloc[0]
+                auto = _clean_scalar(row.get("strategy"))
+                power_rank = _clean_scalar(row.get("power_rank"))
+    except Exception:
+        pass
+    return trade_posture_module.resolve_posture(
+        declared_strategy=declared,
+        auto_strategy=auto,
+        client_strategy=client_strategy,
+        power_rank=power_rank,
+        league_size=league_size,
+        record=roster.get("settings"),
+    )
+
+
+def _clean_scalar(value: Any) -> Any:
+    try:
+        if value is None or (isinstance(value, float) and value != value):
+            return ""
+    except Exception:
+        return ""
+    return value if not hasattr(value, "item") else value.item()
 
 
 def generate_trade_finder_records(
@@ -834,6 +924,7 @@ def generate_trade_finder_records(
     trade_block_pick_ids: tuple[str, ...] = (),
     require_receive_picks: bool = False,
     finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
+    posture: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Trade Finder: "select these specific players/picks, find who'd want
     them" — the same idea-generation engine as the passive Trade Hub board
@@ -873,7 +964,7 @@ def generate_trade_finder_records(
         return []
     score_field = league_value_settings.valuation_score_field(lens)
     rosters = sleeper.get_rosters(league_id)
-    return generate_trade_idea_records(
+    records = generate_trade_idea_records(
         league_id=league_id,
         my_roster_id=roster_id,
         players_df=valued,
@@ -889,6 +980,11 @@ def generate_trade_finder_records(
         require_receive_picks=require_receive_picks,
         finder_trace=finder_trace,
     )
+    if finder_trace is not None and posture:
+        finder_trace.enforced_closest = trade_posture_module.stamp_records(
+            list(finder_trace.enforced_closest), posture
+        )
+    return trade_posture_module.stamp_records(records, posture)
 
 
 def generate_trade_ideas(

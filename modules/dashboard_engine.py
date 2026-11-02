@@ -522,6 +522,13 @@ def build_trade_tile(
             "trade_confidence_label": confidence_label,
             "trade_market_realism_label": _text(headline_idea.get("market_realism_label"), "Thin"),
             "partner_team_name": _text(headline_idea.get("partner_team_name"), "Trade partner"),
+            # Team posture the idea was graded under (modules.trade_posture),
+            # same fields Trade Hub's cards carry.
+            "posture": dict(headline_idea["posture"]) if isinstance(headline_idea.get("posture"), Mapping) else None,
+            "posture_label": _text(headline_idea.get("posture_label")),
+            "posture_note": _text(headline_idea.get("posture_note")),
+            "posture_alignment": _text(headline_idea.get("posture_alignment")),
+            "lineup_points": headline_idea.get("posture_lineup_points"),
         },
     }
 
@@ -1045,7 +1052,16 @@ def build_league_summary(
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
 
     roster_id = my_roster.get("roster_id")
-    team_strategy = team_stance.team_strategy_for_stance(team_stance_value)
+    # Same posture every trade surface uses (declared Team Situation > auto
+    # classification > default); the rankings frame is the shared cached one.
+    posture = trade_hub_engine.roster_posture(
+        league_id=league_id,
+        roster=my_roster,
+        lens=lens,
+        players_db_path=players_db_path,
+        declared_stance=team_stance_value,
+    )
+    team_strategy = posture["key"]
 
     trade_idea_records = None
     if league_calendar.trade_deadline_passed(league):
@@ -1063,6 +1079,7 @@ def build_league_summary(
                 untouchable_player_ids=gm_untouchable_player_ids,
                 gm_target_player_ids=gm_target_player_ids,
                 team_stance=team_stance_value,
+                posture=posture,
             )
         except (TypeError, ValueError):
             pass

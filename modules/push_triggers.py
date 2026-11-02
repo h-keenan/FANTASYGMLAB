@@ -692,6 +692,21 @@ def league_briefing_push_items(
     for roster in rosters:
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
 
+    # Trade-idea alerts are graded and ranked under the team's posture too
+    # (modules.trade_posture): the auto classification from the shared cached
+    # rankings row. The sweep has no per-user Team Situation read, so a
+    # declared stance is not applied here (the Dashboard/Trade Hub apply it).
+    from modules import trade_hub_engine
+
+    try:
+        team_strategy = trade_hub_engine.roster_posture(
+            league_id=league_id,
+            roster=my_roster,
+            lens=league_value_settings.default_lens_for_league(league),
+            players_db_path=PLAYERS_DB_PATH,
+        )["key"]
+    except Exception:
+        team_strategy = "retool"
     briefing = dashboard_engine.compose_next_move_briefing(
         league_id=league_id,
         roster_id=str(my_roster.get("roster_id") or ""),
@@ -702,6 +717,7 @@ def league_briefing_push_items(
         score_field=score_field,
         rosters=rosters,
         untouchable_player_ids=untouchable_player_ids,
+        team_strategy=team_strategy,
     )
     league_name = _safe_text(league.get("name"), "Your league")
     # Push-safety (#1493): no league/team/manager names in push text. A trade

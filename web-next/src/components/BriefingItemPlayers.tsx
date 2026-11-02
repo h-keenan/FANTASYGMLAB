@@ -4,6 +4,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
+import { IdeaPosture } from "@/components/IdeaPosture";
 
 /**
  * The compact player-card visual for a BriefingItem — give/get trade
@@ -44,16 +45,19 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
     (item.presentation.trade_package.send.length > 0 || item.presentation.trade_package.receive.length > 0)
   ) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 items-start">
-        <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={item.presentation.trade_package.send} />
-        <div
-          className="hidden sm:flex items-center justify-center text-xs font-bold uppercase self-stretch"
-          style={{ color: "var(--color-accent)" }}
-          aria-hidden="true"
-        >
-          FOR
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 items-start">
+          <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={item.presentation.trade_package.send} />
+          <div
+            className="hidden sm:flex items-center justify-center text-xs font-bold uppercase self-stretch"
+            style={{ color: "var(--color-accent)" }}
+            aria-hidden="true"
+          >
+            FOR
+          </div>
+          <ExchangeSide label="You get" dotColor="var(--color-success)" assets={item.presentation.trade_package.receive} />
         </div>
-        <ExchangeSide label="You get" dotColor="var(--color-success)" assets={item.presentation.trade_package.receive} />
+        <IdeaPosture idea={item.presentation} />
       </div>
     );
   }

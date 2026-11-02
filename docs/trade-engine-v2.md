@@ -339,6 +339,40 @@ retool 3.5-PPG package is -3892; contender (w_now 1.50) -5113; rebuild (1.05) -3
 - Verdict bands and confidence cut points are product choices layered on the number, not
   fitted to outcomes.
 
+### Posture on every trade surface (parity)
+
+Follow-up to #1597: Trade Hub, Trade Finder (incl. pick searches and Stretch options),
+All Trades, the Dashboard trade tile, GM Plan, the leagues glance and trade-idea push
+alerts used to grade and rank with the stored stance / default lens, so a contender could
+still be shown ideas that cost lineup. Now one function owns the posture:
+
+- `trade_hub_engine.roster_posture(...)` (wraps `trade_posture.resolve_posture`): declared
+  Team Situation > auto classification from the cached league rankings row > client value.
+  `services/mobile_api_service._resolve_trade_posture` delegates to it; callers that already
+  hold the stance or the rankings frame pass them in, so nothing is fetched twice.
+- The idea search is keyed on `posture["key"]` (so cache entries are shared with the
+  Analyzer's age curve and pick multiplier). The user's full posture (source, standing) is
+  stamped on the records OUTSIDE the cache (`trade_posture.stamp_records`), like stance framing.
+- Every idea is graded by the Analyzer's own call (`trade_grade.grade_trade_for_user`, via
+  `_UserSideAnalyzerGate`) under that posture, so an idea and an Analyzer run of the same
+  package get the same verdict, band and trade score (pinned by `tests/test_trade_posture_parity.py`
+  for all five postures). The gate already ran this for the "at least FAIR" filter; it now also
+  copies `posture_label`, `posture_note`, `posture_alignment` and the lineup points onto the idea.
+- Filtering: an idea whose Analyzer label is a posture trade-off ("GOOD VALUE, COSTS YOUR
+  LINEUP", "VALUE WIN, MOVES YOU TOWARD A REBUILD", "VALUE WIN, AGAINST YOUR REBUILD") is not
+  suggested. In Trade Finder it comes back as a Stretch option that says so.
+- Ranking: `trade_posture.sort_rank` leads the presentation key: `aligned` (a contender gaining
+  >= 5 lineup points, a rebuild moving toward the future) first, `neutral` next, `costly`
+  (material lineup cost, or a conversion against the posture) last; within aligned, the Analyzer
+  trade score in 500-unit buckets. The established surface key decides everything else.
+  Ideas without an Analyzer grade rank neutral (unchanged order).
+- Cards (web + app): the shared `PostureChip`, the honest label, the one-line note and a
+  "Fits your plan" tag via `IdeaPosture`. All Trades cards for other teams are graded under
+  THAT team's posture but do not show the chip (it describes the caller's team).
+- Not changed: `/v1/external/*` interesting-trades grades public trades for no particular team
+  under the neutral strategy (there is no user posture to apply). Push alerts use the auto
+  classification only (the sweep has no per-user Team Situation read).
+
 ## Trade Finder: shopping picks (and saying why nothing was found)
 
 Owner report (coridian_, 2026-11-01, mobile screenshot): one pick ticked, "Any return",

@@ -2028,10 +2028,19 @@ def _build_warmup_steps(league_id: str, roster_id: Any) -> dict[str, Any]:
         league = sleeper.get_league(league_id) or {}
         if league_calendar.trade_deadline_passed(league):
             return
+        # Warm the entry a user with no declared Team Situation will hit: the
+        # search is keyed on the auto-classified posture (values_step above
+        # already cached the rankings it reads).
+        warm_roster = next(
+            (r for r in (sleeper.get_rosters(league_id) or []) if str(r.get("roster_id")) == str(roster_id)),
+            {"roster_id": roster_id},
+        )
         trade_hub_engine.generate_trade_idea_records_cached(
             league_id=league_id,
             roster_id=int(roster_id),
-            strategy=team_stance.team_strategy_for_stance(""),
+            strategy=trade_hub_engine.roster_posture(
+                league_id=league_id, roster=warm_roster, lens=lens, players_db_path=PLAYERS_DB_PATH
+            )["key"],
             lens=lens,
             players_db_path=PLAYERS_DB_PATH,
             untouchable_player_ids=(),
@@ -5078,6 +5087,9 @@ def _attach_projection_ppg(
         return valued, pool
 
 
+_STANCE_UNSET: Any = object()
+
+
 def _resolve_trade_posture(
     user: dict[str, Any],
     league_id: str,
@@ -5086,49 +5098,36 @@ def _resolve_trade_posture(
     *,
     lens: str,
     client_strategy: str,
+    declared_stance: Any = _STANCE_UNSET,
+    rankings_frame: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
-    """The user's team posture for a trade verdict (modules.trade_posture).
+    """The user's team posture for every trade surface (Analyzer, Trade Hub,
+    Finder, Dashboard, GM Plan): modules.trade_hub_engine.roster_posture.
 
     Declared Team Situation > the league rankings' auto classification (roster
     strength blended with the real record, age curve, draft capital) > the
-    client's value. Every lookup fails open to the next source; the web client
-    used to hard-code "retool", which is why a contender's verdict never knew
-    it was one.
-    """
+    client's value. Every lookup fails open to the next source. Callers that
+    already read the stance or the rankings frame pass them in, so resolving
+    the posture adds no round trip (the frame is the shared cached one)."""
 
-    declared = ""
-    try:
-        stance = _fetch_team_stance(
-            auth_supabase.get_supabase_config(),
-            str(user.get("id") or ""),
-            str(user.get("_access_token") or ""),
-            league_id,
-        )
-        declared = team_stance.team_strategy_for_stance(stance) if stance else ""
-    except Exception:
-        declared = ""
-    auto = ""
-    power_rank = None
-    league_size = None
-    try:
-        frame = league_rankings.build_league_rankings_frame_cached(
-            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
-        )
-        if frame is not None and not frame.empty:
-            league_size = len(frame)
-            match = frame[frame["roster_id"].astype(str) == str(my_roster.get("roster_id") or "")]
-            if not match.empty:
-                auto = _clean_json_value(match.iloc[0].get("strategy")) or ""
-                power_rank = _clean_json_value(match.iloc[0].get("power_rank"))
-    except Exception:
-        logger.exception("trade posture: rankings lookup failed")
-    return trade_posture.resolve_posture(
-        declared_strategy=declared,
-        auto_strategy=auto,
+    if declared_stance is _STANCE_UNSET:
+        try:
+            declared_stance = _fetch_team_stance(
+                auth_supabase.get_supabase_config(),
+                str(user.get("id") or ""),
+                str(user.get("_access_token") or ""),
+                league_id,
+            )
+        except Exception:
+            declared_stance = ""
+    return trade_hub_engine.roster_posture(
+        league_id=league_id,
+        roster=my_roster,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        declared_stance=declared_stance or "",
         client_strategy=client_strategy,
-        power_rank=power_rank,
-        league_size=league_size,
-        record=my_roster.get("settings"),
+        rankings_frame=rankings_frame,
     )
 
 
@@ -10200,7 +10199,18 @@ def get_league_dashboard(
     declared_team_stance = _fetch_team_stance(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
-    team_strategy = team_stance.team_strategy_for_stance(declared_team_stance)
+    # One posture for the dashboard (declared Team Situation > auto
+    # classification): the rankings frame it needs anyway is read first and
+    # shared, so this adds no second lookup. Same posture the Analyzer, Trade
+    # Hub and Finder use; the trade tile's idea is graded and ranked under it.
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    posture = _resolve_trade_posture(
+        user, league_id, league, my_roster, lens=lens, client_strategy="",
+        declared_stance=declared_team_stance, rankings_frame=rankings_frame,
+    )
+    team_strategy = posture["key"]
     # Shares the exact same cached search Trade Hub's own endpoint uses
     # (trade_hub_engine.generate_trade_idea_records_cached) for this tile,
     # rather than letting compose_next_move_briefing recompute the identical
@@ -10235,6 +10245,7 @@ def get_league_dashboard(
                 gm_target_player_ids=gm_target_ids,
                 team_stance=declared_team_stance,
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+                posture=posture,
             )
         except (TypeError, ValueError):
             pass
@@ -10266,9 +10277,6 @@ def get_league_dashboard(
     bench_rank_tied = False
     auto_strategy = ""
     auto_strategy_label = ""
-    rankings_frame = league_rankings.build_league_rankings_frame_cached(
-        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
-    )
     if not rankings_frame.empty:
         my_roster_id = str(my_roster.get("roster_id") or "")
         match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
@@ -10412,6 +10420,7 @@ def get_league_dashboard(
     # Additive: the effective strategy (declared Team Situation, else retool)
     # so the deadline card can frame buy vs sell without a second request.
     response["team_strategy"] = team_strategy
+    response["posture"] = trade_posture.public_posture(posture)
     if trade_ideas_deferred:
         response["trade_ideas_deferred"] = True
     if is_external:
@@ -11538,9 +11547,11 @@ def get_gm_plan(
     # "trades reopen after the season" state instead (modules.gm_plan).
     if not trade_window["trade_deadline_passed"]:
         try:
-            team_strategy, _ = _fetch_gm_stance_with_set_flag(
-                config, access_token, user_id=user_id, league_id=league_id
+            posture = _resolve_trade_posture(
+                user, league_id, league, my_roster, lens=lens, client_strategy="",
+                declared_stance=declared_team_stance, rankings_frame=rankings_frame,
             )
+            team_strategy = posture["key"]
             gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
                 config, user_id, access_token, league_id
             )
@@ -11554,6 +11565,7 @@ def get_gm_plan(
                 gm_target_player_ids=gm_target_ids,
                 team_stance=declared_team_stance,
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+                posture=posture,
             )
         except (TypeError, ValueError):
             trade_idea_records = []
@@ -14823,11 +14835,16 @@ def get_trade_hub_ideas(
     declared_team_stance = _fetch_team_stance(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
-    if strategy == TRADE_HUB_AUTO_STRATEGY:
-        # The caller asked for the strategy this server derives from the
-        # declared Team Situation (the same mapping GET .../team-stance
-        # returns as `strategy`), so it needs no stance round trip first.
-        strategy = team_stance.team_strategy_for_stance(declared_team_stance)
+    # ONE posture for the whole request (declared Team Situation > auto
+    # classification > the client's value, "auto"/"retool" meaning unset): the
+    # same one the Trade Analyzer grades under, so an idea and an Analyzer run
+    # of its package read the same. The search is keyed on its strategy key.
+    posture = _resolve_trade_posture(
+        user, league_id, league, my_roster, lens=lens,
+        client_strategy="" if strategy == TRADE_HUB_AUTO_STRATEGY else strategy,
+        declared_stance=declared_team_stance,
+    )
+    strategy = posture["key"]
     records = trade_hub_engine.generate_trade_idea_records_cached(
         league_id=league_id,
         roster_id=int(roster_id),
@@ -14838,6 +14855,7 @@ def get_trade_hub_ideas(
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
         keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+        posture=posture,
     )
 
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
@@ -14881,6 +14899,7 @@ def get_trade_hub_ideas(
         "reason": "",
         "hold": hold,
         "posture_sentence": trade_hub_engine.posture_sentence(strategy),
+        "posture": trade_posture.public_posture(posture),
         # Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
         # strategy age-curve adjustment (modules.trade_hub_engine.
         # apply_strategy_age_curve, inside generate_trade_idea_records_cached
@@ -14964,6 +14983,13 @@ def get_trade_hub_idea_share_card(
         config, user_id, access_token, league_id
     )
     declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
+    # The same resolved posture key /trade-hub searched under (see there).
+    posture = _resolve_trade_posture(
+        user, league_id, league, my_roster, lens=lens,
+        client_strategy="" if strategy == TRADE_HUB_AUTO_STRATEGY else strategy,
+        declared_stance=declared_team_stance,
+    )
+    strategy = posture["key"]
     # Same (league_id, roster_id, strategy, lens, untouchables, gm-targets)
     # key /trade-hub itself reads — this call hits that cache rather than
     # recomputing the search, and crucially re-derives the exact idea set
@@ -14978,6 +15004,7 @@ def get_trade_hub_idea_share_card(
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
         keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+        posture=posture,
     )
     idea = next(
         (record for record in records if trade_hub_presentation.idea_recommendation_id(record) == recommendation_id),
@@ -15100,6 +15127,12 @@ def get_trade_finder_ideas(
     declared_team_stance = _fetch_team_stance(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    posture = _resolve_trade_posture(
+        user, league_id, league, my_roster, lens=lens,
+        client_strategy="" if strategy == TRADE_HUB_AUTO_STRATEGY else strategy,
+        declared_stance=declared_team_stance,
+    )
+    strategy = posture["key"]
     trace = trade_ideas.FinderSearchTrace()
     try:
         records = trade_hub_engine.generate_trade_finder_records(
@@ -15115,6 +15148,7 @@ def get_trade_finder_ideas(
             trade_block_pick_ids=selected_pick_ids,
             require_receive_picks=bool(return_picks),
             finder_trace=trace,
+            posture=posture,
         )
     except Exception:
         # A search that crashed is not "no trades exist". Say so, instead of
@@ -15154,6 +15188,7 @@ def get_trade_finder_ideas(
         "upsell": None,
         "trade_window": trade_window,
         "search": trade_ideas.finder_search_payload(trace, found=len(ranked), closest=closest_cards),
+        "posture": trade_posture.public_posture(posture),
     }
 
 
@@ -15267,10 +15302,15 @@ def get_league_all_trades(
     team_name_by_roster_id = {
         str(roster_id): str(profile.get("team_name") or "") for roster_id, profile in roster_profiles.items()
     }
+    all_trades_rankings_frame = None
+    roster_by_id = {
+        int(r["roster_id"]): r for r in rosters if isinstance(r, dict) and r.get("roster_id") is not None
+    }
     try:
         rankings_frame = league_rankings.build_league_rankings_frame_cached(
             league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
         )
+        all_trades_rankings_frame = rankings_frame
         archetype_by_team_name = {
             str(row.get("team_name") or "").strip().lower(): _clean_json_value(row.get("archetype_label"))
             for _, row in rankings_frame.iterrows()
@@ -15297,16 +15337,29 @@ def get_league_all_trades(
             break
         is_my_roster = my_roster_id is not None and roster_id == my_roster_id
         try:
+            # Each card is graded from ITS roster's side under that roster's
+            # own posture (the caller's declared Team Situation for their own
+            # team, the shared auto classification for everyone else).
+            roster_posture = trade_hub_engine.roster_posture(
+                league_id=league_id,
+                roster=roster_by_id.get(roster_id),
+                lens=lens,
+                players_db_path=PLAYERS_DB_PATH,
+                declared_stance=declared_team_stance if is_my_roster else "",
+                client_strategy="" if strategy == TRADE_HUB_AUTO_STRATEGY else strategy,
+                rankings_frame=all_trades_rankings_frame,
+            )
             records = trade_hub_engine.generate_trade_idea_records_cached(
                 league_id=league_id,
                 roster_id=roster_id,
-                strategy=strategy,
+                strategy=roster_posture["key"],
                 lens=lens,
                 players_db_path=PLAYERS_DB_PATH,
                 untouchable_player_ids=gm_untouchable_ids if is_my_roster else (),
                 gm_target_player_ids=gm_target_ids if is_my_roster else (),
                 team_stance=declared_team_stance if is_my_roster else "",
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+                posture=roster_posture,
             )
         except Exception:
             continue
@@ -15322,6 +15375,10 @@ def get_league_all_trades(
                     remaining_free = 0
                     break
             card = trade_hub_engine.project_trade_idea_card(record, is_headline=False).to_dict()
+            if not is_my_roster:
+                # Graded and ranked under that roster's own posture, but the chip and
+                # "You're a contender..." note are about the CALLER's team: not shown here.
+                card.update(posture=None, posture_label="", posture_note="", posture_alignment="")
             card["source_roster_id"] = str(roster_id)
             card["source_team_name"] = team_name_by_roster_id.get(str(roster_id), "")
             card["partner_team_avatar_url"] = avatar_by_team_name.get(
