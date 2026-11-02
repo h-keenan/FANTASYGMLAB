@@ -43,7 +43,7 @@ export default function ScreenInfoNote({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <TouchableOpacity style={styles.row} onPress={() => setOpen(true)} hitSlop={8}>
+      <TouchableOpacity style={styles.row} onPress={() => setOpen(true)} hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}>
         <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
         <AppText style={styles.label}>{label}</AppText>
       </TouchableOpacity>

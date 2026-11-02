@@ -494,7 +494,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
                 setError(null);
                 setNotice(null);
               }}
-              className="self-start text-xs"
+              className="tap-link self-start text-xs"
               style={{ color: "var(--color-text-secondary)" }}
             >
               Forgot password?

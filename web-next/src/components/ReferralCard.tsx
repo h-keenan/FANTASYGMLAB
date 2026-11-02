@@ -100,7 +100,7 @@ export function ReferralCard({
               type="button"
               onClick={handleCopy}
               className="px-4 py-2 text-sm font-bold"
-              style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
+              style={{ minHeight: "var(--touch-target-min)", border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
             >
               {copied ? "Copied!" : "Copy link"}
             </button>

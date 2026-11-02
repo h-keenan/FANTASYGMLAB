@@ -33,7 +33,7 @@ export function InfoTip({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={expanded}
         aria-controls={id}
-        className="inline-flex items-center gap-1 self-start text-xs font-semibold"
+        className="tap-link gap-1 self-start text-xs font-semibold"
         style={{ color, background: "none", border: "none", padding: 0, cursor: "pointer" }}
       >
         <span aria-hidden="true">ⓘ</span>

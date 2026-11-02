@@ -572,7 +572,7 @@ export function GmPlanContent({
         setShowRoster(true);
       }}
       className="glass-surface flex items-center justify-between gap-2 px-3 py-2 text-sm"
-      style={{ color: "var(--color-text-secondary)" }}
+      style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-secondary)" }}
     >
       <span>
         {otherRows.length} more player{otherRows.length === 1 ? "" : "s"} on your roster
