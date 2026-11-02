@@ -1559,6 +1559,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       valueNote={quickViewQuery.data?.identity?.value_note}
       byeWeek={quickViewQuery.data?.identity?.bye_week ?? null}
       onByeThisWeek={quickViewQuery.data?.identity?.on_bye_this_week ?? false}
+      unavailable={quickViewQuery.data?.identity?.availability?.unavailable ?? false}
       overallRating={overallRating}
       ringColor={overallRating !== null ? overallRatingColor(overallRating, colors) : colors.accent}
       usageTrend={model?.usage_trend ?? null}

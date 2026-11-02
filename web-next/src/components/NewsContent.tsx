@@ -164,7 +164,7 @@ function NewsCard({ item }: { item: NewsItem }) {
   );
 }
 
-export function NewsContent({ data }: { data: NewsResponse }) {
+export function NewsContent({ data, playerName }: { data: NewsResponse; playerName?: string | null }) {
   const sections = groupNewsByDate(data.items);
 
   return (
@@ -173,15 +173,22 @@ export function NewsContent({ data }: { data: NewsResponse }) {
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Around the league
         </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>News</h1>
+        <h1 style={{ font: "var(--font-page-title)" }}>{playerName ? `News: ${playerName}` : "News"}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your rosters.
+          {playerName
+            ? "Recent injury, role, transaction, and off-field items that mention this player."
+            : "General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your rosters."}
         </p>
+        {playerName ? (
+          <a className="text-sm underline" href="/news">
+            All news
+          </a>
+        ) : null}
       </header>
 
       {sections.length === 0 ? (
         <EmptyState
-          title={data.status?.state === "warming_up" ? "News is warming up." : "No news right now."}
+          title={playerName ? "No recent news for this player." : data.status?.state === "warming_up" ? "News is warming up." : "No news right now."}
           subtitle={data.status?.message || "Check back later for injury, role, transaction, and off-field updates."}
         />
       ) : (

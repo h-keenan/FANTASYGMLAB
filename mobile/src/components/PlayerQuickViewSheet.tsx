@@ -12,6 +12,7 @@ import ModelRadarChart from './ModelRadarChart';
 import PercentileExplorerSheet from './PercentileExplorerSheet';
 import PlayerHero from './PlayerHero';
 import PlayerLeagueActions from './PlayerLeagueActions';
+import { AvailabilityBlock, LatestNewsSection } from './PlayerQuickViewNews';
 import PlayerTrendsPanel from './PlayerTrendsPanel';
 import SectionHeading from './SectionHeading';
 import SkeletonBlock, { SkeletonChart } from './SkeletonBlock';
@@ -22,7 +23,8 @@ import ValuesCredit from './ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { api, type QuickViewStatItem } from '../lib/api';
-import { injuryAbbreviation, injuryTone } from '../lib/injuryDisplay';
+import { injuryTone } from '../lib/injuryDisplay';
+import { cleanInjuryLabel } from '../lib/playerAvailability';
 import { getLastLeague } from '../lib/lastLeague';
 import { isTradeAnalyzerRoute } from '../lib/tradeShortcuts';
 import { explorerStatKey, type ExplorerPlayer } from '../lib/percentileExplorer';
@@ -122,6 +124,16 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
     staleTime: 5 * 60 * 1000,
   });
 
+  // News is lazy and independent: it starts once the quick view has loaded
+  // (never competes with it) and never gates the sheet.
+  const newsQuery = useQuery({
+    queryKey: [...queryKeys.playerQuickView(player.player_id), 'news'],
+    queryFn: () => api.getPlayerNews(player.player_id, 3),
+    enabled: detailQuery.isSuccess,
+    staleTime: 2 * 60 * 1000,
+  });
+  const newsLoading = detailQuery.isSuccess && newsQuery.isPending;
+
   // "View on Waivers" only when this player really is on the league's waiver
   // list. Same query key/fn Dashboard uses, so the cache is shared.
   const waiverLeagueId = request.league?.leagueId ?? null;
@@ -169,7 +181,10 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
   const team = player.team || resolved?.team || null;
   const age = player.age ?? resolved?.age ?? null;
   const overallRating = player.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
-  const injury = injuryAbbreviation(player.injury_status);
+  // The server's availability block wins; the row's raw status only drives
+  // the chip (with a clean label) until it arrives.
+  const availability = resolved?.availability ?? null;
+  const injury = availability ? null : cleanInjuryLabel(player.injury_status);
   const target = fullProfileTarget(request, fallback);
   // League-less opens (News) borrow the last-used league for the trade
   // shortcuts too, same as Full Profile; none known means no actions.
@@ -194,6 +209,11 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
       stubPlayer({ player_id: other.player_id, name: other.name, position: other.position, team: other.team || null }),
       { leagueId: request.league?.leagueId, leagueName: request.league?.leagueName, sourceLabel: 'Percentile Explorer' },
     );
+  };
+
+  const openPlayerNews = () => {
+    onClose();
+    if (navigationRef.isReady()) navigationRef.navigate('News', { playerId: player.player_id, playerName: name });
   };
 
   const openFullProfile = () => {
@@ -255,6 +275,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
               valueNote={resolved?.value_note}
               byeWeek={resolved?.bye_week ?? null}
               onByeThisWeek={resolved?.on_bye_this_week ?? false}
+              unavailable={availability?.unavailable ?? false}
               overallRating={overallRating}
               ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
               usageTrend={model?.usage_trend ?? null}
@@ -282,6 +303,22 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
               ) : null}
               {mismatch ? <AppText style={styles.note}>{mismatch}</AppText> : null}
             </PlayerHero>
+
+            {availability ? (
+              <AvailabilityBlock
+                availability={availability}
+                injuryItem={newsQuery.data?.injury_item ?? null}
+                newsLoading={newsLoading}
+              />
+            ) : null}
+            {detail ? (
+              <LatestNewsSection
+                items={newsQuery.data ? newsQuery.data.items : null}
+                loading={newsLoading}
+                onSeeAll={openPlayerNews}
+                hideItem={availability ? newsQuery.data?.injury_item ?? null : null}
+              />
+            ) : null}
 
             {loading ? (
               <View style={styles.body}>

@@ -10,6 +10,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageTrend } from '../lib/api';
 import { byePills } from '../lib/playerByePresentation';
+import { byePillText } from '../lib/playerAvailability';
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from '../lib/usageTrendPresentation';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -48,6 +49,7 @@ export default function PlayerHero({
   valueNote,
   byeWeek = null,
   onByeThisWeek = false,
+  unavailable = false,
   expanded,
   onToggleExpand,
   children,
@@ -75,6 +77,8 @@ export default function PlayerHero({
   byeWeek?: number | null;
   /** True when the current NFL week is that bye. */
   onByeThisWeek?: boolean;
+  /** Out/IR/doubtful: the bye stays secondary (pill only). */
+  unavailable?: boolean;
   /** Whether the caller's Snapshot detail is currently shown. */
   expanded?: boolean;
   /** Supplying this turns the score tile into the expand toggle for the
@@ -131,10 +135,10 @@ export default function PlayerHero({
             </View>
             {bye.label ? (
               <View style={styles.metaPill} testID="pqv-bye-pill">
-                <AppText style={styles.metaPillText}>{bye.label}</AppText>
+                <AppText style={styles.metaPillText}>{byeWeek != null ? byePillText(byeWeek, onByeThisWeek === true, unavailable) : bye.label}</AppText>
               </View>
             ) : null}
-            {bye.thisWeek ? <ToneBadge label="On bye this week" color={colors.premium} /> : null}
+            {bye.thisWeek && !unavailable ? <ToneBadge label="On bye this week" color={colors.premium} /> : null}
           </View>
         </View>
       </View>

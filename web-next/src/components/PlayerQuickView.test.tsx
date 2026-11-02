@@ -14,6 +14,7 @@ vi.mock("@/lib/api", async () => {
       getPlayerQuickView: vi.fn(),
       getPlayerAwards: vi.fn(),
       getPlayerWeeklyStats: vi.fn(),
+      getPlayerNews: vi.fn(),
     },
   };
 });
@@ -120,6 +121,8 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerQuickView).mockReset();
     vi.mocked(api.getPlayerAwards).mockReset();
     vi.mocked(api.getPlayerWeeklyStats).mockReset();
+    vi.mocked(api.getPlayerNews).mockReset();
+    vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [], injury_item: null });
     // Benign default (no weeks played) so tests unrelated to the weekly
     // chart don't need to mock this fetch themselves.
     vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({ ok: true, season: 2026, weeks: [] });
@@ -397,5 +400,123 @@ describe("PlayerQuickView", () => {
     );
     const link = screen.getByText("Open Full Profile");
     expect(link.closest("a")).toHaveAttribute("href", "/players/league-1/p1?name=My%20League");
+  });
+
+  describe("availability and latest news", () => {
+    const irIdentity = {
+      player_id: "p1",
+      name: "Player One",
+      team: "HOU",
+      position: "WR",
+      age: 24,
+      status: "Active",
+      value_score: 1500,
+      overall_rating: 72,
+      value_note: "",
+      bye_week: 8,
+      on_bye_this_week: true,
+      availability: {
+        status: "IR",
+        label: "Injured Reserve",
+        severity: "out" as const,
+        unavailable: true,
+        body_part: "Hamstring",
+        report: null,
+        return_note: "No return date reported",
+      },
+    };
+    const injuryItem = {
+      title: "Player One placed on injured reserve",
+      link: "https://example.com/ir",
+      source: "ESPN",
+      summary: "Out at least four games.",
+      published_ts: Date.now() / 1000 - 3 * 86400,
+      event_type: "injury/status",
+      speculative: false,
+    };
+
+    it("shows a clean IR label, body part, no-return-date, the injury headline, and keeps bye secondary", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView({ identity: irIdentity }));
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [injuryItem], injury_item: injuryItem });
+
+      render(<PlayerQuickView identity={identity({ injury_status: "IR" })} onClose={vi.fn()} />);
+
+      const block = await screen.findByTestId("pqv-availability");
+      expect(block).toHaveTextContent("Injured Reserve");
+      expect(block).toHaveTextContent("Hamstring");
+      expect(block).toHaveTextContent("No return date reported");
+      const headline = await screen.findByTestId("pqv-injury-news");
+      expect(headline).toHaveTextContent("Latest injury report");
+      expect(headline).toHaveTextContent("Player One placed on injured reserve");
+      expect(headline).toHaveTextContent("ESPN · 3d ago");
+      expect(headline.querySelector("a")).toHaveAttribute("href", "https://example.com/ir");
+      // No raw "Ir" chip, and bye is a single secondary pill (no warning badge).
+      expect(screen.queryByText("Health: Ir")).not.toBeInTheDocument();
+      expect(screen.queryByText("On bye this week")).not.toBeInTheDocument();
+      expect(screen.getByTestId("pqv-bye-pill")).toHaveTextContent("Bye: Wk 8 (this week)");
+    });
+
+    it("does not repeat the injury headline in Latest news", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView({ identity: irIdentity }));
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [injuryItem], injury_item: injuryItem });
+      render(<PlayerQuickView identity={identity({ injury_status: "IR" })} onClose={vi.fn()} />);
+      await screen.findByTestId("pqv-injury-news");
+      expect(screen.getAllByText("Player One placed on injured reserve")).toHaveLength(1);
+      expect(screen.queryByText("See all news")).not.toBeInTheDocument();
+    });
+
+    it("makes no causal claim when no injury news is found", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView({ identity: irIdentity }));
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+
+      render(<PlayerQuickView identity={identity({ injury_status: "IR" })} onClose={vi.fn()} />);
+
+      await screen.findByTestId("pqv-availability");
+      await screen.findByText("No recent news");
+      expect(screen.queryByTestId("pqv-injury-news")).not.toBeInTheDocument();
+    });
+
+    it("lists up to 3 latest items with a See all news link", async () => {
+      const items = [1, 2, 3, 4].map((n) => ({ ...injuryItem, title: `Item ${n}`, link: `https://example.com/${n}` }));
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items, injury_item: null });
+
+      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+      const section = await screen.findByTestId("pqv-news");
+      expect(section).toHaveTextContent("Item 1");
+      expect(section).toHaveTextContent("Item 3");
+      expect(section).not.toHaveTextContent("Item 4");
+      expect(screen.getByText("See all news").closest("a")).toHaveAttribute("href", "/news?player=p1&name=Player%20One");
+      expect(api.getPlayerNews).toHaveBeenCalledWith("p1", 3);
+    });
+
+    it("shows a skeleton while news loads and never blocks the sheet; a news failure renders nothing", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockReturnValue(new Promise(() => {}));
+      const { unmount } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      expect(screen.getByTestId("pqv-news-skeleton")).toBeInTheDocument();
+      expect(screen.getByText("Decision Fit")).toBeInTheDocument();
+      unmount();
+
+      vi.mocked(api.getPlayerNews).mockRejectedValue(new Error("boom"));
+      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+      await waitFor(() => expect(screen.queryByTestId("pqv-news-skeleton")).not.toBeInTheDocument());
+      expect(screen.queryByText("Latest news")).not.toBeInTheDocument();
+      expect(screen.queryByText("No recent news")).not.toBeInTheDocument();
+    });
+
+    it("shows no availability block for a healthy player", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView({ identity: { ...irIdentity, availability: null } }));
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+      await screen.findByText("No recent news");
+      expect(screen.queryByTestId("pqv-availability")).not.toBeInTheDocument();
+    });
   });
 });

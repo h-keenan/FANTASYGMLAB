@@ -2106,7 +2106,28 @@ export interface QuickViewResponse {
   reason: '' | 'not_found';
 }
 
+/** Present only when the player's status is not healthy; every field is what
+ * the data carries (return_note is the honest "No return date reported"). */
+export interface PlayerAvailability {
+  status: string;
+  label: string;
+  severity: 'out' | 'doubt' | 'question' | 'other';
+  unavailable: boolean;
+  body_part: string | null;
+  report: string | null;
+  return_note: string;
+}
+
+export interface PlayerNewsResponse {
+  ok: true;
+  items: NewsItem[];
+  /** Most recent injury item (<=30d) from the full matched pool, or null.
+   * A headline to read, never proof of cause. */
+  injury_item: NewsItem | null;
+}
+
 export interface QuickViewIdentity {
+  availability?: PlayerAvailability | null;
   player_id: string;
   name: string;
   team: string | null;
@@ -3366,7 +3387,7 @@ export const api = {
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
   getPlayerNews: (playerId: string, limit = 5) =>
-    authorizedFetch<NewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?limit=${limit}`),
+    authorizedFetch<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?limit=${limit}`),
   getLeagueRecap: (leagueId: string, options?: { week?: number }) => {
     const params = new URLSearchParams();
     if (options?.week != null) params.set('week', String(options.week));

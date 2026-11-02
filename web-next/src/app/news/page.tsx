@@ -19,6 +19,16 @@ export default function NewsPage() {
 
   const [data, setData] = useState<NewsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // /news?player=<id>&name=<name> (from the quick view's "See all news").
+  // Read once from the URL on the client (useSearchParams would force a
+  // Suspense boundary around the page). Both server and first client render
+  // show only the loading screen, so there is no visible mismatch.
+  const [filter] = useState<{ playerId: string; name: string } | null | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
+    const params = new URLSearchParams(window.location.search);
+    const playerId = params.get("player");
+    return playerId ? { playerId, name: params.get("name") || "" } : null;
+  });
 
   useEffect(() => {
     if (!session) return;
@@ -26,15 +36,17 @@ export default function NewsPage() {
   }, [session]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || filter === undefined) return;
     if (!session) {
       router.replace("/");
       return;
     }
     let cancelled = false;
 
-    api
-      .getNews()
+    const request: Promise<NewsResponse> = filter
+      ? api.getPlayerNews(filter.playerId, 10).then((result) => ({ ok: result.ok, items: result.items }))
+      : api.getNews();
+    request
       .then((result) => {
         if (!cancelled) setData(result);
       })
@@ -45,7 +57,7 @@ export default function NewsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, router]);
+  }, [authLoading, session, router, filter]);
 
   if (authLoading || (!data && !error)) {
     return (
@@ -59,5 +71,5 @@ export default function NewsPage() {
     );
   }
 
-  return <NewsContent data={data} />;
+  return <NewsContent data={data} playerName={filter ? filter.name || "this player" : null} />;
 }

@@ -2907,3 +2907,43 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   align-items: center;
   min-height: var(--touch-target-min);
 }
+
+/* Quick view: availability block + latest news. */
+.pqv-availability {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--border-width-default) solid var(--color-border);
+  border-left-width: 3px;
+  background: var(--color-surface-muted);
+}
+.pqv-availability--danger { border-left-color: var(--color-danger); }
+.pqv-availability--warning { border-left-color: var(--color-warning); }
+.pqv-availability-label { font-weight: 800; font-size: 0.9rem; color: var(--color-text-primary); }
+.pqv-availability-detail { font-size: 0.78rem; color: var(--color-text-muted); }
+.pqv-news {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+.pqv-news-heading {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-badge);
+  color: var(--color-text-muted);
+}
+.pqv-news-item { display: flex; flex-direction: column; gap: 1px; margin-top: var(--space-xs); }
+.pqv-news-kicker {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.pqv-news-title { font-size: 0.85rem; font-weight: 700; color: var(--color-text-primary); }
+a.pqv-news-title { text-decoration: underline; text-underline-offset: 2px; }
+.pqv-news-meta { font-size: 0.72rem; color: var(--color-text-muted); }
+.pqv-news-summary { font-size: 0.78rem; color: var(--color-text-secondary); }

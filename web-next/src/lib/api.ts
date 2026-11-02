@@ -2261,7 +2261,28 @@ export interface QuickViewResponse {
   reason: "" | "not_found";
 }
 
+/** Present only when the player's status is not healthy; every field is what
+ * the data carries (return_note is the honest "No return date reported"). */
+export interface PlayerAvailability {
+  status: string;
+  label: string;
+  severity: "out" | "doubt" | "question" | "other";
+  unavailable: boolean;
+  body_part: string | null;
+  report: string | null;
+  return_note: string;
+}
+
+export interface PlayerNewsResponse {
+  ok: boolean;
+  items: NewsItem[];
+  /** Most recent injury item (<=30d) from the full matched pool, or null.
+   * A headline to read, never proof of cause. */
+  injury_item: NewsItem | null;
+}
+
 export interface QuickViewIdentity {
+  availability?: PlayerAvailability | null;
   player_id: string;
   name: string;
   team: string | null;
@@ -3869,6 +3890,10 @@ export const api = {
   // above: no leagueId param.
   getNews: (limit: number = 30) =>
     authorizedRequest<NewsResponse>(`/v1/news?limit=${limit}`),
+
+  // Recent news for one player (quick view's Latest news + injury headline).
+  getPlayerNews: (playerId: string, limit: number = 3) =>
+    authorizedRequest<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?limit=${limit}`),
 
   // League-adjusted player rankings — GM Targets (Revision 11) joins this
   // against getGmTargets' bare preference rows for name/position/team/rank/
