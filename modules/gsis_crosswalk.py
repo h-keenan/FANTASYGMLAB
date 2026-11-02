@@ -48,6 +48,7 @@ def normalize_name(name: Any) -> str:
 class GsisCrosswalk:
     def __init__(self, sleeper_players: Mapping[str, Any] | None):
         self._gsis: dict[str, str] = {}
+        self._reverse: dict[str, str] | None = None
         self._reason: dict[str, str] = {}
         self._by_triple: dict[tuple[str, str, str], list[str]] = defaultdict(list)
         owners: dict[str, list[str]] = defaultdict(list)
@@ -86,6 +87,14 @@ class GsisCrosswalk:
         if sid in self._gsis:
             return self._gsis[sid], None
         return None, self._reason.get(sid, R_NOT_IN_DUMP)
+
+    def sleeper_id_for_gsis(self, gsis_id: Any) -> str | None:
+        """Reverse lookup: the unique Sleeper id carrying this GSIS id in the
+        Sleeper dump, or ``None`` (not present, or shared and so ambiguous)."""
+
+        if self._reverse is None:
+            self._reverse = {gsis: sid for sid, gsis in self._gsis.items()}
+        return self._reverse.get(str(gsis_id or "").strip())
 
     def lookup_canonical(self, name: Any, team: Any, position: Any) -> tuple[str | None, str | None, str | None]:
         """Unambiguous name+team+position match -> (gsis, sleeper_id, reason)."""
