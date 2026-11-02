@@ -567,6 +567,83 @@ def healthy_equivalent_roster(
 PASSING_UI_VERDICTS = frozenset({"FAIR", "ACCEPT"})
 
 
+def clears_suggestion_bar(verdict) -> bool:
+    """Whether the Analyzer's verdict is good enough to SUGGEST this trade.
+
+    ``PASSING_UI_VERDICTS`` is "not a loss in the Analyzer's UI wording", but the
+    FAIR UI verdict spans trade scores -400..+500, including the "Slight value
+    edge to them" band (-400..-150): a package the Analyzer itself words as
+    giving up value. A suggestion is a recommendation to act, so it must also
+    sit at or above the "essentially even" rung of the one score ladder
+    (modules.trade_value_bands.EDGE) whenever the verdict was decided on that ladder
+    (a lineup model exists). Scored on the same ``trade_score`` the
+    verdict itself is decided on, so Hub/Finder and the Analyzer cannot diverge.
+    """
+
+    from modules import trade_value_bands
+
+    if verdict is None:
+        return True
+    if verdict.ui_verdict not in PASSING_UI_VERDICTS:
+        return False
+    if not getattr(verdict, "lineup_model", None):
+        # No lineup model (offseason / no weekly data): the verdict was decided by
+        # the legacy value + fit rules, not the score ladder, so the ladder's
+        # "essentially even" rung is not the yardstick for it.
+        return True
+    try:
+        score = float(verdict.trade_score)
+    except (TypeError, ValueError):
+        return False
+    return score >= -trade_value_bands.EDGE
+
+
+def attach_projection_baselines(
+    valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids, score_field: str
+) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """Attach the walk-forward weekly baseline (``proj_ppg``/``proj_sd``, PPR,
+    availability not applied) to the players the lineup model will look at:
+    ``player_ids`` and the top free agents per position. Players with no usable
+    weekly history simply get no column value; the model then labels its
+    fallback basis. Never raises.
+
+    The ONE place this happens, for the Trade Analyzer endpoint AND the Hub /
+    Finder gate. Grading on a frame without it priced the same package off a
+    value-derived estimate instead of real weekly production, so the gate could
+    pass a package (lineup -15 pts, score -21) the Analyzer then graded as a
+    loss (lineup -13 pts, score -357).
+    """
+
+    try:
+        from modules import player_projections
+
+        ids = {str(pid) for pid in player_ids}
+        if pool is not None and not pool.empty and score_field in pool.columns:
+            top = pool.sort_values(score_field, ascending=False).groupby(
+                pool["position"].astype(str).str.upper(), sort=False
+            ).head(25)
+            ids |= {str(pid) for pid in top["player_id"].astype(str)}
+        wanted = valued[valued["player_id"].astype(str).isin(ids)]
+        baselines = player_projections.baseline_weekly_points(
+            [{"player_id": str(r["player_id"]), "position": r.get("position")} for _, r in wanted.iterrows()]
+        )
+        if not baselines:
+            return valued, pool
+
+        def apply(frame: pd.DataFrame | None) -> pd.DataFrame | None:
+            if frame is None or frame.empty:
+                return frame
+            frame = frame.copy()
+            pids = frame["player_id"].astype(str)
+            frame["proj_ppg"] = pids.map(lambda p: (baselines.get(p) or {}).get("ppg"))
+            frame["proj_sd"] = pids.map(lambda p: (baselines.get(p) or {}).get("sd"))
+            return frame
+
+        return apply(valued), apply(pool)
+    except Exception:
+        return valued, pool
+
+
 def grade_trade_for_user(
     *,
     my_team_df: pd.DataFrame,

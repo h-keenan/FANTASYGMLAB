@@ -750,6 +750,13 @@ def decide_offer_verdict(
         score_band = band
         if posture_label:
             band = posture_label
+            if scored.id in {"smash", "accept"}:
+                # The score is still an accept, but the posture says the window
+                # pays for it (a win-now team's material lineup cost). Old
+                # clients that only know the four UI verdicts must not show a
+                # green ACCEPT for it: it degrades to the neutral FAIR rung,
+                # the same way the label-below-accept case lands on FAIR/COUNTER.
+                ui, tone = trade_value_bands.UI_VERDICT_FAIR, "fair"
     elif value_delta >= _VALUE_SMASH and fit_total >= 4:
         band = VERDICT_SMASH_ACCEPT
         ui = UI_VERDICT_ACCEPT

@@ -154,17 +154,18 @@ Two causes, both fixed at the source:
 ```
 trade_score = lineup_model_score + window + direction + present
 
-window    = WIN_VALUE[posture] * d_wins          d_wins = ros_delta * 0.0128   (gain x 0.25)
+window    = WIN_WEIGHT[posture] * k / 0.0128 * d_wins   d_wins = ros_delta * 0.0128   (gain x 0.25)
+            (k / 0.0128 = the league's market price of the ~78 points that make one win)
 direction = -0.10 * max(0, -orientation[posture] * conversion - 1000)
             conversion = (win_now_delta - future_delta) / 2   (>0 buys present, <0 buys future)
 present   = PRESENT_ADJUST[posture] * k * ros_delta
 ```
 
-| posture | WIN_VALUE (per expected win) | orientation (+1 present, -1 future) | PRESENT_ADJUST | net weight on lineup points |
+| posture | WIN_WEIGHT (x market price of one win's points) | orientation (+1 present, -1 future) | PRESENT_ADJUST | net weight on lineup points |
 | --- | --- | --- | --- | --- |
-| contender | 700 | +1.0 | 0 | 1.50 plus the wins term |
-| fringe contender | 450 | +0.6 | 0 | 1.35 plus the wins term |
-| retool | 200 | 0 | 0 | 1.15 |
+| contender | 0.50 | +1.0 | 0 | 1.50 plus the wins term |
+| fringe contender | 0.35 | +0.6 | 0 | 1.35 plus the wins term |
+| retool | 0.15 | 0 | 0 | 1.15 |
 | rebuild | 0 | -0.8 | -0.40 | 0.65 |
 | tank | 0 | -1.0 | -0.60 | 0.40 |
 
@@ -179,7 +180,7 @@ present   = PRESENT_ADJUST[posture] * k * ros_delta
   its lineup for the future is charged.
 - Rebuild/tank take less credit for lineup points (and less penalty for losing them): "short-term
   lineup loss weighs little" is the PRESENT_ADJUST column, not a rule.
-- `lineup_costly` (what the card words) is: posture WIN_VALUE >= 450 and (>= 0.35 expected wins
+- `lineup_costly` (what the card words) is: posture WIN_WEIGHT >= 0.35 (contender / fringe) and (>= 0.35 expected wins
   or >= 3% of the roster's projected points over the remaining weeks) lost. Relative to the
   margin, not a fixed number of points.
 
@@ -193,6 +194,17 @@ ladder's (so older clients still render a valid card):
 | `GOOD VALUE, COSTS YOUR LINEUP` | win-now posture, material lineup cost |
 | `VALUE WIN, MOVES YOU TOWARD A REBUILD` | contender, direction toward the future |
 | `VALUE WIN, AGAINST YOUR REBUILD` | rebuild/tank, direction toward the present |
+
+The window cost is a multiple of the league's own price scale (`value_per_point`), not an
+absolute number of value units. The old fixed 700/win was a rounding error where first-round
+picks price at 5.5-9.8k: a contender selling its best player for two R1s (about 156 lineup
+points, 2 expected wins) still graded SMASH ACCEPT. Beyond the scaled window cost, a win-now
+posture (contender / fringe contender) with a material lineup cost (`lineup_costly`) is never
+shown a clean ACCEPT / SMASH ACCEPT: when the score is still an accept the label becomes
+`GOOD VALUE, COSTS YOUR LINEUP` and the UI verdict degrades to the neutral FAIR rung (a SMASH
+that converts the present into the future, without a material cost, becomes `VALUE WIN, MOVES
+YOU TOWARD A REBUILD`). The score is untouched; only the wording and rung report the
+disagreement. `trade_hub_ideas`/Finder drop these (posture labels are not suggested).
 
 The line under the verdict keeps saying what the market says ("You win big on value"), the
 heading becomes "The trade-off", counter search (`score_band`) treats it as the ladder band and
@@ -228,7 +240,7 @@ rebuild SMASH ACCEPT, contender ACCEPT. Test:
   `test_trade_hub_analyzer_consistency`, ...) pass unchanged: their cases are retool or
   posture-neutral.
 
-Approximate and worth re-checking with real leagues: the 22-point weekly sd, WIN_VALUE and
+Approximate and worth re-checking with real leagues: the 22-point weekly sd, WIN_WEIGHT and
 PRESENT_ADJUST tables (product choices, not fitted), the auto-posture confidence
 (`resolve_posture`: standing x games played), and offseason (no lineup model, so no posture
 terms; the legacy strategy components stand). Trade Hub/Finder still grade with the stored
@@ -358,6 +370,18 @@ still be shown ideas that cost lineup. Now one function owns the posture:
   package get the same verdict, band and trade score (pinned by `tests/test_trade_posture_parity.py`
   for all five postures). The gate already ran this for the "at least FAIR" filter; it now also
   copies `posture_label`, `posture_note`, `posture_alignment` and the lineup points onto the idea.
+- Gate consistency (what "cannot disagree" means in code):
+  - the suggestion bar is `trade_grade.clears_suggestion_bar`: FAIR/ACCEPT **and** trade score
+    >= -150 (the ladder's "essentially even" rung). The FAIR band spans -400..+500, and the
+    -400..-150 part is the Analyzer's own "Slight value edge to them".
+  - the gate grades on the same inputs as the endpoint: the weekly projection baselines
+    (`trade_grade.attach_projection_baselines`, shared with the Analyzer endpoint) and the same
+    waiver pool; without them the gate passed packages the Analyzer scored as losses.
+  - one pick valuation path: every pick is priced by `trade_ideas._build_roster_pick_assets`
+    with the rosters' real records (`settings`). The Hub used to hand the search bare rosters, so
+    its picks ignored records and differed from the same pick resolved by pick_id.
+  - the card's `trade_gain` is the Analyzer's `value_delta` for that package; the engine's raw
+    asset-score difference is kept as `engine_trade_gain`.
 - Filtering: an idea whose Analyzer label is a posture trade-off ("GOOD VALUE, COSTS YOUR
   LINEUP", "VALUE WIN, MOVES YOU TOWARD A REBUILD", "VALUE WIN, AGAINST YOUR REBUILD") is not
   suggested. In Trade Finder it comes back as a Stretch option that says so.

@@ -256,7 +256,10 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
     assert len(ui_changed & win_now) / len(win_now) <= 0.15
     # Rebuild/tank move more by design: their lineup weight drops (PRESENT_ADJUST).
     assert len(ui_changed) / len(after) <= 0.25
-    assert len(label_changed) / len(after) <= 0.30
+    # Labels move a little more than UI verdicts: a win-now ACCEPT/SMASH whose lineup
+    # cost is material is relabelled (and lands on FAIR), and the window cost scales
+    # with the league's price scale (value_per_point), not a fixed 700/win.
+    assert len(label_changed) / len(after) <= 0.35
     for key in ui_changed:
         _, name, strat = key
         a, b = after[key], before[key]
@@ -320,3 +323,62 @@ def test_endpoint_declared_stance_wins_and_failures_fall_back(monkeypatch):
     monkeypatch.setattr(svc.league_rankings, "build_league_rankings_frame_cached", boom)
     p = svc._resolve_trade_posture({"id": "u"}, "L", {}, {"roster_id": 1}, lens="Dynasty", client_strategy="rebuild")
     assert (p["key"], p["source"]) == ("rebuild", "client")
+
+
+# --- window cost scales with the league's price scale; costly accepts are never clean ------
+
+
+def _assess(key, *, ros_delta, k, ros_before=1500.0):
+    model = {
+        "available": True,
+        "points": {"ros_delta": ros_delta, "ros_before": ros_before},
+        "value_per_point": k,
+        "win_now_delta": 0,
+        "future_delta": 0,
+    }
+    return trade_posture.assess({"key": key, "group": trade_posture.GROUP_BY_KEY[key]}, model)
+
+
+def test_window_cost_scales_with_the_leagues_value_per_point():
+    cheap = _assess("contender", ros_delta=-100.0, k=20.0)
+    dear = _assess("contender", ros_delta=-100.0, k=40.0)
+    assert dear["window_term"] == pytest.approx(2 * cheap["window_term"], rel=0.01)
+    # A win is worth a fixed multiple of the market price of the points that make one.
+    wins = 100.0 * trade_posture.WIN_PROB_PER_POINT
+    expected = trade_posture.WINDOW_WIN_WEIGHT["contender"] * 40.0 / trade_posture.WIN_PROB_PER_POINT * wins
+    assert dear["window_term"] == pytest.approx(-expected, rel=0.01)
+    # Same posture ladder as before, still zero for a rebuilder.
+    assert _assess("rebuild", ros_delta=-100.0, k=40.0)["window_term"] == 0
+
+
+def test_a_contender_selling_its_best_player_for_picks_is_never_a_clean_accept():
+    # Gibbs-shaped: a huge market win on paper, ~150 lineup points gone.
+    for key in ("contender", "fringe_contender"):
+        assessment = _assess(key, ros_delta=-150.0, k=30.0)
+        assessment["direction"] = "toward_future"
+        assert assessment["lineup_costly"]
+        for final in ("smash", "accept"):
+            label = trade_posture.verdict_label_override(
+                value_band_id="smash",
+                final_band_id=final,
+                posture={"key": key, "group": "contender"},
+                assessment={**assessment, "adjustment": -1},
+            )
+            assert label == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
+    # A rebuilder keeps the clean accept.
+    reb = _assess("rebuild", ros_delta=-150.0, k=30.0)
+    assert (
+        trade_posture.verdict_label_override(
+            value_band_id="smash", final_band_id="smash", posture={"key": "rebuild", "group": "rebuild"},
+            assessment={**reb, "adjustment": -1},
+        )
+        == ""
+    )
+
+
+def test_a_costly_accept_degrades_the_ui_verdict_for_old_clients():
+    for strategy in ("contender", "fringe_contender"):
+        _, verdict = _higgins(strategy)
+        if verdict.score_band in {"SMASH ACCEPT", "ACCEPT"} and verdict.posture_assessment["lineup_costly"]:
+            assert verdict.band == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
+            assert verdict.ui_verdict != ACCEPT_UI and verdict.tone != "accept"

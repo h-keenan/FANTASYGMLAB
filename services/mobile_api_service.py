@@ -5053,38 +5053,10 @@ def _lineup_hole_waiver_options(
 def _attach_projection_ppg(
     valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids: set[str], score_field: str
 ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
-    """Attach the walk-forward weekly baseline (``proj_ppg``/``proj_sd``, PPR,
-    availability not applied) to the players the lineup model will look at:
-    the user's roster, the package, the partner, and the top free agents per
-    position. Players with no usable weekly history simply get no column
-    value; the model then labels its fallback basis. Never raises."""
+    """Weekly projection baselines for the lineup model; shared with the Trade
+    Hub / Finder gate (modules.trade_grade.attach_projection_baselines)."""
 
-    try:
-        ids = set(player_ids)
-        if pool is not None and not pool.empty and score_field in pool.columns:
-            top = pool.sort_values(score_field, ascending=False).groupby(
-                pool["position"].astype(str).str.upper(), sort=False
-            ).head(25)
-            ids |= {str(pid) for pid in top["player_id"].astype(str)}
-        wanted = valued[valued["player_id"].astype(str).isin(ids)]
-        baselines = player_projections.baseline_weekly_points(
-            [{"player_id": str(r["player_id"]), "position": r.get("position")} for _, r in wanted.iterrows()]
-        )
-        if not baselines:
-            return valued, pool
-
-        def apply(frame: pd.DataFrame | None) -> pd.DataFrame | None:
-            if frame is None or frame.empty:
-                return frame
-            frame = frame.copy()
-            pids = frame["player_id"].astype(str)
-            frame["proj_ppg"] = pids.map(lambda p: (baselines.get(p) or {}).get("ppg"))
-            frame["proj_sd"] = pids.map(lambda p: (baselines.get(p) or {}).get("sd"))
-            return frame
-
-        return apply(valued), apply(pool)
-    except Exception:
-        return valued, pool
+    return trade_grade.attach_projection_baselines(valued, pool, player_ids, score_field)
 
 
 _STANCE_UNSET: Any = object()

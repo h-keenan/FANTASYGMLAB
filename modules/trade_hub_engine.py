@@ -597,8 +597,28 @@ def generate_trade_idea_records(
             for roster in rosters or []
         )
     )
+    # Each roster keeps its Sleeper ``settings`` (wins/losses/ties): the pick
+    # valuation blends a team's REAL record into its pick's slot
+    # (trade_ideas._pick_team_context). Dropping it here priced every pick on
+    # roster talent alone, so a Hub card's pick differed from the same pick the
+    # Analyzer resolves by pick_id (list_draft_pick_assets, full rosters) and
+    # the card's gain disagreed with the Analyzer's.
+    roster_settings_by_id = {
+        str(roster.get("roster_id")): dict(roster.get("settings"))
+        for roster in rosters or []
+        if isinstance(roster.get("settings"), dict)
+    }
     prefetched_rosters = [
-        {"roster_id": roster_id, "players": list(player_ids), "platform": "sleeper"}
+        {
+            "roster_id": roster_id,
+            "players": list(player_ids),
+            "platform": "sleeper",
+            **(
+                {"settings": roster_settings_by_id[roster_id]}
+                if roster_id in roster_settings_by_id
+                else {}
+            ),
+        }
         for roster_id, player_ids in roster_owner_items
     ]
 
