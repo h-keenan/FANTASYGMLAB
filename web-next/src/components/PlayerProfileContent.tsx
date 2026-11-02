@@ -193,6 +193,7 @@ export function PlayerProfileContent({
         valueNote={detail?.identity?.value_note}
         byeWeek={detail?.identity?.bye_week ?? null}
         onByeThisWeek={detail?.identity?.on_bye_this_week ?? false}
+        unavailable={detail?.identity?.availability?.unavailable ?? false}
         loadingIdentity={loading}
         overallRating={overallRating}
         overallRank={player.overall_rank}

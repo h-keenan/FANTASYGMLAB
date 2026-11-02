@@ -6,6 +6,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
+import { byePillText } from "@/lib/playerAvailabilityPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from "@/lib/playerQuickViewPresentation";
 import { SkeletonBlock } from "@/components/Skeleton";
@@ -45,11 +46,14 @@ export function PlayerHeroHeader({
   loadingIdentity = false,
   byeWeek = null,
   onByeThisWeek = false,
+  unavailable = false,
 }: {
   /** Team bye week (null when unknown / free agent). */
   byeWeek?: number | null;
   /** True when the current NFL week is that bye. */
   onByeThisWeek?: boolean;
+  /** Player is out/IR/doubtful: the bye then stays secondary (pill only). */
+  unavailable?: boolean;
   /** Why the Value tile is empty (server-provided), e.g. "No market value yet". */
   valueNote?: string | null;
   /** True while server-resolved identity may still fill team/value. */
@@ -114,10 +118,10 @@ export function PlayerHeroHeader({
             </span>
             {byeWeek != null ? (
               <span className="pqv-meta-pill" data-testid="pqv-bye-pill">
-                Bye: Wk {byeWeek}
+                {byePillText(byeWeek, onByeThisWeek, unavailable)}
               </span>
             ) : null}
-            {byeWeek != null && onByeThisWeek ? (
+            {byeWeek != null && onByeThisWeek && !unavailable ? (
               <ToneBadge label="On bye this week" color="var(--color-warning)" />
             ) : null}
           </div>

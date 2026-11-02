@@ -124,7 +124,10 @@ function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsGroup[
   }));
 }
 
-export default function NewsScreen() {
+export default function NewsScreen({ route }: { route?: { params?: { playerId?: string; playerName?: string } } }) {
+  // Filtered to one player when opened from the quick view's "See all news".
+  const playerId = route?.params?.playerId;
+  const playerName = route?.params?.playerName;
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -137,15 +140,15 @@ export default function NewsScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const result = await api.getNews(30);
+      const result = playerId ? await api.getPlayerNews(playerId, 10) : await api.getNews(30);
       setItems(result.items);
-      setFeedStatus(result.status);
+      setFeedStatus('status' in result ? result.status : undefined);
     } catch (err) {
       setError(toUserErrorMessage(err, 'Failed to load news.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [playerId]);
 
   useEffect(() => {
     void load();
@@ -156,7 +159,13 @@ export default function NewsScreen() {
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <ScreenInfoNote text="General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your specific rosters yet." />
+      <ScreenInfoNote
+        text={
+          playerId
+            ? `Recent injury, role, transaction, and off-field items that mention ${playerName || 'this player'}.`
+            : 'General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your specific rosters yet.'
+        }
+      />
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 

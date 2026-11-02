@@ -3481,7 +3481,7 @@ def test_player_news_returns_empty_for_unknown_player(monkeypatch):
             )
 
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "items": []}
+    assert response.json() == {"ok": True, "items": [], "injury_item": None}
 
 
 def test_player_news_rejects_bad_limit(monkeypatch):
@@ -16097,3 +16097,70 @@ def test_suggested_moves_keep_legit_swap_and_flag_unprojected_fill_for_empty_slo
     bye["projection"] = {"status": "bye_week", "point_estimate": None}
     over_bye = svc._suggested_lineup_moves(_moves_side([_mv_noproj("blue", "RB", "RB")], [bye]))
     assert len(over_bye) == 1 and over_bye[0]["over_reason"] == "bye_week"
+
+
+def test_quick_view_identity_carries_availability_for_ir_player():
+    directory = {
+        "77": {
+            "team": "HOU",
+            "position": "WR",
+            "injury_status": "IR",
+            "injury_body_part": "Hamstring",
+            "injury_notes": "",
+        }
+    }
+    row = pd.Series({"player_id": "77", "name": "A", "team": "HOU", "position": "WR", "age": 24, "value_score": 900})
+    with patch("modules.sleeper.get_players", return_value=directory):
+        identity = _qv_identity("77", row)
+    availability = identity["availability"]
+    assert availability["label"] == "Injured Reserve"
+    assert availability["body_part"] == "Hamstring"
+    assert availability["report"] is None
+    assert availability["return_note"] == "No return date reported"
+
+
+def test_quick_view_identity_healthy_player_has_no_availability():
+    row = pd.Series({"player_id": "78", "name": "B", "team": "HOU", "position": "WR", "age": 24, "value_score": 900})
+    with patch("modules.sleeper.get_players", return_value={"78": {"team": "HOU", "injury_status": None}}):
+        assert _qv_identity("78", row)["availability"] is None
+
+
+def test_player_news_exposes_injury_item_from_full_matched_pool(monkeypatch):
+    import time as _time
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
+    now = _time.time()
+    fake_pool = [
+        {
+            "title": "Nico Collins placed on injured reserve with hamstring injury",
+            "summary": "The Texans WR will miss at least four games.",
+            "link": "https://example.com/collins-ir",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 3 * 86400,
+        },
+        {
+            "title": "Nico Collins signs contract extension",
+            "summary": "The Texans WR agreed to terms on a new deal.",
+            "link": "https://example.com/collins-deal",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 3600,
+        },
+    ]
+    from modules import news as news_module
+
+    news_module.clear_enriched_news_pool_cache()
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+                with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                    body = client.get(
+                        "/v1/players/9001/news?limit=1",
+                        headers={"Authorization": "Bearer good-token"},
+                    ).json()
+    assert len(body["items"]) == 1
+    # The injury item is found even though it is older than the newest `limit`.
+    if body["injury_item"] is not None:
+        assert "injured reserve" in body["injury_item"]["title"].lower()

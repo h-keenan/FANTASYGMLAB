@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
+import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
@@ -16,6 +16,8 @@ import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
+import { cleanInjuryLabel } from "@/lib/playerAvailabilityPresentation";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
   SUB_RATING_DISPLAY,
@@ -79,6 +81,10 @@ export function PlayerQuickView({
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(true);
+  // News loads lazily and independently: it never gates the sheet. null =
+  // not loaded (or failed -> section renders nothing).
+  const [news, setNews] = useState<PlayerNewsResponse | null>(null);
+  const [newsLoading, setNewsLoading] = useState(true);
 
   // Swipe-down-to-dismiss on touch devices: the shared sheet gesture (see
   // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
@@ -115,6 +121,22 @@ export function PlayerQuickView({
         if (!cancelled) setLoading(false);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [identity.player_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPlayerNews(identity.player_id, 3)
+      .then((result) => {
+        if (!cancelled && result.ok) setNews(result);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setNewsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -159,8 +181,15 @@ export function PlayerQuickView({
   const stats = detail?.stats ?? null;
   const bio = detail?.bio ?? null;
   const model = detail?.model ?? null;
-  const injury = waiverInjuryDisplay(identity.injury_status);
   const resolved = detail?.identity ?? null;
+  // The server's availability block (directory status) wins; the row's raw
+  // status only drives the chip until it arrives, with a clean label.
+  const availability = resolved?.availability ?? null;
+  const injuryLabel = cleanInjuryLabel(identity.injury_status);
+  const injury = {
+    label: availability ? null : injuryLabel,
+    tone: waiverInjuryDisplay(identity.injury_status).tone,
+  };
   const overallRating = identity.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
   const name = identity.name || resolved?.name || `Player ${identity.player_id}`;
 
@@ -216,6 +245,7 @@ export function PlayerQuickView({
           loadingIdentity={loading}
           byeWeek={resolved?.bye_week ?? null}
           onByeThisWeek={resolved?.on_bye_this_week ?? false}
+          unavailable={availability?.unavailable ?? false}
           overallRating={overallRating}
           overallRank={identity.overall_rank}
           positionRank={identity.position_rank}
@@ -244,6 +274,23 @@ export function PlayerQuickView({
         {identity.score != null ? <BeginnerHelp term="playerValue" className="mt-1" /> : null}
         {overallRating != null ? <BeginnerHelp term="overallRating" className="mt-1" /> : null}
         {identity.tier ? <BeginnerHelp term="playerTier" className="mt-1" /> : null}
+
+        {availability ? (
+          <AvailabilityBlock
+            availability={availability}
+            injuryItem={news?.injury_item ?? null}
+            newsLoading={newsLoading}
+          />
+        ) : null}
+        {!loadError ? (
+          <LatestNewsSection
+            items={news ? news.items : null}
+            hideItem={availability ? news?.injury_item ?? null : null}
+            loading={newsLoading}
+            playerId={identity.player_id}
+            name={name}
+          />
+        ) : null}
 
         <div className="pqv-body">
           {loading ? (

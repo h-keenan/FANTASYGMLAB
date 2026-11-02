@@ -208,6 +208,7 @@ from modules import (
     player_history,
     player_projections,
     percentile_explorer,
+    player_availability,
     player_quick_view,
     player_rating_history,
     player_state_authority,
@@ -4902,7 +4903,7 @@ def get_player_news(
     row_matches = players_df[players_df["player_id"] == player_id] if not players_df.empty else players_df
     player_name = str(row_matches.iloc[0].get("name") or "").strip() if not row_matches.empty else ""
     if not player_name:
-        return {"ok": True, "items": []}
+        return {"ok": True, "items": [], "injury_item": None}
 
     news_cache.schedule_news_cache_refresh()
     enriched = news_cache.enriched_news_pool()
@@ -4915,7 +4916,16 @@ def get_player_news(
     ]
     matches.sort(key=my_news.news_timestamp, reverse=True)
 
-    return {"ok": True, "items": [_project_news_item(item) for item in matches[:limit]]}
+    projected = [_project_news_item(item) for item in matches]
+    # The item that most plausibly explains an injury designation, from the
+    # same matched pool (not just the newest `limit`). Quick view labels it
+    # "Latest injury report" and never claims it caused the status.
+    injury_item = player_availability.news_explaining_injury(projected, now_ts=time.time())
+    return {
+        "ok": True,
+        "items": projected[:limit],
+        "injury_item": dict(injury_item) if injury_item else None,
+    }
 
 
 def _with_idp_trade_rows(
@@ -7556,7 +7566,16 @@ def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any
     if isinstance(value, (int, float)) and value <= 0:
         value = None
     bye_week, on_bye_this_week = _quick_view_bye(str(team) if team else None)
+    # Sleeper's directory is the injury source of truth; the valued row's
+    # injury_status can be backfilled from free-text notes, so it is only a
+    # fallback when the directory has nothing.
+    availability = player_availability.build_availability(
+        directory.get("injury_status") or _from_row("injury_status"),
+        directory.get("injury_body_part") or _from_row("injury_body_part"),
+        directory.get("injury_notes") or _from_row("injury_notes"),
+    )
     return {
+        "availability": _clean_json_value(availability),
         "bye_week": bye_week,
         "on_bye_this_week": on_bye_this_week,
         "player_id": str(player_id),

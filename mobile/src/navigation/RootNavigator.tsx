@@ -73,7 +73,8 @@ export type RootStackParamList = {
    * carousel (arms Team Situation routing), 'skip' = skipped it. */
   Paywall: { fromOnboarding?: 'getStarted' | 'skip' } | undefined;
   TrialLapsed: undefined;
-  News: undefined;
+  /** playerId/playerName filter the feed to one player's news (quick view's "See all news"). */
+  News: { playerId?: string; playerName?: string } | undefined;
   More: undefined;
   /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
   Design: undefined;
