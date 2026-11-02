@@ -1344,6 +1344,10 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
    * same already-computed signals that ranked it into Priority Adds. */
   confidence_label: string;
   confidence_reason: string;
+  /** Display-only role flag from modules/usage_trends.py (never feeds the score, rank or bid).
+   * `usage_flag_status` says why `usage_flag` is null: "unavailable" = no weekly stats were loaded. */
+  usage_flag?: Pick<UsageFlag, "key" | "label" | "tone" | "explanation"> | null;
+  usage_flag_status?: string;
 }
 
 export interface WaiversResponse {

@@ -165,6 +165,29 @@ describe("WaiversContent", () => {
     expect(screen.getByText("3 teams need a RB and 2 of them have more FAAB than you.")).toBeInTheDocument();
   });
 
+  it("shows the display-only usage flag chip and explanation on the top waiver target, and nothing when absent", () => {
+    const flagged: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [
+        priorityAdd({
+          usage_flag: {
+            key: "role_expanding",
+            label: "Role expanding",
+            tone: "positive",
+            explanation: "His role is growing: snap share is 70% over the last 4 games vs 53% before (+17 pts).",
+          },
+          usage_flag_status: "ok",
+        }),
+      ],
+    };
+    const { unmount } = render(<WaiversContent leagueName="Dynasty Overlords" data={flagged} />);
+    expect(screen.getByTestId("waiver-usage-flag")).toHaveTextContent("Role expanding");
+    expect(screen.getByText(/snap share is 70% over the last 4 games/)).toBeInTheDocument();
+    unmount();
+    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    expect(screen.queryByTestId("waiver-usage-flag")).not.toBeInTheDocument();
+  });
+
   it("never shows dollar bids in a non-FAAB league and handles a missing bid", () => {
     const rolling: WaiversResponse = {
       ...BASE_RESPONSE,

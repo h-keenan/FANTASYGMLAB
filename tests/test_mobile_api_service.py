@@ -11142,6 +11142,38 @@ def test_project_priority_add_carries_the_real_waiver_confidence_label(monkeypat
     assert projected["confidence_reason"]
 
 
+def test_priority_add_usage_flag_is_display_only_and_states_why_it_is_absent(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key-for-tests")
+    from modules.faab import FaabGuidance
+    from services import mobile_api_service
+
+    guidance = FaabGuidance(
+        point_bid=10, low_bid=5, high_bid=15, budget_scale=100, remaining=100, min_bid=1,
+        pct_low=5, pct_high=15, rationale="", dollars_known=True,
+    )
+    row = pd.Series({
+        "player_id": "p1", "name": "Priority Player", "position": "RB", "team": "SEA",
+        "position_rank": 2, "value_score": 40, "priority_need_fit": True,
+        "priority_value_opportunity": False, "stale_free_agent": False,
+    })
+    weekly = [
+        {"week": w, "games_played": 1, "fantasy_points_ppr": 10.0, "snap_share": 0.5 if w <= 4 else 0.8,
+         "rush_attempts": 8 if w <= 4 else 16, "targets": 1 if w <= 4 else 3}
+        for w in range(1, 9)
+    ]
+    with patch("modules.nflverse_advanced_stats.load_season", return_value=None):
+        baseline = mobile_api_service._project_priority_add(row, "value_score", guidance)
+        flagged = mobile_api_service._project_priority_add(row, "value_score", guidance, season_stats={"p1": {"weekly": weekly}})
+    # No weekly stats loaded: said explicitly, no flag invented.
+    assert baseline["usage_flag"] is None and baseline["usage_flag_status"] == "unavailable"
+    assert flagged["usage_flag"]["key"] == "role_expanding"
+    assert flagged["usage_flag_status"] == "ok"
+    # Display-only: nothing the recommendation is built from moves.
+    for key in ("score", "recommendation_label", "confidence_label", "position_rank", "faab"):
+        assert flagged[key] == baseline[key]
+
+
 def test_waivers_overall_rating_uses_the_full_league_pool_not_just_free_agents(monkeypatch):
     """position_rank/overall_rank above are wire-relative (free agents
     only) — a single free agent is trivially "#1 of 1". overall_rating must
