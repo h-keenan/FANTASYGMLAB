@@ -51,8 +51,7 @@ export function ShareConfidenceBars({ level, label }: { level: number; label: st
  * Shared chrome for every branded share-card PNG: the FantasyDesk lockup
  * header (with an optional `kind` kicker under it, e.g. "TRADE", and an
  * optional per-card right-side slot — a TierBadge, a league name, etc.), the
- * glass QR footer ("fantasygmlab.com / Scan to try FantasyDesk") and the
- * PLAN./PROJECT./WIN. tagline. Every share surface (player, compare, trade,
+ * compact glass QR footer ("fantasygmlab.com / Scan to try FantasyDesk"). Every share surface (player, compare, trade,
  * portfolio, recap) renders this exact header/footer so they read as one
  * family — same "shared primitive, card supplies the content" convention the
  * rest of the app uses for list rows (see UI_HIERARCHY_DIRECTIVE.md §9-10),
@@ -102,11 +101,6 @@ const ShareCardChrome = forwardRef<
           <AppText style={styles.qrDomain}>{SHARE_DOMAIN}</AppText>
           <AppText style={styles.qrSubtitle}>Scan to try FantasyDesk</AppText>
         </View>
-        <View style={styles.tagline}>
-          <AppText style={[styles.taglineText, { color: colors.accent }]}>PLAN.</AppText>
-          <AppText style={[styles.taglineText, { color: colors.premium }]}>PROJECT.</AppText>
-          <AppText style={[styles.taglineText, { color: colors.danger }]}>WIN.</AppText>
-        </View>
       </ShareGlass>
     </View>
   );
@@ -148,8 +142,6 @@ const styles = StyleSheet.create({
   qrDomain: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
   qrSubtitle: { fontSize: 10, color: colors.textSecondary, marginTop: 2 },
   qrWrap: { padding: 4, backgroundColor: '#fff', borderRadius: radii.sm },
-  tagline: { alignItems: 'flex-end' },
-  taglineText: { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, lineHeight: 11 },
   meter: {
     flexDirection: 'row',
     alignItems: 'center',

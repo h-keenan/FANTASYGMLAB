@@ -144,18 +144,15 @@ export function ShareQr({ brand, size }: { brand: ShareBrandAssets; size: number
 }
 
 function ShareFooter({ brand }: { brand: ShareBrandAssets }) {
+  // One compact row: QR + domain + one line of copy. (The PLAN./PROJECT./
+  // WIN. tagline was dropped: it crowded the row and said nothing the
+  // lockup does not.)
   return (
-    <div style={{ ...glassStyle(), alignItems: "center", gap: 28, padding: "18px 28px" }}>
-      <ShareQr brand={brand} size={100} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, flexGrow: 1 }}>
-        <div style={{ display: "flex", fontSize: 40, fontWeight: 800 }}>{BRAND_DOMAIN}</div>
-        <div style={{ display: "flex", fontSize: 26, fontWeight: 500, color: T["--color-text-muted"] }}>{`Scan to try ${BRAND_NAME}`}</div>
-      </div>
-      {/* Mobile ShareCardChrome's tagline, same three semantic colors. */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 22, fontWeight: 900, letterSpacing: "0.12em" }}>
-        <span style={{ color: T["--color-accent"] }}>PLAN.</span>
-        <span style={{ color: T["--color-action"] }}>PROJECT.</span>
-        <span style={{ color: T["--color-danger"] }}>WIN.</span>
+    <div style={{ ...glassStyle(), alignItems: "center", gap: 24, padding: "14px 24px" }}>
+      <ShareQr brand={brand} size={84} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, flexGrow: 1 }}>
+        <div style={{ display: "flex", fontSize: 36, fontWeight: 800 }}>{BRAND_DOMAIN}</div>
+        <div style={{ display: "flex", fontSize: 24, fontWeight: 500, color: T["--color-text-muted"] }}>{`Scan to try ${BRAND_NAME}`}</div>
       </div>
     </div>
   );

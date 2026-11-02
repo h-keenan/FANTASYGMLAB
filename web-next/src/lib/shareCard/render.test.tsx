@@ -7,7 +7,8 @@ import type { RankedPlayer, TradeIdea } from "@/lib/api";
 
 import { clearShareCachesForTests, isAllowedImageUrl, renderPlayerCardPng, renderTradeCardPng, sniffImageType } from "./server";
 import { fixtureIdea as idea, fixturePlayer as player, pngSize } from "./testFixtures";
-import { clampText, confidenceBars, maxRowsFor } from "./tradeCard";
+import { confidenceBars, maxRowsFor } from "./tradeCard";
+import { plainTradeWhy } from "./tradeCopy";
 
 describe("share card rendering", () => {
   beforeEach(() => {
@@ -67,11 +68,16 @@ describe("share card helpers", () => {
     expect(confidenceBars("Unrated")).toBeNull();
   });
 
-  it("clamps rationale at a word boundary", () => {
-    expect(clampText("short text", 50)).toBe("short text");
-    const clamped = clampText("alpha bravo charlie delta echo foxtrot golf hotel india juliet", 30);
-    expect(clamped.endsWith("…")).toBe(true);
-    expect(clamped.length).toBeLessThanOrEqual(31);
+  it("rewrites engine reasons to plain English, whole sentences only", () => {
+    const raw =
+      "RB: active room covered; future asset injured; Epstein\u2019s List - WR: active room covered; future asset injured. Epstein\u2019s List can move from RB surplus. You can move from WR / TE surplus.";
+    expect(plainTradeWhy(raw, "Epstein\u2019s List")).toBe("Epstein\u2019s List has RB depth to spare. You have WR / TE depth to spare.");
+    expect(plainTradeWhy("RB: short-term starter coverage; Rival - WR: long-term upside.", "Rival")).toBe("You need an RB starter. Rival wants long-term WR upside.");
+    expect(plainTradeWhy("", "Rival")).toBe("");
+    const long = "This one sentence is far too long to fit on the card in two short lines because it keeps going and going without any end in sight.";
+    expect(plainTradeWhy(`${long} Short and sweet.`, "Rival")).toBe("Short and sweet.");
+    expect(plainTradeWhy("A fine reason. Another fine reason. A third reason.", "Rival")).toBe("A fine reason. Another fine reason.");
+    expect(plainTradeWhy("RB: active room covered; future asset injured.", "Rival")).toBe("");
   });
 });
 
