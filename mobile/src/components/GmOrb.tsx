@@ -133,7 +133,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       icon: 'people-circle-outline',
       needsLeague: true,
       color: colors.violet,
-      subtitle: 'View and compare league teams',
+      subtitle: 'Power rankings across the league',
     },
     // Real Monte Carlo rest-of-season simulation (modules.playoff_simulator)
     // keyed off the same real schedule/Roster Power/standings this app
@@ -171,7 +171,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       icon: 'shuffle-outline',
       needsLeague: true,
       color: colors.premium,
-      subtitle: 'Trade ideas, search, and build a trade',
+      subtitle: 'Trade ideas, trade finder, and trade analyzer',
     },
     // Season-arc complement to Dashboard's one-off "Next Move" tile: a
     // roadmap conditioned on the Team Situation stance declared just above,
@@ -184,7 +184,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       icon: 'map-outline',
       needsLeague: true,
       color: colors.premium,
-      subtitle: 'Roadmap, team situation, protected core and targets',
+      subtitle: 'Your roadmap, stance, and protected/watched players',
     },
     {
       label: 'Draft Center',
