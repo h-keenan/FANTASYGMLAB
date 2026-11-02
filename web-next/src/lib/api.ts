@@ -3,6 +3,7 @@ import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } 
 import { supabase } from "./supabase";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
+import type { OpponentProfileResponse } from "./opponentProfile";
 import type {
   CommissionerIntegrityResponse,
   DraftOrderRule,
@@ -3756,6 +3757,11 @@ export const api = {
   getManagerTendencyDetail: (leagueId: string, rosterId: string | number) =>
     authorizedRequest<ManagerTendenciesDetailResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
+    ),
+
+  getTeamProfile: (leagueId: string, rosterId: string | number) =>
+    authorizedRequest<OpponentProfileResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/teams/${encodeURIComponent(String(rosterId))}/profile`,
     ),
 
   getLeaguePlayoffOdds: (leagueId: string, lens: string = "Dynasty") =>

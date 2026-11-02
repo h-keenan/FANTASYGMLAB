@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ManagerProfileSheet } from "./ManagerProfileSheet";
 
 vi.mock("@/lib/api", () => ({
-  api: { getManagerTendencyDetail: () => new Promise(() => {}) },
+  api: { getManagerTendencyDetail: () => new Promise(() => {}), getTeamProfile: () => new Promise(() => {}) },
 }));
 
 describe("ManagerProfileSheet header", () => {
