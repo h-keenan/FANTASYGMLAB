@@ -317,12 +317,15 @@ def test_endpoint_declared_stance_wins_and_failures_fall_back(monkeypatch):
     assert (p["key"], p["source"]) == ("rebuild", "declared")
 
     def boom(*a, **k):
-        raise RuntimeError("down")
+        raise OSError("down")
 
     monkeypatch.setattr(svc, "_fetch_team_stance", boom)
     monkeypatch.setattr(svc.league_rankings, "build_league_rankings_frame_cached", boom)
     p = svc._resolve_trade_posture({"id": "u"}, "L", {}, {"roster_id": 1}, lens="Dynasty", client_strategy="rebuild")
     assert (p["key"], p["source"]) == ("rebuild", "client")
+    # The fallback is reported, not silent: both lookups failed.
+    assert p["degraded_reason"] == "posture_lookup_failed"
+    assert {r["code"] for r in p["model_status"]["reasons"]} == {"posture_lookup_failed", "declared_stance_failed"}
 
 
 # --- window cost scales with the league's price scale; costly accepts are never clean ------

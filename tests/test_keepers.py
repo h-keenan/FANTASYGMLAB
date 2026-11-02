@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pandas as pd
+import pytest
 
 from modules import keepers
 
@@ -87,7 +88,7 @@ def test_keepers_endpoint_non_keeper_league(monkeypatch):
     assert r.json()["is_keeper_league"] is False
 
 
-def test_keepers_endpoint_keeper_league(monkeypatch):
+def _get_keepers_with_settings(monkeypatch, settings_result):
     from tests.test_mobile_api_service import _TRADE_ANALYZER_LEAGUE, _client, _fake_roster_frame
 
     league = {
@@ -96,6 +97,7 @@ def test_keepers_endpoint_keeper_league(monkeypatch):
         "settings": {**_TRADE_ANALYZER_LEAGUE.get("settings", {}), "type": 1, "max_keepers": 2},
     }
     client = _client(monkeypatch)
+    monkeypatch.setattr("modules.account_store.fetch_user_settings", lambda *a, **k: settings_result)
     auth = Mock(status_code=200)
     auth.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     prof = Mock(status_code=200)
@@ -117,10 +119,21 @@ def test_keepers_endpoint_keeper_league(monkeypatch):
                                     r = client.get(
                                         "/v1/leagues/abc/keepers", headers={"Authorization": "Bearer good-token"}
                                     )
+    return r
+
+
+def test_keepers_endpoint_keeper_league(monkeypatch):
+    r = _get_keepers_with_settings(monkeypatch, ({"settings": {}}, ""))
     body = r.json()
     assert r.status_code == 200 and body["is_keeper_league"] is True
     assert body["players"]["my1"]["is_keeper"] and body["players"]["my1"]["cost_round"] == 9
     assert body["keep_count"] == 2 and "estimate_note" in body
+
+
+def test_keepers_endpoint_is_a_retryable_503_when_the_penalty_cannot_be_read(monkeypatch):
+    r = _get_keepers_with_settings(monkeypatch, ({}, "Could not reach Supabase table storage."))
+    assert r.status_code == 503
+    assert r.json()["degraded_reason"] == "keeper_settings_failed" and r.headers["Retry-After"]
 
 
 def test_keeper_adjusted_values_reward_surplus_and_skip_unknown_cost():
@@ -146,8 +159,30 @@ def test_stored_round_penalty_reads_user_settings_and_falls_back_to_zero():
         assert svc._stored_keeper_round_penalty({}, "u", "t", "L1") == 2
         assert svc._stored_keeper_round_penalty({}, "u", "t", "L2") == keepers.MAX_ROUND_PENALTY
         assert svc._stored_keeper_round_penalty({}, "u", "t", "other") == 0
-    with patch.object(svc.account_store, "fetch_user_settings", return_value=({}, "boom")):
+    # No stored setting is 0; a failed read is NOT 0 (it would misprice and cache).
+    with patch.object(svc.account_store, "fetch_user_settings", return_value=({}, "")):
         assert svc._stored_keeper_round_penalty({}, "u", "t", "L1") == 0
+    assert svc._stored_keeper_round_penalty({}, "", "t", "L1") == 0
+    with patch.object(svc.account_store, "fetch_user_settings", return_value=({}, "boom")):
+        with pytest.raises(svc.model_status.KeeperPricingUnavailable):
+            svc._stored_keeper_round_penalty({}, "u", "t", "L1")
+    with patch.object(svc.account_store, "fetch_user_settings", side_effect=OSError("down")):
+        with pytest.raises(svc.model_status.KeeperPricingUnavailable):
+            svc._stored_keeper_round_penalty({}, "u", "t", "L1")
+
+
+def test_trade_idea_penalty_is_zero_for_non_keeper_leagues_and_raises_for_keeper_lookup_failure():
+    from services import mobile_api_service as svc
+
+    user = {"id": "u", "_access_token": "t"}
+    with patch.object(svc.sleeper, "get_league", return_value={"settings": {}}):
+        assert svc._trade_idea_keeper_round_penalty(user, "L1") == 0
+    keeper_league = {"settings": {"type": 1}}
+    with patch.object(svc.sleeper, "get_league", return_value=keeper_league), patch.object(
+        svc.league_value_settings, "detect_league_value_settings_from_payload", return_value={"_keeper_mode": True}
+    ), patch.object(svc.account_store, "fetch_user_settings", return_value=({}, "boom")):
+        with pytest.raises(svc.model_status.KeeperPricingUnavailable):
+            svc._trade_idea_keeper_round_penalty(user, "L1")
 
 
 def test_round_penalty_never_raises_adjusted_value_and_is_clamped():

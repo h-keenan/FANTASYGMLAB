@@ -16307,3 +16307,39 @@ def test_team_profile_composes_rooms_picks_direction_and_angle(monkeypatch):
     assert body["direction"]["key"]
     assert body["trade_angle"] is not None
     assert body["trade_angle"]["target"]["player_id"].startswith("opp")
+
+
+def test_all_trades_reports_a_team_it_had_to_skip(monkeypatch):
+    """An expected per-team failure no longer silently shrinks the board."""
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch("modules.sleeper.get_rosters", return_value=_all_trades_rosters(3)):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.sleeper.get_league_roster_profiles", return_value={}), patch(
+                        "modules.league_rankings.build_league_rankings_frame_cached", return_value=pd.DataFrame()
+                    ):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                with patch(
+                                    "modules.trade_hub_engine.generate_trade_idea_records",
+                                    side_effect=KeyError("boom"),
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/all-trades?page_size=1&cursor=0",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    body = response.json()
+    assert response.status_code == 200 and body["ideas"] == []
+    assert body["skipped_teams"] == ["1"]
+    assert body["model_status"]["degraded"] is True
+    assert body["model_status"]["reasons"][0]["code"] == "teams_skipped"

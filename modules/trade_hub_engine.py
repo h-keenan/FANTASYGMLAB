@@ -23,6 +23,7 @@ implementation (see modules/trade_trust.py).
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -32,6 +33,7 @@ import pandas as pd
 from modules import keepers as keepers_module
 from modules import league_rankings
 from modules import league_value_settings
+from modules import model_status
 from modules import player_quick_view
 from modules import redis_cache
 from modules import sleeper
@@ -46,6 +48,8 @@ from modules.compact_fantasy_assets import compact_package
 from modules.player_tiers import assign_player_tiers
 from modules.league_value_settings import format_score_columns
 from modules.team_eval import build_league_summary, normalize_team_strategy
+
+logger = logging.getLogger(__name__)
 
 MAX_TRADE_IDEAS = 8
 
@@ -889,13 +893,13 @@ def roster_posture(
     roster = roster or {}
     declared = ""
     if declared_stance:
-        try:
-            declared = team_stance_module.team_strategy_for_stance(declared_stance)
-        except Exception:
-            declared = ""
+        # A pure lookup (unknown stances map to the default key); it cannot
+        # fail, so there is nothing to swallow here.
+        declared = team_stance_module.team_strategy_for_stance(declared_stance)
     auto = ""
     power_rank = None
     league_size = None
+    degraded_reason = ""
     try:
         frame = rankings_frame
         if frame is None:
@@ -909,9 +913,20 @@ def roster_posture(
                 row = match.iloc[0]
                 auto = _clean_scalar(row.get("strategy"))
                 power_rank = _clean_scalar(row.get("power_rank"))
-    except Exception:
-        pass
-    return trade_posture_module.resolve_posture(
+    except model_status.LOOKUP_ERRORS:
+        # "No rankings row yet" (new league / empty frame) is a normal, silent
+        # path above. A *raise* here means the posture below is a guess (the
+        # client default is "retool", the original contender-graded-as-retool
+        # bug), so it is logged and stamped on the posture for every surface.
+        logger.warning(
+            "roster posture lookup failed (league=%s roster=%s); falling back to client strategy %r",
+            league_id,
+            roster.get("roster_id"),
+            client_strategy,
+            exc_info=True,
+        )
+        degraded_reason = "posture_lookup_failed"
+    posture = trade_posture_module.resolve_posture(
         declared_strategy=declared,
         auto_strategy=auto,
         client_strategy=client_strategy,
@@ -919,6 +934,10 @@ def roster_posture(
         league_size=league_size,
         record=roster.get("settings"),
     )
+    if degraded_reason and posture.get("source") == "client":
+        posture["degraded_reason"] = degraded_reason
+        posture["model_status"] = model_status.from_codes([degraded_reason])
+    return posture
 
 
 def _clean_scalar(value: Any) -> Any:

@@ -46,7 +46,7 @@ from modules.player_state_authority import (
 )
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
-from modules import runtime_trace
+from modules import model_status, runtime_trace
 from modules import trade_grade, trade_posture, trade_value_bands
 from modules import team_stance as team_stance_module
 
@@ -4154,6 +4154,11 @@ class _UserSideAnalyzerGate:
         passed = (
             trade_grade.clears_suggestion_bar(verdict)
             and verdict.band not in trade_value_bands.POSTURE_VERDICTS
+            # In season the Analyzer's own engine failed for this package, so
+            # the verdict above came from the value-only fallback ladder:
+            # do not recommend an idea on a verdict the Analyzer would flag
+            # as degraded (the failure was logged where it happened).
+            and "lineup_model_failed" not in model_status.codes((fit or {}).get("model_status"))
         )
         self._results[key] = passed
         return passed

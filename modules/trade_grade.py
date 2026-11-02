@@ -75,12 +75,14 @@ The three adjustments, all in the same value units as the scores:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
+from modules import model_status
 from modules.player_state_authority import is_suspended
 from modules.rankings import (
     COMPOSITE_WEIGHT_OPPORTUNITY,
@@ -89,6 +91,8 @@ from modules.rankings import (
     risk_multiplier,
 )
 from modules.team_eval import normalize_team_strategy
+
+logger = logging.getLogger(__name__)
 
 # --- consolidation -----------------------------------------------------------
 
@@ -605,7 +609,8 @@ def attach_projection_baselines(
     availability not applied) to the players the lineup model will look at:
     ``player_ids`` and the top free agents per position. Players with no usable
     weekly history simply get no column value; the model then labels its
-    fallback basis. Never raises.
+    fallback basis. A lookup failure (not mere absence) is logged and marks the
+    returned frames (``modules.model_status``) so the verdict reports it.
 
     The ONE place this happens, for the Trade Analyzer endpoint AND the Hub /
     Finder gate. Grading on a frame without it priced the same package off a
@@ -640,8 +645,18 @@ def attach_projection_baselines(
             return frame
 
         return apply(valued), apply(pool)
-    except Exception:
-        return valued, pool
+    except model_status.LOOKUP_ERRORS:
+        # "No weekly history" is handled above (empty baselines -> frames
+        # unchanged, and the model labels its value-estimate basis). A
+        # *failure* here is different: grading without baselines recreates the
+        # Hub-gate vs Analyzer divergence this helper exists to prevent, so it
+        # is logged and the returned frames are marked for the lineup model
+        # to report. Non-data errors are bugs and propagate.
+        logger.warning("projection baselines unavailable; lineup model will use value estimates", exc_info=True)
+        return (
+            model_status.mark_frame(valued.copy(), "projection_baselines_failed"),
+            model_status.mark_frame(pool.copy() if pool is not None else None, "projection_baselines_failed"),
+        )
 
 
 def grade_trade_for_user(
