@@ -482,6 +482,7 @@ def generate_trade_idea_records(
     trade_block_pick_ids: tuple[str, ...] = (),
     require_receive_picks: bool = False,
     keeper_context: Mapping[str, Any] | None = None,
+    finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_presentation already work with (trade_confidence_label,
@@ -616,6 +617,7 @@ def generate_trade_idea_records(
         prefetched_rosters=prefetched_rosters or None,
         trade_block_pick_ids=[str(pid) for pid in trade_block_pick_ids if str(pid)],
         require_receive_picks=bool(require_receive_picks),
+        finder_trace=finder_trace,
     )
     enforced = enforce_generated_trade_ideas(
         raw_ideas,
@@ -626,6 +628,27 @@ def generate_trade_idea_records(
         rosters=rosters,
         untouchables=tuple(untouchable_names),
     )
+    if finder_trace is not None:
+        # Trust enforcement is the last word on realistic trades: an idea it
+        # drops is not realistic. Count that honestly, then (only when nothing
+        # realistic survived) run the closest non-realistic packages through
+        # the SAME enforcement so a "closest option" is never something Trust
+        # would have refused outright.
+        dropped = len(raw_ideas) - len(enforced)
+        if dropped > 0:
+            finder_trace.count("trust", dropped)
+        if not enforced:
+            near = finder_trace.closest_ideas(limit=6)
+            kept = enforce_generated_trade_ideas(
+                near,
+                df_players=strategy_df,
+                league_id=league_id,
+                df_summary=df_summary,
+                my_roster_id=my_roster_id,
+                rosters=rosters,
+                untouchables=tuple(untouchable_names),
+            ) if near else []
+            finder_trace.enforced_closest = list(kept)[:3]
     tagged = _tag_landed_gm_targets(
         list(enforced),
         gm_target_player_ids=frozenset(str(pid) for pid in gm_target_player_ids if str(pid)),
@@ -810,6 +833,7 @@ def generate_trade_finder_records(
     team_stance: str = "",
     trade_block_pick_ids: tuple[str, ...] = (),
     require_receive_picks: bool = False,
+    finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
 ) -> list[dict[str, Any]]:
     """Trade Finder: "select these specific players/picks, find who'd want
     them" — the same idea-generation engine as the passive Trade Hub board
@@ -863,6 +887,7 @@ def generate_trade_finder_records(
         team_stance=team_stance,
         trade_block_pick_ids=trade_block_pick_ids,
         require_receive_picks=require_receive_picks,
+        finder_trace=finder_trace,
     )
 
 

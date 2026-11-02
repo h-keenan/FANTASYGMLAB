@@ -15019,27 +15019,60 @@ def get_trade_finder_ideas(
     declared_team_stance = _fetch_team_stance(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
-    records = trade_hub_engine.generate_trade_finder_records(
-        league_id=league_id,
-        roster_id=int(roster_id),
-        strategy=strategy,
-        lens=lens,
-        players_db_path=PLAYERS_DB_PATH,
-        trade_block_player_ids=selected_ids,
-        untouchable_player_ids=gm_untouchable_ids,
-        gm_target_player_ids=gm_target_ids,
-        team_stance=declared_team_stance,
-        trade_block_pick_ids=selected_pick_ids,
-        require_receive_picks=bool(return_picks),
-    )
+    trace = trade_ideas.FinderSearchTrace()
+    try:
+        records = trade_hub_engine.generate_trade_finder_records(
+            league_id=league_id,
+            roster_id=int(roster_id),
+            strategy=strategy,
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            trade_block_player_ids=selected_ids,
+            untouchable_player_ids=gm_untouchable_ids,
+            gm_target_player_ids=gm_target_ids,
+            team_stance=declared_team_stance,
+            trade_block_pick_ids=selected_pick_ids,
+            require_receive_picks=bool(return_picks),
+            finder_trace=trace,
+        )
+    except Exception:
+        # A search that crashed is not "no trades exist". Say so, instead of
+        # letting the client render the same empty state as a real zero.
+        logger.exception("trade-finder search failed for league %s", league_id)
+        return {
+            "ok": True,
+            "ideas": [],
+            "closest": [],
+            "reason": "",
+            "is_premium": True,
+            "upsell": None,
+            "trade_window": trade_window,
+            "search": {
+                "status": "error",
+                "found": 0,
+                "closest": 0,
+                "headline": "The search hit a problem on our side, so this is not a real \"no trades\" result. Try again in a moment.",
+                "reasons": [],
+            },
+        }
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
+    closest_cards: list[dict[str, Any]] = []
+    if not ranked:
+        for record in trace.enforced_closest:
+            note = trade_ideas.finder_closest_note(record)
+            projected = _project_and_enrich_trade_idea_cards([record], league_id=league_id, lens=lens)
+            if projected:
+                projected[0]["finder_note"] = note
+                closest_cards.append(projected[0])
     return {
         "ok": True,
         "ideas": ranked,
+        "closest": closest_cards,
         "reason": "",
         "is_premium": True,
         "upsell": None,
         "trade_window": trade_window,
+        "search": trade_ideas.finder_search_payload(trace, found=len(ranked), closest=closest_cards),
     }
 
 

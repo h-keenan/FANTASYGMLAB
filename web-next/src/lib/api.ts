@@ -1112,9 +1112,44 @@ export interface TradeHubResponse {
  * endpoint's own docstring — Trade Finder isn't free-tier-limited the way
  * Trade Hub's board is), so typing it as TradeHubResponse the way mobile's
  * api.ts does would claim a field that's never actually on the wire. */
+/** Why a Trade Finder "closest option" is NOT a realistic trade yet, and
+ * what would change it (modules.trade_ideas.finder_closest_note). */
+export interface TradeFinderNote {
+  stage: string;
+  /** Always "Stretch": a near miss is never presented as realistic. */
+  label: string;
+  reason: string;
+  value_gap: number;
+}
+
+export interface TradeFinderSearchReason {
+  code: string;
+  count: number;
+  text: string;
+}
+
+/** GET .../trade-finder `search`: where the search ended up and, when it
+ * found nothing realistic, the measured reasons (modules.trade_ideas.
+ * finder_search_payload). `error` means the search crashed, which is not the
+ * same as "no trades exist". */
+export interface TradeFinderSearch {
+  status: "found" | "closest" | "none" | "error";
+  found: number;
+  closest: number;
+  headline?: string;
+  selection?: { labels: string[]; value: number };
+  reasons?: TradeFinderSearchReason[];
+  partners_checked?: number;
+}
+
+export type TradeFinderClosestIdea = TradeIdea & { finder_note?: TradeFinderNote };
+
 export interface TradeFinderResponse {
   ok: boolean;
   ideas: TradeIdea[];
+  /** Labelled near misses, only when `ideas` is empty. Older servers omit it. */
+  closest?: TradeFinderClosestIdea[];
+  search?: TradeFinderSearch;
   reason: string;
   /** Trade Finder is Premium-only (matches app.py's current_user_is_premium()
    * gate) — a Free caller gets an empty idea list plus `upsell` instead of

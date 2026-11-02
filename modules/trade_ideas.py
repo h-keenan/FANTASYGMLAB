@@ -970,9 +970,10 @@ def _first_player_asset(assets: List[Dict[str, Any]]):
 # Trade Finder pick-search bounds (see _build_trade_ideas_impl pattern 5):
 # at most 4 selected picks -> C(4,1)+C(4,2) = 10 send packages; partner
 # return pick packages drawn from that partner's top 4 picks, max 2 per
-# package, capped at 6.
+# package, capped at 6. (Pattern 5 now sizes the return by value; see
+# finder_value_band.)
 TRADE_FINDER_MAX_SELECTED_PICKS = 4
-TRADE_FINDER_SEND_PICK_PACKAGES = 10
+TRADE_FINDER_SEND_PICK_PACKAGES = 14
 TRADE_FINDER_RECEIVE_PICK_PACKAGES = 6
 
 
@@ -986,6 +987,247 @@ def trade_block_pick_key(pick: Mapping[str, Any]) -> str:
     if not (season and round_num and original):
         return ""
     return f"{season}:{round_num}:{original}"
+
+
+# --- Trade Finder search trace -------------------------------------------
+# A Finder search used to be a black box: every candidate that failed any
+# gate vanished, so "No realistic trades found" could mean "nothing near this
+# value exists", "every partner declined on roster fit", "the market check
+# failed" or "the Analyzer grades it as a loss for you" -- and the user got the
+# same dead end for all of them. The trace counts where candidates were
+# eliminated and keeps the closest non-realistic packages (never a Trust
+# hard-fail) so the API can say WHY and show honest, labelled near misses.
+
+FINDER_NEAR_MISS_LIMIT = 6
+
+# Lower rank = closer to being a realistic trade.
+_STAGE_RANK = {"analyzer": 0, "market": 1, "reasoning": 2, "partner_fit": 3, "my_fit": 4, "value_band": 5}
+
+
+class FinderSearchTrace:
+    def __init__(self) -> None:
+        self.funnel: Dict[str, int] = defaultdict(int)
+        self.near_misses: List[tuple] = []
+        self.send_value = 0
+        self.send_labels: List[str] = []
+        self.explicit = False
+        self.roster_at_limit = False
+        self.partners = 0
+        self.closest_asset_gap: int | None = None
+        self.closest_asset_label = ""
+        self.closest_asset_partner = ""
+        # Set by trade_hub_engine after Trust enforcement.
+        self.enforced_closest: List[Dict[str, Any]] = []
+
+    def count(self, stage: str, amount: int = 1) -> None:
+        self.funnel[stage] += amount
+
+    def note_pool(self, send_value: int, partner_name: str, assets: Sequence[Mapping[str, Any]]) -> None:
+        """Remember the partner asset whose value is nearest the selection."""
+
+        for asset in assets:
+            gap = abs(int(asset.get("score") or 0) - int(send_value))
+            if self.closest_asset_gap is None or gap < self.closest_asset_gap:
+                self.closest_asset_gap = gap
+                self.closest_asset_label = str(asset.get("name") or asset.get("label") or "")
+                self.closest_asset_partner = str(partner_name or "")
+
+    def offer(self, stage: str, deficit: float, builder) -> None:
+        key = (_STAGE_RANK.get(stage, 9), float(deficit))
+        if len(self.near_misses) >= FINDER_NEAR_MISS_LIMIT and key >= self.near_misses[-1][0]:
+            return
+        idea = builder()
+        if not idea:
+            return
+        idea["finder_stretch_stage"] = stage
+        signature = (
+            idea.get("partner_team_name"),
+            tuple(sorted(str(a.get("label") or a.get("name")) for a in idea.get("send_assets") or [])),
+            tuple(sorted(str(a.get("label") or a.get("name")) for a in idea.get("receive_assets") or [])),
+        )
+        for index, (old_key, old_idea) in enumerate(self.near_misses):
+            old_sig = (
+                old_idea.get("partner_team_name"),
+                tuple(sorted(str(a.get("label") or a.get("name")) for a in old_idea.get("send_assets") or [])),
+                tuple(sorted(str(a.get("label") or a.get("name")) for a in old_idea.get("receive_assets") or [])),
+            )
+            if old_sig == signature:
+                if key < old_key:
+                    self.near_misses[index] = (key, idea)
+                    self.near_misses.sort(key=lambda row: row[0])
+                return
+        self.near_misses.append((key, idea))
+        self.near_misses.sort(key=lambda row: row[0])
+        del self.near_misses[FINDER_NEAR_MISS_LIMIT:]
+
+    def closest_ideas(self, limit: int = 3) -> List[Dict[str, Any]]:
+        """Best near misses, at most one per partner so the list is not one
+        team repeated three times."""
+
+        picked: List[Dict[str, Any]] = []
+        seen_partners: set = set()
+        for _key, idea in self.near_misses:
+            partner = idea.get("partner_team_name")
+            if partner in seen_partners:
+                continue
+            seen_partners.add(partner)
+            picked.append(idea)
+            if len(picked) >= limit:
+                break
+        return picked
+
+
+def _idea_asset_value(assets: Sequence[Mapping[str, Any]]) -> int:
+    return int(sum(int(asset.get("score") or 0) for asset in assets or []))
+
+
+def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
+    """Honest one-line reason this near miss is NOT a realistic trade, and
+    what would change it. Only facts the engine computed."""
+
+    stage = str(idea.get("finder_stretch_stage") or "")
+    partner = str(idea.get("partner_team_name") or "The other team")
+    gap = _idea_asset_value(idea.get("receive_assets")) - _idea_asset_value(idea.get("send_assets"))
+    if stage == "analyzer":
+        verdict = str(idea.get("analyzer_verdict") or "a loss").strip()
+        reason = f"{partner} might take it, but the Trade Analyzer grades it {verdict} for you."
+    elif stage == "market":
+        reason = str(idea.get("market_realism_summary") or "").strip() or (
+            f"{partner} is unlikely to see this as a balanced offer."
+        )
+    elif stage == "reasoning":
+        reason = "Neither roster gets a clear reason to make this trade."
+    elif stage == "partner_fit":
+        reason = f"{partner} has no roster reason to want what you would send."
+    elif stage == "my_fit":
+        reason = "It does not help your roster."
+    elif stage == "value_band":
+        reason = f"You would need to add about {max(0, gap):,} more value to reach this."
+    else:
+        reason = "Not a realistic trade as it stands."
+    if stage != "value_band" and gap >= 600:
+        reason += f" You would also be asking for about {gap:,} more than you send."
+    elif stage != "value_band" and gap <= -600:
+        reason += f" You would be overpaying by about {-gap:,}."
+    return {"stage": stage, "label": "Stretch", "reason": reason, "value_gap": int(gap)}
+
+
+def finder_search_payload(
+    trace: "FinderSearchTrace | None",
+    *,
+    found: int,
+    closest: Sequence[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """The `search` block of GET .../trade-finder: status found / closest /
+    none, a headline that names the dominant cause, and the counted reasons.
+    Never claims a cause the funnel did not measure."""
+
+    status = "found" if found else ("closest" if closest else "none")
+    payload: Dict[str, Any] = {"status": status, "found": int(found), "closest": len(closest)}
+    if trace is None:
+        return payload
+    funnel = dict(trace.funnel)
+    value = int(trace.send_value or 0)
+    labels = [label for label in trace.send_labels if label]
+    selection = ", ".join(labels) if labels else "your selection"
+    reasons: List[Dict[str, Any]] = []
+
+    def add(code: str, text: str) -> None:
+        reasons.append({"code": code, "count": int(funnel.get(code, 0)), "text": text})
+
+    candidates = int(funnel.get("candidates", 0))
+    if funnel.get("value_band") and not candidates and trace.closest_asset_gap is not None:
+        near = f"{trace.closest_asset_label} on {trace.closest_asset_partner}" if trace.closest_asset_label else "the nearest asset"
+        add(
+            "value_band",
+            f"No team has a player or pick priced near {selection}"
+            + (f" (~{value:,})" if value else "")
+            + f". The nearest is {near}, about {int(trace.closest_asset_gap):,} away.",
+        )
+    if funnel.get("partner_fit"):
+        add(
+            "partner_fit",
+            f"{funnel['partner_fit']} packages near that value were dropped because the other team has no roster reason to want them.",
+        )
+    if funnel.get("my_fit"):
+        add("my_fit", f"{funnel['my_fit']} packages near that value would not help your roster.")
+    if funnel.get("reasoning") or funnel.get("market"):
+        count = int(funnel.get("reasoning", 0)) + int(funnel.get("market", 0))
+        add("market", f"{count} packages did not look like a trade a manager would accept.")
+    if funnel.get("market_hard"):
+        add(
+            "market_hard",
+            f"{funnel['market_hard']} packages were blocked by core-asset protection (we do not suggest cheap sales of cornerstone players).",
+        )
+    if funnel.get("analyzer"):
+        add(
+            "analyzer",
+            f"{funnel['analyzer']} packages a team might accept grade as a loss for you in the Trade Analyzer.",
+        )
+    if not reasons and not candidates:
+        if trace.partners:
+            add("no_candidates", "There was nothing to match: no partner roster had a usable asset in range.")
+        else:
+            add(
+                "no_candidates",
+                "Nothing in this selection could be matched against another team. A player may be protected by your untouchables or core-asset rules, or a pick may no longer be yours.",
+            )
+    if candidates:
+        reasons.sort(key=lambda row: -int(row["count"]))
+    if trace.roster_at_limit:
+        reasons.append(
+            {
+                "code": "roster_full",
+                "count": 0,
+                "text": "Your roster is full, so any deal that adds a player means dropping one.",
+            }
+        )
+    if found:
+        headline = ""
+    elif reasons:
+        headline = reasons[0]["text"]
+        if closest:
+            headline += " The closest options are below; none is a realistic offer as it stands."
+    else:
+        headline = "No realistic trades found for this selection right now."
+    payload.update(
+        {
+            "headline": headline,
+            "selection": {"labels": labels, "value": value},
+            "reasons": reasons,
+            "funnel": funnel,
+            "partners_checked": int(trace.partners),
+        }
+    )
+    return payload
+
+
+def finder_value_band(send_value: int) -> tuple[int, int]:
+    """(low, high) for _value_fits(send, receive): how much LESS / MORE than
+    the selection's value a return may carry. Scales with the selection so a
+    ~600 late pick is matched against ~200-1000 assets instead of being held
+    to a fixed 1500+ player floor sized for first-round picks."""
+
+    send_value = max(0, int(send_value))
+    low = -int(min(1500, max(400, round(send_value * 0.30))))
+    high = int(min(1200, max(400, round(send_value * 0.40))))
+    return low, high
+
+
+def _pick_send_posture_terms(send_assets: List[Dict[str, Any]], my_shape: Mapping[str, Any]) -> tuple[int, int]:
+    """(fit_priority term, my-side fit term) that merely reflect the user's
+    posture disliking pick sales (rebuild: -7 / -12). A user who explicitly
+    ticked a pick to shop has already overridden that default, so the Finder
+    adds these terms back instead of letting posture veto the user's own
+    selection."""
+
+    picks = sum(1 for asset in send_assets if asset.get("asset_type") == "pick")
+    if not picks:
+        return 0, 0
+    strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    priority_term = 6 * picks if strategy in {"contender", "fringe_contender"} else picks if strategy == "retool" else -7 * picks
+    fit_term = {"tank": -16, "rebuild": -12, "retool": -2}.get(strategy, 0)
+    return priority_term, fit_term
 
 
 def _has_pick(assets: List[Dict[str, Any]]) -> bool:
@@ -1358,6 +1600,7 @@ def evaluate_trade_market_realism(
     explicit_player_focus: bool = False,
     focused_player_ids: Sequence[str] | None = None,
     explicit_acquisition_target: bool = False,
+    selection_driven: bool = False,
 ) -> Dict[str, Any]:
     partner_profile = partner_profile or {}
     focused_ids = {
@@ -1366,6 +1609,7 @@ def evaluate_trade_market_realism(
         if str(player_id).strip()
     }
     score = 58
+    roster_note = ""
     positives: List[str] = []
     negatives: List[str] = []
     flags: List[str] = []
@@ -1390,7 +1634,19 @@ def evaluate_trade_market_realism(
     partner_strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
     net_incoming_players = len(receive_players) - len(send_players)
 
-    if net_incoming_players > 0 and bool(my_shape.get("roster_over_limit")):
+    if net_incoming_players > 0 and selection_driven and (
+        bool(my_shape.get("roster_over_limit")) or bool(my_shape.get("roster_at_limit"))
+    ):
+        # The user chose what to shop, so adding a player is the point of the
+        # trade, not a side effect. A full roster just means one cut when it
+        # is accepted (Sleeper prompts for it); it is noted, lightly priced,
+        # and never a veto. Before this a pick-for-player trade lost 20 points
+        # on every full dynasty roster, which was enough to eliminate all of
+        # them.
+        score -= 4 + (2 * net_incoming_players)
+        roster_note = "Your roster is full, so you would need to drop a player to fit this."
+        flags.append("roster_spot_needed")
+    elif net_incoming_players > 0 and bool(my_shape.get("roster_over_limit")):
         score -= 34 + (6 * net_incoming_players)
         negatives.append("This adds roster spots while your roster is already over the practical limit.")
         flags.append("roster_limit_pressure")
@@ -1748,6 +2004,7 @@ def evaluate_trade_market_realism(
         "flags": flags,
         "hard_fail": bool(deduped_hard_fail_flags),
         "hard_fail_flags": deduped_hard_fail_flags,
+        "roster_note": roster_note,
         "value_delta": receive_score - send_score,
         "headliner_ratio": round(float(headliner_ratio or 0.0), 4),
         "consolidation_premium": int(consolidation_premium),
@@ -3760,6 +4017,7 @@ def build_trade_ideas(
     prefetched_rosters: List[Dict[str, Any]] | None = None,
     trade_block_pick_ids: List[str] | None = None,
     require_receive_picks: bool = False,
+    finder_trace: "FinderSearchTrace | None" = None,
 ) -> List[Dict[str, Any]]:
     profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
     try:
@@ -3785,6 +4043,7 @@ def build_trade_ideas(
             prefetched_rosters=prefetched_rosters,
             trade_block_pick_ids=trade_block_pick_ids,
             require_receive_picks=require_receive_picks,
+            finder_trace=finder_trace,
         )
     finally:
         profile.emit()
@@ -3887,6 +4146,7 @@ def _build_trade_ideas_impl(
     prefetched_rosters: List[Dict[str, Any]] | None = None,
     trade_block_pick_ids: List[str] | None = None,
     require_receive_picks: bool = False,
+    finder_trace: "FinderSearchTrace | None" = None,
 ) -> List[Dict[str, Any]]:
     profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
@@ -3966,6 +4226,10 @@ def _build_trade_ideas_impl(
         dict.fromkeys(str(pick_id).strip() for pick_id in (trade_block_pick_ids or ()) if str(pick_id).strip())
     )[:TRADE_FINDER_MAX_SELECTED_PICKS]
     explicit_pick_focus = bool(selected_pick_ids)
+    trace = finder_trace
+    selection_driven = bool(trade_block_names) or explicit_pick_focus
+    if trace is not None:
+        trace.explicit = selection_driven
 
     name_keys = my_team_df["name"].fillna("").astype(str).str.strip().str.casefold()
     requested_names = {str(name).strip().casefold() for name in trade_block_names if str(name).strip()}
@@ -4009,6 +4273,8 @@ def _build_trade_ideas_impl(
         my_shape["archetype"] = str(team_archetype)
         my_shape["archetype_label"] = str(team_archetype)
     my_needs = _normalize_pos_list(my_shape.get("needs", []))
+    if trace is not None:
+        trace.roster_at_limit = bool(my_shape.get("roster_at_limit") or my_shape.get("roster_over_limit"))
 
     # Need-filling acquire suggestions should know about the waiver wire,
     # not just rostered trade partners -- see _waiver_alternative_guardrail.
@@ -4056,6 +4322,8 @@ def _build_trade_ideas_impl(
         ]
         if my_trade_block_df.empty and not my_pick_assets:
             return []
+        if trace is not None:
+            trace.send_labels = [str(p.get("label") or "") for p in my_pick_assets]
     else:
         my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
 
@@ -4128,6 +4396,8 @@ def _build_trade_ideas_impl(
 
         partner_name = partner_row["team_name"]
         partner_mode = partner_row["mode"]
+        if trace is not None:
+            trace.partners += 1
 
         partner_team_df = roster_team_frames.get(
             partner_roster_id,
@@ -4156,9 +4426,10 @@ def _build_trade_ideas_impl(
             min_reason_score: int = 8,
             min_acceptance_score: int = 56,
             fit_context: Dict[str, Any] | None = None,
+            _stretch: bool = False,
         ) -> Dict[str, Any] | None:
             package_key = profile.package_key(send_assets, receive_assets)
-            if package_key in seen_ideas:
+            if package_key in seen_ideas and not _stretch:
                 profile.duplicate_evaluations += 1
                 return None
             cache_key = f"{partner_roster_id}:{package_key}"
@@ -4174,6 +4445,23 @@ def _build_trade_ideas_impl(
                 ),
             )
             if reasoning["score"] < min_reason_score:
+                if trace is not None:
+                    trace.count("reasoning")
+                    trace.offer(
+                        "reasoning",
+                        min_reason_score - int(reasoning["score"]),
+                        lambda: make_reasoned_idea(
+                            send_assets,
+                            receive_assets,
+                            title,
+                            rationale,
+                            priority,
+                            min_reason_score=-99,
+                            min_acceptance_score=-1,
+                            fit_context=fit_context,
+                            _stretch=True,
+                        ),
+                    )
                 return None
             market_context = profile.cached(
                 "market",
@@ -4190,11 +4478,31 @@ def _build_trade_ideas_impl(
                     receive_score=profile.score(receive_assets),
                     explicit_player_focus=explicit_player_focus,
                     focused_player_ids=focused_player_ids,
+                    selection_driven=selection_driven,
                 ),
             )
             if market_context.get("hard_fail"):
+                if trace is not None and not _stretch:
+                    trace.count("market_hard")
                 return None
             if int(market_context.get("score") or 0) < min_acceptance_score:
+                if trace is not None:
+                    trace.count("market")
+                    trace.offer(
+                        "market",
+                        min_acceptance_score - int(market_context.get("score") or 0),
+                        lambda: make_reasoned_idea(
+                            send_assets,
+                            receive_assets,
+                            title,
+                            rationale,
+                            priority,
+                            min_reason_score=-99,
+                            min_acceptance_score=-1,
+                            fit_context=fit_context,
+                            _stretch=True,
+                        ),
+                    )
                 return None
             waiver_guardrail = profile.cached(
                 "waiver_alternative",
@@ -4212,6 +4520,7 @@ def _build_trade_ideas_impl(
                     rationale,
                     market_context.get("summary", ""),
                     waiver_guardrail.get("summary", ""),
+                    str(market_context.get("roster_note") or ""),
                 ]
                 if part
             ).strip()
@@ -4385,11 +4694,17 @@ def _build_trade_ideas_impl(
                 receive_assets = make_package(target)
                 if not _value_fits(player["score"], target["score"], low=-1200, high=1200):
                     continue
+                if trace is not None:
+                    trace.count("candidates")
                 fit_bonus = package_fit_priority(send_assets, receive_assets)
                 if fit_bonus < 0:
+                    if trace is not None:
+                        trace.count("my_fit")
                     continue
                 fit_context = package_fit_context(send_assets, receive_assets)
                 if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                    if trace is not None:
+                        trace.count("partner_fit" if fit_context["partner_score"] <= 0 else "my_fit")
                     continue
                 idea = make_reasoned_idea(
                     send_assets,
@@ -4556,87 +4871,160 @@ def _build_trade_ideas_impl(
                         add_idea(idea)
                         break
 
-        # 5. Trade Finder pick selection: the selected picks alone (1-2 at
-        # a time) for a partner player, and -- when the caller asked for
-        # picks back -- for a partner pick package. Bounded:
-        # _bounded_pick_packages over at most TRADE_FINDER_MAX_SELECTED_PICKS
-        # picks yields <= TRADE_FINDER_SEND_PICK_PACKAGES send packages, each
-        # tried against <= target_cap partner players and <=
-        # TRADE_FINDER_RECEIVE_PICK_PACKAGES partner pick packages, with a
-        # cheap value-band gate before any fit/realism scoring and a break
-        # after the first accepted idea per send package.
+        # 5. Trade Finder pick selection: shop exactly the picks the caller
+        # ticked. Candidates are sized by VALUE, not by a fixed floor:
+        #   - picks for a partner player whose value sits in
+        #     finder_value_band(send value), ranked by roster fit;
+        #   - picks for partner picks (move up / down / consolidate), always
+        #     considered for "Any return" and the only thing "Picks back" keeps.
+        # The user's own posture never vetoes their explicit selection (a
+        # rebuilder who ticked a pick wants offers for it), so the posture
+        # terms that merely dislike pick sales are added back. Everything the
+        # partner or the market can still object to is applied unchanged, and
+        # every elimination is counted in the FinderSearchTrace.
         if explicit_pick_focus and my_pick_assets:
             send_pick_packages = _bounded_pick_packages(
-                my_pick_assets, max_size=2, limit=TRADE_FINDER_SEND_PICK_PACKAGES
+                my_pick_assets, max_size=3, limit=TRADE_FINDER_SEND_PICK_PACKAGES
             )
-            for send_picks in send_pick_packages:
-                for target in gated_partner_players[:target_cap]:
-                    if target["score"] < 1500:
-                        continue
-                    send_assets = make_package(*send_picks)
-                    receive_assets = make_package(target)
-                    if not _value_fits(profile.score(send_assets), target["score"], low=-1500, high=1200):
-                        continue
-                    fit_bonus = package_fit_priority(send_assets, receive_assets)
-                    if fit_bonus < 0:
-                        continue
-                    fit_context = package_fit_context(send_assets, receive_assets)
-                    if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
-                        continue
-                    idea = make_reasoned_idea(
+            if trace is not None and not trace.send_value:
+                trace.send_value = int(sum(int(p.get("score") or 0) for p in my_pick_assets))
+            pool_players = [
+                asset
+                for asset in partner_player_assets
+                if int(asset.get("score") or 0) >= 300
+                and _acquire_candidate_allowed(asset["position"], my_shape, partner_shape)
+            ]
+            partner_all_picks = [
+                _pick_asset(pick, score_multiplier=pick_score_multiplier)
+                for pick in roster_pick_assets.get(partner_roster_id, [])
+            ]
+            partner_all_picks = [pick for pick in partner_all_picks if 1 <= int(pick.get("round") or 99) <= 4]
+
+            def shop_candidate(send_assets, receive_assets, title, rationale, priority_base, min_acceptance, partner_floor):
+                if trace is not None:
+                    trace.count("candidates")
+                priority_term, fit_term = _pick_send_posture_terms(send_assets, my_shape)
+                fit_bonus = package_fit_priority(send_assets, receive_assets) - priority_term
+                fit_context = dict(package_fit_context(send_assets, receive_assets))
+                fit_context["score"] = int(fit_context["score"]) - fit_term
+                fit_context["my_score"] = int(fit_context["my_score"]) - fit_term
+                gap = profile.score(receive_assets) - profile.score(send_assets)
+
+                def stretch(stage_title=title):
+                    return make_reasoned_idea(
                         send_assets,
                         receive_assets,
-                        "Picks for a player",
-                        (
-                            "Turns draft capital you chose to shop into a playable roster piece. "
-                            f"{fit_context['rationale']}"
-                        ).strip(),
-                        70 + fit_bonus + fit_context["score"],
-                        min_reason_score=8,
-                        min_acceptance_score=54,
+                        stage_title,
+                        rationale,
+                        priority_base,
+                        min_reason_score=-99,
+                        min_acceptance_score=-1,
                         fit_context=fit_context,
+                        _stretch=True,
+                    )
+
+                if fit_bonus < 0 or fit_context["score"] < 0:
+                    if trace is not None:
+                        trace.count("my_fit")
+                        trace.offer("my_fit", abs(min(fit_bonus, fit_context["score"])), stretch)
+                    return None
+                if fit_context["partner_score"] <= partner_floor:
+                    if trace is not None:
+                        trace.count("partner_fit")
+                        trace.offer("partner_fit", abs(fit_context["partner_score"] - partner_floor), stretch)
+                    return None
+                return make_reasoned_idea(
+                    send_assets,
+                    receive_assets,
+                    title,
+                    f"{rationale} {fit_context['rationale']}".strip(),
+                    priority_base + fit_bonus + fit_context["score"],
+                    min_reason_score=8,
+                    min_acceptance_score=min_acceptance,
+                    fit_context=fit_context,
+                )
+
+            for send_picks in send_pick_packages:
+                send_assets = make_package(*send_picks)
+                send_value = profile.score(send_assets)
+                low, high = finder_value_band(send_value)
+                in_band = [
+                    asset for asset in pool_players if _value_fits(send_value, int(asset["score"]), low=low, high=high)
+                ]
+                if trace is not None:
+                    trace.note_pool(send_value, partner_name, pool_players)
+                in_band.sort(
+                    key=lambda asset: (
+                        -_target_trade_fit(asset, my_shape, partner_shape),
+                        abs(int(asset["score"]) - send_value),
+                    )
+                )
+                if not in_band:
+                    reach = [asset for asset in pool_players if int(asset["score"]) > send_value]
+                    if trace is not None and pool_players:
+                        trace.count("value_band")
+                    if trace is not None and reach and (
+                        min(int(a["score"]) for a in reach) - send_value <= max(1500, 2 * send_value)
+                    ):
+                        # The cheapest player above the selection is actionable
+                        # ("add ~X more to reach him"); a player far BELOW it
+                        # would just be an overpay, so it is never offered.
+                        nearest = min(reach, key=lambda asset: int(asset["score"]) - send_value)
+                        outside = int(nearest["score"]) - send_value - high
+                        trace.offer(
+                            "value_band",
+                            max(0, outside),
+                            lambda nearest=nearest: make_reasoned_idea(
+                                send_assets,
+                                make_package(nearest),
+                                "Picks for a player",
+                                "Closest player value to the picks you chose to shop.",
+                                60,
+                                min_reason_score=-99,
+                                min_acceptance_score=-1,
+                                _stretch=True,
+                            ),
+                        )
+                for target in in_band[:6]:
+                    idea = shop_candidate(
+                        send_assets,
+                        make_package(target),
+                        "Picks for a player",
+                        "Turns draft capital you chose to shop into a playable roster piece.",
+                        70,
+                        54,
+                        0,
                     )
                     if idea:
                         add_idea(idea)
                         break
-            if require_receive_picks and partner_pick_assets:
-                receive_pick_packages = _bounded_pick_packages(
-                    partner_pick_assets[:4], max_size=2, limit=TRADE_FINDER_RECEIVE_PICK_PACKAGES
-                )
-                for send_picks in send_pick_packages:
-                    for receive_picks in receive_pick_packages:
-                        send_assets = make_package(*send_picks)
-                        receive_assets = make_package(*receive_picks)
-                        # A like-for-like swap (same seasons/rounds both
-                        # ways) is noise, not a trade idea.
-                        if sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in send_assets) == sorted(
-                            (_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in receive_assets
-                        ):
-                            continue
-                        if not _value_fits(profile.score(send_assets), profile.score(receive_assets), low=-900, high=900):
-                            continue
-                        fit_bonus = package_fit_priority(send_assets, receive_assets)
-                        if fit_bonus < 0:
-                            continue
-                        fit_context = package_fit_context(send_assets, receive_assets)
-                        if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
-                            continue
-                        idea = make_reasoned_idea(
-                            send_assets,
-                            receive_assets,
-                            "Pick swap",
-                            (
-                                "Reshapes your draft capital without touching your roster. "
-                                f"{fit_context['rationale']}"
-                            ).strip(),
-                            64 + fit_bonus + fit_context["score"],
-                            min_reason_score=8,
-                            min_acceptance_score=54,
-                            fit_context=fit_context,
-                        )
-                        if idea:
-                            add_idea(idea)
-                            break
+
+                # Picks for picks (move up, move down, consolidate, spread).
+                swap_band = int(min(900, max(250, round(send_value * 0.20))))
+                receive_pick_packages = [
+                    pkg
+                    for pkg in _bounded_pick_packages(partner_all_picks, max_size=2, limit=120)
+                    if abs(profile.score(pkg) - send_value) <= swap_band
+                    and sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in pkg)
+                    != sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in send_assets)
+                ]
+                receive_pick_packages.sort(key=lambda pkg: abs(profile.score(pkg) - send_value))
+                for receive_picks in receive_pick_packages[:3]:
+                    # Pick-for-pick carries no positional signal; the partner's
+                    # only roster-based objection is posture (a rebuilder
+                    # paying future capital), so require "not strongly against".
+                    idea = shop_candidate(
+                        send_assets,
+                        make_package(*receive_picks),
+                        "Pick swap",
+                        "Reshapes your draft capital without touching your roster.",
+                        64,
+                        54,
+                        -4,
+                    )
+                    if idea:
+                        add_idea(idea)
+                        break
 
     if require_receive_picks:
         # "Picks back" is a hard filter on the return, not a ranking nudge.
@@ -4657,6 +5045,7 @@ def _build_trade_ideas_impl(
         waiver_df=_hub_waiver_pool(df_players, roster_players_map),
     )
     selected: List[Dict[str, Any]] = []
+    analyzer_rejected: List[Dict[str, Any]] = []
     tag_counts: Dict[str, int] = {}
     partner_counts: Dict[str, int] = {}
     receive_counts: Dict[str, int] = {}
@@ -4671,13 +5060,14 @@ def _build_trade_ideas_impl(
         if receive_counts.get(receive, 0) >= 2:
             continue
         if not analyzer_gate.passes(idea):
+            analyzer_rejected.append(idea)
             continue
         selected.append(idea)
         tag_counts[tag] = tag_counts.get(tag, 0) + 1
         partner_counts[partner] = partner_counts.get(partner, 0) + 1
         receive_counts[receive] = receive_counts.get(receive, 0) + 1
         if len(selected) >= max_ideas:
-            return selected
+            return _finish_finder_trace(trace, selected, analyzer_rejected)
 
     for idea in ideas:
         if idea not in selected and analyzer_gate.passes(idea):
@@ -4689,6 +5079,23 @@ def _build_trade_ideas_impl(
     # which would place it after lower-ranked survivors. Restore surface
     # rank among the selected set without changing membership or scores.
     selected.sort(key=_trade_surface_sort_key, reverse=True)
+    return _finish_finder_trace(trace, selected, analyzer_rejected)
+
+
+def _finish_finder_trace(
+    trace: "FinderSearchTrace | None",
+    selected: List[Dict[str, Any]],
+    analyzer_rejected: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    if trace is None:
+        return selected
+    trace.count("accepted", len(selected))
+    if analyzer_rejected:
+        trace.count("analyzer", len(analyzer_rejected))
+    if not selected:
+        for idea in analyzer_rejected:
+            score = int(idea.get("analyzer_trade_score") or 0)
+            trace.offer("analyzer", max(0.0, -score) / 100.0, lambda idea=idea: dict(idea))
     return selected
 
 

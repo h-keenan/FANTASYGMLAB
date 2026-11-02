@@ -783,3 +783,48 @@ def test_posture_sentence_is_plain_and_covers_every_strategy():
         sentence = trade_hub_engine.posture_sentence(key)
         assert sentence.startswith("You're") and "strategy" not in sentence.lower()
     assert trade_hub_engine.posture_sentence("nope") == ""
+
+
+def test_finder_closest_options_go_through_the_same_trust_enforcement():
+    """A near miss is only offered when Trust enforcement would also keep it;
+    and enforcement only runs on near misses when nothing realistic survived."""
+
+    from modules import trade_ideas as trade_ideas_module
+
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+    kept_idea = {"partner_team_name": "A", "send_assets": [], "receive_assets": []}
+    dropped_idea = {"partner_team_name": "B", "send_assets": [], "receive_assets": []}
+    calls = []
+
+    def fake_enforce(ideas, **kwargs):
+        calls.append(list(ideas))
+        return [i for i in ideas if i["partner_team_name"] == "A"]
+
+    def fake_build(**kwargs):
+        trace = kwargs["finder_trace"]
+        trace.offer("market", 1.0, lambda: dict(kept_idea))
+        trace.offer("market", 2.0, lambda: dict(dropped_idea))
+        return []
+
+    trace = trade_ideas_module.FinderSearchTrace()
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch("modules.trade_ideas.build_trade_ideas", side_effect=fake_build):
+                with patch("modules.trade_hub_engine.enforce_generated_trade_ideas", side_effect=fake_enforce):
+                    result = trade_hub_engine.generate_trade_idea_records(
+                        league_id="league-1",
+                        my_roster_id=1,
+                        players_df=players_df,
+                        rosters=_rosters(),
+                        league_settings=SETTINGS,
+                        score_field="dynasty_score",
+                        team_strategy="contender",
+                        trade_block_pick_ids=("2027:1:1",),
+                        finder_trace=trace,
+                    )
+
+    assert result == []
+    assert [i["partner_team_name"] for i in trace.enforced_closest] == ["A"]
+    assert len(calls) == 2  # real ideas, then the near misses

@@ -9,12 +9,15 @@ import {
   type LineupPlayer,
   type MyTeamResponse,
   type PremiumUpsell,
+  type TradeFinderClosestIdea,
+  type TradeFinderSearch,
   type TradeIdea,
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { TradeAssetRow } from "@/components/TradeAssetExchange";
+import { TradeFinderNoResults } from "@/components/TradeFinderNoResults";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
@@ -223,6 +226,11 @@ export function TradeFinderContent({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
+  // Why nothing realistic came back, plus labelled near misses (see
+  // TradeFinderNoResults). Reset with `ideas` whenever the selection changes.
+  const [noResults, setNoResults] = useState<{ search?: TradeFinderSearch; closest: TradeFinderClosestIdea[] }>({
+    closest: [],
+  });
   // null = not yet known (no search attempted); set from the first search
   // response's `is_premium`/`upsell` — see the premium-gating note above.
   const [premiumUpsell, setPremiumUpsell] = useState<{ locked: boolean; upsell: PremiumUpsell | null } | null>(null);
@@ -242,6 +250,7 @@ export function TradeFinderContent({
           returnPicks: withReturnPicks,
         });
         setIdeas(result.ideas);
+        setNoResults({ search: result.search, closest: result.closest ?? [] });
         setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
         if (result.ideas.length === 0 && result.reason === "no_players_selected") {
           setSearchError("Select at least one player or pick to search with.");
@@ -457,7 +466,13 @@ export function TradeFinderContent({
 
           {ideas !== null && !searchError ? (
             ideas.length === 0 ? (
-              <EmptyState title="No realistic trades found for this selection right now." />
+              <TradeFinderNoResults
+                search={noResults.search}
+                closest={noResults.closest}
+                leagueId={leagueId}
+                lens={lens}
+                onRetry={() => void runSearch(selectedIds, selectedPickIds, returnPicks, strategy)}
+              />
             ) : (
               <div className="flex flex-col gap-4">
                 {ideas.map((idea, index) => (
