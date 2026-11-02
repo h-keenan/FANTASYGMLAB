@@ -8,6 +8,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardItem } from '../lib/api';
 import { hasTradePackage, signalPlayers, type SignalPlayer } from '../lib/portfolioSignals';
 import { spacing, type ThemeColors } from '../theme';
+import IdeaPosture from './IdeaPosture';
 
 /**
  * The compact player-card visual for a briefing item: a give/get trade
@@ -37,6 +38,7 @@ export default function BriefingItemPlayers({
       <View style={styles.stack}>
         <ExchangeSide side="send" assets={pkg.send} />
         <ExchangeSide side="get" assets={pkg.receive} />
+        {item.presentation?.posture ? <IdeaPosture idea={item.presentation} /> : null}
       </View>
     );
   }

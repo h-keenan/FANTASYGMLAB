@@ -397,8 +397,14 @@ def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
 
     from modules.trade_ideas import _trade_surface_sort_key
 
+    from modules import trade_posture
+
     def _presentation_key(idea: dict) -> tuple:
+        # Team posture first (modules.trade_posture.sort_rank): ideas that fit
+        # the team's status lead, ideas that cost it trail. Ungraded ideas are
+        # neutral, so the established surface key decides as before.
         return (
+            *trade_posture.sort_rank(idea),
             *_trade_surface_sort_key(idea),
             int(idea.get("trade_gain") or 0),
         )

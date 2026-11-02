@@ -5,6 +5,7 @@ import { api, type TradeIdea } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
+import { IdeaPosture } from "@/components/IdeaPosture";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
@@ -218,6 +219,10 @@ export function TradeIdeaCardView({
         </div>
       ) : null}
       <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} />
+
+      {/* Team posture this idea was graded and ranked under: the same chip, label and
+          one-line trade-off the Trade Analyzer shows for this package. */}
+      <IdeaPosture idea={idea} leagueId={leagueId} />
 
       {landedNames.length > 0 ? (
         <p className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>

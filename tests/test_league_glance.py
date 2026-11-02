@@ -245,6 +245,7 @@ def test_build_league_glance_composes_all_five_fields(monkeypatch):
         return ideas
 
     monkeypatch.setattr(league_glance.trade_hub_engine, "generate_trade_idea_records_cached", _trade_records)
+    monkeypatch.setattr(league_glance.trade_hub_engine, "roster_posture", lambda **_k: {"key": "retool"})
     monkeypatch.setattr(
         league_glance.trade_hub_presentation,
         "order_trade_hub_visible_ideas",

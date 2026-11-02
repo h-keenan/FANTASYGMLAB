@@ -289,15 +289,24 @@ def build_league_glance(
 
     trade = None
     try:
+        # Same posture every trade surface uses (declared > auto > default).
+        posture = trade_hub_engine.roster_posture(
+            league_id=league_id,
+            roster=my_roster,
+            lens=lens,
+            players_db_path=players_db_path,
+            declared_stance=team_stance_value,
+        )
         records = trade_hub_engine.generate_trade_idea_records_cached(
             league_id=league_id,
             roster_id=int(roster_id),
-            strategy=team_stance.team_strategy_for_stance(team_stance_value),
+            strategy=posture["key"],
             lens=lens,
             players_db_path=players_db_path,
             untouchable_player_ids=gm_untouchable_player_ids,
             gm_target_player_ids=gm_target_player_ids,
             team_stance=team_stance_value,
+            posture=posture,
         )
     except (TypeError, ValueError):
         records = None

@@ -2298,6 +2298,12 @@ export interface DashboardTradePresentation {
   trade_confidence_label: string;
   trade_market_realism_label: string;
   partner_team_name: string;
+  // Team posture the idea was graded under (modules/trade_posture.py); additive.
+  posture?: TradePosture | null;
+  posture_label?: string;
+  posture_note?: string;
+  posture_alignment?: 'aligned' | 'neutral' | 'costly' | '';
+  lineup_points?: number | null;
 }
 
 export interface DashboardMentionedPlayer {
@@ -2824,6 +2830,14 @@ export interface TradeIdea {
   // watchlist — lets the card call out "lands your target" without a
   // second lookup, since package.receive already has the matching name.
   landed_gm_target_player_ids: string[];
+  // Team posture the idea was graded and ranked under (modules/trade_posture.py);
+  // the same one the Trade Analyzer uses. Additive: absent on older servers.
+  posture?: TradePosture | null;
+  // Honest Analyzer label when the idea is a trade-off ("GOOD VALUE, COSTS YOUR LINEUP").
+  posture_label?: string;
+  posture_note?: string;
+  posture_alignment?: 'aligned' | 'neutral' | 'costly' | '';
+  lineup_points?: number | null;
   // All Trades only: which roster this idea was generated for (not
   // necessarily the caller's own), and that roster's real team name so a
   // card can read "Team A <-> Team B" instead of just naming the partner.
@@ -2864,6 +2878,8 @@ export interface TradeHubResponse {
   team_strategy?: string;
   hold?: TradeHubHold | null;
   posture_sentence?: string;
+  /** The resolved team posture these ideas were graded and ranked under. */
+  posture?: TradePosture | null;
 }
 
 /** Why a Trade Finder "closest option" is NOT a realistic trade yet

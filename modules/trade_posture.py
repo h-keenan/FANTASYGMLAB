@@ -360,3 +360,121 @@ def adjusted_confidence(lineup_model: Mapping[str, Any], adjusted_score: float) 
     p = min(_phi(abs(adjusted_score) / sigma), 0.99)
     label = "High confidence" if p >= 0.88 else "Moderate confidence" if p >= 0.70 else "Close call"
     return round(p * 100, 1), label
+
+
+# --- Trade Hub / Finder / Dashboard: ideas graded and ranked by posture ---------
+#
+# Every generated idea is already graded by the Analyzer's own pipeline
+# (``trade_ideas._UserSideAnalyzerGate`` -> ``trade_grade.grade_trade_for_user``),
+# which is posture-aware since #1597 as soon as it is given the posture KEY. These
+# helpers only (1) copy what that verdict already says onto the idea, (2) order
+# ideas by how well they fit the posture, and (3) stamp the user's full resolved
+# posture (declared/auto/client, standing) onto cached records outside the cache
+# boundary. No new per-idea modelling.
+
+# Lineup points an idea must ADD (expected over the remaining weeks) for a
+# win-now team to call it "improves your lineup now".
+IMPROVES_LINEUP_POINTS = 5.0
+ALIGNED, NEUTRAL, COSTLY = "aligned", "neutral", "costly"
+ALIGNMENT_RANK = {ALIGNED: 1, NEUTRAL: 0, COSTLY: -1}
+IDEA_FIELDS = (
+    "posture",
+    "posture_note",
+    "posture_label",
+    "posture_alignment",
+    "posture_lineup_points",
+    "posture_wins_delta",
+    "posture_assessment",
+    "analyzer_weeks_text",
+)
+
+
+def alignment(posture: Mapping[str, Any] | None, assessment: Mapping[str, Any] | None) -> str:
+    """How well one trade fits the team's posture, from ``assess`` numbers only.
+
+    costly: a material lineup cost for a team that plays for wins, or a
+    conversion in the direction the posture does not want. aligned: a win-now
+    team gaining real lineup points, or a rebuilding team moving toward the
+    future. Everything else is neutral (and ranks by the usual surface key).
+    """
+
+    if not assessment or not assessment.get("available"):
+        return NEUTRAL
+    group = str((posture or {}).get("group") or GROUP_BY_KEY.get(str((posture or {}).get("key") or "retool"), "retool"))
+    pts = _num(assessment.get("lineup_points"))
+    direction = assessment.get("direction")
+    if assessment.get("lineup_costly") or (assessment.get("direction_misaligned") and group != "retool"):
+        return COSTLY
+    if group == "contender" and pts >= IMPROVES_LINEUP_POINTS and direction != "toward_future":
+        return ALIGNED
+    if group == "rebuild" and direction == "toward_future":
+        return ALIGNED
+    return NEUTRAL
+
+
+def idea_fields_from_verdict(verdict: Any, *, weeks_text: str = "") -> dict[str, Any]:
+    """The posture facts of an Analyzer ``OfferVerdict`` to carry on an idea."""
+
+    from modules import trade_value_bands as bands
+
+    posture = dict(getattr(verdict, "posture", None) or {})
+    assessment = dict(getattr(verdict, "posture_assessment", None) or {})
+    band = str(getattr(verdict, "band", "") or "")
+    return {
+        "posture": posture or None,
+        "posture_assessment": assessment or None,
+        "posture_note": str(getattr(verdict, "posture_note", "") or ""),
+        "posture_label": band if band in bands.POSTURE_VERDICTS else "",
+        "posture_alignment": alignment(posture, assessment),
+        "posture_lineup_points": assessment.get("lineup_points"),
+        "posture_wins_delta": assessment.get("wins_delta"),
+        "analyzer_weeks_text": weeks_text,
+    }
+
+
+def sort_rank(idea: Mapping[str, Any]) -> tuple[int, int]:
+    """Leading ranking key: (alignment, analyzer trade score band).
+
+    Ideas without an Analyzer grade rank neutral, so old callers and ideas the
+    Analyzer could not grade keep their existing order. The score is bucketed
+    to 500 value units so the established surface key (readiness, tier,
+    confidence, realism, fit) still decides between comparable ideas.
+    """
+
+    rank = ALIGNMENT_RANK.get(str(idea.get("posture_alignment") or NEUTRAL), 0)
+    score = idea.get("analyzer_trade_score")
+    bucket = 0
+    if rank >= 0 and score is not None:
+        try:
+            bucket = int(max(-4, min(4, round(float(score) / 500.0)))) if rank > 0 else 0
+        except (TypeError, ValueError):
+            bucket = 0
+    return rank, bucket
+
+
+def public_posture(posture: Mapping[str, Any]) -> dict[str, Any]:
+    keys = ("key", "group", "label", "source", "confidence", "confidence_label", "rank", "league_size", "record", "standing", "why")
+    return {k: posture.get(k) for k in keys}
+
+
+def stamp_records(records: list[dict[str, Any]], posture: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Attach the user's resolved posture (and the standing-aware note) to
+    cached idea records. Copies, so the shared cache entry is never mutated."""
+
+    if not posture:
+        return records
+    pub = public_posture(posture)
+    out: list[dict[str, Any]] = []
+    for idea in records:
+        if not isinstance(idea, dict):
+            out.append(idea)
+            continue
+        new = dict(idea)
+        new["posture"] = pub
+        assessment = new.get("posture_assessment")
+        if isinstance(assessment, Mapping):
+            note = posture_sentence(pub, assessment, weeks_text=str(new.get("analyzer_weeks_text") or ""))
+            new["posture_note"] = note
+            new["posture_alignment"] = alignment(pub, assessment)
+        out.append(new)
+    return out
