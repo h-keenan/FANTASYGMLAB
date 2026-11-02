@@ -27,7 +27,9 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
+import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
+import { rangeDisplayRows } from '../lib/startSitRange';
 import ValuesCredit from '../components/ValuesCredit';
 import {
   api,
@@ -666,6 +668,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   const gainColor = toneColor(colors, tone);
   return (
     <View style={styles.moveCard}>
+      <View style={styles.moveTop}>
       <View style={styles.moveSlot}>
         <PositionBadge position={move.slot} label={slotLabel} />
       </View>
@@ -689,6 +692,17 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         </AppText>
         <AppText style={styles.gainCaption}>{move.locked ? 'Locked' : 'Proj pts'}</AppText>
       </View>
+      </View>
+      <RangeCompare
+        rows={rangeDisplayRows(
+          [
+            { key: 'start', label: 'Start', range: move.range?.start ?? null },
+            { key: 'over', label: 'Over', range: move.range?.over ?? null },
+          ],
+          move.range?.lean?.favors ?? null,
+        )}
+        lean={move.range?.lean ?? null}
+      />
     </View>
   );
 }
@@ -824,9 +838,8 @@ function createStyles(colors: ThemeColors) {
     },
     viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
     moveList: { gap: spacing.sm },
+    moveTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     moveCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
       gap: spacing.sm,
       padding: spacing.sm,
       borderRadius: radii.md,

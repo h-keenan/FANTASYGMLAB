@@ -1,5 +1,7 @@
 "use client";
 
+import { RangeCompare } from "@/components/RangeCompare";
+import { rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -564,9 +566,10 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
     tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
   return (
     <li
-      className="flex items-center gap-3 p-3"
+      className="flex flex-col gap-3 p-3"
       style={{ border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-muted-soft)" }}
     >
+      <div className="flex items-center gap-3">
       <PlayerIdentityTrigger
         identity={{
           player_id: move.start.player_id ?? "",
@@ -614,6 +617,17 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         </div>
         {move.locked ? <ToneBadge label="Locked" color="var(--color-text-muted)" /> : null}
       </div>
+      </div>
+      <RangeCompare
+        rows={rangeDisplayRows(
+          [
+            { key: "start", label: "Start", range: move.range?.start ?? null },
+            { key: "over", label: "Over", range: move.range?.over ?? null },
+          ],
+          move.range?.lean?.favors ?? null,
+        )}
+        lean={move.range?.lean ?? null}
+      />
     </li>
   );
 }

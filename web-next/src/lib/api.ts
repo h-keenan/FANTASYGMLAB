@@ -1,6 +1,7 @@
 import { env } from "./env";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
+import type { CandidateCompare, MoveRange } from "./startSitRange";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
 import type { OpponentProfileResponse } from "./opponentProfile";
@@ -1499,6 +1500,8 @@ export interface MatchupSuggestedMove {
   weather_notes?: MatchupWeatherNote[];
   /** True once either player's game has kicked off (Sleeper locks it). */
   locked: boolean;
+  /** Projected / low / high for both players plus the win-probability lean. */
+  range?: MoveRange | null;
 }
 
 export type MatchupGameState = "pregame" | "live" | "between_games" | "final";
@@ -1595,6 +1598,8 @@ export interface MatchupWhatIfCandidate {
   win_probability_delta: number | null;
   win_probability_after: MatchupWinProbability | null;
   bullets: MatchupWhatIfBullet[];
+  /** Projected / low / high vs the current occupant plus the win-probability lean. */
+  compare?: CandidateCompare | null;
 }
 
 export interface MatchupWhatIfResponse {
