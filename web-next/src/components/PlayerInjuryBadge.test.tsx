@@ -10,7 +10,7 @@ describe("injuryAbbreviation", () => {
     expect(injuryAbbreviation("Questionable")).toBe("Q");
     expect(injuryAbbreviation("QUESTIONABLE")).toBe("Q");
     expect(injuryAbbreviation("Doubtful")).toBe("D");
-    expect(injuryAbbreviation("Out")).toBe("O");
+    expect(injuryAbbreviation("Out")).toBe("OUT");
     expect(injuryAbbreviation("IR")).toBe("IR");
     expect(injuryAbbreviation("Injured Reserve")).toBe("IR");
     expect(injuryAbbreviation("Suspended")).toBe("SUS");

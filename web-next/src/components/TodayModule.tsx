@@ -123,7 +123,7 @@ export function TodayModule({
 
       {tradePending ? <SkeletonBlock height={64} data-fgl-this-week-trade-pending="true" /> : null}
 
-      {plan.isEmpty ? (
+      {plan.isEmpty && hidden === 0 ? (
         <EmptyState
           title={
             notReadyReasonMessage(data.reason, {
