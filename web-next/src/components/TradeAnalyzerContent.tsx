@@ -28,6 +28,7 @@ import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { PostureChip } from "@/components/PostureChip";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import {
@@ -379,6 +380,7 @@ function VerdictCard({
           {verdict.band}
         </span>
       ) : null}
+      {verdict.posture ? <PostureChip posture={verdict.posture} leagueId={leagueId} /> : null}
       <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} />
 
       {/* Trade zone: the actual give/receive matchup, visually separated
@@ -445,7 +447,13 @@ function VerdictCard({
           >
             Lineup impact
           </span>
-          <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+          <p
+            className="text-sm font-bold"
+            style={{
+              color: verdict.posture_assessment?.lineup_costly ? "var(--color-danger)" : "var(--color-text-primary)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
             {formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts over Weeks {verdict.lineup_model.weeks.first}-
             {verdict.lineup_model.weeks.last} ({formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week)
           </p>
@@ -972,7 +980,7 @@ export function TradeAnalyzerContent({
             platform: "web",
             leagueId,
             lens,
-            strategy: "retool",
+            strategy: verdict.posture?.key ?? "retool",
             sendIds: [...sendPlayers.map((p) => p.player_id), ...sendPicks.map((p) => p.pick_id)],
             receiveIds: [...receivePlayers.map((p) => p.player_id), ...receivePicks.map((p) => p.pick_id)],
             verdictLabel: verdict.ui_verdict,

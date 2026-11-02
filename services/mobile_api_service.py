@@ -245,6 +245,7 @@ from modules import (
     weekly_box_scores,
 )
 from modules import public_dynasty_values
+from modules import trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import this_week
@@ -5067,6 +5068,60 @@ def _attach_projection_ppg(
         return valued, pool
 
 
+def _resolve_trade_posture(
+    user: dict[str, Any],
+    league_id: str,
+    league: Mapping[str, Any] | None,
+    my_roster: Mapping[str, Any],
+    *,
+    lens: str,
+    client_strategy: str,
+) -> dict[str, Any]:
+    """The user's team posture for a trade verdict (modules.trade_posture).
+
+    Declared Team Situation > the league rankings' auto classification (roster
+    strength blended with the real record, age curve, draft capital) > the
+    client's value. Every lookup fails open to the next source; the web client
+    used to hard-code "retool", which is why a contender's verdict never knew
+    it was one.
+    """
+
+    declared = ""
+    try:
+        stance = _fetch_team_stance(
+            auth_supabase.get_supabase_config(),
+            str(user.get("id") or ""),
+            str(user.get("_access_token") or ""),
+            league_id,
+        )
+        declared = team_stance.team_strategy_for_stance(stance) if stance else ""
+    except Exception:
+        declared = ""
+    auto = ""
+    power_rank = None
+    league_size = None
+    try:
+        frame = league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        if frame is not None and not frame.empty:
+            league_size = len(frame)
+            match = frame[frame["roster_id"].astype(str) == str(my_roster.get("roster_id") or "")]
+            if not match.empty:
+                auto = _clean_json_value(match.iloc[0].get("strategy")) or ""
+                power_rank = _clean_json_value(match.iloc[0].get("power_rank"))
+    except Exception:
+        logger.exception("trade posture: rankings lookup failed")
+    return trade_posture.resolve_posture(
+        declared_strategy=declared,
+        auto_strategy=auto,
+        client_strategy=client_strategy,
+        power_rank=power_rank,
+        league_size=league_size,
+        record=my_roster.get("settings"),
+    )
+
+
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
 def post_trade_analyzer(
     body: TradeAnalyzerRequest,
@@ -5135,6 +5190,11 @@ def post_trade_analyzer(
                 },
             }
 
+    posture = _resolve_trade_posture(
+        user, league_id, league, my_roster, lens=body.lens, client_strategy=body.strategy
+    )
+    strategy = posture["key"]
+
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
     # league_value_settings.build_valued_players_frame_cached's docstring.
     valued = league_value_settings.build_valued_players_frame_cached(
@@ -5148,8 +5208,8 @@ def post_trade_analyzer(
     # (trade_hub_engine.generate_trade_idea_records) and the web Trade
     # Analyzer already used, so a Hub idea and an Analyzer run of the same
     # package grade identically -- see modules.trade_grade.
-    valued = trade_hub_engine.apply_strategy_age_curve(valued, body.strategy, score_field)
-    pick_score_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, body.strategy)
+    valued = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+    pick_score_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, strategy)
 
     # Keeper leagues: fold estimated keeper surplus into player values. Any
     # missing cost data (or failure) silently keeps the normal value.
@@ -5300,10 +5360,11 @@ def post_trade_analyzer(
         send_assets=send_assets,
         receive_assets=receive_assets,
         metrics=None,
-        strategy=body.strategy,
+        strategy=strategy,
         lineup_settings=settings,
         score_field=score_field,
         waiver_df=waiver_pool,
+        posture=posture,
     )
     if not fit or not fit.get("available"):
         return {"ok": True, "verdict": None, "reason": "fit_unavailable"}
@@ -5333,7 +5394,7 @@ def post_trade_analyzer(
     )
 
     counter_search_status = ""
-    if getattr(verdict, "band", None) in trade_offer_analyzer.COUNTER_PACKAGE_BANDS:
+    if (getattr(verdict, "score_band", "") or getattr(verdict, "band", None)) in trade_offer_analyzer.COUNTER_PACKAGE_BANDS:
         # Real alternate packages only get built for an unfavorable verdict,
         # and only reuse assets the two rosters actually hold — never a
         # second, invented valuation. Any failure here (e.g. no picks data
@@ -5376,10 +5437,11 @@ def post_trade_analyzer(
                     send_assets=cand_send,
                     receive_assets=cand_receive,
                     metrics=None,
-                    strategy=body.strategy,
+                    strategy=strategy,
                     lineup_settings=settings,
                     score_field=score_field,
                     waiver_df=waiver_pool,
+                    posture=posture,
                 )
                 if not cand_fit or not cand_fit.get("available"):
                     return None
@@ -5392,7 +5454,7 @@ def post_trade_analyzer(
                 )
 
             alternate_packages = trade_offer_analyzer.build_counter_offer_packages(
-                band=verdict.band,
+                band=verdict.score_band or verdict.band,
                 value_delta=verdict.trade_score,
                 send_assets=send_assets,
                 receive_assets=receive_assets,
@@ -5439,7 +5501,7 @@ def post_trade_analyzer(
         "assumptions": verdict_assumptions.build_verdict_assumptions(
             lens=body.lens,
             settings=settings,
-            strategy=body.strategy,
+            strategy=strategy,
             keeper_adjusted=keeper_adjusted,
             has_picks=bool(send_pick_assets or receive_pick_assets),
             lineup_model=verdict_public.get("lineup_model") if isinstance(verdict_public, dict) else None,

@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import PostureChip from '../components/PostureChip';
 import AppText from '../components/AppText';
 import EmptyState from '../components/EmptyState';
 import Input from '../components/Input';
@@ -872,6 +873,7 @@ function VerdictCard({
           <AppText style={styles.shareButtonText}>Share</AppText>
         </TouchableOpacity>
       </View>
+      {verdict.posture ? <PostureChip posture={verdict.posture} /> : null}
       <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} style={styles.beginnerHelp} />
 
       {/* Quick visual: the same big color-coded value-change number the share
@@ -921,7 +923,12 @@ function VerdictCard({
       {verdict.lineup_model ? (
         <View testID="lineup-model" style={styles.lineupModel}>
           <AppText style={styles.lineupModelLabel}>LINEUP IMPACT</AppText>
-          <AppText style={styles.lineupModelHeadline}>
+          <AppText
+            style={[
+              styles.lineupModelHeadline,
+              verdict.posture_assessment?.lineup_costly && { color: colors.danger },
+            ]}
+          >
             {formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts over Weeks{' '}
             {verdict.lineup_model.weeks.first}-{verdict.lineup_model.weeks.last} (
             {formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week)

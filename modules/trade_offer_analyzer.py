@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from html import escape
 from typing import Any, Callable, Mapping, Sequence
 
-from modules import brand_identity, trade_value_bands
+from modules import brand_identity, trade_posture, trade_value_bands
 from modules.compact_fantasy_assets import compact_matchup_html
 from modules.trade_analyzer_fit import score_asset_value
 from modules.trade_visual_language import (
@@ -92,6 +92,16 @@ class OfferVerdict:
     trade_score: int = 0
     confidence_pct: float | None = None
     lineup_model: dict[str, Any] | None = None
+    # Team posture (modules.trade_posture): who the verdict thinks the user's
+    # team is, the one-sentence trade-off for that posture, and the numbers
+    # behind it. All additive; absent/empty for old callers and the offseason.
+    posture: dict[str, Any] | None = None
+    posture_note: str = ""
+    posture_assessment: dict[str, Any] | None = None
+    # The score-ladder band behind `band` (differs only when `band` is a
+    # posture label such as "GOOD VALUE, COSTS YOUR LINEUP"). Counter search
+    # keys off this one.
+    score_band: str = ""
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +124,10 @@ class OfferVerdict:
             "trade_score": self.trade_score,
             "confidence_pct": self.confidence_pct,
             "lineup_model": self.lineup_model,
+            "posture": self.posture,
+            "posture_note": self.posture_note,
+            "posture_assessment": self.posture_assessment,
+            "score_band": self.score_band or self.band,
         }
 
     def with_alternate_packages(
@@ -483,7 +497,7 @@ def build_counter_offer_packages(
                 return False
         if verdict is None:
             return False
-        if verdict.tone not in _FAVORABLE_TONES:
+        if verdict.tone not in _FAVORABLE_TONES or verdict.band in trade_value_bands.POSTURE_VERDICTS:
             # Not acceptable as-is, but remember it when it is a real
             # improvement on the original offer (honest fallback).
             if verdict.tone == "counter" and verdict.trade_score > int(value_delta):
@@ -710,6 +724,12 @@ def decide_offer_verdict(
 
     lineup_model = fit.get("lineup_model") if isinstance(fit.get("lineup_model"), Mapping) else None
     lineup_model = dict(lineup_model) if lineup_model else None
+    posture = fit.get("posture") if isinstance(fit.get("posture"), Mapping) else None
+    posture = dict(posture) if posture else None
+    posture_assessment = fit.get("posture_assessment") if isinstance(fit.get("posture_assessment"), Mapping) else None
+    posture_assessment = dict(posture_assessment) if posture_assessment else None
+    posture_label = ""
+    score_band = ""
     trade_score = int(fit.get("trade_score", value_delta)) if lineup_model else value_delta
     # Close band first — tiny edges should not scream ACCEPT/DECLINE.
     close_value = abs(value_delta) < _VALUE_CLOSE
@@ -719,6 +739,17 @@ def decide_offer_verdict(
         # One number decides: the posture- and lineup-aware trade score.
         scored = trade_value_bands.band_for_score(trade_score)
         band, ui, tone = scored.verdict, scored.ui_verdict, scored.tone
+        # The market says accept but the posture cost pulled the score below
+        # an accept: keep the score's UI verdict/tone, but say honestly why.
+        posture_label = trade_posture.verdict_label_override(
+            value_band_id=trade_value_bands.band_for_score(value_delta).id,
+            final_band_id=scored.id,
+            posture=posture,
+            assessment=posture_assessment,
+        ) if posture and posture_assessment else ""
+        score_band = band
+        if posture_label:
+            band = posture_label
     elif value_delta >= _VALUE_SMASH and fit_total >= 4:
         band = VERDICT_SMASH_ACCEPT
         ui = UI_VERDICT_ACCEPT
@@ -801,13 +832,19 @@ def decide_offer_verdict(
         rationale = "This is a preference call — either side can be right."
 
     counter, counter_action = build_counter_guidance(
-        band=band,
+        band=score_band or band,
         value_delta=trade_score,
         send_assets=send_assets or (),
         partner_assets=partner_assets,
     )
     if band == VERDICT_FAIR and not counter:
         counter = ""
+    if posture_label:
+        counter, counter_action = (
+            "Keep the value without the lineup hit: ask for a player who starts for you in place of the "
+            "pick or prospect, or keep your top lineup piece out of the deal.",
+            None,
+        )
     hole_warnings = list(lineup_warnings) if has_critical_hole else []
     if lineup_model is not None:
         hole_warnings = []
@@ -829,6 +866,15 @@ def decide_offer_verdict(
     # from (trade_score; the posture-adjusted value_delta when there is no
     # lineup model), never the raw asset delta (audit C1b).
     value_summary = _value_direction_label(trade_score)
+    if posture_label or (
+        posture_assessment
+        and posture_assessment.get("adjustment", 0) < 0
+        and trade_value_bands.band_for_score(value_delta).id in {"smash", "accept", "edge_you"}
+        and trade_value_bands.band_for_score(trade_score).id in {"counter", "decline", "hard"}
+    ):
+        # The verdict was pulled down by posture, not by the market: the line
+        # under it must still say what the market value is.
+        value_summary = _value_direction_label(value_delta)
     roster_summary = lineup_summary or (f"Roster fit: {roster_fit}." if roster_fit else "Roster impact is limited.")
     if not strategy_summary:
         strategy_summary = "Strategy fit is mixed for your current plan."
@@ -851,10 +897,14 @@ def decide_offer_verdict(
         tone=tone,
         counter_action=counter_action,
         lineup_warnings=lineup_warnings,
-        rationale_label=_rationale_label(tone, trade_score),
+        rationale_label="The trade-off" if posture_label else _rationale_label(tone, trade_score),
         trade_score=trade_score,
         confidence_pct=confidence_pct,
         lineup_model=lineup_model,
+        posture=posture,
+        posture_note=str(fit.get("posture_note") or ""),
+        posture_assessment=posture_assessment,
+        score_band=score_band or band,
     )
 
 

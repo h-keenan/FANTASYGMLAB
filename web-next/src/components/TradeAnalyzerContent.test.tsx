@@ -339,6 +339,64 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByText("High confidence (93%)")).toBeInTheDocument();
   });
 
+  it("shows the posture chip and the trade-off for a value win that costs a contender its lineup", async () => {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
+      ok: true,
+      verdict: {
+        ...VERDICT,
+        band: "GOOD VALUE, COSTS YOUR LINEUP",
+        ui_verdict: "COUNTER",
+        tone: "counter",
+        rationale_label: "The trade-off",
+        value_summary: "You win big on value",
+        rationale:
+          "You're a contender (#2 of 12, 4-2): this costs ~90 lineup points over Weeks 8-17 (about 1.2 fewer wins).",
+        posture: {
+          key: "contender",
+          group: "contender",
+          label: "Contender",
+          source: "auto",
+          confidence: 0.82,
+          confidence_label: "high",
+          rank: 2,
+          league_size: 12,
+          record: "4-2",
+          standing: "#2 of 12, 4-2",
+          why: "From your roster strength, record and age curve (#2 of 12, 4-2)",
+        },
+        posture_assessment: {
+          available: true,
+          window_term: -748,
+          direction_term: -330,
+          present_term: 0,
+          adjustment: -1078,
+          wins_delta: -1.1,
+          lineup_points: -90,
+          lineup_share: 0.07,
+          lineup_costly: true,
+          direction: "toward_future",
+          direction_misaligned: true,
+        },
+      },
+      reason: "",
+    });
+    renderPage();
+    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    fireEvent.click(screen.getByText("Their WR"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+    });
+
+    const chip = await screen.findByTestId("posture-chip");
+    expect(chip).toHaveTextContent("Contender");
+    expect(chip).toHaveTextContent("#2 of 12, 4-2");
+    expect(chip.querySelector("a")).toHaveAttribute("href", expect.stringContaining("/team-situation/"));
+    expect(screen.getByText("GOOD VALUE, COSTS YOUR LINEUP")).toBeInTheDocument();
+    expect(screen.getByText("The trade-off")).toBeInTheDocument();
+    expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
+  });
+
   async function analyzeWith(verdictExtra: Record<string, unknown>) {
     vi.mocked(api.postTradeAnalyzer).mockResolvedValue({
       ok: true,

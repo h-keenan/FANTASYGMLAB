@@ -125,6 +125,115 @@ keeps meaning "market fairness". `trade_score` is the number the verdict uses.
 - **Trade Hub gate** (`_UserSideAnalyzerGate`) grades every idea with the same pipeline, with
   the league's real free-agent pool, and exposes `analyzer_trade_score` next to the verdict.
 
+## Team posture: who you are decides what a trade costs
+
+Owner report (coridian_, 2026-11-01, Trade Analyzer on a phone): a contender SENDS Tee Higgins
+(WR, 27, value 5,913) and RECEIVES Jaylin Noel (WR, 24, on IR) plus a 2028 R1. Value balance
++2,466, verdict SMASH ACCEPT, on the same card as "-90 lineup pts over Weeks 8-17 (-9 this
+week)" and "brings back injured production". "smash accept but it would force my team into
+rebuild, it must know team status." Same root as #1568: a single-rule patch was not the answer.
+Code: `modules/trade_posture.py` (new), wired through `trade_analyzer_fit`, `trade_offer_analyzer`
+and `POST /v1/leagues/{id}/trade-analyzer`.
+
+Two causes, both fixed at the source:
+
+1. **The verdict did not know the posture.** The web client hard-coded `strategy: "retool"`.
+   The server now owns it (`resolve_posture`): a declared Team Situation wins, else the auto
+   classification the league rankings already compute (roster strength blended with the real
+   record by `record_signal`, the age curve and draft capital, see `team_eval`), else the
+   client's value (the old "retool" default never overrides an auto classification). Nothing
+   new is classified. The response carries `verdict.posture`
+   (`key`, `label`, `source` declared/auto/client, `confidence`, `rank`, `record`, `why`).
+   The existing override is Team Situation (`/team-situation/{leagueId}` on web, GM Stance on
+   the app); the card chip links to it when the posture was inferred.
+2. **The engine had no notion of the competitive window or of direction.** `assess` adds three
+   terms on top of the lineup model's `trade_score`, all computed from numbers the model already
+   produced (`points.ros_delta`, `points.ros_before`, `win_now_delta`, `future_delta`,
+   `value_per_point`):
+
+```
+trade_score = lineup_model_score + window + direction + present
+
+window    = WIN_VALUE[posture] * d_wins          d_wins = ros_delta * 0.0128   (gain x 0.25)
+direction = -0.10 * max(0, -orientation[posture] * conversion - 1000)
+            conversion = (win_now_delta - future_delta) / 2   (>0 buys present, <0 buys future)
+present   = PRESENT_ADJUST[posture] * k * ros_delta
+```
+
+| posture | WIN_VALUE (per expected win) | orientation (+1 present, -1 future) | PRESENT_ADJUST | net weight on lineup points |
+| --- | --- | --- | --- | --- |
+| contender | 700 | +1.0 | 0 | 1.50 plus the wins term |
+| fringe contender | 450 | +0.6 | 0 | 1.35 plus the wins term |
+| retool | 200 | 0 | 0 | 1.15 |
+| rebuild | 0 | -0.8 | -0.40 | 0.65 |
+| tank | 0 | -1.0 | -0.60 | 0.40 |
+
+- `d_wins` converts lineup points to expected wins with the slope of an even weekly matchup,
+  `phi(0) / (sqrt(2) * 22)` per point per week (22 = assumed weekly team-score sd). A loss of 90
+  points over 10 weeks is about 1.1 expected wins; that is what a contender is paying.
+- Gains are credited at a quarter of what the same loss is charged (playoff odds saturate), so
+  upgrades do not inflate.
+- `direction` charges only the part of a present<->future conversion that runs against the
+  posture, above a 1,000 deadband (bench-for-pick churn is not a direction change). It is
+  symmetric: a rebuilder buying old players with picks is charged, a contender selling
+  its lineup for the future is charged.
+- Rebuild/tank take less credit for lineup points (and less penalty for losing them): "short-term
+  lineup loss weighs little" is the PRESENT_ADJUST column, not a rule.
+- `lineup_costly` (what the card words) is: posture WIN_VALUE >= 450 and (>= 0.35 expected wins
+  or >= 3% of the roster's projected points over the remaining weeks) lost. Relative to the
+  margin, not a fixed number of points.
+
+**No cap and no special case.** The score moves and the verdict is the ladder band of the new
+score. When the market value alone says accept (value balance >= +500) but the posture terms
+pulled the score below an accept, `band` is an honest label while `ui_verdict`/`tone` stay the
+ladder's (so older clients still render a valid card):
+
+| label (`band`) | when |
+| --- | --- |
+| `GOOD VALUE, COSTS YOUR LINEUP` | win-now posture, material lineup cost |
+| `VALUE WIN, MOVES YOU TOWARD A REBUILD` | contender, direction toward the future |
+| `VALUE WIN, AGAINST YOUR REBUILD` | rebuild/tank, direction toward the present |
+
+The line under the verdict keeps saying what the market says ("You win big on value"), the
+heading becomes "The trade-off", counter search (`score_band`) treats it as the ladder band and
+never offers another posture-labelled package as an improvement, and the rationale starts with
+`posture_note`: "You're a contender (#2 of 12, 4-2): this costs ~83 lineup points over Weeks
+8-17 (about 1.1 fewer wins) and trades your present for future value, a step toward a
+rebuild." The "Helps because" lead is not used when the lineup cost is material for a team
+with a competitive window. `verdict.posture_assessment` exposes every term;
+`lineup_model.components` gains `posture_window`, `posture_direction`, `posture_present` and
+`lineup_model.trade_score_before_posture`. Confidence is recomputed for the adjusted score with
+the model's own sigma.
+
+The owner's trade (synthetic, same shape, 2028 R1 priced to a +3,535 balance): contender
+GOOD VALUE, COSTS YOUR LINEUP (ladder FAIR, score -391); fringe contender GOOD VALUE, COSTS
+YOUR LINEUP (FAIR, 476); retool ACCEPT (1,441); rebuild SMASH ACCEPT (3,039). Before: retool and
+rebuild SMASH ACCEPT, contender ACCEPT. Test:
+`tests/test_trade_posture.py`.
+
+### Calibration over the synthetic fixtures
+
+`test_calibration_grid_*` grades 11 trade shapes on 2 rosters (deep, thin) under all 5 postures
+(100 cases) with the posture terms on and off:
+
+- UI verdict changes: contender 3/20, fringe 0/20, retool 2/20, rebuild 7/20, tank 9/20 (21
+  of 100); label-only changes add 8 more (29 total).
+- Every win-now change is a lower score (the grid has no case where a contender gains standing).
+  Even swaps, upgrades, 2-for-1 consolidation and overpays keep their verdict for contender,
+  fringe contender and retool.
+- Rebuild/tank move most by design (their lineup weight drops); the movers are selling a
+  starter or bench piece for picks (COUNTER/DECLINE -> FAIR/ACCEPT) and paying for old players
+  (now charged).
+- The existing suites (`test_trade_lineup_model`, `test_trade_offer_analyzer`,
+  `test_trade_hub_analyzer_consistency`, ...) pass unchanged: their cases are retool or
+  posture-neutral.
+
+Approximate and worth re-checking with real leagues: the 22-point weekly sd, WIN_VALUE and
+PRESENT_ADJUST tables (product choices, not fitted), the auto-posture confidence
+(`resolve_posture`: standing x games played), and offseason (no lineup model, so no posture
+terms; the legacy strategy components stand). Trade Hub/Finder still grade with the stored
+stance or the default lens rather than the resolved posture (follow-up).
+
 ## Offseason and failure behaviour
 
 With no fantasy week (`current_week = 0`, or the calendar says offseason) nothing weekly is
@@ -220,8 +329,9 @@ retool 3.5-PPG package is -3892; contender (w_now 1.50) -5113; rebuild (1.05) -3
   `trade_score`. Future value in the score is the market's (already age-curved, posture-priced).
 - The waiver pool is "who is unrostered and actionable today"; FAAB, waiver priority and what
   other managers will claim are not modeled beyond the 0.90 reliability discount.
-- Playoff odds and standings are not used: the repo has no per-team playoff probability to read
-  here, and the posture (contender / retool / rebuild) is the team-context input.
+- Playoff odds are not read (the repo has no per-team playoff probability here); the team
+  context input is the posture (see "Team posture"), whose competitive-window term uses an
+  expected-wins conversion of lineup points instead.
 - D/ST and IDP slots are outside the model (no points data for defenses, IDP value-only).
 - `k` is one rate for all positions, calibrated from the market's own value/points relationship
   for starters; it is only as good as that relationship (dynasty value includes age, so young
