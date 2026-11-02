@@ -23,6 +23,7 @@ All three live in `modules.trade_grade`, which documents the weights.
 
 from __future__ import annotations
 
+import logging
 import threading
 import weakref
 from typing import Any
@@ -32,7 +33,7 @@ import pandas as pd
 from modules import runtime_trace
 from modules.frame_records import frame_records
 from modules import trade_grade
-from modules import trade_lineup_impact, trade_lineup_model, trade_posture
+from modules import model_status, trade_lineup_impact, trade_lineup_model, trade_posture
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_display import _format_score
@@ -44,6 +45,8 @@ from modules.team_eval import (
     suggest_optimal_lineup,
     team_strategy_label,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _sentence(text: str) -> str:
@@ -581,6 +584,9 @@ def evaluate_trade_analyzer_fit(
     # cost and the this-week hole penalty). Offseason has no weekly claims, so
     # the older value-based pieces stand.
     lineup_model = None
+    engine_status = model_status.from_codes(
+        model_status.frame_codes(all_players_df) + model_status.frame_codes(waiver_df)
+    )
     if window.in_season:
         try:
             model_score_column = score_field if score_field in all_players_df.columns else score_column
@@ -617,8 +623,21 @@ def evaluate_trade_analyzer_fit(
                 consolidation_adjustment=consolidation_adjustment,
                 asset_value=model_asset_value,
             )
-        except Exception:
+        except model_status.DATA_ERRORS:
+            # Expected failure class (a malformed row, a missing column): not
+            # the same thing as "offseason, no weekly data". The verdict falls
+            # back to the value-only ladder, but the payload says so and the
+            # Hub/Finder gate refuses to suggest ideas graded this way.
+            # Anything that is not a data error is a bug and propagates.
+            logger.warning(
+                "trade lineup model failed; grading on the value-only ladder (strategy=%s, send=%d, receive=%d)",
+                strategy_key,
+                len(send_assets or ()),
+                len(receive_assets or ()),
+                exc_info=True,
+            )
             lineup_model = None
+            model_status.add(engine_status, "lineup_model_failed")
     team_posture = dict(posture) if posture else trade_posture.posture_from_strategy(strategy_key)
     posture_assessment = trade_posture.assess(team_posture, lineup_model) if lineup_model is not None else None
     if lineup_model is not None:
@@ -1086,6 +1105,7 @@ def evaluate_trade_analyzer_fit(
         "value_delta": value_delta,
         "trade_score": trade_score,
         "lineup_model": lineup_model,
+        "model_status": engine_status,
         "posture": team_posture,
         "posture_assessment": posture_assessment,
         "posture_note": posture_note,

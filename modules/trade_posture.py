@@ -478,7 +478,12 @@ def sort_rank(idea: Mapping[str, Any]) -> tuple[int, int]:
 
 def public_posture(posture: Mapping[str, Any]) -> dict[str, Any]:
     keys = ("key", "group", "label", "source", "confidence", "confidence_label", "rank", "league_size", "record", "standing", "why")
-    return {k: posture.get(k) for k in keys}
+    pub = {k: posture.get(k) for k in keys}
+    if posture.get("degraded_reason"):
+        # The posture is a default because its lookup failed (see
+        # trade_hub_engine.roster_posture); clients show a "limited data" note.
+        pub["degraded_reason"] = posture["degraded_reason"]
+    return pub
 
 
 def stamp_records(records: list[dict[str, Any]], posture: Mapping[str, Any] | None) -> list[dict[str, Any]]:

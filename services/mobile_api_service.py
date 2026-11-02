@@ -249,6 +249,7 @@ from modules import (
     weekly_box_scores,
 )
 from modules import public_dynasty_values
+from modules import model_status
 from modules import trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
@@ -657,6 +658,21 @@ async def _http_exception_handler(request: Request, exc: HTTPException):
             detail,
         )
     return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": detail})
+
+
+@app.exception_handler(model_status.KeeperPricingUnavailable)
+async def _keeper_pricing_unavailable_handler(request: Request, exc: model_status.KeeperPricingUnavailable):
+    # Already logged where the lookup failed. A retryable 503 beats serving (and
+    # caching) a keeper league priced as if no round penalty were set.
+    return JSONResponse(
+        status_code=503,
+        content={
+            "ok": False,
+            "error": "Your keeper settings could not be loaded. Try again in a moment.",
+            "degraded_reason": "keeper_settings_failed",
+        },
+        headers={"Retry-After": "5"},
+    )
 
 
 @app.exception_handler(RequestValidationError)
@@ -5516,6 +5532,7 @@ def _resolve_trade_posture(
     already read the stance or the rankings frame pass them in, so resolving
     the posture adds no round trip (the frame is the shared cached one)."""
 
+    stance_failed = False
     if declared_stance is _STANCE_UNSET:
         try:
             declared_stance = _fetch_team_stance(
@@ -5524,9 +5541,13 @@ def _resolve_trade_posture(
                 str(user.get("_access_token") or ""),
                 league_id,
             )
-        except Exception:
+        except model_status.LOOKUP_ERRORS:
+            # Not "the user declared nothing": their declared Team Situation
+            # could not be read, so the posture below may ignore what they set.
+            logger.warning("declared team stance lookup failed (league=%s)", league_id, exc_info=True)
             declared_stance = ""
-    return trade_hub_engine.roster_posture(
+            stance_failed = True
+    posture = trade_hub_engine.roster_posture(
         league_id=league_id,
         roster=my_roster,
         lens=lens,
@@ -5535,6 +5556,12 @@ def _resolve_trade_posture(
         client_strategy=client_strategy,
         rankings_frame=rankings_frame,
     )
+    if stance_failed and posture.get("source") != "declared":
+        posture["degraded_reason"] = posture.get("degraded_reason") or "declared_stance_failed"
+        posture["model_status"] = model_status.merge(
+            posture.get("model_status"), model_status.from_codes(["declared_stance_failed"])
+        )
+    return posture
 
 
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
@@ -5626,9 +5653,11 @@ def post_trade_analyzer(
     valued = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
     pick_score_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, strategy)
 
-    # Keeper leagues: fold estimated keeper surplus into player values. Any
-    # missing cost data (or failure) silently keeps the normal value.
+    # Keeper leagues: fold estimated keeper surplus into player values. Missing
+    # cost data keeps the normal value; a *failed* read of the keeper inputs is
+    # logged and reported in the response's ``model_status``.
     keeper_adjusted = False
+    analyzer_status = model_status.ok()
     if settings.get("_keeper_mode"):
         try:
             current_picks, previous_picks = _keeper_draft_picks(league_id, league)
@@ -5648,8 +5677,10 @@ def post_trade_analyzer(
             if adjusted:
                 valued = keepers_module.apply_keeper_values(valued, score_field, adjusted)
                 keeper_adjusted = True
-        except Exception:
+        except (model_status.KeeperPricingUnavailable, *model_status.LOOKUP_ERRORS):
+            logger.warning("keeper values unavailable for trade analysis (league=%s)", league_id, exc_info=True)
             keeper_adjusted = False
+            model_status.add(analyzer_status, "keeper_settings_failed")
 
     my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
     # IDP leagues: defenders resolve as assets at their model value. Trust
@@ -5691,6 +5722,8 @@ def post_trade_analyzer(
         },
         score_field,
     )
+    for code in model_status.frame_codes(valued):
+        model_status.add(analyzer_status, code)
     my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
     if my_team_df.empty:
         return {"ok": True, "verdict": None, "reason": "empty_roster"}
@@ -5893,6 +5926,7 @@ def post_trade_analyzer(
     # can be sent today (modules.league_calendar).
     trade_window = league_calendar.trade_window(league)
     verdict_public = verdict.to_public_dict()
+    model_status.merge_into(analyzer_status, fit.get("model_status"))
     if counter_search_status:
         # Lets clients say "No better package found" instead of showing a
         # COUNTER verdict with nothing concrete beneath it.
@@ -5909,6 +5943,10 @@ def post_trade_analyzer(
         "verdict": verdict_public,
         "reason": "",
         "keeper_adjusted": keeper_adjusted,
+        # Which engine path produced this verdict. ``degraded`` is true when an
+        # input lookup or the lineup model failed and a fallback answered;
+        # clients show the reasons as a "limited data" note.
+        "model_status": analyzer_status,
         "trade_window": trade_window,
         # Read-only description of what this verdict assumed (format, lens,
         # posture, projections vs values, injury timing); see
@@ -5920,6 +5958,7 @@ def post_trade_analyzer(
             keeper_adjusted=keeper_adjusted,
             has_picks=bool(send_pick_assets or receive_pick_assets),
             lineup_model=verdict_public.get("lineup_model") if isinstance(verdict_public, dict) else None,
+            model_status=analyzer_status,
         ),
         "planning_note": " ".join(
             note
@@ -10749,7 +10788,7 @@ def get_league_dashboard(
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
                 posture=posture,
             )
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, model_status.KeeperPricingUnavailable):
             pass
 
     # Computed once and threaded into compose_next_move_briefing below (as
@@ -12069,7 +12108,7 @@ def get_gm_plan(
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
                 posture=posture,
             )
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, model_status.KeeperPricingUnavailable):
             trade_idea_records = []
 
     roster_settings = my_roster.get("settings") or {}
@@ -12882,36 +12921,46 @@ def _keeper_draft_picks(league_id: str, league: dict[str, Any]) -> tuple[list[di
 
 
 def _stored_keeper_round_penalty(config: dict, user_id: str, access_token: str, league_id: str) -> int:
-    """User-set keeper round penalty for a league (user_settings blob); 0 when unset or on any failure."""
+    """User-set keeper round penalty for a league (user_settings blob).
+
+    0 means "no penalty set" (no user, or nothing stored). A failed read raises
+    ``model_status.KeeperPricingUnavailable`` instead of returning 0: pricing a
+    keeper league with no penalty, and caching that under the "no penalty" key,
+    silently misprices every player and pick for everyone sharing that key."""
 
     if not user_id:
         return 0
     try:
         current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
-        if error:
-            return 0
-        stored = (current.get("settings") or {}).get("keeper_round_penalty_by_league") or {}
-        return keepers_module.clamp_round_penalty(stored.get(league_id))
-    except Exception:
-        return 0
+    except model_status.LOOKUP_ERRORS as exc:
+        logger.warning("keeper round penalty lookup failed (league=%s user=%s)", league_id, user_id, exc_info=True)
+        raise model_status.KeeperPricingUnavailable(league_id) from exc
+    if error:
+        logger.warning("keeper round penalty lookup returned an error (league=%s user=%s): %s", league_id, user_id, error)
+        raise model_status.KeeperPricingUnavailable(league_id)
+    stored = (current.get("settings") or {}).get("keeper_round_penalty_by_league") or {}
+    return keepers_module.clamp_round_penalty(stored.get(league_id))
 
 
 def _trade_idea_keeper_round_penalty(user: dict[str, Any], league_id: str) -> int:
     """The user's stored keeper round penalty for trade-idea pricing; 0 for
-    non-keeper leagues or on any failure (no extra storage read in that case)."""
+    non-keeper leagues (no extra storage read in that case). Raises
+    ``model_status.KeeperPricingUnavailable`` when a keeper league's penalty
+    cannot be read, rather than pricing (and caching) it as "no penalty"."""
 
     try:
         league = sleeper.get_league(league_id)
-        if not league or not league_value_settings.detect_league_value_settings_from_payload(league).get("_keeper_mode"):
-            return 0
-        return _stored_keeper_round_penalty(
-            auth_supabase.get_supabase_config(),
-            str(user.get("id") or ""),
-            str(user.get("_access_token") or ""),
-            league_id,
-        )
-    except Exception:
+    except model_status.LOOKUP_ERRORS as exc:
+        logger.warning("keeper mode check failed (league=%s)", league_id, exc_info=True)
+        raise model_status.KeeperPricingUnavailable(league_id) from exc
+    if not league or not league_value_settings.detect_league_value_settings_from_payload(league).get("_keeper_mode"):
         return 0
+    return _stored_keeper_round_penalty(
+        auth_supabase.get_supabase_config(),
+        str(user.get("id") or ""),
+        str(user.get("_access_token") or ""),
+        league_id,
+    )
 
 
 class KeeperSettingsRequest(BaseModel):
@@ -15867,6 +15916,7 @@ def get_league_all_trades(
         remaining_free = max(0, free_cap - free_tier_ledger.pool_size(user_id))
 
     ideas: list[dict[str, Any]] = []
+    skipped_teams: list[str] = []
     for roster_id in page_roster_ids:
         if not is_premium and remaining_free <= 0:
             break
@@ -15896,7 +15946,15 @@ def get_league_all_trades(
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
                 posture=roster_posture,
             )
-        except Exception:
+        except (model_status.KeeperPricingUnavailable, *model_status.LOOKUP_ERRORS):
+            # An expected data/lookup failure for ONE team: keep the rest of
+            # the board, but log with context and report the gap so a
+            # regression cannot quietly shrink the board. Other exceptions are
+            # bugs and propagate to the unhandled-exception logger.
+            logger.warning(
+                "all-trades board skipped a team (league=%s roster=%s)", league_id, roster_id, exc_info=True
+            )
+            skipped_teams.append(str(roster_id))
             continue
         ranked_records = trade_hub_presentation.order_trade_hub_visible_ideas(list(records))
         # Cap per-team so one roster's board can't eat a whole page —
@@ -15933,6 +15991,8 @@ def get_league_all_trades(
         "has_more": next_cursor < total_teams and (is_premium or remaining_free > 0 or ad_unlocks_applied < MAX_AD_UNLOCKS),
         "next_cursor": next_cursor,
         "total_teams": total_teams,
+        "skipped_teams": skipped_teams,
+        "model_status": model_status.from_codes(["teams_skipped"] if skipped_teams else []),
         "entitlement": {
             "is_premium": is_premium,
             "free_limit": trade_hub_presentation.FREE_VISIBLE_IDEAS,

@@ -458,11 +458,29 @@ def test_public_schema_is_additive_for_old_app_builds():
     json.dumps(public, default=str)  # serializable
 
 
-def test_model_failure_falls_back_to_the_legacy_pricing(monkeypatch):
+def test_model_failure_falls_back_to_the_legacy_pricing_and_says_so(monkeypatch):
     def boom(*a, **k):
-        raise RuntimeError("model unavailable")
+        raise ValueError("model input unusable")
 
     monkeypatch.setattr(model, "evaluate_trade", boom)
     fit, verdict = _evaluate(_thin_roster(), ["Jones"], [], receive_assets=[_pick(4800)])
     assert fit["lineup_model"] is None and fit["trade_score"] == fit["value_delta"]
     assert verdict.lineup_model is None
+    # The fallback is reported, never silent.
+    assert fit["model_status"]["degraded"] is True
+    assert [r["code"] for r in fit["model_status"]["reasons"]] == ["lineup_model_failed"]
+
+
+def test_non_data_errors_in_the_model_are_bugs_and_propagate(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("a real bug")
+
+    monkeypatch.setattr(model, "evaluate_trade", boom)
+    with pytest.raises(RuntimeError):
+        _evaluate(_thin_roster(), ["Jones"], [], receive_assets=[_pick(4800)])
+
+
+def test_a_healthy_in_season_run_is_not_marked_degraded():
+    fit, _ = _evaluate(_thin_roster(), ["Jones"], [], receive_assets=[_pick(4800)])
+    assert fit["lineup_model"] is not None
+    assert fit["model_status"] == {"degraded": False, "reasons": []}
