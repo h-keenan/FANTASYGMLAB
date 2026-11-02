@@ -26,6 +26,7 @@ import TradeIdeaCard, { impactTagConfig, type ImpactTagKey } from '../components
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
+import ValueSignalsCard from '../components/ValueSignalsCard';
 import ValuesCredit from '../components/ValuesCredit';
 import {
   type AllTradesEntitlement,
@@ -413,6 +414,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               onUpgrade={() => navigation.navigate('Paywall')}
             />
           )}
+          <ValueSignalsCard leagueId={leagueId} leagueName={leagueName} />
           <ValuesCredit />
         </>
       }

@@ -9,6 +9,7 @@ import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
+import { PlayerValueHistory } from "@/components/PlayerValueHistory";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { PercentileExplorerSheet } from "@/components/PercentileExplorerSheet";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -340,6 +341,8 @@ export function PlayerQuickView({
                   model_radar_chart_html — the flat chip row stays the
                   fallback for a player without a full read on every
                   factor, same split the Python source makes. */}
+              <PlayerValueHistory playerId={identity.player_id} />
+
               {model ? <SubRatingRow model={model} /> : null}
             </>
           )}

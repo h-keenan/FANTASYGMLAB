@@ -374,3 +374,96 @@ def run_player_rating_snapshot_sweep(*, environ: dict | None = None, secrets: An
     stats["errors"].extend(store_stats.get("errors", []))
     stats["ok"] = bool(store_stats.get("ok", False))
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Authenticated read side (in-app value history chart and buy-low / sell-high).
+# Same table, same service-role access and fail-soft contract as
+# `fetch_rating_history`; nothing here ever writes or invents a snapshot.
+# ---------------------------------------------------------------------------
+
+_PAGE_SIZE = 1000
+
+
+def _get_rows(config: RatingSnapshotConfig, params: Mapping[str, str]) -> list[dict[str, Any]] | None:
+    """One PostgREST read; None on any I/O/shape problem (caller degrades)."""
+
+    if not config.configured:
+        return None
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{RATING_SNAPSHOTS_TABLE}",
+            headers=_headers(config),
+            params=dict(params),
+            timeout=15,
+        )
+    except Exception:
+        return None
+    if response.status_code >= 400:
+        return None
+    try:
+        rows = response.json()
+    except Exception:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [row for row in rows if isinstance(row, Mapping)]
+
+
+def fetch_snapshot_date_bounds(config: RatingSnapshotConfig) -> tuple[str, str] | None:
+    """(earliest, latest) snapshot_date present in the table, or None."""
+
+    newest = _get_rows(config, {"select": "snapshot_date", "order": "snapshot_date.desc", "limit": "1"})
+    oldest = _get_rows(config, {"select": "snapshot_date", "order": "snapshot_date.asc", "limit": "1"})
+    if not newest or not oldest:
+        return None
+    latest = _safe_text(newest[0].get("snapshot_date"))
+    earliest = _safe_text(oldest[0].get("snapshot_date"))
+    return (earliest, latest) if earliest and latest else None
+
+
+def fetch_baseline_date(config: RatingSnapshotConfig, *, not_after: str, not_before: str) -> str | None:
+    """The earliest snapshot date inside [not_before, not_after], or None."""
+
+    rows = _get_rows(
+        config,
+        {
+            "select": "snapshot_date",
+            "snapshot_date": f"lte.{not_after}",
+            "and": f"(snapshot_date.gte.{not_before})",
+            "order": "snapshot_date.asc",
+            "limit": "1",
+        },
+    )
+    if not rows:
+        return None
+    return _safe_text(rows[0].get("snapshot_date")) or None
+
+
+def fetch_snapshot_day(config: RatingSnapshotConfig, snapshot_date: str) -> dict[str, int] | None:
+    """player_id -> overall_rating for one stored day (paged), or None when
+    the read fails part-way (a partial day would skew every delta)."""
+
+    out: dict[str, int] = {}
+    offset = 0
+    while True:
+        rows = _get_rows(
+            config,
+            {
+                "select": "player_id,overall_rating",
+                "snapshot_date": f"eq.{snapshot_date}",
+                "order": "player_id.asc",
+                "limit": str(_PAGE_SIZE),
+                "offset": str(offset),
+            },
+        )
+        if rows is None:
+            return None
+        for row in rows:
+            rating = _safe_int_rating(row.get("overall_rating"))
+            pid = _safe_text(row.get("player_id"))
+            if pid and rating is not None:
+                out[pid] = rating
+        if len(rows) < _PAGE_SIZE:
+            return out
+        offset += _PAGE_SIZE

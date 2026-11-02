@@ -13,6 +13,7 @@ import { DeadlineCard } from "@/components/DeadlineCard";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
+import { ValueSignalsCard } from "@/components/ValueSignalsCard";
 import { ValuesCredit } from "@/components/ValuesCredit";
 
 /**
@@ -178,6 +179,7 @@ export function TradeHubContent({
           </ButtonLink>
         </div>
       ) : null}
+      <ValueSignalsCard leagueId={leagueId} />
       <ValuesCredit />
     </main>
   );
