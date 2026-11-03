@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { limitedDataNote, lineupEffectText, needsHeadline, ordinal, teamNeedStat, valueEffectText } from './dropsPresentation.ts';
+import { limitedDataNote, lineupEffectText, needsHeadline, ordinal, overflowHeadline, teamNeedStat, valueEffectText } from './dropsPresentation.ts';
 
 const effect = { lineup_points_ros: -3.4, lineup_points_per_week: -0.4, this_week: 0, value_delta: -412, score: -500, weeks: 9 };
 
@@ -26,5 +26,12 @@ describe('dropsPresentation', () => {
   it('builds the limited-data note from model_status', () => {
     assert.equal(limitedDataNote({ degraded: false, reasons: [] }), null);
     assert.equal(limitedDataNote({ degraded: true, reasons: [{ code: 'x', message: 'Lookup failed.' }] }), 'Limited data: Lookup failed.');
+  });
+
+  it('words the roster-full cuts honestly', () => {
+    const base = { need: 2, drops: [{ name: 'A' }, { name: 'B' }], satisfied: true, effect: null, roster: {}, active_after: 24, active_limit: 22 };
+    assert.equal(overflowHeadline(base as never), "This trade puts you over the roster limit: you'd have to drop 2 players: A, B.");
+    assert.match(overflowHeadline({ ...base, satisfied: false } as never), /not enough safe cuts/);
+    assert.match(overflowHeadline({ ...base, unavailable: 'x' } as never), /could not be named safely/);
   });
 });

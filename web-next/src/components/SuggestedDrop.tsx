@@ -1,10 +1,11 @@
 import { useState } from "react";
-import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel } from "@/lib/api";
+import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel, RosterOverflow } from "@/lib/api";
 import { InfoTip } from "@/components/InfoTip";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
   dropActionLabel,
+  overflowHeadline,
   lineupEffectText,
   needTierLabel,
   upgradeText,
@@ -230,5 +231,39 @@ export function NeedsBreakdown({ needs }: { needs: NeedsModel }) {
         </span>
       </div>
     </InfoTip>
+  );
+}
+
+/** "Roster full: you'd have to drop N" for a trade that overfills the roster (Analyzer verdict and Hub/Finder cards). */
+export function RosterOverflowNote({ overflow, compact = false }: { overflow: RosterOverflow; compact?: boolean }) {
+  const effect = overflow.effect ? [lineupEffectText(overflow.effect), valueEffectText(overflow.effect)].filter(Boolean).join(" · ") : "";
+  return (
+    <div
+      className="flex flex-col gap-1.5 p-3"
+      data-testid="roster-overflow"
+      style={{ border: "var(--border-width-default) solid var(--color-warning)" }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-extrabold uppercase" style={{ color: "var(--color-warning)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          Roster full
+        </span>
+        <ToneBadge label={`${overflow.active_after}/${overflow.active_limit}`} color="var(--color-warning)" />
+      </div>
+      <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+        {overflowHeadline(overflow)}
+      </p>
+      {overflow.unavailable ? null : (
+        <>
+          {overflow.drops.map((drop) => (
+            <DropPlayerLine key={drop.player_id} player={drop} maxReasons={compact ? 1 : 2} />
+          ))}
+          {effect ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Cost of the cuts, already in this result: {effect}
+            </span>
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }

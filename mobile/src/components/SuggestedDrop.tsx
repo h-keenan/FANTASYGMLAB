@@ -4,9 +4,10 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import ScreenInfoNote from './ScreenInfoNote';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel } from '../lib/api';
+import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel, RosterOverflow } from '../lib/api';
 import {
   dropActionLabel,
+  overflowHeadline,
   lineupEffectText,
   needTierLabel,
   upgradeText,
@@ -173,6 +174,28 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
         label="How drops are chosen"
         text="Lowest cost to your team first: players who never start, cost your lineup nothing if cut and have little value. Never suggested: starters, high-value assets, depth you need for byes and injuries, young upside for your team direction, hot players, and anyone you marked untouchable."
       />
+    </View>
+  );
+}
+
+/** "Roster full: you'd have to drop N" for a trade that overfills the roster (Analyzer verdict and Hub/Finder cards). */
+export function RosterOverflowNote({ overflow, compact = false }: { overflow: RosterOverflow; compact?: boolean }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const effect = overflow.effect ? [lineupEffectText(overflow.effect), valueEffectText(overflow.effect)].filter(Boolean).join(' · ') : '';
+  return (
+    <View style={[styles.box, { borderColor: colors.warning }]} testID="roster-overflow">
+      <View style={styles.headRow}>
+        <AppText style={[styles.kicker, { color: colors.warning }]}>ROSTER FULL</AppText>
+        <View style={[styles.badge, { borderColor: `${colors.warning}70`, backgroundColor: `${colors.warning}1A` }]}>
+          <AppText style={[styles.badgeText, { color: colors.warning }]}>{`${overflow.active_after}/${overflow.active_limit}`}</AppText>
+        </View>
+      </View>
+      <AppText style={styles.headline}>{overflowHeadline(overflow)}</AppText>
+      {overflow.unavailable
+        ? null
+        : overflow.drops.map((drop) => <DropPlayerLine key={drop.player_id} player={drop} maxReasons={compact ? 1 : 2} />)}
+      {!overflow.unavailable && effect ? <AppText style={styles.effect}>{`Cost of the cuts, already in this result: ${effect}`}</AppText> : null}
     </View>
   );
 }

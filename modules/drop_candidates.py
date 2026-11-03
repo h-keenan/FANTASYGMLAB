@@ -29,7 +29,7 @@ Pure: frames and mappings in, plain dicts out. Degraded inputs are reported by
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
@@ -122,7 +122,9 @@ def protection_reason(
     return None
 
 
-def _depth_ok(rvc: rvm.RosterValueContext, player_id: str, add_positions: Sequence[str]) -> tuple[bool, str]:
+def _depth_ok(
+    rvc: rvm.RosterValueContext, player_id: str, add_positions: Sequence[str], dropped: Sequence[str] = ()
+) -> tuple[bool, str]:
     """Would dropping him (and adding ``add_positions``) leave the position with
     its starters plus one bye/injury cover?"""
 
@@ -134,6 +136,7 @@ def _depth_ok(rvc: rvm.RosterValueContext, player_id: str, add_positions: Sequen
     healthy = [
         p for p in rvc.active_profiles()
         if p.position == pos and not p.out_all and (p.absence is None or p.absence.weeks < 3)
+        and p.player_id not in set(dropped)
     ]
     count = len(healthy) - (1 if profile in healthy else 0) + sum(1 for p in add_positions if p == pos)
     if count < required:
@@ -213,6 +216,7 @@ def candidate_pool(
     usage: Mapping[str, Mapping[str, Any]],
     add_positions: Sequence[str] = (),
     exclude: set[str] = frozenset(),
+    dropped: Sequence[str] = (),
 ) -> tuple[list[str], list[dict[str, Any]]]:
     """(droppable player ids, protected players with their reason).
 
@@ -225,7 +229,7 @@ def candidate_pool(
             continue
         reason = protection_reason(rvc, pid, untouchable=untouchable, usage=usage)
         if reason is None:
-            ok, why = _depth_ok(rvc, pid, add_positions)
+            ok, why = _depth_ok(rvc, pid, add_positions, dropped)
             if not ok:
                 reason = ("depth_floor", why)
         if reason is not None:
@@ -437,40 +441,51 @@ def drops_for_overflow(
     rvc: rvm.RosterValueContext,
     *,
     need: int,
-    incoming_rows: Sequence[Mapping[str, Any]],
+    protect_ids: set[str],
     untouchable: set[str],
     usage: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """Choose ``need`` players to cut to make room for incoming players
-    (a roster-overfilling trade), one at a time, each judged on the roster
-    that remains after the previous cut."""
+    """Choose ``need`` players to cut to make room (a roster-overfilling
+    trade), one at a time, each judged on the roster that remains after the
+    previous cut. ``rvc`` describes the roster AFTER the trade; ``protect_ids``
+    are the players the trade brings in (never the ones to cut)."""
 
     chosen: list[dict[str, Any]] = []
     dropped: list[str] = []
-    add_positions = [rvm._text(r.get("position")).upper() for r in incoming_rows]
+    prior: dict[str, Any] = {}
     for _ in range(max(0, need)):
-        ids, protected = candidate_pool(
-            rvc, untouchable=untouchable, usage=usage, add_positions=add_positions, exclude=set(dropped)
+        ids, _protected = candidate_pool(
+            rvc, untouchable=untouchable, usage=usage, exclude=set(dropped) | set(protect_ids),
+            dropped=dropped,
         )
         if not ids:
             break
         best_id, best = None, None
         for pid in sorted(ids, key=lambda p: (rvc.healthy_value.get(p, 0.0), p))[: CANDIDATES_PER_ADD * 2]:
-            res = rvm.evaluate_swap(rvc, [*dropped, pid], incoming_rows)
+            res = rvm.evaluate_swap(rvc, [*dropped, pid], ())
             if best is None or res["trade_score"] > best["trade_score"]:
                 best_id, best = pid, res
         stand = _score(rvc, best_id)
-        item = {
+        cumulative = _effect(best)
+        # Each cut shows its OWN cost (the step from the previous cumulative
+        # effect); the plan's ``effect`` below is the total.
+        marginal = {
+            key: round(cumulative[key] - prior.get(key, 0), 1) if isinstance(cumulative[key], float) else cumulative[key] - prior.get(key, 0)
+            for key in ("lineup_points_ros", "lineup_points_per_week", "this_week", "value_delta", "score")
+        }
+        marginal["weeks"] = cumulative["weeks"]
+        chosen.append({
             **_facts(rvc, best_id, usage),
             "reasons": _reasons(rvc, best_id, stand, usage, False),
-            "effect": _effect(best),
-        }
-        chosen.append(item)
+            "effect": marginal,
+        })
+        prior = cumulative
         dropped.append(best_id)
-    final = rvm.evaluate_swap(rvc, dropped, incoming_rows) if dropped else None
+    final = rvm.evaluate_swap(rvc, dropped, ()) if dropped else None
     return {
         "need": need,
         "drops": chosen,
+        "dropped_ids": dropped,
         "satisfied": len(chosen) >= need,
         "effect": _effect(final) if final else None,
     }
@@ -500,3 +515,111 @@ def build_drop_board(
         rvc, untouchable=untouchable, usage=usage, limit=standalone_cap, named=named
     )
     return suggestions, droppable
+
+
+def plan_trade_overflow(
+    *,
+    my_team_df: pd.DataFrame,
+    all_players_df: pd.DataFrame,
+    waiver_df: pd.DataFrame | None,
+    my_roster: Mapping[str, Any],
+    league: Mapping[str, Any],
+    settings: Mapping[str, Any],
+    score_field: str,
+    strategy: str,
+    window: Any,
+    league_rostered_values: Sequence[float],
+    send_player_ids: Sequence[str],
+    receive_player_ids: Sequence[str],
+    untouchable_provider: Callable[[], set[str] | None],
+    usage_provider: Callable[[rvm.RosterValueContext], Mapping[str, Mapping[str, Any]]],
+    status: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Would this trade overfill the roster, and who would have to go?
+
+    ``None`` when the roster limit is unknown or the trade fits. Otherwise the
+    drops (same engine as Waivers), their net effect, and ``forced_assets``
+    (internal: the fit prices the cuts as part of the trade). Incoming players
+    who are IR-eligible use open IR slots first."""
+
+    limits = rvm.roster_limits(league, my_roster)
+    if limits.active_limit is None:
+        return None
+    send = {str(p) for p in send_player_ids}
+    mine = {str(p) for p in (my_roster.get("players") or [])}
+    incoming_ids = [str(p) for p in receive_player_ids if str(p) not in mine]
+    if not incoming_ids and not send:
+        return None
+    frame = all_players_df[all_players_df["player_id"].astype(str).isin(set(incoming_ids))]
+    incoming_rows = frame_records(frame)
+    ir_room = limits.open_ir_slots + sum(1 for pid in limits.ir_ids if pid in send)
+    ir_placed = []
+    for row in incoming_rows:
+        if len(ir_placed) < ir_room and rvm.ir_eligible(row.get("status"), row.get("injury_status"), league) and rvm.is_ruled_out(
+            row.get("status"), row.get("injury_status")
+        ):
+            ir_placed.append(str(row["player_id"]))
+    sent_active = [pid for pid in limits.active_ids if pid in send]
+    active_after = limits.active_count - len(sent_active) + len(incoming_ids) - len(ir_placed)
+    need = active_after - limits.active_limit
+    if need <= 0:
+        return None
+    post_ids = [pid for pid in (my_roster.get("players") or []) if str(pid) not in send] + incoming_ids
+    post_roster = {
+        "players": post_ids,
+        "reserve": [p for p in (my_roster.get("reserve") or []) if str(p) not in send] + ir_placed,
+        "taxi": [p for p in (my_roster.get("taxi") or []) if str(p) not in send],
+    }
+    keep = my_team_df[~my_team_df["player_id"].astype(str).isin(send)]
+    post_df = pd.concat([keep, frame], ignore_index=True)
+    rvc_post = rvm.build_context(
+        roster_df=post_df,
+        all_players_df=all_players_df,
+        pool=waiver_df,
+        my_roster=post_roster,
+        league=league,
+        settings=settings,
+        score_field=score_field,
+        strategy=strategy,
+        window=window,
+        league_rostered_values=league_rostered_values,
+        status=status,
+    )
+    # The untouchable list is read only now that a cut is actually needed. When
+    # it cannot be read no player is named (it could be one the user protected):
+    # the plan says so and the caller reports the marker.
+    untouchable = untouchable_provider()
+    if untouchable is None:
+        return {
+            "need": need, "drops": [], "dropped_ids": [], "satisfied": False, "effect": None,
+            "unavailable": "untouchable_lookup_failed", "roster": limits.to_public(),
+            "incoming_to_ir": ir_placed, "active_after": active_after, "active_limit": limits.active_limit,
+            "forced_assets": [],
+        }
+    plan = drops_for_overflow(
+        rvc_post, need=need, protect_ids=set(incoming_ids), untouchable=untouchable,
+        usage=usage_provider(rvc_post),
+    )
+    from modules.trade_analyzer_assembly import player_asset_from_mapping
+
+    rows = {str(r["player_id"]): r for r in frame_records(post_df)}
+    forced = [
+        {**player_asset_from_mapping(rows[pid], score_field=score_field), "forced_drop": True}
+        for pid in plan["dropped_ids"] if pid in rows
+    ]
+    return {
+        **plan,
+        "roster": limits.to_public(),
+        "incoming_to_ir": ir_placed,
+        "active_after": active_after,
+        "active_limit": limits.active_limit,
+        "forced_assets": forced,
+    }
+
+
+def public_overflow(plan: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The overflow plan without internal assets, for payloads."""
+
+    if not plan:
+        return None
+    return {k: v for k, v in plan.items() if k not in {"forced_assets", "dropped_ids"}}

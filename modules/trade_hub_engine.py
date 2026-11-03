@@ -338,6 +338,9 @@ class TradeIdeaCard:
     posture_note: str = ""
     posture_alignment: str = ""
     lineup_points: float | None = None
+    # Roster-full check (modules.drop_candidates): set only when the trade would
+    # overfill the roster; the idea's numbers already include the forced cuts.
+    roster_overflow: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -360,6 +363,7 @@ class TradeIdeaCard:
             "posture_note": self.posture_note,
             "posture_alignment": self.posture_alignment,
             "lineup_points": self.lineup_points,
+            "roster_overflow": self.roster_overflow,
         }
 
 
@@ -402,6 +406,7 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         posture_note=_safe_text(idea.get("posture_note")),
         posture_alignment=_safe_text(idea.get("posture_alignment")),
         lineup_points=idea.get("posture_lineup_points"),
+        roster_overflow=dict(idea["roster_overflow"]) if isinstance(idea.get("roster_overflow"), Mapping) else None,
     )
 
 

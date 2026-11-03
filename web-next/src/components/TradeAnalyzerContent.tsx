@@ -1,6 +1,8 @@
 import { bridgeNotice, resolveBridgeTrade, type BridgeTrade } from "@/lib/tradeBridge";
 import { VerdictTrust } from "@/components/VerdictTrust";
 import type { VerdictAssumptions } from "@/lib/verdictTrust";
+import type { RosterOverflow } from "@/lib/api";
+import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { LimitWall } from "@/components/LimitWall";
@@ -670,6 +672,7 @@ export function TradeAnalyzerContent({
   // stays open for offseason planning, this note just says so.
   const [planningNote, setPlanningNote] = useState("");
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
+  const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
 
   const selectedPlayerIds = useMemo(
     () => new Set([...sendPlayers, ...receivePlayers].map((p) => p.player_id)),
@@ -824,6 +827,7 @@ export function TradeAnalyzerContent({
       });
       setPlanningNote(result.planning_note ?? "");
       setAssumptions(result.assumptions ?? null);
+      setRosterOverflow(result.roster_overflow ?? null);
       trackUse("trade_analyzer", "evaluated", { leagueId, props: { result: result.verdict ? "verdict" : "no_verdict" } });
       if (result.verdict) {
         setVerdict(result.verdict);
@@ -976,6 +980,7 @@ export function TradeAnalyzerContent({
             myAvatarUrl: teamProfiles[myRosterId]?.avatar_url ?? null,
           }}
         />
+        {rosterOverflow ? <RosterOverflowNote overflow={rosterOverflow} /> : null}
         <VerdictTrust
           assumptions={assumptions}
           context={{

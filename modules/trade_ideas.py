@@ -9,9 +9,12 @@ from math import exp
 from types import MappingProxyType
 from hashlib import sha256
 import json
+import logging
 import time
 
 from modules.platforms.sleeper import get_sleeper_adapter
+
+logger = logging.getLogger(__name__)
 from modules.league_format_context import (
     future_picks_are_trade_capital,
     pick_is_actionable_capital,
@@ -47,7 +50,7 @@ from modules.player_state_authority import (
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import model_status, runtime_trace
-from modules import trade_grade, trade_posture
+from modules import drop_candidates, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
 BASE_PICK_VALUES = {
@@ -4077,6 +4080,85 @@ def _hub_waiver_pool(df_players: pd.DataFrame, roster_players_map: Mapping[Any, 
         return None
 
 
+def _hub_overflow_inputs(
+    *,
+    league_settings: Mapping[str, Any] | None,
+    rosters: Sequence[Mapping[str, Any]] | None,
+    roster_players_map: Mapping[Any, Any],
+    my_roster_id: Any,
+    untouchable_names: Sequence[str],
+    df_players: pd.DataFrame,
+    league_id: Any = "",
+    platform: str = "",
+) -> Dict[str, Any] | None:
+    """Roster-limit inputs for the Hub/Finder roster-full check, or None when the
+    limit or the user's IR/taxi lists are unknown (then nothing is claimed).
+
+    The limit is the league's starters + bench (``league_settings``); IR and
+    taxi players do not count against it and come from the raw Sleeper roster.
+    """
+
+    settings = dict(league_settings or {})
+    limit = int(settings.get("starter_count") or 0) + int(settings.get("bench_count") or 0)
+    mine = next((r for r in (rosters or ()) if str(r.get("roster_id")) == str(my_roster_id)), None)
+    if not mine or not ("reserve" in mine or "taxi" in mine):
+        # The Hub's roster maps carry player ids only. IR and taxi players do not
+        # count against the limit, so without them the count would be wrong:
+        # read the real Sleeper roster (cached) or claim nothing.
+        if str(platform or "").lower() != "sleeper" or not league_id:
+            return None
+        from modules import sleeper
+
+        raw = sleeper.get_rosters(str(league_id)) or []
+        mine = next((r for r in raw if str(r.get("roster_id")) == str(my_roster_id)), None)
+    if limit <= 0 or not mine or not ("reserve" in mine or "taxi" in mine):
+        return None
+    league = {
+        "roster_positions": ["SLOT"] * limit,
+        "settings": {
+            "reserve_slots": int(settings.get("ir_count") or 0),
+            "taxi_slots": int(settings.get("taxi_count") or 0),
+        },
+    }
+    names = {str(n or "").strip().casefold() for n in untouchable_names or () if str(n or "").strip()}
+    untouchable_ids = set()
+    if names and "name" in df_players.columns:
+        mine_ids = {str(p) for p in (mine.get("players") or [])}
+        for _, row in df_players[df_players["player_id"].astype(str).isin(mine_ids)].iterrows():
+            if str(row.get("name") or "").strip().casefold() in names:
+                untouchable_ids.add(str(row["player_id"]))
+    rostered = {str(pid) for players in roster_players_map.values() for pid in players}
+
+    def rostered_values(frame: pd.DataFrame, score_field: str) -> list[float]:
+        sub = frame[frame["player_id"].astype(str).isin(rostered)]
+        return pd.to_numeric(sub[score_field], errors="coerce").dropna().tolist()
+
+    def usage_provider(rvc) -> Dict[str, Dict[str, Any]]:
+        from modules import sleeper, usage_trends
+
+        try:
+            stats = sleeper.get_season_player_stats(season=sleeper.default_player_stats_season(), retain_weekly=True)
+        except model_status.LOOKUP_ERRORS:
+            logger.warning("usage trends unavailable for the Hub roster-full check", exc_info=True)
+            return {}
+        guard: Dict[str, Dict[str, Any]] = {}
+        for pid in rvc.limits.active_ids:
+            profile = rvc.profiles.get(pid)
+            if profile is not None and profile.position in usage_trends.COVERED_POSITIONS:
+                guard[pid] = drop_candidates.usage_guard(
+                    usage_trends.profile_from_season_stats(pid, profile.position, stats)
+                )
+        return guard
+
+    return {
+        "league": league,
+        "my_roster": dict(mine),
+        "untouchable_ids": untouchable_ids,
+        "rostered_values": rostered_values,
+        "usage_provider": usage_provider,
+    }
+
+
 class _UserSideAnalyzerGate:
     """Trade Analyzer verdict for a Hub idea, from the user's side, cached per idea.
 
@@ -4088,7 +4170,12 @@ class _UserSideAnalyzerGate:
     silently dropped, matching the Analyzer returning no verdict.
     """
 
-    def __init__(self, *, my_team_df, all_players_df, strategy, league_settings, score_field, waiver_df=None):
+    def __init__(
+        self, *, my_team_df, all_players_df, strategy, league_settings, score_field, waiver_df=None, overflow=None
+    ):
+        # ``overflow``: roster-limit inputs for the roster-full check (see
+        # ``_hub_overflow_inputs``); None when the roster limit is unknown.
+        self._overflow = overflow
         self._waiver_df = waiver_df
         self._my_team_df = my_team_df
         self._all_players_df = all_players_df
@@ -4097,6 +4184,25 @@ class _UserSideAnalyzerGate:
         self._score_field = score_field
         self._results: Dict[int, bool] = {}
         self._current_context: Dict[str, Any] | None = None
+
+    def _overflow_plan(self, send_assets, receive_assets):
+        spec = self._overflow
+        return drop_candidates.plan_trade_overflow(
+            my_team_df=self._my_team_df,
+            all_players_df=self._all_players_df,
+            waiver_df=self._waiver_df,
+            my_roster=spec["my_roster"],
+            league=spec["league"],
+            settings=self._league_settings,
+            score_field=self._score_field,
+            strategy=self._strategy,
+            window=trade_grade.season_window(self._league_settings),
+            league_rostered_values=spec["rostered_values"](self._all_players_df, self._score_field),
+            send_player_ids=[a.get("player_id") for a in send_assets if a.get("asset_type") == "player"],
+            receive_player_ids=[a.get("player_id") for a in receive_assets if a.get("asset_type") == "player"],
+            untouchable_provider=lambda: spec["untouchable_ids"],
+            usage_provider=spec["usage_provider"],
+        )
 
     def passes(self, idea: Dict[str, Any]) -> bool:
         key = id(idea)
@@ -4111,16 +4217,37 @@ class _UserSideAnalyzerGate:
             self._current_context = prepare_current_roster_context(
                 self._my_team_df, None, self._strategy, self._league_settings, self._score_field
             ) or {}
+        send_assets = list(idea.get("send_assets") or [])
+        receive_assets = list(idea.get("receive_assets") or [])
+        plan = None
+        if self._overflow is not None:
+            try:
+                plan = self._overflow_plan(send_assets, receive_assets)
+            except model_status.DATA_ERRORS:
+                # An idea whose roster-full check failed cannot be shown as
+                # executable: refuse it (the failure is logged) instead of
+                # presenting it as if the roster had room.
+                logger.warning("roster-full check failed for a Hub idea; refusing it", exc_info=True)
+                self._results[key] = False
+                return False
+            if plan is not None:
+                idea["roster_overflow"] = drop_candidates.public_overflow(plan)
+                if plan.get("unavailable") or not plan.get("satisfied"):
+                    # Either no one can be cut without breaking the roster or the
+                    # cuts cannot be named safely: not an executable idea.
+                    self._results[key] = False
+                    return False
         fit, verdict = trade_grade.grade_trade_for_user(
             my_team_df=self._my_team_df,
             all_players_df=self._all_players_df,
-            send_assets=list(idea.get("send_assets") or []),
-            receive_assets=list(idea.get("receive_assets") or []),
+            send_assets=send_assets,
+            receive_assets=receive_assets,
             strategy=self._strategy,
             lineup_settings=self._league_settings,
             score_field=self._score_field,
             current_context=self._current_context or None,
             waiver_df=self._waiver_df,
+            forced_drop_assets=(plan or {}).get("forced_assets") or None,
         )
         if verdict is None:
             self._results[key] = True
@@ -5101,6 +5228,16 @@ def _build_trade_ideas_impl(
         league_settings=league_settings,
         score_field=score_field,
         waiver_df=gate_pool,
+        overflow=_hub_overflow_inputs(
+            league_settings=league_settings,
+            rosters=rosters,
+            roster_players_map=roster_players_map,
+            my_roster_id=my_roster_id,
+            untouchable_names=untouchable_names,
+            df_players=df_players,
+            league_id=league_id,
+            platform=str(getattr(platform_adapter, "platform", "") or ""),
+        ),
     )
     selected: List[Dict[str, Any]] = []
     analyzer_rejected: List[Dict[str, Any]] = []

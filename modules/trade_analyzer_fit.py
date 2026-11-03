@@ -480,8 +480,13 @@ def evaluate_trade_analyzer_fit(
     current_context: dict | None = None,
     waiver_df: pd.DataFrame | None = None,
     posture: dict | None = None,
+    forced_drop_assets: list[dict] | None = None,
 ) -> dict | None:
-    """``posture``: the team's resolved posture (``trade_posture.resolve_posture``);
+    """``forced_drop_assets``: players the user would have to cut to fit the
+    roster limit after this trade (modules.drop_candidates.plan_trade_overflow).
+    They are priced as part of the trade (lineup points and value), so the
+    verdict is the trade AS IT HAPPENS, not the trade on an unlimited roster.
+    ``posture``: the team's resolved posture (``trade_posture.resolve_posture``);
     defaults to the one implied by ``strategy`` alone. ``waiver_df``: the league's real free-agent pool (unrostered, valued
     like ``all_players_df``). Optional; without it the lineup model fills
     holes at the market replacement level and says so."""
@@ -490,6 +495,8 @@ def evaluate_trade_analyzer_fit(
         return None
     if not send_assets and not receive_assets:
         return None
+    if forced_drop_assets:
+        send_assets = [*send_assets, *forced_drop_assets]
 
     # `current_context` lets a caller grading many packages for one roster
     # (Trade Hub's Analyzer gate) compute the before-trade half once. It is

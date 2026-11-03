@@ -1414,6 +1414,23 @@ export interface NeedsModel {
   model_status: ModelStatus;
 }
 
+/** Roster-full check (modules.drop_candidates.plan_trade_overflow): set only when a
+ * trade would leave the roster over the league's limit. The verdict/idea numbers
+ * already include these cuts. */
+export interface RosterOverflow {
+  need: number;
+  drops: DropPlayer[];
+  satisfied: boolean;
+  /** Net effect of the cuts alone (lineup points and value). */
+  effect: DropEffect | null;
+  roster: RosterState;
+  incoming_to_ir?: string[];
+  active_after: number;
+  active_limit: number;
+  /** Set when no player could be named safely (e.g. untouchables unreadable). */
+  unavailable?: string;
+}
+
 export interface WaiversResponse {
   ok: true;
   players: WaiverPlayer[];
@@ -1892,6 +1909,8 @@ export interface TradeAnalyzerResponse {
   trade_window?: TradeWindow;
   /** What this verdict assumed (format, lens, posture, basis, injury timing). */
   assumptions?: VerdictAssumptions;
+  /** Set when the trade would overfill the roster; the verdict already includes the cuts. */
+  roster_overflow?: RosterOverflow | null;
 }
 
 export interface DraftPickAsset {
@@ -3063,6 +3082,8 @@ export interface TradePackage {
 }
 
 export interface TradeIdea {
+  /** Set when the idea would overfill the roster; its numbers already include the cuts. */
+  roster_overflow?: RosterOverflow | null;
   partner_team_name: string;
   partner_team_avatar_url: string | null;
   /** Real untruncated per-side value totals (same fields web reads). */

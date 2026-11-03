@@ -41,6 +41,8 @@ import TradeOddsEffect from '../components/TradeOddsEffect';
 import TradeValueBar from '../components/TradeValueBar';
 import VerdictTrust from '../components/VerdictTrust';
 import type { VerdictAssumptions } from '../lib/verdictTrust';
+import type { RosterOverflow } from '../lib/api';
+import { RosterOverflowNote } from '../components/SuggestedDrop';
 import TradeValueHero from '../components/TradeValueHero';
 import {
   api,
@@ -194,6 +196,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const { isGuest } = useAuth();
   const [planningNote, setPlanningNote] = useState('');
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
+  const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
 
   const orbClearance = useOrbClearance();
 
@@ -460,6 +463,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       });
       setPlanningNote(result.planning_note ?? '');
       setAssumptions(result.assumptions ?? null);
+      setRosterOverflow(result.roster_overflow ?? null);
       trackUse('trade_analyzer', 'evaluated', {
         leagueId,
         props: { result: result.verdict ? 'verdict' : 'no_verdict' },
@@ -567,6 +571,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
               partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
               onBuildCounter={applyCounterAction}
             />
+            {rosterOverflow ? <RosterOverflowNote overflow={rosterOverflow} /> : null}
             <VerdictTrust
               assumptions={assumptions}
               context={{

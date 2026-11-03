@@ -13,6 +13,7 @@ import TeamAvatar from './TeamAvatar';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
 import IdeaPosture from './IdeaPosture';
+import { RosterOverflowNote } from './SuggestedDrop';
 import TradeSharePreviewModal from './TradeSharePreviewModal';
 import TradeOddsEffect, { type OddsAsset } from './TradeOddsEffect';
 import TradeValueBar from './TradeValueBar';
@@ -328,6 +329,7 @@ export default function TradeIdeaCard({
           <IdeaPosture idea={idea} />
         </View>
       ) : null}
+      {idea.roster_overflow ? <RosterOverflowNote overflow={idea.roster_overflow} compact /> : null}
       {/* Header hierarchy: recommendation type (the category/impact badges
           above) -> team name + share action on one line -> value-change
           number prominently, paired with the fairness pill on its own row
