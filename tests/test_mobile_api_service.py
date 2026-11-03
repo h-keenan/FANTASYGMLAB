@@ -16407,3 +16407,81 @@ def test_all_trades_reports_a_team_it_had_to_skip(monkeypatch):
     assert body["skipped_teams"] == ["1"]
     assert body["model_status"]["degraded"] is True
     assert body["model_status"]["reasons"][0]["code"] == "teams_skipped"
+
+
+def _get_waivers_for_drop_tests(monkeypatch, *, bundle_error=None, gm_error=""):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_gm_stance_with_set_flag", lambda *a, **k: ("retool", False)
+    )
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_gm_target_rows", lambda *a, **k: ([], gm_error)
+    )
+    if bundle_error is not None:
+        def _boom(**kwargs):
+            raise bundle_error
+
+        monkeypatch.setattr("services.mobile_api_service._waiver_roster_value_bundle", _boom)
+    fake_get = _routed_requests_get(profile=[{"entitlement": "free", "sleeper_username": "gm_dynasty"}])
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    with patch("requests.get", side_effect=fake_get):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                return client.get(
+                                    f"/v1/leagues/drops-{id(monkeypatch)}/waivers",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+
+def test_waivers_carry_the_roster_value_needs_drops_and_status(monkeypatch):
+    response = _get_waivers_for_drop_tests(monkeypatch)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_status"]["degraded"] is False
+    needs = body["needs_model"]
+    assert needs["model_version"] == "roster-value-v1"
+    assert needs["positions"] and "headline" in needs
+    assert body["roster_state"]["active_limit"] is not None
+    assert body["priority_adds"], "fixture has one free agent"
+    suggestion = body["priority_adds"][0]["drop_suggestion"]
+    assert suggestion["add"]["player_id"] == "target_rb"
+    assert "why" in suggestion and "roster" in suggestion
+    # Free accounts get the standalone list capped (Pro unlocks the rest).
+    assert len(body["droppable_players"]["players"]) <= 2
+
+
+def test_waivers_report_a_failed_need_model_instead_of_silently_falling_back(monkeypatch):
+    response = _get_waivers_for_drop_tests(monkeypatch, bundle_error=KeyError("position"))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["needs_model"] is None and body["droppable_players"] is None
+    assert body["model_status"]["degraded"] is True
+    assert [r["code"] for r in body["model_status"]["reasons"]] == ["need_model_failed"]
+
+
+def test_waivers_suggest_no_drops_when_untouchables_cannot_be_read(monkeypatch):
+    response = _get_waivers_for_drop_tests(monkeypatch, gm_error="supabase down")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_status"]["degraded"] is True
+    assert "untouchable_lookup_failed" in [r["code"] for r in body["model_status"]["reasons"]]
+    assert all("drop_suggestion" not in item for item in body["priority_adds"])
+    assert body["droppable_players"] is None

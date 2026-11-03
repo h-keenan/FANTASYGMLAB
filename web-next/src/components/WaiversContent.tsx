@@ -26,7 +26,6 @@ import {
   filterByRecommendation,
   formatWaiverScore,
   freeAgentContextLine,
-  priorityNeedNote,
   trendingAddLabel,
   waiverInjuryDisplay,
   waiverReasonChips,
@@ -35,6 +34,8 @@ import {
 } from "@/lib/waiversPresentation";
 import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { DroppablePlayersSection, NeedsBreakdown, SuggestedDrop } from "@/components/SuggestedDrop";
+import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
 
 /**
@@ -233,6 +234,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
           {player.usage_flag.explanation}
         </p>
       ) : null}
+      {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
       <BeginnerHelp term="waiverValue" />
       <div className="flex items-center justify-between gap-3">
         {player.confidence_label ? (
@@ -252,12 +254,12 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
   const injury = waiverInjuryDisplay(player.injury_status);
   const contextLine = freeAgentContextLine(player);
   return (
+    <div style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined}>
     <button
       type="button"
       onClick={() => openPlayer({ ...player, sourceLabel: "Waivers" })}
       aria-label={`Open ${player.name || "player"}`}
       className="appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer w-full flex flex-col gap-1.5 py-2.5"
-      style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined}
     >
       {/* Name line first at full width so names never truncate; value, ring,
           bid and the chevron share the second line. */}
@@ -289,6 +291,12 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
         </span>
       </span>
     </button>
+    {player.drop_suggestion ? (
+      <div className="pb-2.5">
+        <SuggestedDrop suggestion={player.drop_suggestion} compact />
+      </div>
+    ) : null}
+    </div>
   );
 }
 
@@ -392,6 +400,7 @@ export function WaiversContent({
   const copy = useExperienceCopy();
 
   const notice = data.reason ? waiversReasonMessage(data.reason) : null;
+  const limitedNote = limitedDataNote(data.model_status);
 
   // GM Targets are only fetched when the Watchlist tab is first opened.
   useEffect(() => {
@@ -469,7 +478,7 @@ export function WaiversContent({
   const stats = [
     { label: "Available", value: String(data.available_count ?? data.players.length) },
     faabItem,
-    { label: "Team need", value: data.needed_positions.length > 0 ? data.needed_positions.join("/") : "None" },
+    { label: "Team need", value: teamNeedStat(data) },
   ];
 
   return (
@@ -498,9 +507,15 @@ export function WaiversContent({
             <span id="priority-adds-heading" className="sr-only">
               Priority Adds
             </span>
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {priorityNeedNote(data.needed_positions)}
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="needs-headline">
+              {needsHeadline(data)}
             </p>
+            {data.needs_model ? <NeedsBreakdown needs={data.needs_model} /> : null}
+            {limitedNote ? (
+              <p className="text-xs" style={{ color: "var(--color-warning)" }} data-testid="limited-data-note">
+                {limitedNote}
+              </p>
+            ) : null}
             <InfoTip label="How Priority Adds rank">
               Need fits and injury cover rank first, then value. {DISCLOSURE_TEXT}
             </InfoTip>
@@ -555,6 +570,8 @@ export function WaiversContent({
               )}
             </section>
           ) : null}
+
+          <DroppablePlayersSection data={data.droppable_players} />
 
           {bestAvailable.length > 0 ? (
             <section className="flex flex-col gap-2" aria-labelledby="snapshot-heading">

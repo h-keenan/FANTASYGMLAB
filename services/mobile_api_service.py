@@ -250,6 +250,7 @@ from modules import (
 )
 from modules import public_dynasty_values
 from modules import model_status
+from modules import drop_candidates, roster_value_model
 from modules import usage_trends
 from modules import trade_posture
 from modules import external_news_contract
@@ -14962,6 +14963,80 @@ def _waivers_team_defense_context(settings: dict[str, Any], roster_player_ids: A
     }
 
 
+def _waiver_roster_value_bundle(
+    *,
+    user: dict[str, Any],
+    league_id: str,
+    league: dict[str, Any],
+    settings: dict[str, Any],
+    valued: pd.DataFrame,
+    free_agents: pd.DataFrame,
+    my_roster: dict[str, Any],
+    rosters: list[dict[str, Any]],
+    lens: str,
+    score_field: str,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    """The shared roster-value model for Waivers (team needs + suggested drops).
+
+    One build, used by the need model and the drop engine so they cannot
+    disagree. Expected failures (a malformed row, a failed lookup) raise the
+    ``model_status`` error classes to the caller, which reports them; nothing
+    is swallowed here."""
+
+    status = model_status.ok()
+    posture = _resolve_trade_posture(user, league_id, league, my_roster, lens=lens, client_strategy="auto")
+    strategy = posture["key"]
+    model_status.merge_into(status, posture.get("model_status"))
+    valued_s = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+    my_ids = {str(pid) for pid in (my_roster.get("players") or []) if pid is not None}
+    # The waiver pool is the endpoint's own cached free-agent frame (already
+    # waiver-actionable), minus rows flagged stale/retired.
+    pool = free_agents
+    if "stale_free_agent" in pool.columns:
+        pool = pool[~pool["stale_free_agent"].fillna(False).astype(bool)]
+    pool = trade_hub_engine.apply_strategy_age_curve(pool, strategy, score_field)
+    valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field)
+    for code in model_status.frame_codes(valued_p):
+        model_status.add(status, code)
+    roster_df = valued_p[valued_p["player_id"].astype(str).isin(my_ids)].copy()
+    rostered_ids = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
+    rostered_values = pd.to_numeric(
+        valued_p[valued_p["player_id"].astype(str).isin(rostered_ids)][score_field], errors="coerce"
+    ).dropna().tolist()
+    window = trade_grade.season_window(settings)
+    rvc = roster_value_model.build_context(
+        roster_df=roster_df,
+        all_players_df=valued_p,
+        pool=pool_p,
+        my_roster=my_roster,
+        league=league,
+        settings=settings,
+        score_field=score_field,
+        strategy=strategy,
+        window=window,
+        league_rostered_values=rostered_values,
+        status=status,
+    )
+    league_table = roster_value_model.league_position_table(valued_p, rosters, rvc.model_ctx)
+    return {"rvc": rvc, "league_table": league_table, "valued": valued_p, "posture": posture, "status": status}
+
+
+def _waiver_usage_guard(
+    rvc: "roster_value_model.RosterValueContext", season_stats: dict[str, Any] | None
+) -> dict[str, dict[str, Any]]:
+    """Usage guard (hot streak / shrinking role) for the roster's skill players."""
+
+    out: dict[str, dict[str, Any]] = {}
+    for pid in rvc.limits.active_ids:
+        profile = rvc.profiles.get(pid)
+        if profile is None or profile.position not in usage_trends.COVERED_POSITIONS:
+            continue
+        built = usage_trends.profile_from_season_stats(pid, profile.position, season_stats)
+        out[pid] = drop_candidates.usage_guard(built)
+    return out
+
+
 @app.get("/v1/leagues/{league_id}/waivers")
 @_with_sleeper_as_of
 def get_league_waivers(
@@ -15085,6 +15160,32 @@ def get_league_waivers(
         # need" (and Priority Adds ranking, which also reads this list)
         # match what the user already sees elsewhere in the app.
         needed_positions = sorted(set(needed_positions) | injury_positions)
+
+    # Team needs, rebuilt on the shared roster-value model (modules.
+    # roster_value_model, the same model the drop engine reads). The legacy
+    # coverage check above is kept only as the explicitly-marked fallback: its
+    # value thresholds assume a 0-100 scale against a 0-11,000 frame, so on a
+    # real dynasty roster it reports "no need" for almost every team.
+    waivers_status = model_status.ok()
+    needs_model: dict[str, Any] | None = None
+    value_bundle: dict[str, Any] | None = None
+    if not roster_df.empty:
+        try:
+            value_bundle = _waiver_roster_value_bundle(
+                user=user, league_id=league_id, league=league, settings=settings, valued=valued,
+                free_agents=free_agents, my_roster=my_roster, rosters=rosters, lens=lens, score_field=score_field, config=config,
+            )
+            needs_model = roster_value_model.assess_needs(
+                value_bundle["rvc"], value_bundle["league_table"], roster_id,
+                dynasty=str(settings.get("league_format") or "") == "Dynasty",
+            )
+            needed_positions = sorted(set(needs_model["needed_positions"]) | injury_positions)
+            model_status.merge_into(waivers_status, needs_model.get("model_status"))
+        except model_status.LOOKUP_ERRORS:
+            logger.warning("waiver need model failed (league=%s); using the coverage check", league_id, exc_info=True)
+            model_status.add(waivers_status, "need_model_failed")
+            needs_model = None
+            value_bundle = None
 
     if injury_positions:
         positions_upper = free_agents["position"].fillna("").astype(str).str.upper()
@@ -15221,6 +15322,49 @@ def get_league_waivers(
             )
         )
 
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    droppable: dict[str, Any] | None = None
+    if value_bundle is not None:
+        try:
+            gm_rows, gm_error = _fetch_gm_target_rows(
+                config, user_id, str(user.get("_access_token") or ""), league_id, select="player_id,untouchable"
+            )
+            if gm_error:
+                # Without the user's untouchable list a drop could name a player
+                # they protected: suggest nothing rather than guess.
+                model_status.add(waivers_status, "untouchable_lookup_failed")
+            else:
+                untouchable_ids = {
+                    gm_targets.normalize_player_id(r.get("player_id"))
+                    for r in gm_rows
+                    if r.get("player_id") and bool(r.get("untouchable"))
+                }
+                rvc = value_bundle["rvc"]
+                if current_week > 0 and not faab_season_stats:
+                    model_status.add(waivers_status, "usage_trends_unavailable")
+                usage_guard = _waiver_usage_guard(rvc, faab_season_stats)
+                valued_by_id = value_bundle["valued"].drop_duplicates("player_id").set_index(
+                    value_bundle["valued"].drop_duplicates("player_id")["player_id"].astype(str), drop=False
+                )
+                for item in priority_adds:
+                    pid = str(item.get("player_id"))
+                    if pid not in valued_by_id.index:
+                        continue
+                    item["drop_suggestion"] = drop_candidates.suggest_drop_for_add(
+                        rvc, valued_by_id.loc[pid].to_dict(), untouchable=untouchable_ids, usage=usage_guard
+                    )
+                standalone_cap = drop_candidates.MAX_STANDALONE if is_premium else drop_candidates.FREE_STANDALONE_LIMIT
+                droppable = drop_candidates.droppable_players(
+                    rvc, untouchable=untouchable_ids, usage=usage_guard, limit=drop_candidates.MAX_STANDALONE
+                )
+                droppable["locked_count"] = max(0, len(droppable["players"]) - standalone_cap)
+                droppable["players"] = droppable["players"][:standalone_cap]
+                droppable["roster"] = rvc.limits.to_public()
+        except model_status.LOOKUP_ERRORS:
+            logger.warning("suggested drops failed (league=%s)", league_id, exc_info=True)
+            model_status.add(waivers_status, "drop_model_failed")
+            droppable = None
+
     # Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
     # Shortlist) — matches web's Premium-only gate (modules/waivers_logic.py:
     # "if not is_premium: render_premium_lock(...); return", app.py's
@@ -15228,7 +15372,6 @@ def get_league_waivers(
     # port: web dedupes against its own `featured_free_agents` presentation
     # slice, which isn't reproduced here — this dedupes against the same
     # Priority Adds list this endpoint already returns instead.
-    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     stash_candidates: list[dict[str, Any]] = []
     watchlist_candidates: list[dict[str, Any]] = []
     faab_targets: list[dict[str, Any]] = []
@@ -15287,6 +15430,13 @@ def get_league_waivers(
         "watchlist_candidates": watchlist_candidates,
         "faab_targets": faab_targets,
         "entitlement": {"is_premium": is_premium},
+        # Additive: the shared roster-value model's per-position needs (with
+        # the numbers behind them), the roster's real limits, the standalone
+        # "players you could drop" list, and the degraded-path marker.
+        "needs_model": needs_model,
+        "roster_state": value_bundle["rvc"].limits.to_public() if value_bundle is not None else None,
+        "droppable_players": droppable,
+        "model_status": waivers_status,
         "reason": "",
     }
 

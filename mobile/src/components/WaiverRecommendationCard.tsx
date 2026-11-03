@@ -11,6 +11,7 @@ import OverallRatingBadge from './OverallRatingBadge';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { WaiverPriorityAdd } from '../lib/api';
+import { SuggestedDrop } from './SuggestedDrop';
 import { waiverReasonChips } from '../lib/waiverChips';
 import { injuryTone } from '../lib/injuryDisplay';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -256,6 +257,7 @@ export default function WaiverRecommendationCard({
         {/* Beginner-only explanations (lib/experienceCopy.ts); nothing renders
             for advanced/unset accounts. Primary card only, so the compact
             rows below stay as dense as before. */}
+        {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
         <BeginnerHelp term="waiverValue" style={styles.beginnerHelp} />
         <BeginnerHelp term="faab" style={styles.beginnerHelp} />
         {/* Real need-fit/standout-value confidence for this recommendation
@@ -292,11 +294,8 @@ export default function WaiverRecommendationCard({
   }
 
   return (
-    <TouchableOpacity
-      style={[styles.compactRow, showDivider && styles.compactDivider]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+    <View style={[styles.compactRow, showDivider && styles.compactDivider]}>
+    <TouchableOpacity style={styles.compactPress} onPress={onPress} activeOpacity={0.7}>
       {/* Line 1: identity (rank slot, name, team/opponent) gets the full row
           width so names never truncate; then reason chips; then value, ring,
           bid and the chevron that opens the player. */}
@@ -314,6 +313,8 @@ export default function WaiverRecommendationCard({
         <Ionicons name="chevron-forward" size={16} color={colors.accentSoft} />
       </View>
     </TouchableOpacity>
+    {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+    </View>
   );
 }
 
@@ -369,6 +370,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.xs,
       gap: spacing.xs,
     },
+    compactPress: { gap: spacing.xs },
     compactMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs },
     compactSpacer: { flex: 1 },
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },

@@ -60,6 +60,16 @@ MESSAGES: dict[str, str] = {
         "Your keeper settings could not be loaded, so keeper values were not applied."
     ),
     "teams_skipped": "Some teams could not be graded and are missing from this board.",
+    "need_model_failed": (
+        "Your roster's needs could not be fully modeled, so this uses a simpler coverage check."
+    ),
+    "untouchable_lookup_failed": (
+        "Your untouchable players could not be loaded, so no drops are suggested."
+    ),
+    "drop_model_failed": "Suggested drops could not be computed for this roster.",
+    "usage_trends_unavailable": (
+        "Recent usage trends could not be loaded, so hot-streak protection is not applied."
+    ),
 }
 
 
