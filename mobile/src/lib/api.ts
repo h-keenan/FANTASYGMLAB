@@ -3034,10 +3034,22 @@ export interface TradeHubResponse {
  * (modules.trade_ideas.finder_closest_note). */
 export interface TradeFinderNote {
   stage: string;
-  /** Always 'Stretch': a near miss is never presented as realistic. */
+  /** 'Stretch', 'Overpay', 'We added' or 'Without <asset>': never blank, and a
+   * near miss is never presented as realistic. */
   label: string;
   reason: string;
-  value_gap: number;
+  value_gap?: number;
+  /** Selected assets a 'Without ...' alternative leaves out. */
+  missing?: string[];
+  /** Picks WE added to a result ('We added'). */
+  added?: string[];
+}
+
+/** A selected asset the search could not include, with why. */
+export interface TradeFinderBlockedAsset {
+  asset: string;
+  code: string;
+  reason: string;
 }
 
 export interface TradeFinderSearchReason {
@@ -3049,10 +3061,15 @@ export interface TradeFinderSearchReason {
 /** GET .../trade-finder `search` block. `error` means the search crashed,
  * which is not the same as "no trades exist". */
 export interface TradeFinderSearch {
-  status: 'found' | 'closest' | 'none' | 'error';
+  status: 'found' | 'closest' | 'none' | 'error' | 'selected_assets_blocked';
   found: number;
   closest: number;
+  /** Plain-English summary, never blank. */
   headline?: string;
+  /** Typed reason, 'selected_assets_blocked: <asset> because <reason>'. */
+  reason?: string;
+  blocked?: TradeFinderBlockedAsset[];
+  overpay?: number;
   selection?: { labels: string[]; value: number };
   reasons?: TradeFinderSearchReason[];
   partners_checked?: number;
@@ -3060,8 +3077,12 @@ export interface TradeFinderSearch {
 
 export type TradeFinderClosestIdea = TradeIdea & { finder_note?: TradeFinderNote };
 
-export interface TradeFinderResponse extends TradeHubResponse {
-  /** Labelled near misses, only when `ideas` is empty. Older servers omit it. */
+export interface TradeFinderResponse extends Omit<TradeHubResponse, 'ideas'> {
+  /** Every package includes ALL selected assets. A package carrying a pick we
+   * added has `finder_note.label === 'We added'`. */
+  ideas: TradeFinderClosestIdea[];
+  /** Labelled stretches (overpay), near misses and 'Without X' alternatives.
+   * Older servers omit it. */
   closest?: TradeFinderClosestIdea[];
   search?: TradeFinderSearch;
 }

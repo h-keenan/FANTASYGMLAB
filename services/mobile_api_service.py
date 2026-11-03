@@ -15797,23 +15797,62 @@ def get_trade_finder_ideas(
             },
         }
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
+    record_by_id = {trade_hub_presentation.idea_recommendation_id(record): record for record in records}
+    found_cards: list[dict[str, Any]] = []
+    found_records: list[dict[str, Any]] = []
+    # A package that makes the user overpay is a stretch, not a "found" trade:
+    # it moves to the closest list with its own label. A package carrying a
+    # pick WE added keeps its place but says so.
     closest_cards: list[dict[str, Any]] = []
-    if not ranked:
-        for record in trace.enforced_closest:
+    closest_records: list[dict[str, Any]] = []
+    overpay_count = 0
+    for card in ranked:
+        record = record_by_id.get(str(card.get("recommendation_id") or ""), {})
+        if trade_ideas.finder_is_overpay(card):
+            overpay_count += 1
+            stretch_record = {**record, "trade_gain": card.get("trade_gain"), "finder_stretch_stage": "overpay"}
+            card["finder_note"] = trade_ideas.finder_closest_note(stretch_record)
+            closest_cards.append(card)
+            closest_records.append(stretch_record)
+            continue
+        note = trade_ideas.finder_found_note(record)
+        if note:
+            card["finder_note"] = note
+        found_cards.append(card)
+        found_records.append(record)
+    if not found_cards:
+        # Near misses (every selected asset kept, not realistic as it stands)
+        # first, then packages that leave a selected asset out, each labelled
+        # with what it leaves out.
+        for record in [*trace.enforced_closest, *trace.enforced_partial]:
             note = trade_ideas.finder_closest_note(record)
             projected = _project_and_enrich_trade_idea_cards([record], league_id=league_id, lens=lens)
             if projected:
                 projected[0]["finder_note"] = note
                 closest_cards.append(projected[0])
+                closest_records.append(record)
+    # "Headline recommendation" belongs to the best real result, never to a
+    # stretch / near miss / "without X" alternative (each is projected on its
+    # own, so each would otherwise claim to be the headline).
+    for card in closest_cards:
+        card["category"] = ""
+    if found_cards and not any(card.get("category") == "Headline Recommendation" for card in found_cards):
+        found_cards[0]["category"] = "Headline Recommendation"
     return {
         "ok": True,
-        "ideas": ranked,
+        "ideas": found_cards,
         "closest": closest_cards,
         "reason": "",
         "is_premium": True,
         "upsell": None,
         "trade_window": trade_window,
-        "search": trade_ideas.finder_search_payload(trace, found=len(ranked), closest=closest_cards),
+        "search": trade_ideas.finder_search_payload(
+            trace,
+            found=len(found_cards),
+            closest=closest_records,
+            found_ideas=found_records,
+            overpay=overpay_count,
+        ),
         "posture": trade_posture.public_posture(posture),
     }
 

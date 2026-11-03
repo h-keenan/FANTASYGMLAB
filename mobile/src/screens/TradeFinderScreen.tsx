@@ -15,7 +15,11 @@ import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import TradeFinderNoResults from '../components/TradeFinderNoResults';
+import TradeFinderNoResults, {
+  TradeFinderClosestSection,
+  TradeFinderNoteRow,
+  TradeFinderSummary,
+} from '../components/TradeFinderNoResults';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -393,7 +397,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   const [returnScope, setReturnScope] = useState<'any' | 'picks'>('any');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
+  const [ideas, setIdeas] = useState<TradeFinderClosestIdea[] | null>(null);
   // Why nothing realistic came back, plus labelled near misses.
   const [noResults, setNoResults] = useState<{ search?: TradeFinderSearch; closest: TradeFinderClosestIdea[] }>({
     closest: [],
@@ -561,14 +565,26 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
               <View style={styles.resultsSection}>
                 <SectionHeading title={searching ? 'Searching…' : `${ideas.length} plausible trade${ideas.length === 1 ? '' : 's'} found`} topGap={12} />
                 {searchError ? <AppText style={styles.error}>{searchError}</AppText> : null}
+                {!searching ? <TradeFinderSummary search={noResults.search} /> : null}
                 {ideas.map((idea, index) => (
-                  <ResultCard
-                    key={`${idea.partner_team_name}-${index}`}
-                    idea={idea}
-                    onPressPlayer={openPlayer}
-                    onPressPick={openPick}
-                  />
+                  <View key={`${idea.partner_team_name}-${index}`}>
+                    <TradeFinderNoteRow note={idea.finder_note} />
+                    <ResultCard idea={idea} onPressPlayer={openPlayer} onPressPick={openPick} />
+                  </View>
                 ))}
+                {!searching ? (
+                  <TradeFinderClosestSection
+                    options={noResults.closest}
+                    renderIdea={(idea, index) => (
+                      <ResultCard
+                        key={`${idea.partner_team_name}-closest-${index}`}
+                        idea={idea}
+                        onPressPlayer={openPlayer}
+                        onPressPick={openPick}
+                      />
+                    )}
+                  />
+                ) : null}
               </View>
             ) : searchError ? (
               <AppText style={styles.error}>{searchError}</AppText>

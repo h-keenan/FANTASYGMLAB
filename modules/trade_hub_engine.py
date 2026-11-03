@@ -199,6 +199,7 @@ def enforce_generated_trade_ideas(
     my_roster_id: int,
     rosters: list[dict] | None,
     untouchables: tuple[str, ...] = (),
+    focused_player_ids: tuple[str, ...] = (),
 ) -> list[dict]:
     """Faithful, simplified port of app.py's enforce_cached_trade_ideas —
     the production Trust safety boundary so a stale cached idea can never
@@ -247,8 +248,11 @@ def enforce_generated_trade_ideas(
             trust_context.league_context_valid and int(my_roster_id) in trust_context.valid_roster_ids
         ),
         untouchable_names=frozenset(_safe_text(name).casefold() for name in untouchables if _safe_text(name)),
-        explicit_player_focus=False,
-        focused_player_ids=(),
+        # Trade Finder's selection: players the user explicitly chose to shop
+        # may be core/protected, and the Trust boundary must not veto them
+        # (their own choice). Everything else still enforces unchanged.
+        explicit_player_focus=bool(focused_player_ids),
+        focused_player_ids=tuple(str(pid) for pid in focused_player_ids if str(pid)),
         explicit_acquisition_target=False,
     )
     return list(board.recommendations)
@@ -645,6 +649,7 @@ def generate_trade_idea_records(
         my_roster_id=my_roster_id,
         trade_block_names=trade_block_names,
         untouchable_names=untouchable_names,
+        trade_block_player_ids=sorted(trade_block_ids),
         role_map={},
         max_ideas=max_ideas,
         score_field=score_field,
@@ -672,28 +677,34 @@ def generate_trade_idea_records(
         my_roster_id=my_roster_id,
         rosters=rosters,
         untouchables=tuple(untouchable_names),
+        focused_player_ids=tuple(sorted(trade_block_ids)),
     )
     if finder_trace is not None:
         # Trust enforcement is the last word on realistic trades: an idea it
-        # drops is not realistic. Count that honestly, then (only when nothing
-        # realistic survived) run the closest non-realistic packages through
-        # the SAME enforcement so a "closest option" is never something Trust
-        # would have refused outright.
+        # drops is not realistic. Count that honestly, then run the closest
+        # non-realistic packages and the labelled "without X" alternatives
+        # through the SAME enforcement so a "closest option" is never something
+        # Trust would have refused outright. They are computed even when real
+        # results exist, because a result whose balance is an overpay is moved
+        # to the stretch list by the caller and the near misses go beside it.
         dropped = len(raw_ideas) - len(enforced)
         if dropped > 0:
             finder_trace.count("trust", dropped)
-        if not enforced:
-            near = finder_trace.closest_ideas(limit=6)
-            kept = enforce_generated_trade_ideas(
-                near,
-                df_players=strategy_df,
-                league_id=league_id,
-                df_summary=df_summary,
-                my_roster_id=my_roster_id,
-                rosters=rosters,
-                untouchables=tuple(untouchable_names),
-            ) if near else []
-            finder_trace.enforced_closest = list(kept)[:3]
+        near = finder_trace.closest_ideas(limit=6)
+        alternatives = list(finder_trace.partial)
+        enforce_kwargs = dict(
+            df_players=strategy_df,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            rosters=rosters,
+            untouchables=tuple(untouchable_names),
+            focused_player_ids=tuple(sorted(trade_block_ids)),
+        )
+        kept_near = enforce_generated_trade_ideas(near, **enforce_kwargs) if near else []
+        kept_alternatives = enforce_generated_trade_ideas(alternatives, **enforce_kwargs) if alternatives else []
+        finder_trace.enforced_closest = list(kept_near)[:3]
+        finder_trace.enforced_partial = list(kept_alternatives)[:3]
     tagged = _tag_landed_gm_targets(
         list(enforced),
         gm_target_player_ids=frozenset(str(pid) for pid in gm_target_player_ids if str(pid)),
@@ -1022,6 +1033,9 @@ def generate_trade_finder_records(
     if finder_trace is not None and posture:
         finder_trace.enforced_closest = trade_posture_module.stamp_records(
             list(finder_trace.enforced_closest), posture
+        )
+        finder_trace.enforced_partial = trade_posture_module.stamp_records(
+            list(finder_trace.enforced_partial), posture
         )
     return trade_posture_module.stamp_records(records, posture)
 
