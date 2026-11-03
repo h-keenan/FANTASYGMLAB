@@ -135,7 +135,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -5597,6 +5597,92 @@ def _resolve_trade_posture(
     return posture
 
 
+def _trade_overflow_planner(
+    *,
+    user: dict[str, Any],
+    league_id: str,
+    league: dict[str, Any],
+    settings: dict[str, Any],
+    valued: pd.DataFrame,
+    waiver_pool: pd.DataFrame | None,
+    my_roster: dict[str, Any],
+    my_team_df: pd.DataFrame,
+    score_field: str,
+    strategy: str,
+    status: dict[str, Any],
+) -> Callable[[list[dict[str, Any]], list[dict[str, Any]]], dict[str, Any] | None]:
+    """Build ``plan(send_assets, receive_assets)``: the roster-full check for
+    a trade (modules.drop_candidates.plan_trade_overflow), memoized per
+    package. Reads the league's rosters, the user's untouchables and recent
+    usage lazily, and only when a package actually overfills the roster."""
+
+    cache: dict[tuple, dict[str, Any] | None] = {}
+    lazy: dict[str, Any] = {}
+
+    def untouchables() -> set[str] | None:
+        if "untouchable" not in lazy:
+            rows, error = _fetch_gm_target_rows(
+                auth_supabase.get_supabase_config(),
+                str(user.get("id") or ""),
+                str(user.get("_access_token") or ""),
+                league_id,
+                select="player_id,untouchable",
+            )
+            if error:
+                model_status.add(status, "untouchable_lookup_failed")
+                lazy["untouchable"] = None
+            else:
+                lazy["untouchable"] = {
+                    gm_targets.normalize_player_id(r.get("player_id"))
+                    for r in rows
+                    if r.get("player_id") and bool(r.get("untouchable"))
+                }
+        return lazy["untouchable"]
+
+    def usage(rvc: "roster_value_model.RosterValueContext") -> dict[str, dict[str, Any]]:
+        if "stats" not in lazy:
+            try:
+                lazy["stats"] = sleeper.get_season_player_stats(
+                    season=sleeper.default_player_stats_season(), retain_weekly=True
+                )
+            except model_status.LOOKUP_ERRORS:
+                logger.warning("usage trends unavailable for roster-full check", exc_info=True)
+                model_status.add(status, "usage_trends_unavailable")
+                lazy["stats"] = {}
+        return _waiver_usage_guard(rvc, lazy["stats"])
+
+    def plan(send_assets: list[dict[str, Any]], receive_assets: list[dict[str, Any]]) -> dict[str, Any] | None:
+        send_ids = tuple(sorted(str(a.get("player_id")) for a in send_assets if a.get("asset_type") == "player"))
+        receive_ids = tuple(sorted(str(a.get("player_id")) for a in receive_assets if a.get("asset_type") == "player"))
+        key = (send_ids, receive_ids)
+        if key not in cache:
+            rosters = sleeper.get_rosters(league_id) or []
+            rostered = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
+            values = pd.to_numeric(
+                valued[valued["player_id"].astype(str).isin(rostered)][score_field], errors="coerce"
+            ).dropna().tolist()
+            cache[key] = drop_candidates.plan_trade_overflow(
+                my_team_df=my_team_df,
+                all_players_df=valued,
+                waiver_df=waiver_pool,
+                my_roster=my_roster,
+                league=league,
+                settings=settings,
+                score_field=score_field,
+                strategy=strategy,
+                window=trade_grade.season_window(settings),
+                league_rostered_values=values,
+                send_player_ids=send_ids,
+                receive_player_ids=receive_ids,
+                untouchable_provider=untouchables,
+                usage_provider=usage,
+                status=status,
+            )
+        return cache[key]
+
+    return plan
+
+
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
 def post_trade_analyzer(
     body: TradeAnalyzerRequest,
@@ -5835,6 +5921,21 @@ def post_trade_analyzer(
                 if str(row.get("player_id")) not in untrusted_idp
             ]
 
+    # Roster-full check: a trade that brings in more players than it sends
+    # out can leave the roster over the league's limit. The cuts it would force
+    # (same engine as Waivers' suggested drops) are priced into the verdict.
+    overflow_planner = _trade_overflow_planner(
+        user=user, league_id=league_id, league=league, settings=settings, valued=valued,
+        waiver_pool=waiver_pool, my_roster=my_roster, my_team_df=my_team_df, score_field=score_field,
+        strategy=strategy, status=analyzer_status,
+    )
+    try:
+        overflow = overflow_planner(send_assets, receive_assets)
+    except model_status.LOOKUP_ERRORS:
+        logger.warning("roster-full check failed (league=%s)", league_id, exc_info=True)
+        model_status.add(analyzer_status, "drop_model_failed")
+        overflow = None
+
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
         my_team_df=my_team_df,
         all_players_df=valued,
@@ -5846,6 +5947,7 @@ def post_trade_analyzer(
         score_field=score_field,
         waiver_df=waiver_pool,
         posture=posture,
+        forced_drop_assets=(overflow or {}).get("forced_assets") or None,
     )
     if not fit or not fit.get("available"):
         return {"ok": True, "verdict": None, "reason": "fit_unavailable"}
@@ -5912,6 +6014,7 @@ def post_trade_analyzer(
             my_needs = list(dict.fromkeys([*sorted(hole_positions), *my_needs]))
 
             def _regrade_counter_package(cand_send, cand_receive):
+                cand_overflow = overflow_planner(cand_send, cand_receive)
                 cand_fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
                     my_team_df=my_team_df,
                     all_players_df=valued,
@@ -5923,6 +6026,7 @@ def post_trade_analyzer(
                     score_field=score_field,
                     waiver_df=waiver_pool,
                     posture=posture,
+                    forced_drop_assets=(cand_overflow or {}).get("forced_assets") or None,
                 )
                 if not cand_fit or not cand_fit.get("available"):
                     return None
@@ -5975,6 +6079,9 @@ def post_trade_analyzer(
         "ok": True,
         "verdict": verdict_public,
         "reason": "",
+        # Additive: set only when the trade would overfill the roster. The
+        # verdict above already prices these cuts (see trade_analyzer_fit).
+        "roster_overflow": drop_candidates.public_overflow(overflow),
         "keeper_adjusted": keeper_adjusted,
         # Which engine path produced this verdict. ``degraded`` is true when an
         # input lookup or the lineup model failed and a fallback answered;

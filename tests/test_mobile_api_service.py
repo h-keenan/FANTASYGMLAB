@@ -16505,3 +16505,43 @@ def test_waiver_cards_and_the_droppable_list_come_from_one_definition(monkeypatc
         assert listed, "the list must never read empty while a card names a drop"
     if any((item.get("drop_suggestion") or {}).get("no_good_drop") for item in body["priority_adds"]):
         assert all(p["named_for"] for p in body["droppable_players"]["players"])
+
+
+def test_trade_analyzer_flags_a_roster_full_trade_and_prices_the_cut(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr("services.mobile_api_service._fetch_gm_target_rows", lambda *a, **k: ([], ""))
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    # The league's roster limit equals the current roster size, so receiving one
+    # player with nothing going out overfills it.
+    full_league = {**_TRADE_ANALYZER_LEAGUE, "roster_positions": ["BN"] * len(my_roster_ids)}
+
+    def post(send):
+        with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+            with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+                with patch(
+                    "modules.sleeper.get_rosters",
+                    return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids, "reserve": [], "taxi": []}],
+                ):
+                    with patch("modules.sleeper.get_league", return_value=full_league):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                return client.post(
+                                    "/v1/leagues/abc/trade-analyzer",
+                                    json={"send_player_ids": send, "receive_player_ids": ["target_rb"], "strategy": "contender"},
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    body = post([]).json()
+    overflow = body["roster_overflow"]
+    assert overflow is not None and overflow["need"] == 1
+    assert overflow["active_after"] == overflow["active_limit"] + 1
+    assert "forced_assets" not in overflow
+    # An even swap fits the roster: nothing to say.
+    assert post(["my_bench_rb"]).json()["roster_overflow"] is None

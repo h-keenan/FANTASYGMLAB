@@ -5,7 +5,7 @@
  * lineup math lives here. Mirrored in mobile/src/lib/dropsPresentation.ts.
  */
 
-import type { DropEffect, DropPlayer, ModelStatus, NeedsModel, NeedsPosition } from "./api";
+import type { DropEffect, DropPlayer, ModelStatus, NeedsModel, NeedsPosition, RosterOverflow } from "./api";
 
 export function ordinal(n: number): string {
   const mod100 = n % 100;
@@ -67,4 +67,12 @@ export function upgradeText(position: NeedsPosition): string {
 export function limitedDataNote(status: ModelStatus | null | undefined): string | null {
   if (!status?.degraded || status.reasons.length === 0) return null;
   return `Limited data: ${status.reasons.map((r) => r.message).join(" ")}`;
+}
+
+/** "You'd have to drop 2: A, B" for a trade that overfills the roster. */
+export function overflowHeadline(overflow: RosterOverflow): string {
+  const count = `${overflow.need} player${overflow.need === 1 ? '' : 's'}`;
+  if (overflow.unavailable) return `This trade puts you ${overflow.need} over the roster limit, and the cuts could not be named safely.`;
+  if (!overflow.satisfied) return `This trade puts you ${overflow.need} over the roster limit and there are not enough safe cuts: you would have to drop starters or protected players.`;
+  return `This trade puts you over the roster limit: you'd have to drop ${count}: ${overflow.drops.map((d) => d.name).join(', ')}.`;
 }

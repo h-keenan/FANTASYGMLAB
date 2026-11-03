@@ -6,6 +6,7 @@ import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
 import { IdeaPosture } from "@/components/IdeaPosture";
+import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -224,6 +225,7 @@ export function TradeIdeaCardView({
       {/* Team posture this idea was graded and ranked under: the same chip, label and
           one-line trade-off the Trade Analyzer shows for this package. */}
       <IdeaPosture idea={idea} leagueId={leagueId} />
+      {idea.roster_overflow ? <RosterOverflowNote overflow={idea.roster_overflow} compact /> : null}
 
       {landedNames.length > 0 ? (
         <p className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>
