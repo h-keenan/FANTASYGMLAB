@@ -81,3 +81,21 @@ data. nflverse is not an endorser; wording must not imply endorsement.
 * Upstream outage or a bad file: the job exits non-zero, nothing is committed,
   the previous file keeps serving and shows its "through week N" stamp, and the
   workflow opens a tracking issue.
+
+## Pro gate (owner decision, coridian_, 2026-11-03)
+
+Advanced usage is a Pro feature, enforced on the server (the client never
+decides; `modules/usage_trends.py` `free_view` / `PRO_GATE`):
+
+| Surface | Free | Pro |
+|---|---|---|
+| Player Quick View / profile Usage block (`model.usage_profile`) | Season snap share, target share, touches and opportunities per game (already free in rankings/profile) with percentiles; `gated: true` marker, static "what Pro unlocks" list, nflverse credit kept | Everything: air-yards share, opportunity share, red-zone looks, last-4 / last-8 windows and deltas, points-vs-usage read, role flags |
+| `GET /v1/players/{id}/percentile-explorer` for `air_yards_share`, `opportunity`, `red_zone_looks` | `reason: "pro_required"`, no data | Distribution as before |
+| Waivers priority adds: usage chip and "Usage:" line | Fields omitted, `usage_locked: true`; page-level `usage_gate` drives one teaser line | `usage_flag` as before |
+| Waivers drop suggestions: role-change reasons, usage chip | Text blanked (the protect/shrinking *decision* is unchanged for everyone, only the displayed text is Pro) | Shown |
+| Trade Analyzer `role_notes` and suggested-lineup (start/sit) `why` role line | Omitted | Display-only role-change lines; scores, verdicts and lineups are unchanged |
+
+Free payloads never contain `last4`, `last8`, `prior`, `delta_last4_vs_prior`,
+`direction`, `season_total`, `last4_total` or any flag text; pinned by
+`tests/test_usage_pro_gate.py`. The nflverse attribution stays visible on every
+usage block (target share is nflverse-derived even in the Free view).

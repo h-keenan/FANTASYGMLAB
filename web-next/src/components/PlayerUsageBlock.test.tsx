@@ -92,4 +92,29 @@ describe("usage presentation helpers", () => {
     expect(formatUsageDelta(count)).toBe("+5.0");
     expect(hasUsageContent(null)).toBe(false);
   });
+
+  it("shows only Sleeper-basic usage plus the Pro teaser and nflverse credit for a gated (Free) profile", () => {
+    const gated = profile({
+      status: "free",
+      gated: true,
+      gating: {
+        gated: true, required: "pro", unlocks: ["Air-yards share", "Last-4 and last-8 game trends"],
+        upsell: { title: "Advanced usage is a Pro feature", body: "x" },
+      },
+      flags: [],
+      advanced: undefined,
+      not_available: undefined,
+      metrics: [
+        { key: "snap_share", label: "Snap share", unit: "pct", source: "sleeper", season: 0.66, games_with_data: 8, explorer_key: "snap", percentile: 83 },
+      ],
+    });
+    expect(hasUsageContent(gated)).toBe(true);
+    render(<PlayerUsageBlock profile={gated} position="WR" />);
+    expect(screen.getByTestId("usage-pro-teaser")).toBeTruthy();
+    expect(screen.getByText("Air-yards share")).toBeTruthy();
+    expect(screen.getByText("Snap share")).toBeTruthy();
+    expect(screen.queryByText(/Last 4:/)).toBeNull();
+    expect(screen.queryByText("Role expanding")).toBeNull();
+    expect(screen.getByTestId("usage-credit").textContent).toContain("nflverse");
+  });
 });

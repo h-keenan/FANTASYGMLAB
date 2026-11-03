@@ -1295,6 +1295,8 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
   // usage_flag_status says why usage_flag is null ("unavailable" = no weekly stats loaded).
   usage_flag?: Pick<UsageFlag, 'key' | 'label' | 'tone' | 'explanation'> | null;
   usage_flag_status?: string;
+  /** True for a Free caller: the server omitted usage_flag (advanced usage is Pro). */
+  usage_locked?: boolean;
   /** "Add X, drop Y" (modules.drop_candidates). Absent when drops could not be computed: see model_status. */
   drop_suggestion?: DropSuggestion;
 }
@@ -1460,6 +1462,8 @@ export interface WaiversResponse {
   watchlist_candidates: WaiverPlayer[];
   faab_targets: WaiverPlayer[];
   entitlement: EntitlementGateInfo;
+  /** Free only: advanced usage (chips, "Usage:" lines, role-change drop reasons) is withheld; drives the teaser. */
+  usage_gate?: UsageGate | null;
   /** Shared roster-value model (modules.roster_value_model). Null when it failed: see model_status. */
   needs_model?: NeedsModel | null;
   roster_state?: RosterState | null;
@@ -1919,6 +1923,8 @@ export interface TradeAnalyzerResponse {
   assumptions?: VerdictAssumptions;
   /** Set when the trade would overfill the roster; the verdict already includes the cuts. */
   roster_overflow?: RosterOverflow | null;
+  /** Pro only, display-only: role-change lines for the players in this package (absent for Free). */
+  role_notes?: string[];
 }
 
 export interface DraftPickAsset {
@@ -2192,12 +2198,13 @@ export interface UsageMetric {
   label: string;
   unit: 'pct' | 'count';
   source: 'sleeper' | 'nflverse';
-  last4: number | null;
-  last8: number | null;
-  prior: number | null;
+  /** Pro only: the server omits the windows, delta and direction for Free (see UsageProfile.gated). */
+  last4?: number | null;
+  last8?: number | null;
+  prior?: number | null;
   season: number | null;
-  delta_last4_vs_prior: number | null;
-  direction: 'up' | 'down' | 'flat' | 'unknown';
+  delta_last4_vs_prior?: number | null;
+  direction?: 'up' | 'down' | 'flat' | 'unknown';
   games_with_data: number;
   /** Percentile explorer stat key; present on the five pool metrics. */
   explorer_key?: string;
@@ -2214,8 +2221,19 @@ export interface UsageFlag {
   evidence_metrics: string[];
 }
 
+/** Server-side Pro gate marker (modules/usage_trends.py PRO_GATE): what Pro unlocks, static copy. */
+export interface UsageGate {
+  gated: true;
+  required: 'pro';
+  unlocks: string[];
+  upsell: { title: string; body: string };
+}
+
 export interface UsageProfile {
-  status: 'ok' | 'building_sample' | 'low_usage' | 'no_data' | 'not_covered' | 'unavailable';
+  status: 'ok' | 'building_sample' | 'low_usage' | 'no_data' | 'not_covered' | 'unavailable' | 'free' | 'pro_required';
+  /** True for a Free caller: only Sleeper-basic season usage is present; advanced usage is withheld server-side. */
+  gated?: boolean;
+  gating?: UsageGate;
   status_note?: string | null;
   reason?: string;
   season?: number;

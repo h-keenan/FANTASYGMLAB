@@ -65,8 +65,12 @@ def _ordinal_rank_text(share: float) -> str:
     return f"{share * 100:.0f}%"
 
 
-def usage_guard(profile: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Reduce a ``usage_trends`` profile to what the drop guard needs."""
+def usage_guard(profile: Mapping[str, Any] | None, *, display: bool = False) -> dict[str, Any]:
+    """Reduce a ``usage_trends`` profile to what the drop guard needs.
+
+    ``display`` defaults to False (advanced usage is Pro: a caller must opt in
+    for a Pro user); False keeps the guard decision
+    but blanks every piece of text that would quote advanced usage."""
 
     if not profile:
         return {"hot": False, "shrinking": False, "label": "", "explanation": ""}
@@ -79,8 +83,8 @@ def usage_guard(profile: Mapping[str, Any] | None) -> dict[str, Any]:
     return {
         "hot": bool(hot),
         "shrinking": bool(shrinking and not hot),
-        "label": str(first.get("label") or ""),
-        "explanation": str(first.get("explanation") or ""),
+        "label": str(first.get("label") or "") if display else "",
+        "explanation": str(first.get("explanation") or "") if display else "",
         "points_direction": points,
     }
 
