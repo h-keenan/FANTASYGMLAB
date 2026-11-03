@@ -131,7 +131,7 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
                 Or
               </span>
               {alternatives.map((alt) => (
-                <DropPlayerLine key={alt.player_id} player={alt} />
+                <DropPlayerLine key={alt.player_id} player={alt} maxReasons={1} />
               ))}
             </div>
           ) : null}

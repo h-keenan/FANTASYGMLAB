@@ -123,7 +123,7 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
             <View style={styles.alts}>
               <AppText style={styles.kicker}>OR</AppText>
               {alternatives.map((alt) => (
-                <DropPlayerLine key={alt.player_id} player={alt} />
+                <DropPlayerLine key={alt.player_id} player={alt} maxReasons={1} />
               ))}
             </View>
           ) : null}
