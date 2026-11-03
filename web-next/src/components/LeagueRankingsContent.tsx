@@ -25,6 +25,7 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -247,7 +248,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
   };
 
   return (
-    <section className="flex flex-col gap-3">
+    <section id="playoff-odds" className="flex flex-col gap-3 scroll-mt-4">
       <SectionHeading
         kicker="What might happen next"
         note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes."
@@ -365,10 +366,7 @@ export function LeagueRankingsContent({
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          League Rankings
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="League Rankings" leagueName={leagueName} />
       </header>
 
       {notReady ? (

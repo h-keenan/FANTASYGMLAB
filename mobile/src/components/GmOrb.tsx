@@ -27,6 +27,7 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
+import ToneBadge from './ToneBadge';
 import BrandMark from './BrandMark';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { SheetModal, SheetScrollProvider, SheetScrollView, useSheetDismissGesture } from './SwipeDismissSheet';
@@ -71,6 +72,9 @@ interface Destination {
   // screen, not a data claim. "Matchup" deliberately says "comparison," not
   // "projections": this app has no weekly points-projection data source.
   subtitle: string;
+  /** Paid destination: shows a gold PRO tag to anyone not on Pro, so the lock
+   * is visible before the tap (UX audit 2026-11-03, 4.2). */
+  pro?: boolean;
 }
 
 // Split into two groups (was one flat 15-item list) so the sheet can render
@@ -147,6 +151,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       needsLeague: true,
       color: colors.violet,
       subtitle: 'Simulated playoff chances for every team',
+      pro: true,
     },
     {
       label: 'Players',
@@ -193,6 +198,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       needsLeague: true,
       color: colors.premium,
       subtitle: 'Picks, order, and draft tools',
+      pro: true,
     },
     // Was only reachable via More -> Your Team; web-next lists it in GM Tools
     // next to Draft Center (org audit 2026-10, parity).
@@ -203,6 +209,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       needsLeague: true,
       color: colors.premium,
       subtitle: 'Real-time draft room',
+      pro: true,
     },
     // Trails GM Tools, not the League group — both the brief's own written
     // §4 IA list and all three concept screenshots (Recap sits immediately
@@ -233,6 +240,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
             needsLeague: true,
             color: colors.violet,
             subtitle: 'League integrity: lineups, tanking signals, trades',
+            pro: true,
           },
   ];
 }
@@ -262,6 +270,7 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
       icon: 'layers-outline',
       color: colors.violet,
       subtitle: 'Your standing across every saved league',
+      pro: true,
     },
     ...(founder
       ? [
@@ -275,6 +284,23 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
         ]
       : []),
     { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
+    // Both were reachable only through More (Trade History) or at the bottom
+    // of Trade History (the shared-trades feed, 4 taps deep); web has them
+    // as nav rows (UX audit 2026-11-03, parity).
+    {
+      label: 'Trade History',
+      route: 'TradeHistory',
+      icon: 'time-outline',
+      color: colors.violet,
+      subtitle: "Trades you've confirmed, and how they worked out",
+    },
+    {
+      label: 'Community',
+      route: 'Community',
+      icon: 'people-circle-outline',
+      color: colors.premium,
+      subtitle: 'Trades other users chose to share',
+    },
     storeSubscriber
       ? {
           label: 'Manage subscription',
@@ -291,9 +317,9 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
           subtitle: 'Unlock the full FantasyDesk experience',
         },
     {
-      label: 'More',
+      label: 'Account',
       route: 'More',
-      icon: 'ellipsis-horizontal-outline',
+      icon: 'person-circle-outline',
       color: colors.textSecondary,
       subtitle: 'Settings, legal, and support',
     },
@@ -366,6 +392,7 @@ function NavRow({
   isCurrent,
   unreadCount,
   hasNew,
+  showPro,
   onPress,
 }: {
   destination: Destination;
@@ -377,6 +404,8 @@ function NavRow({
    * badge (Alerts' actual unread article count). Optional prop on the
    * shared row, never hardcoded to a specific route inside NavRow itself. */
   hasNew?: boolean;
+  /** Show the gold PRO tag on a paid destination (Free plan only). */
+  showPro?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useThemeMode();
@@ -404,6 +433,7 @@ function NavRow({
             {destination.label}
           </AppText>
           {hasNew ? <View style={[styles.newDot, { backgroundColor: destination.color }]} /> : null}
+          {showPro && destination.pro ? <ToneBadge label="Pro" color={colors.premium} size="xs" /> : null}
         </View>
         <AppText style={styles.destSubtitle} numberOfLines={1}>
           {destination.subtitle}
@@ -571,6 +601,16 @@ export default function GmOrb() {
     enabled: !isRestoring && open && Boolean(league?.leagueId) && !isEspnLeagueId(league?.leagueId),
   });
   const recapReady = Boolean(recapQuery.data?.recap && !recapQuery.data.recap.incomplete);
+  // Plan for the gold PRO tags: only a confirmed Free plan shows them (an
+  // unreadable plan shows none rather than a wrong one).
+  const planQuery = useQuery({
+    queryKey: queryKeys.mePlan(),
+    queryFn: () => api.getMe(),
+    enabled: !isRestoring && open,
+    staleTime: 5 * 60 * 1000,
+  });
+  const showProTags =
+    planQuery.data?.user.profile_status === 'ok' && planQuery.data.user.entitlement !== 'premium' && !storeSubscriber;
 
   // Lightweight destination search — substring match against label +
   // subtitle across the same three static destination lists the
@@ -866,7 +906,10 @@ export default function GmOrb() {
             >
               {/* BrandMark is the transparent, theme-tinted FD mark, so the
                   disc's own backgroundColor shows through around it. */}
-              <BrandMark width={34} height={23} />
+              <BrandMark width={28} height={19} />
+              {/* The orb was a bare logo; the visible GM matches its accessibility
+                  label ("Open GM menu"). */}
+              <AppText style={styles.orbLabel}>GM</AppText>
             </TouchableOpacity>
           </Animated.View>
         </GestureDetector>
@@ -929,6 +972,7 @@ export default function GmOrb() {
                     key={destination.route}
                     destination={destination}
                     isCurrent={destination.route === currentRouteName}
+                    showPro={showProTags}
                     unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
                     hasNew={
                       destination.route === 'Trades'
@@ -986,6 +1030,7 @@ export default function GmOrb() {
                           destination={destination}
                           isCurrent={destination.route === currentRouteName}
                           unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
+                          showPro={showProTags}
                           onPress={() => go(destination)}
                         />
                       ))}
@@ -1004,6 +1049,7 @@ export default function GmOrb() {
                                 ? recapReady
                                 : false
                           }
+                          showPro={showProTags}
                           onPress={() => go(destination)}
                         />
                       ))}
@@ -1033,6 +1079,7 @@ export default function GmOrb() {
                       key={destination.route}
                       destination={destination}
                       isCurrent={destination.route === currentRouteName}
+                      showPro={showProTags}
                       onPress={() => go(destination)}
                     />
                   ))}
@@ -1099,6 +1146,14 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.orbGlow,
+  },
+  orbLabel: {
+    marginTop: 1,
+    fontSize: 9,
+    lineHeight: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: colors.accent,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

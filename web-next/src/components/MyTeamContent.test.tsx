@@ -132,7 +132,7 @@ describe("MyTeamContent", () => {
   it("renders real starters/bench with OVR gauges and canonical position colors", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "My Team" })).toBeInTheDocument();
     expect(screen.getByText("Test Quarterback")).toBeInTheDocument();
     expect(screen.getByText("Test Running Back")).toBeInTheDocument();
     // Bench and IR players live behind their own tabs.

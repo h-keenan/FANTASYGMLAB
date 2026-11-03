@@ -42,6 +42,7 @@ import {
   type PlayersStatusFilter,
 } from "@/lib/playersPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Players / Asset Explorer (Revision 16, extended in Revision 17) — ports
@@ -315,10 +316,7 @@ export function PlayersContent({
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Players
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="Players" leagueName={leagueName} />
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {view === "players"
             ? "Ranked by value for this league."

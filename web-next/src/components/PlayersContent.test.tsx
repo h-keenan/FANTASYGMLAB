@@ -70,7 +70,7 @@ describe("PlayersContent", () => {
   it("renders every player in the pool by default", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Players" })).toBeInTheDocument();
     expect(screen.getByText("Alpha Receiver")).toBeInTheDocument();
     expect(screen.getByText("Beta Back")).toBeInTheDocument();
     expect(screen.getByText("Gamma Kicker")).toBeInTheDocument();

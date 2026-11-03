@@ -23,6 +23,9 @@ export type NavGlyphName =
   | "community"
   | "games"
   | "commissioner"
+  | "playoffOdds"
+  | "pro"
+  | "account"
   | "founderAnalytics";
 
 /**
@@ -252,6 +255,31 @@ export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; s
         <svg {...common}>
           <path d="M256 64 96 120v120c0 100 68 172 160 208 92-36 160-108 160-208V120Z" {...stroke} />
           <path d="m184 256 52 52 96-104" {...stroke} />
+        </svg>
+      );
+    case "playoffOdds":
+      // A rising line over two baseline ticks: odds of a season outcome.
+      return (
+        <svg {...common}>
+          <path d="M80 400h352M80 400V96" {...stroke} />
+          <path d="m128 320 88-96 72 56 96-128" {...stroke} />
+          <path d="M320 152h64v64" {...stroke} />
+        </svg>
+      );
+    case "pro":
+      // A five-point star: the paid tier (mobile's Pro row uses star-outline).
+      return (
+        <svg {...common}>
+          <path d="m256 64 56 118 130 18-94 90 22 128-114-62-114 62 22-128-94-90 130-18Z" {...stroke} />
+        </svg>
+      );
+    case "account":
+      // Head and shoulders in a circle: the signed-in person.
+      return (
+        <svg {...common}>
+          <circle cx="256" cy="256" r="192" {...stroke} />
+          <circle cx="256" cy="212" r="56" {...stroke} />
+          <path d="M132 392c24-60 70-88 124-88s100 28 124 88" {...stroke} />
         </svg>
       );
     case "founderAnalytics":

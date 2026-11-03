@@ -22,6 +22,7 @@ import {
 } from "@/lib/myTeamPresentation";
 import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports modules/my_team_ui.py's render_my_team_workspace for Revision 2 —
@@ -215,10 +216,7 @@ export function MyTeamContent({
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          My Team
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="My Team" leagueName={leagueName} />
         <BeginnerHelp term="myTeamIntro" />
         <BeginnerHelp term="myTeamValueTiers" />
       </header>

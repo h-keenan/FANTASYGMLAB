@@ -44,6 +44,7 @@ import { buildProtectRows, splitProtectRows, type ProtectRow } from "@/lib/teamS
 import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTargetsPresentation";
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -622,10 +623,7 @@ export function GmPlanContent({
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          GM Plan
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="GM Plan" leagueName={leagueName} />
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Roadmap, stance, and watched players.
         </p>

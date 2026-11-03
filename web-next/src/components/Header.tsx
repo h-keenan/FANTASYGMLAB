@@ -378,7 +378,7 @@ export function Header() {
             className="px-3 py-2.5 text-xs font-bold uppercase min-h-[var(--touch-target-min)]"
             style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", letterSpacing: "0.03em" }}
           >
-            Menu
+            Account
           </button>
 
           {menuOpen ? (
@@ -427,7 +427,7 @@ export function Header() {
                     className="px-3 py-3 text-xs font-semibold"
                     style={{ color: "var(--color-text-secondary)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
                   >
-                    Account
+                    Account settings
                   </Link>
                 ) : null}
                 {LEGAL_LINKS.map((item) => (
