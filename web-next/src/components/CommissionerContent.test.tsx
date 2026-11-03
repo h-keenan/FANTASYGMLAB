@@ -67,4 +67,25 @@ describe("CommissionerContent", () => {
     // One page title; the upsell title is a section heading, not a second <h1>.
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
+
+  it("shows a repeated-trade pair as worth a look with its evidence and innocent explanations", async () => {
+    vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(
+      body({
+        collusion: [
+          {
+            roster_ids: [3, 9], beneficiary_name: "Alpha", giver_name: "Bravo", headline: "Alpha and Bravo",
+            summary: "4 trades between them with a repeating pattern worth a look", patterns: ["round_trip"],
+            trades_between: 4, lopsided_same_direction: 0, band: "worth_a_look", band_label: "Worth a look", confidence: "low",
+            evidence: ["3 assets went back and forth between them across 4 trades (2026 1st)."],
+            innocent_explanations: ["A trade can be undone or reworked."],
+          },
+        ],
+      }),
+    );
+    render(<CommissionerContent leagueId="L1" leagueName="My League" />);
+    expect(await screen.findByText("Alpha and Bravo")).toBeTruthy();
+    expect(screen.getByText(/repeating pattern worth a look/)).toBeTruthy();
+    expect(screen.getByText(/went back and forth/)).toBeTruthy();
+    expect(screen.getByText("A trade can be undone or reworked.")).toBeTruthy();
+  });
 });

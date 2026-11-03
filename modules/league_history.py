@@ -202,6 +202,7 @@ def _pick_asset(pick: Mapping[str, Any], *, to_roster_id: int, from_roster_id: i
         "team": "",
         "season": _text(pick.get("season")),
         "round": _positive_int(pick.get("round"), 0) or None,
+        "original_roster_id": _positive_int(pick.get("roster_id"), 0) or None,
         "label": label,
         "roster_id": to_roster_id,
         "from_roster_id": from_roster_id,

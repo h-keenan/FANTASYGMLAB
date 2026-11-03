@@ -143,13 +143,12 @@ function CollusionCard({ pair }: { pair: IntegrityCollusionPair }) {
     <AccentCard accent={bandColor(pair.band)} as="article">
       <div className="flex items-start justify-between gap-2">
         <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          {pair.giver_name} and {pair.beneficiary_name}
+          {pair.headline}
         </span>
         <ToneBadge label={BAND_LABEL[pair.band]} color={bandColor(pair.band)} />
       </div>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        {pair.trades_between} trades between them; {pair.lopsided_same_direction} lopsided in {pair.beneficiary_name}&rsquo;s favor ·{" "}
-        {CONFIDENCE_LABEL[pair.confidence]}
+        {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
       </p>
       <Bullets title="Evidence" items={pair.evidence} />
       <Bullets title="Could be innocent" items={pair.innocent_explanations} />
@@ -211,8 +210,8 @@ export function CommissionerView({
 
       {data.collusion.length ? (
         <section className="flex flex-col gap-3">
-          <SectionHeading note="Same two managers, repeated one-sided trades. Picks are not valued, so trades with picks are never flagged.">
-            Repeated lopsided trades
+          <SectionHeading note="Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict.">
+            Repeated trades worth a look
           </SectionHeading>
           {data.collusion.map((pair) => (
             <CollusionCard key={pair.roster_ids.join("-")} pair={pair} />

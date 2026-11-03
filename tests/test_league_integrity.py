@@ -252,10 +252,142 @@ def test_balanced_repeat_trades_and_pick_trades_are_not_flagged():
     even = [_trade(2, "a", 3, 4, "p0", "p1"), _trade(4, "b", 3, 4, "p2", "p3"), _trade(5, "c", 4, 3, "p4", "p5")]
     r1 = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=even, values=values, current_week=7)
     assert r1["collusion"] == []
-    with_picks = [dict(_trade(2, "a", 3, 4, "star1", "scrub1"), draft_picks=[{"to_roster_id": 3, "from_roster_id": 4}])] * 3
+    with_picks = [
+        dict(_trade(w, f"a{w}", 3, 4, "star1", "scrub1"), draft_picks=[{"to_roster_id": 3, "from_roster_id": 4}])
+        for w in (2, 3, 4)
+    ]
     values2 = {"star1": {"value_score": 6000}, "scrub1": {"value_score": 500}}
     r2 = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=with_picks, values=values2, current_week=7)
+    # A pick on the transaction that is not on either side cannot be priced: never scored.
     assert r2["collusion"] == []
+
+
+def _pick(season, rnd, to, frm, orig=None):
+    return {"kind": "pick", "season": str(season), "round": rnd, "name": f"{season} {rnd}", "to_roster_id": to,
+            "from_roster_id": frm, "original_roster_id": orig or frm}
+
+
+def _swap(week, tid, a, b, a_gets, b_gets, *, ts=0):
+    """Two-party trade. a_gets / b_gets: lists of ('player', pid) or ('pick', season, round, orig)."""
+
+    def assets(items, to, frm):
+        out = []
+        for it in items:
+            out.append({"kind": "player", "player_id": it[1], "name": it[1]} if it[0] == "player"
+                       else _pick(it[1], it[2], to, frm, it[3] if len(it) > 3 else frm))
+        return out
+
+    a_in, b_in = assets(a_gets, a, b), assets(b_gets, b, a)
+    return {
+        "transaction_id": tid, "type": "trade", "status": "complete", "week": week, "timestamp": ts or week * 1000,
+        "roster_ids": [a, b],
+        "draft_picks": [x for x in a_in + b_in if x["kind"] == "pick"],
+        "sides": [
+            {"roster_id": a, "receives": a_in, "drops": [x for x in b_in if x["kind"] == "player"]},
+            {"roster_id": b, "receives": b_in, "drops": [x for x in a_in if x["kind"] == "player"]},
+        ],
+    }
+
+
+PICK_VALUES = {f"v{i}": {"value_score": 3000} for i in range(8)} | {"scrub": {"value_score": 500}}
+
+
+def test_pick_priced_lopsided_repeat_trades_are_seen():
+    # Team 4 keeps paying 1st-round picks for a low-value player: invisible before picks were priced.
+    txs = [
+        _swap(2, "a", 3, 4, [("pick", 2027, 1, 4)], [("player", "scrub")]),
+        _swap(4, "b", 3, 4, [("pick", 2028, 1, 4)], [("player", "scrub")]),
+        _swap(5, "c", 3, 4, [("pick", 2026, 1, 4), ("pick", 2026, 2, 4)], [("player", "scrub")]),
+    ]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    pair = report["collusion"][0]
+    assert "lopsided" in pair["patterns"] and pair["lopsided_same_direction"] == 3
+    assert pair["beneficiary_roster_id"] == 3 and pair["giver_roster_id"] == 4
+    assert pair["band"] == li.BAND_STRONG
+    assert any("2027 1" in line for line in pair["evidence"])  # the priced pick is named in the evidence
+
+
+def test_two_pick_lopsided_trades_is_only_worth_a_look():
+    txs = [_swap(2, "a", 3, 4, [("pick", 2027, 1, 4)], [("player", "scrub")]),
+           _swap(4, "b", 3, 4, [("pick", 2028, 1, 4)], [("player", "scrub")])]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    assert report["collusion"][0]["band"] == li.BAND_LOOK
+
+
+def test_balanced_pick_for_pick_trades_are_not_flagged():
+    txs = [_swap(2, "a", 3, 4, [("pick", 2027, 1, 4)], [("pick", 2027, 1, 3)]),
+           _swap(4, "b", 3, 4, [("pick", 2028, 2, 4)], [("pick", 2028, 2, 3)]),
+           _swap(5, "c", 4, 3, [("pick", 2029, 2, 3)], [("pick", 2029, 2, 4)])]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    assert report["collusion"] == []
+
+
+def test_same_picks_moved_back_and_forth_three_times_is_worth_a_look():
+    # Real pattern (league 1312122984617476096, rosters 3 and 9): same picks A->B->A->B in week 1.
+    picks = [("pick", 2026, 2, 9), ("pick", 2027, 2, 9)]  # ~6400 priced vs 6000 of players: not lopsided
+    txs = [_swap(1, "a", 3, 4, picks, [("player", "v0"), ("player", "v1")], ts=1),
+           _swap(1, "b", 4, 3, picks, [("player", "v2"), ("player", "v3")], ts=2),
+           _swap(1, "c", 3, 4, picks, [("player", "v4"), ("player", "v5")], ts=3)]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    pair = report["collusion"][0]
+    assert pair["patterns"] == ["round_trip"] and pair["band"] == li.BAND_LOOK and pair["confidence"] == "low"
+    assert pair["beneficiary_roster_id"] is None and pair["lopsided_same_direction"] == 0
+    assert "went back and forth" in pair["evidence"][0]
+    # Never accusing language.
+    text = " ".join(pair["evidence"] + [pair["summary"], pair["headline"]]).lower()
+    assert not any(w in text for w in ("collu", "cheat", "fraud", "rigg"))
+    assert pair["innocent_explanations"]
+
+
+def test_three_trades_between_a_pair_in_one_week_is_worth_a_look():
+    # Real pattern (rosters 3 and 6, week 4): three separate, otherwise balanced trades in one week.
+    txs = [_swap(4, "a", 3, 4, [("player", "v0")], [("player", "v1")], ts=1),
+           _swap(4, "b", 3, 4, [("player", "v2")], [("player", "v3")], ts=2),
+           _swap(4, "c", 3, 4, [("player", "v4")], [("player", "v5")], ts=3)]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    pair = report["collusion"][0]
+    assert pair["patterns"] == ["burst"] and pair["band"] == li.BAND_LOOK
+    assert "3 trades between them in week 4" in pair["evidence"][0]
+
+
+def test_week_one_offseason_trades_never_count_as_a_burst():
+    txs = [_swap(1, "a", 3, 4, [("player", "v0")], [("player", "v1")], ts=1),
+           _swap(1, "b", 3, 4, [("player", "v2")], [("player", "v3")], ts=2),
+           _swap(1, "c", 3, 4, [("player", "v4")], [("player", "v5")], ts=3)]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    assert report["collusion"] == []
+
+
+def test_returns_months_apart_are_ordinary_trading_not_a_pattern():
+    day = 24 * 3600 * 1000
+    picks = [("pick", 2027, 2, 4), ("pick", 2027, 4, 4)]
+    txs = [_swap(1, "a", 3, 4, [("player", "v0")], [("player", "v1")], ts=1 * day),
+           _swap(4, "b", 3, 4, picks, [("player", "v2"), ("player", "v3")], ts=40 * day),
+           _swap(8, "c", 4, 3, picks, [("player", "v4"), ("player", "v5")], ts=80 * day)]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=9)
+    assert report["collusion"] == []
+
+
+def test_a_single_undone_trade_is_below_the_minimum_sample():
+    txs = [_swap(2, "a", 3, 4, [("player", "v0")], [("player", "v1")]), _swap(3, "b", 3, 4, [("player", "v1")], [("player", "v0")])]
+    report = li.build_league_integrity(**build({t: sensible for t in TEAMS}), transactions=txs, values=PICK_VALUES, current_week=7)
+    assert report["collusion"] == []
+
+
+def test_trade_with_unpriceable_pick_is_not_scored():
+    bad = _swap(2, "a", 3, 4, [("pick", 2027, 1, 4)], [("player", "scrub")])
+    bad["draft_picks"][0]["round"] = None
+    bad["sides"][0]["receives"][0]["round"] = None
+    legs = li.trade_legs([bad], PICK_VALUES)
+    assert legs[0]["valued"] is False
+
+
+def test_pick_price_comes_from_the_trade_analyzer_pick_table():
+    from modules.trade_ideas import canonical_pick_identity_value
+
+    legs = li.trade_legs([_swap(2, "a", 3, 4, [("pick", 2027, 1, 4)], [("player", "scrub")])], PICK_VALUES)
+    assert legs[0]["legs"][3]["received"] == canonical_pick_identity_value({"round": 1})
+    assert legs[0]["legs"][3]["sent"] == 500
 
 
 def test_inactive_manager_same_lineup_no_moves_and_empty_slots():
