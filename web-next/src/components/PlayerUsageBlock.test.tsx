@@ -41,7 +41,7 @@ describe("PlayerUsageBlock", () => {
     });
     render(<PlayerUsageBlock profile={profile()} position="WR" playerId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Snap share percentile explorer" }));
-    await waitFor(() => expect(api.getPercentileExplorer).toHaveBeenCalledWith("p1", "snap", "position"));
+    await waitFor(() => expect(api.getPercentileExplorer).toHaveBeenCalledWith("p1", "snap", "position", true));
     expect(await screen.findByTestId("pe-sample-note")).toHaveTextContent(/at least 4 games played in 2026/);
   });
 

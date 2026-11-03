@@ -107,3 +107,22 @@ def test_usage_stat_is_omitted_when_the_pool_is_missing(monkeypatch):
 
     monkeypatch.setattr(usage_trends, "season_pool_table", lambda season=None: pd.DataFrame(columns=["position", "games"]))
     assert _build(_pool_with_subject(30), stat="air_yards_share")["reason"] == "insufficient_pool"
+
+
+def test_full_pool_is_opt_in_and_matches_the_histogram_exactly():
+    players = _pool_with_subject(40)
+    assert "pool_players" not in _build(players)
+    payload = px.build_explorer(players, _subject_row(players), stat="ppr_ppg", pool="position", full_pool=True)
+    pool_players = payload["pool_players"]
+    assert len(pool_players) == payload["pool_size"] == sum(b["count"] for b in payload["bins"])
+    assert len({p["player_id"] for p in pool_players}) == len(pool_players)
+    assert any(p["player_id"] == "fixture-player" for p in pool_players)
+    values = [p["value"] for p in pool_players]
+    assert values == sorted(values, reverse=True)
+    # Ascending slices by bin counts put every player inside his bin's value range.
+    ascending = list(reversed(pool_players))
+    offset = 0
+    for b in payload["bins"]:
+        for p in ascending[offset : offset + b["count"]]:
+            assert b["value_start"] - 0.06 <= p["value"] <= b["value_end"] + 0.06
+        offset += b["count"]

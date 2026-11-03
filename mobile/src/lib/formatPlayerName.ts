@@ -25,7 +25,13 @@ export function abbreviatePlayerName(name: string | null | undefined): string {
   // Single-word names (mononyms) have no "first name" to shrink to an
   // initial — return as-is rather than producing "N." with nothing after it.
   if (parts.length < 2) return trimmed;
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+  const [first, ...rest] = parts;
+  // A first name that is already initials ("D.K.", "A.J.", "J.") or an
+  // all-caps initialism ("CJ", "DJ", "TJ") is the player's real identity:
+  // keep it whole instead of collapsing it to a misleading single letter.
+  if (/^(?:\p{L}\.){1,3}$/u.test(first) || /^\p{Lu}{2,3}$/u.test(first)) return trimmed;
+  const initial = Array.from(first)[0];
+  return `${initial}. ${rest.join(' ')}`;
 }
 
 /**

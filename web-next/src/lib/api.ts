@@ -4123,9 +4123,9 @@ export const api = {
     authorizedRequest<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
 
   // Percentile Explorer: distribution + nearby real players behind one stat tile.
-  getPercentileExplorer: (playerId: string, stat: string, pool: "position" | "all") =>
+  getPercentileExplorer: (playerId: string, stat: string, pool: "position" | "all", full = false) =>
     authorizedRequest<PercentileExplorerResponse>(
-      `/v1/players/${encodeURIComponent(playerId)}/percentile-explorer?stat=${encodeURIComponent(stat)}&pool=${pool}`,
+      `/v1/players/${encodeURIComponent(playerId)}/percentile-explorer?stat=${encodeURIComponent(stat)}&pool=${pool}${full ? "&full=true" : ""}`,
     ),
 
   // Shared PlayerQuickView modal (Revision 22) — the same verified-badges

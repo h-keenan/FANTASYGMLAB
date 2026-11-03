@@ -388,6 +388,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
           playerId={player.player_id}
           statKey={explorer.key}
           statLabel={explorer.label}
+          leagueId={request.league?.leagueId ?? fallback?.leagueId ?? null}
           onClose={() => setExplorer(null)}
           onOpenPlayer={openExplorerPlayer}
         />
