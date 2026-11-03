@@ -40,4 +40,16 @@ describe("landing forced-dark theme", () => {
     expect(rule(".lp .lp-cta > * {")).toContain("min-height: 52px");
     expect(rule(".lp-footer-links a {")).toContain("min-height: var(--touch-target-min)");
   });
+
+  it("landing root is not its own scroll container (no phantom scroll space from the sweep)", () => {
+    const start = css.lastIndexOf(".fd-landing-dark,\n[data-onboarding-root] {");
+    const block = css.slice(start, css.indexOf("}", start));
+    expect(block).toContain("overflow: clip");
+    expect(block).not.toMatch(/^\s*overflow-y: auto;/m);
+  });
+
+  it("signed-in visitors never see the marketing blocks; onboarding steps scroll under a pinned footer", () => {
+    expect(rule("[data-landing-signed-in] .lp-marketing {")).toContain("display: none");
+    expect(rule(".onboarding-scroll {")).toContain("overflow-y: auto");
+  });
 });

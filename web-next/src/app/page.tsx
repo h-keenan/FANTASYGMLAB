@@ -91,7 +91,7 @@ export default function LandingPage() {
               links. For utm_campaign=share_card the h1 swaps to the shared-
               analysis line via a pre-paint flag (lib/landingShare.ts); no
               data is carried in the URL. */}
-          <header className="lp-hero">
+          <header className="lp-hero lp-marketing">
             <Image
               src="/share-card/lockup-white.png"
               alt="FantasyDesk"
@@ -120,7 +120,7 @@ export default function LandingPage() {
             <AppStoreModules />
           </header>
 
-          <section aria-labelledby="lp-how-heading" className="lp-section">
+          <section aria-labelledby="lp-how-heading" className="lp-section lp-marketing">
             <h2 id="lp-how-heading" className="lp-h2">
               How it works
             </h2>
@@ -139,7 +139,7 @@ export default function LandingPage() {
             </ol>
           </section>
 
-          <section aria-labelledby="lp-features-heading" className="lp-section">
+          <section aria-labelledby="lp-features-heading" className="lp-section lp-marketing">
             <h2 id="lp-features-heading" className="lp-h2">
               Built for the decisions you actually make
             </h2>
@@ -156,10 +156,12 @@ export default function LandingPage() {
           <LandingScreens />
 
           <section id="get-started" aria-labelledby="lp-start-heading" className="lp-section lp-start">
-            <h2 id="lp-start-heading" className="lp-h2">
+            <h2 id="lp-start-heading" className="lp-h2 lp-marketing">
               Create your account
             </h2>
-            <LandingTrialHeadline />
+            <div className="lp-marketing">
+              <LandingTrialHeadline />
+            </div>
             {/* useSearchParams() (for ?billing=success) needs a Suspense
                 boundary or this page's static prerender fails the build.
                 Only the island sits inside it. */}
@@ -169,7 +171,7 @@ export default function LandingPage() {
             {/* Keep in step with ESPN_SUPPORTED_SEGMENTS in lib/leaguePlatform.ts
                 and docs/platform-import-status.md: imported leagues get Dashboard,
                 Matchup, My Team, Trade Analyzer, Players and League Rankings. */}
-            <p className="lp-note">
+            <p className="lp-note lp-marketing">
               Works with Sleeper leagues, plus public ESPN, Fleaflicker and MFL leagues (Dashboard, Matchup, My Team,
               Trade Analyzer, Players and League Rankings).
             </p>

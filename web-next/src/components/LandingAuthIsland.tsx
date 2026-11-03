@@ -11,7 +11,7 @@ import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
-import { setLandingPending } from "@/lib/landingPending";
+import { setLandingPending, setLandingSignedIn } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 import { analyzerBridgePath, bridgePickerPath, consumePendingBridge, pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
@@ -131,6 +131,13 @@ export function LandingAuthIsland() {
   // land on the cross-league Portfolio view instead of guessing which one;
   // zero saved leagues falls through to the normal sign-in flow below.
   // Only applies once, on load — never re-triggers mid-flow.
+  // Signed in => onboarding view: hide the marketing blocks (CSS keys off this).
+  const signedIn = !!session || accountReady;
+  useLayoutEffect(() => {
+    if (loading) return;
+    setLandingSignedIn(signedIn);
+  }, [loading, signedIn]);
+
   useEffect(() => {
     if (loading || !session || skippedExistingSession.current) return;
     skippedExistingSession.current = true;

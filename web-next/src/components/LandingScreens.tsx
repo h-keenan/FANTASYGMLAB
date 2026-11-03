@@ -15,7 +15,7 @@ const SCREEN_KEYS = ["tradehub", "gameplan", "matchup", "waivers"] as const;
 export function LandingScreens() {
   const items = SCREEN_KEYS.map((key) => ONBOARDING_FEATURES.find((f) => f.key === key)!);
   return (
-    <section aria-labelledby="lp-screens-heading" className="lp-section">
+    <section aria-labelledby="lp-screens-heading" className="lp-section lp-marketing">
       <h2 id="lp-screens-heading" className="lp-h2">
         See it in action
       </h2>

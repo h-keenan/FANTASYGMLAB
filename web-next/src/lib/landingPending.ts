@@ -37,3 +37,19 @@ export function setLandingPending(pending: boolean) {
   if (pending) root.setAttribute(LANDING_PENDING_ATTR, "");
   else root.removeAttribute(LANDING_PENDING_ATTR);
 }
+
+/**
+ * A signed-in visitor (just signed up, or returning with no league yet) is in
+ * onboarding -> connect -> offer, not browsing marketing. The island sets
+ * this on the landing root and CSS hides every `.lp-marketing` block, so the
+ * hero, screenshots and sign-up copy never sit above the connect form or the
+ * Premium offer. See .lp-marketing in globals.css.
+ */
+export const LANDING_SIGNED_IN_ATTR = "data-landing-signed-in";
+
+export function setLandingSignedIn(signedIn: boolean) {
+  const root = document.getElementById(LANDING_ROOT_ID);
+  if (!root) return;
+  if (signedIn) root.setAttribute(LANDING_SIGNED_IN_ATTR, "");
+  else root.removeAttribute(LANDING_SIGNED_IN_ATTR);
+}

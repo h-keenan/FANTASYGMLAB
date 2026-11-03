@@ -1899,8 +1899,18 @@ body:has(.fd-landing-dark) .brand-mark-icon {
      a visitor scroll to content that doesn't fit. Zach: "why is it cut
      off" (screenshot of the real landing page, Continue button right at
      the window edge). */
-  overflow-x: hidden;
-  overflow-y: auto;
+  /* 2026-11-02 (coridian_: "~900px of empty black at the bottom, scroll
+     feels rubber-bandy"): overflow-y:auto made this <main> its own scroll
+     container, and .onboarding-sweep (top:-20%, height:140%) then added 20%
+     of the page height as scrollable empty space below the content, nested
+     inside the document scroll. `clip` still clips the sweep but is not a
+     scroll container, so the document is the only scroller and the page ends
+     where its content ends. Content can't be cut off: this box grows with it. */
+  overflow: clip;
+}
+/* Keep the last content clear of iOS Safari's bottom bar / home indicator. */
+.fd-landing-content {
+  padding-bottom: max(var(--space-lg), env(safe-area-inset-bottom));
 }
 
 /* Same hand-rolled animated field-line + sweep background the carousel
@@ -1963,6 +1973,10 @@ body:has(.fd-landing-dark) .brand-mark-icon {
    attribute (new visitors, and every no-JS crawler) the marketing view
    shows and the loader stays hidden. */
 .fd-landing-loader {
+  display: none;
+}
+/* Signed-in visitors are in onboarding/connect/offer, never marketing. */
+[data-landing-signed-in] .lp-marketing {
   display: none;
 }
 [data-landing-pending] > .fd-landing-loader {
@@ -2108,6 +2122,18 @@ body:has(.fd-landing-dark) .brand-mark-icon {
    local build (every other .onboarding-* class survived intact). Moved
    up here, away from the tail of the file, as the fix — not touching the
    rules themselves, which were already correct. */
+/* Step content scrolls inside this region while the topbar and the footer
+   (primary button) stay put, so Continue is reachable on any phone height
+   (360x640 to 430x932) and under iOS Safari's bottom bar (shell is 100dvh). */
+.onboarding-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .onboarding-footer {
   margin-top: auto;
   padding: var(--space-md) 0 max(var(--space-lg), env(safe-area-inset-bottom));

@@ -33,5 +33,6 @@ def test_premium_and_landing_use_full_trade_hub():
     assert "PREMIUM_FULL_TRADE_HUB" in PREMIUM
     assert product_copy.PREMIUM_FULL_TRADE_HUB == "Full Trade Hub"
     html = (ROOT / "static" / "landing" / "index.html").read_text(encoding="utf-8")
-    assert "Full Trade Hub" in html
+    # The apex landing no longer carries a Free-vs-Premium table (pricing lives
+    # in the app); it must not reintroduce the old "Full trade board" naming.
     assert "Full trade board" not in html

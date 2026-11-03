@@ -462,3 +462,18 @@ describe("LandingPage share-card redesign", () => {
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 });
+
+describe("LandingPage signed-in view", () => {
+  it("flags the root signed-in (CSS hides marketing) once a session resolves, and not for guests", async () => {
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [] });
+    const { unmount } = render(<LandingPage />);
+    await waitFor(() => expect(document.getElementById(LANDING_ROOT_ID)).toHaveAttribute("data-landing-signed-in"));
+    expect(document.querySelectorAll(".lp-marketing").length).toBeGreaterThan(3);
+    unmount();
+    mockAuth(null);
+    render(<LandingPage />);
+    await screen.findByText("SignInForm");
+    expect(document.getElementById(LANDING_ROOT_ID)).not.toHaveAttribute("data-landing-signed-in");
+  });
+});
