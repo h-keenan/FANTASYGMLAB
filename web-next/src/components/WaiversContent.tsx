@@ -132,6 +132,17 @@ function ReasonChips({ chips }: { chips: string[] }) {
   );
 }
 
+/** Display-only role flag (modules/usage_trends.py) shown beside the other reason chips. */
+function UsageFlagChip({ player }: { player: WaiverPriorityAdd }) {
+  const flag = player.usage_flag;
+  if (!flag) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5" data-testid="waiver-usage-flag">
+      <ToneBadge label={flag.label} color={flag.tone === "positive" ? "var(--color-success)" : "var(--color-danger)"} />
+    </div>
+  );
+}
+
 function FaabRange({ player, prominent = false }: { player: WaiverPriorityAdd; prominent?: boolean }) {
   const { primary, secondary } = faabRangeText(player.faab);
   const isBid = faabIsBid(player.faab);
@@ -202,6 +213,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
       </div>
       <WaiverIdentity player={player} avatarSize={56} />
       <ReasonChips chips={waiverReasonChips(player)} />
+      <UsageFlagChip player={player} />
       <div
         className="flex items-center justify-between gap-3 pt-3"
         style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}
@@ -213,6 +225,12 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
         <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
           <span className="font-bold">Why: </span>
           {player.faab.why}
+        </p>
+      ) : null}
+      {player.usage_flag ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          <span className="font-bold">Usage: </span>
+          {player.usage_flag.explanation}
         </p>
       ) : null}
       <BeginnerHelp term="waiverValue" />
@@ -260,6 +278,7 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
         </span>
       </span>
       <ReasonChips chips={waiverReasonChips(player)} />
+      <UsageFlagChip player={player} />
       <span className="flex items-center gap-3 pl-8 w-full">
         <ValueWithRing player={player} />
         <span className="ml-auto">
