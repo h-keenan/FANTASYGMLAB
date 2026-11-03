@@ -106,6 +106,7 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
         <View style={styles.infoNoteWrap}>
           <PremiumLock
             feature="playoff_odds"
+            leagueName={leagueName}
             title={locked.title || 'Your real shot at the playoffs'}
             description={
               locked.body ||

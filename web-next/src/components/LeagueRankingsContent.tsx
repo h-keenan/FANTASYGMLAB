@@ -227,7 +227,15 @@ function PlayoffOddsRow({ team, rankLabel, myRosterId }: { team: PlayoffOddsTeam
   );
 }
 
-function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRosterId: string }) {
+/** The one real fact the Playoff Odds wall can show a Free user: where they
+ * stand right now, straight from this page's own standings. */
+function playoffOddsExample(team: TeamRanking | undefined, leagueName: string): string | undefined {
+  if (!team || team.standing_rank == null || !team.record_label) return undefined;
+  const status = team.playoff_status ? ` (${team.playoff_status})` : "";
+  return `Right now you're ${formatRank(team.standing_rank)} in ${leagueName} at ${team.record_label}${status}. Playoff Odds turns that into a real playoff chance.`;
+}
+
+function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leagueId: string; leagueName: string; myRosterId: string; myTeam?: TeamRanking }) {
   const [state, setState] = useState<"idle" | "loading" | "error" | "ready">("idle");
   const [result, setResult] = useState<PlayoffOddsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -281,6 +289,8 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
         <PremiumUpsellCard
           bare
           kicker="Playoff Odds"
+          leagueName={leagueName}
+          example={playoffOddsExample(myTeam, leagueName)}
           upsell={result.upsell ?? null}
           fallbackTitle="Your real shot at the playoffs"
           fallbackBody="Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
@@ -376,7 +386,7 @@ export function LeagueRankingsContent({
       ) : (
         <>
           <StandingsSection data={data} myRosterId={myRosterId} onOpenManager={openManager} />
-          <PlayoffOddsSection leagueId={leagueId} myRosterId={myRosterId} />
+          <PlayoffOddsSection leagueId={leagueId} leagueName={leagueName} myRosterId={myRosterId} myTeam={data.teams.find((team) => team.roster_id === myRosterId)} />
           <RankBoardSection board="power" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
           <RankBoardSection board="franchise" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
           <RankBoardSection board="draft_capital" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />

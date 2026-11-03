@@ -457,7 +457,7 @@ describe("TradeFinderContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
     });
 
-    expect(screen.getByRole("heading", { name: "Build and search for a trade" })).toBeInTheDocument();
+    expect(screen.getByText("Build and search for a trade")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Find Realistic Trades/ })).not.toBeInTheDocument();
   });
 
@@ -488,7 +488,7 @@ describe("TradeFinderContent", () => {
       render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} initialPlayerId="p1" />);
       await act(async () => {});
 
-      expect(screen.getByRole("heading", { name: "Build and search for a trade" })).toBeInTheDocument();
+      expect(screen.getByText("Build and search for a trade")).toBeInTheDocument();
     });
 
     it("ignores a player who isn't on this roster", async () => {

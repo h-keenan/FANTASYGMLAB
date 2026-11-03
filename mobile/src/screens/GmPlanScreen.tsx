@@ -261,6 +261,8 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const gateNotice = locked ? (
     <>
       <PremiumLock
+        feature="gm_plan"
+        leagueName={leagueName}
         title={plan?.upsell?.title || 'Your season-arc roadmap'}
         description={plan?.upsell?.body || 'GM Plan is a Pro feature: where you stand, your best trade paths, and your roster construction.'}
       />

@@ -311,6 +311,7 @@ export function CommissionerContent({ leagueId, leagueName }: { leagueId: string
       ) : data.is_premium === false ? (
         <PremiumUpsellCard
           kicker="Commissioner"
+          leagueName={leagueName}
           upsell={data.upsell ?? null}
           fallbackTitle="Spot tanking and lineup problems early"
           fallbackBody="League integrity is a Pro feature for commissioners."

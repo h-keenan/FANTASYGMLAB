@@ -12,6 +12,7 @@ import { useIsRestoring, useQueries, useQuery } from '@tanstack/react-query';
 import BrandedSpinner from '../components/BrandedSpinner';
 import FadeInView from '../components/FadeInView';
 import EmptyState from '../components/EmptyState';
+import PremiumLock from '../components/PremiumLock';
 import GridBackground from '../components/GridBackground';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
 import TeamAvatar from '../components/TeamAvatar';
@@ -234,17 +235,16 @@ export default function PortfolioScreen() {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
-        <EmptyState
-          icon="star-outline"
-          title={index.upsell?.title ?? 'Portfolio is a Pro feature'}
-          subtitle={
-            index.upsell?.body ??
-            'Upgrade to Pro to see your standing across every saved league in one place.'
-          }
-          actionLabel="Upgrade to Pro"
-          actionVariant="premium"
-          onPressAction={() => navigation.navigate('Paywall')}
-        />
+        <View style={styles.lockWrap}>
+          <PremiumLock
+            feature="portfolio"
+            title={index.upsell?.title ?? 'Portfolio is a Pro feature'}
+            description={
+              index.upsell?.body ??
+              'Upgrade to Pro to see your standing across every saved league in one place.'
+            }
+          />
+        </View>
       </View>
     );
   }
@@ -631,6 +631,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
     list: { backgroundColor: 'transparent' },
+    lockWrap: { padding: spacing.lg },
     listContent: { padding: spacing.lg },
     infoNoteWrap: { marginBottom: spacing.md, gap: spacing.sm },
     headerBlock: { gap: spacing.xs },
