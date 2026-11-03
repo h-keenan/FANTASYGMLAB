@@ -4947,7 +4947,9 @@ def _project_usage_trend(row: pd.Series) -> dict[str, Any] | None:
     return rankings.recency_trend_display(row)
 
 
-def _project_usage_profile(row: pd.Series, players_df: pd.DataFrame | None = None) -> dict[str, Any]:
+def _project_usage_profile(
+    row: pd.Series, players_df: pd.DataFrame | None = None, *, pro: bool = False
+) -> dict[str, Any]:
     """Rolling last-4/last-8 usage and role flags (modules.usage_trends).
 
     Always a dict so clients can render an explicit state: ``status`` is
@@ -4955,11 +4957,18 @@ def _project_usage_profile(row: pd.Series, players_df: pd.DataFrame | None = Non
     ``not_covered``, or ``unavailable`` when an input lookup failed (logged and
     reported, never swallowed into a fake "no trend"; programming errors
     propagate, see modules.model_status).
+
+    Advanced usage is Pro (owner decision 2026-11-03): with ``pro=False`` the
+    server drops everything beyond the player's Sleeper-basic season usage
+    (``usage_trends.free_view``) and marks the block ``gated``; the client
+    never decides what to hide.
     """
 
     player_id = str(row.get("player_id") or "")
     try:
         profile = usage_trends.profile_for_player(player_id, str(row.get("position") or ""))
+        if not pro:
+            profile = usage_trends.free_view(profile)
         # Each pool metric carries its explorer key (so the tap opens the same
         # percentile pop-up as every other stat) and, when the position pool is
         # large enough, its percentile with the season/sample stated.
@@ -5716,7 +5725,9 @@ def _trade_overflow_planner(
                 logger.warning("usage trends unavailable for roster-full check", exc_info=True)
                 model_status.add(status, "usage_trends_unavailable")
                 lazy["stats"] = {}
-        return _waiver_usage_guard(rvc, lazy["stats"])
+        if "pro" not in lazy:
+            lazy["pro"] = _is_pro_caller(user)
+        return _waiver_usage_guard(rvc, lazy["stats"], display=lazy["pro"])
 
     def plan(send_assets: list[dict[str, Any]], receive_assets: list[dict[str, Any]]) -> dict[str, Any] | None:
         send_ids = tuple(sorted(str(a.get("player_id")) for a in send_assets if a.get("asset_type") == "player"))
@@ -6168,6 +6179,9 @@ def post_trade_analyzer(
         # clients show the reasons as a "limited data" note.
         "model_status": analyzer_status,
         "trade_window": trade_window,
+        # Pro only (advanced usage; owner decision 2026-11-03): display-only
+        # role-change lines for the players in this package. Omitted for Free.
+        **({"role_notes": _role_change_notes([*send_assets, *receive_assets])} if _is_pro_caller(user) else {}),
         # Read-only description of what this verdict assumed (format, lens,
         # posture, projections vs values, injury timing); see
         # modules.verdict_assumptions. Never feeds back into the verdict.
@@ -6479,6 +6493,22 @@ def _is_pro_caller(user: dict[str, Any]) -> bool:
     Pro, so they pass. Checked before any computation or catalog read."""
 
     return _manager_tendencies_gate(user)
+
+
+def _role_change_notes(assets: list[dict[str, Any]]) -> list[str]:
+    """Display-only role-change lines for the players in a package (Pro only;
+    callers decide). Never feeds a score, verdict or ranking."""
+
+    notes: list[str] = []
+    for asset in assets:
+        if asset.get("asset_type") != "player":
+            continue
+        line = usage_trends.role_change_line_for_player(
+            asset.get("player_id"), str(asset.get("position") or ""), str(asset.get("name") or "Player")
+        )
+        if line and line not in notes:
+            notes.append(line)
+    return notes
 
 
 @app.get("/v1/leagues/{league_id}/managers/tendencies")
@@ -8075,7 +8105,9 @@ def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dic
     }
 
 
-def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None) -> dict[str, Any]:
+def _project_player_model(
+    row: pd.Series, players_df: pd.DataFrame | None = None, *, pro: bool = False
+) -> dict[str, Any]:
     """The web dossier's "Model" grid — market/opportunity/scarcity/role/age/
     confidence/workload-trend — ported from app.py's player-card assembly
     (~app.py:4098-4110). Every field here is a plain column already present
@@ -8124,7 +8156,7 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
         "workload_trend": _clean_json_value(row.get("workload_trend")),
         "usage_trend": _project_usage_trend(row),
         "depth_chart_note": _project_depth_chart_note(row),
-        "usage_profile": _project_usage_profile(row, players_df),
+        "usage_profile": _project_usage_profile(row, players_df, pro=pro),
         "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),
         **{
             key: _clean_json_value(value)
@@ -8136,7 +8168,7 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
 @app.get("/v1/players/{player_id}/quick-view")
 def get_player_quick_view(
     player_id: str,
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Player Quick View: season stats + bio + model breakdown for the
     player detail screen.
@@ -8174,7 +8206,7 @@ def get_player_quick_view(
         "ok": True,
         "stats": _quick_view_stats_dict(stats),
         "bio": dataclasses.asdict(bio),
-        "model": _project_player_model(row, players_df),
+        "model": _project_player_model(row, players_df, pro=_is_pro_caller(user)),
         "identity": _quick_view_identity(player_id, row),
         "reason": "",
     }
@@ -8187,16 +8219,23 @@ def get_player_percentile_explorer(
     pool: str = "position",
     season: int | None = None,
     full: bool = False,
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Distribution + nearby real players behind one quick-view stat tile.
 
     Same pool/percentile primitive as the tiles (modules.percentile_explorer),
     and gated exactly like quick-view: any signed-in user, because the tile
     percentiles themselves are not Pro-gated. Only the loaded season exists, so
-    a different `season` returns reason "season_unavailable".
+    a different `season` returns reason "season_unavailable". The advanced
+    usage stats (air-yards share, opportunity share, red-zone looks) are Pro:
+    a Free caller gets `reason: "pro_required"` and no distribution.
     """
 
+    if stat in usage_trends.ADVANCED_EXPLORER_STATS and not _is_pro_caller(user):
+        return {
+            "ok": True, "stat": stat, "pool": pool, "reason": "pro_required", "scopes": ["season"],
+            "bins": [], "nearby": [], "player": None, "gating": dict(usage_trends.PRO_GATE),
+        }
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
@@ -13612,6 +13651,7 @@ def _matchup_side(
     matchup_entry: dict[str, Any] | None = None,
     bench_out: list[dict[str, Any]] | None = None,
     idp_result: dict[str, Any] | None = None,
+    role_lines: bool = False,
 ) -> dict[str, Any]:
     """One team's side of the matchup: identity, suggested starters, season-value total.
 
@@ -13674,6 +13714,13 @@ def _matchup_side(
 
     for player in starters:
         player["why"] = _matchup_starter_why(player, best_score_by_position)
+        if role_lines:
+            # Pro only, display-only: never changes who is suggested.
+            role = usage_trends.role_change_line_for_player(
+                player.get("player_id"), str(player.get("position") or ""), str(player.get("name") or "Player")
+            )
+            if role:
+                player["why"] = f"{player['why']} {role}".strip()
         # _suggested_lineup_split already attached this week's projection to
         # every row when a projection context exists (one computation per
         # player, reused here).
@@ -14768,6 +14815,7 @@ def _build_matchup(
         matchup_entry=my_entry,
         bench_out=my_bench if state is not None else None,
         idp_result=idp_result,
+        role_lines=_is_pro_caller(user),
     )
     opponent_side = _matchup_side(
         opponent_roster_id,
@@ -15072,14 +15120,20 @@ def _project_priority_add(
     opponent_by_team: dict[str, dict[str, Any]] | None = None,
     defense_strength_by_position: dict[str, dict[str, dict[str, Any]]] | None = None,
     season_stats: dict[str, Any] | None = None,
+    pro: bool = False,
 ) -> dict[str, Any]:
     projected = _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
     # Display-only usage explanation (modules.usage_trends). It never touches
     # the score, rank, recommendation label or FAAB math above/below; the
     # status says why a flag is absent ("unavailable" = no weekly stats loaded).
-    usage = usage_trends.explanation_hook(row.get("player_id"), str(row.get("position") or ""), season_stats)
-    projected["usage_flag"] = usage["flag"]
-    projected["usage_flag_status"] = usage["status"]
+    # Pro only (owner decision 2026-11-03): for Free the fields are omitted
+    # entirely and `usage_locked` says why.
+    if pro:
+        usage = usage_trends.explanation_hook(row.get("player_id"), str(row.get("position") or ""), season_stats)
+        projected["usage_flag"] = usage["flag"]
+        projected["usage_flag_status"] = usage["status"]
+    else:
+        projected["usage_locked"] = True
     position_rank = int(row.get("position_rank") or 99) or 99
     label, tone = waivers_logic.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
@@ -15197,9 +15251,13 @@ def _waiver_roster_value_bundle(
 
 
 def _waiver_usage_guard(
-    rvc: "roster_value_model.RosterValueContext", season_stats: dict[str, Any] | None
+    rvc: "roster_value_model.RosterValueContext", season_stats: dict[str, Any] | None, *, display: bool
 ) -> dict[str, dict[str, Any]]:
-    """Usage guard (hot streak / shrinking role) for the roster's skill players."""
+    """Usage guard (hot streak / shrinking role) for the roster's skill players.
+
+    The guard decision is the same for everyone; ``display=False`` (Free)
+    blanks the label/explanation so no advanced usage text reaches the payload.
+    """
 
     out: dict[str, dict[str, Any]] = {}
     for pid in rvc.limits.active_ids:
@@ -15207,7 +15265,7 @@ def _waiver_usage_guard(
         if profile is None or profile.position not in usage_trends.COVERED_POSITIONS:
             continue
         built = usage_trends.profile_from_season_stats(pid, profile.position, season_stats)
-        out[pid] = drop_candidates.usage_guard(built)
+        out[pid] = drop_candidates.usage_guard(built, display=display)
     return out
 
 
@@ -15476,6 +15534,7 @@ def get_league_waivers(
         except Exception:
             faab_season_stats = {}
     priority_adds: list[dict[str, Any]] = []
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     for _, row in priority_df.iterrows():
         guidance = faab.faab_guidance_for_free_agent(
             row,
@@ -15501,11 +15560,11 @@ def get_league_waivers(
         )
         priority_adds.append(
             _project_priority_add(
-                row, score_field, guidance, opponent_by_team, defense_strength_by_position, faab_season_stats
+                row, score_field, guidance, opponent_by_team, defense_strength_by_position, faab_season_stats,
+                pro=is_premium,
             )
         )
 
-    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     droppable: dict[str, Any] | None = None
     if value_bundle is not None:
         try:
@@ -15525,7 +15584,7 @@ def get_league_waivers(
                 rvc = value_bundle["rvc"]
                 if current_week > 0 and not faab_season_stats:
                     model_status.add(waivers_status, "usage_trends_unavailable")
-                usage_guard = _waiver_usage_guard(rvc, faab_season_stats)
+                usage_guard = _waiver_usage_guard(rvc, faab_season_stats, display=is_premium)
                 valued_by_id = value_bundle["valued"].drop_duplicates("player_id").set_index(
                     value_bundle["valued"].drop_duplicates("player_id")["player_id"].astype(str), drop=False
                 )
@@ -15612,6 +15671,9 @@ def get_league_waivers(
         "watchlist_candidates": watchlist_candidates,
         "faab_targets": faab_targets,
         "entitlement": {"is_premium": is_premium},
+        # Free: advanced usage (chips, "Usage:" lines, role-change drop reasons)
+        # is withheld server-side; this marker + static unlock list drives the teaser.
+        "usage_gate": None if is_premium else dict(usage_trends.PRO_GATE),
         # Additive: the shared roster-value model's per-position needs (with
         # the numbers behind them), the roster's real limits, the standalone
         # "players you could drop" list, and the degraded-path marker.

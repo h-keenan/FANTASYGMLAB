@@ -140,6 +140,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [watchlistCandidates, setWatchlistCandidates] = useState<WaiverPlayer[]>([]);
   const [faabTargets, setFaabTargets] = useState<WaiverPlayer[]>([]);
   const [isPremium, setIsPremium] = useState(true);
+  const [usageGated, setUsageGated] = useState(false);
   const [stats, setStats] = useState<{ available: number | null; faab: string; faabLabel: string }>({
     available: null,
     faab: '—',
@@ -191,6 +192,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           setWatchlistCandidates(result.watchlist_candidates);
           setFaabTargets(result.faab_targets);
           setIsPremium(result.entitlement.is_premium);
+          setUsageGated(Boolean(result.usage_gate));
           setStats({
             available: result.available_count ?? result.players.length,
             ...(result.faab_enabled === false
@@ -501,6 +503,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 ) : null}
                 <SecondaryWaiverBoard
                   isPremium={isPremium}
+                  usageGated={usageGated}
                   stashCandidates={stashCandidates}
                   watchlistCandidates={watchlistCandidates}
                   faabTargets={faabTargets}
@@ -578,6 +581,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
 function SecondaryWaiverBoard({
   isPremium,
+  usageGated,
   stashCandidates,
   watchlistCandidates,
   faabTargets,
@@ -588,6 +592,7 @@ function SecondaryWaiverBoard({
   highlightId: string | null;
   onReveal: (windowY: number) => void;
   isPremium: boolean;
+  usageGated: boolean;
   stashCandidates: WaiverPlayer[];
   watchlistCandidates: WaiverPlayer[];
   faabTargets: WaiverPlayer[];
@@ -600,7 +605,7 @@ function SecondaryWaiverBoard({
       <View style={styles.secondaryLockWrap}>
         <PremiumLock
           title="Full waiver board and FAAB shortlist"
-          description="Priority Adds stay free — Pro adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim."
+          description={"Priority Adds stay free — Pro adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim." + (usageGated ? ' Pro also adds usage trends and role flags to each pickup.' : '')}
         />
       </View>
     );

@@ -4997,6 +4997,10 @@ def test_quick_view_model_sends_no_usage_trend_below_the_display_gate(monkeypatc
 
 def test_quick_view_model_carries_the_usage_profile_with_explicit_states(monkeypatch):
     client = _client(monkeypatch)
+    # Advanced usage is Pro: this test is the Pro view (Free is in test_usage_pro_gate).
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields", lambda *a, **k: {"entitlement": "premium"}
+    )
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     weeks = [
@@ -11243,8 +11247,8 @@ def test_priority_add_usage_flag_is_display_only_and_states_why_it_is_absent(mon
         for w in range(1, 9)
     ]
     with patch("modules.nflverse_advanced_stats.load_season", return_value=None):
-        baseline = mobile_api_service._project_priority_add(row, "value_score", guidance)
-        flagged = mobile_api_service._project_priority_add(row, "value_score", guidance, season_stats={"p1": {"weekly": weekly}})
+        baseline = mobile_api_service._project_priority_add(row, "value_score", guidance, pro=True)
+        flagged = mobile_api_service._project_priority_add(row, "value_score", guidance, season_stats={"p1": {"weekly": weekly}}, pro=True)
     # No weekly stats loaded: said explicitly, no flag invented.
     assert baseline["usage_flag"] is None and baseline["usage_flag_status"] == "unavailable"
     assert flagged["usage_flag"]["key"] == "role_expanding"

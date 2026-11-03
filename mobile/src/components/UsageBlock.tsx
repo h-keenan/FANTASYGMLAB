@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
+import PremiumLock from './PremiumLock';
 import { StatRowsCard, type ExploreHandler } from './StatRows';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageProfile } from '../lib/api';
@@ -29,7 +30,7 @@ export default function UsageBlock({
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!hasUsageContent(profile)) return null;
   const rows = usageRows(profile, position);
-  const showNote = profile.status === 'ok' || profile.status === 'building_sample' || profile.status === 'low_usage';
+  const showNote = !profile.gated && (profile.status === 'ok' || profile.status === 'building_sample' || profile.status === 'low_usage');
   const note = showNote ? usageDataNote(profile) : null;
   const caption = rows.some((row) => row.percentile != null) ? poolCaption(position, profile.season) : null;
   return (
@@ -50,7 +51,14 @@ export default function UsageBlock({
         {profile.flags.length === 0 && profile.status_note ? <AppText style={styles.note}>{profile.status_note}</AppText> : null}
       </StatRowsCard>
       {note ? <AppText style={styles.noteOut}>{note}</AppText> : null}
-      {profile.not_available?.length ? (
+      {profile.gated && profile.gating ? (
+        <PremiumLock
+          feature="advanced_usage"
+          title={profile.gating.upsell.title}
+          description={`${profile.gating.upsell.body} Unlocks: ${profile.gating.unlocks.join('; ')}.`}
+        />
+      ) : null}
+      {!profile.gated && profile.not_available?.length ? (
         <AppText style={styles.noteOut}>
           Not shown: {profile.not_available.map((item) => item.label).join(', ')}. No free data source we can use in a paid
           app publishes it.

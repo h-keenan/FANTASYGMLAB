@@ -21,6 +21,7 @@ export function formatUsageDelta(metric: UsageMetric): string {
 }
 
 export function usageDataNote(profile: UsageProfile): string | null {
+  if (profile.gated) return null;
   const advanced = profile.advanced;
   if (!advanced) return null;
   if (advanced.available) {
@@ -34,5 +35,6 @@ export function usageDataNote(profile: UsageProfile): string | null {
 export function hasUsageContent(profile: UsageProfile | null | undefined): profile is UsageProfile {
   if (!profile) return false;
   if (profile.status === 'not_covered') return false;
-  return profile.metrics.length > 0 || profile.status === 'unavailable';
+  // A gated (Free) profile always has something honest to show: the teaser.
+  return profile.metrics.length > 0 || profile.status === 'unavailable' || Boolean(profile.gated && profile.gating);
 }

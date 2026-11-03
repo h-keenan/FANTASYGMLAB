@@ -195,6 +195,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [limitWall, setLimitWall] = useState<LimitWallModel | null>(null);
   const { isGuest } = useAuth();
   const [planningNote, setPlanningNote] = useState('');
+  const [roleNotes, setRoleNotes] = useState<string[]>([]);
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
 
@@ -462,6 +463,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
       setPlanningNote(result.planning_note ?? '');
+      setRoleNotes(result.role_notes ?? []);
       setAssumptions(result.assumptions ?? null);
       setRosterOverflow(result.roster_overflow ?? null);
       trackUse('trade_analyzer', 'evaluated', {
@@ -558,6 +560,16 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           {/* Past the trade deadline the analyzer stays open for offseason
               planning — this note just says the trade can't be sent yet. */}
           {planningNote ? <AppText style={styles.planningNote}>{planningNote}</AppText> : null}
+          {roleNotes.length ? (
+            <View style={styles.roleNotes}>
+              <AppText style={styles.roleNotesTitle}>ROLE CHANGES (PRO)</AppText>
+              {roleNotes.map((line) => (
+                <AppText key={line} style={styles.roleNote}>
+                  {line}
+                </AppText>
+              ))}
+            </View>
+          ) : null}
           {verdict ? (
             <>
             <VerdictCard
@@ -1295,5 +1307,8 @@ function createStyles(colors: ThemeColors) {
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   planningNote: { color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: spacing.sm },
+  roleNotes: { gap: spacing.xs, marginBottom: spacing.sm },
+  roleNotesTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
+  roleNote: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
   });
 }

@@ -70,3 +70,18 @@ test('headline tiles take PPR PPG then the position usage numbers; Games is neve
   const heads = headlineRows({ position: 'RB', seasons: [{ season: 2026, fantasy: items }] }, profile);
   assert.deepEqual(heads.map((r) => r.key), ['PPR PPG', 'opportunity_share', 'snap_share']);
 });
+
+test('a gated (Free) profile shows the teaser and no trend rows, and keeps the nflverse credit', () => {
+  const gated: UsageProfile = {
+    status: 'free', gated: true, season: 2026, flags: [],
+    gating: { gated: true, required: 'pro', unlocks: ['Air-yards share'], upsell: { title: 'Advanced usage is a Pro feature', body: 'x' } },
+    attribution: { text: 'Usage stats: nflverse (nflverse.com), CC BY 4.0', url: 'https://www.nflverse.com/', license: 'CC BY 4.0' },
+    metrics: [{ key: 'snap_share', label: 'Snap share', unit: 'pct', source: 'sleeper', season: 0.66, games_with_data: 8, explorer_key: 'snap', percentile: 83 }],
+  };
+  assert.equal(hasUsageContent(gated), true);
+  assert.equal(usageDataNote(gated), null);
+  const rows = usageRows(gated, 'WR');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].trend, null);
+  assert.equal(hasUsageContent({ ...gated, metrics: [] }), true);
+});

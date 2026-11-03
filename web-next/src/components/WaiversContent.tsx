@@ -608,6 +608,11 @@ export function WaiversContent({
               <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 Priority Adds stay free. Pro adds stashes, depth and FAAB.
               </p>
+              {data.usage_gate ? (
+                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="waiver-usage-gate">
+                  Pro also adds usage trends and role flags to each pickup.
+                </p>
+              ) : null}
               <ButtonLink href="/premium" variant="premium" size="sm">
                 Upgrade →
               </ButtonLink>

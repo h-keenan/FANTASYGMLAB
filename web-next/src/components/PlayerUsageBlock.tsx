@@ -1,4 +1,5 @@
 import { StatRowsCard } from "@/components/StatRows";
+import { UsageProTeaser } from "@/components/UsageProTeaser";
 import type { UsageProfile } from "@/lib/api";
 import { poolCaption, usageRows } from "@/lib/statRowsPresentation";
 import { hasUsageContent, usageDataNote } from "@/lib/usageProfilePresentation";
@@ -19,7 +20,7 @@ export function PlayerUsageBlock({
 }) {
   if (!hasUsageContent(profile)) return null;
   const rows = usageRows(profile, position);
-  const showNote = profile.status === "ok" || profile.status === "building_sample" || profile.status === "low_usage";
+  const showNote = !profile.gated && (profile.status === "ok" || profile.status === "building_sample" || profile.status === "low_usage");
   const note = showNote ? usageDataNote(profile) : null;
   return (
     <div data-testid="usage-block">
@@ -38,7 +39,8 @@ export function PlayerUsageBlock({
         {profile.flags.length === 0 && profile.status_note ? <p className="sr-note">{profile.status_note}</p> : null}
       </StatRowsCard>
       {note ? <p className="sr-note sr-note--out">{note}</p> : null}
-      {profile.not_available?.length ? (
+      {profile.gated && profile.gating ? <UsageProTeaser gate={profile.gating} /> : null}
+      {!profile.gated && profile.not_available?.length ? (
         <p className="sr-note sr-note--out">
           Not shown: {profile.not_available.map((item) => item.label).join(", ")}. No free data source we can use in a paid app
           publishes it.

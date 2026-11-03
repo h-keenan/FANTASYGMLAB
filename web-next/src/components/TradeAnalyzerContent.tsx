@@ -671,6 +671,7 @@ export function TradeAnalyzerContent({
   // Non-empty once the league's trade deadline has passed — the analyzer
   // stays open for offseason planning, this note just says so.
   const [planningNote, setPlanningNote] = useState("");
+  const [roleNotes, setRoleNotes] = useState<string[]>([]);
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
 
@@ -826,6 +827,7 @@ export function TradeAnalyzerContent({
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
       });
       setPlanningNote(result.planning_note ?? "");
+      setRoleNotes(result.role_notes ?? []);
       setAssumptions(result.assumptions ?? null);
       setRosterOverflow(result.roster_overflow ?? null);
       trackUse("trade_analyzer", "evaluated", { leagueId, props: { result: result.verdict ? "verdict" : "no_verdict" } });
@@ -962,6 +964,19 @@ export function TradeAnalyzerContent({
         <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
           {planningNote}
         </p>
+      ) : null}
+
+      {roleNotes.length ? (
+        <div className="glass-surface p-4 flex flex-col gap-1" data-testid="trade-role-notes">
+          <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            Role changes (Pro)
+          </span>
+          {roleNotes.map((line) => (
+            <span key={line} className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              {line}
+            </span>
+          ))}
+        </div>
       ) : null}
 
       {verdict ? (

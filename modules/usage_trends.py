@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from modules import model_status
 from modules import nflverse_advanced_stats as adv_stats
 from modules import sleeper
 
@@ -391,6 +392,89 @@ def profile_for_player(sleeper_id: Any, position: str, *, season: int | None = N
     profile = build_usage_profile(position, weeks, advanced)
     profile["season"] = selected
     return profile
+
+
+# --------------------------------------------------------------------------
+# Pro gate (owner decision 2026-11-03): advanced usage is a Pro feature.
+#
+# Free keeps the player's own Sleeper-basic usage that is already free in the
+# profile/rankings (snap share, target share, touches and opportunities per
+# game, season values only). Everything else is withheld on the server, never
+# by the client: air-yards share, opportunity share, red-zone looks, the
+# last-4 / last-8 windows and deltas, the points-vs-usage read, and every role
+# flag. The Free payload carries a gating marker and a static list of what Pro
+# unlocks (no data-dependent hint such as "this player has a flag").
+
+FREE_METRIC_KEYS = ("snap_share", "target_share", "touches", "opportunities")
+FREE_METRIC_FIELDS = ("key", "label", "unit", "source", "season", "games_with_data")
+#: percentile-explorer stats that exist only for advanced usage metrics.
+ADVANCED_EXPLORER_STATS = frozenset({"air_yards_share", "opportunity", "red_zone_looks"})
+PRO_UNLOCKS = (
+    "Air-yards share",
+    "Opportunity share",
+    "Red-zone looks per game",
+    "Last-4 and last-8 game trends",
+    "Role flags: expanding, shrinking, usage vs points",
+)
+PRO_GATE = {
+    "gated": True,
+    "required": "pro",
+    "unlocks": list(PRO_UNLOCKS),
+    "upsell": {
+        "title": "Advanced usage is a Pro feature",
+        "body": "Pro adds air-yards share, red-zone looks, last-4 and last-8 trends and role flags to every player.",
+    },
+}
+#: Keys that must never appear in a Free usage payload (tests pin this).
+ADVANCED_PROFILE_KEYS = frozenset({"last4", "last8", "prior", "delta_last4_vs_prior", "direction", "season_total", "last4_total"})
+
+
+def free_view(profile: Mapping[str, Any]) -> dict[str, Any]:
+    """The Free-safe copy of a usage profile (see the Pro gate above)."""
+
+    if profile.get("status") in {"unavailable", "not_covered"}:
+        return {**{k: v for k, v in profile.items() if k in {"status", "reason", "position", "season"}},
+                "metrics": [], "flags": [], "headline": None, "gating": dict(PRO_GATE), "gated": True}
+    metrics = [
+        {k: m.get(k) for k in FREE_METRIC_FIELDS}
+        for m in profile.get("metrics", [])
+        if m.get("key") in FREE_METRIC_KEYS
+    ]
+    return {
+        "status": "pro_required" if not metrics else "free",
+        "position": profile.get("position"),
+        "season": profile.get("season"),
+        "games_played": profile.get("games_played"),
+        "season_ppg": profile.get("season_ppg"),
+        "not_available": [dict(item) for item in NOT_AVAILABLE],
+        "attribution": profile.get("attribution"),
+        "metrics": metrics,
+        "flags": [],
+        "headline": None,
+        "gated": True,
+        "gating": dict(PRO_GATE),
+    }
+
+
+def role_change_line(name: str, flag: Mapping[str, Any] | None) -> str | None:
+    """One display-only line for a role flag (Pro surfaces only; never a score)."""
+
+    if not flag or not flag.get("label") or not flag.get("explanation"):
+        return None
+    return f"{name}: {str(flag['label']).lower()}. {flag['explanation'][:1].upper()}{flag['explanation'][1:]}."
+
+
+def role_change_line_for_player(player_id: Any, position: str, name: str, *, season: int | None = None) -> str | None:
+    """Role line from cached Sleeper weeks + the advanced file (no network)."""
+
+    if str(position or "").upper() not in COVERED_POSITIONS:
+        return None
+    try:
+        profile = profile_for_player(player_id, position, season=season)
+    except model_status.LOOKUP_ERRORS:
+        return None
+    flags = profile.get("flags") or []
+    return role_change_line(name, flags[0]) if flags else None
 
 
 # --------------------------------------------------------------------------
