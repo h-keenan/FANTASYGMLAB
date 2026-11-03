@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Linking,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
@@ -9,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
+import { sleeperLeagueUrl } from '../lib/matchupPlanner';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import SectionHeading from '../components/SectionHeading';
@@ -350,6 +353,16 @@ export default function WaiversScreen({ route, navigation }: Props) {
       />
       <View style={styles.headerRow}>
         <AppText style={styles.headerSubtitle}>Ranked by fit for your team.</AppText>
+        {!isEspnLeagueId(leagueId) ? (
+          <TouchableOpacity
+            onPress={() => void Linking.openURL(sleeperLeagueUrl(leagueId))}
+            accessibilityRole="link"
+            accessibilityLabel="Open your league in Sleeper to place a claim"
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+          >
+            <AppText style={styles.sleeperLink}>Open your league in Sleeper ↗</AppText>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <DashboardStatRow
         style={styles.statRow}
@@ -940,6 +953,7 @@ function createStyles(colors: ThemeColors) {
   },
   statRow: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
   headerSubtitle: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
+  sleeperLink: { fontSize: 13, fontWeight: '700', color: colors.accent },
   tabWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   filterPills: { marginBottom: spacing.sm },
   freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },

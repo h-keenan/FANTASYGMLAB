@@ -1,3 +1,5 @@
+import { isEspnLeagueId } from "@/lib/leaguePlatform";
+import { sleeperLeagueUrl } from "@/lib/matchupPlanner";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
@@ -522,6 +524,17 @@ export function WaiversContent({
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Place claims in Sleeper — we don&apos;t submit them.
             </p>
+            {leagueId && !isEspnLeagueId(leagueId) ? (
+              <a
+                href={sleeperLeagueUrl(leagueId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tap-link self-start text-sm font-bold"
+                style={{ color: "var(--color-accent)" }}
+              >
+                Open your league in Sleeper ↗
+              </a>
+            ) : null}
             {data.team_defense?.empty_slot ? (
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper&apos;s free agents for one.

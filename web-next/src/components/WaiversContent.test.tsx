@@ -128,6 +128,17 @@ describe("WaiversContent", () => {
     ).toBeInTheDocument();
   });
 
+  it("links a Sleeper league straight to Sleeper so the claim is one tap away, and omits it for imported leagues", () => {
+    const { unmount } = render(<WaiversContent leagueId="1312141796616187904" leagueName="L" data={BASE_RESPONSE} />);
+    expect(screen.getByRole("link", { name: /Open your league in Sleeper/ })).toHaveAttribute(
+      "href",
+      "https://sleeper.com/leagues/1312141796616187904",
+    );
+    unmount();
+    render(<WaiversContent leagueId="espn:42654852:2026" leagueName="L" data={BASE_RESPONSE} />);
+    expect(screen.queryByRole("link", { name: /Open your league in Sleeper/ })).toBeNull();
+  });
+
   it("shows the Current need framing from needed_positions", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
