@@ -11,6 +11,7 @@ from modules import league_value_settings
 from modules import rankings
 from modules import redis_cache
 from modules import sleeper
+from modules.roster_value_model import FILLS_NEED_MIN_PPW
 
 # Same live-time-bucket idiom modules.trade_hub_engine/modules.league_rankings/
 # modules.playoff_simulator already use for their own Redis-backed caches: a
@@ -255,6 +256,8 @@ def waiver_confidence_label(row, position_rank: int) -> tuple[str, str]:
     if stale or score <= 0:
         return "Low", "Stale or low-value under the current lens."
     need_fit = bool(row.get("priority_need_fit")) or bool(row.get("injury_replacement_fit"))
+    if bool(row.get("priority_stash_for_need")) and not need_fit:
+        return "Medium", "Best stash at your top need; no one on the wire would start for you there."
     value_opportunity = bool(row.get("priority_value_opportunity"))
     if need_fit:
         return "High", "Matches a real roster need on this roster."
@@ -296,6 +299,7 @@ def select_top_waiver_opportunity(
     needed_positions: list[str] | None = None,
     league: Mapping[str, Any] | None = None,
     rosters: list[Mapping[str, Any]] | None = None,
+    needs_model: Mapping[str, Any] | None = None,
 ):
     if free_agents is None or free_agents.empty:
         return pd.Series(dtype="object")
@@ -309,6 +313,7 @@ def select_top_waiver_opportunity(
         max_items=1,
         league=league,
         rosters=rosters,
+        needs_model=needs_model,
     )
     if ranked.empty:
         return pd.Series(dtype="object")
@@ -325,6 +330,27 @@ def select_top_waiver_opportunity(
             "have a viable active option."
         )
     return selected
+
+
+def align_headline_with_adds(needs_model: Mapping[str, Any], priority: pd.DataFrame) -> str:
+    """The need headline, plus one sentence when the top Priority Add is not at
+    the biggest need, saying why (so the two never seem to contradict)."""
+
+    headline = str(needs_model.get("headline") or "")
+    biggest = str(needs_model.get("biggest_need") or "").upper()
+    if not biggest or priority is None or priority.empty:
+        return headline
+    top = priority.iloc[0]
+    top_pos = str(top.get("position") or "").upper()
+    if top_pos == biggest:
+        return headline
+    entry = next((e for e in needs_model.get("positions") or () if e.get("position") == biggest), None)
+    if entry is None or entry.get("wire_verdict") in (None, "unknown", "upgrade"):
+        return headline
+    ppw = top.get("priority_wire_ppw")
+    gain = "" if ppw is None or pd.isna(ppw) else f" (+{float(ppw):.1f} pts/wk)"
+    reason = f"top add is {top_pos} {top.get('name')}{gain}" if bool(top.get("priority_need_fit")) else f"top add is {top.get('name')}"
+    return f"{headline} So the {reason}" + ("" if reason.endswith(".") else ".")
 
 
 def _roster_has_viable_kicker(roster_df: pd.DataFrame) -> bool:
@@ -393,12 +419,23 @@ def rank_priority_add_candidates(
     max_items: int = 6,
     league: Mapping[str, Any] | None = None,
     rosters: list[Mapping[str, Any]] | None = None,
+    needs_model: Mapping[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Order Priority Adds for THIS roster — not bare dynasty-score tops.
 
     Preserves Best Available as a separate Snapshot surface. Uses existing
     TeamNeedsAssessment outputs + score/injury flags. Does not invent a new
     opaque score.
+
+    ``needs_model`` (``roster_value_model.assess_needs`` output, optional) is
+    the ONE source of truth for "what does this roster need": when given, a
+    free agent "fills a need" only if the lineup model says he adds at least
+    ``FILLS_NEED_MIN_PPW`` points per week at a position the model lists as a
+    need, need-fit adds are ordered by the model's own need order (weakest
+    position first) and then by those marginal lineup points, and the best
+    stash at the top need is kept on the board when nobody on the wire would
+    actually start there. Without it (model unavailable) the older
+    positions-list behaviour applies.
 
     `league`/`rosters` (both optional, for callers that already have them —
     the real Waivers endpoint does) let this detect a pre-/mid-draft league
@@ -506,6 +543,24 @@ def rank_priority_add_candidates(
     )
     qb_format = _qb_format(settings)
 
+    model_positions = list((needs_model or {}).get("positions") or [])
+    use_model = needs_model is not None and bool(model_positions)
+    need_rank: dict[str, int] = {}
+    wire_ppw: dict[str, float] = {}
+    stash_ids: dict[str, str] = {}
+    if use_model:
+        for entry in model_positions:
+            for option in entry.get("wire") or ():
+                wire_ppw[str(option["player_id"])] = float(option["ppw"])
+            if entry.get("tier") in ("primary", "secondary"):
+                need_rank[str(entry["position"]).upper()] = len(need_rank)
+        top_need = next((e for e in model_positions if e.get("tier") in ("primary", "secondary")), None)
+        if top_need is not None and top_need.get("wire_verdict") in ("marginal", "none"):
+            if top_need.get("wire_verdict") == "marginal" and top_need.get("wire"):
+                stash_ids[str(top_need["wire"][0]["player_id"])] = str(top_need["position"]).upper()
+            elif top_need.get("stash"):
+                stash_ids[str(top_need["stash"]["player_id"])] = str(top_need["position"]).upper()
+
     positive = candidates[(~stale) & (~role_blocked) & (scores > 0)].copy()
     if positive.empty:
         return candidates.iloc[0:0].copy()
@@ -516,18 +571,26 @@ def rank_priority_add_candidates(
     overall_rank = pos_scores.rank(ascending=False, method="first")
 
     need_fit = []
+    stash_flags: list[bool] = []
     value_opportunity = []
     actionable = []
-    skill_needs = needed - {"QB", "TE", "K"}
+    skill_needs = (set(need_rank) if use_model else needed) - {"QB", "TE", "K"}
     for idx in positive.index:
         position = str(positive.at[idx, "position"] or "").upper()
         score = float(pos_scores.at[idx])
         injured = bool(injury_fit.at[idx] if idx in injury_fit.index else False)
-        is_need = position in needed or injured
+        pid = str(positive.at[idx, "player_id"]) if "player_id" in positive.columns else ""
+        if use_model and position in {"QB", "RB", "WR", "TE"}:
+            # The model's own verdict: a need position, and this player is a
+            # priced add worth real lineup points there.
+            injured = False
+            is_need = position in need_rank and wire_ppw.get(pid, 0.0) >= FILLS_NEED_MIN_PPW
+        else:
+            is_need = position in needed or injured
         if position == "K":
             is_need = bool(kicker_required and not has_viable_kicker)
         is_elite_value = bool(overall_rank.at[idx] <= 2 or score >= top_cutoff)
-        if position in {"QB", "TE"} and position not in needed and not injured:
+        if position in {"QB", "TE"} and position not in (need_rank if use_model else needed) and not injured:
             is_need = False
             # Do not let covered QB/TE displace true skill-position needs.
             if skill_needs:
@@ -543,9 +606,11 @@ def rank_priority_add_candidates(
         if position == "K" and suppress_kickers:
             is_need = False
             is_elite_value = False
+        is_stash = bool(use_model and pid in stash_ids and not is_need)
+        stash_flags.append(is_stash)
         need_fit.append(is_need)
-        value_opportunity.append(bool(is_elite_value and not is_need))
-        actionable.append(bool(is_need or is_elite_value))
+        value_opportunity.append(bool(is_elite_value and not is_need and not is_stash))
+        actionable.append(bool(is_need or is_elite_value or is_stash))
 
     positive = positive.copy()
     positive["priority_need_fit"] = need_fit
@@ -553,14 +618,33 @@ def rank_priority_add_candidates(
     positive["priority_actionable"] = actionable
     positive["_priority_score"] = pos_scores
     positive["_injury_fit"] = injury_fit.reindex(positive.index).fillna(False)
+    positive["priority_stash_for_need"] = stash_flags
+    positive["priority_wire_ppw"] = [
+        wire_ppw.get(str(pid)) for pid in positive["player_id"]
+    ] if "player_id" in positive.columns else None
     positive = positive[positive["priority_actionable"]].copy()
     if positive.empty:
         return positive
 
-    positive = positive.sort_values(
-        ["_injury_fit", "priority_need_fit", "priority_value_opportunity", "_priority_score"],
-        ascending=[False, False, False, False],
-    )
+    if use_model:
+        # The model's need order (weakest position first), then the lineup
+        # points the add is worth, then value. A stash for the top need (when
+        # nobody there would start) follows the real need adds.
+        positive["_need_rank"] = [
+            need_rank.get(str(pos).upper(), 99) if fit else 99
+            for pos, fit in zip(positive["position"], positive["priority_need_fit"])
+        ]
+        positive["_ppw"] = pd.to_numeric(positive["priority_wire_ppw"], errors="coerce").fillna(-1.0)
+        positive = positive.sort_values(
+            ["priority_need_fit", "priority_stash_for_need", "_need_rank", "_ppw",
+             "priority_value_opportunity", "_priority_score"],
+            ascending=[False, False, True, False, False, False],
+        )
+    else:
+        positive = positive.sort_values(
+            ["_injury_fit", "priority_need_fit", "priority_value_opportunity", "_priority_score"],
+            ascending=[False, False, False, False],
+        )
 
     # Soft diversity: prefer decision utility across rooms without a rigid 1-of-each rule.
     selected_indices: list = []
@@ -596,7 +680,7 @@ def rank_priority_add_candidates(
                 break
 
     result = positive.loc[selected_indices].copy()
-    drop_cols = [col for col in ("_priority_score", "_injury_fit") if col in result.columns]
+    drop_cols = [col for col in ("_priority_score", "_injury_fit", "_need_rank", "_ppw") if col in result.columns]
     if drop_cols:
         result = result.drop(columns=drop_cols)
     return result.reset_index(drop=True)
