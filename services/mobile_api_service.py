@@ -15142,6 +15142,9 @@ def _project_priority_add(
     # lineup model's marginal points when it priced the add).
     projected["fills_need"] = bool(row.get("priority_need_fit"))
     projected["stash_for_need"] = bool(row.get("priority_stash_for_need"))
+    # Worth far more lineup points than the best fix at the biggest need
+    # (roster_value_model.outsized_adds); clients show one chip with lineup_ppw.
+    projected["bigger_upgrade"] = bool(row.get("priority_bigger_upgrade"))
     ppw = row.get("priority_wire_ppw")
     projected["lineup_ppw"] = None if ppw is None or pd.isna(ppw) else round(float(ppw), 2)
     # Real need-fit/standout-value confidence for this Priority Add — same

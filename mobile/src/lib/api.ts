@@ -1216,6 +1216,8 @@ export interface WaiverPlayer {
   fills_need?: boolean;
   /** Best stash at the top need when no one on the wire would start there. */
   stash_for_need?: boolean;
+  /** Worth far more lineup points than the best fix at the biggest need (one chip, lineup_ppw). */
+  bigger_upgrade?: boolean;
   /** Lineup points per week the add is worth on this roster (null when not priced). */
   lineup_ppw?: number | null;
   injury_replacement_note: string;

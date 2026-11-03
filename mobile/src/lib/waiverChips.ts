@@ -19,6 +19,12 @@ const CHIP_RULES: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
   [/^\d+ teams? (need|needs) /i, () => 'Rival demand'],
 ];
 
+export function biggerUpgradeChip(lineupPpw: number | null | undefined): string {
+  return typeof lineupPpw === 'number' && Number.isFinite(lineupPpw)
+    ? `Bigger than your need: +${lineupPpw.toFixed(1)} pts/wk`
+    : 'Bigger than your need';
+}
+
 export function waiverReasonChips(
   player: {
     faab?: { reasons?: string[] } | null;
@@ -26,10 +32,15 @@ export function waiverReasonChips(
     injury_replacement_fit?: boolean;
     /** Server: best stash at your top need when nobody on the wire would start there. */
     stash_for_need?: boolean;
+    /** Server: worth far more lineup points than the best fix at the biggest need. */
+    bigger_upgrade?: boolean;
+    lineup_ppw?: number | null;
   },
   max = 2,
 ): string[] {
   const hits = new Map<string, number>();
+  // One line, always first: the add outprices what the team's need would fetch.
+  if (player.bigger_upgrade) hits.set(biggerUpgradeChip(player.lineup_ppw), -1);
   if (player.sleeper_trending_add) hits.set('Trending', 0);
   for (const reason of player.faab?.reasons ?? []) {
     CHIP_RULES.some(([pattern, toChip], index) => {

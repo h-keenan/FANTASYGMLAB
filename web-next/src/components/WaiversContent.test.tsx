@@ -105,6 +105,17 @@ const NEEDS_MODEL: NeedsModel = {
 };
 
 describe("WaiversContent", () => {
+  it("shows one bigger-upgrade chip with the lineup gain on the flagged top add, and none otherwise", () => {
+    const flagged = priorityAdd({ name: "Big Upgrade", bigger_upgrade: true, lineup_ppw: 1.84 });
+    const { unmount } = render(
+      <WaiversContent leagueName="L" data={{ ...BASE_RESPONSE, priority_adds: [flagged] }} />,
+    );
+    expect(screen.getAllByText("Bigger than your need: +1.8 pts/wk")).toHaveLength(1);
+    unmount();
+    render(<WaiversContent leagueName="L" data={BASE_RESPONSE} />);
+    expect(screen.queryByText(/Bigger than your need/)).toBeNull();
+  });
+
   it("renders the league name, stat tiles, and the top Priority Add with FAAB range and confidence", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 

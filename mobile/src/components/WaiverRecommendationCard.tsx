@@ -165,7 +165,7 @@ function UsageFlagChip({ player }: { player: WaiverPriorityAdd }) {
 
 const chipStyles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: { borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  chip: { borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 2, flexShrink: 1 },
   text: { fontSize: 11, fontWeight: '700' },
 });
 

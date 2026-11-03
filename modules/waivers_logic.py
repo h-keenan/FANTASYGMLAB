@@ -259,6 +259,8 @@ def waiver_confidence_label(row, position_rank: int) -> tuple[str, str]:
     if bool(row.get("priority_stash_for_need")) and not need_fit:
         return "Medium", "Best stash at your top need; no one on the wire would start for you there."
     value_opportunity = bool(row.get("priority_value_opportunity"))
+    if bool(row.get("priority_bigger_upgrade")):
+        return "High", "Adds more lineup points than the best fix at your biggest need."
     if need_fit:
         return "High", "Matches a real roster need on this roster."
     if value_opportunity or int(position_rank or 99) <= 1:
@@ -345,11 +347,16 @@ def align_headline_with_adds(needs_model: Mapping[str, Any], priority: pd.DataFr
     if top_pos == biggest:
         return headline
     entry = next((e for e in needs_model.get("positions") or () if e.get("position") == biggest), None)
-    if entry is None or entry.get("wire_verdict") in (None, "unknown", "upgrade"):
+    bigger = bool(top.get("priority_bigger_upgrade"))
+    if entry is None or (entry.get("wire_verdict") in (None, "unknown", "upgrade") and not bigger):
         return headline
     ppw = top.get("priority_wire_ppw")
     gain = "" if ppw is None or pd.isna(ppw) else f" (+{float(ppw):.1f} pts/wk)"
-    reason = f"top add is {top_pos} {top.get('name')}{gain}" if bool(top.get("priority_need_fit")) else f"top add is {top.get('name')}"
+    reason = (
+        f"top add is {top_pos} {top.get('name')}{gain}"
+        if bool(top.get("priority_need_fit")) or bigger
+        else f"top add is {top.get('name')}"
+    )
     return f"{headline} So the {reason}" + ("" if reason.endswith(".") else ".")
 
 
@@ -548,7 +555,9 @@ def rank_priority_add_candidates(
     need_rank: dict[str, int] = {}
     wire_ppw: dict[str, float] = {}
     stash_ids: dict[str, str] = {}
+    bigger_ids: set[str] = set()
     if use_model:
+        bigger_ids = {str(o["player_id"]) for o in needs_model.get("outsized_adds") or ()}
         for entry in model_positions:
             for option in entry.get("wire") or ():
                 wire_ppw[str(option["player_id"])] = float(option["ppw"])
@@ -572,6 +581,7 @@ def rank_priority_add_candidates(
 
     need_fit = []
     stash_flags: list[bool] = []
+    bigger_flags: list[bool] = []
     value_opportunity = []
     actionable = []
     skill_needs = (set(need_rank) if use_model else needed) - {"QB", "TE", "K"}
@@ -607,10 +617,14 @@ def rank_priority_add_candidates(
             is_need = False
             is_elite_value = False
         is_stash = bool(use_model and pid in stash_ids and not is_need)
+        # The shared model's "bigger upgrade than your need" (roster_value_model.
+        # outsized_adds): always actionable and ranked first, whatever its tag.
+        is_bigger = bool(use_model and pid in bigger_ids)
+        bigger_flags.append(is_bigger)
         stash_flags.append(is_stash)
         need_fit.append(is_need)
         value_opportunity.append(bool(is_elite_value and not is_need and not is_stash))
-        actionable.append(bool(is_need or is_elite_value or is_stash))
+        actionable.append(bool(is_need or is_elite_value or is_stash or is_bigger))
 
     positive = positive.copy()
     positive["priority_need_fit"] = need_fit
@@ -619,6 +633,7 @@ def rank_priority_add_candidates(
     positive["_priority_score"] = pos_scores
     positive["_injury_fit"] = injury_fit.reindex(positive.index).fillna(False)
     positive["priority_stash_for_need"] = stash_flags
+    positive["priority_bigger_upgrade"] = bigger_flags
     positive["priority_wire_ppw"] = [
         wire_ppw.get(str(pid)) for pid in positive["player_id"]
     ] if "player_id" in positive.columns else None
@@ -635,10 +650,12 @@ def rank_priority_add_candidates(
             for pos, fit in zip(positive["position"], positive["priority_need_fit"])
         ]
         positive["_ppw"] = pd.to_numeric(positive["priority_wire_ppw"], errors="coerce").fillna(-1.0)
+        # Bigger-than-the-need adds lead, among themselves by lineup points.
+        positive["_bigger_ppw"] = positive["_ppw"].where(positive["priority_bigger_upgrade"], -2.0)
         positive = positive.sort_values(
-            ["priority_need_fit", "priority_stash_for_need", "_need_rank", "_ppw",
+            ["_bigger_ppw", "priority_need_fit", "priority_stash_for_need", "_need_rank", "_ppw",
              "priority_value_opportunity", "_priority_score"],
-            ascending=[False, False, True, False, False, False],
+            ascending=[False, False, False, True, False, False, False],
         )
     else:
         positive = positive.sort_values(
