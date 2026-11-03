@@ -30,6 +30,7 @@ import ToneBadge from '../components/ToneBadge';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
 import { rangeDisplayRows } from '../lib/startSitRange';
+import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
 import {
   api,
@@ -298,6 +299,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
         ) : (
           <SuggestedMoves matchup={matchup} />
         )}
+        <NextSteps title="Fix a weak spot" steps={['waivers', 'trade-hub', 'my-team']} leagueId={leagueId} leagueName={leagueName} />
         <ValuesCredit />
       </ScrollView>
     </View>

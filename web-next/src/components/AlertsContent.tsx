@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { markAlertReadSynced, overlayPendingAlertReads, reconcileAlertReads } from "@/lib/alertReadSync";
 import { useRouter } from "next/navigation";
+import { NextSteps } from "@/components/NextSteps";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -291,6 +292,7 @@ export function AlertsContent({
           })}
         </div>
       )}
+      <NextSteps steps={["matchup", "waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />
     </main>
   );
 }
