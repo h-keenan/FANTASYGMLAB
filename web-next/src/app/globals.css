@@ -2155,6 +2155,22 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-footer > * {
   min-height: 3rem;
 }
+.onboarding-footer--stack > * {
+  flex: 1 1 auto;
+}
+/* Post-carousel steps (connect league, offer) render their normal forms inside
+   the shell; the form's submit stays pinned to the bottom of the scroll area. */
+.onboarding-connect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md) 0;
+}
+.onboarding-connect form > button[type="submit"] {
+  position: sticky;
+  bottom: 0;
+  align-self: stretch;
+}
 .onboarding-skip {
   min-height: 2.75rem;
   padding: 0 var(--space-sm);

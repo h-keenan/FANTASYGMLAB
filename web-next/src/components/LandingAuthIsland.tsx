@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
+import { OnboardingShell } from "@/components/OnboardingShell";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
@@ -253,30 +254,36 @@ export function LandingAuthIsland() {
         }}
       />
     ) : paywallSeen ? (
-      <>
-        {returnedFromCheckout ? (
-          <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
-            {/* One umbrella completion message for the paid tier (the site says "Pro"
-                everywhere, 2026-11-03); tier-agnostic by design. */}
-            You&apos;re in. Pro is unlocked. Connect your league to get started.
-          </p>
-        ) : null}
-        {/* Signed in with no league: the one job is connecting one, so the
-            page leads with exactly that (UX audit 2026-11-03, 4.1). */}
-        <header className="flex flex-col gap-1" data-testid="connect-first-heading">
-          <h1 className="lp-h2">Connect your league</h1>
-          <p className="lp-body">Pick where your league lives. We read your real roster and build your first Game Plan.</p>
-        </header>
-        <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
-        <SampleLeagueButton surface="connect_step" />
-      </>
+      // Same glass stage as the carousel: one step at a time, no app chrome or
+      // footer links (coridian_, 2026-11-03: connect step looked like a plain
+      // page after the redesign). "Try a sample league" is the pinned action.
+      <OnboardingShell footer={<SampleLeagueButton surface="connect_step" />}>
+        <div className="onboarding-connect" data-testid="connect-first-heading">
+          {returnedFromCheckout ? (
+            <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
+              {/* One umbrella completion message for the paid tier (the site says "Pro"
+                  everywhere, 2026-11-03); tier-agnostic by design. */}
+              You&apos;re in. Pro is unlocked. Connect your league to get started.
+            </p>
+          ) : null}
+          <header className="flex flex-col gap-1">
+            <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
+            <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Game Plan.</p>
+          </header>
+          <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
+        </div>
+      </OnboardingShell>
     ) : (
-      <OnboardingPaywall
-        onSkip={() => {
-          markOnboardingStepCompleted(userId, "paywall");
-          setPaywallDismissed(true);
-        }}
-      />
+      <OnboardingShell>
+        <div className="onboarding-connect">
+          <OnboardingPaywall
+            onSkip={() => {
+              markOnboardingStepCompleted(userId, "paywall");
+              setPaywallDismissed(true);
+            }}
+          />
+        </div>
+      </OnboardingShell>
     )
   ) : (
     <SignInForm onSignedIn={() => setAccountReady(true)} />
