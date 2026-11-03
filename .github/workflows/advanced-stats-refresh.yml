@@ -9,11 +9,23 @@ name: Advanced Stats Refresh
 # non-zero, the committed file is left alone (readers keep serving it with its
 # "through week" stamp) and the failure step opens a tracking issue.
 #
-# Two runs a day: nflverse publishes weekly stats after games finish, so more
-# frequent runs would only find nothing new; a no-change run commits nothing.
-
+# Cadence (all UTC; GitHub cron can lag a few minutes). The data must not trail
+# breaking news, so it runs hourly through every game window and a few times
+# otherwise. A run that finds nothing new commits nothing, and a run that
+# fetches a bad file commits nothing either (see the failure note above), so
+# frequent runs are cheap. Run it by hand any time with "Run workflow".
+#   Thu night games   -> Fri 00-06   (hourly)
+#   Sunday games      -> Sun 17-23, Mon 00-06 (hourly)
+#   Monday night game -> Tue 00-06   (hourly)
+#   Tue/Wed           -> nflverse finalizes stats: 08, 14, 20
+#   Every day         -> 10 and 22 as a baseline
 on:
   schedule:
+    - cron: "15 0-6 * * 5"
+    - cron: "15 17-23 * * 0"
+    - cron: "15 0-6 * * 1"
+    - cron: "15 0-6 * * 2"
+    - cron: "15 8,14,20 * * 2,3"
     - cron: "25 10,22 * * *"
   workflow_dispatch:
 
