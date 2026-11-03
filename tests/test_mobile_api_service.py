@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -21,6 +22,88 @@ def _open_free_league_gate(monkeypatch):
     own suite (tests/test_paywall_league_cap.py), so open the gate here."""
 
     monkeypatch.setattr("services.mobile_api_service._league_access_allowed", lambda *a, **k: True)
+
+
+@pytest.fixture
+def offline_nfl_schedule(monkeypatch):
+    """The Analyzer / Hub paths read nflverse's games.csv (bye weeks, kickoff).
+    Without this the tests make a real GitHub request (and write
+    data/nfl_games.csv) on a cold machine, and read a stale local copy on a
+    warm one. Serve an empty schedule, like a fresh CI checkout with the fetch
+    failing, and drop the in-process parse cache around the test."""
+
+    from modules import nfl_schedule
+
+    monkeypatch.setattr(nfl_schedule, "_load_games_uncached", lambda **kwargs: pd.DataFrame())
+    nfl_schedule.clear_load_games_cache()
+    yield
+    nfl_schedule.clear_load_games_cache()
+
+
+@pytest.fixture
+def isolated_news_players_universe(monkeypatch):
+    """/v1/news resolves article player identity against the full players
+    universe, which by default is ``rankings.load_players("data/players.db")``:
+    the real, tracked database, which that loader reconciles and writes back to.
+    A test that only cares about filtering/ordering must not do that (it made
+    every later test in the worker see a rewritten committed db, and the
+    canonical-player-state tests copy that db). Serve an empty universe: the
+    general feed then skips identity attachment, exactly its fail-closed path."""
+
+    monkeypatch.setattr("modules.news._general_feed_players_universe", lambda: pd.DataFrame())
+
+
+@pytest.fixture
+def isolated_players_universe(monkeypatch):
+    """Serve the small fixture roster frame instead of the real
+    ``rankings.load_players("data/players.db")``. The real loader reconciles
+    and writes back to the committed database (see tests/conftest.py
+    ``_guard_real_players_db``); endpoint tests that stub every other
+    dependency must stub this one too."""
+
+    monkeypatch.setattr("modules.rankings.load_players", lambda *a, **k: _fake_roster_frame())
+    monkeypatch.setattr("modules.player_eligibility.filter_current_fantasy_players", lambda df, **kwargs: df)
+
+
+def _routed_requests_get(*, profile, auth=None, extra=()):
+    """A ``requests.get`` stand-in that answers by URL, not by call position.
+
+    The endpoint tests used to hand ``requests.get`` a finite, strictly ordered
+    ``side_effect`` list, so a request's mock-slot depended on how many other
+    outbound calls ran before it (cold vs warm process-level Sleeper caches,
+    an extra Supabase read). Routing by URL makes each answer independent of
+    order and count. Anything that is not Supabase auth/profile/rows or the
+    Sleeper API is recorded in ``fake.unrouted`` and answered with a 599, so a
+    test can assert no call escaped to a real network.
+    """
+
+    auth_response = Mock(status_code=200)
+    auth_response.json.return_value = auth or {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = profile
+    empty = Mock(status_code=200)
+    empty.json.return_value = []
+    routes = [
+        *extra,
+        ("/auth/v1/user", auth_response),
+        ("/rest/v1/profiles", profile_response),
+        # Every other per-user table read (saved_leagues, GM targets, Team
+        # Situation, ...): "no rows", the same fallback the tests relied on.
+        ("/rest/v1/", empty),
+        # Sleeper league endpoints (drafts, users, transactions, trending): empty.
+        ("api.sleeper.app/", empty),
+    ]
+    unrouted: list[str] = []
+
+    def fake(url, *args, **kwargs):
+        for needle, response in routes:
+            if needle in str(url):
+                return response
+        unrouted.append(str(url))
+        return Mock(status_code=599)
+
+    fake.unrouted = unrouted
+    return fake
 
 
 def _client(monkeypatch):
@@ -2785,30 +2868,13 @@ def test_draft_picks_degrade_confidence_for_further_out_seasons(monkeypatch):
     assert compared, "fixture produced no further-out pick to compare"
 
 
-@pytest.mark.known_flaky
-# known_flaky: passes reliably alone (verified 3/3 runs) but can fail under
-# full-suite xdist parallel runs. Root cause: modules.sleeper.get_league_drafts
-# is @lru_cache'd at process level, so whether this test's draft-picks call
-# makes a real (mocked) requests.get for league "abc"'s drafts or hits an
-# already-warm in-process cache from another test in the same xdist worker
-# is nondeterministic -- it shifts this test's own strict ordered
-# requests.get side_effect list by one, not a logic bug in the endpoint or
-# in _resolve_my_roster's own saved-leagues fetch.
-def test_trade_analyzer_includes_a_real_pick_asset_when_pick_ids_given(monkeypatch):
+def test_trade_analyzer_includes_a_real_pick_asset_when_pick_ids_given(monkeypatch, offline_nfl_schedule):
     client = _client(monkeypatch)
 
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-    saved_leagues_response = Mock(status_code=200)
-    saved_leagues_response.json.return_value = []
     fake_rosters, fake_users = _draft_picks_fixture_context()
+    fake_get = _routed_requests_get(profile=[{"entitlement": "free", "sleeper_username": "gm_dynasty"}])
 
-    with patch(
-        "requests.get",
-        side_effect=[auth_user_response, auth_user_response, auth_user_response, profile_response, saved_leagues_response],
-    ):
+    with patch("requests.get", side_effect=fake_get):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
                 with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
@@ -2844,6 +2910,7 @@ def test_trade_analyzer_includes_a_real_pick_asset_when_pick_ids_given(monkeypat
     # through list_draft_pick_assets -> pick_asset_from_mapping ->
     # trade_analyzer_fit without crashing on a mixed player+pick package.
     assert body["verdict"] is not None
+    assert fake_get.unrouted == []
 
 
 def test_trade_analyzer_reports_assets_not_found_for_an_unknown_pick_id(monkeypatch):
@@ -3248,7 +3315,7 @@ def test_news_endpoint_rejects_bad_limit(monkeypatch):
         assert response.status_code == 422
 
 
-def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
+def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch, isolated_news_players_universe):
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
@@ -3318,7 +3385,7 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
         assert "speculative" in item
 
 
-def test_news_endpoint_drops_articles_older_than_the_max_age(monkeypatch):
+def test_news_endpoint_drops_articles_older_than_the_max_age(monkeypatch, isolated_news_players_universe):
     """A refresh that keeps failing must not leave month-old headlines on the
     News tab (the committed fallback cache dates from July)."""
 
@@ -6518,9 +6585,18 @@ def test_external_rating_history_cites_real_corroborating_news_in_window(monkeyp
     client = TestClient(mobile_api_service.app)
 
     now = time.time()
+    # The news event is published an hour ago and must fall inside the snapshot
+    # window (previous snapshot_date -> current snapshot_date, UTC), so the
+    # snapshot dates are derived from "now" rather than pinned to a calendar
+    # day: with fixed 2026-10-18/19 dates the event drifted out of the window as
+    # soon as real time moved on and the test started asserting the no-driver
+    # fallback instead of the citation it exists to guard.
+    today_utc = datetime.fromtimestamp(now, tz=timezone.utc).date()
+    current_date = today_utc.isoformat()
+    previous_date = (today_utc - timedelta(days=1)).isoformat()
     snapshots = [
-        {"player_id": "9001", "snapshot_date": "2026-10-19", "overall_rating": 72, "computed_at": "x"},
-        {"player_id": "9001", "snapshot_date": "2026-10-18", "overall_rating": 85, "computed_at": "y"},
+        {"player_id": "9001", "snapshot_date": current_date, "overall_rating": 72, "computed_at": "x"},
+        {"player_id": "9001", "snapshot_date": previous_date, "overall_rating": 85, "computed_at": "y"},
     ]
     players_frame = pd.DataFrame(
         [{"player_id": "9001", "name": "Nico Collins", "status": "Out", "injury_status": "Hamstring"}]
@@ -8197,25 +8273,22 @@ def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monke
     assert body["entitlement"] == {"is_premium": True, "visible_count": 0, "hidden_count": 0, "free_limit": 4}
 
 
-@pytest.mark.known_flaky
-def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
+def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch, offline_nfl_schedule):
     # Dashboard's trade tile and the Trade Hub endpoint ask the identical
-    # (league, roster, strategy, lens) question — this pins that they hit
-    # ONE cached search (trade_hub_engine.generate_trade_idea_records_cached)
+    # (league, roster, strategy, lens) question: this pins that they hit ONE
+    # cached search (trade_hub_engine.generate_trade_idea_records_cached)
     # instead of each independently recomputing it.
     #
-    # known_flaky: passes reliably alone (verified 3/3 runs) but fails
-    # intermittently in CI's full-suite run only. This test doesn't mock
-    # requests.get at all (auth/profile are patched at the function level
-    # instead), so _resolve_my_roster's new per-league saved_leagues lookup
-    # now makes a real (unmocked, failing) network call here — caught and
-    # swallowed cleanly by account_store.fetch_rows's own try/except, so it
-    # doesn't break correctness, but the added real DNS/connect-timeout
-    # latency is apparently enough to shift timing under CI's parallel load
-    # in a way that trips this test's "must hit the shared cache" timing-
-    # sensitive assertion. Not a regression in the _resolve_my_roster fix
-    # itself — same root cause already documented on the waivers and trade
-    # hub known_flaky tests above.
+    # It has to be able to fail both ways, so it asserts the count after EACH
+    # request: the Dashboard alone must compute the search once (otherwise
+    # "one call in total" could just be the Hub computing it while the
+    # Dashboard never searched at all), the Hub must add none, and a request
+    # under a different declared posture (a different cache key) must add one
+    # (so the counter provably sees a recompute).
+    #
+    # Outbound HTTP is routed by URL (profile, saved_leagues, Sleeper...), so
+    # _resolve_my_roster's per-league saved_leagues read can no longer reach a
+    # real network, and the process-level Sleeper caches are cleared per test.
     client = _client(monkeypatch)
     from modules import trade_hub_engine
 
@@ -8227,17 +8300,11 @@ def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
         call_count["n"] += 1
         return real_generate(*args, **kwargs)
 
-    # Function-level auth/profile mocks (not a finite requests.get side_effect
-    # list) since this test makes two full authenticated requests.
+    fake_get = _routed_requests_get(profile=[{"entitlement": "free", "sleeper_username": "gm_dynasty"}])
+    headers = {"Authorization": "Bearer good-token"}
+
     with contextlib.ExitStack() as stack:
-        stack.enter_context(patch(
-            "services.mobile_api_service.auth_supabase.fetch_auth_user",
-            return_value=({"id": "user-123", "email": "gm@example.com"}, ""),
-        ))
-        stack.enter_context(patch(
-            "services.mobile_api_service._fetch_profile_fields",
-            return_value={"entitlement": "free", "sleeper_username": "gm_dynasty"},
-        ))
+        stack.enter_context(patch("requests.get", side_effect=fake_get))
         stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
         stack.enter_context(patch(
             "modules.sleeper.get_rosters",
@@ -8260,18 +8327,24 @@ def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
         stack.enter_context(patch.object(
             trade_hub_engine, "generate_trade_idea_records", side_effect=counting_generate
         ))
-        dashboard_response = client.get(
-            "/v1/leagues/abc/dashboard",
-            headers={"Authorization": "Bearer good-token"},
-        )
-        trade_hub_response = client.get(
-            "/v1/leagues/abc/trade-hub?strategy=retool&lens=Dynasty",
-            headers={"Authorization": "Bearer good-token"},
-        )
+        dashboard_response = client.get("/v1/leagues/abc/dashboard", headers=headers)
+        after_dashboard = call_count["n"]
+        trade_hub_response = client.get("/v1/leagues/abc/trade-hub?strategy=retool&lens=Dynasty", headers=headers)
+        after_hub = call_count["n"]
+        # The search is keyed on the server-resolved posture (the client's
+        # strategy param is only a fallback), so the control declares a
+        # different Team Situation.
+        stack.enter_context(patch("services.mobile_api_service._fetch_team_stance", return_value="rebuilding"))
+        other_posture_response = client.get("/v1/leagues/abc/trade-hub?strategy=retool&lens=Dynasty", headers=headers)
+        after_other_posture = call_count["n"]
 
     assert dashboard_response.status_code == 200
     assert trade_hub_response.status_code == 200
-    assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
+    assert other_posture_response.status_code == 200
+    assert after_dashboard == 1, "the Dashboard's trade tile must run the idea search itself"
+    assert after_hub == 1, "expected the Hub to hit the Dashboard's cached search, not recompute"
+    assert after_other_posture == 2, "a different posture is a different cache key and must recompute"
+    assert fake_get.unrouted == []
 
 
 def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monkeypatch):
@@ -9201,7 +9274,7 @@ def test_gm_plan_rejects_an_invalid_lens(monkeypatch):
     assert response.status_code == 422
 
 
-def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch):
+def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch, isolated_players_universe):
     # Week 10 with a week-15 playoff start reads as "trade deadline
     # approach" per modules.gm_plan.derive_season_phase.
     league = dict(_TRADE_ANALYZER_LEAGUE)
@@ -9421,7 +9494,7 @@ def test_gm_plan_flags_an_uncovered_starter_injury(monkeypatch):
     assert injury_item["source"] == "modules.trade_analyzer_fit.roster_injury_context"
 
 
-def test_gm_plan_surfaces_playoff_odds_for_the_callers_own_roster(monkeypatch):
+def test_gm_plan_surfaces_playoff_odds_for_the_callers_own_roster(monkeypatch, isolated_players_universe):
     # Connectivity-audit fix: "Where You Stand" now also checks the
     # already-cached rest-of-season playoff odds simulation
     # (modules.playoff_simulator.build_league_playoff_odds_cached) for the
@@ -9523,7 +9596,7 @@ def test_gm_plan_surfaces_playoff_odds_for_the_callers_own_roster(monkeypatch):
     assert all(item["label"] != "Playoff Odds" or item["median_seed"] == 4 for item in standing["items"])
 
 
-def test_gm_plan_omits_playoff_odds_when_simulation_not_ready(monkeypatch):
+def test_gm_plan_omits_playoff_odds_when_simulation_not_ready(monkeypatch, isolated_players_universe):
     # Early season / no playoff format / etc. — the simulation's own
     # not-ready contract (empty `teams`) must not fabricate a fact.
     league = dict(_TRADE_ANALYZER_LEAGUE)
@@ -9854,66 +9927,17 @@ def _fake_idea_record(name: str, *, gain: int) -> dict:
     }
 
 
-@pytest.mark.known_flaky
-def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monkeypatch):
-    # known_flaky: passes reliably alone (verified 3/3 runs) but
-    # intermittently fails only in the full repo-wide suite — same root-
-    # cause class as test_waivers_endpoint_repeated_requests_hit_cache_
-    # with_correct_data above (see that test's own docstring): this
-    # test's exact `requests.get` call count depends on whether
-    # generate_trade_idea_records_cached's real (uncached-in-tests)
-    # internals happen to also make their two extra real-shaped Sleeper
-    # calls, which is sensitive to shared cache/module state from
-    # whichever other tests ran earlier in the same xdist worker. Not a
-    # regression in the _resolve_my_roster fix this file also covers.
+def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monkeypatch, offline_nfl_schedule):
     client = _client(monkeypatch)
-
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(4)]
-    gm_targets_response = Mock(status_code=200)
-    gm_targets_response.json.return_value = []
-    team_stance_response = Mock(status_code=200)
-    team_stance_response.json.return_value = []
-    # _resolve_my_roster now also checks for a per-league saved_leagues row
-    # before falling back to the profile's sleeper_username (see its own
-    # docstring) — an empty list here means "not saved yet", the same
-    # fallback this test already expected.
-    saved_leagues_response = Mock(status_code=200)
-    saved_leagues_response.json.return_value = []
-    # generate_trade_idea_records_cached's real internals run uncached here
-    # (no Redis in tests) and make two more real-shaped Sleeper calls of
-    # their own (league users, transactions) before the mocked
-    # generate_trade_idea_records is ever reached — not new, just not
-    # previously named/accounted for in this list by the same margin that
-    # happened to tolerate it before.
-    sleeper_users_response = Mock(status_code=200)
-    sleeper_users_response.json.return_value = []
-    sleeper_transactions_response = Mock(status_code=200)
-    sleeper_transactions_response.json.return_value = []
-
-    # Two full requests, each: require_user's auth check + one profile fetch
-    # shared between entitlement and _resolve_my_roster (no double-fetch),
-    # the saved_leagues per-league lookup, the GM Targets lookup that feeds
-    # untouchable/landed-target state into idea generation, the Team
-    # Situation lookup that feeds presentation-only rationale framing, and
-    # the two Sleeper calls generate_trade_idea_records_cached's real
-    # (uncached in tests) internals make before reaching the mocked
-    # generate_trade_idea_records.
-    responses = [
-        auth_user_response,
-        profile_response,
-        saved_leagues_response,
-        gm_targets_response,
-        team_stance_response,
-        sleeper_users_response,
-        sleeper_transactions_response,
-    ] * 2
-    with patch("requests.get", side_effect=responses):
+    # Answered by URL (auth, profile, saved_leagues, GM Targets, Team Situation,
+    # Sleeper users/transactions): the number and order of outbound calls the
+    # real generate_trade_idea_records_cached internals make is not what this
+    # test is about, so it must not decide which mock a request gets.
+    fake_get = _routed_requests_get(profile=[{"entitlement": "free", "sleeper_username": "gm_dynasty"}])
+    with patch("requests.get", side_effect=fake_get):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
                 "modules.sleeper.get_rosters",
@@ -9958,6 +9982,7 @@ def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monke
     assert unlocked_body["entitlement"]["visible_count"] == 4
     assert unlocked_body["entitlement"]["ad_unlocks_applied"] == 1
     assert unlocked_body["entitlement"]["hidden_count"] == 0
+    assert fake_get.unrouted == []
 
 
 def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monkeypatch):
@@ -10914,8 +10939,7 @@ def test_waiver_free_agent_pool_cached_concurrent_misses_single_flight(monkeypat
         assert valued.shape[0] == len(roster_frame)
 
 
-@pytest.mark.known_flaky
-def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypatch):
+def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypatch, offline_nfl_schedule):
     """A second request for the same (league_id, lens) within the cache's
     30s window must be a genuine cache hit — the expensive free-agent-pool
     build (modules.player_state_authority.waiver_actionable_player_pool)
@@ -10923,18 +10947,10 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
     carry the real, correctly-computed free-agent data (not a stale or
     wrong cached shape).
 
-    known_flaky: passes reliably alone (verified 5/5 runs) but intermittently
-    fails only inside the full-suite xdist run (~1 in 5), always the same
-    way — request 2 gets a 401 because request 1 consumed one fewer
-    `requests.get` mock than expected. Root cause not fully pinned down
-    (modules.sleeper.get_trending_players appears uncached at the Python
-    level, so this isn't the simple "cache already warm from a prior test"
-    explanation it looks like at a glance) — a real cross-test interaction
-    specific to xdist's worker-process reuse, not something this test's own
-    change (already given a unique league_id to rule out the obvious cache-
-    key collision) could fully isolate against. Pre-existing test
-    fragility, not a regression in the _resolve_my_roster fix this file
-    also covers."""
+    Outbound HTTP is answered by URL (``_routed_requests_get``) and the
+    process-level Sleeper caches are cleared per test (tests/conftest.py), so
+    neither the number of calls request 1 happens to make nor which test ran
+    earlier in the worker decides which mock request 2 receives."""
 
     import threading
 
@@ -10942,35 +10958,13 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
 
     client = _client(monkeypatch)
     # The FAAB bid reads the caller's declared Team Situation (one Supabase
-    # read per request); stub it so it doesn't consume the requests.get
-    # sequence below, which this test is counting precisely.
+    # read per request); stub it, this test is about the pool cache only.
     monkeypatch.setattr(
         "services.mobile_api_service._fetch_gm_stance_with_set_flag",
         lambda *args, **kwargs: ("retool", False),
     )
 
-    auth_user_response_1 = Mock(status_code=200)
-    auth_user_response_1.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response_1 = Mock(status_code=200)
-    profile_response_1.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-    auth_user_response_2 = Mock(status_code=200)
-    auth_user_response_2.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    profile_response_2 = Mock(status_code=200)
-    profile_response_2.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-    # _resolve_my_roster now also checks for a per-league saved_leagues row
-    # before falling back to the profile's sleeper_username (see its own
-    # docstring) — an empty list here means "not saved yet", the same
-    # fallback this test already expected.
-    saved_leagues_response_1 = Mock(status_code=200)
-    saved_leagues_response_1.json.return_value = []
-    saved_leagues_response_2 = Mock(status_code=200)
-    saved_leagues_response_2.json.return_value = []
-    # build_waiver_free_agent_pool_cached's real internals run uncached here
-    # (no Redis in tests) and make a real Sleeper "trending add" call of
-    # their own before the single-flight cache serves request 2 — not new,
-    # just not previously named/accounted for in this list.
-    trending_add_response = Mock(status_code=200)
-    trending_add_response.json.return_value = []
+    fake_get = _routed_requests_get(profile=[{"entitlement": "free", "sleeper_username": "gm_dynasty"}])
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     roster_frame = _fake_roster_frame()
@@ -10986,18 +10980,7 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
             call_count += 1
         return real_pool(valued, roster_player_map, **kwargs)
 
-    with patch(
-        "requests.get",
-        side_effect=[
-            auth_user_response_1,
-            profile_response_1,
-            saved_leagues_response_1,
-            trending_add_response,
-            auth_user_response_2,
-            profile_response_2,
-            saved_leagues_response_2,
-        ],
-    ):
+    with patch("requests.get", side_effect=fake_get):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
                 "modules.sleeper.get_rosters",
@@ -11040,6 +11023,7 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
     assert response_1.status_code == 200
     assert response_2.status_code == 200
     assert call_count == 1, "second request within the cache window must be a cache hit, not a recomputation"
+    assert fake_get.unrouted == []
 
     for body in (response_1.json(), response_2.json()):
         assert body["ok"] is True
@@ -15414,7 +15398,7 @@ def test_all_trades_stops_after_the_deadline(monkeypatch):
     generate.assert_not_called()
 
 
-def test_trade_hub_keeps_ideas_through_the_deadline_week(monkeypatch):
+def test_trade_hub_keeps_ideas_through_the_deadline_week(monkeypatch, isolated_players_universe):
     client = _client(monkeypatch)
     league = {**_PAST_DEADLINE_LEAGUE, "settings": {"type": 2, "leg": 11, "trade_deadline": 11}}
     with contextlib.ExitStack() as stack:

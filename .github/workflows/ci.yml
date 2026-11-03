@@ -48,18 +48,9 @@ jobs:
       - name: Data files sanity (sleeper_players.json is a real player map)
         run: python scripts/check_data_integrity.py
       - name: Full test suite
-        run: python -m pytest -q -n auto -m "not known_flaky"
+        run: python -m pytest -q -n auto
       - name: Tests must not dirty tracked data files
         run: python scripts/check_data_integrity.py --check-clean
-      # A small, STABLE set of pre-existing tests has failed intermittently
-      # on main for a while, unrelated to whatever PR touched them (see
-      # pytest.ini's own comment on the known_flaky marker). Runs separately
-      # and non-blocking (continue-on-error) so a real regression in one of
-      # these specific tests still shows up in the job output — never
-      # silently discarded — it just doesn't gate the merge.
-      - name: Known-flaky suite (non-blocking)
-        continue-on-error: true
-        run: python -m pytest -q -m known_flaky
       - name: Benchmark public player cache
         run: python scripts/benchmark_public_player_cache.py
 
