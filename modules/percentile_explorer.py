@@ -21,6 +21,9 @@ import pandas as pd
 from modules import player_quick_view as pqv
 from modules.player_eligibility import filter_current_fantasy_players
 
+USAGE_PREFIX = "usage:"
+USAGE_METRIC_COLUMNS = ("snap_share", "target_share", "air_yards_share", "opportunity_share", "red_zone_looks")
+
 #: Stat key -> (tile display label, source label the tile percentiles use,
 #: format kind). Keys mirror the tiles on the Stats tab.
 _STATS: dict[str, tuple[str, str, str]] = {
@@ -39,11 +42,16 @@ _STATS: dict[str, tuple[str, str, str]] = {
     "pass_att": ("Pass Att", "Pass Att", "count"),
     "pass_yards": ("Pass Yards", "Pass Yards", "yards"),
     "pass_tds": ("Pass TDs", "Pass TDs", "td"),
-    "snap": ("Snap %", "Snap Share", "share"),
+    # Usage metrics read the weekly usage pool (modules.usage_trends), the same
+    # numbers the Usage section shows. The old DB columns behind Target Share /
+    # Opportunity / Route % / Carry Share are empty in production.
+    "snap": ("Snap Share", f"{USAGE_PREFIX}snap_share", "share"),
     "route": ("Route %", "Route Part.", "share"),
-    "target_share": ("Target Share", "Target Share", "share"),
+    "target_share": ("Target Share", f"{USAGE_PREFIX}target_share", "share"),
+    "air_yards_share": ("Air Yards Share", f"{USAGE_PREFIX}air_yards_share", "share"),
     "carry_share": ("Carry Share", "Rush Share", "share"),
-    "opportunity": ("Opportunity", "Opportunity Share", "share"),
+    "opportunity": ("Opportunity Share", f"{USAGE_PREFIX}opportunity_share", "share"),
+    "red_zone_looks": ("Red-Zone Looks / Game", f"{USAGE_PREFIX}red_zone_looks", "rate"),
     "targets_gm": ("Targets/Gm", "Targets/Gm", "rate"),
     "rec_gm": ("Rec/Gm", "Rec/Gm", "rate"),
     "yards_catch": ("Yards/Catch", "Yards/Catch", "rate"),
@@ -64,6 +72,18 @@ def supported_stats() -> list[str]:
 
 
 def _values_for(frame: pd.DataFrame, source_label: str) -> pd.Series | None:
+    if source_label.startswith(USAGE_PREFIX):
+        from modules import usage_trends
+
+        table = usage_trends.season_pool_table()
+        if table.empty or "player_id" not in frame.columns:
+            return None
+        column = source_label[len(USAGE_PREFIX):]
+        return frame["player_id"].astype(str).map(table[column]).astype(float)
+    return _values_for_label(frame, source_label)
+
+
+def _values_for_label(frame: pd.DataFrame, source_label: str) -> pd.Series | None:
     fields = pqv._PERCENTILE_STAT_FIELDS.get(source_label)
     if fields is not None:
         return pqv._coalesced_numeric_column(frame, fields)
@@ -207,6 +227,15 @@ def build_explorer(
     base.update(
         {"label": label, "format": fmt, "position": position, "pool": scope, "season": pqv._integer(row.get("stats_season"))}
     )
+    if _STATS[stat][1].startswith(USAGE_PREFIX):
+        from modules import sleeper, usage_trends
+
+        base["season"] = int(sleeper.default_player_stats_season())
+        who = "players" if scope == "all" else f"{position}s"
+        base["sample_note"] = (
+            f"{who} with at least {usage_trends.MIN_POOL_GAMES} games played in {base['season']}; "
+            "season average of weekly values"
+        )
 
     if players_df is None or players_df.empty or "position" not in players_df.columns:
         return {**base, "reason": "no_data"}
@@ -232,3 +261,27 @@ def build_explorer(
         "player": me,
         "nearby": select_nearby(dist["players"], player_id),
     }
+
+
+def usage_metric_percentiles(players_df: pd.DataFrame | None, row: Mapping[str, object]) -> dict[str, dict]:
+    """Position percentile of one player's season usage numbers, keyed by usage
+    metric (``snap_share`` ...), for the Usage section. Same pool and primitive
+    as the explorer, so the bar and the pop-up always agree. A metric with a
+    thin pool or no value is simply absent (the section then shows it without a
+    percentile rather than inventing one)."""
+
+    from modules import usage_trends
+
+    out: dict[str, dict] = {}
+    for metric, stat in usage_trends.EXPLORER_KEYS.items():
+        payload = build_explorer(players_df, row, stat=stat)
+        if payload.get("reason") or not payload.get("player"):
+            continue
+        out[metric] = {
+            "percentile": payload["player"]["percentile"],
+            "pool_size": payload["pool_size"],
+            "season": payload["season"],
+            "sample_note": payload.get("sample_note"),
+            "position": payload.get("position"),
+        }
+    return out

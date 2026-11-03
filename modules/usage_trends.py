@@ -391,3 +391,90 @@ def profile_for_player(sleeper_id: Any, position: str, *, season: int | None = N
     profile = build_usage_profile(position, weeks, advanced)
     profile["season"] = selected
     return profile
+
+
+# --------------------------------------------------------------------------
+# Season-level pool: one row per covered player, for percentiles + explorer.
+
+#: Games a player needs before his season average may enter a percentile pool.
+MIN_POOL_GAMES = 4
+#: metric key -> percentile explorer stat key (modules.percentile_explorer).
+EXPLORER_KEYS = {
+    "snap_share": "snap",
+    "target_share": "target_share",
+    "air_yards_share": "air_yards_share",
+    "opportunity_share": "opportunity",
+    "red_zone_looks": "red_zone_looks",
+}
+POOL_METRICS = tuple(EXPLORER_KEYS)
+
+_POOL_CACHE: dict[tuple, Any] = {}
+
+
+def _season_cache_path(season: int) -> str:
+    return sleeper.PLAYER_STATS_CACHE_TEMPLATE.format(season=season)
+
+
+def season_pool_table(season: int | None = None):
+    """DataFrame indexed by Sleeper id: ``games`` plus each pool metric's season
+    mean over played games, for every RB/WR/TE with at least ``MIN_POOL_GAMES``
+    games. Built from the same weekly series as ``build_usage_profile`` so a
+    player's displayed season number equals his pool value. Empty (not an
+    error) when the Sleeper cache is missing. Re-read only when either source
+    file changes."""
+
+    import json
+    import os
+
+    import pandas as pd
+
+    selected = int(season or sleeper.default_player_stats_season())
+    cache_path = _season_cache_path(selected)
+    adv_path = adv_stats.DATA_PATH_TEMPLATE.format(season=selected)
+
+    def _mtime(path: str) -> float:
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            return -1.0
+
+    key = (selected, _mtime(cache_path), _mtime(adv_path))
+    cached = _POOL_CACHE.get("table")
+    if cached and cached[0] == key:
+        return cached[1]
+    columns = ["position", "games", *POOL_METRICS]
+    rows: dict[str, dict[str, Any]] = {}
+    if key[1] >= 0:
+        with open(cache_path, "r", encoding="utf-8") as handle:
+            season_stats = json.load(handle)
+        payload = adv_stats.load_season(selected)
+        by_sid = {}
+        if payload:
+            by_sid = {rec["sleeper_id"]: rec for rec in payload.get("players", {}).values() if rec.get("sleeper_id")}
+        for sid, record in season_stats.items():
+            weekly = record.get("weekly") if isinstance(record, Mapping) else None
+            rec = by_sid.get(sid)
+            position = (rec or {}).get("position") or str(record.get("position") or "").upper()
+            if not weekly or position not in COVERED_POSITIONS:
+                continue
+            played = _played_rows(weekly)
+            if len(played) < MIN_POOL_GAMES:
+                continue
+            advanced = (
+                {
+                    "available": True,
+                    "through_week": int(payload.get("through_week") or 0),
+                    "weeks": {int(w): row for w, row in rec["weeks"].items()},
+                }
+                if rec
+                else {"available": False}
+            )
+            series = _weekly_values(played, advanced)
+            row: dict[str, Any] = {"position": position, "games": len(played)}
+            for metric in POOL_METRICS:
+                vals = [v for _, v in series[metric] if v is not None]
+                row[metric] = _mean(vals) if vals else None
+            rows[str(sid)] = row
+    table = pd.DataFrame.from_dict(rows, orient="index", columns=columns)
+    _POOL_CACHE["table"] = (key, table)
+    return table

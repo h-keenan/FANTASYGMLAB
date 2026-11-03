@@ -2268,6 +2268,11 @@ export interface UsageMetric {
   delta_last4_vs_prior: number | null;
   direction: "up" | "down" | "flat" | "unknown";
   games_with_data: number;
+  /** Percentile explorer stat key; present on the five pool metrics. */
+  explorer_key?: string;
+  /** Season-average percentile vs the position pool (omitted when the pool is too thin). */
+  percentile?: number | null;
+  percentile_note?: string | null;
   season_total?: number;
   last4_total?: number | null;
 }

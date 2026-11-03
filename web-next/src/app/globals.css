@@ -2950,90 +2950,219 @@ a.pqv-news-title { text-decoration: underline; text-underline-offset: 2px; }
 .pqv-news-meta { font-size: 0.72rem; color: var(--color-text-muted); }
 .pqv-news-summary { font-size: 0.78rem; color: var(--color-text-secondary); }
 
-/* Usage block (rolling last-4/last-8 usage + role flags), shared by PQV and the
-   full profile. Rows use the same tokens as the stat tiles. */
-.pqv-usage-flag {
+/* Stat rows: the one presentation for usage + season stats in Player Quick View
+   and the profile. Label/value on top, percentile bar, pool caption, trend line.
+   Headline tiles carry the few numbers that matter, large. */
+.hl-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+.hl-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-md) var(--space-sm);
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-secondary);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+button.hl-tile {
+  cursor: pointer;
+}
+.hl-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-muted);
+}
+.hl-value {
+  font-size: 1.5rem;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.hl-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.sr-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-secondary);
+}
+.sr-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.sr-head h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-muted);
+}
+.sr-head-caption {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+.sr-season {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.sr-season-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sr-list {
+  display: flex;
+  flex-direction: column;
+}
+.sr {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-sm) 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  width: 100%;
+}
+.sr + .sr {
+  border-top: var(--border-width-default) solid var(--color-border);
+}
+button.sr {
+  cursor: pointer;
+}
+.sr-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.sr-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.sr-value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.sr-barline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.sr-bar {
+  display: block;
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+.sr-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.sr-fill--low {
+  background: var(--color-danger);
+}
+.sr-fill--mid {
+  background: var(--color-action);
+}
+.sr-fill--high {
+  background: var(--color-success);
+}
+.sr-pct--low {
+  color: var(--color-danger);
+}
+.sr-pct--mid {
+  color: var(--color-action);
+}
+.sr-pct--high {
+  color: var(--color-success);
+}
+.sr-meta {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+.sr-pct {
+  min-width: 2.4rem;
+  text-align: right;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.sr-trend {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+.sr-trend--up {
+  color: var(--color-success);
+}
+.sr-trend--down {
+  color: var(--color-danger);
+}
+.sr-more {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: var(--space-xs) 0;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+.sr-flag {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
   align-items: flex-start;
   padding: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-sm);
   border-radius: var(--radius-sm);
   border: var(--border-width-default) solid var(--color-border);
-  background: var(--color-surface-secondary);
 }
-.pqv-usage-flag--positive {
+.sr-flag--positive {
   border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
 }
-.pqv-usage-flag--negative {
+.sr-flag--negative {
   border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
 }
-.pqv-usage-flag p,
-.pqv-usage-note {
+.sr-flag p,
+.sr-note {
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.4;
   color: var(--color-text-secondary);
 }
-.pqv-usage-note {
-  margin-top: var(--space-sm);
-  font-size: 0.75rem;
+.sr-note--out {
+  margin-top: var(--space-xs);
+  font-size: 0.72rem;
   color: var(--color-text-muted);
 }
-.pqv-usage-table {
-  display: flex;
-  flex-direction: column;
-  border: var(--border-width-default) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.pqv-usage-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.9fr) repeat(3, minmax(0, 0.8fr));
-  gap: var(--space-sm);
-  align-items: baseline;
-  padding: var(--space-sm);
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  background: var(--color-surface-secondary);
-}
-.pqv-usage-row + .pqv-usage-row {
-  border-top: var(--border-width-default) solid var(--color-border);
-}
-.pqv-usage-row > span:not(:first-child) {
-  text-align: right;
-}
-.pqv-usage-row--head {
-  font-size: 0.66rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
-  color: var(--color-text-muted);
-  background: transparent;
-}
-.pqv-usage-label {
-  display: flex;
-  flex-direction: column;
-  font-weight: 600;
-}
-.pqv-usage-delta {
+.sr-credit {
+  margin: var(--space-xs) 0 0;
   font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
 }
-.pqv-usage-delta--up {
-  color: var(--color-success);
-}
-.pqv-usage-delta--down {
-  color: var(--color-danger);
-}
-.pqv-usage-credit {
-  margin: var(--space-sm) 0 0;
-  font-size: 0.7rem;
-}
-.pqv-usage-credit a {
+.sr-credit a {
   color: var(--color-text-muted);
   text-decoration: underline;
 }

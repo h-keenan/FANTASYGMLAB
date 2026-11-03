@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import {
+import { type UsageProfile,
   api,
   type PlayerAward,
   type QuickViewResponse,
@@ -13,6 +13,9 @@ import { AwardsStrip, BioGrid, StatGroup, SubRatingRow } from "@/components/Play
 import { PillRow } from "@/components/PillRow";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerUsageBlock } from "@/components/PlayerUsageBlock";
+import { SeasonStatsRows } from "@/components/SeasonStatsRows";
+import { HeadlineTiles } from "@/components/StatRows";
+import { headlineRows } from "@/lib/statRowsPresentation";
 import { PlayerCareerTab } from "@/components/PlayerCareerTab";
 import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
@@ -57,23 +60,23 @@ const PROFILE_TABS: Array<{ label: string; value: ProfileTab }> = [
   { label: "Model", value: "model" },
 ];
 
-function StatsTab({ stats, playerId }: { stats: QuickViewStats | null; playerId: string }) {
+function StatsTab({
+  stats,
+  playerId,
+  usageProfile,
+}: {
+  stats: QuickViewStats | null;
+  playerId: string;
+  usageProfile: UsageProfile | null | undefined;
+}) {
   if (!stats || (stats.seasons.length === 0 && stats.college.length === 0)) {
     return <p className="pqv-status-text">No stats available for this player yet.</p>;
   }
   return (
     <>
-      {stats.seasons.map((season) => (
-        <section key={season.label} className="pqv-stat-season">
-          <h3>
-            {season.label}
-            {season.games != null ? ` · ${season.games} games` : ""}
-          </h3>
-          {seasonStatGroups(season).map((group) => (
-            <StatGroup key={group.title} title={group.title} items={group.items} playerId={playerId} />
-          ))}
-        </section>
-      ))}
+      <HeadlineTiles rows={headlineRows(stats, usageProfile)} playerId={playerId} />
+      <PlayerUsageBlock profile={usageProfile} position={stats.position} playerId={playerId} />
+      <SeasonStatsRows stats={stats} usageProfile={usageProfile} playerId={playerId} />
       {stats.college.length > 0 ? (
         <section className="pqv-stat-season">
           <h3>College</h3>
@@ -233,8 +236,7 @@ export function PlayerProfileContent({
             />
 
             <div className="flex flex-col gap-4">
-              {tab === "stats" ? <PlayerUsageBlock profile={model?.usage_profile} /> : null}
-              {tab === "stats" ? <StatsTab stats={stats} playerId={player.player_id} /> : null}
+              {tab === "stats" ? <StatsTab stats={stats} playerId={player.player_id} usageProfile={model?.usage_profile} /> : null}
               {tab === "trends" ? (
                 <PlayerTrendsPanel playerId={player.player_id} name={name} gradientId="profile-weekly-fill" />
               ) : null}

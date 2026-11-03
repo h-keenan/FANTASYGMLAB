@@ -157,6 +157,7 @@ export function PercentileExplorerSheet({
             {statLabel} Percentile Explorer
           </h3>
           <p className="pe-hint">Tap a player to compare where he sits.</p>
+          {data?.sample_note ? <p className="pe-hint" data-testid="pe-sample-note">{data.sample_note}</p> : null}
 
           <div className="pe-controls">
             <PillRow

@@ -4862,6 +4862,10 @@ def test_quick_view_model_carries_the_usage_profile_with_explicit_states(monkeyp
     assert profile["advanced"] == {"available": False, "reason": "advanced_stats_file_unavailable", "through_week": None, "as_of": None}
     assert profile["not_available"][0]["key"] == "routes_run"
     assert profile["attribution"]["license"] == "CC BY 4.0"
+    # Pool metrics open the shared percentile pop-up; a one-player pool is too
+    # thin for a percentile, which is then absent rather than invented.
+    snap = next(m for m in profile["metrics"] if m["key"] == "snap_share")
+    assert snap["explorer_key"] == "snap" and snap["percentile"] is None
 
 
 def test_quick_view_usage_profile_failure_is_reported_not_hidden(monkeypatch):
