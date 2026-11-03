@@ -112,6 +112,16 @@ flagged card lists the evidence lines and "Could be innocent" explanations.
 - Possibly inactive: same starting lineup 4+ weeks in a row with no roster
   moves all season, or empty starting slots in 2+ weeks.
 
+## Page layout and calendar
+
+Default view for a clean league: one summary line ("All 12 teams look fine this
+week") with a count and an expandable team list, instead of one green card per
+team. The report also returns `calendar` (trade deadline, weeks left, phase,
+playoff start week, current week) read from the league settings through
+`modules/league_calendar.py`; web and app show it as a "League calendar" card.
+Nothing is guessed: no deadline setting (Sleeper uses 99) shows "No trade
+deadline set".
+
 ## Limitations (also returned in `limits`)
 
 - Sleeper does not expose past injuries/inactives. We exclude bye weeks and
