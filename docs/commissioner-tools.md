@@ -92,9 +92,23 @@ flagged card lists the evidence lines and "Could be innocent" explanations.
 
 ## Extras
 
-- Repeated lopsided trades: two managers with >= 2 trades between them where
-  the same side wins on value >= 2 times ("Worth a look"; 3+ is "Strong").
-  Trades with picks, three-team trades and unvalued players are never scored.
+- Repeated trades worth a look (two managers, all trades between them; never
+  scored when a trade has an unpriced asset or three teams). Draft picks are
+  priced from the one canonical pick table the Trade Analyzer and History
+  grades share (`trade_ideas.canonical_pick_identity_value`, round-level, mid
+  slot; a past trade's exact slot is unknown). Three patterns, each capped at
+  "Worth a look" unless noted, framed as a prompt, never an accusation:
+  - `lopsided`: >= 2 trades between them where the same side wins on value
+    (decline/hard band). 3+ is "Strong signals".
+  - `round_trip`: >= 3 trades between them AND >= 2 assets (players or picks)
+    that went back and forth between them, each return within 14 days of the
+    previous move (value deltas cancel, so lopsided cannot see it).
+  - `burst`: >= 3 trades between them in one in-season week (week 1 holds all
+    offseason trades, so it never counts).
+  Validated on real leagues (see PR): league 1312122984617476096 rosters 3 and 9
+  (same picks moved back and forth across 3 trades) and 3 and 6 (3 trades in
+  week 4, 3 assets returned) are now flagged; the other 3 public leagues stay
+  clean.
 - Possibly inactive: same starting lineup 4+ weeks in a row with no roster
   moves all season, or empty starting slots in 2+ weeks.
 
@@ -109,8 +123,8 @@ flagged card lists the evidence lines and "Could be innocent" explanations.
 - IR/taxi exclusion uses the current roster, not that week's.
 - Greedy narrowest-slot-first lineup solving is optimal for nested flexes;
   overlapping custom flexes (WRRB with REC) may be off by a slot.
-- Pick values are not priced; trade value uses current values, not values at
-  trade time.
+- Pick prices are round-level (same as the Trade Analyzer); trade value uses
+  current values, not values at trade time.
 - Results are cached 30 minutes per (league, draft rule).
 
 ## False-positive handling

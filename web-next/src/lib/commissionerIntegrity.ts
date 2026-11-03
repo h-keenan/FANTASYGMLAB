@@ -40,10 +40,15 @@ export interface IntegrityTeam {
   series: IntegritySeriesPoint[];
 }
 
+export type IntegrityTradePattern = "lopsided" | "round_trip" | "burst";
+
 export interface IntegrityCollusionPair {
   roster_ids: number[];
   beneficiary_name: string;
   giver_name: string;
+  headline: string;
+  summary: string;
+  patterns: IntegrityTradePattern[];
   trades_between: number;
   lopsided_same_direction: number;
   band: IntegrityBand;
@@ -145,7 +150,7 @@ export function integritySummaryLine(resp: CommissionerIntegrityResponse): strin
   }
   const parts: string[] = [];
   if (flagged.length) parts.push(`${flagged.length} team${flagged.length === 1 ? "" : "s"} worth a look`);
-  if (resp.collusion.length) parts.push(`${resp.collusion.length} repeated lopsided trade pair${resp.collusion.length === 1 ? "" : "s"}`);
+  if (resp.collusion.length) parts.push(`${resp.collusion.length} trade pair${resp.collusion.length === 1 ? "" : "s"} worth a look`);
   if (resp.inactive.length) parts.push(`${resp.inactive.length} possibly inactive manager${resp.inactive.length === 1 ? "" : "s"}`);
   return `After ${weeks} week${weeks === 1 ? "" : "s"}: ${parts.join(", ")}. These are prompts to check, not conclusions.`;
 }

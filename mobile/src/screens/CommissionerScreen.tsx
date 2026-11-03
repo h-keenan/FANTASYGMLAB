@@ -228,8 +228,8 @@ function IntegrityBody({
       {data.collusion.length ? (
         <View style={styles.stack}>
           <SectionHeading
-            title="Repeated lopsided trades"
-            caption="Same two managers, repeated one-sided trades. Picks are not valued, so trades with picks are never flagged."
+            title="Repeated trades worth a look"
+            caption="Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict."
           />
           {data.collusion.map((pair) => (
             <CollusionCard key={pair.roster_ids.join('-')} pair={pair} toneColor={toneColor} styles={styles} />
@@ -276,13 +276,12 @@ function CollusionCard({
     <AccentCard accent={toneColor(pair.band)}>
       <View style={styles.cardHead}>
         <AppText style={[styles.teamName, styles.flex]}>
-          {pair.giver_name} and {pair.beneficiary_name}
+          {pair.headline}
         </AppText>
         <ToneBadge label={BAND_LABEL[pair.band]} color={toneColor(pair.band)} />
       </View>
       <AppText style={styles.body}>
-        {pair.trades_between} trades between them; {pair.lopsided_same_direction} lopsided in {pair.beneficiary_name}&rsquo;s favor ·{' '}
-        {CONFIDENCE_LABEL[pair.confidence]}
+        {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
       </AppText>
       <Bullets title="Evidence" items={pair.evidence} styles={styles} />
       <Bullets title="Could be innocent" items={pair.innocent_explanations} styles={styles} />
