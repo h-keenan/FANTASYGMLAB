@@ -400,6 +400,8 @@ describe("LandingPage onboarding progress persistence", () => {
     mockSavedLeagues({ data: [] });
     render(<LandingPage />);
     expect(await screen.findByText("SleeperImportForm")).toBeInTheDocument();
+    // The signed-in connect step leads with what the person has to do.
+    expect(screen.getByTestId("connect-first-heading")).toHaveTextContent("Connect your league");
   });
 
   it("still shows the carousel to a different account on the same browser", async () => {
