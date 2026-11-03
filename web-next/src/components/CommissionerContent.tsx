@@ -29,9 +29,9 @@ import {
 } from "@/lib/commissionerIntegrity";
 
 /**
- * Commissioner: league integrity for the league's commissioner (Sleeper's
- * is_owner flag, confirmed server-side). Every number comes from
- * modules/league_integrity.py; nothing is computed here. Signals are prompts
+ * Commissioner: league integrity for any Pro user who can open the league
+ * (no commissioner check; access and the Pro gate are enforced server-side).
+ * Every number comes from modules/league_integrity.py; nothing is computed here. Signals are prompts
  * to look, never verdicts, so each card lists the innocent explanations next
  * to the evidence. Mirrors mobile's CommissionerScreen.
  */
@@ -310,10 +310,10 @@ export function CommissionerContent({ leagueId, leagueName }: { leagueId: string
         <ErrorState message={state.error || "Could not load League integrity."} onRetry={() => { setState({ key: "", data: null, error: null }); setAttempt((n) => n + 1); }} />
       ) : data.is_premium === false ? (
         <PremiumUpsellCard
-          kicker="Commissioner"
+          kicker="League integrity"
           upsell={data.upsell ?? null}
           fallbackTitle="Spot tanking and lineup problems early"
-          fallbackBody="League integrity is a Pro feature for commissioners."
+          fallbackBody="League integrity is a Pro feature: lineup efficiency, tanking signals with the evidence behind them, repeated lopsided trades and inactive managers."
           bare
         />
       ) : data.reason ? (

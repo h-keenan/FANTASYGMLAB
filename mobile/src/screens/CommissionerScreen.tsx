@@ -44,8 +44,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Commissioner'>;
 
 /**
  * Commissioner: league integrity (lineups, tanking signals, lopsided repeat
- * trades, inactive managers) for the league's commissioner. Every number is
- * read from the server (modules/league_integrity.py); signals are prompts to
+ * trades, inactive managers) for any Pro user who can open the league (no
+ * commissioner check). Every number is read from the server (modules/league_integrity.py); signals are prompts to
  * look, so each card lists the innocent explanations beside the evidence.
  * Mirrors web-next's CommissionerContent and shares lib/commissionerIntegrity.
  */
@@ -80,7 +80,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
       <PremiumLock
         feature="commissioner"
         title={data.upsell?.title || 'Spot tanking and lineup problems early'}
-        description={data.upsell?.body || 'League integrity is a Pro feature for commissioners.'}
+        description={data.upsell?.body || 'League integrity is a Pro feature: lineup efficiency, tanking signals with the evidence behind them, repeated lopsided trades and inactive managers.'}
       />
     );
   } else if (data.reason) {
