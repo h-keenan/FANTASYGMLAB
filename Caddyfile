@@ -71,6 +71,14 @@
 	import encode_responses
 	root * /srv/static/landing
 
+	# coridian_, 2026-11-03: the apex must show the new landing, which
+	# lives in web-next on {$APP_DOMAIN} (session state is origin-scoped,
+	# so proxying it here would split sign-in). Redirect only the landing
+	# page itself (query kept, so share-card QR UTMs survive); robots.txt,
+	# sitemap.xml and the old assets stay served from static/landing.
+	@landing path /
+	redir @landing https://{$APP_DOMAIN}{uri} temporary
+
 	# Filenames here are NOT content-hashed/fingerprinted (checked-in as
 	# plain names like landing.css, favicon.png — see
 	# scripts/build_static_landing_assets.py), so a long, unconditional
