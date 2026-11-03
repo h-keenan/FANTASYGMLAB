@@ -478,3 +478,33 @@ def season_pool_table(season: int | None = None):
     table = pd.DataFrame.from_dict(rows, orient="index", columns=columns)
     _POOL_CACHE["table"] = (key, table)
     return table
+
+def explanation_hook(
+    player_id: Any,
+    position: str,
+    season_stats: Mapping[str, Any] | None,
+    *,
+    season: int | None = None,
+) -> dict[str, Any]:
+    """Display-only usage flag for recommendation surfaces (waivers, trades).
+
+    Takes the season stats the caller already loaded (``retain_weekly``) so a
+    list of players costs no extra file reads. Returns ``{"status", "flag"}``:
+    ``flag`` is the first role flag (key/label/tone/explanation) or ``None``;
+    ``status`` says *why* there is no flag (``building_sample``, ``low_usage``,
+    ``ok`` meaning evaluated and nothing notable, ``no_data``, ``not_covered``)
+    or ``unavailable`` when the caller had no weekly stats at all. It never
+    feeds a score or ranking.
+    """
+
+    record = (season_stats or {}).get(str(player_id or ""))
+    weekly = record.get("weekly") if isinstance(record, Mapping) else None
+    if not weekly:
+        return {"status": "unavailable", "flag": None}
+    selected = int(season or sleeper.default_player_stats_season())
+    profile = build_usage_profile(position, weekly, adv_stats.weekly_for_sleeper_id(player_id, selected))
+    flag = profile["flags"][0] if profile["flags"] else None
+    return {
+        "status": profile["status"],
+        "flag": {k: flag[k] for k in ("key", "label", "tone", "explanation")} if flag else None,
+    }

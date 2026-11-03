@@ -1285,6 +1285,10 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
    * confidence language Trade Hub's cards already use. */
   confidence_label: string;
   confidence_reason: string;
+  // Display-only role flag (modules/usage_trends.py); never feeds the score, rank or bid.
+  // usage_flag_status says why usage_flag is null ("unavailable" = no weekly stats loaded).
+  usage_flag?: Pick<UsageFlag, 'key' | 'label' | 'tone' | 'explanation'> | null;
+  usage_flag_status?: string;
 }
 
 // Shared shape for every endpoint that gates part of its own response by

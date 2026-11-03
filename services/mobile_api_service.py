@@ -14901,8 +14901,15 @@ def _project_priority_add(
     guidance: "faab.FaabGuidance",
     opponent_by_team: dict[str, dict[str, Any]] | None = None,
     defense_strength_by_position: dict[str, dict[str, dict[str, Any]]] | None = None,
+    season_stats: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     projected = _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
+    # Display-only usage explanation (modules.usage_trends). It never touches
+    # the score, rank, recommendation label or FAAB math above/below; the
+    # status says why a flag is absent ("unavailable" = no weekly stats loaded).
+    usage = usage_trends.explanation_hook(row.get("player_id"), str(row.get("position") or ""), season_stats)
+    projected["usage_flag"] = usage["flag"]
+    projected["usage_flag_status"] = usage["status"]
     position_rank = int(row.get("position_rank") or 99) or 99
     label, tone = waivers_logic.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
@@ -15208,7 +15215,9 @@ def get_league_waivers(
             best_ball=league_calendar.is_best_ball(league),
         )
         priority_adds.append(
-            _project_priority_add(row, score_field, guidance, opponent_by_team, defense_strength_by_position)
+            _project_priority_add(
+                row, score_field, guidance, opponent_by_team, defense_strength_by_position, faab_season_stats
+            )
         )
 
     # Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB

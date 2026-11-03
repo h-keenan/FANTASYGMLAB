@@ -145,6 +145,23 @@ function ReasonChips({ player }: { player: WaiverPriorityAdd }) {
   );
 }
 
+/** Display-only role flag chip (modules/usage_trends.py); never feeds the score, rank or bid. */
+function UsageFlagChip({ player }: { player: WaiverPriorityAdd }) {
+  const { colors } = useThemeMode();
+  const flag = player.usage_flag;
+  if (!flag) return null;
+  const tint = flag.tone === 'positive' ? colors.success : colors.danger;
+  return (
+    <View style={chipStyles.row}>
+      <View style={[chipStyles.chip, { borderColor: `${tint}70`, backgroundColor: `${tint}1A` }]}>
+        <AppText style={[chipStyles.text, { color: tint }]} numberOfLines={1}>
+          {flag.label}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
 const chipStyles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: { borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 2 },
@@ -209,6 +226,7 @@ export default function WaiverRecommendationCard({
         </View>
         <View style={styles.identityWrap}>{identity}</View>
         <ReasonChips player={player} />
+        <UsageFlagChip player={player} />
         <View style={styles.metricsRow}>
           <View style={styles.scoreBlock}>
             <AppText style={styles.scoreNumberPrimary}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
@@ -223,6 +241,16 @@ export default function WaiverRecommendationCard({
         {player.faab?.why ? (
           <AppText style={styles.faabWhy} numberOfLines={3}>
             {player.faab.why}
+          </AppText>
+        ) : null}
+        {/* Display-only role flag (modules/usage_trends.py): never feeds the
+            score, rank or bid. Same copy as web's Top Waiver Target card. */}
+        {player.usage_flag ? (
+          <AppText style={styles.faabWhy}>
+            <AppText style={{ fontWeight: '700', color: player.usage_flag.tone === 'positive' ? colors.success : colors.danger }}>
+              {player.usage_flag.label}:{' '}
+            </AppText>
+            {player.usage_flag.explanation}
           </AppText>
         ) : null}
         {/* Beginner-only explanations (lib/experienceCopy.ts); nothing renders
@@ -274,6 +302,7 @@ export default function WaiverRecommendationCard({
           bid and the chevron that opens the player. */}
       <View style={styles.compactIdentity}>{identity}</View>
       <ReasonChips player={player} />
+        <UsageFlagChip player={player} />
       <View style={styles.compactMetaRow}>
         <View style={styles.scoreBlock}>
           <AppText style={styles.scoreLabel}>VALUE</AppText>
