@@ -13,6 +13,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
+import NextSteps from '../components/NextSteps';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -266,6 +267,11 @@ export default function AlertsScreen({ route, navigation }: Props) {
               week={recapReadyWeek}
               onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
             />
+          ) : null
+        }
+        ListFooterComponent={
+          !loading ? (
+            <NextSteps steps={['matchup', 'waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
           ) : null
         }
         ListEmptyComponent={

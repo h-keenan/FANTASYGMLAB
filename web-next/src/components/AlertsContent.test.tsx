@@ -133,4 +133,13 @@ describe("AlertsContent", () => {
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect a league" })).toBeInTheDocument();
   });
+
+  it("ends with next-step links so the feed is never a dead end", () => {
+    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={{ ok: true, reason: "", items: [] }} />);
+    expect(screen.getByText(/All quiet/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Find a waiver add/ })).toHaveAttribute(
+      "href",
+      "/waivers/league-1?name=Dynasty%20Overlords",
+    );
+  });
 });

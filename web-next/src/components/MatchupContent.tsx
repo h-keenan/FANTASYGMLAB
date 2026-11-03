@@ -15,6 +15,7 @@ import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { EmptyState } from "@/components/EmptyState";
 import { reloadPage } from "@/components/ErrorState";
 import { PillRow } from "@/components/PillRow";
+import { NextSteps } from "@/components/NextSteps";
 import { PlannerBar, SwapSheet, useLineupPlanner } from "@/components/MatchupPlanner";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -787,6 +788,14 @@ export function MatchupContent({
       ) : (
         <SuggestedMoves matchup={matchup} />
       )}
+      {leagueId ? (
+        <NextSteps
+          title="Fix a weak spot"
+          steps={["waivers", "trade-hub", "my-team"]}
+          leagueId={leagueId}
+          leagueName={leagueName}
+        />
+      ) : null}
       <ValuesCredit />
     </main>
   );
