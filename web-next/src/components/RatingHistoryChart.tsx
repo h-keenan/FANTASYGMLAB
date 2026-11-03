@@ -38,7 +38,7 @@ export function RatingHistoryChart({ points, gradientId }: { points: RatingHisto
             domain={[lo, hi]}
             tickLine={false}
             axisLine={false}
-            width={28}
+            width={22}
             tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
             allowDecimals={false}
           />

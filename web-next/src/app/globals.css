@@ -1628,14 +1628,20 @@ a {
 .pqv-actions {
   border-top: var(--border-width-default) solid var(--color-border);
   padding-top: var(--space-md);
-  display: flex;
-  justify-content: flex-end;
+  /* One grid: two equal columns spanning the same gutters as the content
+     above; an odd last button spans the full width. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-sm);
-  flex-wrap: wrap;
+}
+.pqv-actions > .pqv-action-link:nth-last-child(1):nth-child(odd) {
+  grid-column: 1 / -1;
 }
 .pqv-action-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   min-height: 44px;
   font-size: 0.8rem;
   font-weight: 700;
@@ -1658,10 +1664,10 @@ a {
   border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 .pqv-action-message {
-  flex-basis: 100%;
+  grid-column: 1 / -1;
   margin: 0;
   font-size: 0.78rem;
-  text-align: right;
+  text-align: center;
   color: var(--color-warning);
 }
 

@@ -148,7 +148,7 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
               domain={[minimum, maximum]}
               tickLine={false}
               axisLine={false}
-              width={28}
+              width={22}
               tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
               tickFormatter={(value: number) => value.toFixed(0)}
             />
