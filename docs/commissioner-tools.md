@@ -14,7 +14,7 @@ Owner decision (coridian_): the section is Pro-only and does NOT depend on
 being the league's commissioner. Any Pro user can open it for any Sleeper
 league they can access (same league-access and `_is_pro_caller` gating as
 Playoff Odds; trialing counts as Pro; Free gets the upsell and no data).
-There is no commissioner detection. It is framed honestly as a league-integrity
+There is no commissioner detection (re-confirmed 2026-11-03: it stays open to any Pro user who can access the league; copy and code comments no longer say "for the commissioner"). It is framed honestly as a league-integrity
 view over public Sleeper data: signals to check, not accusations. ESPN/MFL and
 other imported leagues are not supported (`unsupported_platform`). Endpoint:
 `GET /v1/leagues/{id}/commissioner/integrity`. Nav entry "Commissioner" sits
@@ -117,7 +117,7 @@ flagged card lists the evidence lines and "Could be innocent" explanations.
 
 Prompts, not verdicts: a team flagged because of a late injury, a thin
 position, a bye conflict or a busy manager looks the same in saved data, so
-each card lists those explanations and tells the commissioner to ask first.
+each card lists those explanations and tells the reader to ask the manager first.
 Tuning knobs are constants at the top of `modules/league_integrity.py`; the
 golden synthetic leagues in `tests/test_league_integrity.py` (obvious tank,
 injury-ridden innocent team, one-off bad week, post-elimination vs alive,
