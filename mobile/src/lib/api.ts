@@ -2143,6 +2143,8 @@ export interface QuickViewBio {
   weight: string;
   bye_week: string;
   contract_status: string;
+  /** years_exp === 0 (backend definition); see rookieBadge(). */
+  is_rookie?: boolean;
 }
 
 /**

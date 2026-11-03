@@ -149,3 +149,20 @@ describe("PlayerHeroHeader bye week", () => {
     expect(screen.getByText("On bye this week")).toBeTruthy();
   });
 });
+
+describe("PlayerHeroHeader rookie badge", () => {
+  it("shows the ROOKIE badge and a detail line only from real data", () => {
+    renderHero({ rookie: { label: "ROOKIE", detail: "2026 · Round 1 · Pick 12" } });
+    expect(screen.getByTestId("pqv-rookie-badge").textContent).toBe("ROOKIE");
+    expect(screen.getByTestId("pqv-rookie-line").textContent).toContain("2026 · Round 1 · Pick 12");
+  });
+
+  it("shows only the badge when there is no draft detail, and nothing for veterans", () => {
+    const { unmount } = renderHero({ rookie: { label: "ROOKIE", detail: null } });
+    expect(screen.getByTestId("pqv-rookie-badge")).toBeTruthy();
+    expect(screen.queryByTestId("pqv-rookie-line")).toBeNull();
+    unmount();
+    renderHero();
+    expect(screen.queryByTestId("pqv-rookie-badge")).toBeNull();
+  });
+});

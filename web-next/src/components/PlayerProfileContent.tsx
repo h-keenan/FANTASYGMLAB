@@ -22,7 +22,7 @@ import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
-import { seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
+import { rookieBadge, seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { BRAND_NAME } from "@/lib/brand";
 import { useShareImage } from "@/lib/useShareImage";
@@ -206,6 +206,7 @@ export function PlayerProfileContent({
         usageTrend={model?.usage_trend ?? null}
         usageLoading={loading}
         depthChartNote={model?.depth_chart_note}
+        rookie={rookieBadge(bio)}
       />
 
       <div className="pqv-signal-row">

@@ -40,6 +40,7 @@ import { headlineRows } from '../lib/statRows';
 import ValuesCredit from '../components/ValuesCredit';
 import PlayerTrendsPanel from '../components/PlayerTrendsPanel';
 import { injuryTone } from '../lib/injuryDisplay';
+import { rookieBadge } from '../lib/playerQuickViewPresentation';
 import { percentileColor, overallRatingColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import { playerSubRatings } from '../lib/subRatings';
 import {
@@ -1372,6 +1373,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       byeWeek={quickViewQuery.data?.identity?.bye_week ?? null}
       onByeThisWeek={quickViewQuery.data?.identity?.on_bye_this_week ?? false}
       unavailable={quickViewQuery.data?.identity?.availability?.unavailable ?? false}
+      rookie={rookieBadge(quickViewQuery.data?.bio)}
       overallRating={overallRating}
       ringColor={overallRating !== null ? overallRatingColor(overallRating, colors) : colors.accent}
       usageTrend={model?.usage_trend ?? null}

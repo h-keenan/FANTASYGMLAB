@@ -125,3 +125,15 @@ def test_executive_snapshot_uses_verified_metadata_without_fabrication():
     assert snapshot.height == "6'2\""
     assert snapshot.weight == "208 lb"
     assert snapshot.contract_status == ""
+
+
+def test_executive_snapshot_is_rookie_only_for_zero_years_exp():
+    def snap(years):
+        return player_quick_view.build_executive_snapshot({}, {"years_exp": years})
+
+    assert snap(0).is_rookie is True  # first NFL season, drafted or UDFA
+    assert snap(0).years_in_league == "Rookie"
+    assert snap(1).is_rookie is False  # second-year is out of scope
+    assert snap(7).is_rookie is False
+    assert snap(None).is_rookie is False  # unknown experience is not a rookie
+    assert snap("").is_rookie is False

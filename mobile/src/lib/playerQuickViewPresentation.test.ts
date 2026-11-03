@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   radarPoints,
+  rookieBadge,
   rankLine,
   seasonStatGroups,
   tierOpportunityMismatchCaption,
@@ -43,4 +44,14 @@ test('radarPoints requires every axis and clamps to 0-99', () => {
   assert.deepEqual(radarPoints(full)?.map((p) => p.value), [90, 99, 50]);
   assert.equal(radarPoints([...full, { label: 'DUR', rating: null }]), null);
   assert.equal(radarPoints(full.slice(0, 2)), null);
+});
+
+test('rookieBadge only shows for is_rookie true, never invents draft data', () => {
+  assert.equal(rookieBadge(null), null);
+  assert.equal(rookieBadge({ is_rookie: false, draft_capital: '2025 / Round 1' }), null);
+  assert.deepEqual(rookieBadge({ is_rookie: true, draft_capital: '', college: '' }), { label: 'ROOKIE', detail: null });
+  assert.deepEqual(rookieBadge({ is_rookie: true, draft_capital: '2026 / Round 1 / Pick 12', college: 'Ohio State' }), {
+    label: 'ROOKIE',
+    detail: '2026 · Round 1 · Pick 12 · Ohio State',
+  });
 });
