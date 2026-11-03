@@ -85,6 +85,18 @@ FILLS_NEED_MIN_PPW = 0.25
 # How many of a position's best projected free agents are priced by the lineup
 # model (one swap each) when looking for the best real add at a position.
 WIRE_OPTIONS_PER_POSITION = 5
+
+# An add "outprices" the biggest need's best fix when it is worth at least
+# max(floor, need fix + margin, need fix x ratio) lineup points per week. All
+# three are judgment calls, not backtested: 1.0 pt/wk is a clear lineup change
+# (a material upgrade is 0.75); the margin is one material upgrade, so a gap
+# smaller than "noticeable" never reorders; the ratio keeps big need fixes from
+# being leapfrogged by a merely larger one. Points only: a value-only edge
+# (a stash) is not a lineup upgrade and keeps its current rank.
+OUTSIZED_MIN_PPW = 1.0
+OUTSIZED_MARGIN_PPW = MATERIAL_UPGRADE_PPW
+OUTSIZED_RATIO = 1.5
+OUTSIZED_MAX_ADDS = 3
 # Aging: a starter whose age-curve multiplier falls by this share within two
 # years is "aging" (modules.rankings.age_multiplier, the curve valuation uses).
 AGING_DROP_SHARE = 0.12
@@ -622,6 +634,39 @@ def _sentence(text: str) -> str:
     return text if text.endswith((".", "!", "?")) else text + "."
 
 
+def outsized_threshold(need_ppw: float) -> float:
+    """Lineup points per week an add elsewhere must be worth to outprice a
+    need whose best fix is worth ``need_ppw``."""
+
+    need = max(0.0, float(need_ppw))
+    return max(OUTSIZED_MIN_PPW, need + OUTSIZED_MARGIN_PPW, need * OUTSIZED_RATIO)
+
+
+def outsized_adds(positions: Sequence[Mapping[str, Any]], biggest_need: str | None) -> list[dict[str, Any]]:
+    """Real adds at another position that are worth far more lineup points than
+    the best fix at the biggest need (see ``OUTSIZED_*``), best first.
+
+    Never changes which position is a need; it only says an add elsewhere is
+    the bigger move. Empty when there is no biggest need, or the surface has no
+    free-agent data (``unknown`` wire): nothing to compare against."""
+
+    ref = next((e for e in positions if e.get("position") == biggest_need), None)
+    if ref is None or ref.get("wire_verdict") in (None, "unknown"):
+        return []
+    ref_ppw = float((ref.get("upgrade") or {}).get("ppw") or 0.0)
+    threshold = outsized_threshold(ref_ppw)
+    found = [
+        {
+            "player_id": str(o["player_id"]), "name": o.get("name"), "position": e["position"],
+            "ppw": float(o["ppw"]), "over_position": ref["position"], "over_ppw": round(ref_ppw, 2),
+        }
+        for e in positions if e.get("position") != biggest_need
+        for o in e.get("wire") or () if float(o["ppw"]) >= threshold
+    ]
+    found.sort(key=lambda o: (-o["ppw"], o["player_id"]))
+    return found[:OUTSIZED_MAX_ADDS]
+
+
 def assess_needs(
     rvc: RosterValueContext,
     league_table: Mapping[str, Mapping[str, Sequence[float]]],
@@ -782,6 +827,7 @@ def assess_needs(
     needed = [d["position"] for d in positions if d["tier"] in ("primary", "secondary")]
     biggest = positions[0] if positions else None
     no_need = bool(biggest) and biggest["tier"] in ("watch", "covered")
+    biggest_need = biggest["position"] if biggest and biggest["tier"] in ("primary", "secondary") else None
     headline = ""
     if biggest:
         ws = biggest["weakest_slot"]
@@ -803,7 +849,8 @@ def assess_needs(
     return {
         "model_version": MODEL_VERSION,
         "needed_positions": needed,
-        "biggest_need": biggest["position"] if biggest and biggest["tier"] in ("primary", "secondary") else None,
+        "biggest_need": biggest_need,
+        "outsized_adds": outsized_adds(positions, biggest_need),
         "weakest_position": biggest["position"] if biggest else None,
         "no_need": no_need,
         "headline": headline,

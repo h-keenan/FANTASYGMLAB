@@ -26,6 +26,17 @@ describe("waiverReasonChips", () => {
   });
 });
 
+describe("bigger upgrade chip", () => {
+  it("is one short line with the lineup gain, first, and absent without the server flag", () => {
+    expect(waiverReasonChips({ bigger_upgrade: true, lineup_ppw: 1.84, sleeper_trending_add: true })).toEqual([
+      "Bigger than your need: +1.8 pts/wk",
+      "Trending",
+    ]);
+    expect(waiverReasonChips({ lineup_ppw: 1.84 })).toEqual([]);
+    expect(waiverReasonChips({ bigger_upgrade: true, lineup_ppw: null })).toEqual(["Bigger than your need"]);
+  });
+});
+
 describe("filterByRecommendation", () => {
   it("filters by label", () => {
     const rows = [{ recommendation_label: "Add" }, { recommendation_label: "Stash" }];

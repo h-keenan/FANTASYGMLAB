@@ -55,6 +55,28 @@ The need headline and the Priority Adds read the same `assess_needs` result. Per
   need adds, and the headline says so ("No QB on the wire would start for you; best available: X (+0.4 pts/wk)")
   plus, when the top add is at another position, why ("So the top add is RB X (+0.7 pts/wk)").
 
+### Bigger than your need
+
+Need order alone could bury a clearly better add: a mild QB need with a +0.5 pts/wk fix ranked above an RB worth
++1.8 pts/wk (audit, 2026-11-03; the RB was itself a lower-ranked need, so it was not an "off-need" case per se).
+One rule in `roster_value_model.outsized_adds` (stored on `assess_needs` as `outsized_adds`, read by the ranking, the
+headline and both clients):
+
+* reference = the best wire fix at the biggest need (`biggest_need`); no biggest need or `unknown` wire data flags nothing;
+* an add at any other position is "bigger" when its lineup points per week >= `max(1.0, need + 0.75, need x 1.5)`
+  (`OUTSIZED_MIN_PPW`, `OUTSIZED_MARGIN_PPW` = one material upgrade, `OUTSIZED_RATIO`; judgment calls, not backtested);
+  at most 3 are flagged;
+* flagged adds rank first (among themselves by points), carry `priority_bigger_upgrade` / API `bigger_upgrade`, and
+  show ONE chip on web and mobile Waivers: "Bigger than your need: +1.8 pts/wk" (the existing chip pill, no extra text
+  block). The headline gains at most one short clause, "So the top add is RB X (+1.8 pts/wk)";
+* it never changes which position is labelled a need, `Fills need`, or the stash logic. Points only: a value-only edge
+  (a stash) is not a lineup upgrade and keeps its rank. Close gains (under the threshold) keep the need order, so the
+  order cannot flip-flop on small changes.
+
+The drop engine needs no second rule: `suggest_drop_for_add` already prices each add (any position) as a lineup swap,
+so a flagged add gets the same surplus-first cut, with the same protections (untouchable, core, high-value, young
+upside, depth floor).
+
 Only free agents with a path to play are priced (`roster_value_model.has_path_to_play`): not role-blocked, and a
 quarterback needs depth-chart rank 1 or every quarterback listed ahead of him injured. Before this, fourth-string
 quarterbacks with one game of tape were priced as 15-ppg starters, which made QB a "primary" need with a fictional

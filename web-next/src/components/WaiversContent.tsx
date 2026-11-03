@@ -129,7 +129,7 @@ function ReasonChips({ chips }: { chips: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {chips.map((chip) => (
-        <ToneBadge key={chip} label={chip} color="var(--color-accent)" />
+        <ToneBadge key={chip} label={chip} color="var(--color-accent)" wrap />
       ))}
     </div>
   );
