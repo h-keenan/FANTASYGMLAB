@@ -213,6 +213,7 @@ def build_explorer(
     *,
     stat: str,
     pool: str = "position",
+    full_pool: bool = False,
 ) -> dict:
     """The explorer payload. ``reason`` is "" on success, else one of
     ``unknown_stat`` / ``insufficient_pool`` / ``no_data``."""
@@ -254,13 +255,19 @@ def build_explorer(
     me = next((p for p in dist["players"] if p["player_id"] == player_id), None)
     if me is None:
         return {**base, "reason": "no_data"}
-    return {
+    payload = {
         **base,
         "pool_size": dist["pool_size"],
         "bins": dist["bins"],
         "player": me,
         "nearby": select_nearby(dist["players"], player_id),
     }
+    if full_pool:
+        # Every ranked member of the pool (value desc), so the client can scrub,
+        # bucket-drill and search without another round trip. Same rows the
+        # histogram counts, so bin membership is exact.
+        payload["pool_players"] = dist["players"]
+    return payload
 
 
 def usage_metric_percentiles(players_df: pd.DataFrame | None, row: Mapping[str, object]) -> dict[str, dict]:

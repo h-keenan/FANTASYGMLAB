@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -23,21 +23,25 @@ export default function SegmentedTabBar<T extends string>({
   options,
   active,
   onChange,
+  scrollable = false,
 }: {
   options: Array<SegmentedTabOption<T>>;
   active: T;
   onChange: (key: T) => void;
+  /** Many options: segments size to their label and the track scrolls sideways
+   * (web's PillRow variant="scroll"). */
+  scrollable?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.track}>
+  const body = (
+    <View style={[styles.track, scrollable && styles.trackScroll]}>
       {options.map((option) => {
         const isActive = option.key === active;
         return (
           <TouchableOpacity
             key={option.key}
-            style={[styles.segment, isActive && styles.segmentActive]}
+            style={[styles.segment, scrollable && styles.segmentScroll, isActive && styles.segmentActive]}
             onPress={() => onChange(option.key)}
             activeOpacity={0.75}
           >
@@ -48,6 +52,13 @@ export default function SegmentedTabBar<T extends string>({
         );
       })}
     </View>
+  );
+  return scrollable ? (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist">
+      {body}
+    </ScrollView>
+  ) : (
+    body
   );
 }
 
@@ -70,6 +81,8 @@ function createStyles(colors: ThemeColors) {
       minHeight: 44,
       borderRadius: radii.pill,
     },
+    trackScroll: { alignSelf: 'flex-start' },
+    segmentScroll: { flex: 0, paddingHorizontal: 12 },
     segmentActive: {
       backgroundColor: colors.accentMuted,
       borderWidth: 1,

@@ -7998,6 +7998,7 @@ def get_player_percentile_explorer(
     stat: str,
     pool: str = "position",
     season: int | None = None,
+    full: bool = False,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Distribution + nearby real players behind one quick-view stat tile.
@@ -8014,7 +8015,7 @@ def get_player_percentile_explorer(
     matches = players_df[players_df["player_id"] == player_id]
     if matches.empty:
         return {"ok": True, "stat": stat, "pool": pool, "reason": "no_data", "scopes": ["season"]}
-    payload = percentile_explorer.build_explorer(players_df, matches.iloc[0], stat=stat, pool=pool)
+    payload = percentile_explorer.build_explorer(players_df, matches.iloc[0], stat=stat, pool=pool, full_pool=full)
     if season is not None and payload.get("season") not in (None, season):
         return {**payload, "ok": True, "reason": "season_unavailable", "bins": [], "nearby": [], "player": None}
     return _clean_json_value({"ok": True, **payload})

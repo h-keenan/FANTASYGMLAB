@@ -98,3 +98,11 @@ test('a name exactly at the threshold stays full; one character over abbreviates
   const overThreshold = atThreshold + 'A';
   assert.equal(shouldAbbreviatePlayerName(overThreshold), true);
 });
+
+import { PLAYER_NAME_FIXTURES } from './playerNameFixtures.ts';
+
+test('shared fixture list (identical on web) abbreviates as expected', () => {
+  for (const [input, expected] of PLAYER_NAME_FIXTURES) {
+    assert.equal(abbreviatePlayerName(input), expected, `input: ${JSON.stringify(input)}`);
+  }
+});

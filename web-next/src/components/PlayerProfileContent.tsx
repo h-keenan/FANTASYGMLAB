@@ -1,5 +1,6 @@
 "use client";
 
+import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import { useEffect, useState } from "react";
 
 import { type UsageProfile,
@@ -236,7 +237,11 @@ export function PlayerProfileContent({
             />
 
             <div className="flex flex-col gap-4">
-              {tab === "stats" ? <StatsTab stats={stats} playerId={player.player_id} usageProfile={model?.usage_profile} /> : null}
+              {tab === "stats" ? (
+                <ExplorerLeagueProvider leagueId={leagueId}>
+                  <StatsTab stats={stats} playerId={player.player_id} usageProfile={model?.usage_profile} />
+                </ExplorerLeagueProvider>
+              ) : null}
               {tab === "trends" ? (
                 <PlayerTrendsPanel playerId={player.player_id} name={name} gradientId="profile-weekly-fill" />
               ) : null}

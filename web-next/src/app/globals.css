@@ -2458,17 +2458,33 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   z-index: 60;
 }
 .pe-sheet {
+  display: flex;
+  flex-direction: column;
   max-height: 92vh;
 }
 .pe-body {
   position: relative;
   z-index: 1;
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
   flex-direction: column;
   gap: var(--space-md);
-  max-height: 92vh;
   overflow-y: auto;
   padding: var(--space-lg);
+}
+/* Fixed-height pieces (chart, lists) must scroll, never squash. */
+.pe-body > * {
+  flex-shrink: 0;
+}
+/* Head-to-head stays visible while the chart and lists scroll. */
+.pe-pinned {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding: var(--space-sm) var(--space-lg);
+  border-top: var(--border-width-default) solid var(--color-border);
+  background: var(--color-surface-primary);
 }
 .pe-title {
   margin: 0;
@@ -2484,8 +2500,13 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 }
 .pe-controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-sm);
+  min-width: 0;
+}
+.pe-controls > * {
+  max-width: 100%;
 }
 .pe-skeleton {
   height: 260px;
@@ -2503,12 +2524,13 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   left: 0;
   right: 0;
   bottom: 22px;
-  height: 64px;
+  height: 88px;
   border-bottom: 2px solid var(--color-accent);
 }
 .pe-bar {
   position: absolute;
   bottom: 0;
+  transition: background-color 120ms ease;
   box-sizing: border-box;
   background: var(--color-surface-raised);
   border-right: 1px solid var(--color-surface-primary);
@@ -2541,6 +2563,114 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
+.pe-bar--focus {
+  background: var(--color-accent);
+}
+.pe-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--color-accent-strong);
+  pointer-events: none;
+}
+/* Full-width touch strip over the histogram: drag to scrub, tap to pick a bar.
+   Vertical pan stays with the sheet's scroll. */
+.pe-scrub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  height: 88px;
+  touch-action: pan-y;
+  cursor: ew-resize;
+  border-radius: var(--radius-sm);
+}
+.pe-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+.pe-bucket,
+.pe-search,
+.pe-mine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.pe-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 264px;
+  overflow-y: auto;
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.pe-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: 4px var(--space-sm);
+  background: none;
+  border: 0;
+  border-bottom: var(--border-width-default) solid var(--color-border);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pe-row:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+.pe-row--picked {
+  background: var(--color-action-soft);
+}
+.pe-row-id {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+.pe-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pe-row-meta {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+.pe-row-value {
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.pe-mine-tag {
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.pe-search-input {
+  width: 100%;
+}
 .pe-stem {
   position: absolute;
   bottom: 22px;
@@ -2555,8 +2685,9 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  width: 58px;
+  min-width: 58px;
   padding: 0;
+  transition: left 200ms ease, bottom 200ms ease;
   background: none;
   border: 0;
   color: var(--color-text-secondary);
@@ -2567,12 +2698,19 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   cursor: default;
 }
 .pe-marker-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.6rem;
-  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.pe-marker--mine .pe-marker-name {
+  color: var(--color-accent);
+}
+.pe-marker-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 .pe-marker-value {
   font-size: 0.78rem;
@@ -2631,6 +2769,7 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   background: var(--color-surface-secondary);
 }
 .pe-side-id {
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
@@ -2646,13 +2785,16 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   cursor: pointer;
 }
 .pe-side-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .pe-side-meta {
   font-size: 0.68rem;
   color: var(--color-text-muted);
+}
+.pe-side-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 .pe-side-value {
   font-size: 1.25rem;
@@ -2667,8 +2809,8 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   gap: 2px;
 }
 .pe-swap {
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: var(--radius-pill);
   border: var(--border-width-default) solid var(--color-border);
   background: var(--color-surface-secondary);
@@ -3165,4 +3307,11 @@ button.sr {
 .sr-credit a {
   color: var(--color-text-muted);
   text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pe-marker,
+  .pe-bar {
+    transition: none;
+  }
 }

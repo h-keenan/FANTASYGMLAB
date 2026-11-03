@@ -1,27 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { useExplorerLeague } from "@/context/ExplorerLeagueContext";
 import { EmptyState } from "@/components/EmptyState";
+import { Input } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { SheetHandle } from "@/components/SheetHandle";
 import { api } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import {
+  addPin,
   assignMarkerLanes,
+  binIndexAtPercentile,
+  bucketPlayers,
   defaultComparison,
+  explorerMetricsFor,
   formatExplorerDelta,
   formatExplorerValue,
+  playersNearPercentile,
+  poolMedian,
+  rosterIdsFromRoster,
+  searchExplorerPool,
   type ExplorerPlayer,
   type PercentileExplorerResponse,
 } from "@/lib/percentileExplorer";
 import { ordinal, statPercentileBand } from "@/lib/playerQuickViewPresentation";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
-const LANE_COUNT = 3;
-const LANE_STEP = 84;
+const LANE_STEP = 74;
+const BAR_H = 88;
+const AXIS_H = 22;
+const LIST_CAP = 30;
 
 export interface ExplorerOpenPlayer {
   player_id: string;
@@ -60,36 +73,59 @@ function PlayerFace({ player, highlight }: { player: ExplorerPlayer; highlight: 
 /**
  * Percentile Explorer: bottom sheet behind one Player Quick View stat tile.
  * Same pool and percentile as the tile (served by
- * GET /v1/players/{id}/percentile-explorer), nearby real players as markers,
- * and a head-to-head compare card. Rendered in a portal so it stacks over the
- * quick view; keyboard events stop here so Esc closes only this sheet.
+ * GET /v1/players/{id}/percentile-explorer?full=true). Explorable: switch
+ * metric without closing, scrub or tap the histogram to list who sits in a
+ * bucket, search any pool player onto the chart, mark your own roster, and a
+ * pinned head-to-head summary. Every player label is first initial + full last
+ * name (lib/formatPlayerName), never a character-truncated ellipsis. Rendered
+ * in a portal so it stacks over the quick view; keyboard events stop here so
+ * Esc closes only this sheet.
  */
 export function PercentileExplorerSheet({
   playerId,
   statKey,
   statLabel,
+  leagueId: leagueIdProp,
   onClose,
   onOpenPlayer,
 }: {
   playerId: string;
   statKey: string;
   statLabel: string;
+  /** When set, the user's rostered players are marked distinctly. */
+  leagueId?: string | null;
   onClose: () => void;
   onOpenPlayer?: (player: ExplorerOpenPlayer) => void;
 }) {
+  const contextLeagueId = useExplorerLeague();
+  const leagueId = leagueIdProp ?? contextLeagueId;
+  const [metric, setMetric] = useState({ key: statKey, label: statLabel });
   const [pool, setPool] = useState<"position" | "all">("position");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pins, setPins] = useState<string[]>([]);
   const [swapped, setSwapped] = useState(false);
+  const [focusPct, setFocusPct] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [rosterIds, setRosterIds] = useState<Set<string>>(() => new Set());
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const scrubbing = useRef(false);
   const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: onClose });
 
   useEffect(() => {
     let cancelled = false;
     api
-      .getPercentileExplorer(playerId, statKey, pool)
+      .getPercentileExplorer(playerId, metric.key, pool, true)
       .then((data) => {
-        if (!cancelled) setState({ status: "ready", data });
+        if (cancelled) return;
+        const known = new Set([...(data.pool_players ?? []), ...(data.nearby ?? [])].map((p) => p.player_id));
+        const seeded = (data.nearby ?? []).map((p) => p.player_id);
+        // Keep pins that still exist in this pool; top up with nearby players.
+        setPins((prev) => {
+          const kept = prev.filter((id) => known.has(id) && id !== playerId);
+          return kept.length >= 3 ? kept : [...kept, ...seeded.filter((id) => !kept.includes(id))].slice(-7);
+        });
+        setState({ status: "ready", data });
       })
       .catch(() => {
         if (!cancelled) setState({ status: "error" });
@@ -97,7 +133,23 @@ export function PercentileExplorerSheet({
     return () => {
       cancelled = true;
     };
-  }, [playerId, statKey, pool]);
+  }, [playerId, metric.key, pool]);
+
+  useEffect(() => {
+    if (!leagueId) return;
+    let cancelled = false;
+    api
+      .getMyRoster(leagueId)
+      .then((res) => {
+        if (!cancelled && !res.reason) setRosterIds(rosterIdsFromRoster(res.roster));
+      })
+      .catch(() => {
+        // Best-effort: no roster means no roster marks, never a guess.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -109,24 +161,79 @@ export function PercentileExplorerSheet({
   const data = state.status === "ready" ? state.data : null;
   const me = data?.player ?? null;
   const nearby = useMemo(() => data?.nearby ?? [], [data]);
+  const poolPlayers = useMemo(() => data?.pool_players ?? (me ? [...nearby, me] : []), [data, me, nearby]);
+  const hasFullPool = (data?.pool_players?.length ?? 0) > 0;
+  const byId = useMemo(() => new Map(poolPlayers.map((p) => [p.player_id, p])), [poolPlayers]);
   const comparison = useMemo(() => {
     if (!me) return null;
-    return nearby.find((p) => p.player_id === pickedId) ?? defaultComparison(me, nearby);
-  }, [me, nearby, pickedId]);
+    const picked = pickedId ? byId.get(pickedId) : null;
+    return picked && picked.player_id !== me.player_id ? picked : defaultComparison(me, nearby);
+  }, [me, nearby, pickedId, byId]);
   const markers = useMemo(() => {
     if (!me) return [];
-    return [...nearby, me].sort((a, b) => a.percentile - b.percentile);
-  }, [me, nearby]);
+    const ids = new Set(pins);
+    if (comparison) ids.add(comparison.player_id);
+    const others = [...ids].map((id) => byId.get(id)).filter((p): p is ExplorerPlayer => !!p && p.player_id !== me.player_id);
+    return [...others, me].sort((a, b) => a.percentile - b.percentile);
+  }, [me, pins, comparison, byId]);
   const lanes = useMemo(() => assignMarkerLanes(markers.map((m) => m.percentile)), [markers]);
-  const maxCount = Math.max(1, ...(data?.bins ?? []).map((b) => b.count));
+  const laneCount = Math.max(1, ...lanes.map((lane) => lane + 1));
+  const bins = useMemo(() => data?.bins ?? [], [data]);
+  const maxCount = Math.max(1, ...bins.map((b) => b.count));
+  const focusBin = focusPct == null ? -1 : binIndexAtPercentile(bins, focusPct);
+  const bucket = useMemo(() => (hasFullPool && focusBin >= 0 ? bucketPlayers(poolPlayers, bins, focusBin) : []), [hasFullPool, focusBin, poolPlayers, bins]);
+  const nearFocus = useMemo(
+    () => (focusPct == null ? [] : playersNearPercentile(poolPlayers, focusPct, 1)),
+    [focusPct, poolPlayers],
+  );
+  const results = useMemo(() => searchExplorerPool(poolPlayers, query), [poolPlayers, query]);
+  const median = useMemo(() => poolMedian(poolPlayers), [poolPlayers]);
+  const mine = useMemo(
+    () => poolPlayers.filter((p) => rosterIds.has(p.player_id) && p.player_id !== me?.player_id),
+    [poolPlayers, rosterIds, me],
+  );
   const positionLabel = data?.position || "";
+  const metrics = explorerMetricsFor(positionLabel || undefined, { key: statKey, label: statLabel });
 
   function changePool(next: string) {
-    trackUse("percentile_explorer", "pool_changed", { props: { item_kind: statKey, result: next === "all" ? "all" : "position" } });
+    trackUse("percentile_explorer", "pool_changed", { props: { item_kind: metric.key, result: next === "all" ? "all" : "position" } });
     setPool(next === "all" ? "all" : "position");
     setState({ status: "loading" });
     setPickedId(null);
     setSwapped(false);
+    setFocusPct(null);
+  }
+
+  function changeMetric(key: string) {
+    const next = metrics.find((m) => m.key === key);
+    if (!next || next.key === metric.key) return;
+    trackUse("percentile_explorer", "metric_changed", { props: { item_kind: next.key } });
+    setMetric(next);
+    setState({ status: "loading" });
+    setFocusPct(null);
+    setSwapped(false);
+  }
+
+  function pick(player: ExplorerPlayer) {
+    if (me && player.player_id === me.player_id) return;
+    trackUse("percentile_explorer", "compare_picked", { props: { item_kind: metric.key } });
+    setPickedId(player.player_id);
+    setPins((prev) => addPin(prev, player.player_id));
+    setSwapped(false);
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(8);
+  }
+
+  function pctFromPointer(event: PointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return null;
+    return Math.min(100, Math.max(0, ((event.clientX - rect.left) / rect.width) * 100));
+  }
+
+  function onScrubKey(event: KeyboardEvent<HTMLDivElement>) {
+    const step = event.key === "ArrowRight" ? 2 : event.key === "ArrowLeft" ? -2 : 0;
+    if (!step) return;
+    event.preventDefault();
+    setFocusPct((prev) => Math.min(100, Math.max(0, (prev ?? me?.percentile ?? 50) + step)));
   }
 
   const sheet = (
@@ -154,12 +261,18 @@ export function PercentileExplorerSheet({
         </button>
         <div className="pe-body">
           <h3 id="pe-title" className="pe-title">
-            {statLabel} Percentile Explorer
+            {metric.label} Percentile Explorer
           </h3>
-          <p className="pe-hint">Tap a player to compare where he sits.</p>
-          {data?.sample_note ? <p className="pe-hint" data-testid="pe-sample-note">{data.sample_note}</p> : null}
+          <p className="pe-hint">Drag across the chart or tap a bar to see who sits there.</p>
 
           <div className="pe-controls">
+            <PillRow
+              variant="scroll"
+              ariaLabel="Metric"
+              options={metrics.map((m) => ({ label: m.label, value: m.key }))}
+              active={metric.key}
+              onSelect={changeMetric}
+            />
             <PillRow
               options={[
                 { label: positionLabel ? `Same Position (${positionLabel})` : "Same Position", value: "position" },
@@ -168,7 +281,6 @@ export function PercentileExplorerSheet({
               active={pool}
               onSelect={changePool}
             />
-            <PillRow options={[{ label: data?.season ? `Season ${data.season}` : "Season", value: "season" }]} active="season" onSelect={() => {}} />
           </div>
 
           {state.status === "loading" ? (
@@ -177,46 +289,75 @@ export function PercentileExplorerSheet({
             <EmptyState title="Couldn't load this stat" subtitle="Try again in a moment." />
           ) : data && data.reason === "" && me ? (
             <>
-              <div className="pe-chart" data-testid="pe-chart" style={{ height: 86 + LANE_COUNT * LANE_STEP }}>
+              <div className="pe-chart" data-testid="pe-chart" style={{ height: AXIS_H + BAR_H + 8 + laneCount * LANE_STEP }}>
                 <div className="pe-bars" aria-hidden="true">
-                  {(data.bins ?? []).map((bin, index) => (
+                  {bins.map((bin, index) => (
                     <span
                       key={index}
-                      className="pe-bar"
+                      className={`pe-bar${index === focusBin ? " pe-bar--focus" : ""}`}
                       style={{
                         left: `${bin.pct_start}%`,
                         width: `${Math.max(0, bin.pct_end - bin.pct_start)}%`,
-                        height: `${(bin.count / maxCount) * 100}%`,
+                        height: `${Math.max(3, (bin.count / maxCount) * 100)}%`,
                       }}
                     />
                   ))}
+                  {focusPct != null ? <span className="pe-cursor" style={{ left: `${focusPct}%` }} /> : null}
                 </div>
+                <div
+                  className="pe-scrub"
+                  data-testid="pe-scrub"
+                  role="slider"
+                  tabIndex={0}
+                  aria-label={`Scrub ${metric.label} percentile`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(focusPct ?? me.percentile)}
+                  onKeyDown={onScrubKey}
+                  onPointerDown={(event) => {
+                    scrubbing.current = true;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                    const pct = pctFromPointer(event);
+                    if (pct != null) setFocusPct(pct);
+                  }}
+                  onPointerMove={(event) => {
+                    if (!scrubbing.current) return;
+                    const pct = pctFromPointer(event);
+                    if (pct != null) setFocusPct(pct);
+                  }}
+                  onPointerUp={() => {
+                    scrubbing.current = false;
+                  }}
+                  onPointerCancel={() => {
+                    scrubbing.current = false;
+                  }}
+                />
                 {markers.map((marker, index) => {
                   const isMe = marker.player_id === me.player_id;
                   const isPicked = !isMe && comparison?.player_id === marker.player_id;
-                  const left = Math.min(94, Math.max(6, marker.percentile));
+                  const isMine = !isMe && rosterIds.has(marker.player_id);
+                  const left = Math.min(87, Math.max(13, marker.percentile));
                   const lift = lanes[index] * LANE_STEP;
                   const band = statPercentileBand(marker.percentile);
                   return (
                     <div key={marker.player_id}>
-                      <span className="pe-stem" style={{ left: `${marker.percentile}%`, height: 64 + lift }} aria-hidden="true" />
+                      <span className="pe-stem" style={{ left: `${marker.percentile}%`, height: BAR_H + lift }} aria-hidden="true" />
                       <button
                         type="button"
-                        className={`pe-marker${isMe ? " pe-marker--me" : ""}${isPicked ? " pe-marker--picked" : ""}`}
-                        style={{ left: `${left}%`, bottom: 86 + lift }}
-                        aria-label={`${marker.name}, ${formatExplorerValue(marker.value, data.format)} ${statLabel}, ${ordinal(marker.percentile)} percentile`}
+                        className={`pe-marker${isMe ? " pe-marker--me" : ""}${isPicked ? " pe-marker--picked" : ""}${isMine ? " pe-marker--mine" : ""}`}
+                        style={{ left: `${left}%`, bottom: AXIS_H + BAR_H + lift }}
+                        aria-label={`${marker.name}, ${formatExplorerValue(marker.value, data.format)} ${metric.label}, ${ordinal(marker.percentile)} percentile`}
                         aria-pressed={isPicked}
                         disabled={isMe}
-                        onClick={() => {
-                          trackUse("percentile_explorer", "compare_picked", { props: { item_kind: statKey } });
-                          setPickedId(marker.player_id);
-                          setSwapped(false);
-                        }}
+                        onClick={() => pick(marker)}
                       >
-                        <span className="pe-marker-name">{marker.name}</span>
-                        <span className="pe-marker-value">{formatExplorerValue(marker.value, data.format)}</span>
+                        <span className="pe-marker-name">{abbreviatePlayerName(marker.name)}</span>
                         <PlayerFace player={marker} highlight={isMe} />
-                        <span className={`pe-badge pe-badge--${band}`}>{ordinal(marker.percentile)}</span>
+                        <span className="pe-marker-stat">
+                          <span className="pe-marker-value">{formatExplorerValue(marker.value, data.format)}</span>
+                          <span className={`pe-badge pe-badge--${band}`}>{ordinal(marker.percentile)}</span>
+                          {isMine ? <span className="pe-mine-tag">MY</span> : null}
+                        </span>
                       </button>
                     </div>
                   );
@@ -229,29 +370,141 @@ export function PercentileExplorerSheet({
                   ))}
                 </div>
               </div>
-              <p className="pe-axis-title">{statLabel} percentile</p>
+              <p className="pe-axis-title">{metric.label} percentile</p>
+              {data.sample_note ? (
+                <p className="pe-hint" data-testid="pe-sample-note">{data.sample_note}</p>
+              ) : data.season ? (
+                <p className="pe-hint">Season {data.season}</p>
+              ) : null}
+              {rosterIds.size > 0 && markers.some((m) => rosterIds.has(m.player_id) && m.player_id !== me.player_id) ? (
+                <p className="pe-hint">MY = a player on your roster</p>
+              ) : null}
 
-              {comparison ? (
-                <CompareCard
-                  me={me}
-                  other={comparison}
-                  swapped={swapped}
-                  onSwap={() => setSwapped((value) => !value)}
-                  format={data.format}
-                  statLabel={statLabel}
-                  onOpenPlayer={onOpenPlayer}
-                />
+              {focusBin >= 0 && hasFullPool ? (
+                <section className="pe-bucket" data-testid="pe-bucket" aria-label="Players in this bucket">
+                  <header className="pe-section-head">
+                    <span>
+                      {bins[focusBin].value_start === bins[focusBin].value_end
+                        ? formatExplorerValue(bins[focusBin].value_start, data.format)
+                        : `${formatExplorerValue(bins[focusBin].value_start, data.format)} to ${formatExplorerValue(bins[focusBin].value_end, data.format)}`}
+                      {" · "}
+                      {bucket.length} {bucket.length === 1 ? "player" : "players"}
+                    </span>
+                    {focusPct != null && nearFocus[0] ? <span>About the {ordinal(Math.round(focusPct))} percentile</span> : null}
+                  </header>
+                  {bucket.length === 0 ? (
+                    <p className="pe-hint">Nobody sits in this bucket.</p>
+                  ) : (
+                    <PlayerList players={bucket.slice(0, LIST_CAP)} format={data.format} meId={me.player_id} comparisonId={comparison?.player_id} rosterIds={rosterIds} onPick={pick} />
+                  )}
+                  {bucket.length > LIST_CAP ? <p className="pe-hint">Showing the top {LIST_CAP}. Search to find anyone else.</p> : null}
+                </section>
+              ) : null}
+
+              {hasFullPool ? (
+                <section className="pe-search" aria-label="Add a player to the chart">
+                  <Input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={pool === "all" ? "Search any player to add" : `Search ${positionLabel || "position"} players to add`}
+                    aria-label="Search players to add to the chart"
+                    autoComplete="off"
+                    className="pe-search-input"
+                  />
+                  {query.trim().length >= 2 ? (
+                    results.length > 0 ? (
+                      <PlayerList players={results} format={data.format} meId={me.player_id} comparisonId={comparison?.player_id} rosterIds={rosterIds} onPick={(player) => { pick(player); setQuery(""); }} />
+                    ) : (
+                      <p className="pe-hint">
+                        No {pool === "all" ? "" : `${positionLabel || "position"} `}player with a ranked value matches that.
+                        {pool === "position" ? " Try All Players." : ""}
+                      </p>
+                    )
+                  ) : null}
+                </section>
+              ) : null}
+
+              {mine.length > 0 ? (
+                <section className="pe-mine" aria-label="Your roster">
+                  <header className="pe-section-head">
+                    <span>Your roster here</span>
+                    <span>{mine.length}</span>
+                  </header>
+                  <PlayerList players={mine.slice(0, LIST_CAP)} format={data.format} meId={me.player_id} comparisonId={comparison?.player_id} rosterIds={rosterIds} onPick={pick} />
+                </section>
               ) : null}
             </>
           ) : (
             <EmptyState {...explorerEmptyCopy(data?.reason ?? "no_data", positionLabel)} />
           )}
         </div>
+        {data && data.reason === "" && me && comparison ? (
+          <div className="pe-pinned">
+            <CompareCard
+              me={me}
+              other={comparison}
+              swapped={swapped}
+              onSwap={() => setSwapped((value) => !value)}
+              format={data.format}
+              statLabel={metric.label}
+              median={median}
+              onOpenPlayer={onOpenPlayer}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
 
   return typeof document === "undefined" ? null : createPortal(sheet, document.body);
+}
+
+function PlayerList({
+  players,
+  format,
+  meId,
+  comparisonId,
+  rosterIds,
+  onPick,
+}: {
+  players: ExplorerPlayer[];
+  format: PercentileExplorerResponse["format"];
+  meId: string;
+  comparisonId?: string;
+  rosterIds: Set<string>;
+  onPick: (player: ExplorerPlayer) => void;
+}) {
+  return (
+    <ul className="pe-list">
+      {players.map((player) => {
+        const isMe = player.player_id === meId;
+        return (
+          <li key={player.player_id}>
+            <button
+              type="button"
+              className={`pe-row${player.player_id === comparisonId ? " pe-row--picked" : ""}`}
+              disabled={isMe}
+              onClick={() => onPick(player)}
+              aria-label={`${isMe ? "Selected player " : "Compare with "}${player.name}`}
+            >
+              <PlayerAvatar playerId={player.player_id} size={32} />
+              <span className="pe-row-id">
+                <span className="pe-row-name">
+                  {abbreviatePlayerName(player.name)}
+                  {rosterIds.has(player.player_id) ? <span className="pe-mine-tag">MY ROSTER</span> : null}
+                  {isMe ? <span className="pe-mine-tag">YOU</span> : null}
+                </span>
+                <span className="pe-row-meta">{[player.team, player.position].filter(Boolean).join(" · ")}</span>
+              </span>
+              <span className="pe-row-value">{formatExplorerValue(player.value, format)}</span>
+              <span className={`pe-badge pe-badge--${statPercentileBand(player.percentile)}`}>{ordinal(player.percentile)}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 function CompareCard({
@@ -261,6 +514,7 @@ function CompareCard({
   onSwap,
   format,
   statLabel,
+  median,
   onOpenPlayer,
 }: {
   me: ExplorerPlayer;
@@ -269,6 +523,7 @@ function CompareCard({
   onSwap: () => void;
   format: PercentileExplorerResponse["format"];
   statLabel: string;
+  median: number | null;
   onOpenPlayer?: (player: ExplorerOpenPlayer) => void;
 }) {
   const left = swapped ? other : me;
@@ -285,11 +540,13 @@ function CompareCard({
         }
       >
         <PlayerAvatar playerId={player.player_id} size={40} />
-        <span className="pe-side-name">{player.name}</span>
+        <span className="pe-side-name">{abbreviatePlayerName(player.name)}</span>
       </button>
       <span className="pe-side-meta">{[player.team, player.position].filter(Boolean).join(" · ")}</span>
-      <span className="pe-side-value">{formatExplorerValue(player.value, format)}</span>
-      <span className={`pe-badge pe-badge--${statPercentileBand(player.percentile)}`}>{ordinal(player.percentile)} percentile</span>
+      <span className="pe-side-stat">
+        <span className="pe-side-value">{formatExplorerValue(player.value, format)}</span>
+        <span className={`pe-badge pe-badge--${statPercentileBand(player.percentile)}`}>{ordinal(player.percentile)}</span>
+      </span>
     </div>
   );
   return (
@@ -301,6 +558,11 @@ function CompareCard({
         </button>
         <span className="pe-delta-value">{delta}</span>
         <span className="pe-delta-label">vs comparison</span>
+        {median != null ? (
+          <span className="pe-delta-label" data-testid="pe-median">
+            Pool median {formatExplorerValue(median, format)}
+          </span>
+        ) : null}
       </div>
       {side(right)}
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -303,7 +304,7 @@ export function PlayerQuickView({
           ) : loadError ? (
             <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
           ) : (
-            <>
+            <ExplorerLeagueProvider leagueId={identity.leagueId}>
               {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
 
               <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
@@ -342,7 +343,7 @@ export function PlayerQuickView({
               <PlayerValueHistory playerId={identity.player_id} />
 
               {model ? <SubRatingRow model={model} /> : null}
-            </>
+            </ExplorerLeagueProvider>
           )}
         </div>
 

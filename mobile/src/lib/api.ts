@@ -3661,9 +3661,9 @@ export const api = {
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   getPlayerQuickView: (playerId: string) =>
     authorizedFetch<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
-  getPercentileExplorer: (playerId: string, stat: string, pool: 'position' | 'all') =>
+  getPercentileExplorer: (playerId: string, stat: string, pool: 'position' | 'all', full = false) =>
     authorizedFetch<PercentileExplorerResponse>(
-      `/v1/players/${encodeURIComponent(playerId)}/percentile-explorer?stat=${encodeURIComponent(stat)}&pool=${pool}`,
+      `/v1/players/${encodeURIComponent(playerId)}/percentile-explorer?stat=${encodeURIComponent(stat)}&pool=${pool}${full ? '&full=true' : ''}`,
     ),
   getPlayerAwards: (playerId: string) =>
     authorizedFetch<PlayerAwardsResponse>(`/v1/players/${encodeURIComponent(playerId)}/awards`),

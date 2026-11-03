@@ -3,7 +3,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  addPin,
   assignMarkerLanes,
+  binIndexAtPercentile,
+  bucketPlayers,
+  explorerMetricsFor,
+  playersNearPercentile,
+  poolMedian,
+  rosterIdsFromRoster,
+  searchExplorerPool,
   defaultComparison,
   explorerEmptyCopy,
   explorerStatKey,
@@ -76,4 +84,37 @@ test('default comparison is the nearest player above, else nearest', () => {
   assert.equal(defaultComparison(me, [p('a', 12, 60), p('b', 11, 55), p('c', 9, 45)])?.player_id, 'b');
   assert.equal(defaultComparison(me, [p('c', 9, 45)])?.player_id, 'c');
   assert.equal(defaultComparison(me, []), null);
+});
+
+test('buckets players exactly by histogram counts', () => {
+  const pool = [p('e', 9, 90), p('d', 8, 70), p('c', 5, 50), p('b', 2, 30), p('a', 1, 10)];
+  const bins = [
+    { count: 2, pct_start: 0, pct_end: 40, value_start: 1, value_end: 4 },
+    { count: 1, pct_start: 40, pct_end: 60, value_start: 4, value_end: 6 },
+    { count: 2, pct_start: 60, pct_end: 100, value_start: 6, value_end: 9 },
+  ];
+  assert.deepEqual(bucketPlayers(pool, bins, 0).map((x) => x.player_id), ['b', 'a']);
+  assert.deepEqual(bucketPlayers(pool, bins, 1).map((x) => x.player_id), ['c']);
+  assert.deepEqual(bucketPlayers(pool, bins, 2).map((x) => x.player_id), ['e', 'd']);
+  assert.deepEqual(bucketPlayers(pool, bins, 3), []);
+  assert.equal(binIndexAtPercentile(bins, 0), 0);
+  assert.equal(binIndexAtPercentile(bins, 40), 1);
+  assert.equal(binIndexAtPercentile(bins, 100), 2);
+  assert.deepEqual(playersNearPercentile(pool, 68, 2).map((x) => x.player_id), ['d', 'c']);
+});
+
+test('search, median, roster ids, pins and metrics', () => {
+  const named = (id: string, name: string): ExplorerPlayer => ({ ...p(id, 1, 1), name });
+  const pool = [named('1', 'Amon-Ra St. Brown'), named('2', 'Marvin Brownlee'), named('3', 'Cobrown Smith')];
+  assert.deepEqual(searchExplorerPool(pool, 'st').map((x) => x.player_id), ['1']);
+  assert.deepEqual(searchExplorerPool(pool, 'brown').map((x) => x.player_id), ['1', '2', '3']);
+  assert.deepEqual(searchExplorerPool(pool, 'b'), []);
+  assert.equal(poolMedian([p('1', 1, 1), p('2', 5, 2), p('3', 9, 3)]), 5);
+  assert.equal(poolMedian([]), null);
+  assert.deepEqual([...rosterIdsFromRoster({ players: ['1', '2', 3] })], ['1', '2']);
+  assert.equal(rosterIdsFromRoster(null).size, 0);
+  assert.deepEqual(addPin(['a', 'b'], 'c', 2), ['b', 'c']);
+  assert.deepEqual(addPin(['a'], 'a'), ['a']);
+  assert.ok(explorerMetricsFor('QB', { key: 'ppr_ppg', label: 'PPR PPG' }).some((m) => m.key === 'pass_yards'));
+  assert.equal(explorerMetricsFor('WR', { key: 'carry_share', label: 'Carry Share' })[0].key, 'carry_share');
 });

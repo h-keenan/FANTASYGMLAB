@@ -1591,6 +1591,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         playerId={player.player_id}
         statKey={explorer.key}
         statLabel={explorer.label}
+        leagueId={leagueId}
         onClose={() => setExplorer(null)}
         onOpenPlayer={openExplorerPlayer}
       />
