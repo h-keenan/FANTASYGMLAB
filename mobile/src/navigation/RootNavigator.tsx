@@ -41,6 +41,8 @@ import TradeHistoryScreen from '../screens/TradeHistoryScreen';
 import CommunityScreen from '../screens/CommunityScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradesScreen from '../screens/TradesScreen';
+import TradeOfferScreen from '../screens/TradeOfferScreen';
+import type { OfferPrefill } from '../lib/tradeOffer';
 import TeamsScreen from '../screens/TeamsScreen';
 import PlayoffOddsScreen from '../screens/PlayoffOddsScreen';
 import GamesScreen from '../screens/GamesScreen';
@@ -111,7 +113,11 @@ export type RootStackParamList = {
     leagueName: string;
     initialTab?: 'block' | 'search' | 'make';
     tradePlayer?: RankedPlayer;
+    // A built offer ("Build an offer") loaded into Make a Trade to tweak/share.
+    offerPrefill?: OfferPrefill;
   };
+  // "Build an offer": 2-3 built packages to get a player off another team.
+  TradeOffer: { leagueId: string; leagueName: string; playerId: string };
   // `metric` picks which TeamRanking rank field the leaderboard sorts/labels
   // by (defaults to 'power' when omitted, matching every pre-existing
   // caller) — added so My Team's Age tile (TeamAnalysisPanel) can drill
@@ -330,6 +336,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Recap" component={EspnRecapScreen} />
           <AppStack.Screen name="Dashboard" component={EspnDashboardScreen} />
           <AppStack.Screen name="Trades" component={TradesScreen} />
+          <AppStack.Screen name="TradeOffer" component={TradeOfferScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
           <AppStack.Screen name="PlayoffOdds" component={EspnPlayoffOddsScreen} />
           <AppStack.Screen name="Games" component={EspnGamesScreen} />

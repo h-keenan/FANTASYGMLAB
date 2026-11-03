@@ -61,6 +61,7 @@ import { valueDirectionLabel } from '../lib/tradeValue';
 import { formatTradeGain } from '../lib/liveDraft';
 import { idpTradePoolPlayers, tradePositionOptions } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
+import { offerPrefillKey, resolvePrefill, type OfferPrefill } from '../lib/tradeOffer';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
 import ValuesCredit from '../components/ValuesCredit';
@@ -83,6 +84,9 @@ interface Props {
    * the right side once rosters load, owning team selected, and the active
    * side moved to the empty one. */
   quickAddPlayer?: RankedPlayer;
+  /** A built offer ("Build an offer"): loaded once into both sides so it can
+   * be tweaked, regraded and shared. Ids not in this league are skipped. */
+  offerPrefill?: OfferPrefill;
 }
 type Side = 'send' | 'receive';
 type AssetType = 'players' | 'picks';
@@ -161,7 +165,7 @@ interface OtherTeam {
 
 const ALL_TEAMS_ID = '__all__';
 
-export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, quickAddPlayer }: Props) {
+export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, quickAddPlayer, offerPrefill }: Props) {
 
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -314,6 +318,25 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
     setPositionFilter(null);
     setVerdict(null);
   }, [loading, quickAddPlayer, myRosterIds, otherTeams, rankings]);
+
+  // "Build an offer" hand-off, once per offer, after the first load.
+  const appliedOfferKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || !offerPrefill) return;
+    const key = offerPrefillKey(offerPrefill);
+    if (appliedOfferKey.current === key) return;
+    appliedOfferKey.current = key;
+    const resolved = resolvePrefill(offerPrefill, rankings, allPicks);
+    setSendIds(resolved.send);
+    setReceiveIds(resolved.receive);
+    setSendPicks(resolved.sendPicks);
+    setReceivePicks(resolved.receivePicks);
+    const owner = otherTeams.find((team) => resolved.receive.some((p) => team.playerIds.has(p.player_id)));
+    if (owner) setSelectedTeamId(owner.rosterId);
+    setSearch('');
+    setPositionFilter(null);
+    setVerdict(null);
+  }, [loading, offerPrefill, rankings, allPicks, otherTeams]);
 
   const selectedIds = useMemo(
     () => new Set([...sendIds, ...receiveIds].map((p) => p.player_id)),

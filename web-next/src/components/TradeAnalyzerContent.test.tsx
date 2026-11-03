@@ -539,6 +539,27 @@ describe("TradeAnalyzerContent", () => {
     });
   });
 
+  describe("Built offer hand-off (offerPrefill)", () => {
+    it("loads the built offer's players and picks so it can be tweaked, and skips ids not in this league", () => {
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[pick({ pick_id: "2027:1:1" })]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+          offerPrefill={{ send: ["send-1", "gone-player"], receive: ["receive-1"], sendPicks: ["2027:1:1"], receivePicks: ["2099:9:9"] }}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
+      expect(screen.queryByText(/gone-player/)).not.toBeInTheDocument();
+    });
+  });
+
   describe("Public Trade Analyzer bridge (bridgeTrade)", () => {
     const renderBridge = (bridgeTrade: { a: string[]; b: string[] }) =>
       render(

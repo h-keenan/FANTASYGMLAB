@@ -6,6 +6,7 @@ import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type RankedPlayer } from '../lib/api';
 import { tradeShortcutsFor } from '../lib/tradeShortcuts';
+import { canBuildOffer } from '../lib/tradeOffer';
 import { useRosterOwnership } from '../lib/useRosterOwnership';
 import { navigationRef } from '../navigation/navigationRef';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -13,7 +14,8 @@ import { radii, spacing, type ThemeColors } from '../theme';
 /**
  * The contextual league actions on Player Quick View (web twin:
  * PlayerLeagueActions.tsx): "Add to Trade" for any rostered player, "Find
- * trades" for the user's own, and "Add to GM Targets" (☆/★) for players not
+ * trades" for the user's own, "Build an offer" (first, one primary button) for
+ * a player on ANOTHER team, and "Add to GM Targets" (☆/★) for players not
  * on the user's roster. Roster membership comes from the same
  * useRosterOwnership hook Player Detail uses; until it answers only nothing
  * shows, never a guess. `onNavigate` lets the sheet close itself first.
@@ -37,6 +39,7 @@ export default function PlayerLeagueActions({
   const ownership = useRosterOwnership(leagueId);
   const shortcuts = tradeShortcutsFor(player.player_id, ownership);
   const showAddToTrade = shortcuts.canAddToTrade && !hideAddToTrade;
+  const showBuildOffer = !hideAddToTrade && canBuildOffer(player.player_id, ownership);
   const onMyRoster = ownership?.myPlayerIds.has(player.player_id) ?? null;
   const [watching, setWatching] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -91,9 +94,27 @@ export default function PlayerLeagueActions({
     }
   };
 
-  if (!showAddToTrade && !shortcuts.canFindTrades && watching === null) return null;
+  const goBuildOffer = () => {
+    onNavigate();
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('TradeOffer', { leagueId, leagueName, playerId: player.player_id });
+    }
+  };
+
+  if (!showBuildOffer && !showAddToTrade && !shortcuts.canFindTrades && watching === null) return null;
   return (
     <View style={styles.row}>
+      {showBuildOffer ? (
+        <TouchableOpacity
+          style={styles.chip}
+          onPress={goBuildOffer}
+          accessibilityRole="button"
+          accessibilityLabel={`Build an offer for ${player.name ?? 'this player'}`}
+        >
+          <Ionicons name="hammer-outline" size={14} color={colors.accent} />
+          <AppText style={styles.chipText}>Build an offer</AppText>
+        </TouchableOpacity>
+      ) : null}
       {showAddToTrade ? (
         <TouchableOpacity
           style={styles.chip}

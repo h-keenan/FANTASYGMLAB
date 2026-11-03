@@ -481,3 +481,36 @@ Limits, stated plainly: "partner would likely take it" is inferred from roster f
 realism, not from manager behavior beyond the existing trade-style hints; value gaps use the
 engine's pick values (posture-adjusted), not market consensus; the synthetic league has a smooth
 value ladder, so real leagues will show different mixes of reasons.
+
+## Build an offer for a player on another team ("Get this player")
+
+Owner request (coridian_): "there's no way to create a trade based on someone not on your team
+currently, where our logic automatically builds the trade." Code: `modules/trade_target_offers.py`
+(glue), `trade_hub_engine.generate_target_offer_result` (loads the same frame/summary/keeper context
+as the Hub), `GET /v1/leagues/{id}/trade-target?player_id=` (Pro, gated like Trade Finder), tests in
+`tests/test_trade_target_offers.py` and `tests/test_trade_target_endpoint.py`.
+
+There is no second engine. The target-player search that already existed in
+`trade_ideas.build_player_trade_hub_ideas(mode="target_player")` (never wired to an endpoint) proposes
+packages: one-for-one, player + pick, multi-asset, pick-only and the blockbuster path for a
+cornerstone, with partner roster fit, market realism, untouchables kept out of every send side and
+picks priced by `_build_roster_pick_assets` with the real records. Each candidate is then graded by
+the Analyzer's own call (`_UserSideAnalyzerGate` -> `grade_trade_for_user`), so a package that strips a
+thin position fails on lineup points (the lineup model and posture), not on a position rule.
+
+- Overpaying (the Analyzer says you give up more than the "essentially even" rung): the partner is
+  asked to add one real asset back, drawn from their roster/picks with the Analyzer's sweetener
+  ranking (`trade_offer_analyzer._rank_addition_candidates`), sized to the gap (0.4x to 1.8x), never a
+  pick of a year/round you already send, and regraded through the same gate.
+- Fair for both sides: the user-side value delta must clear the suggestion bar and may not exceed the
+  Analyzer's ACCEPT line (+500), so the other manager is not being skimmed.
+- Selection: team posture first (`posture_surface_sort_key`), then at most 3 offers that differ in
+  structure (players / players + picks / picks only) and lead asset.
+- Acceptance read: Likely / Possible / Long shot from the market-realism score and partner fit, one
+  rung lower when they give up value. No percentage is shown: none is calibrated.
+- A free agent is not a trade target (`not_rostered`: go to Waivers); your own player returns
+  `own_player`; a dead end returns `none` with a reason from the search diagnostics.
+- Clients: one primary "Build an offer" button under Player Quick View for a player on another
+  roster (web `PlayerLeagueActions`, mobile `PlayerLeagueActions` and Player Detail), a result page
+  (web `/trade-offer/[leagueId]`, mobile `TradeOffer`) and "Open in Trade Analyzer", which carries ids
+  only (`send/receive/sendPicks/receivePicks`); the Analyzer regrades the package.

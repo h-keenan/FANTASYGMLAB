@@ -164,6 +164,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   community: "Community",
   "trade-analyzer": "Trade Analyzer",
   "trade-finder": "Trade Finder",
+  "trade-offer": "Build an Offer",
   "player-compare": "Player Compare",
   "founder-analytics": "Founder Analytics",
   premium: "Pro",

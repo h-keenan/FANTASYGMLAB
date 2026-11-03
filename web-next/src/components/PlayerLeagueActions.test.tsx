@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlayerLeagueActions } from "./PlayerLeagueActions";
@@ -82,6 +82,33 @@ describe("PlayerLeagueActions", () => {
     renderActions("mine-1");
     await act(async () => {});
     expect(screen.getByRole("link", { name: "Add to Trade" })).toBeInTheDocument();
+  });
+
+  it("offers one primary Build an offer for a player on another team, linking to the builder", async () => {
+    renderActions("other-1");
+    await act(async () => {});
+    expect(screen.getByRole("link", { name: "Build an offer" })).toHaveAttribute(
+      "href",
+      "/trade-offer/L1?name=Dynasty+Overlords&playerId=other-1",
+    );
+  });
+
+  it("never offers Build an offer for my own player, a free agent, before ownership is known, or inside the Analyzer", async () => {
+    const { unmount } = renderActions("other-1");
+    expect(screen.queryByRole("link", { name: "Build an offer" })).toBeNull();
+    await act(async () => {});
+    unmount();
+    renderActions("mine-1");
+    await act(async () => {});
+    expect(screen.queryByRole("link", { name: "Build an offer" })).toBeNull();
+    cleanup();
+    renderActions("free-1");
+    await act(async () => {});
+    expect(screen.queryByRole("link", { name: "Build an offer" })).toBeNull();
+    cleanup();
+    renderActions("other-1", true);
+    await act(async () => {});
+    expect(screen.queryByRole("link", { name: "Build an offer" })).toBeNull();
   });
 
   it("offers Find trades (not GM Targets) for a player on my roster", async () => {
