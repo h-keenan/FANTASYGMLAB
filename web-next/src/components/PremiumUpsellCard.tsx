@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
+import { SectionHeading } from "@/components/SectionHeading";
 import { trackUse } from "@/lib/analytics";
 import type { PremiumUpsell } from "@/lib/api";
 
@@ -42,12 +43,17 @@ export function PremiumUpsellCard({
 
   return (
     <Wrapper className={bare ? "flex flex-col gap-8" : "flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto"}>
-      <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {kicker}
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{title}</h1>
-      </header>
+      {bare ? (
+        // Inside a page that already has its own <h1>: a section heading, not a second page title.
+        <SectionHeading kicker={kicker}>{title}</SectionHeading>
+      ) : (
+        <header className="flex flex-col gap-1">
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {kicker}
+          </span>
+          <h1 style={{ font: "var(--font-page-title)" }}>{title}</h1>
+        </header>
+      )}
       <AccentCard accent="var(--color-premium)" as="div" className="premium-glow-card">
         <p className="text-sm">{body}</p>
         <ButtonLink href="/premium" variant="premium" onClick={() => trackUse(gateFeature, "upsell_tapped", { tier: "free" })}>

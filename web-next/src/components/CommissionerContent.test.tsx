@@ -64,5 +64,7 @@ describe("CommissionerContent", () => {
     );
     render(<CommissionerContent leagueId="L1" leagueName="My League" />);
     expect(await screen.findByText("Spot tanking early")).toBeTruthy();
+    // One page title; the upsell title is a section heading, not a second <h1>.
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 });

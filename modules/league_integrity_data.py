@@ -17,6 +17,14 @@ from modules import (
     sleeper,
 )
 
+class SleeperUnavailable(RuntimeError):
+    """Sleeper returned nothing for data this report cannot be built without.
+
+    Raised instead of returning an "offseason" / short report so a Sleeper
+    blip is never cached for 30 minutes as if it were the league's real state.
+    """
+
+
 INTEGRITY_TTL_SECONDS = 30 * 60
 _LOCK_TIMEOUT_SECONDS = 20.0
 
@@ -39,6 +47,8 @@ def _bye_checker(season: int) -> Callable[[str, int], bool]:
 
 def _build(league_id: str, draft_rule: str, players_db_path: str, _bucket: int) -> dict[str, Any]:
     league = sleeper.get_league(league_id) or {}
+    if not league:
+        raise SleeperUnavailable("league")
     settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
     status = str(league.get("status") or "")
     leg = int(settings.get("leg") or 0)
@@ -55,6 +65,11 @@ def _build(league_id: str, draft_rule: str, players_db_path: str, _bucket: int) 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(weeks)), thread_name_prefix="dgm-integrity") as ex:
         fetched = list(ex.map(lambda w: sleeper.get_matchups(league_id, w) or [], weeks))
     weekly = {w: rows for w, rows in zip(weeks, fetched) if rows}
+    # A played week with no rows before a later week that has rows is a failed
+    # fetch, not a real gap: scoring around it would corrupt every team's
+    # lineup history (and could flag people).
+    if weekly and any(w not in weekly for w in range(1, max(weekly))):
+        raise SleeperUnavailable("matchups")
 
     players = sleeper.get_players() or {}
     meta: dict[str, dict[str, Any]] = {}

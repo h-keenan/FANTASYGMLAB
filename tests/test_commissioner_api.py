@@ -41,3 +41,29 @@ def test_integrity_does_not_check_commissioner_status(pro_feature_client, monkey
 def test_integrity_rejects_unknown_draft_order(pro_feature_client, monkeypatch):
     _set_profile(monkeypatch, "premium", trial_ends_at="2999-01-01T00:00:00+00:00")
     assert pro_feature_client.get("/v1/leagues/abc/commissioner/integrity?draft_order=bogus", headers=AUTH).status_code == 422
+
+
+def test_integrity_sleeper_outage_is_503_not_a_cached_offseason(pro_feature_client, monkeypatch):
+    """An empty league payload (Sleeper blip) must not become an "offseason" report."""
+    from modules import league_integrity_data as lid
+
+    _set_profile(monkeypatch, "premium", trial_ends_at="2999-01-01T00:00:00+00:00")
+    with patch("modules.sleeper.get_league", return_value={}):
+        with pytest.raises(lid.SleeperUnavailable):
+            lid._build("abc", "unknown", ":memory:", 0)
+    with patch("modules.league_integrity_data.build_cached", side_effect=lid.SleeperUnavailable("league")):
+        resp = pro_feature_client.get("/v1/leagues/abc/commissioner/integrity", headers=AUTH)
+    assert resp.status_code == 503
+
+
+def test_integrity_failed_middle_week_fetch_raises(monkeypatch):
+    from modules import league_integrity_data as lid
+
+    league = {"status": "in_season", "season": "2026", "settings": {"leg": 5, "playoff_week_start": 15}}
+    row = [{"roster_id": 1, "players": [], "starters": [], "players_points": {}}]
+    weeks = {1: row, 2: [], 3: row, 4: row}
+    with patch("modules.sleeper.get_league", return_value=league), patch("modules.sleeper.get_rosters", return_value=[]), \
+            patch("modules.sleeper.get_league_roster_profiles", return_value={}), \
+            patch("modules.sleeper.get_matchups", side_effect=lambda _l, w: weeks.get(w, [])):
+        with pytest.raises(lid.SleeperUnavailable):
+            lid._build("abc", "unknown", ":memory:", 0)

@@ -13259,7 +13259,10 @@ def get_commissioner_integrity(
     if external_leagues.is_external_league_key(league_id):
         return {"ok": True, "reason": "unsupported_platform", "is_premium": True, "teams": [],
                 "collusion": [], "inactive": [], "upsell": None}
-    report = league_integrity_data.build_cached(league_id, draft_order, PLAYERS_DB_PATH)
+    try:
+        report = league_integrity_data.build_cached(league_id, draft_order, PLAYERS_DB_PATH)
+    except league_integrity_data.SleeperUnavailable:
+        raise HTTPException(status_code=503, detail="Sleeper did not return this league's data. Try again in a minute.")
     return {**report, "is_premium": True, "upsell": None}
 
 
