@@ -36,7 +36,14 @@ def test_position_ranks_unknown_roster_is_empty():
 
 def test_room_reads_surplus_needs_and_strongest_weakest():
     ranks = op.position_ranks(_summary(), 1)
-    rooms, surplus, needs = op.room_reads(ranks, {"QB": "covered", "RB": "short_term_need", "TE": "covered"})
+    rooms, surplus, needs = op.room_reads(
+        ranks,
+        {
+            "QB": {"classification": "covered", "surplus": True},
+            "RB": {"classification": "short_term_need", "surplus": False},
+            "TE": {"classification": "covered", "surplus": False},
+        },
+    )
     assert "QB" in surplus
     assert "RB" in needs
     strongest, weakest = op.strongest_weakest(rooms)
@@ -44,11 +51,20 @@ def test_room_reads_surplus_needs_and_strongest_weakest():
     assert strongest["position"] in {"QB", "WR"}
 
 
-def test_surplus_requires_covered_room():
+def test_a_need_is_never_also_a_surplus():
     ranks = op.position_ranks(_summary(), 1)
-    _rooms, surplus, needs = op.room_reads(ranks, {"QB": "short_term_need"})
+    _rooms, surplus, needs = op.room_reads(ranks, {"QB": {"classification": "short_term_need", "surplus": True}})
     assert "QB" not in surplus
     assert "QB" in needs
+
+
+def test_rank_alone_decides_neither_need_nor_surplus():
+    # Roster 1 has the best QB room and roster 6 the worst RB room by rank, but
+    # the tags come from the need model, not from the rank.
+    ranks = op.position_ranks(_summary(), 1)
+    rooms, surplus, needs = op.room_reads(ranks, {})
+    assert surplus == [] and needs == []
+    assert all(row["tag"] is None for row in rooms)
 
 
 def test_tiny_league_has_no_rank_reads():
@@ -77,14 +93,17 @@ def _lineup():
     )
 
 
-def test_bench_candidates_excludes_starters_and_zero_value():
-    bench = op.bench_candidates(_lineup(), "value_score")
-    assert [p["player_id"] for p in bench["RB"]] == ["3", "2"]
+def test_surplus_candidates_are_the_models_surplus_players_best_value_first():
+    roster = _lineup()
+    bench = op.surplus_candidates(roster, {"RB": ["2", "3", "1"], "WR": ["4"]}, "value_score")
+    # Highest value first; the zero-value WR is not a usable chip.
+    assert [p["player_id"] for p in bench["RB"]] == ["1", "3", "2"]
     assert "WR" not in bench
+    assert op.surplus_candidates(roster, {}, "value_score") == {}
 
 
 def test_trade_angle_receive_and_send_and_none():
-    their_bench = op.bench_candidates(_lineup(), "value_score")
+    their_bench = op.surplus_candidates(_lineup(), {"RB": ["2", "3"]}, "value_score")
     angle = op.trade_angle(
         my_needs=["RB"], my_surplus=[], their_needs=[], their_surplus=["RB"], their_bench=their_bench, my_bench={}
     )

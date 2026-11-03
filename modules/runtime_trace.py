@@ -120,9 +120,7 @@ SAFE_MILESTONES = frozenset(
     }
 )
 TRACKED_DUPLICATES = {
-    "assess_team_needs",
     "build_league_summary",
-    "classify_roster_rooms",
     "get_team_vs_league",
     "injury_parsing",
     "news_parsing",
@@ -130,7 +128,6 @@ TRACKED_DUPLICATES = {
     "player_metadata_construction",
     "suggest_optimal_lineup",
     "trade_board_generation",
-    "true_roster_needs",
 }
 
 _active_trace: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(

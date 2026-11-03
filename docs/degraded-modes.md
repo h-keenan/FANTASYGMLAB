@@ -23,7 +23,8 @@ fail open for the Hub's keeper context.
 
 | Code | Where it comes from | Surfaced on |
 |---|---|---|
-| `need_model_failed` | `roster_value_model` could not be built for the roster (expected data/lookup error); Waivers falls back to the legacy coverage check | Waivers `model_status`, "Limited data" line |
+| `need_model_failed` | `roster_value_model` could not be built for the roster (expected data/lookup error); Waivers lists only the injury positions and says so | Waivers / My Team `model_status`, "Limited data" line |
+| `need_model_unavailable` | No need-model result exists for the roster (not in the league's rosters, or its model failed); the assessment shows no needs and is marked degraded instead of "covered" | My Team `model_status`, Trade Analyzer `model_status` |
 | `untouchable_lookup_failed` | GM Targets could not be read, so an untouchable player could be named; no drops are suggested | Waivers `model_status` |
 | `drop_model_failed` | The drop engine raised an expected data/lookup error | Waivers `model_status` |
 | `usage_trends_unavailable` | Weekly stats not loaded in season, so the hot-streak guard was not applied | Waivers `model_status` |

@@ -76,7 +76,8 @@ def _evaluate(roster, send_ids, receive_rows, *, strategy="retool", waiver=None,
     receive = receive_assets if receive_assets is not None else [_asset(r) for r in receive_rows]
     universe = pd.concat([roster, _universe(), pd.DataFrame(receive_rows or [])], ignore_index=True)
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
-        roster, universe, send, receive, None, strategy, settings or SETTINGS, "dynasty_score", waiver_df=waiver
+        roster, universe, send, receive, None, strategy, settings or SETTINGS, "dynasty_score", waiver_df=waiver,
+        team_needs={},  # these tests are about the lineup model, not roster needs
     )
     verdict = trade_offer_analyzer.decide_offer_verdict(fit, send_assets=send, receive_assets=receive)
     return fit, verdict

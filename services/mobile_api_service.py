@@ -263,8 +263,6 @@ from modules import idp_scoring
 from modules import guillotine as guillotine_module
 from modules import keepers as keepers_module
 from modules.team_eval import (
-    build_league_summary,
-    get_team_vs_league,
     lineup_open_slots,
     refine_team_directions,
     suggest_optimal_lineup,
@@ -2766,30 +2764,29 @@ def get_league_team_rankings(
 def _room_context(
     valued: pd.DataFrame,
     roster: Mapping[str, Any],
-    settings: dict[str, Any],
     score_field: str,
-    df_summary: pd.DataFrame,
+    league_needs: "roster_value_model.LeagueNeeds",
 ) -> dict[str, Any]:
-    """Lineup, bench candidates and per-room need classifications for one
-    roster, built exactly the way GET .../my-team-needs builds the user's own."""
+    """Per-room need / surplus read and surplus players for one roster, from the
+    one need model (the same call GET .../my-team-needs reads for the user's own)."""
 
     player_ids = {str(pid) for pid in (roster.get("players") or [])}
     roster_df = valued[valued["player_id"].astype(str).isin(player_ids)].copy()
-    if roster_df.empty:
-        return {"empty": True, "classifications": {}, "bench": {}}
-    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-    metrics = None
-    try:
-        metrics = get_team_vs_league(df_summary, roster.get("roster_id"))
-    except Exception:
-        metrics = None
-    assessment = trade_analyzer_fit.build_team_needs_assessment(
-        roster_df, metrics, settings, lineup_df=lineup_df, score_field=score_field
-    )
+    team_needs = league_needs.for_roster(roster.get("roster_id"))
+    if roster_df.empty or team_needs is None:
+        return {"empty": True, "rooms": {}, "bench": {}}
+    assessment = trade_analyzer_fit.build_team_needs_assessment(team_needs)
+    surplus_ids = trade_analyzer_fit.surplus_player_ids(team_needs)
     return {
         "empty": False,
-        "classifications": {item.position: item.classification for item in assessment.positions},
-        "bench": opponent_profile.bench_candidates(lineup_df, score_field),
+        "rooms": {
+            item.position: {
+                "classification": item.classification,
+                "surplus": item.position in surplus_ids,
+            }
+            for item in assessment.positions
+        },
+        "bench": opponent_profile.surplus_candidates(roster_df, surplus_ids, score_field),
     }
 
 
@@ -2807,7 +2804,7 @@ def get_league_team_profile(
 
     Composition only: room ranks come from the cached league summary frame,
     starter/bench/draft-capital ranks from the cached rankings frame, needs
-    from modules.roster_needs via trade_analyzer_fit (same call as
+    from the one need model, modules.roster_value_model, via trade_analyzer_fit (same call as
     GET .../my-team-needs), direction from trade_hub_engine.roster_posture
     (the opponent's declared Team Situation is private, so only the
     auto-classification is ever used). Anything that cannot be computed is
@@ -2854,9 +2851,12 @@ def get_league_team_profile(
         return _empty("no_rankings_data")
     row = rank_rows.iloc[0]
 
-    theirs = _room_context(valued, their_roster, settings, score_field, df_summary)
+    league_needs = roster_value_model.league_needs(
+        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field
+    )
+    theirs = _room_context(valued, their_roster, score_field, league_needs)
     ranks = opponent_profile.position_ranks(df_summary, roster_id)
-    rooms, surplus, needs = opponent_profile.room_reads(ranks, theirs["classifications"])
+    rooms, surplus, needs = opponent_profile.room_reads(ranks, theirs["rooms"])
     strongest, weakest = opponent_profile.strongest_weakest(rooms)
 
     posture = trade_hub_engine.roster_posture(
@@ -2901,11 +2901,11 @@ def get_league_team_profile(
     if my_roster is not None:
         is_me = str(my_roster.get("roster_id")) == str(roster_id)
         if not is_me:
-            mine = _room_context(valued, my_roster, settings, score_field, df_summary)
+            mine = _room_context(valued, my_roster, score_field, league_needs)
             if not mine["empty"] and not theirs["empty"]:
                 my_rooms, my_surplus, my_needs = opponent_profile.room_reads(
                     opponent_profile.position_ranks(df_summary, my_roster.get("roster_id")),
-                    mine["classifications"],
+                    mine["rooms"],
                 )
                 angle = opponent_profile.trade_angle(
                     my_needs=my_needs,
@@ -5846,6 +5846,15 @@ def post_trade_analyzer(
     my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
     if my_team_df.empty:
         return {"ok": True, "verdict": None, "reason": "empty_roster"}
+    # The one need / surplus model, for the same league frame the verdict is
+    # graded on. A roster it could not model is reported (``model_status``),
+    # not read as "no needs".
+    analyzer_needs = roster_value_model.league_needs(
+        valued=valued, rosters=sleeper.get_rosters(league_id), league=league, settings=settings,
+        score_field=score_field, status=analyzer_status,
+    )
+    model_status.merge_into(analyzer_status, analyzer_needs.status)
+    my_team_needs = analyzer_needs.for_roster(my_roster.get("roster_id"))
 
     def build_assets(player_ids: list[str]) -> list[dict[str, Any]]:
         wanted = {str(pid) for pid in player_ids if pid}
@@ -5948,6 +5957,7 @@ def post_trade_analyzer(
         waiver_df=waiver_pool,
         posture=posture,
         forced_drop_assets=(overflow or {}).get("forced_assets") or None,
+        team_needs=my_team_needs,
     )
     if not fit or not fit.get("available"):
         return {"ok": True, "verdict": None, "reason": "fit_unavailable"}
@@ -6008,7 +6018,9 @@ def post_trade_analyzer(
                     elif body.partner_roster_id and owner == str(body.partner_roster_id):
                         partner_asset_pool.append(pick_asset_from_mapping(pick, pick_score_multiplier=pick_score_multiplier))
 
-            my_needs = trade_analyzer_fit.get_needed_positions(my_team_df, None, settings)
+            my_needs = trade_analyzer_fit.get_needed_positions(
+                trade_analyzer_fit.build_team_needs_assessment(my_team_needs)
+            )
             # Positions the trade would leave empty this week rank first when
             # looking for a partner piece to ask for.
             my_needs = list(dict.fromkeys([*sorted(hole_positions), *my_needs]))
@@ -6027,6 +6039,7 @@ def post_trade_analyzer(
                     waiver_df=waiver_pool,
                     posture=posture,
                     forced_drop_assets=(cand_overflow or {}).get("forced_assets") or None,
+                    team_needs=my_team_needs,
                 )
                 if not cand_fit or not cand_fit.get("available"):
                     return None
@@ -10990,6 +11003,7 @@ def get_league_dashboard(
         score_field=score_field,
         entitlement=str(profile.get("entitlement") or "free"),
         rosters=rosters,
+        league=league,
         team_strategy=team_strategy,
         trade_idea_records=trade_idea_records,
         roster_df=roster_df,
@@ -13325,17 +13339,12 @@ def get_league_my_team_needs(
     deliberately left out as "lineup view only" (see that endpoint's own
     docstring).
 
-    Thin wrapper only: every field below comes from calling the exact same
-    pure engines app.py's My Team route already calls for these sections —
-    modules.team_eval.build_league_summary + get_team_vs_league for the
-    league-relative position-strength list, modules.trade_analyzer_fit.
-    build_team_needs_assessment (the same call GET .../waivers already
-    makes for its own needed_positions) for per-position classification,
-    and modules.roster_needs.select_need_headline for the Biggest Need
-    headline — no new valuation or need-classification logic is introduced
-    here, and the weaknesses filter below mirrors app.py's My Team route
-    (short_term_need rooms that are not merely a temporary injury blip)
-    byte-for-byte.
+    Thin wrapper only: every field below comes from the one roster-value need
+    model (modules.roster_value_model, via modules.trade_analyzer_fit.
+    build_team_needs_assessment, the same model GET .../waivers, the Dashboard
+    and Trade Hub read), headlined by modules.roster_needs.select_need_headline
+    for the Biggest Need tile. ``model_status`` is degraded when the model had
+    no result for this roster.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -13368,36 +13377,17 @@ def get_league_my_team_needs(
     if roster_df.empty:
         return _empty_my_team_needs_response(settings, reason="empty_roster")
 
-    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-
-    # League-relative room strength (QB/RB/WR/TE meaningfully above the
-    # league's starter-weighted average) — same per-team summary frame
-    # GET .../team-rankings' archetype column is refined from, read
-    # directly here for the single list My Team's Strength & Pressure
-    # "Strength" card needs. Best-effort: a Sleeper hiccup building the
-    # league-wide summary degrades to an empty strengths list rather than
-    # failing this endpoint's actual roster-needs data below.
-    team_metrics: dict[str, Any] | None = None
-    try:
-        df_summary = build_league_summary(
-            valued,
-            league_id,
-            score_field=score_field,
-            current_score_field=score_field,
-            lineup_settings=settings,
-        )
-        if not df_summary.empty:
-            team_metrics = get_team_vs_league(df_summary, my_roster.get("roster_id"))
-    except Exception:
-        team_metrics = None
-    strengths = [str(pos) for pos in ((team_metrics or {}).get("strengths") or [])]
-
-    assessment = trade_analyzer_fit.build_team_needs_assessment(
-        roster_df, team_metrics, settings, lineup_df=lineup_df, score_field=score_field
+    # Strengths, needs and the headline all come from the one roster-value
+    # need model (league rank of every starting slot, depth, injuries, aging),
+    # the same one Waivers, the Dashboard and Trade Hub read.
+    rosters = sleeper.get_rosters(league_id)
+    league_needs = roster_value_model.league_needs(
+        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field
     )
-    major_needed_positions = trade_analyzer_fit.get_needed_positions(
-        roster_df, team_metrics, settings, include_fallback=False, assessment=assessment
-    )
+    team_needs = league_needs.for_roster(my_roster.get("roster_id"))
+    assessment = trade_analyzer_fit.build_team_needs_assessment(team_needs, status=league_needs.status)
+    strengths = [str(item["position"]) for item in ((team_needs or {}).get("positions") or ()) if item.get("strength")]
+    major_needed_positions = trade_analyzer_fit.get_needed_positions(assessment, include_fallback=False)
     weaknesses = [
         position
         for position in major_needed_positions
@@ -13436,6 +13426,7 @@ def get_league_my_team_needs(
         "weaknesses": weaknesses,
         "biggest_need": biggest_need,
         "position_groups": position_groups,
+        "model_status": dict(assessment.model_status),
     }
 
 
@@ -15238,12 +15229,6 @@ def get_league_waivers(
     injured_starters = 0
     if not roster_df.empty:
         lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-        team_needs = trade_analyzer_fit.build_team_needs_assessment(
-            roster_df, None, settings, lineup_df=lineup_df, score_field=score_field
-        )
-        needed_positions = trade_analyzer_fit.get_needed_positions(
-            roster_df, None, settings, include_fallback=False, assessment=team_needs
-        )
         injury_context = trade_analyzer_fit.roster_injury_context(
             roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
         )
@@ -15259,23 +15244,17 @@ def get_league_waivers(
             # there's no lineup slot to fill off the wire. Waiver needs fall
             # back to genuine roster-construction needs only.
             injury_positions = set()
-        # coridian_, 2026-10-18: "this says current need none when i
-        # beluve i have needs for my team" — get_needed_positions(...,
-        # include_fallback=False) only returns strict true_needs, which
-        # excludes a position with an injured starter whose backup still
-        # clears the weekly-coverage bar (temporary_injury_pressure, not
-        # a true_need). Dashboard/GM Plan's "Biggest Team Need" tile uses
-        # select_need_headline, a broader priority ladder that DOES
-        # surface injury pressure — union it in here so Waivers' "Current
-        # need" (and Priority Adds ranking, which also reads this list)
-        # match what the user already sees elsewhere in the app.
-        needed_positions = sorted(set(needed_positions) | injury_positions)
+        # Waivers' "Current need" (and Priority Adds ranking, which also reads
+        # this list) also names a position with an injured starter, matching
+        # the Dashboard's "Biggest Team Need" ladder (coridian_, 2026-10-18:
+        # "this says current need none when i beluve i have needs"). Until the
+        # need model below has answered, injury positions are the whole list.
+        needed_positions = sorted(injury_positions)
 
-    # Team needs, rebuilt on the shared roster-value model (modules.
-    # roster_value_model, the same model the drop engine reads). The legacy
-    # coverage check above is kept only as the explicitly-marked fallback: its
-    # value thresholds assume a 0-100 scale against a 0-11,000 frame, so on a
-    # real dynasty roster it reports "no need" for almost every team.
+    # Team needs from the one roster-value model (modules.roster_value_model,
+    # the same model the drop engine, Dashboard, My Team and Trade Hub read).
+    # If it cannot be built for an expected data / lookup reason the response
+    # says so (``need_model_failed``) and lists only the injury positions.
     waivers_status = model_status.ok()
     needs_model: dict[str, Any] | None = None
     value_bundle: dict[str, Any] | None = None
@@ -15292,7 +15271,7 @@ def get_league_waivers(
             needed_positions = sorted(set(needs_model["needed_positions"]) | injury_positions)
             model_status.merge_into(waivers_status, needs_model.get("model_status"))
         except model_status.LOOKUP_ERRORS:
-            logger.warning("waiver need model failed (league=%s); using the coverage check", league_id, exc_info=True)
+            logger.warning("waiver need model failed (league=%s); showing injury positions only", league_id, exc_info=True)
             model_status.add(waivers_status, "need_model_failed")
             needs_model = None
             value_bundle = None

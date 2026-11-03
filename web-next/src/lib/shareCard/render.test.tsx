@@ -74,6 +74,12 @@ describe("share card helpers", () => {
     expect(plainTradeWhy(raw, "Epstein\u2019s List")).toBe("Epstein\u2019s List has RB depth to spare. You have WR / TE depth to spare.");
     expect(plainTradeWhy("RB: short-term starter coverage; Rival - WR: long-term upside.", "Rival")).toBe("You need an RB starter. Rival wants long-term WR upside.");
     expect(plainTradeWhy("", "Rival")).toBe("");
+    // One engine sentence about two teams: each clause keeps its own team.
+    expect(plainTradeWhy("You can move from TE surplus; Rival can move from RB surplus.", "Rival")).toBe(
+      "You have TE depth to spare. Rival has RB depth to spare.",
+    );
+    // A clause that is not a plain surplus statement is dropped, never merged.
+    expect(plainTradeWhy("You can move from TE surplus; the room is covered.", "Rival")).toBe("");
     const long = "This one sentence is far too long to fit on the card in two short lines because it keeps going and going without any end in sight.";
     expect(plainTradeWhy(`${long} Short and sweet.`, "Rival")).toBe("Short and sweet.");
     expect(plainTradeWhy("A fine reason. Another fine reason. A third reason.", "Rival")).toBe("A fine reason. Another fine reason.");

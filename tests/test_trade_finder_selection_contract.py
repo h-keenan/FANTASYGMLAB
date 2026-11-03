@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 from modules import trade_hub_engine, trade_ideas
-from scripts.profile_trade_hub import FixtureSpec, build_fixture
+from scripts.profile_trade_hub import FixtureSpec, build_fixture, give_last_teams_depth
 
 DRAFT_STATUS = {"draft_year": 2026, "current_year_picks_active": True}
 CORE_ID = "F01-00"  # 8,100+ Elite: protected/core on every posture
@@ -97,6 +97,7 @@ def test_player_plus_pick_every_package_sends_both(strategy):
 
 def test_two_players_every_package_sends_both():
     fixture = _fixture("contender")
+    give_last_teams_depth(fixture["players"])
     players = ["F01-10", "F01-12"]
     ideas = _search(fixture, players=players)
     assert ideas
@@ -159,18 +160,21 @@ def test_sweetener_is_only_used_when_nothing_plain_works():
 
 def test_nothing_includes_both_players_so_alternatives_are_labelled_not_results():
     fixture = _fixture("contender")
-    players = ["F01-12", "F01-14"]
+    # The elite QB plus a late WR: no partner takes both, but one without the WR
+    # works. (A TE + QB pair is not used: the weakest teams, who need every
+    # room under the one need model, can absorb it.)
+    players = ["F01-00", "F01-24"]
     trace = trade_ideas.FinderSearchTrace()
     ideas = _search(fixture, players=players, trace=trace)
     assert ideas == []
     assert trace.partial, "a workable package without one of them should be offered, labelled"
     for alt in trace.partial:
         missing = alt["finder_missing_selected"]
-        assert missing and set(missing) <= {"F01-12", "F01-14"}
+        assert missing and set(missing) <= {"F01-00", "F01-24"}
         assert trade_ideas.finder_closest_note(alt)["label"] == "Without " + " and ".join(missing)
     payload = trade_ideas.finder_search_payload(trace, found=0, closest=trace.partial)
     assert payload["status"] == "selected_assets_blocked"
-    assert payload["reason"].startswith("selected_assets_blocked: F01-1")
+    assert payload["reason"].startswith("selected_assets_blocked: F01-")
     assert payload["headline"].strip()
     # The probes do not pollute the funnel of the user's real selection.
     assert trace.send_labels == players

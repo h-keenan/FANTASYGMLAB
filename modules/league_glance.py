@@ -22,7 +22,7 @@ league:
                    rostered players carry an injury designation
                    (modules.rankings.injury_level)
   5. need       -- the top team-need headline
-                   (modules.roster_needs.assess_team_needs via
+                   (the one need model, modules.roster_value_model, via
                    trade_analyzer_fit.build_team_needs_assessment, headlined by
                    roster_needs.select_need_headline)
 
@@ -52,6 +52,7 @@ from modules import (
     league_standings,
     league_value_settings,
     my_news,
+    roster_value_model,
     sleeper,
     sleeper_leagues,
     team_stance,
@@ -60,7 +61,6 @@ from modules import (
 )
 from modules.rankings import injury_level
 from modules.roster_needs import select_need_headline
-from modules.team_eval import suggest_optimal_lineup
 from modules.trade_analyzer_fit import build_team_needs_assessment, get_needed_positions
 from modules.waivers_logic import select_top_waiver_opportunity
 
@@ -265,18 +265,18 @@ def build_league_glance(
     score_field = league_value_settings.valuation_score_field(lens)
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
 
-    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    league_needs = roster_value_model.league_needs(
+        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field
+    )
     assessment = build_team_needs_assessment(
-        roster_df, None, settings, lineup_df=lineup_df, score_field=score_field
+        league_needs.for_roster(roster_id), status=league_needs.status
     )
     need = project_need_tile(select_need_headline(assessment))
 
     all_rostered_player_ids: set[str] = set()
     for roster in rosters:
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
-    needed_positions = get_needed_positions(
-        roster_df, None, settings, assessment=assessment, lineup_df=lineup_df
-    )
+    needed_positions = get_needed_positions(assessment, include_fallback=False)
     free_agents_df = valued[~valued["player_id"].astype(str).isin(all_rostered_player_ids)]
     top_waiver = select_top_waiver_opportunity(
         free_agents_df, roster_df, settings, score_field, needed_positions=needed_positions

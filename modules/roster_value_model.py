@@ -1,17 +1,18 @@
 """One roster-value model for "what does MY roster need" and "who can I drop".
 
-Waivers used to answer "team need" from ``roster_needs.classify_roster_rooms``,
-a coverage-count policy whose value thresholds (18 / 20 / 24 / 55) are written
-for a 0-100 scale while the valued frame is 0-11,000: every rostered player
-cleared "playable cover" and every young player was a "core young asset", so a
-dynasty roster could never have a need and the header said "None" (see
-``docs/suggested-drops-and-needs.md``). That policy also never ranked positions
-against each other, so there was nothing to surface when nothing was binary.
-
-This module replaces it for the waiver surfaces and is shared with
-``modules.drop_candidates`` so the two cannot disagree about a player's worth
-to the roster. Both read the same facts, all from the lineup model the Trade
-Analyzer uses (``modules.trade_lineup_model``):
+This is the ONE need / surplus model. It replaced ``roster_needs``'s
+coverage-count policy (``classify_roster_rooms``), whose value thresholds
+(18 / 20 / 24 / 55) were written for a 0-100 scale while the valued frame runs
+0-11,000: every rostered player cleared "playable cover" and every young
+player was a "core young asset", so a dynasty roster could never have a need
+(see ``docs/suggested-drops-and-needs.md``). Waivers, the Dashboard, My Team,
+the league glance, push triggers, the opponent profile, the Trade Analyzer fit
+and Trade Hub / Finder all read it now (through ``league_needs`` and
+``roster_needs.assessment_from_model``), and it is shared with
+``modules.drop_candidates`` so no two surfaces can disagree about a player's
+worth to the roster. Every fact comes from the lineup model the Trade Analyzer
+uses (``modules.trade_lineup_model``) and is league-scaled (ranks, percentiles
+and the league's own rostered values), never a fixed number on a value scale:
 
 * ``start_share``      share of remaining weeks a player is in the best lineup;
 * ``slot ranks``       each starter slot at a position vs the same slot on every
@@ -21,7 +22,10 @@ Analyzer uses (``modules.trade_lineup_model``):
 * ``depth``            healthy players at the position vs starters + one cover;
 * ``future``           dynasty only: aging starters (the repo age curve) with no
                        young cover behind them;
-* ``injury pressure``  starters who are ruled out.
+* ``injury pressure``  starters who are ruled out;
+* ``surplus``          healthy players beyond starters + one cover who could
+                       start for the average team in this league. These are
+                       the only players a trade may call "moving from surplus".
 
 Nothing here is silent: a lookup that fails for an expected reason is reported
 through ``modules.model_status`` and the caller says so; anything else is a bug
@@ -41,7 +45,7 @@ from modules import model_status, trade_lineup_model as tlm
 from modules.frame_records import frame_records
 from modules.injury_status import is_ruled_out
 from modules.rankings import age_multiplier
-from modules.trade_grade import FANTASY_SEASON_WEEKS, SeasonWindow, healthy_equivalent_roster
+from modules.trade_grade import FANTASY_SEASON_WEEKS, SeasonWindow, healthy_equivalent_roster, season_window
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +69,9 @@ HIGH_VALUE_PLAYERS_PER_TEAM_MIN = 3
 # league rank of a starter slot as a 0..1 percentile (0 = best team, 1 = worst).
 PRIMARY_RANK_PCT = 0.60  # 8th of 12 or worse
 SECONDARY_RANK_PCT = 0.45  # 6th of 12 or worse (watch-list only)
+# A room is a "strength" when even its weakest starting slot ranks in the top
+# third of the league (4th of 12 or better).
+STRENGTH_RANK_PCT = 1 / 3
 # A weak slot rank alone (no free agent upgrade, no injury) is a real need only
 # when it is bottom-quarter; between PRIMARY and this it is a watch item.
 RANK_ONLY_SECONDARY_PCT = 0.75
@@ -446,6 +453,30 @@ def _aging(p: tlm.PlayerPoints) -> bool:
     return now > 0 and (now - then) / now >= AGING_DROP_SHARE
 
 
+def _median(values: Sequence[float]) -> float:
+    ordered = sorted(float(v) for v in values)
+    if not ordered:
+        return 0.0
+    mid = len(ordered) // 2
+    return ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def _need_type(tier: str, *, depth_short: int, future_gap: bool) -> str:
+    """The short room label the trade copy and the share card's plain-English
+    rewrite key on (the words ``tradeShareCopy.plainTradeWhy`` understands).
+    A primary/secondary tier is always about the starting lineup (a missing,
+    injured, weak or upgradeable starter); depth and aging alone only reach
+    ``watch``."""
+
+    if tier in ("primary", "secondary"):
+        return "short-term starter coverage"
+    if future_gap:
+        return "long-term upside"
+    if depth_short:
+        return "short-term backup only"
+    return "covered"
+
+
 def assess_needs(
     rvc: RosterValueContext,
     league_table: Mapping[str, Mapping[str, Sequence[float]]],
@@ -522,6 +553,15 @@ def assess_needs(
             if p.position == pos and (p.out_all or (p.absence is not None and p.absence.weeks >= 3))
             and (p.ppg or 0.0) >= floor_ppg
         ]
+        # Surplus: healthy players beyond starters + one cover who could start
+        # for the typical team in this league (at least the median weakest
+        # starter at the position). Anyone else on the bench is depth or a
+        # stash, not a chip.
+        slot_floor = _median([
+            (table.get(pos, [])[starters_n - 1] if len(table.get(pos, [])) >= starters_n else 0.0)
+            for table in league_table.values()
+        ])
+        spare = [p for p in healthy_here[required_depth:] if (p.ppg or 0.0) >= slot_floor]
         aging = [p for p in mine[pos][:starters_n] if _aging(p)]
         young_cover = [
             p for p in rvc.profiles.values()
@@ -556,6 +596,7 @@ def assess_needs(
             reasons.append("injured: " + ", ".join(p.name for p in injured_starters[:2]))
         if future_gap:
             reasons.append("aging starter(s) " + ", ".join(p.name for p in aging[:2]) + " with no young cover")
+        need_type = _need_type(tier, depth_short=depth_short, future_gap=future_gap)
         score = (
             weakest["pct"]
             + min(1.0, max(0.0, upgrade["ppw"]) / (MATERIAL_UPGRADE_PPW * 4))
@@ -577,6 +618,11 @@ def assess_needs(
             "injured_starters": [p.name for p in injured_starters],
             "aging_starters": [p.name for p in aging],
             "future_gap": future_gap,
+            "need_type": need_type,
+            "relative_weakness": weakest["pct"] >= SECONDARY_RANK_PCT,
+            "strength": weakest["pct"] <= STRENGTH_RANK_PCT and tier == "covered",
+            "surplus": bool(spare) and tier in ("watch", "covered"),
+            "surplus_player_ids": [p.player_id for p in spare] if tier in ("watch", "covered") else [],
             "reasons": reasons,
         })
     positions.sort(key=lambda d: (-TIER_ORDER[d["tier"]], -d["score"], d["position"]))
@@ -612,3 +658,107 @@ def assess_needs(
         "dynasty": bool(dynasty),
         "model_status": status,
     }
+
+
+# --- the league-wide need table ----------------------------------------------
+
+# Strategy used when a surface has no declared posture of its own. Needs are
+# lineup-points and league-rank facts; the posture only reweights value, so one
+# neutral key keeps every non-Waivers surface answering identically.
+NEUTRAL_STRATEGY = "retool"
+
+
+@dataclass(frozen=True)
+class LeagueNeeds:
+    """``assess_needs`` for every roster in a league, built once."""
+
+    by_roster: Mapping[str, Mapping[str, Any]]
+    status: Mapping[str, Any]
+
+    def for_roster(self, roster_id: Any) -> Mapping[str, Any] | None:
+        return self.by_roster.get(str(roster_id))
+
+
+_LEAGUE_NEEDS_CACHE: list[tuple[tuple, Any, LeagueNeeds]] = []
+_LEAGUE_NEEDS_CACHE_MAX = 6
+
+
+def _rosters_signature(rosters: Iterable[Mapping[str, Any]]) -> tuple:
+    return tuple(sorted(
+        (
+            str(r.get("roster_id")),
+            tuple(sorted(str(p) for p in (r.get("players") or []) if p is not None)),
+            tuple(sorted(str(p) for p in (r.get("reserve") or []) if p is not None)),
+            tuple(sorted(str(p) for p in (r.get("taxi") or []) if p is not None)),
+        )
+        for r in rosters
+    ))
+
+
+def league_needs(
+    *,
+    valued: pd.DataFrame,
+    rosters: Sequence[Mapping[str, Any]],
+    league: Mapping[str, Any] | None,
+    settings: Mapping[str, Any],
+    score_field: str,
+    strategy: str = NEUTRAL_STRATEGY,
+    pool: pd.DataFrame | None = None,
+    status: Mapping[str, Any] | None = None,
+) -> LeagueNeeds:
+    """Need / surplus for every roster, from one lineup-model calibration.
+
+    The one entry point for surfaces that are not Waivers (Waivers builds its
+    own context with the caller's posture, projections and real free-agent
+    pool and calls ``assess_needs`` directly; same function, same thresholds).
+    Memoized per (valued frame object, rosters, settings, strategy, pool).
+
+    Expected data / lookup failures for ONE roster are reported through
+    ``model_status`` (``need_model_failed``) and that roster is absent from the
+    table; anything else is a bug and propagates."""
+
+    league = league or {}
+    settings = dict(settings)
+    pool_id = id(pool) if pool is not None else None
+    settings_key = repr(sorted((str(k), repr(v)) for k, v in settings.items()))
+    key = (id(valued), pool_id, score_field, strategy, _rosters_signature(rosters), settings_key)
+    for entry_key, _held, cached in _LEAGUE_NEEDS_CACHE:
+        if entry_key == key:
+            return cached
+
+    out_status = model_status.merge(status)
+    by_roster: dict[str, Mapping[str, Any]] = {}
+    if valued is not None and not valued.empty and rosters:
+        window = season_window(settings)
+        dynasty = str(settings.get("league_format") or "") == "Dynasty"
+        ids_by_roster = {
+            str(r.get("roster_id")): {str(p) for p in (r.get("players") or []) if p is not None} for r in rosters
+        }
+        rostered = set().union(*ids_by_roster.values())
+        values = pd.to_numeric(
+            valued[valued["player_id"].astype(str).isin(rostered)][score_field], errors="coerce"
+        ).dropna().tolist()
+        model_ctx = tlm.get_context(
+            valued, settings, score_field if score_field in valued.columns else "value_score",
+            window=window, strategy=strategy, waiver_df=pool,
+        )
+        league_table = league_position_table(valued, rosters, model_ctx)
+        for roster in rosters:
+            rid = str(roster.get("roster_id"))
+            roster_df = valued[valued["player_id"].astype(str).isin(ids_by_roster[rid])].copy()
+            if roster_df.empty:
+                continue
+            try:
+                rvc = build_context(
+                    roster_df=roster_df, all_players_df=valued, pool=pool, my_roster=roster, league=league,
+                    settings=settings, score_field=score_field, strategy=strategy, window=window,
+                    league_rostered_values=values, status=out_status,
+                )
+                by_roster[rid] = assess_needs(rvc, league_table, rid, dynasty=dynasty)
+            except model_status.LOOKUP_ERRORS:
+                logger.warning("need model failed (roster=%s)", rid, exc_info=True)
+                model_status.add(out_status, "need_model_failed")
+    result = LeagueNeeds(by_roster=by_roster, status=out_status)
+    _LEAGUE_NEEDS_CACHE.append((key, (valued, pool), result))
+    del _LEAGUE_NEEDS_CACHE[:-_LEAGUE_NEEDS_CACHE_MAX]
+    return result

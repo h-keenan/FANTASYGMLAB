@@ -57,7 +57,7 @@ from modules import (
     trade_hub_engine,
 )
 from modules.canonical_recommendation_narrative import build_waiver_narrative
-from modules import league_calendar
+from modules import league_calendar, roster_value_model
 from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_display import _format_score
@@ -557,6 +557,7 @@ def _shared_trade_independent_tiles(
     league_settings: Mapping[str, Any] | None,
     score_field: str,
     injury_display_context: Mapping[str, Any],
+    rosters: list[dict] | None = None,
 ) -> dict[str, Any]:
     frame_key = league_value_settings.valued_players_frame_cache_key(players_df)
     if not frame_key or os.environ.get("DASHBOARD_SHARED_TILES", "1") == "0":  # kill switch / A-B harness
@@ -571,6 +572,8 @@ def _shared_trade_independent_tiles(
             tuple(sorted(str(pid) for pid in all_rostered_player_ids)),
             repr(sorted((league_settings or {}).items(), key=lambda kv: str(kv[0]))),
             repr(sorted(injury_display_context.items(), key=lambda kv: str(kv[0]))),
+            # Needs rank this roster against every other roster in the league.
+            repr(roster_value_model._rosters_signature(rosters or ())),
         )
     except Exception:
         return compute()
@@ -593,6 +596,7 @@ def compose_next_move_briefing(
     score_field: str,
     entitlement: str = "free",
     rosters: list[dict] | None = None,
+    league: Mapping[str, Any] | None = None,
     team_strategy: str = "retool",
     trade_idea_records: list[dict[str, Any]] | None = None,
     roster_df: pd.DataFrame | None = None,
@@ -670,12 +674,16 @@ def compose_next_move_briefing(
         injury_context = roster_injury_context(roster_df, lineup_df)
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
     def _compute_trade_independent_tiles() -> dict[str, Any]:
+        # The one need model: this roster's starting slots ranked against every
+        # other roster in the league (modules.roster_value_model).
+        league_needs = roster_value_model.league_needs(
+            valued=players_df, rosters=rosters or [], league=league, settings=dict(league_settings or {}),
+            score_field=score_field,
+        )
         team_needs_assessment = build_team_needs_assessment(
-            roster_df, None, league_settings, lineup_df=lineup_df, score_field=score_field
+            league_needs.for_roster(roster_id), status=league_needs.status
         )
-        needed_positions = get_needed_positions(
-            roster_df, None, league_settings, assessment=team_needs_assessment, lineup_df=lineup_df
-        )
+        needed_positions = get_needed_positions(team_needs_assessment, include_fallback=False)
 
         free_agents_df = players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)]
         if include_trade_and_waiver:
@@ -728,6 +736,7 @@ def compose_next_move_briefing(
         league_settings=league_settings,
         score_field=score_field,
         injury_display_context=injury_display_context,
+        rosters=rosters,
     )
     roster_pressure_tile = tiles["roster_pressure_tile"]
     waiver_tile = tiles["waiver_tile"]
@@ -1141,6 +1150,7 @@ def build_league_summary(
         score_field=score_field,
         entitlement=entitlement,
         rosters=rosters,
+        league=league,
         team_strategy=team_strategy,
         trade_idea_records=trade_idea_records,
         roster_df=roster_df,

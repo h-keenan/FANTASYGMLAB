@@ -35,7 +35,8 @@ from modules.team_eval import (
     team_strategy_label,
     team_strategy_mode,
 )
-from modules.roster_needs import SHALLOW_POSITIONS, true_roster_needs, true_shallow_position_needs
+from modules import roster_value_model
+from modules.roster_needs import SHALLOW_POSITIONS, assessment_from_model, room_records, true_shallow_position_needs
 from modules.rankings import (
     build_player_injury_index,
     injury_display_label,
@@ -1441,6 +1442,28 @@ def _pick_assets(assets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [asset for asset in assets if asset.get("asset_type") == "pick"]
 
 
+def _is_surplus_asset(shape: Dict[str, Any], asset: Dict[str, Any]) -> bool:
+    """Whether this exact player is one the need model calls surplus on this team."""
+
+    if asset.get("asset_type") == "pick":
+        return False
+    pos = str(asset.get("position") or "").upper()
+    ids = (shape.get("surplus_player_ids") or {}).get(pos) or ()
+    return str(asset.get("player_id") or "") in {str(i) for i in ids}
+
+
+def _surplus_positions_moved(shape: Dict[str, Any], assets: List[Dict[str, Any]]) -> set[str]:
+    """Positions this side is "moving from surplus": the package must contain a
+    player the model calls surplus there. A room being surplus is not enough
+    (a starter, a pick or a player at another position says nothing about it)."""
+
+    return {
+        str(asset.get("position") or "").upper()
+        for asset in _player_assets(assets)
+        if _is_surplus_asset(shape, asset)
+    }
+
+
 def _asset_positions(assets: List[Dict[str, Any]]) -> set[str]:
     return {
         str(asset.get("position") or "").upper()
@@ -1830,12 +1853,11 @@ def evaluate_trade_market_realism(
     receive_score = _score_assets(receive_assets) if receive_score is None else int(receive_score)
     partner_net = send_score - receive_score
     partner_needs = set(partner_shape.get("needs") or [])
-    partner_surplus = set(partner_shape.get("surplus") or [])
     send_positions = _asset_positions(send_assets)
     receive_positions = _asset_positions(receive_assets)
     partner_need_hits = send_positions & partner_needs
     partner_need_leaks = receive_positions & partner_needs
-    partner_surplus_out = receive_positions & partner_surplus
+    partner_surplus_out = _surplus_positions_moved(partner_shape, receive_assets)
     has_first_round_pick = any(_safe_int(asset.get("round"), 99) == 1 for asset in send_picks)
     first_round_count = sum(1 for asset in send_picks if _safe_int(asset.get("round"), 99) == 1)
     partner_strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
@@ -2547,6 +2569,7 @@ def _team_shape_signature(
     pick_assets: List[Dict[str, Any]] | None,
     league_draft_capitals: List[int] | None,
     league_settings: Dict[str, Any] | None,
+    team_needs: Mapping[str, Any] | None = None,
 ) -> str:
     roster_key = _safe_int(roster_id)
     summary_fp: tuple[Any, ...] = ()
@@ -2558,8 +2581,6 @@ def _team_shape_signature(
             summary_fp = (
                 _safe_int(row.get("total_score")),
                 str(row.get("strategy") or row.get("mode") or ""),
-                str(row.get("strengths") or ""),
-                str(row.get("weaknesses") or ""),
                 str(row.get("avg_age") or ""),
             )
     team_fp: tuple[Any, ...] = ()
@@ -2590,6 +2611,10 @@ def _team_shape_signature(
             pick_fp,
             list(league_draft_capitals or []),
             settings_fp,
+            [
+                [p.get("position"), p.get("tier"), list(p.get("surplus_player_ids") or [])]
+                for p in ((team_needs or {}).get("positions") or [])
+            ],
         ],
         separators=(",", ":"),
         default=str,
@@ -2702,7 +2727,9 @@ def _build_team_shape(
     league_settings: Dict[str, Any] | None = None,
     player_injury_index: dict[str, dict[str, Any]] | None = None,
     injury_index_loader=None,
+    league_needs: "roster_value_model.LeagueNeeds | None" = None,
 ) -> Dict[str, Any]:
+    team_needs = league_needs.for_roster(roster_id) if league_needs is not None else None
     signature_started = time.perf_counter()
     signature = _team_shape_signature(
         df_summary,
@@ -2712,6 +2739,7 @@ def _build_team_shape(
         pick_assets,
         league_draft_capitals,
         league_settings,
+        team_needs,
     )
     _TEAM_SHAPE_STATS["signature_ms"] = float(_TEAM_SHAPE_STATS["signature_ms"]) + (
         (time.perf_counter() - signature_started) * 1000.0
@@ -2752,12 +2780,19 @@ def _build_team_shape(
         (time.perf_counter() - injury_started) * 1000.0
     )
     needs_started = time.perf_counter()
-    smart_needs, room_coverage = true_roster_needs(
-        work_team,
-        lineup_df,
-        league_settings,
-        metrics.get("weaknesses", []),
+    # The one need / surplus model (modules.roster_value_model): league ranks
+    # of every starter slot, depth, injuries, aging, and which bench players
+    # are real surplus. A missing result is reported, never read as "covered".
+    need_assessment = assessment_from_model(
+        team_needs, status=league_needs.status if league_needs is not None else None
     )
+    smart_needs = list(need_assessment.true_needs)
+    room_coverage = room_records(team_needs)
+    surplus_player_ids = {
+        str(item["position"]): [str(pid) for pid in item.get("surplus_player_ids") or ()]
+        for item in ((team_needs or {}).get("positions") or ())
+        if item.get("surplus_player_ids")
+    }
     # K/DEF run through their own shallow-room model (see roster_needs) --
     # they're never part of CORE_POSITIONS' depth-gradient need machinery --
     # but a real gap there (no startable K/DEF) belongs in the same "needs"
@@ -2783,7 +2818,9 @@ def _build_team_shape(
             list(dict.fromkeys(list(smart_needs) + list(shallow_needs)))
         ),
         "room_coverage": {**room_coverage, **shallow_room_coverage},
-        "surplus": _normalize_pos_list(metrics.get("strengths", [])),
+        "surplus": _normalize_pos_list(list(surplus_player_ids)),
+        "surplus_player_ids": surplus_player_ids,
+        "need_model_status": dict(need_assessment.model_status),
         "counts": counts,
         "minimums": _team_position_minimums(league_settings),
         "position_values": _position_value_map(work_team, score_field),
@@ -3282,6 +3319,7 @@ def _team_fit_assessment(
     }
     needs = set(shape.get("needs") or [])
     surplus = set(shape.get("surplus") or [])
+    surplus_moved = _surplus_positions_moved(shape, outgoing_assets)
 
     get_verb = "get" if is_you else "gets"
     move_verb = "move" if is_you else "moves"
@@ -3300,7 +3338,7 @@ def _team_fit_assessment(
         if pos in needs and received > 0:
             score += 18
             positives.append(f"{get_verb} {pos} help")
-        if pos in surplus and sent > 0:
+        if pos in surplus_moved:
             score += 12
             positives.append(f"{move_verb} from {pos} surplus")
 
@@ -3765,9 +3803,7 @@ def _trade_reasoning_context(
     send_positions = _asset_positions(send_assets)
     receive_positions = _asset_positions(receive_assets)
     my_needs = set(my_shape.get("needs") or [])
-    my_surplus = set(my_shape.get("surplus") or [])
     partner_needs = set(partner_shape.get("needs") or [])
-    partner_surplus = set(partner_shape.get("surplus") or [])
     my_strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
     partner_strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
     my_mode = team_strategy_mode(my_strategy)
@@ -3791,8 +3827,8 @@ def _trade_reasoning_context(
 
     my_need_hits = receive_positions & my_needs
     partner_need_hits = send_positions & partner_needs
-    my_surplus_moves = send_positions & my_surplus
-    partner_surplus_moves = receive_positions & partner_surplus
+    my_surplus_moves = _surplus_positions_moved(my_shape, send_assets)
+    partner_surplus_moves = _surplus_positions_moved(partner_shape, receive_assets)
 
     if my_need_hits or partner_need_hits:
         tags.append("Need-Based")
@@ -4189,20 +4225,51 @@ def _partner_is_managed(partner_row) -> bool:
     return bool(str(owner).strip()) and str(owner).strip().lower() not in {"none", "nan", "null"}
 
 
-def _partner_complement_score(partner_row, my_needs: List[str], my_strengths: List[str]) -> int:
+def _league_needs_for(
+    df_players: pd.DataFrame,
+    rosters: Sequence[Mapping[str, Any]],
+    league_settings: Dict[str, Any] | None,
+    score_field: str,
+) -> "roster_value_model.LeagueNeeds":
+    """The one need / surplus model for every roster in the league, once per search.
+
+    It reads only the rosters (the adapter's, with IR / taxi when the platform
+    has them) and the league settings; the league size is the roster count."""
+
+    return roster_value_model.league_needs(
+        valued=df_players,
+        rosters=rosters,
+        league={"total_rosters": len(rosters)},
+        settings=dict(league_settings or {}),
+        score_field=score_field,
+    )
+
+
+def _model_room_sets(
+    league_needs: "roster_value_model.LeagueNeeds | None", roster_id: Any
+) -> tuple[List[str], List[str]]:
+    """(needs, surplus) positions for one roster from the one need model."""
+
+    result = league_needs.for_roster(roster_id) if league_needs is not None else None
+    needs = list(assessment_from_model(result).true_needs)
+    surplus = [
+        str(item["position"])
+        for item in ((result or {}).get("positions") or ())
+        if item.get("surplus_player_ids")
+    ]
+    return needs, surplus
+
+
+def _partner_complement_score(
+    partner_roster_id: Any,
+    my_needs: List[str],
+    my_surplus: List[str],
+    league_needs: "roster_value_model.LeagueNeeds | None",
+) -> int:
     """Cheap partner order for reduced Dashboard search — not a second scorer."""
 
-    partner_strengths = _normalize_pos_list(
-        partner_row.get("strengths") if hasattr(partner_row, "get") else []
-    )
-    if not partner_strengths and hasattr(partner_row, "get"):
-        partner_strengths = _normalize_pos_list(partner_row.get("surplus") or [])
-    partner_needs = _normalize_pos_list(
-        partner_row.get("needs") if hasattr(partner_row, "get") else []
-    )
-    return len(set(my_needs) & set(partner_strengths)) * 2 + len(
-        set(my_strengths) & set(partner_needs)
-    )
+    partner_needs, partner_surplus = _model_room_sets(league_needs, partner_roster_id)
+    return len(set(my_needs) & set(partner_surplus)) * 2 + len(set(my_surplus) & set(partner_needs))
 
 
 def build_trade_ideas(
@@ -4369,11 +4436,13 @@ class _UserSideAnalyzerGate:
     """
 
     def __init__(
-        self, *, my_team_df, all_players_df, strategy, league_settings, score_field, waiver_df=None, overflow=None
+        self, *, my_team_df, all_players_df, strategy, league_settings, score_field, waiver_df=None, overflow=None,
+        team_needs=None,
     ):
         # ``overflow``: roster-limit inputs for the roster-full check (see
         # ``_hub_overflow_inputs``); None when the roster limit is unknown.
         self._overflow = overflow
+        self._team_needs = team_needs
         self._waiver_df = waiver_df
         self._my_team_df = my_team_df
         self._all_players_df = all_players_df
@@ -4413,7 +4482,8 @@ class _UserSideAnalyzerGate:
             from modules.trade_analyzer_fit import prepare_current_roster_context
 
             self._current_context = prepare_current_roster_context(
-                self._my_team_df, None, self._strategy, self._league_settings, self._score_field
+                self._my_team_df, None, self._strategy, self._league_settings, self._score_field,
+                self._team_needs,
             ) or {}
         send_assets = list(idea.get("send_assets") or [])
         receive_assets = list(idea.get("receive_assets") or [])
@@ -4446,6 +4516,7 @@ class _UserSideAnalyzerGate:
             current_context=self._current_context or None,
             waiver_df=self._waiver_df,
             forced_drop_assets=(plan or {}).get("forced_assets") or None,
+            team_needs=self._team_needs,
         )
         if verdict is None:
             self._results[key] = True
@@ -4553,6 +4624,8 @@ def _build_trade_ideas_impl(
         for assets in roster_pick_assets.values()
     ]
 
+    league_needs = _league_needs_for(df_players, rosters, league_settings, score_field)
+
     my_roster_key = _safe_int(my_roster_id)
     my_player_ids = roster_players_map.get(my_roster_key, [])
     owner_ids = df_players["player_id"].map(player_owner_by_id)
@@ -4652,8 +4725,6 @@ def _build_trade_ideas_impl(
     auto_strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
     active_strategy = normalize_team_strategy(team_strategy or auto_strategy, default=auto_strategy)
     my_mode = team_strategy_mode(active_strategy)
-    my_strengths = metrics.get("strengths", []) or []
-    my_strengths = _normalize_pos_list(my_strengths)
     my_shape = _build_team_shape(
         df_summary,
         my_roster_key,
@@ -4662,6 +4733,7 @@ def _build_trade_ideas_impl(
         roster_pick_assets.get(my_roster_key, []),
         league_draft_capitals,
         league_settings=league_settings,
+        league_needs=league_needs,
     )
     my_shape["strategy"] = active_strategy
     my_shape["strategy_label"] = team_strategy_label(active_strategy)
@@ -4670,6 +4742,7 @@ def _build_trade_ideas_impl(
         my_shape["archetype"] = str(team_archetype)
         my_shape["archetype_label"] = str(team_archetype)
     my_needs = _normalize_pos_list(my_shape.get("needs", []))
+    my_surplus = _normalize_pos_list(my_shape.get("surplus", []))
     if trace is not None:
         trace.roster_at_limit = bool(my_shape.get("roster_at_limit") or my_shape.get("roster_over_limit"))
 
@@ -4699,7 +4772,7 @@ def _build_trade_ideas_impl(
                 }
 
     pos_focus = my_needs if my_needs else ["WR", "RB", "QB", "TE"]
-    movable_positions = list(dict.fromkeys(my_strengths + ["WR", "RB", "QB", "TE"]))
+    movable_positions = list(dict.fromkeys(my_surplus + ["WR", "RB", "QB", "TE"]))
 
     my_candidates = my_trade_block_df[
         my_trade_block_df["position"].isin(movable_positions)
@@ -4832,7 +4905,7 @@ def _build_trade_ideas_impl(
         partner_rows.append(partner_row)
     if dashboard_budget:
         partner_rows.sort(
-            key=lambda row: _partner_complement_score(row, my_needs, my_strengths),
+            key=lambda row: _partner_complement_score(_safe_int(row["roster_id"]), my_needs, my_surplus, league_needs),
             reverse=True,
         )
         partner_rows = partner_rows[:partner_cap]
@@ -4862,6 +4935,7 @@ def _build_trade_ideas_impl(
             roster_pick_assets.get(partner_roster_id, []),
             league_draft_capitals,
             league_settings=league_settings,
+            league_needs=league_needs,
         )
         partner_mode = str(partner_shape.get("mode") or partner_mode)
         partner_profile = partner_row.to_dict() if hasattr(partner_row, "to_dict") else {}
@@ -5094,9 +5168,9 @@ def _build_trade_ideas_impl(
                 continue
             for i, first in enumerate(my_player_assets[:outgoing_cap]):
                 for second in my_player_assets[i + 1 : outgoing_cap + 2]:
-                    if str(first.get("position") or "").upper() in my_needs and str(first.get("position") or "").upper() not in my_strengths:
+                    if str(first.get("position") or "").upper() in my_needs and str(first.get("position") or "").upper() not in my_surplus:
                         continue
-                    if str(second.get("position") or "").upper() in my_needs and str(second.get("position") or "").upper() not in my_strengths:
+                    if str(second.get("position") or "").upper() in my_needs and str(second.get("position") or "").upper() not in my_surplus:
                         continue
                     send_assets = make_package(first, second)
                     receive_assets = make_package(target)
@@ -5139,7 +5213,7 @@ def _build_trade_ideas_impl(
         # missed entirely — this closes that gap.
         for player in my_player_assets[:outgoing_cap]:
             player_pos = str(player.get("position") or "").upper()
-            if player_pos in my_needs and player_pos not in my_strengths:
+            if player_pos in my_needs and player_pos not in my_surplus:
                 continue
             for target in gated_partner_players:
                 if target["score"] < 1500:
@@ -5184,7 +5258,7 @@ def _build_trade_ideas_impl(
                     continue
                 for player in my_player_assets[:outgoing_cap]:
                     player_pos = str(player.get("position") or "").upper()
-                    if player_pos in my_needs and player_pos not in my_strengths:
+                    if player_pos in my_needs and player_pos not in my_surplus:
                         continue
                     if player["position"] == target["position"] and player["score"] >= target["score"] - 500:
                         continue
@@ -5220,7 +5294,7 @@ def _build_trade_ideas_impl(
         if partner_pick_assets:
             for player in my_player_assets[:outgoing_cap]:
                 player_pos = str(player.get("position") or "").upper()
-                if player_pos in my_needs and player_pos not in my_strengths:
+                if player_pos in my_needs and player_pos not in my_surplus:
                     continue
                 try:
                     player_age = float(player.get("age"))
@@ -5285,7 +5359,7 @@ def _build_trade_ideas_impl(
             useful_picks = partner_pick_assets[:6]
             for player in my_player_assets[:outgoing_cap]:
                 player_pos = str(player.get("position") or "").upper()
-                if player_pos in my_needs and player_pos not in my_strengths:
+                if player_pos in my_needs and player_pos not in my_surplus:
                     continue
                 try:
                     player_age = float(player.get("age"))
@@ -5608,6 +5682,7 @@ def _build_trade_ideas_impl(
         league_settings=league_settings,
         score_field=score_field,
         waiver_df=gate_pool,
+        team_needs=league_needs.for_roster(my_roster_key),
         overflow=_hub_overflow_inputs(
             league_settings=league_settings,
             rosters=rosters,
@@ -5775,11 +5850,10 @@ def _my_player_candidate_reason(
     tier = str(selected_asset.get("player_tier") or "").strip()
     age = _safe_float(selected_asset.get("age"), 0.0)
     strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
-    surplus = set(my_shape.get("surplus") or [])
     injury_positions = set(my_shape.get("injured_starter_positions") or [])
 
-    if pos in surplus:
-        return f"{selected_asset.get('label')} is a realistic chip because {pos} is one of your surplus rooms."
+    if _is_surplus_asset(my_shape, selected_asset):
+        return f"{selected_asset.get('label')} is a realistic chip because he is surplus to your {pos} room."
     if strategy in {"rebuild", "tank"} and age >= 26:
         return f"{selected_asset.get('label')} is a candidate because an older {tier or pos} can be converted into younger value or picks."
     if strategy in {"contender", "fringe_contender"} and pos not in injury_positions:
@@ -5822,8 +5896,8 @@ def _target_partner_reason(
 ) -> str:
     pos = str(target_asset.get("position") or "").upper()
     strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
-    if pos in set(partner_shape.get("surplus") or []):
-        return f"{partner_name} may move this player because {pos} is one of their stronger surplus rooms."
+    if _is_surplus_asset(partner_shape, target_asset):
+        return f"{partner_name} may move this player because he is surplus to their {pos} room."
     send_positions = _asset_positions(send_assets)
     partner_needs = set(partner_shape.get("needs") or [])
     need_hits = send_positions & partner_needs
@@ -6919,6 +6993,7 @@ def _build_my_player_fallback_ideas(
     active_strategy: str,
     league_settings: Dict[str, Any] | None = None,
     team_frames: Dict[int, pd.DataFrame] | None = None,
+    league_needs: "roster_value_model.LeagueNeeds | None" = None,
 ) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
     diagnostics = _empty_player_search_funnel()
     diagnostics.update(
@@ -7235,6 +7310,7 @@ def _build_my_player_fallback_ideas(
             roster_pick_assets.get(partner_roster_id, []),
             league_draft_capitals,
             league_settings=league_settings,
+            league_needs=league_needs,
         )
         _add_stage_ms(diagnostics, "stage_ms_team_shape", shape_started)
         partner_mode = str(partner_shape.get("mode") or partner_row.get("mode") or "")
@@ -7606,6 +7682,8 @@ def build_player_trade_hub_ideas(
             rosters = platform_adapter.get_rosters(league_id)
             roster_players_map = _roster_players_map(rosters)
 
+        league_needs = _league_needs_for(df_players, rosters, league_settings, score_field)
+
         pick_source = "adapter_rebuild"
         if prefetched_pick_assets:
             if isinstance(prefetched_pick_assets, Mapping):
@@ -7692,6 +7770,7 @@ def build_player_trade_hub_ideas(
                 league_draft_capitals,
                 league_settings=league_settings,
                 injury_index_loader=_load_find_injury_index,
+                league_needs=league_needs,
             )
         my_shape = _build_team_shape(
             df_summary,
@@ -7702,6 +7781,7 @@ def build_player_trade_hub_ideas(
             league_draft_capitals,
             league_settings=league_settings,
             injury_index_loader=_load_find_injury_index,
+            league_needs=league_needs,
         )
         team_shape_ms = round((time.perf_counter() - shape_started) * 1000, 3)
     _emit_team_shape_substages(hot_path_state)
@@ -7766,6 +7846,7 @@ def build_player_trade_hub_ideas(
                 active_strategy=active_strategy,
                 league_settings=league_settings,
                 team_frames=team_frames,
+                league_needs=league_needs,
             )
             combined_diag = dict(diagnostics)
             _universe_keys = {
@@ -7891,6 +7972,7 @@ def build_player_trade_hub_ideas(
         roster_pick_assets.get(target_roster_id, []),
         league_draft_capitals,
         league_settings=league_settings,
+        league_needs=league_needs,
     )
     partner_mode = str(partner_shape.get("mode") or "")
     partner_profile = partner_row_df.iloc[0].to_dict() if not partner_row_df.empty else {}

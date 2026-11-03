@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import threading
 import weakref
-from typing import Any
+from typing import Any, Mapping
 
 import pandas as pd
 
@@ -38,7 +38,7 @@ from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_display import _format_score
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
-from modules.roster_needs import TeamNeedsAssessment, assess_team_needs
+from modules.roster_needs import TeamNeedsAssessment, assessment_from_model
 from modules.team_eval import (
     known_player_ages,
     normalize_team_strategy,
@@ -329,51 +329,32 @@ def roster_injury_context(
 
 
 def build_team_needs_assessment(
-    roster_df: pd.DataFrame,
-    metrics: dict | None,
-    league_settings: dict | None = None,
+    team_needs: Mapping[str, Any] | None,
     *,
-    lineup_df: pd.DataFrame | None = None,
-    score_field: str | None = None,
+    status: Mapping[str, Any] | None = None,
 ) -> TeamNeedsAssessment:
-    """Build one immutable assessment from an already-loaded roster context."""
+    """One immutable assessment from the roster-value need model.
 
-    settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
-    settings.update(league_settings or {})
-    resolved_lineup = (
-        lineup_df
-        if lineup_df is not None
-        else suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-    )
-    return assess_team_needs(
-        roster_df,
-        resolved_lineup,
-        settings,
-        relative_weaknesses=list((metrics or {}).get("weaknesses", []) or []),
-    )
+    ``team_needs`` is ``roster_value_model.assess_needs`` for this roster
+    (``roster_value_model.league_needs(...).for_roster(roster_id)``, or the
+    Waivers context's own call). ``None`` means no model result exists for this
+    roster and is reported as ``need_model_unavailable`` on the assessment, not
+    answered as "covered"."""
+
+    return assessment_from_model(team_needs, status=status)
 
 
 def get_needed_positions(
-    my_team_df: pd.DataFrame,
-    metrics: dict | None,
-    league_settings: dict | None = None,
+    assessment: TeamNeedsAssessment,
     *,
     include_fallback: bool = True,
-    assessment: TeamNeedsAssessment | None = None,
-    lineup_df: pd.DataFrame | None = None,
 ) -> list[str]:
-    """Return the legacy position list derived from a canonical assessment."""
+    """The position list (true needs first) derived from a canonical assessment."""
 
-    resolved_assessment = assessment or build_team_needs_assessment(
-        my_team_df,
-        metrics,
-        league_settings,
-        lineup_df=lineup_df,
-    )
-    ordered_positions = list(resolved_assessment.true_needs)
+    ordered_positions = list(assessment.true_needs)
     if include_fallback:
-        ordered_positions.extend(resolved_assessment.upgrade_opportunities)
-        ordered_positions.extend(resolved_assessment.future_risks)
+        ordered_positions.extend(assessment.upgrade_opportunities)
+        ordered_positions.extend(assessment.future_risks)
     return list(dict.fromkeys(ordered_positions))[:4]
 
 
@@ -408,7 +389,7 @@ def _asset_rows_by_id(
     return rows
 
 
-def _current_context_key(metrics, strategy, lineup_settings, score_field) -> tuple:
+def _current_context_key(metrics, strategy, lineup_settings, score_field, team_needs=None) -> tuple:
     def freeze(value):
         if isinstance(value, dict):
             return tuple(sorted((str(k), freeze(v)) for k, v in value.items()))
@@ -416,7 +397,30 @@ def _current_context_key(metrics, strategy, lineup_settings, score_field) -> tup
             return tuple(freeze(v) for v in value)
         return repr(value)
 
-    return (freeze(metrics or {}), str(strategy or ""), freeze(lineup_settings or {}), str(score_field or ""))
+    return (
+        freeze(metrics or {}),
+        str(strategy or ""),
+        freeze(lineup_settings or {}),
+        str(score_field or ""),
+        _needs_key(team_needs),
+    )
+
+
+def _needs_key(team_needs: Mapping[str, Any] | None) -> tuple:
+    return tuple(
+        (str(p.get("position")), str(p.get("tier")), tuple(p.get("surplus_player_ids") or ()))
+        for p in ((team_needs or {}).get("positions") or ())
+    )
+
+
+def surplus_player_ids(team_needs: Mapping[str, Any] | None) -> dict[str, frozenset[str]]:
+    """position -> ids of the players the need model calls surplus there."""
+
+    return {
+        str(p.get("position")): frozenset(str(i) for i in (p.get("surplus_player_ids") or ()))
+        for p in ((team_needs or {}).get("positions") or ())
+        if p.get("surplus_player_ids")
+    }
 
 
 def prepare_current_roster_context(
@@ -425,8 +429,13 @@ def prepare_current_roster_context(
     strategy: str,
     lineup_settings: dict | None,
     score_field: str,
+    team_needs: Mapping[str, Any] | None = None,
 ) -> dict | None:
-    """The before-trade half of evaluate_trade_analyzer_fit, for reuse."""
+    """The before-trade half of evaluate_trade_analyzer_fit, for reuse.
+
+    ``team_needs``: ``roster_value_model.assess_needs`` for this roster (the one
+    need / surplus model). Without it the fit has no need or surplus signal and
+    says so (``need_model_unavailable`` in the result's ``model_status``)."""
 
     if my_team_df is None or my_team_df.empty:
         return None
@@ -453,16 +462,13 @@ def prepare_current_roster_context(
         return None
     return {
         "my_team_df": my_team_df,
-        "key": _current_context_key(metrics, strategy, lineup_settings, score_field),
+        "key": _current_context_key(metrics, strategy, lineup_settings, score_field, team_needs),
         "score_column": score_column,
         "window": window,
         "snapshot": snapshot,
-        "needs": get_needed_positions(
-            my_team_df,
-            metrics,
-            lineup_settings,
-            include_fallback=False,
-        ),
+        "needs": get_needed_positions(build_team_needs_assessment(team_needs), include_fallback=False),
+        "surplus_ids": surplus_player_ids(team_needs),
+        "needs_available": team_needs is not None,
         "health": roster_injury_context(my_team_df, snapshot.get("lineup_df", pd.DataFrame())),
     }
 
@@ -481,6 +487,7 @@ def evaluate_trade_analyzer_fit(
     waiver_df: pd.DataFrame | None = None,
     posture: dict | None = None,
     forced_drop_assets: list[dict] | None = None,
+    team_needs: Mapping[str, Any] | None = None,
 ) -> dict | None:
     """``forced_drop_assets``: players the user would have to cut to fit the
     roster limit after this trade (modules.drop_candidates.plan_trade_overflow).
@@ -504,10 +511,11 @@ def evaluate_trade_analyzer_fit(
     if not (
         current_context
         and current_context.get("my_team_df") is my_team_df
-        and current_context.get("key") == _current_context_key(metrics, strategy, lineup_settings, score_field)
+        and current_context.get("key")
+        == _current_context_key(metrics, strategy, lineup_settings, score_field, team_needs)
     ):
         current_context = prepare_current_roster_context(
-            my_team_df, metrics, strategy, lineup_settings, score_field
+            my_team_df, metrics, strategy, lineup_settings, score_field, team_needs
         )
     if current_context is None:
         return None
@@ -594,6 +602,8 @@ def evaluate_trade_analyzer_fit(
     engine_status = model_status.from_codes(
         model_status.frame_codes(all_players_df) + model_status.frame_codes(waiver_df)
     )
+    if not current_context.get("needs_available"):
+        model_status.add(engine_status, "need_model_unavailable")
     if window.in_season:
         try:
             model_score_column = score_field if score_field in all_players_df.columns else score_column
@@ -672,7 +682,7 @@ def evaluate_trade_analyzer_fit(
         trade_score = value_delta
     current_needs = current_context["needs"]
     need_set = {str(pos).upper() for pos in current_needs}
-    strength_set = {str(pos).upper() for pos in (metrics or {}).get("strengths", []) or []}
+    surplus_ids = current_context.get("surplus_ids") or {}
 
     send_positions = {
         str(asset.get("position") or "").upper()
@@ -686,7 +696,14 @@ def evaluate_trade_analyzer_fit(
     }
     filled_needs = sorted(pos for pos in receive_positions & need_set if pos)
     exposed_needs = sorted(pos for pos in (send_positions & need_set) - receive_positions if pos)
-    surplus_moves = sorted(pos for pos in send_positions & strength_set if pos)
+    # "Moving from surplus" is a claim about the players in THIS package: only
+    # a player the need model calls surplus counts, never just his position.
+    sent_player_ids = {
+        str(asset.get("player_id") or "")
+        for asset in send_assets or []
+        if asset.get("asset_type") == "player"
+    }
+    surplus_moves = sorted(pos for pos, ids in surplus_ids.items() if ids & sent_player_ids)
 
     current_counts = _team_position_counts(my_team_df)
     post_counts = _team_position_counts(post_team_df)

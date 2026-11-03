@@ -110,7 +110,8 @@ def grade(roster_df, universe, waiver, send, receive, strategy, week, legacy: bo
         trade_lineup_model.evaluate_trade = boom
     try:
         fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
-            roster_df, universe, send, receive, None, strategy, settings, "dynasty_score", waiver_df=waiver
+            roster_df, universe, send, receive, None, strategy, settings, "dynasty_score", waiver_df=waiver,
+            team_needs={},  # synthetic rosters have no league to rank against
         )
     finally:
         trade_lineup_model.evaluate_trade = original
