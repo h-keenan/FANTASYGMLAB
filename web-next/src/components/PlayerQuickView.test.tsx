@@ -209,7 +209,7 @@ describe("PlayerQuickView", () => {
     expect(await screen.findByText(/MKT 91, OPP 84, SCR 62, ROLE 73, DUR 58/)).toBeInTheDocument();
     expect(screen.getByText("Targets")).toBeInTheDocument();
     expect(screen.getByText("140")).toBeInTheDocument();
-    expect(screen.getByText(/88th pct/)).toBeInTheDocument();
+    expect(screen.getByText("88th")).toBeInTheDocument();
     expect(screen.getByText(/Top-3 WR/)).toBeInTheDocument();
     expect(screen.getByText("Ohio State")).toBeInTheDocument();
 
@@ -227,16 +227,14 @@ describe("PlayerQuickView", () => {
     expect(usageTile).toHaveAttribute("data-tone", "positive");
     expect(usageTile).toHaveTextContent("12%");
 
-    // coridian_, 2026-10-20 (screenshots): "this takes up way too much
-    // space for the information that is displaying" — each stat is a
-    // compact tile (label + value + a small percentile dot) inside a
-    // dense grid, not a full-width row with its own full-width progress
-    // bar and a separate percentile-text line underneath.
-    const targetsRow = screen.getByText("Targets").closest(".pqv-stat-row");
+    // coridian_, 2026-10-20 ("too much space") and 2026-11-02 ("didn't look
+    // great"): each stat is a compact row (label + value on one line, a thin
+    // percentile bar with its ordinal on the next), grouped in a card whose
+    // header names the position pool and season once.
+    const targetsRow = screen.getByText("Targets").closest(".sr");
     expect(targetsRow).toBeInTheDocument();
-    expect(targetsRow?.querySelector(".pqv-percentile-dot")).toBeInTheDocument();
-    expect(targetsRow?.querySelector(".pqv-percentile-bar")).not.toBeInTheDocument();
-    expect(container.querySelector(".pqv-stat-grid")).toBeInTheDocument();
+    expect(targetsRow?.querySelector(".sr-bar")).toBeInTheDocument();
+    expect(screen.getAllByText("Percentile vs WRs · 2026").length).toBeGreaterThan(0);
   });
 
   // coridian_, 2026-10-19: "was there any way for us to predict (scenario)

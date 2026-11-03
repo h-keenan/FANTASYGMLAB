@@ -16,7 +16,6 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AwardsStrip from '../components/AwardsStrip';
-import CircularProgressRing from '../components/CircularProgressRing';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -24,7 +23,7 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import MetricCard from '../components/MetricCard';
 import PercentileExplorerSheet from '../components/PercentileExplorerSheet';
-import { explorerStatKey, type ExplorerPlayer } from '../lib/percentileExplorer';
+import { type ExplorerPlayer } from '../lib/percentileExplorer';
 import PlayerHero from '../components/PlayerHero';
 import DecisionFitCard from '../components/DecisionFitCard';
 import PlayerSharePreviewModal from '../components/PlayerSharePreviewModal';
@@ -34,6 +33,10 @@ import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonRow } from '../components/SkeletonBlock';
 import SubRatingRow from '../components/SubRatingRow';
+import UsageBlock from '../components/UsageBlock';
+import SeasonStatsRows from '../components/SeasonStatsRows';
+import { HeadlineTiles } from '../components/StatRows';
+import { headlineRows } from '../lib/statRows';
 import ValuesCredit from '../components/ValuesCredit';
 import PlayerTrendsPanel from '../components/PlayerTrendsPanel';
 import { injuryTone } from '../lib/injuryDisplay';
@@ -47,7 +50,6 @@ import {
   type PlayerAward,
   type QuickViewBio,
   type QuickViewModel,
-  type QuickViewStatItem,
   type QuickViewStats,
   type ScheduleWeek,
   type UsageTrend,
@@ -340,126 +342,8 @@ function StatGrid({
   );
 }
 
-/** "72%" -> 72; anything else (blank, non-percent stats) -> null, so the
- * caller falls back to a plain StatCell instead of drawing an empty bar. */
-function parsePercent(value: string): number | null {
-  const match = /^(\d+(?:\.\d+)?)%$/.exec(value.trim());
-  if (!match) return null;
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : null;
-}
-
-function PercentBar({
-  label,
-  percent,
-  display,
-  percentile,
-}: {
-  label: string;
-  percent: number;
-  display: string;
-  percentile?: number | null;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const pctl = percentileLabel(percentile);
-  return (
-    <View style={styles.percentRow}>
-      <View style={styles.percentLabelRow}>
-        <AppText style={styles.percentLabel} numberOfLines={1}>
-          {label}
-        </AppText>
-        <View style={styles.percentValueGroup}>
-          <AppText style={styles.percentValue}>{display}</AppText>
-          {pctl ? (
-            <View style={styles.statCellPercentileRow}>
-              <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile, colors)} />
-              <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile, colors) }]}>{pctl}</AppText>
-            </View>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.percentTrack}>
-        <View style={[styles.percentFill, { width: `${percent}%` }]} />
-      </View>
-    </View>
-  );
-}
 
 
-/** Usage stats (Snap %, Route %, Target Share, Carry Share, Opportunity)
- * are all shares — a plain number is harder to size up at a glance than a
- * bar, so this renders each as one instead of falling through to the
- * generic StatGrid the other sections use. Renders bare rows only — the
- * caller (AnalyticsSection) supplies the card chrome and "Usage" heading.
- *
- * coridian_'s follow-up (Discord): "the usage section could literally just
- * be a small square module somewhere that says usage above it, and then it
- * has the percentage gage underneath it." The old layout put Snap %'s label
- * on the left and the ring on the right in a full-width row; this drops the
- * label (the AnalyticsSection header above already says "Usage") and
- * centers the ring directly underneath it instead, so the whole module
- * reads as one small square block rather than a wide row. Any other usage
- * shares (Route %, Target Share, Carry Share, Opportunity) still render as
- * compact bar rows below the ring — the square treatment is for the
- * headline Snap % ring, not a claim every position's Usage group is always
- * exactly one number. */
-function UsageSquare({ items }: { items: QuickViewStatItem[] }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const ringItem =
-    items.find((item) => item.label === 'Snap %' && Boolean(item.value) && parsePercent(item.value) !== null) ?? null;
-  const ringPercent = ringItem ? parsePercent(ringItem.value) : null;
-  const ringPctl = ringItem ? percentileLabel(ringItem.percentile) : null;
-  const restItems = items.filter((item) => item !== ringItem);
-  return (
-    <>
-      {ringItem && ringPercent !== null ? (
-        <View style={styles.usageRingWrap}>
-          <CircularProgressRing
-            percent={ringPercent}
-            size={64}
-            strokeWidth={6}
-            valueLabel={ringItem.value}
-            valueFontScale={0.28}
-            color={colors.accent}
-          />
-          {ringPctl ? (
-            <View style={[styles.statCellPercentileRow, styles.usageRingPctlRow]}>
-              <Ionicons
-                name={percentileTrendIcon(ringItem.percentile)!}
-                size={11}
-                color={percentileColor(ringItem.percentile, colors)}
-              />
-              <AppText style={[styles.statCellPercentile, { color: percentileColor(ringItem.percentile, colors) }]}>
-                {ringPctl}
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-      {restItems.map((item, index) => {
-        const percent = item.value ? parsePercent(item.value) : null;
-        if (percent === null) {
-          return (
-            <View key={`${item.label}-${index}`} style={styles.percentFallbackRow}>
-              <StatCell label={item.label} value={item.value || null} percentile={item.percentile} />
-            </View>
-          );
-        }
-        return (
-          <PercentBar
-            key={`${item.label}-${index}`}
-            label={item.label}
-            percent={percent}
-            display={item.value}
-            percentile={item.percentile}
-          />
-        );
-      })}
-    </>
-  );
-}
 
 // Per-stat glyph icons (coridian_'s Discord ask: "we need glyph icons for
 // things like receptions, targets, receiving touchdowns, yards, and stuff
@@ -506,75 +390,7 @@ function statLabelIcon(label: string): IoniconName | undefined {
   return STAT_LABEL_ICONS[label];
 }
 
-// Fantasy Output tiles sit right next to each other on the same card — "PPR
-// 48.3" (a season total) next to "PPR PPG 16.1" (a per-game rate) reads as
-// two numbers of the same kind unless each tile says which it is (coridian_:
-// "it doesn't imply that it's yearly stats on some of those stats"). The
-// backend's _fantasy_stats labels every per-game row "... PPG"; everything
-// else in that group is a season cumulative total.
-function fantasyPeriodLabel(label: string): string {
-  return label.includes('PPG') ? 'Per Game' : 'Season Total';
-}
 
-// Receiving-specific labels split out of `season.key_stats` — the backend's
-// _key_stats already orders these together per position (see
-// modules/player_quick_view.py's _key_stats `order` map), this just groups
-// them under their own "Receiving" card instead of "Production" per the
-// concept sheet's split, e.g. RB: Production = Games/Rush Att/Rush Yards/
-// Rush TDs/Targets, Receiving = Receptions/Rec Yards/Rec TDs. Pure relabeling
-// of already-computed items — no new metric is invented.
-const RECEIVING_LABELS = new Set(['Receptions', 'Rec Yards', 'Rec TDs']);
-
-// QB's own `_key_stats` order already ends in Rush Yards/Rush TDs (see
-// modules/player_quick_view.py) mixed into the same "Production" card as
-// passing volume — coridian_'s brief wants QB rushing pulled out into its
-// own secondary/smaller-weight treatment instead of sitting at equal visual
-// weight next to Pass Att/Pass Yards/Pass TDs. Same split mechanism as
-// RECEIVING_LABELS above, just keyed to the position that applies to.
-const QB_RUSHING_LABELS = new Set(['Rush Yards', 'Rush TDs']);
-
-/** Splits `season.key_stats` into the primary "Production" (QB: "Passing
- * Production") group and a secondary group — Receiving for every non-QB
- * position, QB Rushing for QB — using the label sets above. Still pure
- * relabeling/regrouping of already-computed items; no metric is invented and
- * no backend value is recomputed. */
-function splitKeyStats(
-  position: string,
-  items: QuickViewStatItem[],
-): { primary: QuickViewStatItem[]; secondary: QuickViewStatItem[] } {
-  const secondaryLabels = position === 'QB' ? QB_RUSHING_LABELS : RECEIVING_LABELS;
-  const primary: QuickViewStatItem[] = [];
-  const secondary: QuickViewStatItem[] = [];
-  for (const item of items) {
-    (secondaryLabels.has(item.label) ? secondary : primary).push(item);
-  }
-  return { primary, secondary };
-}
-
-type StatGroupKey = 'fantasy' | 'production' | 'receiving' | 'qbRushing' | 'usage' | 'efficiency' | 'college';
-
-const DEFAULT_STAT_GROUP_ORDER: StatGroupKey[] = ['fantasy', 'production', 'receiving', 'usage', 'efficiency', 'college'];
-
-/**
- * Position-aware stat-group ORDER only — never which metrics exist per
- * position (that's already correctly data-driven server-side; see
- * modules/player_quick_view.py's `_key_stats`/`_fantasy_stats`/`_usage_stats`/
- * `_efficiency_stats`). coridian_'s brief: for QB, decision importance runs
- * Fantasy Output -> Passing Production -> (QB Rushing, secondary weight) ->
- * Usage -> Efficiency -> Role Trend -> Bio, with Role Trend/Bio rendered
- * outside this array (see PlayerDetailScreen's InsightChipsRow/Bio
- * placement, unchanged). One shared `AnalyticsSection`-based architecture
- * consults this table — never a per-position screen/component copy. Add a
- * position's own array here to reorder its groups; any position missing from
- * this table falls back to DEFAULT_STAT_GROUP_ORDER unchanged.
- */
-const STAT_GROUP_ORDER: Partial<Record<string, StatGroupKey[]>> = {
-  QB: ['fantasy', 'production', 'qbRushing', 'usage', 'efficiency', 'college'],
-};
-
-function statGroupOrderForPosition(position: string): StatGroupKey[] {
-  return STAT_GROUP_ORDER[position] ?? DEFAULT_STAT_GROUP_ORDER;
-}
 
 /**
  * Fidelity fix vs. both concept sheets: neither ever wraps a 3-4 metric
@@ -1152,10 +968,6 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [explorer, setExplorer] = useState<{ key: string; label: string } | null>(null);
   // Tiles with a percentile open the Percentile Explorer; others stay plain.
-  const explorerPress = (label: string, percentile: number | null | undefined) => {
-    const key = percentile != null ? explorerStatKey(label) : null;
-    return key ? () => setExplorer({ key, label }) : undefined;
-  };
   const openExplorerPlayer = (other: ExplorerPlayer) => {
     setExplorer(null);
     navigation.push('PlayerDetail', {
@@ -1660,223 +1472,33 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
     if (activeTab === 'stats' && season) {
       const position = (player.position ?? '').toUpperCase();
-      const isQB = position === 'QB';
-      const { primary: productionItems, secondary: secondaryItems } = splitKeyStats(position, season.key_stats);
-      // Decided up front (not just at ordering time) so Efficiency's own
-      // card sizing below can size for a half-width column when this will
-      // actually apply — see the ordering step further down for why this is
-      // gated to small groups only.
-      const canPairUsageEfficiency = season.usage.length <= 2 && season.efficiency.length <= 2;
-
-      // One group -> one rendered node, keyed by the same StatGroupKey the
-      // position-aware order table above uses to sequence them — this is the
-      // "consult a config, don't hardcode one fixed order" architecture the
-      // brief asks for (item 17), not a per-position screen/component.
-      const groupNodes: Partial<Record<StatGroupKey, React.ReactNode>> = {};
-
-      if (season.fantasy.length > 0) {
-        const cardStyle = metricGroupCardStyle(season.fantasy.length);
-        groupNodes.fantasy = (
-          <AnalyticsSection key="fantasy" title="Fantasy Output" icon="american-football-outline">
-            <View style={styles.metricGrid}>
-              {season.fantasy.map((item, index) => (
-                <MetricCard
-                  key={`${item.label}-${index}`}
-                  label={item.label}
-                  icon={statLabelIcon(item.label)}
-                  onPress={explorerPress(item.label, item.percentile)}
-                  value={item.value || null}
-                  percentile={item.percentile}
-                  periodLabel={fantasyPeriodLabel(item.label)}
-                  style={cardStyle}
-                />
-              ))}
-            </View>
-          </AnalyticsSection>
-        );
-      }
-
-      if (productionItems.length > 0) {
-        const cardStyle = metricGroupCardStyle(productionItems.length);
-        groupNodes.production = (
-          <AnalyticsSection key="production" title={isQB ? 'Passing Production' : 'Production'} icon="bar-chart-outline">
-            <View style={styles.metricGrid}>
-              {productionItems.map((item, index) => (
-                <MetricCard
-                  key={`${item.label}-${index}`}
-                  label={item.label}
-                  icon={statLabelIcon(item.label)}
-                  onPress={explorerPress(item.label, item.percentile)}
-                  value={item.value || null}
-                  percentile={item.percentile}
-                  style={cardStyle}
-                />
-              ))}
-            </View>
-          </AnalyticsSection>
-        );
-      }
-
-      if (secondaryItems.length > 0) {
-        if (isQB) {
-          // Secondary/smaller weight vs. the MetricCard+PercentileBar tiles
-          // above — reuses StatGrid, the same lighter-weight pattern Bio/
-          // Model/Career already use, rather than inventing a new component.
-          groupNodes.qbRushing = (
-            <AnalyticsSection key="qb-rushing" title="QB Rushing" icon="walk-outline">
-              <StatGrid
-                items={secondaryItems.map((item) => ({
-                  label: item.label,
-                  value: item.value || null,
-                  percentile: item.percentile,
-                  icon: statLabelIcon(item.label),
-                }))}
-              />
-            </AnalyticsSection>
-          );
-        } else {
-          const cardStyle = metricGroupCardStyle(secondaryItems.length);
-          groupNodes.receiving = (
-            <AnalyticsSection key="receiving" title="Receiving" icon="locate-outline">
+      // One coherent stats presentation (same rows and Percentile Explorer as
+      // the quick view sheet): headline numbers, the Usage card, then season
+      // stat cards. The legacy Usage tiles fold into the Usage card.
+      const onExplore = (target: { key: string; label: string }) => setExplorer(target);
+      content.push(
+        <View key="stats-tab">
+          <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} onExplore={onExplore} />
+          <UsageBlock profile={model?.usage_profile} position={position} onExplore={onExplore} />
+          {/* Percentiles compare this player only to other players at his
+              position, over the season shown on each card header. */}
+          <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={onExplore} />
+          {stats?.college_available && stats.college.length > 0 ? (
+            <AnalyticsSection title="College" icon="school-outline">
               <View style={styles.metricGrid}>
-                {secondaryItems.map((item, index) => (
+                {stats.college.map((item, index) => (
                   <MetricCard
                     key={`${item.label}-${index}`}
                     label={item.label}
                     icon={statLabelIcon(item.label)}
-                    onPress={explorerPress(item.label, item.percentile)}
                     value={item.value || null}
                     percentile={item.percentile}
-                    style={cardStyle}
+                    style={metricGroupCardStyle(stats.college.length)}
                   />
                 ))}
               </View>
             </AnalyticsSection>
-          );
-        }
-      }
-
-      if (season.usage.length > 0) {
-        const usageSection = (
-          <AnalyticsSection key="usage" title="Usage" icon="speedometer-outline">
-            <UsageSquare items={season.usage} />
-          </AnalyticsSection>
-        );
-        // When Usage is about to pair with Efficiency below (see
-        // canPairUsageEfficiency), it already renders inside a compact
-        // half-width `pairedCol` — no extra wrapper needed. Otherwise it
-        // would render as its own full-width row, which is exactly the
-        // "small square module" ask: constrain it to a narrow, left-aligned
-        // card instead.
-        groupNodes.usage = canPairUsageEfficiency ? (
-          usageSection
-        ) : (
-          <View key="usage-square" style={styles.usageSquareWrap}>
-            {usageSection}
-          </View>
-        );
-      }
-
-      if (season.efficiency.length > 0) {
-        // Halved-column sizing when this will render next to Usage (see
-        // canPairUsageEfficiency above) — the normal row-fill sizing assumes
-        // a full-width section and would force a 2-item group to wrap
-        // vertically inside a half-width card instead of sitting side by
-        // side the way the concept sheet shows it.
-        const cardStyle = canPairUsageEfficiency
-          ? { minWidth: 64, flexBasis: '46%' as const }
-          : metricGroupCardStyle(season.efficiency.length);
-        groupNodes.efficiency = (
-          <AnalyticsSection key="efficiency" title="Efficiency" icon="calculator-outline">
-            <View style={styles.metricGrid}>
-              {season.efficiency.map((item, index) => (
-                <MetricCard
-                  key={`${item.label}-${index}`}
-                  label={item.label}
-                  icon={statLabelIcon(item.label)}
-                  onPress={explorerPress(item.label, item.percentile)}
-                  value={item.value || null}
-                  percentile={item.percentile}
-                  style={cardStyle}
-                />
-              ))}
-            </View>
-          </AnalyticsSection>
-        );
-      }
-
-      if (stats?.college_available && stats.college.length > 0) {
-        const cardStyle = metricGroupCardStyle(stats.college.length);
-        groupNodes.college = (
-          <AnalyticsSection key="college" title="College" icon="school-outline">
-            <View style={styles.metricGrid}>
-              {stats.college.map((item, index) => (
-                <MetricCard
-                  key={`${item.label}-${index}`}
-                  label={item.label}
-                  icon={statLabelIcon(item.label)}
-                  onPress={explorerPress(item.label, item.percentile)}
-                  value={item.value || null}
-                  percentile={item.percentile}
-                  style={cardStyle}
-                />
-              ))}
-            </View>
-          </AnalyticsSection>
-        );
-      }
-
-      // Usage and Efficiency render side-by-side in one row, not stacked
-      // full-width — matching the QB concept sheet (Usage's Snap % module
-      // sits next to Efficiency's tiles at the same height) and reusing the
-      // exact paired-column pattern already established below for
-      // Awards+Bio (`awardsBioRow`/`awardsBioCol`) instead of inventing a
-      // second one. Gated (canPairUsageEfficiency, above) to when both groups
-      // are small (<=2 items each) — the RB concept sheet shows no Usage
-      // section at all, so there's no visual evidence a 4-item Efficiency
-      // group (RB's real shape) should ever be squeezed into a half-width
-      // column; large groups keep the original full-width stacked layout the
-      // density fix above already covers.
-      const orderKeys = statGroupOrderForPosition(position);
-      const orderedGroups: React.ReactNode[] = [];
-      for (let i = 0; i < orderKeys.length; i += 1) {
-        const key = orderKeys[i];
-        if (
-          key === 'usage' &&
-          orderKeys[i + 1] === 'efficiency' &&
-          groupNodes.usage &&
-          groupNodes.efficiency &&
-          canPairUsageEfficiency
-        ) {
-          orderedGroups.push(
-            <View key="usage-efficiency-row" style={styles.pairedRow}>
-              <View style={styles.pairedCol}>{groupNodes.usage}</View>
-              <View style={styles.pairedCol}>{groupNodes.efficiency}</View>
-            </View>,
-          );
-          i += 1;
-          continue;
-        }
-        if (groupNodes[key]) orderedGroups.push(groupNodes[key]);
-      }
-
-      content.push(
-        <View key="stats-tab">
-          <AppText style={styles.seasonLabel}>{season.label}</AppText>
-          {/* coridian_'s percentile concern: "there's probably 900+ players
-           * in the NFL ... that can drastically sway percentiles." Verified
-           * against the backend (modules/player_quick_view.py's
-           * _position_pool) — every percentile on this tab is already
-           * ranked only within this player's own position group (e.g. a WR
-           * against other eligible WRs), never the full league pool. The
-           * math was already right; this just says so, since nothing on
-           * the tile itself named the comparison pool. */}
-          {position ? (
-            <AppText style={styles.percentileContextNote}>
-              Percentiles compare this player only to other {position}s, not the full league.
-            </AppText>
           ) : null}
-          {orderedGroups}
           {model ? <InsightChipsRow model={model} /> : null}
         </View>,
       );

@@ -170,7 +170,7 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
         ) : (
           <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
         )}
-        <span className="pqv-stat-tile-caption">Usage</span>
+        <span className="pqv-stat-tile-caption">Usage trend</span>
         {loading ? null : <span className="pqv-stat-tile-note">No clear trend</span>}
       </div>
     );
@@ -193,7 +193,7 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
         {trend.arrow} {magnitude}%
       </span>
       <span className="pqv-stat-tile-caption" aria-hidden="true">
-        Usage
+        Usage trend
       </span>
       <span className="pqv-stat-tile-divider" aria-hidden="true" />
       <span className="pqv-stat-tile-confidence" aria-hidden="true">

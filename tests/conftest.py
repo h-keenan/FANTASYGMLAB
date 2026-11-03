@@ -39,6 +39,32 @@ _DATA_BASELINE = {
 }
 
 
+# data/players.db is committed too, and rankings.load_players() reconciles and
+# WRITES BACK to the path it is given. A test that loads the real default db
+# rewrites the tracked file for the rest of the run (and for other xdist
+# workers), which is how tests/test_canonical_player_state_authority.py (it
+# copies data/players.db) failed depending on which test ran first. Same rule
+# as the JSON files, but a leak fails the test: tests must load a tmp copy
+# (see tests/test_canonical_player_state_authority.py) or patch the loader.
+_PLAYERS_DB = _REPO_DATA_DIR / "players.db"
+_PLAYERS_DB_BASELINE = (_data_json_stat(_PLAYERS_DB), _PLAYERS_DB.read_bytes() if _PLAYERS_DB.exists() else None)
+
+
+@pytest.fixture(autouse=True)
+def _guard_real_players_db():
+    yield
+    stat, content = _PLAYERS_DB_BASELINE
+    if content is None:
+        return
+    if _data_json_stat(_PLAYERS_DB) != stat and _PLAYERS_DB.read_bytes() != content:
+        _PLAYERS_DB.write_bytes(content)
+        pytest.fail(
+            "test rewrote the committed data/players.db (reverted); load a tmp_path copy "
+            "or patch modules.rankings.load_players instead",
+            pytrace=False,
+        )
+
+
 @pytest.fixture(autouse=True)
 def _guard_real_data_json_files():
     """Stop tests from persisting changes into the repo's real data/*.json.
@@ -135,6 +161,27 @@ def _reset_sleeper_budget_for_tests():
     sleeper_budget.reset_for_tests()
     yield
     sleeper_budget.reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def _reset_sleeper_process_caches_for_tests():
+    """modules.sleeper keeps process-level ``lru_cache``s on its live-league
+    endpoints (``get_league_drafts``, ``get_draft``, users, rosters, ...) and on
+    the global trending lists. Whether a test's own (mocked) Sleeper call is
+    made at all then depends on which test ran earlier in the same process (or
+    xdist worker): the same endpoint test passes alone and fails after another
+    test warmed league "abc". Clear them around every test so each test sees a
+    cold, deterministic cache, whatever ran before it."""
+
+    from modules import sleeper
+
+    sleeper.clear_live_league_endpoint_caches()
+    sleeper.clear_trending_player_caches()
+    try:
+        yield
+    finally:
+        sleeper.clear_live_league_endpoint_caches()
+        sleeper.clear_trending_player_caches()
 
 
 @pytest.fixture(autouse=True)

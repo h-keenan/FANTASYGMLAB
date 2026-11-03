@@ -36,6 +36,9 @@ export interface PercentileExplorerResponse {
   season?: number | null;
   scopes: string[];
   pool_size?: number;
+  /** Who the percentile is measured against and over what (usage stats), e.g.
+   * "WRs with at least 4 games played in 2026; season average of weekly values". */
+  sample_note?: string;
   bins?: ExplorerBin[];
   player?: ExplorerPlayer | null;
   nearby?: ExplorerPlayer[];
@@ -61,6 +64,10 @@ const STAT_KEY_BY_LABEL: Record<string, string> = {
   "Pass Yards": "pass_yards",
   "Pass TDs": "pass_tds",
   "Snap %": "snap",
+  "Snap Share": "snap",
+  "Air Yards Share": "air_yards_share",
+  "Opportunity Share": "opportunity",
+  "Red-Zone Looks / Game": "red_zone_looks",
   "Route %": "route",
   "Target Share": "target_share",
   "Carry Share": "carry_share",

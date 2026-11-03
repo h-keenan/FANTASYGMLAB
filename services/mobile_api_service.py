@@ -250,6 +250,7 @@ from modules import (
 )
 from modules import public_dynasty_values
 from modules import model_status
+from modules import usage_trends
 from modules import trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
@@ -4945,6 +4946,37 @@ def _project_usage_trend(row: pd.Series) -> dict[str, Any] | None:
     return rankings.recency_trend_display(row)
 
 
+def _project_usage_profile(row: pd.Series, players_df: pd.DataFrame | None = None) -> dict[str, Any]:
+    """Rolling last-4/last-8 usage and role flags (modules.usage_trends).
+
+    Always a dict so clients can render an explicit state: ``status`` is
+    ``ok`` / ``building_sample`` / ``low_usage`` / ``no_data`` /
+    ``not_covered``, or ``unavailable`` when an input lookup failed (logged and
+    reported, never swallowed into a fake "no trend"; programming errors
+    propagate, see modules.model_status).
+    """
+
+    player_id = str(row.get("player_id") or "")
+    try:
+        profile = usage_trends.profile_for_player(player_id, str(row.get("position") or ""))
+        # Each pool metric carries its explorer key (so the tap opens the same
+        # percentile pop-up as every other stat) and, when the position pool is
+        # large enough, its percentile with the season/sample stated.
+        percentiles = percentile_explorer.usage_metric_percentiles(players_df, row)
+        for metric in profile.get("metrics", []):
+            explorer_key = usage_trends.EXPLORER_KEYS.get(metric["key"])
+            if explorer_key:
+                metric["explorer_key"] = explorer_key
+                metric["percentile"] = (percentiles.get(metric["key"]) or {}).get("percentile")
+                metric["percentile_note"] = (percentiles.get(metric["key"]) or {}).get("sample_note")
+        return profile
+    except model_status.LOOKUP_ERRORS:
+        # Bad/unavailable input (file, parse, lookup): reported, not hidden.
+        # Anything else is a programming error and propagates.
+        logger.exception("usage profile failed for player %s", player_id)
+        return {"status": "unavailable", "reason": "usage_profile_error", "flags": [], "metrics": []}
+
+
 # A meaningful depth-chart move is at least one full spot (e.g. 2 -> 1) --
 # anything smaller doesn't exist (depth_chart_order is an integer rank).
 DEPTH_CHART_NOTE_MIN_DELTA = 1
@@ -7904,6 +7936,7 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
         "workload_trend": _clean_json_value(row.get("workload_trend")),
         "usage_trend": _project_usage_trend(row),
         "depth_chart_note": _project_depth_chart_note(row),
+        "usage_profile": _project_usage_profile(row, players_df),
         "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),
         **{
             key: _clean_json_value(value)

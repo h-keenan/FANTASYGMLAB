@@ -2031,6 +2031,49 @@ export interface UsageTrend {
   detail: string;
 }
 
+/** One rolling usage metric from modules/usage_trends.py (same payload web renders). Shares are
+ * fractions of 1; count metrics are per-game averages. `direction` is decided server-side. */
+export interface UsageMetric {
+  key: string;
+  label: string;
+  unit: 'pct' | 'count';
+  source: 'sleeper' | 'nflverse';
+  last4: number | null;
+  last8: number | null;
+  prior: number | null;
+  season: number | null;
+  delta_last4_vs_prior: number | null;
+  direction: 'up' | 'down' | 'flat' | 'unknown';
+  games_with_data: number;
+  /** Percentile explorer stat key; present on the five pool metrics. */
+  explorer_key?: string;
+  /** Season-average percentile vs the position pool (omitted when the pool is too thin). */
+  percentile?: number | null;
+  percentile_note?: string | null;
+}
+
+export interface UsageFlag {
+  key: 'role_expanding' | 'role_shrinking' | 'positive_regression' | 'unsustainable';
+  label: string;
+  tone: 'positive' | 'negative';
+  explanation: string;
+  evidence_metrics: string[];
+}
+
+export interface UsageProfile {
+  status: 'ok' | 'building_sample' | 'low_usage' | 'no_data' | 'not_covered' | 'unavailable';
+  status_note?: string | null;
+  reason?: string;
+  season?: number;
+  games_played?: number;
+  metrics: UsageMetric[];
+  flags: UsageFlag[];
+  headline?: string | null;
+  advanced?: { available: boolean; reason?: string | null; through_week?: number | null; as_of?: string | null };
+  not_available?: Array<{ key: string; label: string; reason: string }>;
+  attribution?: { text: string; url: string; license: string };
+}
+
 export interface QuickViewModel {
   market_score: number | null;
   opportunity_score: number | null;
@@ -2041,6 +2084,8 @@ export interface QuickViewModel {
   opportunity_confidence: number | null;
   workload_trend: string | null;
   usage_trend: UsageTrend | null;
+  // Rolling last-4/last-8 usage and role flags (modules/usage_trends.py); same field web carries.
+  usage_profile?: UsageProfile | null;
   // Plain-language depth-chart move since the last players.db refresh
   // (modules.depth_chart_history); null when no prior snapshot or too small.
   // Same field web's quick-view response carries.

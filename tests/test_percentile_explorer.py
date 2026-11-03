@@ -78,6 +78,32 @@ def test_unknown_stat_and_ratio_stat():
     assert _build(players, stat="targets_gm")["reason"] == ""
 
 
-def test_share_stats_are_shown_as_percent():
-    payload = _build(_pool_with_subject(30), stat="snap")
-    assert payload["player"]["value"] > 1 or payload["player"]["value"] == 0
+def _usage_table(players, metric_values):
+    ids = players["player_id"].astype(str)
+    table = pd.DataFrame(
+        {"position": players["position"].values, "games": 8, **{k: metric_values for k in px.USAGE_METRIC_COLUMNS}},
+        index=ids.values,
+    )
+    return table
+
+
+def test_usage_stats_use_the_usage_pool_with_season_and_sample_stated(monkeypatch):
+    from modules import usage_trends
+
+    players = _pool_with_subject(30)
+    values = [0.02 * i for i in range(len(players))]
+    monkeypatch.setattr(usage_trends, "season_pool_table", lambda season=None: _usage_table(players, values))
+    monkeypatch.setattr("modules.sleeper.default_player_stats_season", lambda: 2026)
+    payload = _build(players, stat="target_share")
+    assert payload["reason"] == ""
+    assert payload["season"] == 2026
+    assert "at least 4 games played in 2026" in payload["sample_note"]
+    assert payload["player"]["value"] <= 100 and payload["player"]["percentile"] >= 1
+    assert payload["label"] == "Target Share"
+
+
+def test_usage_stat_is_omitted_when_the_pool_is_missing(monkeypatch):
+    from modules import usage_trends
+
+    monkeypatch.setattr(usage_trends, "season_pool_table", lambda season=None: pd.DataFrame(columns=["position", "games"]))
+    assert _build(_pool_with_subject(30), stat="air_yards_share")["reason"] == "insufficient_pool"

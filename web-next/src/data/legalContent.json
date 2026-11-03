@@ -235,6 +235,7 @@
           "paragraphs": [
             "References to leagues, teams, players, platforms, logos, statistics, and other third-party material are used only to identify and analyze fantasy football information. Ownership remains with the applicable rights holders.",
             "Availability of third-party data does not imply a partnership, endorsement, sponsorship, or official relationship.",
+            "Usage statistics in FantasyDesk (target share, air-yards share, red-zone looks, opportunity share) are aggregated from nflverse (nflverse.com) data, licensed CC BY 4.0 (creativecommons.org/licenses/by/4.0), and combined with Sleeper data. We compute rolling averages and role flags from those figures. nflverse does not endorse or sponsor FantasyDesk.",
             "Player values in FantasyDesk are informed by market values from FantasyCalc (fantasycalc.com), combined with our own model and league settings. FantasyCalc does not endorse or sponsor FantasyDesk."
           ],
           "bullets": []

@@ -125,6 +125,7 @@ export default function PercentileExplorerSheet({
             <View style={styles.headerText}>
               <AppText style={styles.title}>{statLabel} Percentile Explorer</AppText>
               <AppText style={styles.hint}>Tap a player to compare where he sits.</AppText>
+              {data?.sample_note ? <AppText style={styles.hint}>{data.sample_note}</AppText> : null}
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityLabel="Close percentile explorer">
               <Ionicons name="close" size={22} color={colors.textSecondary} />
