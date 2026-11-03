@@ -104,3 +104,13 @@ def test_fringe_player_gets_metrics_but_no_flag():
     rows = _weeks([{"snap_share": 0.1, "pts": 1.0}] * 4 + [{"snap_share": 0.5, "pts": 1.5}] * 4)
     prof = ut.build_usage_profile("WR", rows, None)
     assert prof["status"] == "low_usage" and prof["flags"] == [] and prof["metrics"]
+
+
+def test_one_metric_moving_alone_is_not_a_role_call():
+    # Snap share jumps but targets and air yards are flat: not corroborated.
+    rows = _weeks([{"snap_share": 0.55, "pts": 10}] * 4 + [{"snap_share": 0.9, "pts": 10}] * 4)
+    adv = _adv([(0.2, 0.25)] * 8)
+    prof = ut.build_usage_profile("WR", rows, adv)
+    assert prof["status"] == "ok" and prof["flags"] == []
+    snap = next(m for m in prof["metrics"] if m["key"] == "snap_share")
+    assert snap["direction"] == "up"

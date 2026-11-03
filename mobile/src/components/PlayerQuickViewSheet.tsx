@@ -21,15 +21,19 @@ import PlayerValueHistory from './PlayerValueHistory';
 import { ratingHistoryCaption } from '../lib/valueHistoryPresentation';
 import SubRatingRow from './SubRatingRow';
 import ToneBadge from './ToneBadge';
+import SeasonStatsRows from './SeasonStatsRows';
+import { HeadlineTiles } from './StatRows';
+import UsageBlock from './UsageBlock';
+import { headlineRows } from '../lib/statRows';
 import ValuesCredit from './ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
-import { api, type QuickViewStatItem } from '../lib/api';
+import { api } from '../lib/api';
 import { injuryTone } from '../lib/injuryDisplay';
 import { cleanInjuryLabel } from '../lib/playerAvailability';
 import { getLastLeague } from '../lib/lastLeague';
 import { isTradeAnalyzerRoute } from '../lib/tradeShortcuts';
-import { explorerStatKey, type ExplorerPlayer } from '../lib/percentileExplorer';
+import { type ExplorerPlayer } from '../lib/percentileExplorer';
 import { overallRatingColor } from '../lib/percentile';
 import { resolvePlayerTier } from '../lib/playerTier';
 import {
@@ -39,7 +43,7 @@ import {
   type QuickViewLeague,
   type QuickViewRequest,
 } from '../lib/playerQuickView';
-import { rankLine, seasonStatGroups, tierOpportunityMismatchCaption } from '../lib/playerQuickViewPresentation';
+import { rankLine, tierOpportunityMismatchCaption } from '../lib/playerQuickViewPresentation';
 import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
@@ -56,41 +60,6 @@ function Section({ title, icon, children }: { title: string; icon?: React.Compon
     <View style={styles.section}>
       <SectionHeading title={title} icon={icon} />
       {children}
-    </View>
-  );
-}
-
-function StatTiles({
-  title,
-  items,
-  onExplore,
-}: {
-  title: string;
-  items: QuickViewStatItem[];
-  onExplore?: (target: ExplorerTarget) => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  if (!items.length) return null;
-  return (
-    <View style={styles.statGroup}>
-      <AppText style={styles.groupTitle}>{title}</AppText>
-      <View style={styles.tileGrid}>
-        {items.map((item) => {
-          // Tiles that carry a percentile open the Percentile Explorer, same
-          // as web's StatGroup and Player Detail.
-          const key = onExplore && item.percentile != null ? explorerStatKey(item.label) : null;
-          return (
-            <MetricCard
-              key={item.label}
-              label={item.label}
-              value={item.value || null}
-              percentile={item.percentile ?? null}
-              onPress={key && onExplore ? () => onExplore({ key, label: item.label }) : undefined}
-            />
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -343,19 +312,12 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
             ) : (
               <View style={styles.body}>
                 {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
+                <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} onExplore={setExplorer} />
                 <View style={styles.section}>
                   <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
                 </View>
-                {(stats?.seasons ?? []).map((seasonItem) => (
-                  <View key={seasonItem.label} style={styles.section}>
-                    <SectionHeading
-                      title={`${seasonItem.label}${seasonItem.games != null ? ` · ${seasonItem.games} games` : ''}`}
-                    />
-                    {seasonStatGroups(seasonItem).map((group) => (
-                      <StatTiles key={group.title} title={group.title} items={group.items} onExplore={setExplorer} />
-                    ))}
-                  </View>
-                ))}
+                <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
+                <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
                 {stats && stats.college.length > 0 ? (
                   <View style={styles.section}>
                     <SectionHeading title="College" />

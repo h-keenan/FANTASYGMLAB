@@ -8,6 +8,10 @@ import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse 
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
+import { PlayerUsageBlock } from "@/components/PlayerUsageBlock";
+import { SeasonStatsRows } from "@/components/SeasonStatsRows";
+import { HeadlineTiles } from "@/components/StatRows";
+import { headlineRows } from "@/lib/statRowsPresentation";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerValueHistory } from "@/components/PlayerValueHistory";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
@@ -302,23 +306,17 @@ export function PlayerQuickView({
             <>
               {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
 
+              <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
+
               <PlayerTrendsPanel
                 playerId={identity.player_id}
                 name={identity.name || "This player"}
                 gradientId="pqv-weekly-fill"
               />
 
-              {stats?.seasons.map((season) => (
-                <section key={season.label} className="pqv-stat-season">
-                  <h3>
-                    {season.label}
-                    {season.games != null ? ` · ${season.games} games` : ""}
-                  </h3>
-                  {seasonStatGroups(season).map((group) => (
-                    <StatGroup key={group.title} title={group.title} items={group.items} playerId={identity.player_id} />
-                  ))}
-                </section>
-              ))}
+              <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
+
+              <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
 
               {stats && stats.college.length > 0 ? (
                 <section className="pqv-stat-season">
