@@ -23,10 +23,13 @@ import {
   CONFIDENCE_LABEL,
   DRAFT_ORDER_OPTIONS,
   INTERPRETATION_LABEL,
+  calendarLines,
   integrityReasonMessage,
   integritySummaryLine,
+  restSummary,
   splitTeams,
   type CommissionerIntegrityResponse,
+  type IntegrityCalendar,
   type DraftOrderRule,
   type IntegrityBand,
   type IntegrityCollusionPair,
@@ -85,7 +88,12 @@ export default function CommissionerScreen({ route, navigation }: Props) {
       />
     );
   } else if (data.reason) {
-    body = <EmptyState icon="shield-checkmark-outline" title="Nothing to show yet" subtitle={integrityReasonMessage(data.reason)} />;
+    body = (
+      <View style={styles.stack}>
+        <EmptyState icon="shield-checkmark-outline" title="Nothing to show yet" subtitle={integrityReasonMessage(data.reason)} />
+        <CalendarCard calendar={data.calendar} accent={colors.accent} styles={styles} />
+      </View>
+    );
   } else {
     body = <IntegrityBody data={data} draftOrder={draftOrder} onDraftOrder={setDraftOrder} toneColor={toneColor} styles={styles} />;
   }
@@ -205,6 +213,7 @@ function IntegrityBody({
   return (
     <View style={styles.stack}>
       <AppText style={styles.body}>{integritySummaryLine(data)}</AppText>
+      <CalendarCard calendar={data.calendar} accent={colors.accent} styles={styles} />
       <View style={styles.bullets}>
         <AppText style={styles.bulletsTitle}>How is your draft order set?</AppText>
         <SegmentedTabBar
@@ -229,8 +238,8 @@ function IntegrityBody({
       {data.collusion.length ? (
         <View style={styles.stack}>
           <SectionHeading
-            title="Repeated lopsided trades"
-            caption="Same two managers, repeated one-sided trades. Picks are not valued, so trades with picks are never flagged."
+            title="Repeated trades worth a look"
+            caption="Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict."
           />
           {data.collusion.map((pair) => (
             <CollusionCard key={pair.roster_ids.join('-')} pair={pair} toneColor={toneColor} styles={styles} />
@@ -249,10 +258,15 @@ function IntegrityBody({
 
       {rest.length ? (
         <View style={styles.stack}>
-          <SectionHeading title="Everyone else" />
-          <TouchableOpacity onPress={() => setShowRest((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showRest }}>
-            <AppText style={styles.link}>{showRest ? 'Hide teams' : `Show ${rest.length} team${rest.length === 1 ? '' : 's'}`}</AppText>
-          </TouchableOpacity>
+          <SectionHeading title={flagged.length ? 'Everyone else' : 'Team lineups'} />
+          <AccentCard accent={colors.success}>
+            <View style={styles.cardHead}>
+              <AppText style={[styles.teamName, styles.flex, { color: colors.success }]}>{restSummary(data.teams, flagged.length)}</AppText>
+              <TouchableOpacity onPress={() => setShowRest((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showRest }}>
+                <AppText style={styles.link}>{showRest ? 'Hide teams' : `Show ${rest.length} team${rest.length === 1 ? '' : 's'}`}</AppText>
+              </TouchableOpacity>
+            </View>
+          </AccentCard>
           {showRest
             ? rest.map((team) => <TeamCard key={team.roster_id} team={team} toneColor={toneColor} colors={colors} styles={styles} />)
             : null}
@@ -261,6 +275,29 @@ function IntegrityBody({
 
       {data.limits?.length ? <Bullets title="What this can and can't tell you" items={data.limits} styles={styles} /> : null}
     </View>
+  );
+}
+
+function CalendarCard({
+  calendar,
+  accent,
+  styles,
+}: {
+  calendar: IntegrityCalendar | null | undefined;
+  accent: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const lines = calendarLines(calendar);
+  if (!lines.length) return null;
+  return (
+    <AccentCard accent={accent}>
+      <AppText style={styles.bulletsTitle}>League calendar</AppText>
+      {lines.map((line) => (
+        <AppText key={line} style={styles.body}>
+          {line}
+        </AppText>
+      ))}
+    </AccentCard>
   );
 }
 
@@ -277,13 +314,12 @@ function CollusionCard({
     <AccentCard accent={toneColor(pair.band)}>
       <View style={styles.cardHead}>
         <AppText style={[styles.teamName, styles.flex]}>
-          {pair.giver_name} and {pair.beneficiary_name}
+          {pair.headline}
         </AppText>
         <ToneBadge label={BAND_LABEL[pair.band]} color={toneColor(pair.band)} />
       </View>
       <AppText style={styles.body}>
-        {pair.trades_between} trades between them; {pair.lopsided_same_direction} lopsided in {pair.beneficiary_name}&rsquo;s favor ·{' '}
-        {CONFIDENCE_LABEL[pair.confidence]}
+        {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
       </AppText>
       <Bullets title="Evidence" items={pair.evidence} styles={styles} />
       <Bullets title="Could be innocent" items={pair.innocent_explanations} styles={styles} />

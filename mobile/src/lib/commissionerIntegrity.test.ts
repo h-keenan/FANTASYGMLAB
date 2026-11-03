@@ -6,7 +6,9 @@ import test from 'node:test';
 import {
   bandTone,
   integrityReasonMessage,
+  calendarLines,
   integritySummaryLine,
+  restSummary,
   splitTeams,
   type CommissionerIntegrityResponse,
   type IntegrityTeam,
@@ -56,4 +58,20 @@ test('summary is calm and flagged teams come first', () => {
 test('reasons have honest copy', () => {
   assert.match(integrityReasonMessage('not_enough_weeks'), /three completed/);
   assert.match(integrityReasonMessage('weird'), /not available/);
+});
+
+test('restSummary is one line for a clean league and counts the rest otherwise', () => {
+  const teams = Array.from({ length: 12 }, (_, i) => team('fine', i + 1));
+  assert.equal(restSummary(teams, 0), 'All 12 teams look fine this week');
+  assert.equal(
+    restSummary([team('strong', 1), team('fine', 2), team('not_enough_data', 3)], 1),
+    '1 other team looks fine this week; 1 without enough weeks yet',
+  );
+});
+
+test('calendarLines shows deadline phase and playoff start', () => {
+  const base = { trade_deadline_week: 11, current_week: 8, trade_deadline_passed: false, weeks_to_deadline: 3, deadline_phase: 'open' as const, playoff_week_start: 15, regular_season_weeks: 14, in_season: true };
+  assert.deepEqual(calendarLines(base), ['Week 8 now', 'Trade deadline: after week 11 (3 weeks left)', 'Playoffs start week 15']);
+  assert.ok(calendarLines({ ...base, deadline_phase: 'passed', trade_deadline_passed: true })[1].includes('passed'));
+  assert.deepEqual(calendarLines(null), []);
 });

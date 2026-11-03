@@ -86,6 +86,10 @@ LOPSIDED_BAND_IDS = {"decline", "hard"}  # trade_value_bands ladder
 COLLUSION_MIN_TRADES = 2
 COLLUSION_MIN_LOPSIDED = 2
 COLLUSION_STRONG_LOPSIDED = 3
+COLLUSION_MIN_REPEAT_TRADES = 3  # round-trip / same-week bursts need 3 trades between a pair
+COLLUSION_MIN_RETURNED_ASSETS = 2  # ...and 2 assets that went back and forth
+COLLUSION_RETURN_WINDOW_MS = 14 * 24 * 3600 * 1000  # a return only counts when it follows within 14 days
+COLLUSION_RETURN_WINDOW_WEEKS = 2  # ...or within 2 weeks when Sleeper gave no timestamp
 INACTIVE_MIN_WEEKS = 4  # identical lineup + no moves for N weeks
 
 NON_STARTING_SLOTS = {"BN", "IR", "TAXI"}
@@ -119,7 +123,8 @@ LIMITS = [
     "Sleeper's public API does not say who was injured or inactive in a past week. We exclude bye weeks and "
     "players who scored zero, but a late scratch can still look like a lineup mistake.",
     "Sleeper does not publish your league's draft-order rule, so context defaults to \"unknown\" unless you set it.",
-    "Trade value uses current player values and does not price draft picks, so trades involving picks are never "
+    "Trade value uses current player values and the same round-level pick prices as the Trade Analyzer, not the "
+    "values at trade time or the exact draft slot. Three-team trades and trades with an unpriced asset are never "
     "scored as lopsided.",
     "Lineup history is read from each week's saved Sleeper matchup. Playoff weeks are excluded, so toilet-bowl "
     "and consolation brackets are never counted.",
@@ -430,23 +435,55 @@ def _context_multiplier(state: str, draft_rule: str) -> float:
 # Trades
 # ---------------------------------------------------------------------------
 
-def _asset_value(asset: Mapping[str, Any], values: Mapping[str, Mapping[str, Any]]) -> float | None:
+def _canonical_pick_value(asset: Mapping[str, Any]) -> float | None:
+    """The one pick price source: the canonical pick table the Trade Analyzer
+    and History grades share (``trade_ideas.canonical_pick_identity_value``).
+
+    Retrospective pricing is round-level (mid slot): a past trade's exact slot
+    and class are not known, so this never invents more precision."""
+
+    from modules.trade_ideas import canonical_pick_identity_value
+
+    value = canonical_pick_identity_value(asset)
+    return float(value) if value and value > 0 else None
+
+
+def _asset_value(
+    asset: Mapping[str, Any],
+    values: Mapping[str, Mapping[str, Any]],
+    pick_value: Callable[[Mapping[str, Any]], float | None] = _canonical_pick_value,
+) -> float | None:
+    if asset.get("kind") == "pick":
+        return pick_value(asset)
     if asset.get("kind") != "player":
         return None
     row = values.get(str(asset.get("player_id")))
     return _num((row or {}).get("value_score")) if row else None
 
 
+def _asset_key(asset: Mapping[str, Any]) -> str:
+    if asset.get("kind") == "pick":
+        return f"pick:{asset.get('season')}:{asset.get('round')}:{asset.get('original_roster_id') or ''}"
+    return f"player:{asset.get('player_id')}"
+
+
+def _asset_name(asset: Mapping[str, Any]) -> str:
+    return str(asset.get("name") or asset.get("label") or asset.get("player_id") or "asset")
+
+
 def trade_legs(
     transactions: Iterable[Mapping[str, Any]],
     values: Mapping[str, Mapping[str, Any]],
+    pick_value: Callable[[Mapping[str, Any]], float | None] = _canonical_pick_value,
 ) -> list[dict[str, Any]]:
-    """Two-party player-for-player trades with a value delta per side.
+    """Two-party trades with a value delta per side.
 
     ``delta`` is value received minus value sent, in the same units as the
-    trade engine's score ladder (modules.trade_value_bands). Trades involving
-    picks, three-way trades, or any unvalued player are returned with
-    ``valued=False`` and are never scored.
+    trade engine's score ladder (modules.trade_value_bands). Draft picks are
+    priced from the canonical pick table (one source, same as the Trade
+    Analyzer's pick prices). Three-way trades, trades whose picks cannot all be
+    matched to a side, and any trade with an unvalued asset are returned with
+    ``valued=False`` and are never scored for value.
     """
 
     out: list[dict[str, Any]] = []
@@ -455,23 +492,37 @@ def trade_legs(
             continue
         sides = [s for s in (tx.get("sides") or []) if isinstance(s, Mapping)]
         roster_ids = [_int(s.get("roster_id")) for s in sides]
-        has_picks = bool(tx.get("draft_picks"))
+        raw_picks = tx.get("draft_picks") or []
+        has_picks = bool(raw_picks)
+        # Picks live on the receiving side's ``receives``; the sender is the
+        # asset's ``from_roster_id``. Every pick on the transaction must be
+        # found on a side, otherwise the trade is not scored.
+        pick_assets = [
+            a for s in sides for a in (s.get("receives") or [])
+            if isinstance(a, Mapping) and a.get("kind") == "pick"
+        ]
+        valued = len(sides) == 2 and len(pick_assets) == len(raw_picks)
         legs: dict[int, dict[str, Any]] = {}
-        valued = len(sides) == 2 and not has_picks
         for side, rid in zip(sides, roster_ids):
-            got = [_asset_value(a, values) for a in side.get("receives") or [] if isinstance(a, Mapping)]
-            sent = [_asset_value(a, values) for a in side.get("drops") or [] if isinstance(a, Mapping)]
+            got_assets = [a for a in side.get("receives") or [] if isinstance(a, Mapping)]
+            sent_assets = [a for a in side.get("drops") or [] if isinstance(a, Mapping)]
+            sent_assets += [a for a in pick_assets if _int(a.get("from_roster_id")) == rid]
+            got = [_asset_value(a, values, pick_value) for a in got_assets]
+            sent = [_asset_value(a, values, pick_value) for a in sent_assets]
             if any(v is None for v in got) or any(v is None for v in sent) or not got or not sent:
                 valued = False
             legs[rid] = {
                 "received": sum(v for v in got if v is not None),
                 "sent": sum(v for v in sent if v is not None),
-                "received_names": [str(a.get("name") or a.get("player_id")) for a in side.get("receives") or [] if isinstance(a, Mapping)],
-                "sent_names": [str(a.get("name") or a.get("player_id")) for a in side.get("drops") or [] if isinstance(a, Mapping)],
+                "received_names": [_asset_name(a) for a in got_assets],
+                "sent_names": [_asset_name(a) for a in sent_assets],
+                "received_keys": [_asset_key(a) for a in got_assets],
+                "sent_keys": [_asset_key(a) for a in sent_assets],
             }
         out.append({
             "transaction_id": tx.get("transaction_id"),
             "week": _int(tx.get("week")),
+            "timestamp": _int(tx.get("timestamp")),
             "roster_ids": roster_ids,
             "valued": valued,
             "has_picks": has_picks,
@@ -496,7 +547,50 @@ def _lopsided_losers(legs: Sequence[Mapping[str, Any]]) -> list[tuple[int, int, 
     return result
 
 
+def _back_and_forth(trades: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Assets that moved between the same two managers and then came back soon.
+
+    ``trades`` are all the two-party trades between one pair, in time order.
+    An asset's moves are the rosters that received it. A move counts as a
+    return only when the asset goes to the other manager and the previous move
+    was recent (within 14 days, or 2 weeks when there is no timestamp):
+    buying a pick back a month later is ordinary trading. Returns
+    ``{"name", "moves"}`` for assets that were returned at least once.
+    """
+
+    moves: dict[str, list[tuple[int, int, int]]] = {}
+    names: dict[str, str] = {}
+    for trade in trades:
+        for rid, leg in trade["legs"].items():
+            for key, name in zip(leg["received_keys"], leg["received_names"]):
+                moves.setdefault(key, []).append((rid, _int(trade.get("timestamp")), _int(trade.get("week"))))
+                names[key] = name
+    result = []
+    for key, seq in moves.items():
+        returns = 0
+        for (r0, t0, w0), (r1, t1, w1) in zip(seq, seq[1:]):
+            if r0 == r1:
+                continue
+            recent = (t1 - t0) <= COLLUSION_RETURN_WINDOW_MS if (t0 > 0 and t1 > 0) else (w1 - w0) <= COLLUSION_RETURN_WINDOW_WEEKS
+            if recent:
+                returns += 1
+        if returns:
+            result.append({"name": names[key], "moves": len(seq)})
+    return result
+
+
 def collusion_pairs(legs: Sequence[Mapping[str, Any]], team_names: Mapping[str, str]) -> list[dict[str, Any]]:
+    """Pairs of managers whose trades are worth a look.
+
+    Three independent patterns, none of which is a verdict:
+    * ``lopsided``: the same manager wins on value >= 2 times (picks priced
+      from the canonical pick table); 3+ is "Strong signals".
+    * ``round_trip``: >= 3 trades between the pair and >= 2 assets that went
+      back and forth between them (value deltas cancel, so lopsided misses it).
+    * ``burst``: >= 3 trades between the pair within one in-season week
+      (week 1 holds all offseason trades, so it never counts as a burst).
+    """
+
     by_pair: dict[tuple[int, int], list[Mapping[str, Any]]] = {}
     for trade in legs:
         if len(trade["roster_ids"]) == 2:
@@ -506,6 +600,7 @@ def collusion_pairs(legs: Sequence[Mapping[str, Any]], team_names: Mapping[str, 
     for (a, b), trades in by_pair.items():
         if len(trades) < COLLUSION_MIN_TRADES:
             continue
+        trades = sorted(trades, key=lambda t: (t["week"], t["timestamp"]))
         # Same direction: the same manager is the repeated winner.
         wins: dict[int, list[tuple[int, float, dict[str, Any]]]] = {a: [], b: []}
         for loser, winner, delta, trade in lopsided:
@@ -513,38 +608,66 @@ def collusion_pairs(legs: Sequence[Mapping[str, Any]], team_names: Mapping[str, 
                 wins[winner].append((loser, delta, trade))
         beneficiary = max(wins, key=lambda r: len(wins[r]))
         count = len(wins[beneficiary])
-        if count < COLLUSION_MIN_LOPSIDED:
+        has_lopsided = count >= COLLUSION_MIN_LOPSIDED
+        returned = _back_and_forth(trades)
+        has_round_trip = len(trades) >= COLLUSION_MIN_REPEAT_TRADES and len(returned) >= COLLUSION_MIN_RETURNED_ASSETS
+        per_week: dict[int, int] = {}
+        for t in trades:
+            if t["week"] > 1:
+                per_week[t["week"]] = per_week.get(t["week"], 0) + 1
+        burst_weeks = sorted(w for w, n in per_week.items() if n >= COLLUSION_MIN_REPEAT_TRADES)
+        has_burst = bool(burst_weeks)
+        if not (has_lopsided or has_round_trip or has_burst):
             continue
+        name_a, name_b = team_names.get(str(a), f"Team {a}"), team_names.get(str(b), f"Team {b}")
+        patterns = [p for p, on in (("lopsided", has_lopsided), ("round_trip", has_round_trip), ("burst", has_burst)) if on]
         giver = b if beneficiary == a else a
-        band = BAND_STRONG if count >= COLLUSION_STRONG_LOPSIDED else BAND_LOOK
-        lines = []
-        for _, delta, trade in sorted(wins[beneficiary], key=lambda x: x[1]):
-            leg = trade["legs"][giver]
-            label = trade_value_bands.band_for_score(delta).direction_label.replace("against you", "against them")
+        lines: list[str] = []
+        if has_lopsided:
+            for _, delta, trade in sorted(wins[beneficiary], key=lambda x: x[1]):
+                leg = trade["legs"][giver]
+                label = trade_value_bands.band_for_score(delta).direction_label.replace("against you", "against them")
+                lines.append(
+                    f"Week {trade['week']}: {team_names.get(str(giver), 'Team')} sent "
+                    f"{', '.join(leg['sent_names'][:3])} for {', '.join(leg['received_names'][:3])} ({label})."
+                )
+        if has_round_trip:
+            shown = ", ".join(r["name"] for r in returned[:3])
             lines.append(
-                f"Week {trade['week']}: {team_names.get(str(giver), 'Team')} sent "
-                f"{', '.join(leg['sent_names'][:3])} for {', '.join(leg['received_names'][:3])} ({label})."
+                f"{len(returned)} asset{'s' if len(returned) != 1 else ''} went back and forth between them "
+                f"across {len(trades)} trades ({shown})."
             )
+        for w in burst_weeks:
+            lines.append(f"{per_week[w]} trades between them in week {w}.")
+        strong = has_lopsided and count >= COLLUSION_STRONG_LOPSIDED
+        band = BAND_STRONG if strong else BAND_LOOK
+        if has_lopsided:
+            summary = f"{len(trades)} trades between them; {count} lopsided in {team_names.get(str(beneficiary), f'Team {beneficiary}')}\u2019s favor"
+        else:
+            summary = f"{len(trades)} trades between them with a repeating pattern worth a look"
         pairs.append({
             "roster_ids": [a, b],
-            "beneficiary_roster_id": beneficiary,
-            "giver_roster_id": giver,
-            "beneficiary_name": team_names.get(str(beneficiary), f"Team {beneficiary}"),
-            "giver_name": team_names.get(str(giver), f"Team {giver}"),
+            "beneficiary_roster_id": beneficiary if has_lopsided else None,
+            "giver_roster_id": giver if has_lopsided else None,
+            "beneficiary_name": team_names.get(str(beneficiary), f"Team {beneficiary}") if has_lopsided else name_a,
+            "giver_name": team_names.get(str(giver), f"Team {giver}") if has_lopsided else name_b,
+            "headline": f"{name_a} and {name_b}",
+            "summary": summary,
+            "patterns": patterns,
             "trades_between": len(trades),
-            "lopsided_same_direction": count,
+            "lopsided_same_direction": count if has_lopsided else 0,
             "band": band,
             "band_label": BAND_LABELS[band],
-            "confidence": "medium" if count >= COLLUSION_STRONG_LOPSIDED else "low",
+            "confidence": "medium" if strong else "low",
             "evidence": lines,
             "innocent_explanations": [
                 "The two managers are friends or family and trade often.",
                 "One side is rebuilding and the other contending, so value is not the only goal.",
-                "Current values can miss injuries, scarcity or league-specific scoring.",
-                "Draft picks, which this check does not price, may have changed hands off-platform.",
+                "A trade can be undone or reworked, which looks like assets going back and forth.",
+                "Current values can miss injuries, scarcity or league-specific scoring, and pick prices are typical for the round, not the exact slot.",
             ],
         })
-    pairs.sort(key=lambda p: (-p["lopsided_same_direction"], -p["trades_between"]))
+    pairs.sort(key=lambda p: (p["band"] != BAND_STRONG, -p["lopsided_same_direction"], -p["trades_between"]))
     return pairs
 
 

@@ -40,10 +40,15 @@ export interface IntegrityTeam {
   series: IntegritySeriesPoint[];
 }
 
+export type IntegrityTradePattern = "lopsided" | "round_trip" | "burst";
+
 export interface IntegrityCollusionPair {
   roster_ids: number[];
   beneficiary_name: string;
   giver_name: string;
+  headline: string;
+  summary: string;
+  patterns: IntegrityTradePattern[];
   trades_between: number;
   lopsided_same_direction: number;
   band: IntegrityBand;
@@ -61,6 +66,17 @@ export interface IntegrityInactiveManager {
   innocent_explanations: string[];
 }
 
+export interface IntegrityCalendar {
+  trade_deadline_week: number | null;
+  current_week: number | null;
+  trade_deadline_passed: boolean;
+  weeks_to_deadline: number | null;
+  deadline_phase: "none" | "open" | "final_week" | "passed";
+  playoff_week_start: number | null;
+  regular_season_weeks: number | null;
+  in_season: boolean;
+}
+
 export interface CommissionerIntegrityResponse {
   ok: boolean;
   reason: string;
@@ -75,6 +91,7 @@ export interface CommissionerIntegrityResponse {
   inactive: IntegrityInactiveManager[];
   summary?: Record<IntegrityBand, number>;
   limits?: string[];
+  calendar?: IntegrityCalendar | null;
 }
 
 export const DRAFT_ORDER_OPTIONS: { value: DraftOrderRule; label: string }[] = [
@@ -145,8 +162,40 @@ export function integritySummaryLine(resp: CommissionerIntegrityResponse): strin
   }
   const parts: string[] = [];
   if (flagged.length) parts.push(`${flagged.length} team${flagged.length === 1 ? "" : "s"} worth a look`);
-  if (resp.collusion.length) parts.push(`${resp.collusion.length} repeated lopsided trade pair${resp.collusion.length === 1 ? "" : "s"}`);
+  if (resp.collusion.length) parts.push(`${resp.collusion.length} trade pair${resp.collusion.length === 1 ? "" : "s"} worth a look`);
   if (resp.inactive.length) parts.push(`${resp.inactive.length} possibly inactive manager${resp.inactive.length === 1 ? "" : "s"}`);
   return `After ${weeks} week${weeks === 1 ? "" : "s"}: ${parts.join(", ")}. These are prompts to check, not conclusions.`;
+}
+/** Short summary for the teams with no flag, so a clean league is one line, not a wall of identical cards. */
+export function restSummary(teams: IntegrityTeam[], flaggedCount: number): string {
+  const { rest } = splitTeams(teams);
+  if (!rest.length) return "";
+  const fine = rest.filter((t) => t.band === "fine").length;
+  const early = rest.length - fine;
+  if (flaggedCount === 0 && early === 0) return `All ${teams.length} teams look fine this week`;
+  const head = fine === 1 ? "1 other team looks fine this week" : `${fine} other teams look fine this week`;
+  return early ? `${head}; ${early} without enough weeks yet` : head;
+}
+
+/** League calendar facts (trade deadline, playoffs) as short lines; never guessed, only what Sleeper settings say. */
+export function calendarLines(cal: IntegrityCalendar | null | undefined): string[] {
+  if (!cal) return [];
+  const lines: string[] = [];
+  if (cal.current_week && cal.in_season) lines.push(`Week ${cal.current_week} now`);
+  const d = cal.trade_deadline_week;
+  if (d == null) {
+    lines.push("No trade deadline set");
+  } else if (cal.deadline_phase === "passed") {
+    lines.push(`Trade deadline passed (after week ${d}); trades reopen after the season`);
+  } else if (cal.deadline_phase === "final_week") {
+    lines.push(`Trade deadline is this week (week ${d}): last call`);
+  } else if (cal.deadline_phase === "open" && cal.weeks_to_deadline != null) {
+    const n = cal.weeks_to_deadline;
+    lines.push(`Trade deadline: after week ${d} (${n} week${n === 1 ? "" : "s"} left)`);
+  } else {
+    lines.push(`Trade deadline: after week ${d}`);
+  }
+  if (cal.playoff_week_start) lines.push(`Playoffs start week ${cal.playoff_week_start}`);
+  return lines;
 }
 // SHARED END
