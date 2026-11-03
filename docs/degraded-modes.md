@@ -18,3 +18,12 @@ Not-yet-done follow-ups: a dedicated "limited data" chip in web/mobile (the
 Analyzer shows it today through the existing assumptions line);
 `trade_hub_engine._apply_keeper_context` / `_keeper_context_for_league` still
 fail open for the Hub's keeper context.
+
+## Waivers: needs and suggested drops
+
+| Code | Where it comes from | Surfaced on |
+|---|---|---|
+| `need_model_failed` | `roster_value_model` could not be built for the roster (expected data/lookup error); Waivers falls back to the legacy coverage check | Waivers `model_status`, "Limited data" line |
+| `untouchable_lookup_failed` | GM Targets could not be read, so an untouchable player could be named; no drops are suggested | Waivers `model_status` |
+| `drop_model_failed` | The drop engine raised an expected data/lookup error | Waivers `model_status` |
+| `usage_trends_unavailable` | Weekly stats not loaded in season, so the hot-streak guard was not applied | Waivers `model_status` |

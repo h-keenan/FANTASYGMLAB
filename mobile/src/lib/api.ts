@@ -1289,6 +1289,8 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
   // usage_flag_status says why usage_flag is null ("unavailable" = no weekly stats loaded).
   usage_flag?: Pick<UsageFlag, 'key' | 'label' | 'tone' | 'explanation'> | null;
   usage_flag_status?: string;
+  /** "Add X, drop Y" (modules.drop_candidates). Absent when drops could not be computed: see model_status. */
+  drop_suggestion?: DropSuggestion;
 }
 
 // Shared shape for every endpoint that gates part of its own response by
@@ -1296,6 +1298,120 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
 // gates, not just a UI hint.
 export interface EntitlementGateInfo {
   is_premium: boolean;
+}
+
+/** modules.model_status payload: which degraded path (if any) produced an answer. */
+export interface ModelStatus {
+  degraded: boolean;
+  reasons: { code: string; message: string }[];
+}
+
+/** modules.roster_value_model.RosterLimits.to_public: the real roster shape. */
+export interface RosterState {
+  active_limit: number | null;
+  active_count: number;
+  open_spots: number | null;
+  is_full: boolean;
+  reserve_slots: number;
+  reserve_used: number;
+  taxi_slots: number;
+  taxi_used: number;
+}
+
+export interface DropEffect {
+  /** Expected lineup points over the rest of the season (negative = loses points). */
+  lineup_points_ros: number;
+  lineup_points_per_week: number;
+  this_week: number;
+  /** Market value change (add minus drop), healthy-equivalent. */
+  value_delta: number;
+  score: number;
+  weeks: number;
+}
+
+export interface DropPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  status: string;
+  injury_status: string;
+  value: number;
+  start_share: number;
+  usage_flag: string | null;
+  reasons: string[];
+  effect: DropEffect;
+  action?: "drop" | "move_to_ir";
+  why?: string;
+  /** Standalone list only: the adds whose card names this player as the cut. */
+  named_for?: string[];
+}
+
+/** "Add X, drop Y" for one waiver target (modules.drop_candidates.suggest_drop_for_add). */
+export interface DropSuggestion {
+  status: string;
+  add: { player_id: string; name: string; position: string };
+  roster: RosterState;
+  /** False when a roster spot is open (no drop needed); null when the league's roster limit is unknown. */
+  drop_required: boolean | null;
+  drop: DropPlayer | null;
+  alternatives: DropPlayer[];
+  no_good_drop: boolean;
+  cheapest?: DropPlayer | null;
+  why: string;
+  protected_count?: number;
+}
+
+/** "Players you could drop", worst first (modules.drop_candidates.droppable_players). */
+export interface DroppablePlayers {
+  players: DropPlayer[];
+  total: number;
+  protected_count: number;
+  candidates_checked: number;
+  /** Players hidden behind Premium (Free sees the first few). */
+  locked_count: number;
+  roster?: RosterState;
+}
+
+export interface NeedsSlotRank {
+  slot: string;
+  rank: number;
+  of: number;
+  pct: number;
+  ppg: number;
+}
+
+export interface NeedsPosition {
+  position: string;
+  tier: "primary" | "secondary" | "watch" | "covered";
+  score: number;
+  starters: number;
+  weakest_slot: NeedsSlotRank;
+  slot_ranks: NeedsSlotRank[];
+  upgrade: { ppw: number; ros: number; name: string; player_id: string; ppg: number | null };
+  healthy_count: number;
+  required_depth: number;
+  depth_short: number;
+  injured_starters: string[];
+  aging_starters: string[];
+  future_gap: boolean;
+  reasons: string[];
+}
+
+/** modules.roster_value_model.assess_needs: per-position needs with the numbers behind them. */
+export interface NeedsModel {
+  model_version: string;
+  needed_positions: string[];
+  biggest_need: string | null;
+  weakest_position: string | null;
+  no_need: boolean;
+  headline: string;
+  positions: NeedsPosition[];
+  league_size: number;
+  basis: string;
+  dynasty: boolean;
+  model_status: ModelStatus;
 }
 
 export interface WaiversResponse {
@@ -1321,6 +1437,11 @@ export interface WaiversResponse {
   watchlist_candidates: WaiverPlayer[];
   faab_targets: WaiverPlayer[];
   entitlement: EntitlementGateInfo;
+  /** Shared roster-value model (modules.roster_value_model). Null when it failed: see model_status. */
+  needs_model?: NeedsModel | null;
+  roster_state?: RosterState | null;
+  droppable_players?: DroppablePlayers | null;
+  model_status?: ModelStatus;
   reason: string;
 }
 

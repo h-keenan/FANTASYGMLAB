@@ -43,7 +43,9 @@ import WaiverRecommendationCard, {
   waiverOpponentContextColor,
   waiverTrendingAddLabel,
 } from '../components/WaiverRecommendationCard';
-import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
+import { api, type DroppablePlayers, type ModelStatus, type NeedsModel, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
+import { DroppablePlayersSection, needsBreakdownText } from '../components/SuggestedDrop';
+import { limitedDataNote, needsHeadline, teamNeedStat } from '../lib/dropsPresentation';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isIdpPositionFilter, withIdpPositionOptions } from '../lib/idpPresentation';
@@ -128,6 +130,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [defenseSlotOpen, setDefenseSlotOpen] = useState(false);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [neededPositions, setNeededPositions] = useState<string[]>([]);
+  const [needsModel, setNeedsModel] = useState<NeedsModel | null>(null);
+  const [droppable, setDroppable] = useState<DroppablePlayers | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [stashCandidates, setStashCandidates] = useState<WaiverPlayer[]>([]);
   const [watchlistCandidates, setWatchlistCandidates] = useState<WaiverPlayer[]>([]);
   const [faabTargets, setFaabTargets] = useState<WaiverPlayer[]>([]);
@@ -176,6 +181,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
           setDefenseSlotOpen(result.team_defense?.empty_slot === true);
           setPriorityAdds(result.priority_adds);
           setNeededPositions(result.needed_positions);
+          setNeedsModel(result.needs_model ?? null);
+          setDroppable(result.droppable_players ?? null);
+          setModelStatus(result.model_status ?? null);
           setStashCandidates(result.stash_candidates);
           setWatchlistCandidates(result.watchlist_candidates);
           setFaabTargets(result.faab_targets);
@@ -348,7 +356,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
         items={[
           { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
           { label: stats.faabLabel, value: stats.faab },
-          { label: 'Team need', value: neededPositions.length > 0 ? neededPositions.join('/') : 'None' },
+          { label: 'Team need', value: teamNeedStat({ needs_model: needsModel, needed_positions: neededPositions }) },
         ]}
       />
       <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
@@ -402,6 +410,17 @@ export default function WaiversScreen({ route, navigation }: Props) {
           ListHeaderComponent={
             tab === 'recommended' ? (
               <View>
+                <AppText style={styles.needsHeadline} testID="needs-headline">
+                  {needsHeadline({ needs_model: needsModel, needed_positions: neededPositions })}
+                </AppText>
+                {needsModel ? (
+                  <ScreenInfoNote label="How we read your needs" text={needsBreakdownText(needsModel)} />
+                ) : null}
+                {limitedDataNote(modelStatus) ? (
+                  <AppText style={styles.limitedNote} testID="limited-data-note">
+                    {limitedDataNote(modelStatus)}
+                  </AppText>
+                ) : null}
                 {topPriority ? (
                   <View style={styles.sectionBlock}>
                     <SectionHeading title="Top Waiver Target" caption={priorityCaption} />
@@ -443,6 +462,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
                         ))}
                       </AnimatedCard>
                     )}
+                  </View>
+                ) : null}
+                {droppable ? (
+                  <View style={styles.sectionBlock}>
+                    <SectionHeading title="Players you could drop" />
+                    <DroppablePlayersSection data={droppable} />
                   </View>
                 ) : null}
                 {bestAvailable.length > 0 ? (
@@ -829,6 +854,8 @@ function createStyles(colors: ThemeColors) {
   loading: { marginTop: spacing.xl },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   sectionBlock: { marginBottom: spacing.lg },
+  needsHeadline: { fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginBottom: spacing.xs },
+  limitedNote: { fontSize: 12, lineHeight: 16, color: colors.warning, marginBottom: spacing.sm },
   compactGroupCard: { marginTop: spacing.sm, padding: spacing.sm },
   bestAvailableRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   bestAvailableCard: {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WaiversContent } from "./WaiversContent";
 import { api } from "@/lib/api";
-import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
+import type { DropSuggestion, NeedsModel, WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 
 function player(overrides: Partial<WaiverPlayer>): WaiverPlayer {
   return {
@@ -61,6 +61,49 @@ const BASE_RESPONSE: WaiversResponse = {
   entitlement: { is_premium: true },
 };
 
+const DROP_EFFECT = { lineup_points_ros: 4.2, lineup_points_per_week: 0.5, this_week: 0.4, value_delta: 1263, score: 1500, weeks: 9 };
+
+const DROP_SUGGESTION: DropSuggestion = {
+  status: "ok",
+  add: { player_id: "p1", name: "Test Free Agent", position: "RB" },
+  roster: { active_limit: 22, active_count: 22, open_spots: 0, is_full: true, reserve_slots: 3, reserve_used: 1, taxi_slots: 0, taxi_used: 0 },
+  drop_required: true,
+  drop: {
+    player_id: "d1", name: "Dead Weight", position: "WR", team: "NYJ", age: 31, status: "Active", injury_status: "", value: 300,
+    start_share: 0, usage_flag: null, reasons: ["never starts in your best lineup", "low trade/dynasty value"], effect: DROP_EFFECT, action: "drop",
+  },
+  alternatives: [
+    {
+      player_id: "d2", name: "Bench Guy", position: "TE", team: "DEN", age: 29, status: "Active", injury_status: "", value: 500,
+      start_share: 0, usage_flag: null, reasons: ["never starts in your best lineup"], effect: { ...DROP_EFFECT, lineup_points_ros: 0, value_delta: 700 }, action: "drop",
+    },
+  ],
+  no_good_drop: false,
+  why: "Add Test Free Agent, drop Dead Weight.",
+};
+
+const NEEDS_MODEL: NeedsModel = {
+  model_version: "roster-value-v1",
+  needed_positions: ["WR"],
+  biggest_need: "WR",
+  weakest_position: "WR",
+  no_need: false,
+  headline: "Biggest need: WR — your WR3 is 8th of 12.",
+  league_size: 12,
+  basis: "in_season",
+  dynasty: true,
+  model_status: { degraded: false, reasons: [] },
+  positions: [
+    {
+      position: "WR", tier: "primary", score: 1.6, starters: 3,
+      weakest_slot: { slot: "WR3", rank: 8, of: 12, pct: 0.64, ppg: 9.1 }, slot_ranks: [],
+      upgrade: { ppw: 1.2, ros: 10.8, name: "Pat Wire", player_id: "fa", ppg: 10.3 },
+      healthy_count: 4, required_depth: 5, depth_short: 1, injured_starters: [], aging_starters: [], future_gap: false,
+      reasons: ["WR3 is 8th of 12 in the league"],
+    },
+  ],
+};
+
 describe("WaiversContent", () => {
   it("renders the league name, stat tiles, and the top Priority Add with FAAB range and confidence", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
@@ -91,11 +134,117 @@ describe("WaiversContent", () => {
     expect(screen.getByText(/Current need: RB \/ QB\./)).toBeInTheDocument();
   });
 
-  it("falls back to the no-need framing when needed_positions is empty", () => {
-    const noNeed: WaiversResponse = { ...BASE_RESPONSE, needed_positions: [] };
+  it("says so (never a bare 'None') when the need model failed and there is no legacy need", () => {
+    const noNeed: WaiversResponse = {
+      ...BASE_RESPONSE,
+      needed_positions: [],
+      needs_model: null,
+      model_status: { degraded: true, reasons: [{ code: "need_model_failed", message: "Needs could not be fully modeled." }] },
+    };
     render(<WaiversContent leagueName="Dynasty Overlords" data={noNeed} />);
 
-    expect(screen.getByText(/No primary need/)).toBeInTheDocument();
+    expect(screen.getByTestId("needs-headline")).toHaveTextContent(/could not be fully modeled/);
+    expect(screen.getByTestId("limited-data-note")).toHaveTextContent(/Limited data/);
+    expect(screen.queryByText("None")).not.toBeInTheDocument();
+  });
+
+  it("surfaces the model's weakest position with the numbers behind it", () => {
+    const withModel: WaiversResponse = { ...BASE_RESPONSE, needs_model: NEEDS_MODEL };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={withModel} />);
+
+    expect(screen.getByTestId("needs-headline")).toHaveTextContent("Biggest need: WR — your WR3 is 8th of 12.");
+    fireEvent.click(screen.getByRole("button", { name: /How we read your needs/ }));
+    expect(screen.getByTestId("needs-breakdown")).toHaveTextContent(/WR3 · 8th of 12/);
+    expect(screen.getByTestId("needs-breakdown")).toHaveTextContent(/Pat Wire \+1\.2 pts\/wk/);
+  });
+
+  it("says 'Covered' only when the model says no position needs help", () => {
+    const covered: WaiversResponse = {
+      ...BASE_RESPONSE,
+      needs_model: { ...NEEDS_MODEL, biggest_need: null, no_need: true, needed_positions: [], headline: "No urgent need — your weakest spot is TE1 (3rd of 12)." },
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={covered} />);
+
+    expect(screen.getByText("Covered")).toBeInTheDocument();
+    expect(screen.getByTestId("needs-headline")).toHaveTextContent(/^No urgent need/);
+  });
+
+  it("shows 'Add X, drop Y' with the reasons, net effect and an alternative on the top card", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [priorityAdd({ drop_suggestion: DROP_SUGGESTION })],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const box = screen.getByTestId("suggested-drop");
+    expect(box).toHaveTextContent("Add Test Free Agent, drop Dead Weight");
+    expect(box).toHaveTextContent("never starts in your best lineup");
+    expect(box).toHaveTextContent("+4 lineup pts over 9 weeks");
+    expect(box).toHaveTextContent("Value +1,263");
+    expect(box).toHaveTextContent("Bench Guy");
+  });
+
+  it("collapses repeated drops to one line on the list rows, details one tap away", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [
+        priorityAdd({ drop_suggestion: DROP_SUGGESTION }),
+        priorityAdd({ player_id: "p2", name: "Second Add", drop_suggestion: { ...DROP_SUGGESTION, add: { ...DROP_SUGGESTION.add, name: "Second Add" } } }),
+      ],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const compact = screen.getByTestId("suggested-drop-compact");
+    expect(compact).toHaveTextContent("Drop");
+    expect(compact).toHaveTextContent("Dead Weight · WR");
+    expect(screen.queryByTestId("suggested-drop-details")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Why/ }));
+    expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("never starts in your best lineup");
+  });
+
+  it("lists the same cut the cards name, with the adds it is the cut for", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [priorityAdd({ drop_suggestion: DROP_SUGGESTION })],
+      droppable_players: {
+        players: [{ ...DROP_SUGGESTION.drop!, named_for: ["Test Free Agent"] }],
+        total: 1, protected_count: 3, candidates_checked: 5, locked_count: 0,
+      },
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const section = screen.getByTestId("droppable-players");
+    expect(section).toHaveTextContent("Dead Weight");
+    expect(section).toHaveTextContent("The cut when you add Test Free Agent");
+    expect(section).not.toHaveTextContent(/Nobody on your roster is a free cut/);
+  });
+
+  it("says 'No good drop' honestly and names the cheapest cut", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [
+        priorityAdd({
+          drop_suggestion: { ...DROP_SUGGESTION, drop: null, alternatives: [], no_good_drop: true, cheapest: DROP_SUGGESTION.drop, why: "No good drop for Test Free Agent." },
+        }),
+      ],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const box = screen.getByTestId("suggested-drop");
+    expect(box).toHaveTextContent("No good drop");
+    expect(box).toHaveTextContent("Cheapest cut: Dead Weight");
+  });
+
+  it("lists 'Players you could drop' and the Premium count for Free", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      droppable_players: { players: [DROP_SUGGESTION.drop!], total: 3, protected_count: 12, candidates_checked: 8, locked_count: 2 },
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const section = screen.getByTestId("droppable-players");
+    expect(section).toHaveTextContent("Dead Weight");
+    expect(section).toHaveTextContent("+2 more with Premium");
   });
 
   it("shows the Premium upsell instead of the secondary board when not premium", () => {

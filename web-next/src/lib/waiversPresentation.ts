@@ -78,16 +78,6 @@ export function faabRangeText(faab: WaiverFaabGuidance | null | undefined): { pr
   };
 }
 
-/** modules.waivers_ui.priority_adds_section_note's "Current need" framing —
- * the exact copy the UX audit called out as a standout, ported verbatim. */
-export function priorityNeedNote(neededPositions: string[]): string {
-  const positions = neededPositions.map((pos) => pos.toUpperCase()).filter(Boolean);
-  if (positions.length > 0) {
-    return `Current need: ${positions.join(" / ")}.`;
-  }
-  return "No primary need — high-value adds can still be worth a claim.";
-}
-
 /** Raw Sleeper injury_status ("questionable"/"out"/"ir"/...) -> a display
  * label + tone, reusing myTeamPresentation.ts's injuryTone (same
  * football_assets.py tone resolution) once the raw code is title-cased into

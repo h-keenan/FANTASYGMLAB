@@ -508,3 +508,24 @@ def explanation_hook(
         "status": profile["status"],
         "flag": {k: flag[k] for k in ("key", "label", "tone", "explanation")} if flag else None,
     }
+
+
+def profile_from_season_stats(
+    player_id: Any,
+    position: str,
+    season_stats: Mapping[str, Any] | None,
+    *,
+    season: int | None = None,
+) -> dict[str, Any] | None:
+    """The full usage profile for a player from already-loaded season stats
+    (``retain_weekly``), or ``None`` when no weekly rows are loaded for him.
+
+    Same inputs and gate as ``explanation_hook``; used by the drop engine as a
+    guard (never as a score)."""
+
+    record = (season_stats or {}).get(str(player_id or ""))
+    weekly = record.get("weekly") if isinstance(record, Mapping) else None
+    if not weekly:
+        return None
+    selected = int(season or sleeper.default_player_stats_season())
+    return build_usage_profile(position, weekly, adv_stats.weekly_for_sleeper_id(player_id, selected))
