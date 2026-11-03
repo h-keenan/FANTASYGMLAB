@@ -143,6 +143,8 @@ export function waiverReasonChips(
     faab?: { reasons?: string[] } | null;
     sleeper_trending_add?: boolean;
     injury_replacement_fit?: boolean;
+    /** Server: best stash at your top need when nobody on the wire would start there. */
+    stash_for_need?: boolean;
   },
   max = 2,
 ): string[] {
@@ -158,6 +160,7 @@ export function waiverReasonChips(
     });
   }
   if (player.injury_replacement_fit) hits.set("Injury cover", CHIP_RULES.length);
+  if (player.stash_for_need) hits.set("Stash for need", CHIP_RULES.length + 1);
   return [...hits.entries()].sort((x, y) => x[1] - y[1]).map(([chip]) => chip).slice(0, max);
 }
 

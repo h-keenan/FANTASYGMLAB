@@ -15084,6 +15084,12 @@ def _project_priority_add(
     label, tone = waivers_logic.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
     projected["recommendation_tone"] = tone
+    # Why this row is on the board relative to the roster's need list (the
+    # lineup model's marginal points when it priced the add).
+    projected["fills_need"] = bool(row.get("priority_need_fit"))
+    projected["stash_for_need"] = bool(row.get("priority_stash_for_need"))
+    ppw = row.get("priority_wire_ppw")
+    projected["lineup_ppw"] = None if ppw is None or pd.isna(ppw) else round(float(ppw), 2)
     # Real need-fit/standout-value confidence for this Priority Add — same
     # already-computed signals rank_priority_add_candidates used to rank it
     # (see waivers_logic.waiver_confidence_label), shown with Trade Ideas'
@@ -15346,6 +15352,17 @@ def get_league_waivers(
     if injury_positions:
         positions_upper = free_agents["position"].fillna("").astype(str).str.upper()
         fit_mask = positions_upper.isin(injury_positions) & (score_series > 0) & (~free_agents["stale_free_agent"])
+        if needs_model is not None:
+            # One source of truth: "healthy cover for your injury-hit room" only
+            # for adds the lineup model prices as real points at that position.
+            priced = {
+                str(o["player_id"]): float(o["ppw"])
+                for entry in needs_model.get("positions") or ()
+                for o in entry.get("wire") or ()
+            }
+            fit_mask = fit_mask & free_agents["player_id"].astype(str).map(
+                lambda pid: priced.get(pid, 0.0) >= roster_value_model.FILLS_NEED_MIN_PPW
+            )
         free_agents["injury_replacement_fit"] = fit_mask
         free_agents["injury_replacement_note"] = [
             f"Healthy cover for your injury-hit {pos} room." if fit else ""
@@ -15417,7 +15434,10 @@ def get_league_waivers(
         max_items=6,
         league=league,
         rosters=rosters,
+        needs_model=needs_model,
     )
+    if needs_model is not None:
+        needs_model["headline"] = waivers_logic.align_headline_with_adds(needs_model, priority_df)
     faab_budget = faab.sleeper_faab_budget_context(league, rosters, roster_id=roster_id)
     # Sleeper settings.waiver_type: only FAAB leagues (2) get dollar bids;
     # rolling / reverse-standings leagues get claim guidance instead.
@@ -15465,7 +15485,14 @@ def get_league_waivers(
             market=faab_market,
             budget_initial=faab_budget.initial,
             remaining_budget=faab_budget.remaining,
-            needed_positions=needed_positions,
+            # "Fills need" only when the ranker (the model's own verdict) says
+            # this add fills one; the raw position list would tag any player at
+            # a need position.
+            needed_positions=(
+                needed_positions
+                if needs_model is None or bool(row.get("priority_need_fit"))
+                else []
+            ),
             min_bid=faab.sleeper_min_bid(league),
             week=current_week or None,
             team_strategy=faab_strategy,

@@ -44,6 +44,7 @@ import pandas as pd
 from modules import model_status, trade_lineup_model as tlm
 from modules.frame_records import frame_records
 from modules.injury_status import is_ruled_out
+from modules.rankings import injury_level
 from modules.rankings import age_multiplier
 from modules.trade_grade import FANTASY_SEASON_WEEKS, SeasonWindow, healthy_equivalent_roster, season_window
 
@@ -78,6 +79,12 @@ RANK_ONLY_SECONDARY_PCT = 0.75
 # Lineup points per week the best free agent would add before it counts as a
 # real upgrade (about a typical flex's weekly spread, not noise).
 MATERIAL_UPGRADE_PPW = 0.75
+# A free agent "fills a need" (Priority Add tag, ranking by need) only when the
+# lineup model says adding him is worth at least this many points per week.
+FILLS_NEED_MIN_PPW = 0.25
+# How many of a position's best projected free agents are priced by the lineup
+# model (one swap each) when looking for the best real add at a position.
+WIRE_OPTIONS_PER_POSITION = 5
 # Aging: a starter whose age-curve multiplier falls by this share within two
 # years is "aging" (modules.rankings.age_multiplier, the curve valuation uses).
 AGING_DROP_SHARE = 0.12
@@ -281,6 +288,8 @@ class RosterValueContext:
     league_size: int
     pool: pd.DataFrame | None
     status: dict[str, Any] = field(default_factory=model_status.ok)
+    all_players: pd.DataFrame | None = None
+    wire_cache: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
     @property
     def weeks(self) -> int:
@@ -372,6 +381,7 @@ def build_context(
         league_size=league_size,
         pool=pool,
         status=model_status.merge(status),
+        all_players=all_players_df,
     )
 
 
@@ -424,6 +434,51 @@ def evaluate_swap(
 # --- needs -------------------------------------------------------------------
 
 
+def has_path_to_play(pool: pd.DataFrame, all_players: pd.DataFrame | None) -> pd.Series:
+    """True for free agents who can realistically take lineup snaps.
+
+    The lineup model prices a free agent by what he scores *when he plays*, so
+    a fourth-string quarterback with one garbage-time game can look like a
+    15-point starter. A quarterback only plays when the quarterbacks ahead of
+    him on the team's depth chart are out: he needs depth-chart rank 1, or
+    every quarterback listed ahead of him must be injured / ruled out. A free
+    agent with no depth-chart rank has no path either. Role-blocked players
+    (``workload_trend == Blocked``, the rankings' own "no current role" tier)
+    never qualify. Other positions share snaps (committees, slot receivers), so
+    only the role-blocked rule applies to them."""
+
+    if pool is None or pool.empty:
+        return pd.Series(dtype=bool)
+    position = pool["position"].fillna("").astype(str).str.upper()
+    blocked = (
+        pool.get("workload_trend", pd.Series("", index=pool.index)).fillna("").astype(str).str.strip().str.casefold()
+        == "blocked"
+    )
+    ok = ~blocked
+    qb_idx = pool.index[(position == "QB") & ok]
+    if len(qb_idx) == 0:
+        return ok
+    order = pd.to_numeric(pool.get("depth_chart_order", pd.Series(float("nan"), index=pool.index)), errors="coerce")
+    ahead_healthy: dict[str, set[int]] = {}
+    if all_players is not None and not all_players.empty and "depth_chart_order" in all_players.columns:
+        qbs = all_players[all_players["position"].fillna("").astype(str).str.upper() == "QB"]
+        for _, r in qbs.iterrows():
+            rank = _num(r.get("depth_chart_order"), 0.0)
+            team = _text(r.get("team")).upper()
+            if rank <= 0 or not team:
+                continue
+            if injury_level(_text(r.get("status")), _text(r.get("injury_status"))) == "healthy":
+                ahead_healthy.setdefault(team, set()).add(int(rank))
+    for idx in qb_idx:
+        rank = order.get(idx)
+        team = _text(pool.at[idx, "team"]).upper() if "team" in pool.columns else ""
+        if rank is None or pd.isna(rank) or rank <= 0:
+            ok.at[idx] = False
+        elif rank > 1 and any(r < rank for r in ahead_healthy.get(team, ())):
+            ok.at[idx] = False
+    return ok
+
+
 def _pool_by_position(pool: pd.DataFrame | None, score_field: str) -> dict[str, list[dict[str, Any]]]:
     out: dict[str, list[dict[str, Any]]] = {pos: [] for pos in MODELED_POSITIONS}
     if pool is None or pool.empty:
@@ -443,6 +498,67 @@ def best_free_agents(rvc: RosterValueContext, position: str, limit: int = 3) -> 
     pool = [p for p in rvc.model_ctx.waiver if p.position == position and p.ppg is not None]
     pool.sort(key=lambda p: (-(p.ppg or 0.0), p.player_id))
     return pool[:limit]
+
+
+def wire_options(rvc: RosterValueContext, position: str, limit: int = WIRE_OPTIONS_PER_POSITION) -> list[dict[str, Any]]:
+    """The best real adds at a position, priced by the lineup model.
+
+    Only free agents with a path to play (``has_path_to_play``) are priced, the
+    top ``limit`` by expected PPG, each as one swap on this roster: points per
+    week over the rest of the season (byes, injuries, superflex / flex slots
+    and the league's scoring are all in the lineup model). Best add first. This
+    is the one list both the need headline and the Priority Adds ranking read,
+    so they cannot disagree about who helps."""
+
+    cached = rvc.wire_cache.get(position)
+    if cached is not None:
+        return cached
+    out: list[dict[str, Any]] = []
+    pool = rvc.pool
+    if pool is not None and not pool.empty:
+        rows = pool[pool["position"].fillna("").astype(str).str.upper() == position]
+        if not rows.empty:
+            rows = rows[has_path_to_play(rows, rvc.all_players).reindex(rows.index).fillna(False)]
+        if not rows.empty:
+            by_id = {str(r["player_id"]): r for r in frame_records(rows)}
+            profiles = [
+                p for p in tlm.profile_roster(rows, rvc.model_ctx, free_agent=True)
+                if p.ppg is not None and not p.out_all
+            ]
+            profiles.sort(key=lambda p: (-(p.ppg or 0.0), p.player_id))
+            weeks = max(1, rvc.weeks)
+            for p in profiles[: max(1, limit)]:
+                swap = evaluate_swap(rvc, [], [by_id[p.player_id]])
+                ros = float(swap["points"]["ros_delta"])
+                out.append({
+                    "player_id": p.player_id, "name": p.name, "team": p.team, "position": position,
+                    "ppg": round(float(p.ppg or 0.0), 1), "ppw": round(ros / weeks, 2), "ros": round(ros, 1),
+                })
+            out.sort(key=lambda o: (-o["ppw"], -o["ppg"], o["player_id"]))
+    rvc.wire_cache[position] = out
+    return out
+
+
+def best_stash(rvc: RosterValueContext, position: str, exclude: Iterable[str] = ()) -> dict[str, Any] | None:
+    """The most valuable free agent at a position who would not help the
+    lineup now (a backup or a stash), by the league's valuation, or None."""
+
+    pool = rvc.pool
+    if pool is None or pool.empty:
+        return None
+    skip = {str(x) for x in exclude}
+    rows = pool[pool["position"].fillna("").astype(str).str.upper() == position]
+    if rows.empty or rvc.score_field not in rows.columns:
+        return None
+    blocked = rows.get("workload_trend", pd.Series("", index=rows.index)).fillna("").astype(str).str.strip().str.casefold() == "blocked"
+    rows = rows[~blocked & ~rows["player_id"].astype(str).isin(skip)]
+    if rows.empty:
+        return None
+    values = pd.to_numeric(rows[rvc.score_field], errors="coerce").fillna(0.0)
+    if float(values.max()) <= 0:
+        return None
+    row = rows.loc[values.idxmax()]
+    return {"player_id": str(row["player_id"]), "name": _text(row.get("name")), "team": _text(row.get("team")), "position": position}
 
 
 def _aging(p: tlm.PlayerPoints) -> bool:
@@ -475,6 +591,35 @@ def _need_type(tier: str, *, depth_short: int, future_gap: bool) -> str:
     if depth_short:
         return "short-term backup only"
     return "covered"
+
+
+def wire_clause(entry: Mapping[str, Any]) -> str:
+    """The sentence that ties a need to what the wire can actually do about it,
+    so the headline and the Priority Adds can never seem to disagree."""
+
+    pos = entry["position"]
+    up = entry["upgrade"]
+    verdict = entry.get("wire_verdict")
+    if verdict in (None, "unknown"):
+        return ""
+    if verdict == "upgrade":
+        return " " + _sentence(f"Best add: {up['name']} (+{up['ppw']:.1f} pts/wk)")
+    if verdict == "marginal":
+        return " " + _sentence(
+            f"No {pos} on the wire would start for you; best available: {up['name']} (+{up['ppw']:.1f} pts/wk)"
+        )
+    stash = entry.get("stash")
+    if stash:
+        return " " + _sentence(f"No {pos} on the wire would help your lineup now; best stash: {stash['name']}")
+    return f" No {pos} on the wire would help your lineup."
+
+
+def _sentence(text: str) -> str:
+    """``text`` as a sentence, without doubling a period that already ends it
+    (a name like "Anthony Richardson Sr.")."""
+
+    text = text.rstrip()
+    return text if text.endswith((".", "!", "?")) else text + "."
 
 
 def assess_needs(
@@ -526,22 +671,27 @@ def assess_needs(
                 "ppg": round(mine_k, 1),
             })
         weakest = max(slot_ranks, key=lambda s: (s["pct"], s["slot"]))
-        # Upgrade: the best free agent as a rostered player.
+        # Upgrade: the best real add at the position, priced as a rostered
+        # player by the lineup model (only free agents with a path to play).
+        wire = wire_options(rvc, pos)
         upgrade = {"ppw": 0.0, "ros": 0.0, "name": "", "player_id": "", "ppg": None}
-        fas = best_free_agents(rvc, pos, 1)
-        if fas:
-            fa = fas[0]
-            fa_row = None
-            if rvc.pool is not None and not rvc.pool.empty:
-                match = rvc.pool[rvc.pool["player_id"].astype(str) == fa.player_id]
-                fa_row = frame_records(match)[0] if not match.empty else None
-            if fa_row is not None:
-                swap = evaluate_swap(rvc, [], [fa_row])
-                ros = float(swap["points"]["ros_delta"])
-                upgrade = {
-                    "ppw": round(ros / weeks, 2), "ros": round(ros, 1), "name": fa.name,
-                    "player_id": fa.player_id, "ppg": round(float(fa.ppg or 0.0), 1),
-                }
+        if wire and wire[0]["ppw"] > 0:
+            top = wire[0]
+            upgrade = {
+                "ppw": top["ppw"], "ros": top["ros"], "name": top["name"],
+                "player_id": top["player_id"], "ppg": top["ppg"],
+            }
+        # What the wire can do for this position, in one word: "upgrade" (the
+        # best add is worth FILLS_NEED_MIN_PPW or more), "marginal" (helps a
+        # little), "none" (nobody on the wire adds lineup points).
+        wire_verdict = (
+            "unknown" if rvc.pool is None  # no free-agent data on this surface: say nothing about the wire
+            else "upgrade" if upgrade["ppw"] >= FILLS_NEED_MIN_PPW
+            else "marginal" if upgrade["ppw"] > 0 else "none"
+        )
+        stash = None
+        if wire_verdict == "none":
+            stash = best_stash(rvc, pos)
         healthy_here = [p for p in mine[pos] if not p.out_all and (p.absence is None or p.absence.weeks < 3)]
         required_depth = starters_n + (1 if pos != "K" else 0)
         depth_short = max(0, required_depth - len(healthy_here))
@@ -612,6 +762,9 @@ def assess_needs(
             "weakest_slot": weakest,
             "slot_ranks": slot_ranks,
             "upgrade": upgrade,
+            "wire": wire,
+            "wire_verdict": wire_verdict,
+            "stash": stash,
             "healthy_count": len(healthy_here),
             "required_depth": required_depth,
             "depth_short": depth_short,
@@ -633,11 +786,13 @@ def assess_needs(
     if biggest:
         ws = biggest["weakest_slot"]
         if biggest["tier"] in ("primary", "secondary"):
-            lead = "Biggest need" if biggest["tier"] == "primary" else "Top need"
+            # ``positions[0]`` is the weakest position by tier then score: the
+            # biggest need, whatever the tier (a tier only grades how fixable it is).
+            lead = "Biggest need"
             detail = f"your {ws['slot']} is {_ordinal(ws['rank'])} of {ws['of']}"
             if biggest["reasons"] and ws["pct"] < SECONDARY_RANK_PCT:
                 detail = biggest["reasons"][0]
-            headline = f"{lead}: {biggest['position']} — {detail}."
+            headline = f"{lead}: {biggest['position']} — {detail}.{wire_clause(biggest)}"
         else:
             headline = (
                 f"No urgent need — your weakest spot is {ws['slot']} ({_ordinal(ws['rank'])} of {ws['of']}, "

@@ -1313,6 +1313,12 @@ export interface WaiverPlayer {
   overall_rank: number | null;
   stale_free_agent: boolean;
   injury_replacement_fit: boolean;
+  /** True when the lineup model says this add fills a need; false for value / stash rows. */
+  fills_need?: boolean;
+  /** Best stash at the top need when no one on the wire would start there. */
+  stash_for_need?: boolean;
+  /** Lineup points per week the add is worth on this roster (null when not priced). */
+  lineup_ppw?: number | null;
   injury_replacement_note: string;
   // Sleeper's GLOBAL trending-add signal — cross-league, last-24h add
   // velocity across every league on Sleeper, NOT scoped to this league. See

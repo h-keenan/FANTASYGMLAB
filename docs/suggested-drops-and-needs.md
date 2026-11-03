@@ -42,6 +42,25 @@ a roster the assessment is degraded (`need_model_unavailable`), never "covered".
 K/DEF stay on the binary `roster_needs.classify_shallow_position_rooms` check (a league starts one of
 each; there is no depth gradient to rank).
 
+## Waivers: one judgment for the headline and the Priority Adds
+
+The need headline and the Priority Adds read the same `assess_needs` result. Per position it carries
+`wire` (the best real adds, each priced by the lineup model as lineup points per week), `wire_verdict`
+(`upgrade` >= 0.25 pts/wk, `marginal`, `none`, `unknown` when a surface has no free-agent data) and
+`stash`. `rank_priority_add_candidates(needs_model=...)` then:
+
+* tags "Fills need" only for an add the model prices at >= 0.25 pts/wk at a position it lists as a need;
+* orders need-fit adds by the model's own need order (weakest position first), then marginal points, then value;
+* when nobody at the biggest need would start, keeps the best stash there (`stash_for_need`) after the real
+  need adds, and the headline says so ("No QB on the wire would start for you; best available: X (+0.4 pts/wk)")
+  plus, when the top add is at another position, why ("So the top add is RB X (+0.7 pts/wk)").
+
+Only free agents with a path to play are priced (`roster_value_model.has_path_to_play`): not role-blocked, and a
+quarterback needs depth-chart rank 1 or every quarterback listed ahead of him injured. Before this, fourth-string
+quarterbacks with one game of tape were priced as 15-ppg starters, which made QB a "primary" need with a fictional
++1.2 pts/wk fix that the Priority Adds then (correctly) ignored. Other surfaces (Dashboard, My Team, Trade Hub) still
+build needs without a free-agent pool, so a position's tier there is rank-only; they never print a wire clause.
+
 ## Drop engine
 
 A drop is a trade with the wire: `evaluate_swap` calls `trade_lineup_model.evaluate_trade`
