@@ -15,6 +15,8 @@ import { newsPlayerIdentities } from '../lib/newsIdentity';
 import { alsoReportedLine } from '../lib/playerNews';
 import { stubPlayer } from '../lib/playerQuickView';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import NextSteps from '../components/NextSteps';
+import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -156,6 +158,7 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
   }, [load]);
 
   const sections = useMemo(() => groupByDate(items), [items]);
+  const lastLeague = useLastLeague();
 
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
@@ -176,6 +179,16 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         stickySectionHeadersEnabled={false}
+        ListFooterComponent={
+          !playerId && lastLeague ? (
+            <NextSteps
+              title="News on your players"
+              steps={['alerts']}
+              leagueId={lastLeague.leagueId}
+              leagueName={lastLeague.leagueName}
+            />
+          ) : null
+        }
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
             <AppText style={styles.sectionHeaderText}>{section.title}</AppText>

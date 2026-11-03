@@ -22,6 +22,7 @@ import {
 } from "@/lib/myTeamPresentation";
 import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { NextSteps } from "@/components/NextSteps";
 import { PageTitle } from "@/components/PageTitle";
 
 /**
@@ -75,6 +76,7 @@ const KEEPER_BASIS_LABEL: Record<string, string> = {
 };
 
 export function MyTeamContent({
+  leagueId = "",
   leagueName,
   myTeam,
   needs,
@@ -84,6 +86,8 @@ export function MyTeamContent({
   keepers = null,
   onKeeperRoundPenalty,
 }: {
+  /** Enables the "Act on a need" links; omitted: no links. */
+  leagueId?: string;
   leagueName: string;
   myTeam: MyTeamResponse;
   needs: MyTeamNeedsResponse | null;
@@ -303,6 +307,9 @@ export function MyTeamContent({
                 ))}
               </div>
             </InfoTip>
+          ) : null}
+          {needs && needs.weaknesses.length > 0 ? (
+            <NextSteps title="Act on a need" steps={["waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />
           ) : null}
         </section>
       ) : null}

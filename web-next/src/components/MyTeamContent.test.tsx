@@ -128,6 +128,19 @@ const TEAM_RANKING: TeamRanking = {
   health_flag: "Stable",
 };
 
+describe("MyTeamContent need links", () => {
+  it("offers Waivers and Trade Hub under Team Analysis when there is a real need", () => {
+    render(<MyTeamContent leagueId="L1" leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    expect(screen.getByRole("link", { name: /Find a waiver add/ })).toHaveAttribute("href", "/waivers/L1?name=Dynasty%20Overlords");
+    expect(screen.getByRole("link", { name: /See trade ideas/ })).toHaveAttribute("href", "/trade-hub/L1?name=Dynasty%20Overlords");
+  });
+
+  it("shows no links without a league id", () => {
+    render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    expect(screen.queryByRole("link", { name: /Find a waiver add/ })).toBeNull();
+  });
+});
+
 describe("MyTeamContent", () => {
   it("renders real starters/bench with OVR gauges and canonical position colors", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);

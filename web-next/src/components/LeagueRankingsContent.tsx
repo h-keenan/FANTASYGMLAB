@@ -23,6 +23,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ToneBadge } from "@/components/ToneBadge";
+import { NextSteps } from "@/components/NextSteps";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
 import { PageTitle } from "@/components/PageTitle";
@@ -405,6 +406,7 @@ export function LeagueRankingsContent({
           onClose={() => setProfile(null)}
         />
       ) : null}
+      {notReady ? null : <NextSteps title="Make a move" steps={["trade-hub", "matchup"]} leagueId={leagueId} leagueName={leagueName} />}
       <ValuesCredit />
     </main>
   );

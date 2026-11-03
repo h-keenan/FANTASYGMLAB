@@ -13,13 +13,21 @@ import { spacing } from '../theme';
  * (Alerts, Matchup). Mirrors web-next's components/NextSteps.tsx: keep the
  * step list and copy identical.
  */
-export type NextStepKey = 'matchup' | 'waivers' | 'trade-hub' | 'my-team';
+export type NextStepKey = 'matchup' | 'waivers' | 'trade-hub' | 'trade-finder' | 'trade-analyzer' | 'my-team' | 'alerts';
 
-export const NEXT_STEPS: Record<NextStepKey, { label: string; route: 'Matchup' | 'Waivers' | 'Trades' | 'MyTeam' }> = {
+type StepRoute = 'Matchup' | 'Waivers' | 'Trades' | 'MyTeam' | 'Alerts';
+
+export const NEXT_STEPS: Record<
+  NextStepKey,
+  { label: string; route: StepRoute; params?: { initialTab: 'block' | 'search' | 'make' } }
+> = {
   matchup: { label: 'Check your lineup', route: 'Matchup' },
   waivers: { label: 'Find a waiver add', route: 'Waivers' },
   'trade-hub': { label: 'See trade ideas', route: 'Trades' },
+  'trade-finder': { label: 'See other packages in Trade Finder', route: 'Trades', params: { initialTab: 'search' } },
+  'trade-analyzer': { label: 'Analyze a trade', route: 'Trades', params: { initialTab: 'make' } },
   'my-team': { label: 'Review your roster', route: 'MyTeam' },
+  alerts: { label: 'See news on your players', route: 'Alerts' },
 };
 
 export default function NextSteps({
@@ -45,7 +53,10 @@ export default function NextSteps({
             variant="secondary"
             size="sm"
             label={`${NEXT_STEPS[step].label} →`}
-            onPress={() => navigation.navigate(NEXT_STEPS[step].route, { leagueId, leagueName })}
+            onPress={() => {
+              const target = NEXT_STEPS[step];
+              navigation.navigate(target.route as 'Matchup', { leagueId, leagueName, ...(target.params ?? {}) } as never);
+            }}
           />
         ))}
       </View>

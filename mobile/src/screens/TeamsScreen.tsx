@@ -18,6 +18,7 @@ import ManagerProfileModal from '../components/ManagerProfileModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
+import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -368,7 +369,12 @@ export default function TeamsScreen({ route, navigation }: Props) {
         <SegmentedTabBar options={METRIC_TABS} active={metric} onChange={setMetric} />
       </View>
       <FlatList
-        ListFooterComponent={<ValuesCredit />}
+        ListFooterComponent={
+          <>
+            <NextSteps title="Make a move" steps={['trade-hub', 'matchup']} leagueId={leagueId} leagueName={leagueName} />
+            <ValuesCredit />
+          </>
+        }
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         data={teams}

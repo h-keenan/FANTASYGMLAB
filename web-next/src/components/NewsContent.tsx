@@ -5,6 +5,7 @@ import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { eventTypeColorVar, eventTypeLabel, relativeTime } from "@/lib/alertsPresentation";
 import { groupNewsByDate } from "@/lib/newsPresentation";
+import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 
 /**
  * Ports modules/general_news_ui.py / mobile's NewsScreen.tsx for
@@ -242,6 +243,16 @@ export function NewsContent({ data, playerName }: { data: NewsResponse; playerNa
               })}
             </section>
           ))}
+        </div>
+      )}
+      {playerName ? null : (
+        <div className="flex flex-col gap-2" data-testid="news-next-step">
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            This is the league-wide feed. News on the players you own is in Alerts.
+          </p>
+          <div>
+            <LeagueLinkStep step="alerts" label="See news on your players" pickLabel="Pick a league for your alerts" />
+          </div>
         </div>
       )}
     </main>

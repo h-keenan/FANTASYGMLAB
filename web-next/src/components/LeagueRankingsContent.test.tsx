@@ -102,6 +102,12 @@ describe("LeagueRankingsContent", () => {
     expect(screen.getAllByText("Rival Squad").length).toBeGreaterThan(0);
   });
 
+  it("ends with next-step links instead of a dead end", () => {
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    expect(screen.getByRole("link", { name: /See trade ideas/ })).toHaveAttribute("href", "/trade-hub/L1?name=My%20League");
+    expect(screen.getByRole("link", { name: /Check your lineup/ })).toHaveAttribute("href", "/matchup/L1?name=My%20League");
+  });
+
   it("shows the not-ready message instead of boards when there are no teams", () => {
     const empty: LeagueTeamRankingsResponse = { ...BASE_RESPONSE, teams: [], reason: "no_rankings_data" };
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={empty} />);

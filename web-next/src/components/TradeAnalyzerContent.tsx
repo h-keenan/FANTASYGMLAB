@@ -52,6 +52,7 @@ import {
 } from "@/lib/tradeAnalyzerPresentation";
 import { dropRepeatedSentences, shortSummary } from "@/lib/verdictText";
 import { ShareToCommunityToggle } from "@/components/ShareToCommunityToggle";
+import { NextSteps } from "@/components/NextSteps";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 
@@ -325,6 +326,7 @@ function VerdictCard({
   receiveAssets,
   onBuildCounter,
   leagueId,
+  leagueName,
   partnerTeamName,
   lens,
   cardTeams,
@@ -334,6 +336,7 @@ function VerdictCard({
   receiveAssets: TradeAsset[];
   onBuildCounter: () => void;
   leagueId: string;
+  leagueName: string;
   partnerTeamName: string;
   lens: string;
   cardTeams: AnalyzerCardTeams;
@@ -591,6 +594,8 @@ function VerdictCard({
         sendAssets={sendAssets}
         receiveAssets={receiveAssets}
       />
+
+      <NextSteps title="Want other options?" steps={["trade-finder", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />
 
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         Reply to your partner directly — no in-app accept.
@@ -970,6 +975,7 @@ export function TradeAnalyzerContent({
           receiveAssets={receiveAssets}
           onBuildCounter={applyCounterAction}
           leagueId={leagueId}
+          leagueName={leagueName}
           partnerTeamName={selectedTeamId === ALL_TEAMS_ID ? "" : (teamProfiles[selectedTeamId]?.team_name ?? "")}
           lens={lens}
           cardTeams={{

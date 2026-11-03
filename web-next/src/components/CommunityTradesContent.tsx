@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/EmptyState";
+import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 import { useState } from "react";
 
 import type { CommunityTradeItem } from "@/lib/api";
@@ -180,7 +181,11 @@ export function CommunityTradesContent({
       </header>
 
       {trades.length === 0 ? (
-        <EmptyState title="No standout trades yet." subtitle="Check back once more confirmed trades across the app have had a few weeks to play out." />
+        <EmptyState title="No standout trades yet." subtitle="Check back once more confirmed trades across the app have had a few weeks to play out.">
+          <div className="mt-2">
+            <LeagueLinkStep step="trade-analyzer" label="Analyze a trade of your own" pickLabel="Pick a league to analyze a trade" />
+          </div>
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
           {trades.map((item) => (

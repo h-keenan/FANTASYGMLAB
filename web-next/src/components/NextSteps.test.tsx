@@ -16,6 +16,13 @@ describe("NextSteps", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("links the verdict's Trade Finder, Analyzer and Alerts steps", () => {
+    render(<NextSteps steps={["trade-finder", "trade-analyzer", "alerts"]} leagueId="9" leagueName="L" />);
+    expect(screen.getByRole("link", { name: /See other packages in Trade Finder/ })).toHaveAttribute("href", "/trade-finder/9?name=L");
+    expect(screen.getByRole("link", { name: /Analyze a trade/ })).toHaveAttribute("href", "/trade-analyzer/9?name=L");
+    expect(screen.getByRole("link", { name: /See news on your players/ })).toHaveAttribute("href", "/alerts/9?name=L");
+  });
+
   it("builds the roster link", () => {
     expect(nextStepHref("my-team", "9", "A B")).toBe("/my-team/9?name=A%20B");
   });

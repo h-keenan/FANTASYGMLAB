@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import ValueStat from '../components/ValueStat';
 import BeginnerHelp from '../components/BeginnerHelp';
+import NextSteps from '../components/NextSteps';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -299,6 +300,9 @@ export default function MyTeamScreen({ route, navigation }: Props) {
           <>
             <SectionHeading title="Team Analysis" topGap={12} />
             <TeamAnalysisRows rows={analysisRows} />
+            {needsQuery.data && needsQuery.data.weaknesses.length > 0 ? (
+              <NextSteps title="Act on a need" steps={['waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
+            ) : null}
           </>
         ) : null}
 

@@ -137,6 +137,7 @@ export default function MyTeamPage() {
 
   return (
     <MyTeamContent
+      leagueId={leagueId}
       leagueName={leagueName}
       myTeam={myTeam}
       needs={needs}

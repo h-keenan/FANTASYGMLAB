@@ -8,13 +8,16 @@ import { SectionHeading } from "@/components/SectionHeading";
  * NextSteps (mobile/src/components/NextSteps.tsx): keep the step list and
  * copy identical.
  */
-export type NextStepKey = "matchup" | "waivers" | "trade-hub" | "my-team";
+export type NextStepKey = "matchup" | "waivers" | "trade-hub" | "trade-finder" | "trade-analyzer" | "my-team" | "alerts";
 
 const STEPS: Record<NextStepKey, { label: string; segment: string }> = {
   matchup: { label: "Check your lineup", segment: "matchup" },
   waivers: { label: "Find a waiver add", segment: "waivers" },
   "trade-hub": { label: "See trade ideas", segment: "trade-hub" },
+  "trade-analyzer": { label: "Analyze a trade", segment: "trade-analyzer" },
+  "trade-finder": { label: "See other packages in Trade Finder", segment: "trade-finder" },
   "my-team": { label: "Review your roster", segment: "my-team" },
+  alerts: { label: "See news on your players", segment: "alerts" },
 };
 
 export function nextStepHref(step: NextStepKey, leagueId: string, leagueName: string): string {

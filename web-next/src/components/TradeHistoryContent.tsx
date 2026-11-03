@@ -13,6 +13,7 @@ import {
 } from "@/lib/tradeHistoryPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
+import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 
 /**
  * Ports modules/trade_outcomes_page.py's render_trade_history_page — the
@@ -91,7 +92,11 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
       </header>
 
       {data.outcomes.length === 0 ? (
-        <EmptyState title="No trade history yet. Confirm a trade to see it here." />
+        <EmptyState title="No trade history yet. Confirm a trade to see it here.">
+          <div className="mt-2">
+            <LeagueLinkStep step="trade-analyzer" label="Analyze a trade" pickLabel="Pick a league to analyze a trade" variant="primary" />
+          </div>
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
           {data.outcomes.map((outcome) => (

@@ -246,6 +246,12 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByRole("img", { name: "Confidence: High confidence" })).toBeInTheDocument();
     expect(screen.getByText("Minimal injury risk on either side.")).toBeInTheDocument();
     expect(screen.getByText("Ask for a sweetener too")).toBeInTheDocument();
+
+    // The verdict is no longer a dead end: other packages live in Trade Finder.
+    expect(screen.getByRole("link", { name: /See other packages in Trade Finder/ })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/trade-finder\/league-1\?name=/),
+    );
   });
 
   it("shows a lineup-hole warning and a direction-matched rationale heading (coridian_ 2026-10-27)", async () => {

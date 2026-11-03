@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppText from '../components/AppText';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -10,9 +11,13 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SharedTradesFeed from '../components/SharedTradesFeed';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type SharedCommunityTrade } from '../lib/api';
+import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
+import type { RootStackParamList } from '../navigation/RootNavigator';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Community'>;
 
 /**
  * Community: the trades other users chose to share. Web has this as its own
@@ -21,7 +26,8 @@ import { spacing, type ThemeColors } from '../theme';
  * four taps deep (UX audit 2026-11-03). This screen is that feed on its own,
  * reachable from the orb. Trade History keeps its copy at the bottom.
  */
-export default function CommunityScreen() {
+export default function CommunityScreen({ navigation }: Props) {
+  const lastLeague = useLastLeague();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -77,6 +83,17 @@ export default function CommunityScreen() {
             icon="people-circle-outline"
             title="Community isn't available yet"
             subtitle="Shared trades will show up here once sharing is switched on."
+            actionLabel={lastLeague ? 'Analyze a trade of your own' : undefined}
+            onPressAction={
+              lastLeague
+                ? () =>
+                    navigation.navigate('Trades', {
+                      leagueId: lastLeague.leagueId,
+                      leagueName: lastLeague.leagueName,
+                      initialTab: 'make',
+                    })
+                : undefined
+            }
           />
         )}
         <ValuesCredit />
