@@ -50,6 +50,7 @@ export default function PlayerHero({
   byeWeek = null,
   onByeThisWeek = false,
   unavailable = false,
+  rookie = null,
   expanded,
   onToggleExpand,
   children,
@@ -79,6 +80,8 @@ export default function PlayerHero({
   onByeThisWeek?: boolean;
   /** Out/IR/doubtful: the bye stays secondary (pill only). */
   unavailable?: boolean;
+  /** ROOKIE badge from rookieBadge(bio); null for everyone else. */
+  rookie?: { label: string; detail: string | null } | null;
   /** Whether the caller's Snapshot detail is currently shown. */
   expanded?: boolean;
   /** Supplying this turns the score tile into the expand toggle for the
@@ -133,6 +136,7 @@ export default function PlayerHero({
               <AppText style={styles.metaPillDot}>•</AppText>
               <AppText style={styles.metaPillText}>Age {age ?? (usageLoading ? '—' : 'N/A')}</AppText>
             </View>
+            {rookie ? <ToneBadge label={rookie.label} color={colors.accent} /> : null}
             {bye.label ? (
               <View style={styles.metaPill} testID="pqv-bye-pill">
                 <AppText style={styles.metaPillText}>{byeWeek != null ? byePillText(byeWeek, onByeThisWeek === true, unavailable) : bye.label}</AppText>
@@ -140,6 +144,7 @@ export default function PlayerHero({
             ) : null}
             {bye.thisWeek && !unavailable ? <ToneBadge label="On bye this week" color={colors.premium} /> : null}
           </View>
+          {rookie?.detail ? <AppText style={styles.rookieLine}>Rookie · {rookie.detail}</AppText> : null}
         </View>
       </View>
 
@@ -251,6 +256,7 @@ function createStyles(colors: ThemeColors) {
     archetypeText: { flexShrink: 1, fontSize: 12.5, fontWeight: '700', color: colors.textPrimary },
     infoCol: { flex: 1, alignItems: 'flex-start', gap: spacing.sm, paddingTop: spacing.xs },
     name: { fontSize: 28, fontWeight: '800', color: colors.textPrimary, lineHeight: 31, letterSpacing: -0.3 },
+    rookieLine: { fontSize: 12, color: colors.textSecondary },
     metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     metaPill: {
       flexDirection: 'row',

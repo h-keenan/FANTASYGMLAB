@@ -43,7 +43,7 @@ import {
   type QuickViewLeague,
   type QuickViewRequest,
 } from '../lib/playerQuickView';
-import { rankLine, tierOpportunityMismatchCaption } from '../lib/playerQuickViewPresentation';
+import { rankLine, rookieBadge, tierOpportunityMismatchCaption } from '../lib/playerQuickViewPresentation';
 import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
@@ -260,6 +260,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
               byeWeek={resolved?.bye_week ?? null}
               onByeThisWeek={resolved?.on_bye_this_week ?? false}
               unavailable={availability?.unavailable ?? false}
+              rookie={rookieBadge(bio)}
               overallRating={overallRating}
               ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
               usageTrend={model?.usage_trend ?? null}

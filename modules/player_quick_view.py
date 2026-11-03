@@ -71,6 +71,11 @@ class ExecutiveSnapshot:
     weight: str = ""
     bye_week: str = ""
     contract_status: str = ""
+    #: True exactly when ``years_exp == 0`` (the same "rookie" definition
+    #: modules.live_draft._is_rookie uses): a player in their first NFL
+    #: season, drafted or undrafted. Year-2 players (``years_exp == 1``) and
+    #: unknown experience are False; never inferred from age or draft class.
+    is_rookie: bool = False
 
 
 def build_executive_snapshot(
@@ -83,8 +88,10 @@ def build_executive_snapshot(
 
     years_raw = pd.to_numeric(pd.Series([source.get("years_exp")]), errors="coerce").iloc[0]
     years = ""
+    is_rookie = False
     if pd.notna(years_raw) and float(years_raw) >= 0:
         seasons = int(float(years_raw))
+        is_rookie = seasons == 0
         years = "Rookie" if seasons == 0 else f"{seasons} season{'s' if seasons != 1 else ''}"
 
     round_raw = pd.to_numeric(pd.Series([source.get("draft_round")]), errors="coerce").iloc[0]
@@ -117,6 +124,7 @@ def build_executive_snapshot(
         weight=weight,
         bye_week=_text(source.get("bye_week")),
         contract_status=_text(source.get("contract_status")),
+        is_rookie=is_rookie,
     )
 
 

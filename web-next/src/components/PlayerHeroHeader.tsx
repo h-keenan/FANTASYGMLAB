@@ -47,7 +47,10 @@ export function PlayerHeroHeader({
   byeWeek = null,
   onByeThisWeek = false,
   unavailable = false,
+  rookie = null,
 }: {
+  /** ROOKIE badge from rookieBadge(bio); null for everyone else. */
+  rookie?: { label: string; detail: string | null } | null;
   /** Team bye week (null when unknown / free agent). */
   byeWeek?: number | null;
   /** True when the current NFL week is that bye. */
@@ -116,6 +119,9 @@ export function PlayerHeroHeader({
               <span aria-hidden="true">•</span>
               <span>Age {age ?? (loadingIdentity ? "—" : "N/A")}</span>
             </span>
+            {rookie ? (
+              <ToneBadge label={rookie.label} color="var(--color-accent)" title={rookie.detail ?? undefined} testId="pqv-rookie-badge" />
+            ) : null}
             {byeWeek != null ? (
               <span className="pqv-meta-pill" data-testid="pqv-bye-pill">
                 {byePillText(byeWeek, onByeThisWeek, unavailable)}
@@ -125,6 +131,11 @@ export function PlayerHeroHeader({
               <ToneBadge label="On bye this week" color="var(--color-warning)" />
             ) : null}
           </div>
+          {rookie?.detail ? (
+            <p className="pqv-rookie-line" data-testid="pqv-rookie-line">
+              Rookie · {rookie.detail}
+            </p>
+          ) : null}
         </div>
 
         <div className="pqv-stat-tiles">

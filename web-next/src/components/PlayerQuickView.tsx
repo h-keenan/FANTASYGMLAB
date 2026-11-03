@@ -30,6 +30,7 @@ import {
   awardTierTone,
   overallRatingBand,
   ordinal,
+  rookieBadge,
   seasonStatGroups,
   statPercentileBand,
   tierOpportunityMismatchCaption,
@@ -258,6 +259,7 @@ export function PlayerQuickView({
           usageTrend={model?.usage_trend ?? null}
           usageLoading={loading}
           depthChartNote={model?.depth_chart_note}
+          rookie={rookieBadge(bio)}
         />
 
         <div className="pqv-signal-row">

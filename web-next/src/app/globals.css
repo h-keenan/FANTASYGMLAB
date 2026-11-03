@@ -1281,6 +1281,11 @@ a {
   flex-direction: column;
   gap: var(--space-xs);
 }
+.pqv-rookie-line {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
 .pqv-rank-line {
   margin: 0;
   font-size: 0.78rem;

@@ -64,3 +64,23 @@ export function radarPoints(
   }
   return points;
 }
+
+/**
+ * ROOKIE badge for the Player Quick View / Profile header. Rookie status is
+ * the backend's `bio.is_rookie` (years_exp === 0, the same definition live
+ * draft rookie rankings use); this never re-derives it from age or draft
+ * year. `detail` is a one-line "2026 · Round 1 · Pick 12 · College" built only
+ * from bio fields that are actually present, or null when none are.
+ */
+export function rookieBadge(
+  bio: { is_rookie?: boolean | null; draft_capital?: string | null; college?: string | null } | null | undefined,
+): { label: 'ROOKIE'; detail: string | null } | null {
+  if (!bio || bio.is_rookie !== true) return null;
+  const parts = [
+    ...(bio.draft_capital ?? '').split('/'),
+    bio.college ?? '',
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return { label: 'ROOKIE', detail: parts.length > 0 ? parts.join(' · ') : null };
+}
