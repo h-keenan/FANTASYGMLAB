@@ -58,7 +58,7 @@ describe("TradeHubContent", () => {
   it("renders a trade idea card with partner, fairness pill, value edge, and give/get assets", () => {
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Trade Hub" })).toBeInTheDocument();
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("Favorable")).toBeInTheDocument();
     expect(screen.getByText("+800")).toBeInTheDocument();

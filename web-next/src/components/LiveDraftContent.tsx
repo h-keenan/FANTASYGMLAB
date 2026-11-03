@@ -29,6 +29,7 @@ import {
   type LiveDraftRankFilter,
 } from "@/lib/liveDraftPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Live Draft (Revision 21) — the last page on the original migration punch
@@ -370,10 +371,7 @@ export function LiveDraftContent({
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Live Draft
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="Live Draft" leagueName={leagueName} />
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Read-only Sleeper draft-room assistant. Picks and recommendations update automatically — nothing is
           submitted to Sleeper.

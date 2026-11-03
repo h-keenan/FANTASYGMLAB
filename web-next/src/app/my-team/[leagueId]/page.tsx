@@ -11,6 +11,7 @@ import { api, type KeepersResponse, type MyTeamNeedsResponse, type MyTeamRespons
 import { MyTeamContent } from "@/components/MyTeamContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { PageTitle } from "@/components/PageTitle";
 
 /** Reserves the final page's block heights so the content doesn't jump. */
 function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
@@ -20,10 +21,7 @@ function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto" aria-busy="true">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          My Team
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="My Team" leagueName={leagueName} />
       </header>
       <span className="sr-only" role="status">
         Loading My Team

@@ -12,9 +12,11 @@ import { api, type RankedPlayer } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
+import { NavProMarker } from "@/components/NavProMarker";
 import { PositionBadge } from "@/components/PositionBadge";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
+import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
 import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from "@/lib/playerSearch";
@@ -83,7 +85,9 @@ export function GmOrb() {
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || leagueId || "";
-  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations } = useNavDestinations(leagueId, leagueName);
+  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName);
+  // Gold "Pro" markers on paid rows, shown only once we know the plan is Free.
+  const showProMarkers = useIsPro() === false;
   // Founder Analytics (coridian_, 2026-10-19: "just put it in the orb menu
   // for the specific account(s) listed on supabase") — gated on the SAME
   // server-issued `founder_ops` app_metadata claim GET /v1/founder/analytics
@@ -123,11 +127,11 @@ export function GmOrb() {
 
   const destinationResults = useMemo(() => {
     if (!normalizedQuery) return [];
-    const searchable = [...(leagueId ? [...coreLeagueDestinations, ...gmToolsDestinations] : []), ...generalDestinations];
+    const searchable = [...(leagueId ? [...coreLeagueDestinations, ...gmToolsDestinations] : []), ...generalDestinations, ...accountDestinations];
     return searchable.filter((destination) =>
       `${destination.label} ${destination.subtitle}`.toLowerCase().includes(normalizedQuery),
     );
-  }, [normalizedQuery, leagueId, coreLeagueDestinations, gmToolsDestinations, generalDestinations]);
+  }, [normalizedQuery, leagueId, coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations]);
   const playerResults = useMemo(
     () => (wantsPlayers && poolReady ? matchPlayersByName(playerPool.players, normalizedQuery) : []),
     [wantsPlayers, poolReady, playerPool, normalizedQuery],
@@ -185,7 +189,14 @@ export function GmOrb() {
             2026-10-17: the floating nav button is one of the most-seen
             elements on both platforms, so it should actually be the brand,
             not a placeholder). */}
-        <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
+        <span className="flex flex-col items-center" style={{ gap: "1px" }}>
+          <Image src="/brand-mark.png" alt="" width={22} height={22} className="brand-mark-icon" style={{ objectFit: "contain" }} />
+          {/* The orb was a bare logo: nothing said it opens the nav. The
+              visible "GM" matches the aria-label ("Open GM menu"). */}
+          <span aria-hidden="true" className="font-extrabold uppercase" style={{ fontSize: "0.625rem", lineHeight: 1, letterSpacing: "0.06em", color: "var(--color-accent)" }}>
+            GM
+          </span>
+        </span>
       </button>
 
       {open ? (
@@ -250,7 +261,7 @@ export function GmOrb() {
                     {destinationResults.length > 0 ? (
                       <div className="flex flex-col">
                         {destinationResults.map((destination) => (
-                          <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                          <NavRow key={destination.path} destination={destination} showPro={showProMarkers} onNavigate={() => setOpen(false)} />
                         ))}
                       </div>
                     ) : null}
@@ -297,7 +308,7 @@ export function GmOrb() {
               {leagueId ? (
                 <NavSection label={leagueName || "League"}>
                   {coreLeagueDestinations.map((destination) => (
-                    <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                    <NavRow key={destination.path} destination={destination} showPro={showProMarkers} onNavigate={() => setOpen(false)} />
                   ))}
                 </NavSection>
               ) : (
@@ -309,14 +320,20 @@ export function GmOrb() {
               {leagueId ? (
                 <NavSection label="GM Tools">
                   {gmToolsDestinations.map((destination) => (
-                    <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                    <NavRow key={destination.path} destination={destination} showPro={showProMarkers} onNavigate={() => setOpen(false)} />
                   ))}
                 </NavSection>
               ) : null}
 
               <NavSection label="General">
                 {generalDestinations.map((destination) => (
-                  <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                  <NavRow key={destination.path} destination={destination} showPro={showProMarkers} onNavigate={() => setOpen(false)} />
+                ))}
+              </NavSection>
+
+              <NavSection label="Account">
+                {accountDestinations.map((destination) => (
+                  <NavRow key={destination.path} destination={destination} showPro={showProMarkers} onNavigate={() => setOpen(false)} />
                 ))}
               </NavSection>
 
@@ -349,7 +366,7 @@ function NavSection({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-function NavRow({ destination, onNavigate }: { destination: NavDestination; onNavigate: () => void }) {
+function NavRow({ destination, showPro = false, onNavigate }: { destination: NavDestination; showPro?: boolean; onNavigate: () => void }) {
   return (
     <Link
       href={destination.path}
@@ -361,8 +378,11 @@ function NavRow({ destination, onNavigate }: { destination: NavDestination; onNa
         <NavDestinationGlyph name={destination.glyph} size={20} />
       </span>
       <span className="flex flex-col min-w-0">
-        <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-          {destination.label}
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+            {destination.label}
+          </span>
+          {showPro && destination.pro ? <NavProMarker /> : null}
         </span>
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {destination.subtitle}

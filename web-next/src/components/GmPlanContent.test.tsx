@@ -195,7 +195,7 @@ describe("GmPlanContent", () => {
   it("renders the hero phase/stance badges, headline, and league name", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "GM Plan" })).toBeInTheDocument();
     expect(screen.getByText("Trade Deadline Approaching")).toBeInTheDocument();
     expect(screen.getByText("Rebuilding")).toBeInTheDocument();
     expect(screen.getByText("The trade market is most active right now.")).toBeInTheDocument();

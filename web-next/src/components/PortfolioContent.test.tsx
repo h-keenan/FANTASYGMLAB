@@ -474,7 +474,7 @@ describe("PortfolioContent", () => {
 
   it("paints a header plus final-height skeleton cards for the instant shell", () => {
     const { container } = render(<PortfolioShell />);
-    expect(screen.getByRole("heading", { name: "Your leagues" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Portfolio" })).toBeInTheDocument();
     const skeletons = container.querySelectorAll("[data-portfolio-skeleton]");
     expect(skeletons).toHaveLength(PORTFOLIO_SHELL_SKELETON_COUNT);
     skeletons.forEach((el) => expect((el as HTMLElement).style.minHeight).toBe(`${PORTFOLIO_CARD_MIN_HEIGHT}px`));

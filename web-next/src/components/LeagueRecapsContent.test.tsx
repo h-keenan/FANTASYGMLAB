@@ -213,7 +213,7 @@ describe("LeagueRecapsContent", () => {
   it("colors each recap story's title by its category, not a flat/uniform color", () => {
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "League Recaps" })).toBeInTheDocument();
     expect(screen.getByText("Week 5 recap")).toBeInTheDocument();
 
     const performanceTitle = screen.getByText("Highest team score");

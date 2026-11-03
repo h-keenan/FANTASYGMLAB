@@ -50,7 +50,7 @@ describe("AlertsContent", () => {
   it("renders the league name, grouped event type, and the alert's headline/player identity", () => {
     const { container } = render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Alerts" })).toBeInTheDocument();
     expect(screen.getByText("Injury / Status")).toBeInTheDocument();
     expect(screen.getByText("Test player ruled out for Week 7")).toBeInTheDocument();
     expect(screen.getByText("Test Player")).toBeInTheDocument();
