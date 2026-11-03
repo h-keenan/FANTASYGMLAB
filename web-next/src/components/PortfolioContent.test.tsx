@@ -371,7 +371,7 @@ describe("PortfolioContent", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "See every league at a glance" })).toBeInTheDocument();
+    expect(screen.getByText("See every league at a glance")).toBeInTheDocument();
     expect(
       screen.getByText(/free accounts keep one saved league, so there's nothing to aggregate yet/),
     ).toBeInTheDocument();

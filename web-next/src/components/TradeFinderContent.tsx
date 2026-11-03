@@ -361,6 +361,7 @@ export function TradeFinderContent({
     return (
       <PremiumUpsellCard
         kicker="Trade Finder"
+        leagueName={leagueName}
         upsell={premiumUpsell.upsell}
         fallbackTitle="Build and search for a trade"
         fallbackBody="Trade Finder is a Pro feature — build a custom package and search every roster in your league for a real match. Upgrade to Pro to unlock it."

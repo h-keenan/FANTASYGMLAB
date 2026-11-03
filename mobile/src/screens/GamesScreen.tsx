@@ -240,6 +240,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
           data.upsell?.body ?? 'Add or drop players and see the change in your playoff odds before you make the move.'
         }
         feature="games_what_if"
+        previewKey="what_if"
       />
     );
   }

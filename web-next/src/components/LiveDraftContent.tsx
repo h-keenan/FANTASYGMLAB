@@ -361,6 +361,7 @@ export function LiveDraftContent({
     return (
       <PremiumUpsellCard
         kicker="Live Draft"
+        leagueName={leagueName}
         upsell={discovery.upsell}
         fallbackTitle="Draft with real-time recommendations"
         fallbackBody="Live Draft is a Pro feature — Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening. Upgrade to Pro to unlock it."
