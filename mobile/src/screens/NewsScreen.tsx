@@ -12,6 +12,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem, type NewsResponse } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { newsPlayerIdentities } from '../lib/newsIdentity';
+import { alsoReportedLine } from '../lib/playerNews';
 import { stubPlayer } from '../lib/playerQuickView';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -25,7 +26,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 // gray = everything else. Per Magna Carta §3 an event-type badge must mean the
 // same class of thing everywhere in the app, so this stays in lockstep with
 // Alerts rather than inventing a News-specific palette.
-function eventBadgeColors(colors: ThemeColors): Record<string, string> {
+export function eventBadgeColors(colors: ThemeColors): Record<string, string> {
   return {
     'injury/status': colors.danger,
     transaction: colors.accent,
@@ -48,7 +49,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   'off-field/drama': 'Off-Field',
 };
 
-function eventTypeLabel(eventType: string | null): string {
+export function eventTypeLabel(eventType: string | null): string {
   if (!eventType) return 'Update';
   return (
     EVENT_TYPE_LABELS[eventType] ??
@@ -218,7 +219,17 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
   );
 }
 
-function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }) {
+/** One story row. Exported for the full player profile's News tab. */
+export function NewsRow({
+  item,
+  showDivider,
+  showEventTag = false,
+}: {
+  item: NewsItem;
+  showDivider: boolean;
+  /** Prefix the row with its impact tag (Injury / Transaction / ...). */
+  showEventTag?: boolean;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createRowStyles(colors), [colors]);
   const footerBits = [
@@ -239,6 +250,14 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
       activeOpacity={item.link ? 0.7 : 1}
       disabled={!item.link}
     >
+      {showEventTag && item.event_type ? (
+        <AppText
+          style={[styles.eventTag, { color: eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary }]}
+          testID="news-event-tag"
+        >
+          {eventTypeLabel(item.event_type)}
+        </AppText>
+      ) : null}
       <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
       {identities.map((identity, index) => (
         <CompactPlayerModule
@@ -272,6 +291,7 @@ function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }
           {item.summary}
         </AppText>
       ) : null}
+      {alsoReportedLine(item) ? <AppText style={styles.footerMeta}>{alsoReportedLine(item)}</AppText> : null}
       {footerBits.length > 0 ? <AppText style={styles.footerMeta}>{footerBits.join(' · ')}</AppText> : null}
     </TouchableOpacity>
   );
@@ -281,6 +301,7 @@ function createRowStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { paddingVertical: spacing.sm + 2 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    eventTag: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 2 },
     time: { fontSize: 11, color: colors.textTertiary, marginBottom: 3 },
     identity: { marginBottom: spacing.xs },
     title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },

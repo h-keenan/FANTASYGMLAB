@@ -1473,6 +1473,8 @@ export interface NewsItem {
   published_ts: number | null;
   event_type: string | null;
   speculative: boolean;
+  /** Other outlets that reported the same story (player news with group_duplicates). */
+  also_reported_by?: Array<{ source: string | null; link: string | null }>;
   // GET /v1/news only sends these when the backend resolved a player
   // (absent otherwise — never guessed client-side). matched_players is the
   // two-player case (e.g. a trade), exactly two entries.
@@ -2412,6 +2414,12 @@ export interface PlayerNewsResponse {
   /** Most recent injury item (<=30d) from the full matched pool, or null.
    * A headline to read, never proof of cause. */
   injury_item: NewsItem | null;
+  /** Pagination (absent on an older server). */
+  total?: number;
+  has_more?: boolean;
+  next_offset?: number | null;
+  /** Feed cache state; "warming_up"/"stale" explains an empty or thin list. */
+  status?: NewsFeedStatus;
 }
 
 export interface QuickViewIdentity {
@@ -3721,8 +3729,12 @@ export const api = {
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
-  getPlayerNews: (playerId: string, limit = 5) =>
-    authorizedFetch<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?limit=${limit}`),
+  getPlayerNews: (playerId: string, limit = 5, options?: { offset?: number; groupDuplicates?: boolean }) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (options?.offset) params.set('offset', String(options.offset));
+    if (options?.groupDuplicates) params.set('group_duplicates', 'true');
+    return authorizedFetch<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?${params.toString()}`);
+  },
   getLeagueRecap: (leagueId: string, options?: { week?: number }) => {
     const params = new URLSearchParams();
     if (options?.week != null) params.set('week', String(options.week));

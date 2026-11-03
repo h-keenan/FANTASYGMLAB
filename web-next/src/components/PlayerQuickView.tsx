@@ -23,7 +23,7 @@ import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
-import { cleanInjuryLabel } from "@/lib/playerAvailabilityPresentation";
+import { cleanInjuryLabel, playerProfileNewsHref } from "@/lib/playerAvailabilityPresentation";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
   SUB_RATING_DISPLAY,
@@ -295,6 +295,11 @@ export function PlayerQuickView({
             loading={newsLoading}
             playerId={identity.player_id}
             name={name}
+            seeAllHref={
+              identity.leagueId
+                ? playerProfileNewsHref(identity.leagueId, identity.player_id, identity.leagueName || "")
+                : undefined
+            }
           />
         ) : null}
 

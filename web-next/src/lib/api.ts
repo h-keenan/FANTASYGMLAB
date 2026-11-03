@@ -1907,6 +1907,8 @@ export interface NewsItem {
   published_ts: number | null;
   event_type: string | null;
   speculative: boolean;
+  /** Other outlets that reported the same story (player news with group_duplicates). */
+  also_reported_by?: Array<{ source: string | null; link: string | null }>;
   matched_player?: string | null;
   matched_player_id?: string | null;
   matched_player_position?: string | null;
@@ -2605,6 +2607,12 @@ export interface PlayerNewsResponse {
   /** Most recent injury item (<=30d) from the full matched pool, or null.
    * A headline to read, never proof of cause. */
   injury_item: NewsItem | null;
+  /** Pagination (absent on an older server): matched items, more pages, next offset. */
+  total?: number;
+  has_more?: boolean;
+  next_offset?: number | null;
+  /** Feed cache state; "warming_up"/"stale" explains an empty or thin list. */
+  status?: NewsFeedStatus;
 }
 
 export interface QuickViewIdentity {
@@ -4230,8 +4238,16 @@ export const api = {
     authorizedRequest<NewsResponse>(`/v1/news?limit=${limit}`),
 
   // Recent news for one player (quick view's Latest news + injury headline).
-  getPlayerNews: (playerId: string, limit: number = 3) =>
-    authorizedRequest<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?limit=${limit}`),
+  getPlayerNews: (
+    playerId: string,
+    limit: number = 3,
+    options: { offset?: number; groupDuplicates?: boolean } = {},
+  ) => {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (options.offset) query.set("offset", String(options.offset));
+    if (options.groupDuplicates) query.set("group_duplicates", "true");
+    return authorizedRequest<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?${query.toString()}`);
+  },
 
   // League-adjusted player rankings — GM Targets (Revision 11) joins this
   // against getGmTargets' bare preference rows for name/position/team/rank/

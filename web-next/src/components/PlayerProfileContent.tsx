@@ -18,6 +18,7 @@ import { SeasonStatsRows } from "@/components/SeasonStatsRows";
 import { HeadlineTiles } from "@/components/StatRows";
 import { headlineRows } from "@/lib/statRowsPresentation";
 import { PlayerCareerTab } from "@/components/PlayerCareerTab";
+import { PlayerNewsTab } from "@/components/PlayerNewsTab";
 import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
@@ -51,7 +52,7 @@ import { trackUse } from "@/lib/analytics";
  * awards-bio-row).
  */
 
-type ProfileTab = "stats" | "trends" | "schedule" | "career" | "model";
+type ProfileTab = "stats" | "trends" | "schedule" | "career" | "model" | "news";
 
 const PROFILE_TABS: Array<{ label: string; value: ProfileTab }> = [
   { label: "Stats", value: "stats" },
@@ -59,7 +60,13 @@ const PROFILE_TABS: Array<{ label: string; value: ProfileTab }> = [
   { label: "Schedule", value: "schedule" },
   { label: "Career", value: "career" },
   { label: "Model", value: "model" },
+  { label: "News", value: "news" },
 ];
+
+/** `?tab=news` (Quick View "See all news") opens that tab; anything unknown is Stats. */
+export function profileTabFromParam(param: string | null | undefined): ProfileTab {
+  return PROFILE_TABS.some((option) => option.value === param) ? (param as ProfileTab) : "stats";
+}
 
 function StatsTab({
   stats,
@@ -132,7 +139,10 @@ export function PlayerProfileContent({
   leagueId,
   leagueName,
   lens = "Dynasty",
+  initialTab = "stats",
 }: {
+  /** Tab to open on (from the `?tab=` URL param). */
+  initialTab?: ProfileTab;
   player: RankedPlayer;
   leagueId: string;
   leagueName: string;
@@ -143,7 +153,7 @@ export function PlayerProfileContent({
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loadError, setLoadError] = useState(false);
-  const [tab, setTab] = useState<ProfileTab>("stats");
+  const [tab, setTab] = useState<ProfileTab>(initialTab);
   // Which player `detail`/`awards` actually belong to — compared against
   // player.player_id below to derive "still loading" without a second
   // setState call synchronously at the top of the effect (same
@@ -233,7 +243,7 @@ export function PlayerProfileContent({
               options={PROFILE_TABS.map((option) => ({ label: option.label, value: option.value }))}
               active={tab}
               onSelect={(value) => setTab(value as ProfileTab)}
-              fullWidth
+              variant="scroll"
             />
 
             <div className="flex flex-col gap-4">
@@ -247,6 +257,9 @@ export function PlayerProfileContent({
               ) : null}
               {tab === "schedule" ? <PlayerScheduleTab playerId={player.player_id} /> : null}
               {tab === "career" ? <PlayerCareerTab playerId={player.player_id} /> : null}
+              {tab === "news" ? (
+                <PlayerNewsTab playerId={player.player_id} availability={detail?.identity?.availability ?? null} />
+              ) : null}
               {tab === "model" ? (
                 model ? (
                   <SubRatingRow model={model} />

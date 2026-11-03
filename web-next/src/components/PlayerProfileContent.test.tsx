@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PlayerProfileContent } from "./PlayerProfileContent";
+import { PlayerProfileContent, profileTabFromParam } from "./PlayerProfileContent";
 import { resetShareBlobCache } from "@/lib/useShareImage";
 import {
   api,
@@ -24,6 +24,7 @@ vi.mock("@/lib/api", async () => {
       getPlayerSchedule: vi.fn(),
       getPlayerCareer: vi.fn(),
       getPlayerShareCardBlob: vi.fn(),
+      getPlayerNews: vi.fn(),
     },
   };
 });
@@ -147,6 +148,24 @@ describe("PlayerProfileContent", () => {
 
     expect(screen.getByText("Player One")).toBeInTheDocument();
     expect(screen.getByText(/Loading player profile/)).toBeInTheDocument();
+  });
+
+  it("opens on the News tab from ?tab=news and lists the player's stories", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+    vi.mocked(api.getPlayerNews).mockResolvedValue({
+      ok: true,
+      items: [{ title: "Player One signs extension", link: "https://example.com/x", source: "ESPN", summary: "Done deal.", published_ts: Date.now() / 1000 - 60, event_type: "transaction", speculative: false }],
+      injury_item: null,
+    });
+
+    render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" initialTab={profileTabFromParam("news")} />);
+
+    expect(await screen.findByText("Player One signs extension")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "News" })).toBeInTheDocument();
+    expect(api.getPlayerNews).toHaveBeenCalledWith("p1", 10, { groupDuplicates: true });
+    expect(profileTabFromParam("bogus")).toBe("stats");
+    expect(profileTabFromParam(null)).toBe("stats");
   });
 
   it("shows an error state when the detail request fails", async () => {

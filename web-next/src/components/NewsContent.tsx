@@ -96,7 +96,8 @@ function NewsIdentity({ item }: { item: NewsItem }) {
   return null;
 }
 
-function NewsCard({ item }: { item: NewsItem }) {
+/** Exported for the full profile's News tab (one card for every news list). */
+export function NewsCard({ item, showEventTag = false }: { item: NewsItem; showEventTag?: boolean }) {
   const time = relativeTime(item.published_ts);
   const hasLink = Boolean(item.link);
 
@@ -111,6 +112,15 @@ function NewsCard({ item }: { item: NewsItem }) {
         {item.source ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {item.source}
+          </span>
+        ) : null}
+        {showEventTag && item.event_type ? (
+          <span
+            className="uppercase font-extrabold text-xs"
+            style={{ color: eventTypeColorVar(item.event_type), letterSpacing: "var(--letter-spacing-badge)" }}
+            data-testid="news-event-tag"
+          >
+            {eventTypeLabel(item.event_type)}
           </span>
         ) : null}
         {item.speculative ? (
@@ -131,6 +141,12 @@ function NewsCard({ item }: { item: NewsItem }) {
       <p className="text-sm font-bold mt-1" style={{ color: "var(--color-text-primary)" }}>
         {item.title}
       </p>
+
+      {item.also_reported_by && item.also_reported_by.length > 0 ? (
+        <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }} data-testid="news-also-reported">
+          Also reported by {item.also_reported_by.map((other) => other.source).filter(Boolean).join(", ")}
+        </p>
+      ) : null}
 
       {item.summary ? (
         <p className="text-sm mt-1" style={{ font: "var(--type-caption-emphasis)", color: "var(--color-text-secondary)" }}>

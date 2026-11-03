@@ -37,3 +37,10 @@ describe("playerAvailabilityPresentation", () => {
     expect(newsPageHref("12", "A B")).toBe("/news?player=12&name=A%20B");
   });
 });
+
+describe("playerProfileNewsHref", () => {
+  it("opens the full profile on its News tab", async () => {
+    const { playerProfileNewsHref } = await import("./playerAvailabilityPresentation");
+    expect(playerProfileNewsHref("L 1", "12", "My League")).toBe("/players/L%201/12?name=My%20League&tab=news");
+  });
+});

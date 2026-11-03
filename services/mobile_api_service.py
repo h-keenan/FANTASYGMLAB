@@ -30,7 +30,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
   - GET  /v1/leagues/{id}/players/{id}/rank — one player's league-adjusted rank, looked up directly
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
-  - GET  /v1/players/{id}/news           — recent news items matched to one player
+  - GET  /v1/players/{id}/news           — news items matched to one player (limit/offset paging, group_duplicates)
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
   - GET  /v1/leagues/{id}/history        — season transaction timeline (trades/waivers/picks) with retrospective grades
@@ -5367,16 +5367,59 @@ def get_news(
 
 
 MAX_PLAYER_NEWS_LIMIT = 10
+MAX_PLAYER_NEWS_OFFSET = 1000
+
+
+def _group_syndicated_news(projected: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapses one story reported by several outlets into a single entry.
+
+    `projected` is newest-first. The newest item of a cluster is kept as the
+    representative and the other outlets are listed in `also_reported_by`
+    ({source, link}). Two items are one story when their normalized headlines
+    match, or are near-duplicates (news_signal.tokens_near_duplicate) within
+    NEAR_DUPLICATE_WINDOW_SECONDS of each other. Reuses the same title
+    normalization the rest of the news pipeline dedupes with.
+    """
+
+    grouped: list[dict[str, Any]] = []
+    keys: list[tuple[str, frozenset, float]] = []
+    for item in projected:
+        title = item.get("title")
+        norm = news_signal.normalize_title(title)
+        tokens = news_signal.title_tokens(title)
+        ts = float(item.get("published_ts") or 0)
+        home: dict[str, Any] | None = None
+        if norm:
+            for entry, (entry_norm, entry_tokens, entry_ts) in zip(grouped, keys):
+                same = norm == entry_norm
+                near = (
+                    news_signal.tokens_near_duplicate(tokens, entry_tokens)
+                    and abs(ts - entry_ts) <= news_signal.NEAR_DUPLICATE_WINDOW_SECONDS
+                )
+                if same or near:
+                    home = entry
+                    break
+        if home is None:
+            grouped.append(dict(item))
+            keys.append((norm, tokens, ts))
+            continue
+        also = home.setdefault("also_reported_by", [])
+        source = item.get("source")
+        if source and source != home.get("source") and all(a.get("source") != source for a in also):
+            also.append({"source": source, "link": item.get("link")})
+    return grouped
 
 
 @app.get("/v1/players/{player_id}/news")
 def get_player_news(
     player_id: str,
     limit: int = 5,
+    offset: int = 0,
+    group_duplicates: bool = False,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Recent news items mentioning one player — powers Player Detail's
-    "impacted by news" badge.
+    "impacted by news" badge and the full profile's News tab.
 
     The generic news pool /v1/news reads from is league-independent, so
     unlike the roster-aware Alerts/Dashboard path (news_intelligence's
@@ -5385,10 +5428,20 @@ def get_player_news(
     resolve names against. Since the caller already names a specific
     player, this matches that player's own name as a phrase against each
     article directly instead, which sidesteps needing that index.
+
+    Pagination (newest first): `limit` items starting at `offset`. The
+    response carries `total` (matched items, after grouping when requested),
+    `has_more` and `next_offset`. `group_duplicates=true` folds one story
+    syndicated by several outlets into one item with `also_reported_by`.
+    `status` is the feed's honest cache state (ok / warming_up / stale) so a
+    client can tell "no news" from "news is not loaded yet". Without the new
+    params the items are exactly what they were before.
     """
 
     if not 1 <= limit <= MAX_PLAYER_NEWS_LIMIT:
         raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_PLAYER_NEWS_LIMIT}.")
+    if not 0 <= offset <= MAX_PLAYER_NEWS_OFFSET:
+        raise HTTPException(status_code=422, detail=f"offset must be between 0 and {MAX_PLAYER_NEWS_OFFSET}.")
 
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
@@ -5396,7 +5449,14 @@ def get_player_news(
     row_matches = players_df[players_df["player_id"] == player_id] if not players_df.empty else players_df
     player_name = str(row_matches.iloc[0].get("name") or "").strip() if not row_matches.empty else ""
     if not player_name:
-        return {"ok": True, "items": [], "injury_item": None}
+        return {
+            "ok": True,
+            "items": [],
+            "injury_item": None,
+            "total": 0,
+            "has_more": False,
+            "next_offset": None,
+        }
 
     news_cache.schedule_news_cache_refresh()
     enriched = news_cache.enriched_news_pool()
@@ -5414,10 +5474,17 @@ def get_player_news(
     # same matched pool (not just the newest `limit`). Quick view labels it
     # "Latest injury report" and never claims it caused the status.
     injury_item = player_availability.news_explaining_injury(projected, now_ts=time.time())
+    listing = _group_syndicated_news(projected) if group_duplicates else projected
+    page = listing[offset : offset + limit]
+    has_more = offset + limit < len(listing)
     return {
         "ok": True,
-        "items": projected[:limit],
+        "items": page,
         "injury_item": dict(injury_item) if injury_item else None,
+        "total": len(listing),
+        "has_more": has_more,
+        "next_offset": offset + limit if has_more else None,
+        "status": news_cache.news_feed_status(),
     }
 
 

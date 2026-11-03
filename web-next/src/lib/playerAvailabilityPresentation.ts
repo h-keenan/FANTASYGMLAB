@@ -55,3 +55,8 @@ export function newsAgeLabel(publishedTs: number | null, nowMs: number = Date.no
 export function newsPageHref(playerId: string, name: string): string {
   return `/news?player=${encodeURIComponent(playerId)}&name=${encodeURIComponent(name)}`;
 }
+
+/** Full profile opened on its News tab (Quick View "See all news"). */
+export function playerProfileNewsHref(leagueId: string, playerId: string, leagueName: string): string {
+  return `/players/${encodeURIComponent(leagueId)}/${encodeURIComponent(playerId)}?name=${encodeURIComponent(leagueName)}&tab=news`;
+}
