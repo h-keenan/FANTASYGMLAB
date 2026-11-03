@@ -205,13 +205,13 @@ def test_trace_reports_value_gap_when_no_team_has_anything_near_the_selection(mo
     assert payload["funnel"]["value_band"] > 0
 
 
-def test_trace_payload_for_found_results_has_no_headline_and_unmeasured_causes_are_not_invented():
+def test_trace_payload_for_found_results_has_a_plain_headline_and_unmeasured_causes_are_not_invented():
     fixture = _fixture("contender")
     trace = trade_ideas.FinderSearchTrace()
     ideas = _search(fixture, [_pick_id(fixture, 2026, 1)], trace=trace)
     payload = trade_ideas.finder_search_payload(trace, found=len(ideas), closest=[])
     assert payload["status"] == "found"
-    assert payload["headline"] == ""
+    assert payload["headline"] == "Every package below includes 2026 Round 1."
     assert payload["found"] == len(ideas)
     codes = {r["code"] for r in payload["reasons"]}
     assert codes <= {"value_band", "partner_fit", "my_fit", "market", "market_hard", "analyzer", "roster_full", "no_candidates"}
@@ -226,8 +226,9 @@ def test_unowned_pick_selection_is_reported_as_unmatchable_not_as_a_value_proble
     trace = trade_ideas.FinderSearchTrace()
     assert _search(fixture, ["2026:1:2"], trace=trace) == []  # roster 2's pick
     payload = trade_ideas.finder_search_payload(trace, found=0, closest=[])
-    assert payload["status"] == "none"
-    assert "could be matched" in payload["headline"]
+    assert payload["status"] == "selected_assets_blocked"
+    assert payload["reason"] == "selected_assets_blocked: 2026 Round 1 because you do not own that pick in this league"
+    assert "you do not own that pick" in payload["headline"]
 
 
 def test_default_board_is_unchanged_by_the_trace_plumbing():

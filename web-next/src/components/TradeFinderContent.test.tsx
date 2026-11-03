@@ -325,6 +325,95 @@ describe("TradeFinderContent", () => {
     expect(screen.getByText("Near Miss GM")).toBeInTheDocument();
   });
 
+  it("says what every result contains, labels a pick we added, and lists an overpay as a stretch (not found)", async () => {
+    const response: TradeFinderResponse = {
+      ok: true,
+      ideas: [
+        {
+          ...idea({ partner_team_name: "Added Pick GM" }),
+          finder_note: {
+            stage: "we_added",
+            label: "We added",
+            reason: "We added 2028 Round 3 from your picks to make this work; you did not select it.",
+            added: ["2028 Round 3"],
+          },
+        },
+      ],
+      closest: [
+        {
+          ...idea({ partner_team_name: "Overpay GM", trade_gain: -600 }),
+          finder_note: { stage: "overpay", label: "Overpay", reason: "You would overpay: the balance is -600 for you." },
+        },
+      ],
+      reason: "",
+      is_premium: true,
+      upsell: null,
+      search: {
+        status: "found",
+        found: 1,
+        closest: 1,
+        headline: "Every package below includes both My Running Back and 2027 Round 1. 1 of them include a pick we added.",
+      },
+    };
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(screen.getByTestId("trade-finder-summary")).toHaveTextContent(/Every package below includes both My Running Back/);
+    expect(screen.getByText("We added")).toBeInTheDocument();
+    expect(screen.getByText(/We added 2028 Round 3/)).toBeInTheDocument();
+    expect(screen.getByText("Overpay")).toBeInTheDocument();
+    expect(screen.getByText("Closest options (stretch)")).toBeInTheDocument();
+    expect(screen.getByText("Overpay GM")).toBeInTheDocument();
+    expect(screen.queryByTestId("trade-finder-no-results")).not.toBeInTheDocument();
+  });
+
+  it("when the selection cannot be included, says which asset and why, and labels alternatives as not including it", async () => {
+    const response: TradeFinderResponse = {
+      ok: true,
+      ideas: [],
+      reason: "",
+      is_premium: true,
+      upsell: null,
+      search: {
+        status: "selected_assets_blocked",
+        found: 0,
+        closest: 1,
+        reason: "selected_assets_blocked: My Running Back because 40 packages grade as a loss for you",
+        headline: "We could not build a realistic trade that includes both My Running Back and 2027 Round 1.",
+        blocked: [{ asset: "My Running Back", code: "analyzer", reason: "40 packages grade as a loss for you" }],
+        reasons: [],
+      },
+      closest: [
+        {
+          ...idea({ partner_team_name: "Without GM" }),
+          finder_note: {
+            stage: "excludes_selection",
+            label: "Without My Running Back",
+            reason: "This does NOT include My Running Back, which you selected.",
+            missing: ["My Running Back"],
+          },
+        },
+      ],
+    };
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(screen.getByText(/couldn't build a trade with everything you selected/)).toBeInTheDocument();
+    expect(screen.getByText(/could not build a realistic trade that includes both/)).toBeInTheDocument();
+    expect(screen.getByText("Without My Running Back")).toBeInTheDocument();
+    expect(screen.getByText(/does NOT include My Running Back/)).toBeInTheDocument();
+  });
+
   it("reports a failed search as a problem with a retry, not as zero trades", async () => {
     const response: TradeFinderResponse = {
       ok: true,

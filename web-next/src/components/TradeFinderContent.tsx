@@ -11,13 +11,17 @@ import {
   type PremiumUpsell,
   type TradeFinderClosestIdea,
   type TradeFinderSearch,
-  type TradeIdea,
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { TradeAssetRow } from "@/components/TradeAssetExchange";
-import { TradeFinderNoResults } from "@/components/TradeFinderNoResults";
+import {
+  TradeFinderClosestSection,
+  TradeFinderNoResults,
+  TradeFinderNoteRow,
+  TradeFinderSummary,
+} from "@/components/TradeFinderNoResults";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
@@ -225,7 +229,7 @@ export function TradeFinderContent({
   const [returnPicks, setReturnPicks] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
+  const [ideas, setIdeas] = useState<TradeFinderClosestIdea[] | null>(null);
   // Why nothing realistic came back, plus labelled near misses (see
   // TradeFinderNoResults). Reset with `ideas` whenever the selection changes.
   const [noResults, setNoResults] = useState<{ search?: TradeFinderSearch; closest: TradeFinderClosestIdea[] }>({
@@ -475,15 +479,14 @@ export function TradeFinderContent({
               />
             ) : (
               <div className="flex flex-col gap-4">
+                <TradeFinderSummary search={noResults.search} />
                 {ideas.map((idea, index) => (
-                  <TradeIdeaCardView
-                    key={`${idea.partner_team_name}-${index}`}
-                    idea={idea}
-                    leagueId={leagueId}
-                    strategy="retool"
-                    lens={lens}
-                  />
+                  <div key={`${idea.partner_team_name}-${index}`} className="flex flex-col gap-2">
+                    <TradeFinderNoteRow note={idea.finder_note} />
+                    <TradeIdeaCardView idea={idea} leagueId={leagueId} strategy="retool" lens={lens} />
+                  </div>
                 ))}
+                <TradeFinderClosestSection options={noResults.closest} leagueId={leagueId} lens={lens} />
               </div>
             )
           ) : null}

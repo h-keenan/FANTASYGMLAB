@@ -1004,6 +1004,29 @@ FINDER_NEAR_MISS_LIMIT = 6
 _STAGE_RANK = {"analyzer": 0, "market": 1, "reasoning": 2, "partner_fit": 3, "my_fit": 4, "value_band": 5}
 
 
+def selected_asset_key(asset: Mapping[str, Any]) -> str:
+    """Stable identity of an asset a user selected: player id or pick id."""
+
+    if asset.get("asset_type") == "pick":
+        key = trade_block_pick_key(asset)
+        return f"pick:{key}" if key else ""
+    player_id = str(asset.get("player_id") or "").strip()
+    return f"player:{player_id}" if player_id else ""
+
+
+def missing_selected_assets(
+    required: Sequence[Mapping[str, Any]], send_assets: Sequence[Mapping[str, Any]]
+) -> List[str]:
+    """Labels of selected assets absent from `send_assets` (empty = complete)."""
+
+    present = {selected_asset_key(asset) for asset in send_assets}
+    return [
+        str(asset.get("label") or asset.get("name") or "")
+        for asset in required
+        if selected_asset_key(asset) not in present
+    ]
+
+
 class FinderSearchTrace:
     def __init__(self) -> None:
         self.funnel: Dict[str, int] = defaultdict(int)
@@ -1018,9 +1041,27 @@ class FinderSearchTrace:
         self.closest_asset_partner = ""
         # Set by trade_hub_engine after Trust enforcement.
         self.enforced_closest: List[Dict[str, Any]] = []
+        self.enforced_partial: List[Dict[str, Any]] = []
+        # Every explicit selection is a hard constraint: `required` holds the
+        # assets (players and picks) every returned package must send.
+        # `blocked` lists selected assets that could not even enter the search
+        # ({"label", "code", "reason"}). `partial` holds packages that clear the
+        # quality bar but leave some selected asset out; they are only ever
+        # shown as clearly-labelled alternatives, never as results.
+        self.required: List[Dict[str, Any]] = []
+        self.blocked: List[Dict[str, Any]] = []
+        self.partial: List[Dict[str, Any]] = []
+        self.hard_flags: Dict[str, int] = defaultdict(int)
 
     def count(self, stage: str, amount: int = 1) -> None:
         self.funnel[stage] += amount
+
+    def count_hard_flags(self, flags: Sequence[str] | None) -> None:
+        for flag in flags or ():
+            self.hard_flags[str(flag)] += 1
+
+    def missing_selected(self, idea: Mapping[str, Any]) -> List[str]:
+        return missing_selected_assets(self.required, idea.get("send_assets") or [])
 
     def note_pool(self, send_value: int, partner_name: str, assets: Sequence[Mapping[str, Any]]) -> None:
         """Remember the partner asset whose value is nearest the selection."""
@@ -1038,6 +1079,10 @@ class FinderSearchTrace:
             return
         idea = builder()
         if not idea:
+            return
+        if self.missing_selected(idea):
+            # A near miss that drops a selected asset is not a near miss of
+            # THIS search; the labelled partial alternatives cover that case.
             return
         idea["finder_stretch_stage"] = stage
         signature = (
@@ -1081,6 +1126,38 @@ def _idea_asset_value(assets: Sequence[Mapping[str, Any]]) -> int:
     return int(sum(int(asset.get("score") or 0) for asset in assets or []))
 
 
+# A found package whose balance is worse than this for the user is a stretch
+# (an overpay), not a "found" trade. Small negatives are normal on a package the
+# Analyzer grades FAIR; a few hundred points is a real overpay.
+FINDER_OVERPAY_GAIN = -250
+
+_HARD_FLAG_TEXT = {
+    "user_core_protection": "it would mean selling one of your cornerstone players without enough coming back",
+    "protected_outgoing": "it would sell one of your protected players you did not select",
+    "cornerstone_protection": "the other team would not give up its best player for that offer",
+    "best_asset_problem": "the other team would be giving up its best asset without a comparable centerpiece back",
+    "scarcity_problem": "premium players rarely move for depth alone",
+    "throw_in_problem": "the extra pieces read as throw-ins, not real value",
+    "need_leak": "it asks the other team to give up a position it needs",
+    "roster_limit_pressure": "it adds more players than your roster can hold",
+    "asset_quality_downgrade": "it swaps your best asset for a clearly weaker one",
+    "low_pick_quality_bridge": "a late pick cannot bridge that big a drop in quality",
+    "one_qb_qb_cost": "quarterbacks cost more than this offer in 1QB leagues",
+    "superflex_qb_scarcity": "elite quarterbacks cost more than this offer in Superflex",
+}
+
+
+def _asset_list_text(labels: Sequence[str]) -> str:
+    labels = [str(label) for label in labels if str(label)]
+    if not labels:
+        return "your selection"
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
 def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
     """Honest one-line reason this near miss is NOT a realistic trade, and
     what would change it. Only facts the engine computed."""
@@ -1088,6 +1165,26 @@ def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
     stage = str(idea.get("finder_stretch_stage") or "")
     partner = str(idea.get("partner_team_name") or "The other team")
     gap = _idea_asset_value(idea.get("receive_assets")) - _idea_asset_value(idea.get("send_assets"))
+    if stage == "excludes_selection":
+        left_out = [str(label) for label in idea.get("finder_missing_selected") or [] if str(label)]
+        what = _asset_list_text(left_out)
+        return {
+            "stage": stage,
+            "label": f"Without {what}",
+            "reason": (
+                f"This does NOT include {what}, which you selected. "
+                "No package that includes everything you selected cleared the bar, so this is the closest "
+                "workable deal without it."
+            ),
+            "value_gap": int(gap),
+            "missing": left_out,
+        }
+    if stage == "overpay":
+        reason = f"You would overpay: the balance is {int(idea.get('trade_gain') or gap):,} for you."
+        added = [str(label) for label in idea.get("finder_added_assets") or [] if str(label)]
+        if added:
+            reason += f" It also includes {_asset_list_text(added)}, which we added and you did not select."
+        return {"stage": stage, "label": "Overpay", "reason": reason, "value_gap": int(gap)}
     if stage == "analyzer":
         verdict = str(idea.get("analyzer_verdict") or "a loss").strip()
         reason = (
@@ -1115,24 +1212,68 @@ def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
     return {"stage": stage, "label": "Stretch", "reason": reason, "value_gap": int(gap)}
 
 
+def finder_found_note(idea: Mapping[str, Any]) -> Dict[str, Any] | None:
+    """Note for a package that IS a result but carries something the user
+    did not select: only ever a pick the engine added to make it work."""
+
+    added = [str(label) for label in idea.get("finder_added_assets") or [] if str(label)]
+    if not added:
+        return None
+    what = _asset_list_text(added)
+    return {
+        "stage": "we_added",
+        "label": "We added",
+        "reason": (
+            f"We added {what} from your picks to make this work; you did not select it. "
+            "Everything you selected is in the offer."
+        ),
+        "added": added,
+    }
+
+
+def finder_is_overpay(idea: Mapping[str, Any]) -> bool:
+    return int(idea.get("trade_gain") or 0) <= FINDER_OVERPAY_GAIN
+
+
+def split_finder_results(ideas: Sequence[Mapping[str, Any]]) -> tuple[List[Mapping[str, Any]], List[Mapping[str, Any]]]:
+    """(found, overpay): a negative-balance package is a stretch, not a find."""
+
+    found = [idea for idea in ideas if not finder_is_overpay(idea)]
+    overpay = [idea for idea in ideas if finder_is_overpay(idea)]
+    return found, overpay
+
+
 def finder_search_payload(
     trace: "FinderSearchTrace | None",
     *,
     found: int,
     closest: Sequence[Mapping[str, Any]],
+    found_ideas: Sequence[Mapping[str, Any]] = (),
+    overpay: int = 0,
 ) -> Dict[str, Any]:
     """The `search` block of GET .../trade-finder: status found / closest /
-    none, a headline that names the dominant cause, and the counted reasons.
-    Never claims a cause the funnel did not measure."""
+    selected_assets_blocked / none, a plain-English headline that is never
+    blank, and the counted reasons. Never claims a cause the funnel did not
+    measure.
 
-    status = "found" if found else ("closest" if closest else "none")
-    payload: Dict[str, Any] = {"status": status, "found": int(found), "closest": len(closest)}
+    A selection is a hard constraint, so when no package can include every
+    selected asset the status is `selected_assets_blocked` with a typed
+    `reason` ("selected_assets_blocked: <asset> because <reason>") and the
+    closest options say, per option, what they leave out."""
+
+    partial = [idea for idea in closest if idea.get("finder_stretch_stage") == "excludes_selection"]
+    payload: Dict[str, Any] = {
+        "status": "found" if found else ("closest" if closest else "none"),
+        "found": int(found),
+        "closest": len(closest),
+    }
     if trace is None:
         return payload
     funnel = dict(trace.funnel)
     value = int(trace.send_value or 0)
     labels = [label for label in trace.send_labels if label]
-    selection = ", ".join(labels) if labels else "your selection"
+    selection = _asset_list_text(labels)
+    both = "both " if len(labels) == 2 else "all of " if len(labels) > 2 else ""
     reasons: List[Dict[str, Any]] = []
 
     def add(code: str, text: str) -> None:
@@ -1158,9 +1299,12 @@ def finder_search_payload(
         count = int(funnel.get("reasoning", 0)) + int(funnel.get("market", 0))
         add("market", f"{count} packages did not look like a trade a manager would accept.")
     if funnel.get("market_hard"):
+        top_flag = max(trace.hard_flags.items(), key=lambda row: row[1])[0] if trace.hard_flags else ""
+        cause = _HARD_FLAG_TEXT.get(top_flag)
         add(
             "market_hard",
-            f"{funnel['market_hard']} packages were blocked by core-asset protection (we do not suggest cheap sales of cornerstone players).",
+            f"{funnel['market_hard']} packages failed the market-realism checks"
+            + (f", mostly because {cause}." if cause else "."),
         )
     if funnel.get("analyzer"):
         add(
@@ -1173,7 +1317,7 @@ def finder_search_payload(
         else:
             add(
                 "no_candidates",
-                "Nothing in this selection could be matched against another team. A player may be protected by your untouchables or core-asset rules, or a pick may no longer be yours.",
+                "Nothing in this selection could be matched against another team. A pick may no longer be yours, or the player is not on your roster.",
             )
     if candidates:
         reasons.sort(key=lambda row: -int(row["count"]))
@@ -1185,8 +1329,53 @@ def finder_search_payload(
                 "text": "Your roster is full, so any deal that adds a player means dropping one.",
             }
         )
+
+    blocked: List[Dict[str, Any]] = [dict(entry) for entry in trace.blocked]
+    if not found and partial:
+        left_out_counts: Dict[str, int] = defaultdict(int)
+        for idea in partial:
+            for label in idea.get("finder_missing_selected") or []:
+                left_out_counts[str(label)] += 1
+        because = reasons[0]["text"].rstrip(".") if reasons else "no package that includes it clears the quality bar"
+        code = reasons[0]["code"] if reasons else "no_candidates"
+        for label in sorted(left_out_counts, key=lambda key: -left_out_counts[key]):
+            blocked.append({"asset": label, "label": label, "code": code, "reason": because})
+    for entry in blocked:
+        entry.setdefault("asset", entry.get("label", ""))
+
+    status = payload["status"]
+    reason_text = ""
     if found:
-        headline = ""
+        extras = []
+        sweetened = sum(1 for idea in found_ideas if idea.get("finder_added_assets"))
+        if sweetened:
+            extras.append(f"{sweetened} of them include a pick we added, marked \"We added\".")
+        if overpay:
+            extras.append(
+                f"{overpay} more would make you overpay, so {'it is' if overpay == 1 else 'they are'} listed separately as "
+                f"{'a stretch' if overpay == 1 else 'stretches'}."
+            )
+        for entry in blocked:
+            extras.append(f"Not used: {entry['asset']} ({entry['reason']}).")
+        headline = f"Every package below includes {both}{selection}." + (" " + " ".join(extras) if extras else "")
+    elif blocked:
+        status = "selected_assets_blocked"
+        first = blocked[0]
+        reason_text = f"selected_assets_blocked: {first['asset']} because {first['reason']}"
+        if partial:
+            headline = (
+                f"We could not build a realistic trade that includes {both}{selection}. "
+                f"{reasons[0]['text'] if reasons else ''} "
+                "The options below leave something out and say so."
+            ).replace("  ", " ").strip()
+        elif closest:
+            headline = (
+                f"We could not build a realistic trade that includes {both}{selection}, "
+                f"because {first['reason']}. The closest options below keep everything you selected "
+                "but are stretches."
+            )
+        else:
+            headline = f"We could not build a trade that includes {first['asset']}, because {first['reason']}."
     elif reasons:
         headline = reasons[0]["text"]
         if closest:
@@ -1195,11 +1384,15 @@ def finder_search_payload(
         headline = "No realistic trades found for this selection right now."
     payload.update(
         {
+            "status": status,
             "headline": headline,
             "selection": {"labels": labels, "value": value},
             "reasons": reasons,
             "funnel": funnel,
             "partners_checked": int(trace.partners),
+            "blocked": blocked,
+            "reason": reason_text,
+            "overpay": int(overpay),
         }
     )
     return payload
@@ -1800,9 +1993,11 @@ def evaluate_trade_market_realism(
         for asset in send_players
         if str(asset.get("player_id") or "").strip() not in focused_ids
     ]
-    allow_focused_core_move = bool(
-        explicit_player_focus and focused_send_is_cornerstone and not extra_unfocused_sends
-    )
+    # The user chose to shop these players, so the protection that exists to
+    # stop AUTOMATIC boards from selling a cornerstone must not veto the user's
+    # own selection (the verdict still grades it honestly). It only applies
+    # while every outgoing player is one the user selected.
+    allow_focused_core_move = bool(explicit_player_focus and not extra_unfocused_sends)
 
     if user_gives_cornerstone:
         user_best_out = incoming_best_score
@@ -1818,7 +2013,8 @@ def evaluate_trade_market_realism(
             score -= 18
             negatives.append("Adding extra value on top of your cornerstone needs a much clearer tier-up to headline.")
             flags.append("user_core_protection")
-            hard_fail_flags.append("user_core_protection")
+            if not allow_focused_core_move:
+                hard_fail_flags.append("user_core_protection")
         elif user_gets_cornerstone and user_best_in < user_best_out + 350 and user_value_delta < 500:
             score -= 18
             negatives.append("This asks you to move a cornerstone without a clear upgrade or enough package value back.")
@@ -4029,6 +4225,7 @@ def build_trade_ideas(
     trade_block_pick_ids: List[str] | None = None,
     require_receive_picks: bool = False,
     finder_trace: "FinderSearchTrace | None" = None,
+    trade_block_player_ids: Sequence[str] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
     try:
@@ -4055,6 +4252,7 @@ def build_trade_ideas(
             trade_block_pick_ids=trade_block_pick_ids,
             require_receive_picks=require_receive_picks,
             finder_trace=finder_trace,
+            trade_block_player_ids=trade_block_player_ids,
         )
     finally:
         profile.emit()
@@ -4185,6 +4383,7 @@ def _build_trade_ideas_impl(
     trade_block_pick_ids: List[str] | None = None,
     require_receive_picks: bool = False,
     finder_trace: "FinderSearchTrace | None" = None,
+    trade_block_player_ids: Sequence[str] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
@@ -4265,18 +4464,51 @@ def _build_trade_ideas_impl(
     )[:TRADE_FINDER_MAX_SELECTED_PICKS]
     explicit_pick_focus = bool(selected_pick_ids)
     trace = finder_trace
-    selection_driven = bool(trade_block_names) or explicit_pick_focus
+    requested_ids = {str(pid).strip() for pid in (trade_block_player_ids or ()) if str(pid).strip()}
+    player_selection = bool(trade_block_names) or bool(requested_ids)
+    selection_driven = player_selection or explicit_pick_focus
     if trace is not None:
         trace.explicit = selection_driven
+        if len({str(pid).strip() for pid in (trade_block_pick_ids or ()) if str(pid).strip()}) > len(selected_pick_ids):
+            trace.blocked.append(
+                {
+                    "label": "extra picks",
+                    "code": "pick_limit",
+                    "reason": f"a search can offer at most {TRADE_FINDER_MAX_SELECTED_PICKS} picks, so the rest were not used",
+                }
+            )
 
     name_keys = my_team_df["name"].fillna("").astype(str).str.strip().str.casefold()
     requested_names = {str(name).strip().casefold() for name in trade_block_names if str(name).strip()}
-    if trade_block_names:
-        requested_mask = name_keys.isin(requested_names)
+    if player_selection:
+        if requested_ids:
+            requested_mask = my_team_df["player_id"].astype(str).isin(requested_ids)
+        else:
+            requested_mask = name_keys.isin(requested_names)
         protected_mask = name_keys.isin(keeper_names)
         my_trade_block_df = my_team_df[
             requested_mask & (~protected_mask | bool(allow_protected_focus))
         ].copy()
+        if trace is not None:
+            found_ids = set(my_trade_block_df["player_id"].astype(str))
+            if requested_ids:
+                for missing_id in sorted(requested_ids - found_ids):
+                    trace.blocked.append(
+                        {
+                            "label": missing_id,
+                            "code": "not_on_roster",
+                            "reason": "that player is not on your roster in this league",
+                        }
+                    )
+            vetoed = my_team_df[requested_mask & protected_mask] if not allow_protected_focus else my_team_df.iloc[0:0]
+            for _, protected_row in vetoed.iterrows():
+                trace.blocked.append(
+                    {
+                        "label": str(protected_row["name"]),
+                        "code": "untouchable",
+                        "reason": "he is marked untouchable in your GM Targets",
+                    }
+                )
     elif explicit_pick_focus:
         # A picks-only selection offers no players at all.
         my_trade_block_df = my_team_df.iloc[0:0].copy()
@@ -4345,7 +4577,9 @@ def _build_trade_ideas_impl(
     my_candidates = my_trade_block_df[
         my_trade_block_df["position"].isin(movable_positions)
     ].copy()
-    if my_candidates.empty:
+    if my_candidates.empty or player_selection:
+        # A selection is a hard constraint: never narrow it to "movable"
+        # positions, every chosen player stays in the pool.
         my_candidates = my_trade_block_df.copy()
 
     role_by_pid = {str(pid): role for pid, role in role_map.items()}
@@ -4353,17 +4587,37 @@ def _build_trade_ideas_impl(
         _pick_asset(pick, score_multiplier=pick_score_multiplier)
         for pick in roster_pick_assets.get(my_roster_key, [])
     ]
+    # Picks the engine itself may add to a PLAYER-only Trade Finder selection
+    # to make a deal work. They are never used silently: any package carrying
+    # one is flagged `we_added` and only shown when no package without it works.
+    sweetener_pick_assets: List[Dict[str, Any]] = []
     if explicit_pick_focus:
         selected_pick_set = set(selected_pick_ids)
+        owned_pick_keys = {trade_block_pick_key(pick) for pick in my_pick_assets}
+        if trace is not None:
+            for pick_id in selected_pick_ids:
+                if pick_id not in owned_pick_keys:
+                    pick_parts = pick_id.split(":")
+                    pick_label = (
+                        f"{pick_parts[0]} Round {pick_parts[1]}" if len(pick_parts) == 3 else pick_id
+                    )
+                    trace.blocked.append(
+                        {
+                            "label": pick_label,
+                            "code": "pick_not_owned",
+                            "reason": "you do not own that pick in this league",
+                        }
+                    )
         my_pick_assets = [
             pick for pick in my_pick_assets if trade_block_pick_key(pick) in selected_pick_set
         ]
         if my_trade_block_df.empty and not my_pick_assets:
             return []
-        if trace is not None:
-            trace.send_labels = [str(p.get("label") or "") for p in my_pick_assets]
     else:
         my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
+        if player_selection:
+            sweetener_pick_assets = my_pick_assets
+            my_pick_assets = []
 
     # Trade Finder's explicit "search around exactly this selection" intent
     # — the same flag that already lets `_automatic_outgoing_asset_allowed`
@@ -4378,9 +4632,9 @@ def _build_trade_ideas_impl(
     # hard-failed right back out at the market-realism stage, so Trade
     # Finder still reports zero plausible trades for exactly the kind of
     # asset someone most wants to shop.
-    explicit_player_focus = bool(allow_protected_focus and trade_block_names)
+    explicit_player_focus = bool(allow_protected_focus and player_selection)
     focused_player_ids = (
-        [str(pid) for pid in my_trade_block_df["player_id"].astype(str)] if trade_block_names else []
+        [str(pid) for pid in my_trade_block_df["player_id"].astype(str)] if player_selection else []
     )
 
     with profile.stage("outgoing_asset_filtering"):
@@ -4403,6 +4657,34 @@ def _build_trade_ideas_impl(
                 )
             ]
 
+    # The selection contract: every asset the user explicitly chose to send.
+    # Every returned package must carry all of them (enforced below).
+    required_send: List[Dict[str, Any]] = []
+    if selection_driven:
+        if player_selection:
+            required_send.extend(base_my_player_assets)
+            if trace is not None:
+                resolved = {str(asset.get("player_id")) for asset in base_my_player_assets}
+                for _, lost in my_trade_block_df.iterrows():
+                    if str(lost["player_id"]) not in resolved:
+                        trace.blocked.append(
+                            {
+                                "label": str(lost["name"]),
+                                "code": "no_trade_value",
+                                "reason": "he has no trade value in this league's scoring",
+                            }
+                        )
+        required_send.extend(my_pick_assets)
+        if trace is not None:
+            trace.required = list(required_send)
+            trace.send_labels = [str(asset.get("label") or "") for asset in required_send]
+            trace.send_value = int(_score_assets(required_send))
+
+    if selection_driven and not required_send:
+        # Everything selected was blocked (not on the roster, no value, ...);
+        # the trace carries the reasons. Never fall back to a different search.
+        return []
+
     def add_idea(idea: Dict[str, Any]) -> None:
         with profile.stage("duplicate_package_elimination"):
             key = profile.package_key(idea["send_assets"], idea["receive_assets"])
@@ -4412,6 +4694,8 @@ def _build_trade_ideas_impl(
             seen_ideas.add(key)
             ideas.append(idea)
 
+    alternative_ideas: List[Dict[str, Any]] = []
+    alternative_keys: set = set()
     partner_rows = []
     for _, partner_row in df_summary.iterrows():
         if _safe_int(partner_row["roster_id"]) == my_roster_key:
@@ -4482,7 +4766,11 @@ def _build_trade_ideas_impl(
                     partner_name,
                 ),
             )
-            if reasoning["score"] < min_reason_score:
+            if reasoning["score"] < min_reason_score and not _stretch:
+                # (A stretch rebuild exists to turn an eliminated package into
+                # a labelled near miss; gating it again on the same score made
+                # the builder re-offer itself without end when the score was
+                # below even its permissive floor.)
                 if trace is not None:
                     trace.count("reasoning")
                     trace.offer(
@@ -4522,6 +4810,7 @@ def _build_trade_ideas_impl(
             if market_context.get("hard_fail"):
                 if trace is not None and not _stretch:
                     trace.count("market_hard")
+                    trace.count_hard_flags(market_context.get("hard_fail_flags"))
                 return None
             if int(market_context.get("score") or 0) < min_acceptance_score:
                 if trace is not None:
@@ -4762,7 +5051,7 @@ def _build_trade_ideas_impl(
         # 2. Buy a need-position upgrade with one player plus one owned pick.
         # An explicit Trade Finder pick selection opts in regardless of
         # strategy -- the caller said they'd move these picks.
-        if (active_strategy in {"contender", "fringe_contender", "retool"} or explicit_pick_focus) and my_pick_assets:
+        if not selection_driven and active_strategy in {"contender", "fringe_contender", "retool"} and my_pick_assets:
             for target in partner_target_players[:target_cap]:
                 if target["score"] < 3500:
                     continue
@@ -4909,23 +5198,22 @@ def _build_trade_ideas_impl(
                         add_idea(idea)
                         break
 
-        # 5. Trade Finder pick selection: shop exactly the picks the caller
-        # ticked. Candidates are sized by VALUE, not by a fixed floor:
-        #   - picks for a partner player whose value sits in
+        # 5. Trade Finder: shop the WHOLE selection. Every asset the caller
+        # ticked (players and picks) goes out together in ONE package -- a
+        # selection is a hard constraint, never a menu the engine may drop
+        # items from. Candidates are sized by VALUE, not by a fixed floor:
+        #   - the return is a partner player whose value sits in
         #     finder_value_band(send value), ranked by roster fit;
-        #   - picks for partner picks (move up / down / consolidate), always
-        #     considered for "Any return" and the only thing "Picks back" keeps.
+        #   - or two assets (player + player / player + pick) that together
+        #     reach that band;
+        #   - or partner picks only (move up / down / consolidate), the only
+        #     shape "Picks back" keeps besides player + pick.
         # The user's own posture never vetoes their explicit selection (a
         # rebuilder who ticked a pick wants offers for it), so the posture
         # terms that merely dislike pick sales are added back. Everything the
         # partner or the market can still object to is applied unchanged, and
         # every elimination is counted in the FinderSearchTrace.
-        if explicit_pick_focus and my_pick_assets:
-            send_pick_packages = _bounded_pick_packages(
-                my_pick_assets, max_size=3, limit=TRADE_FINDER_SEND_PICK_PACKAGES
-            )
-            if trace is not None and not trace.send_value:
-                trace.send_value = int(sum(int(p.get("score") or 0) for p in my_pick_assets))
+        if selection_driven and required_send:
             pool_players = [
                 asset
                 for asset in partner_player_assets
@@ -4946,7 +5234,6 @@ def _build_trade_ideas_impl(
                 fit_context = dict(package_fit_context(send_assets, receive_assets))
                 fit_context["score"] = int(fit_context["score"]) - fit_term
                 fit_context["my_score"] = int(fit_context["my_score"]) - fit_term
-                gap = profile.score(receive_assets) - profile.score(send_assets)
 
                 def stretch(stage_title=title):
                     return make_reasoned_idea(
@@ -4982,21 +5269,45 @@ def _build_trade_ideas_impl(
                     fit_context=fit_context,
                 )
 
-            for send_picks in send_pick_packages:
-                send_assets = make_package(*send_picks)
+            def shop_whole_selection(
+                send_assets: List[Dict[str, Any]], added: List[str], *, alternative: bool = False
+            ) -> bool:
+                """Search this partner for a return to `send_assets`.
+                True when at least one package was accepted. `alternative`
+                searches a package that leaves a selected asset out; its
+                results are kept apart and only ever shown labelled."""
+
+                accepted = False
+
+                def accept(idea: Dict[str, Any] | None) -> bool:
+                    if not idea:
+                        return False
+                    if added:
+                        idea["finder_added_assets"] = list(added)
+                    if alternative:
+                        idea["finder_missing_selected"] = missing_selected_assets(required_send, send_assets)
+                        key = profile.package_key(idea["send_assets"], idea["receive_assets"])
+                        if key not in alternative_keys:
+                            alternative_keys.add(key)
+                            alternative_ideas.append(idea)
+                        return True
+                    add_idea(idea)
+                    return True
+
                 send_value = profile.score(send_assets)
                 low, high = finder_value_band(send_value)
-                in_band = [
-                    asset for asset in pool_players if _value_fits(send_value, int(asset["score"]), low=low, high=high)
-                ]
                 if trace is not None:
                     trace.note_pool(send_value, partner_name, pool_players)
-                in_band.sort(
+                fit_sorted = sorted(
+                    pool_players,
                     key=lambda asset: (
                         -_target_trade_fit(asset, my_shape, partner_shape),
                         abs(int(asset["score"]) - send_value),
-                    )
+                    ),
                 )
+                in_band = [
+                    asset for asset in fit_sorted if _value_fits(send_value, int(asset["score"]), low=low, high=high)
+                ]
                 if not in_band:
                     reach = [asset for asset in pool_players if int(asset["score"]) > send_value]
                     if trace is not None and pool_players:
@@ -5015,58 +5326,127 @@ def _build_trade_ideas_impl(
                             lambda nearest=nearest: make_reasoned_idea(
                                 send_assets,
                                 make_package(nearest),
-                                "Picks for a player",
-                                "Closest player value to the picks you chose to shop.",
+                                "Selection for a player",
+                                "Closest player value to the assets you chose to shop.",
                                 60,
                                 min_reason_score=-99,
                                 min_acceptance_score=-1,
                                 _stretch=True,
                             ),
                         )
-                for target in in_band[:6]:
-                    idea = shop_candidate(
-                        send_assets,
-                        make_package(target),
-                        "Picks for a player",
-                        "Turns draft capital you chose to shop into a playable roster piece.",
-                        70,
-                        54,
-                        0,
-                    )
-                    if idea:
-                        add_idea(idea)
+                if not require_receive_picks:
+                    for target in in_band[:6]:
+                        if accept(
+                            shop_candidate(
+                                send_assets,
+                                make_package(target),
+                                "Your selection for a player",
+                                "Turns the assets you chose to shop into a playable roster piece.",
+                                70,
+                                54,
+                                0,
+                            )
+                        ):
+                            accepted = True
+                            break
+
+                # Two-asset returns (player + player, player + pick) that reach
+                # the band together; pairs are drawn from the best-fitting
+                # pieces so the search stays bounded.
+                pair_pool = fit_sorted[:10] + partner_all_picks[:5]
+                pair_packages = []
+                for first, second in combinations(pair_pool, 2):
+                    if first.get("asset_type") == "player" and second.get("asset_type") == "player":
+                        if require_receive_picks:
+                            continue
+                    elif first.get("asset_type") == "pick" and second.get("asset_type") == "pick":
+                        continue
+                    pair_value = int(first.get("score") or 0) + int(second.get("score") or 0)
+                    if not _value_fits(send_value, pair_value, low=low, high=high):
+                        continue
+                    pair_packages.append((first, second, abs(pair_value - send_value)))
+                pair_packages.sort(key=lambda row: row[2])
+                for first, second, _gap in pair_packages[:6]:
+                    if accept(
+                        shop_candidate(
+                            send_assets,
+                            make_package(first, second),
+                            "Your selection for two assets",
+                            "Spreads the assets you chose to shop across two pieces coming back.",
+                            66,
+                            54,
+                            0,
+                        )
+                    ):
+                        accepted = True
                         break
 
                 # Picks for picks (move up, move down, consolidate, spread).
                 swap_band = int(min(900, max(250, round(send_value * 0.20))))
+                send_signature = sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in send_assets)
                 receive_pick_packages = [
                     pkg
                     for pkg in _bounded_pick_packages(partner_all_picks, max_size=2, limit=120)
                     if abs(profile.score(pkg) - send_value) <= swap_band
-                    and sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in pkg)
-                    != sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in send_assets)
+                    and sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in pkg) != send_signature
                 ]
                 receive_pick_packages.sort(key=lambda pkg: abs(profile.score(pkg) - send_value))
                 for receive_picks in receive_pick_packages[:3]:
                     # Pick-for-pick carries no positional signal; the partner's
                     # only roster-based objection is posture (a rebuilder
                     # paying future capital), so require "not strongly against".
-                    idea = shop_candidate(
-                        send_assets,
-                        make_package(*receive_picks),
-                        "Pick swap",
-                        "Reshapes your draft capital without touching your roster.",
-                        64,
-                        54,
-                        -4,
-                    )
-                    if idea:
-                        add_idea(idea)
+                    if accept(
+                        shop_candidate(
+                            send_assets,
+                            make_package(*receive_picks),
+                            "Picks for picks" if all(a.get("asset_type") == "pick" for a in send_assets) else "Your selection for picks",
+                            "Reshapes your assets into draft capital.",
+                            64,
+                            54,
+                            -4,
+                        )
+                    ):
+                        accepted = True
+                        break
+                return accepted
+
+            full_send = make_package(*required_send)
+            full_ok = shop_whole_selection(full_send, [])
+            if not full_ok and len(required_send) >= 2:
+                # The whole selection found nothing here. Search each "leave
+                # one out" package so the user can be shown a real alternative
+                # that is explicitly labelled as NOT including the asset. These
+                # probes are not counted in the funnel (the funnel describes
+                # the user's actual selection) and never become results.
+                live_trace, trace = trace, None
+                try:
+                    for left_out in range(len(required_send)):
+                        subset = [a for i, a in enumerate(required_send) if i != left_out]
+                        shop_whole_selection(make_package(*subset), [], alternative=True)
+                finally:
+                    trace = live_trace
+            if not full_ok and sweetener_pick_assets:
+                # Nothing works for this partner with exactly what the user
+                # chose. A pick may be added to make it work, but it is the
+                # engine's addition: flagged `we_added` and labelled as such.
+                for sweetener in sorted(sweetener_pick_assets, key=lambda pick: int(pick.get("score") or 0))[:3]:
+                    added_pick = dict(sweetener, we_added=True)
+                    if shop_whole_selection(make_package(*required_send, added_pick), [str(added_pick.get("label") or "")]):
                         break
 
     if require_receive_picks:
         # "Picks back" is a hard filter on the return, not a ranking nudge.
         ideas = [idea for idea in ideas if _has_pick(idea.get("receive_assets") or [])]
+
+    if required_send:
+        # The selection is a hard constraint: a package that leaves a selected
+        # asset out is never a result, whichever pattern produced it. Packages
+        # carrying an asset WE added (not selected) only stand when no package
+        # without one works.
+        ideas = [idea for idea in ideas if not missing_selected_assets(required_send, idea.get("send_assets") or [])]
+        plain_ideas = [idea for idea in ideas if not idea.get("finder_added_assets")]
+        if plain_ideas:
+            ideas = plain_ideas
 
     with profile.stage("final_sorting"):
         ideas.sort(key=_trade_surface_sort_key, reverse=True)
@@ -5132,6 +5512,18 @@ def _build_trade_ideas_impl(
             selected.append(idea)
         if len(selected) >= max_ideas:
             break
+
+    if trace is not None and not selected and alternative_ideas:
+        # Nothing honest includes the whole selection. Surface the best
+        # packages that do clear the bar WITHOUT some selected asset, each
+        # labelled with what it leaves out.
+        alternative_ideas.sort(key=_trade_surface_sort_key, reverse=True)
+        for idea in alternative_ideas:
+            if len(trace.partial) >= 3:
+                break
+            if analyzer_gate.passes(idea):
+                idea["finder_stretch_stage"] = "excludes_selection"
+                trace.partial.append(idea)
 
     # Diversity may skip a higher-ranked idea then append it during fill,
     # which would place it after lower-ranked survivors. Restore surface
