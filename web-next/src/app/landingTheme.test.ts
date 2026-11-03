@@ -31,12 +31,13 @@ describe("landing forced-dark theme", () => {
     expect(css).toMatch(/body:has\(\.fd-landing-dark\) \.brand-mark-icon \{\s*filter: invert\(1\)/);
   });
 
-  it("showcase controls keep the dots centered with the pause button in a side column", () => {
-    expect(rule(".landing-showcase-controls {")).toContain("grid-template-columns: 1fr auto 1fr");
-    expect(rule(".landing-showcase-dots {")).toContain("grid-column: 2");
+  it("landing share-card variant swaps the h1 copy with a CSS flag, not a rerender", () => {
+    expect(rule(".lp-share-only {")).toContain("display: none");
+    expect(css).toContain("[data-share-landing] .lp-default-only");
   });
 
-  it("showcase slides size to a 3.5-slide peek", () => {
-    expect(rule(".landing-shot {")).toContain("/ 3.5)");
+  it("landing CTAs and footer links keep 44px+ tap targets", () => {
+    expect(rule(".lp .lp-cta > * {")).toContain("min-height: 52px");
+    expect(rule(".lp-footer-links a {")).toContain("min-height: var(--touch-target-min)");
   });
 });

@@ -369,13 +369,13 @@ describe("LandingPage hero copy accuracy", () => {
     mockAuth(null);
     render(<LandingPage />);
     expect(screen.queryByText(/Paste your Sleeper username/)).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Create your account\. Get the trade your leaguemate would actually accept\./ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: /Get the trade your leaguemate would actually accept\./ })).toBeInTheDocument();
   });
 
   it("scopes the free/no-card note to the sample league, not the real signup trial", () => {
     mockAuth(null);
     render(<LandingPage />);
-    expect(screen.getByText(/Look around a full sample league free, no account or card needed\./)).toBeInTheDocument();
+    expect(screen.getByText(/Look around a full sample league free: no account or card needed\./)).toBeInTheDocument();
   });
 });
 
@@ -425,5 +425,40 @@ describe("LandingPage SEO metadata", () => {
     render(<LandingPage />);
     expect(screen.getByText(/The Premium trial needs a card/)).toBeInTheDocument();
     expect(screen.getByText(/The free plan needs no card/)).toBeInTheDocument();
+  });
+});
+
+describe("LandingPage share-card redesign", () => {
+  it("ships one primary sample-league CTA and a secondary import CTA that jumps to the account form", () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    expect(screen.getByTestId("sample-league-button")).toHaveAttribute("href", "/sample-league");
+    expect(screen.getByRole("link", { name: "Import your league" })).toHaveAttribute("href", "#get-started");
+    expect(document.getElementById("get-started")).not.toBeNull();
+  });
+
+  it("carries the shared-analysis hero line in the HTML for share_card visits (CSS picks the variant)", () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    expect(
+      screen.getByText("Someone shared a FantasyDesk trade verdict. Get yours for your own league."),
+    ).toHaveClass("lp-share-only");
+  });
+
+  it("renders the 3 steps, 4 feature cards, real screenshots and a footer", () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(10);
+    expect(screen.getByRole("heading", { name: "How it works" })).toBeInTheDocument();
+    for (const t of [
+      "Trade verdicts that know your roster",
+      "Waivers that fit your team",
+      "Start/sit with weather and matchup",
+      "League intelligence",
+    ]) {
+      expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole("img", { name: /shown with sample league data/ }).length).toBe(4);
+    expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 });

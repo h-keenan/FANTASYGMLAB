@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 
 import { AppStoreModules } from "@/components/AppStoreModules";
 import { InlineScript } from "@/components/InlineScript";
 import { LandingAuthIsland, LandingAuthSlotPlaceholder } from "@/components/LandingAuthIsland";
-import { LandingShowcase } from "@/components/LandingShowcase";
+import { LandingScreens } from "@/components/LandingScreens";
 import { LandingTrialHeadline } from "@/components/LandingTrialHeadline";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
+import { ValuesCredit } from "@/components/ValuesCredit";
+import { LANDING_SHARE_SCRIPT } from "@/lib/landingShare";
 import { absoluteUrl, OG_IMAGE } from "@/lib/seo/site";
 import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
 
@@ -45,50 +48,117 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [OG_IMAGE.url] },
 };
 
-const BENEFITS = ["Know your move this week", "Trades your league will accept", "Waivers ranked for your roster"];
+const SHARE_HEADLINE = "Someone shared a FantasyDesk trade verdict. Get yours for your own league.";
+
+const STEPS = [
+  { title: "Connect your league", body: "Use your Sleeper username, or a public ESPN, Fleaflicker or MFL league." },
+  { title: "We read your roster", body: "Real player values, matched to your lineup, depth and what each manager needs." },
+  { title: "Get your next move", body: "A clear verdict on trades, waivers and your lineup, with the reasons why." },
+] as const;
+
+const FEATURES = [
+  { title: "Trade verdicts that know your roster", body: "See if a trade helps your team before you send it, based on your needs and what your partner would accept." },
+  { title: "Waivers that fit your team", body: "Pickups ranked for your roster, with FAAB ranges, so you stop chasing names that do not help you." },
+  { title: "Start/sit with weather and matchup", body: "Lineup calls that account for the opponent and game-day weather, with win odds for your week." },
+  { title: "League intelligence", body: "See how each manager trades, who is contending, and simulated playoff odds for every team." },
+] as const;
+
+const FOOTER_LINKS = [
+  { href: "/dynasty-tools", label: "Dynasty tools" },
+  { href: "/dynasty-rankings/qb", label: "Dynasty rankings" },
+  { href: "/trade-analyzer", label: "Free trade analyzer" },
+  { href: "/dynasty-trade-value-chart", label: "Trade value chart" },
+  { href: "/methodology", label: "How we evaluate" },
+  { href: "/legal/terms", label: "Terms" },
+  { href: "/legal/privacy", label: "Privacy" },
+  { href: "/legal/no_affiliation", label: "No-affiliation disclaimer" },
+] as const;
 
 export default function LandingPage() {
   return (
     <div id={LANDING_ROOT_ID} className="flex-1 flex flex-col" suppressHydrationWarning>
       <InlineScript html={LANDING_PENDING_SCRIPT} />
+      <InlineScript html={LANDING_SHARE_SCRIPT} />
       <main className="fd-landing-content fd-landing-dark flex-1 flex flex-col items-center px-4 py-4 md:py-8">
         <div className="onboarding-field" aria-hidden="true" />
         <div className="onboarding-sweep" aria-hidden="true" />
-        <div className="landing-grid">
-          {/* Hero copy. 2026-10-27 (P0 UX audit): the previous headline, "Paste
-              your Sleeper username," named an action that isn't actually the
-              first step — the real flow is create account -> onboarding
-              carousel -> paywall -> only then connect a Sleeper (or ESPN/
-              Fleaflicker/MFL) league. Still leads with the real differentiator,
-              the roster-aware trade verdict (2026-10-26 marketing pass,
-              Zach), just without claiming a specific first action that isn't
-              true. No superlatives or unverifiable claims. The primary CTA is
-              the sample league so value shows before any account wall;
-              guests cannot buy, so nothing here can start a purchase.
-              The "free, no card" note below was also sitting right above the
-              real signup form's "Start free for N days" trial CTA further
-              down the page, reading as a contradiction (free vs. a trial that
-              eventually charges) — reworded here to scope "no card" to the
-              sample league only, a separate, genuinely free-forever demo. */}
-          <div className="landing-hero flex flex-col gap-2">
-            <h1 style={{ font: "var(--font-page-title)" }}>
-              Create your account. Get the trade your leaguemate would actually accept.
+        <div className="lp">
+          {/* Hero. Built for someone who scanned a share-card QR and has
+              seconds to decide: logo, one promise, one primary action
+              (sample league: value before any account wall; guests cannot
+              buy, so nothing here starts a purchase), one secondary (own
+              league, which means the account form below), and the store
+              links. For utm_campaign=share_card the h1 swaps to the shared-
+              analysis line via a pre-paint flag (lib/landingShare.ts); no
+              data is carried in the URL. */}
+          <header className="lp-hero">
+            <Image
+              src="/share-card/lockup-white.png"
+              alt="FantasyDesk"
+              width={1102}
+              height={160}
+              priority
+              className="lp-logo"
+            />
+            <h1 className="lp-h1">
+              <span className="lp-default-only">Get the trade your leaguemate would actually accept.</span>
+              <span className="lp-share-only">{SHARE_HEADLINE}</span>
             </h1>
-            <p className="text-sm md:text-base" style={{ color: "var(--color-text-secondary)" }}>
+            <p className="lp-sub">
               Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front
               office would.
             </p>
-            <SampleLeagueButton surface="landing_hero" variant="primary" fullWidth={false} />
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Look around a full sample league free, no account or card needed. Ready for your own? Create an
-              account to get started.
-            </p>
-          </div>
+            <div className="lp-cta">
+              <SampleLeagueButton surface="landing_hero" variant="primary" />
+              <a href="#get-started" className="lp-cta-secondary">
+                Import your league
+              </a>
+            </div>
+            <p className="lp-note">Look around a full sample league free: no account or card needed.</p>
+            {/* Google Play is live; the App Store slot stays "Coming soon"
+                until lib/appStoreLinks.ts has a URL. */}
+            <AppStoreModules />
+          </header>
 
-          {/* Real screenshots (sample league data) lead the page. */}
-          <LandingShowcase />
+          <section aria-labelledby="lp-how-heading" className="lp-section">
+            <h2 id="lp-how-heading" className="lp-h2">
+              How it works
+            </h2>
+            <ol className="lp-steps">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="lp-step">
+                  <span className="lp-step-num" aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h3 className="lp-h3">{step.title}</h3>
+                    <p className="lp-body">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
 
-          <div className="landing-form flex flex-col gap-2">
+          <section aria-labelledby="lp-features-heading" className="lp-section">
+            <h2 id="lp-features-heading" className="lp-h2">
+              Built for the decisions you actually make
+            </h2>
+            <ul className="lp-features">
+              {FEATURES.map((f) => (
+                <li key={f.title} className="lp-feature onboarding-glass">
+                  <h3 className="lp-h3">{f.title}</h3>
+                  <p className="lp-body">{f.body}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <LandingScreens />
+
+          <section id="get-started" aria-labelledby="lp-start-heading" className="lp-section lp-start">
+            <h2 id="lp-start-heading" className="lp-h2">
+              Create your account
+            </h2>
             <LandingTrialHeadline />
             {/* useSearchParams() (for ?billing=success) needs a Suspense
                 boundary or this page's static prerender fails the build.
@@ -96,45 +166,27 @@ export default function LandingPage() {
             <Suspense fallback={<LandingAuthSlotPlaceholder />}>
               <LandingAuthIsland />
             </Suspense>
-          </div>
-
-          <div className="landing-extra flex flex-col gap-4">
-            <ul className="flex flex-col gap-1.5 text-sm font-bold">
-              {BENEFITS.map((line) => (
-                <li key={line} className="flex items-center gap-2">
-                  <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
-                    ✓
-                  </span>
-                  {line}
-                </li>
-              ))}
-            </ul>
             {/* Keep in step with ESPN_SUPPORTED_SEGMENTS in lib/leaguePlatform.ts
                 and docs/platform-import-status.md: imported leagues get Dashboard,
                 Matchup, My Team, Trade Analyzer, Players and League Rankings. */}
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            <p className="lp-note">
               Works with Sleeper leagues, plus public ESPN, Fleaflicker and MFL leagues (Dashboard, Matchup, My Team,
               Trade Analyzer, Players and League Rankings).
             </p>
-            {/* Store slots stay quiet: Google Play is live, App Store is
-                "Coming soon" until lib/appStoreLinks.ts has a URL. */}
-            <AppStoreModules />
-            {/* Crawlable internal links into the public SEO pages. */}
-            <nav aria-label="Dynasty tools" className="flex flex-wrap gap-x-4 text-xs">
-              <Link href="/dynasty-tools" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
-                Dynasty tools
-              </Link>
-              <Link href="/dynasty-rankings/qb" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
-                Dynasty rankings
-              </Link>
-              <Link href="/trade-analyzer" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
-                Free trade analyzer
-              </Link>
-              <Link href="/dynasty-trade-value-chart" className="underline tap-link" style={{ color: "var(--color-text-secondary)" }}>
-                Trade value chart
-              </Link>
+          </section>
+
+          <footer className="lp-footer">
+            <nav aria-label="Footer">
+              <ul className="lp-footer-links">
+                {FOOTER_LINKS.map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href}>{l.label}</Link>
+                  </li>
+                ))}
+              </ul>
             </nav>
-          </div>
+            <ValuesCredit />
+          </footer>
         </div>
       </main>
       {/* Hidden unless the root is flagged pending (returning user about to

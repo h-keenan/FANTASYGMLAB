@@ -2707,181 +2707,246 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   }
 }
 
-/* Signed-out landing (app/page.tsx): phone-first single column; at >=768px
-   the product strip moves to a right-hand column beside hero + form. */
-.landing-grid {
+/* Signed-out landing (app/page.tsx): phone-first single column built for
+   share-card QR visitors. Tokens only; at >=768px the hero splits into two
+   columns and the cards/screens open up. */
+.lp {
   position: relative;
   z-index: 1;
   width: 100%;
   max-width: 26rem;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-3xl);
+  padding-bottom: var(--space-xl);
 }
-.landing-hero {
-  text-align: center;
-}
-.landing-showcase {
-  margin: 0 calc(-1 * var(--space-md));
-}
-.landing-showcase-track {
+.lp-hero {
   display: flex;
-  gap: var(--space-md);
-  margin: 0;
-  padding: 0 var(--space-md);
-  list-style: none;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding: 0 var(--space-md);
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-lg);
+  padding-top: var(--space-lg);
 }
-.landing-showcase-track::-webkit-scrollbar {
-  display: none;
-}
-.landing-shot {
-  flex: 0 0 auto;
-  /* 3.5 slides across the screen-wide track (content box plus the right
-     padding, minus the 3 gaps): three full slides and an intentional
-     half-slide peek bleeding to the screen edge. A fixed 6.75rem left a
-     ~2px sliver of slide 4 at 390px, which read as cut off. */
-  width: calc((100% + var(--space-md) - 3 * var(--space-md)) / 3.5);
-  scroll-snap-align: start;
-  text-align: center;
-}
-.landing-phone {
+.lp-logo {
+  width: 11.5rem;
   height: auto;
-  width: 100%;
-  margin-top: 0;
+  align-self: flex-start;
 }
-.landing-shot-title {
-  margin: var(--space-xs) 0 0;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-accent);
+.lp-h1 {
+  margin: 0;
+  font-size: clamp(1.875rem, 8.4vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  text-wrap: balance;
 }
-.landing-shot-benefit {
-  margin: 2px 0 0;
-  font-size: 0.6875rem;
-  line-height: 1.3;
+.lp-sub {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.45;
   color: var(--color-text-secondary);
 }
-/* Autoplay motion: transform/opacity only, gated on data-playing so SSR,
-   reduced-motion and paused states are static. */
-.landing-shot-img {
-  transform-origin: 50% 18%;
+.lp-cta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
-.landing-showcase[data-playing="true"] .landing-shot-img {
-  transition: transform 0.8s ease-in-out;
+.lp .lp-cta > * {
+  min-height: 52px;
+  font-size: 1rem;
 }
-.landing-showcase[data-playing="true"] .landing-shot[data-active="true"] .landing-shot-img {
-  transform: scale(1.1);
-  transition: transform 2.5s ease-out;
-  will-change: transform;
-}
-.landing-shot-caption {
-  transition: opacity 0.6s ease;
-}
-.landing-showcase[data-playing="true"] .landing-shot[data-active="false"] .landing-shot-caption {
-  opacity: 0.45;
-}
-/* Dots stay truly centered; the pause button sits in the right-hand column
-   so it no longer pushes the dots off-center. */
-.landing-showcase-controls {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  margin-top: var(--space-xs);
-}
-.landing-showcase-dots {
-  grid-column: 2;
-}
-.landing-showcase-pause {
-  grid-column: 3;
-  justify-self: start;
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
+.lp-cta-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  border: var(--border-width-default) solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+}
+.lp-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--color-text-secondary);
-  font-size: 0.5625rem;
-  cursor: pointer;
 }
-.landing-showcase-dots {
+/* Share-card variant: both h1 spans ship in the HTML, the pre-paint flag
+   (lib/landingShare.ts) picks one, so there is no flash and the page stays static. */
+.lp-share-only {
+  display: none;
+}
+[data-share-landing] .lp-share-only {
+  display: inline;
+}
+[data-share-landing] .lp-default-only {
+  display: none;
+}
+.lp-section {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-lg);
 }
-.landing-showcase-dot {
-  position: relative;
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
+.lp-h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+}
+.lp-h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+.lp-lede,
+.lp-body {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+.lp-steps,
+.lp-features,
+.lp-screens {
+  margin: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+  list-style: none;
 }
-.landing-showcase-dot::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
+.lp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.lp-step {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.lp-step-num {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--color-on-accent);
+  background: var(--color-accent-strong);
   border-radius: 999px;
-  background: var(--color-text-secondary);
-  opacity: 0.4;
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease;
 }
-.landing-showcase-dot[aria-current="true"]::after {
-  opacity: 1;
-  background: var(--color-accent);
-  transform: scale(1.4);
+.lp-features {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
 }
-.landing-showcase-pause:focus-visible,
-.landing-showcase-dot:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
+.lp-feature {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border-left: var(--border-width-semantic) solid var(--color-accent);
 }
-@media (prefers-reduced-motion: reduce) {
-  .landing-shot-img,
-  .landing-shot-caption {
-    transition: none !important;
-    transform: none !important;
-    opacity: 1 !important;
-  }
+.lp-screens {
+  display: flex;
+  gap: var(--space-lg);
+  margin: 0 calc(-1 * var(--space-lg));
+  padding: 0 var(--space-lg) var(--space-sm);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--space-lg);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.lp-screens::-webkit-scrollbar {
+  display: none;
+}
+.lp-screen {
+  flex: 0 0 min(70vw, 17rem);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.lp-device {
+  aspect-ratio: 600 / 1298;
+  border: 6px solid rgba(255, 255, 255, 0.16);
+  border-radius: 2rem;
+  background: var(--color-bg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.lp-device-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.lp-screen-title {
+  margin: var(--space-sm) 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.lp-screen-benefit {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+.lp-start {
+  scroll-margin-top: var(--space-lg);
+}
+.lp-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: var(--space-lg);
+  border-top: var(--border-width-default) solid var(--color-border);
+}
+.lp-footer-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-xl);
+}
+.lp-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  text-decoration: underline;
 }
 @media (min-width: 768px) {
-  .landing-grid {
-    max-width: 62rem;
-    display: grid;
-    grid-template-columns: 26rem 1fr;
-    column-gap: 2.5rem;
-    align-content: center;
+  .lp {
+    max-width: 64rem;
   }
-  .landing-hero {
-    text-align: left;
-    grid-column: 1;
+  .lp-hero {
+    max-width: 36rem;
   }
-  .landing-form,
-  .landing-extra {
-    grid-column: 1;
+  .lp-features {
+    grid-template-columns: repeat(2, 1fr);
   }
-  .landing-showcase {
-    grid-column: 2;
-    grid-row: 1 / span 3;
+  .lp-steps {
+    flex-direction: row;
+  }
+  .lp-step {
+    flex: 1;
+  }
+  .lp-screens {
     margin: 0;
-    align-self: center;
-    min-width: 0;
+    padding: 0 0 var(--space-sm);
+    gap: var(--space-xl);
   }
-  .landing-shot {
-    width: 10rem;
+  .lp-screen {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
