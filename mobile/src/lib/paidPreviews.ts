@@ -36,6 +36,7 @@ export function paidPreview(key: string, leagueName?: string): PaidPreview | nul
         ],
       };
     case "commissioner":
+    case "league_integrity":
       return {
         bullets: [
           "Per-team lineup efficiency",

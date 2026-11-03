@@ -1,4 +1,4 @@
-"""League integrity signals for commissioners: tanking, lineup integrity,
+"""League integrity signals for any league member: tanking, lineup integrity,
 collusion-style trades and inactive managers.
 
 Pure functions over already-fetched Sleeper payloads (no network, no player
