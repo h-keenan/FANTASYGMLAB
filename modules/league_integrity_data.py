@@ -9,6 +9,7 @@ import time
 from typing import Any, Callable
 
 from modules import (
+    league_calendar,
     league_history,
     league_integrity,
     league_value_settings,
@@ -45,6 +46,21 @@ def _bye_checker(season: int) -> Callable[[str, int], bool]:
     return on_bye
 
 
+def calendar_payload(league: dict[str, Any]) -> dict[str, Any]:
+    """The league's trade deadline and season calendar (modules.league_calendar
+    plus the playoff start week), so the page can show it next to the report."""
+
+    settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    playoff_start = league_calendar._int_or_none(settings.get("playoff_week_start"))
+    playoff_start = playoff_start if playoff_start and playoff_start > 1 else None
+    return {
+        **league_calendar.trade_window(league),
+        "playoff_week_start": playoff_start,
+        "regular_season_weeks": (playoff_start - 1) if playoff_start else None,
+        "in_season": league_calendar.is_in_season(league),
+    }
+
+
 def _build(league_id: str, draft_rule: str, players_db_path: str, _bucket: int) -> dict[str, Any]:
     league = sleeper.get_league(league_id) or {}
     if not league:
@@ -54,7 +70,8 @@ def _build(league_id: str, draft_rule: str, players_db_path: str, _bucket: int) 
     leg = int(settings.get("leg") or 0)
     if status not in {"in_season", "complete"} or (status == "in_season" and leg <= 0):
         return {"ok": True, "reason": "offseason", "teams": [], "collusion": [], "inactive": [],
-                "limits": league_integrity.LIMITS, "draft_order_rule": draft_rule}
+                "limits": league_integrity.LIMITS, "draft_order_rule": draft_rule,
+                "calendar": calendar_payload(league)}
     playoff_start = int(settings.get("playoff_week_start") or 0)
     last = max(1, (playoff_start - 1) if playoff_start > 1 else leg)
     if status == "in_season":
@@ -109,6 +126,7 @@ def _build(league_id: str, draft_rule: str, players_db_path: str, _bucket: int) 
         draft_rule=draft_rule, current_week=leg if status == "in_season" else None,
     )
     report["week"] = leg if status == "in_season" else None
+    report["calendar"] = calendar_payload(league)
     report["trades_valued"] = bool(values)
     return report
 

@@ -36,3 +36,18 @@ def test_build_reads_weeks_before_current_leg_only():
 
 def test_offseason_league_reports_offseason():
     assert _run(status="pre_draft", leg=0)["reason"] == "offseason"
+
+
+def test_report_carries_the_league_calendar():
+    built = build(_tank_lineups())
+    with_deadline = {**built["league"], "status": "in_season", "season": "2026",
+                     "settings": {**built["league"]["settings"], "leg": 7, "trade_deadline": 11, "playoff_week_start": 15}}
+    cal = data.calendar_payload(with_deadline)
+    assert cal["trade_deadline_week"] == 11 and cal["current_week"] == 7
+    assert cal["weeks_to_deadline"] == 4 and cal["deadline_phase"] == "open"
+    assert cal["playoff_week_start"] == 15 and cal["regular_season_weeks"] == 14
+    # 99 means "no deadline" (modules.league_calendar), never shown as week 99.
+    none = data.calendar_payload({"status": "in_season", "settings": {"trade_deadline": 99, "leg": 3}})
+    assert none["trade_deadline_week"] is None and none["playoff_week_start"] is None
+    assert _run(leg=7)["calendar"]["current_week"] == 7
+    assert _run(status="pre_draft", leg=0)["calendar"]["in_season"] is False

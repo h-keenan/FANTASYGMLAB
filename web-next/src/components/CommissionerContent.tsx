@@ -18,9 +18,12 @@ import {
   DRAFT_ORDER_OPTIONS,
   INTERPRETATION_LABEL,
   integrityReasonMessage,
+  calendarLines,
   integritySummaryLine,
+  restSummary,
   splitTeams,
   type CommissionerIntegrityResponse,
+  type IntegrityCalendar,
   type DraftOrderRule,
   type IntegrityBand,
   type IntegrityCollusionPair,
@@ -168,6 +171,23 @@ function InactiveCard({ manager }: { manager: IntegrityInactiveManager }) {
   );
 }
 
+function CalendarCard({ calendar }: { calendar: IntegrityCalendar | null | undefined }) {
+  const lines = calendarLines(calendar);
+  if (!lines.length) return null;
+  return (
+    <section className="glass-surface p-4 flex flex-col gap-1" aria-label="League calendar" data-testid="integrity-calendar">
+      <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+        League calendar
+      </span>
+      {lines.map((line) => (
+        <span key={line} className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          {line}
+        </span>
+      ))}
+    </section>
+  );
+}
+
 export function CommissionerView({
   data,
   draftOrder,
@@ -184,6 +204,7 @@ export function CommissionerView({
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="integrity-summary">
         {integritySummaryLine(data)}
       </p>
+      <CalendarCard calendar={data.calendar} />
       <div className="flex flex-col gap-1">
         <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           How is your draft order set?
@@ -230,16 +251,21 @@ export function CommissionerView({
 
       {rest.length ? (
         <section className="flex flex-col gap-3">
-          <SectionHeading>Everyone else</SectionHeading>
-          <button
-            type="button"
-            className="text-xs font-bold self-start"
-            style={{ color: "var(--color-accent)" }}
-            aria-expanded={showRest}
-            onClick={() => setShowRest((v) => !v)}
-          >
-            {showRest ? "Hide teams" : `Show ${rest.length} team${rest.length === 1 ? "" : "s"}`}
-          </button>
+          <SectionHeading>{flagged.length ? "Everyone else" : "Team lineups"}</SectionHeading>
+          <div className="glass-surface p-4 flex items-center justify-between gap-3" data-testid="integrity-rest-summary">
+            <span className="text-sm font-bold" style={{ color: "var(--color-success)" }}>
+              {restSummary(data.teams, flagged.length)}
+            </span>
+            <button
+              type="button"
+              className="text-xs font-bold shrink-0"
+              style={{ color: "var(--color-accent)" }}
+              aria-expanded={showRest}
+              onClick={() => setShowRest((v) => !v)}
+            >
+              {showRest ? "Hide teams" : `Show ${rest.length} team${rest.length === 1 ? "" : "s"}`}
+            </button>
+          </div>
           {showRest ? rest.map((team) => <IntegrityTeamCard key={team.roster_id} team={team} />) : null}
         </section>
       ) : null}
@@ -316,7 +342,10 @@ export function CommissionerContent({ leagueId, leagueName }: { leagueId: string
           bare
         />
       ) : data.reason ? (
-        <EmptyState title="Nothing to show yet" subtitle={integrityReasonMessage(data.reason)} />
+        <>
+          <EmptyState title="Nothing to show yet" subtitle={integrityReasonMessage(data.reason)} />
+          <CalendarCard calendar={data.calendar} />
+        </>
       ) : (
         <CommissionerView data={data} draftOrder={draftOrder} onDraftOrder={setDraftOrder} />
       )}
