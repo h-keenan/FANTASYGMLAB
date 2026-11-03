@@ -56,9 +56,16 @@ export function plainTradeWhy(rationale: string | null | undefined, partnerTeam:
       plain.push(...needsOf("You", cut >= 0 ? body.slice(0, cut) : body), ...(cut >= 0 ? needsOf(partner, body.slice(cut + marker.length)) : []));
       continue;
     }
-    const surplus = /^(you|.+?) (?:can move|is moving) from ([A-Z /]+) surplus$/i.exec(body);
-    if (surplus) {
-      plain.push(`${surplus[1].toLowerCase() === "you" ? "You have" : `${surplus[1]} has`} ${surplus[2].trim()} depth to spare.`);
+    // "You can move from TE surplus; Rival can move from RB surplus" is one
+    // engine sentence about two different teams: read each clause on its own
+    // (a lazy match across the ";" attributed the first team's words to the
+    // second), and only when every clause is a surplus statement.
+    const clauses = body.split(/\s*;\s*/).map((clause) => /^(you|[^;]+?) (?:can move|is moving) from ([A-Z /]+) surplus$/i.exec(clause));
+    if (clauses.every(Boolean)) {
+      for (const surplus of clauses) {
+        const who = surplus![1];
+        plain.push(`${who.toLowerCase() === "you" ? "You have" : `${who} has`} ${surplus![2].trim()} depth to spare.`);
+      }
       continue;
     }
     if (/\bsurplus\b|\broom\b|\bcovered\b|;/.test(body)) continue;

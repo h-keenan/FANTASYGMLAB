@@ -2,15 +2,17 @@
 
 Everything here is a pure read of numbers the app already computes for every
 roster (the league summary frame's per-position room scores, the rankings
-frame's starter/bench/draft-capital ranks, ``roster_needs`` classifications,
+frame's starter/bench/draft-capital ranks, the need model's per-room read,
 ``trade_hub_engine.roster_posture`` for direction). Nothing is invented:
 
 - a position's strength is its rank among the league's rosters for that room;
-- "surplus" means a top-third room that also covers the lineup requirement;
-- "need" means ``roster_needs`` says the room is short (or, softer, it ranks in
-  the bottom third of the league);
+- "surplus" and "need" are the one need model's call
+  (``modules.roster_value_model``): a need is a room whose starting slots trail
+  the league or are short or hurt, and a surplus is a room holding a healthy
+  player beyond the starters and one cover who could start for a typical team.
+  Neither is re-derived here from the rank;
 - the trade angle only appears when one side's need meets the other side's
-  surplus, and names a real bench player to prefill the Trade Analyzer with.
+  surplus, and names a real surplus player to prefill the Trade Analyzer with.
 
 When the inputs are too thin (tiny league, no picks data) the field is left
 ``None`` and the client shows nothing rather than a guess.
@@ -36,10 +38,6 @@ def _num(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return None if math.isnan(out) else out
-
-
-def _third(size: int) -> int:
-    return max(1, int(math.ceil(size / 3)))
 
 
 def position_ranks(df_summary: pd.DataFrame, roster_id: Any) -> list[dict[str, Any]]:
@@ -90,33 +88,30 @@ def starter_bench_read(starter_rank: Any, bench_rank: Any, size: int) -> dict[st
 
 
 def room_reads(
-    ranks: Sequence[Mapping[str, Any]], classifications: Mapping[str, str]
+    ranks: Sequence[Mapping[str, Any]], model_rooms: Mapping[str, Mapping[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     """Tag each room, and list the surplus and need positions.
 
-    Surplus: top third of the league AND the room covers this season's lineup
-    (``roster_needs`` has no short-term flag). Need: ``roster_needs`` flags the
-    room as short for the current lineup, or it sits in the bottom third of the
-    league. A long-term "future risk" flag alone is neither: a top-ranked room
-    is never called a need.
+    ``model_rooms`` maps position -> ``{"classification", "surplus"}`` from the
+    need model. A room that is a need is never also a surplus (the model only
+    reports surplus for rooms that are not needs). The rank only labels the row
+    (``item["rank"]``); it never decides the tag.
     """
 
     rows: list[dict[str, Any]] = []
     surplus: list[str] = []
     needs: list[str] = []
     for item in ranks:
-        size = int(item["of"])
         position = str(item["position"])
-        classification = str(classifications.get(position) or "covered")
-        top = size >= MIN_LEAGUE_SIZE and item["rank"] <= _third(size)
-        bottom = size >= MIN_LEAGUE_SIZE and item["rank"] > size - _third(size)
+        room = model_rooms.get(position) or {}
+        classification = str(room.get("classification") or "covered")
         tag = None
-        if top and classification not in _NEEDY:
-            tag = "surplus"
-            surplus.append(position)
-        elif classification in _NEEDY or bottom:
+        if classification in _NEEDY:
             tag = "need"
             needs.append(position)
+        elif room.get("surplus"):
+            tag = "surplus"
+            surplus.append(position)
         rows.append({**item, "classification": classification, "tag": tag})
     return rows, surplus, needs
 
@@ -132,31 +127,32 @@ def strongest_weakest(rows: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any]
     return pick(best), pick(worst)
 
 
-def bench_candidates(
-    lineup_df: pd.DataFrame | None, score_field: str
+def surplus_candidates(
+    roster_df: pd.DataFrame | None, surplus_player_ids: Mapping[str, Sequence[str]], score_field: str
 ) -> dict[str, list[dict[str, Any]]]:
-    """Non-starting players per position, best value first."""
+    """The need model's surplus players per position, best value first."""
 
     out: dict[str, list[dict[str, Any]]] = {}
-    if lineup_df is None or lineup_df.empty or "suggested_starter" not in lineup_df.columns:
+    if roster_df is None or roster_df.empty:
         return out
-    bench = lineup_df[~lineup_df["suggested_starter"].astype(bool)]
-    for _, row in bench.iterrows():
-        position = str(row.get("position") or "").upper()
+    by_id = {str(row.get("player_id")): row for _, row in roster_df.iterrows()}
+    for position, ids in surplus_player_ids.items():
         if position not in POSITIONS:
             continue
-        value = _num(row.get(score_field))
-        if value is None or value <= 0:
-            continue
-        out.setdefault(position, []).append(
-            {
-                "player_id": str(row.get("player_id") or ""),
-                "name": str(row.get("name") or ""),
-                "position": position,
-                "team": str(row.get("team") or ""),
-                "_value": value,
-            }
-        )
+        for player_id in ids:
+            row = by_id.get(str(player_id))
+            value = _num(row.get(score_field)) if row is not None else None
+            if row is None or value is None or value <= 0:
+                continue
+            out.setdefault(position, []).append(
+                {
+                    "player_id": str(player_id),
+                    "name": str(row.get("name") or ""),
+                    "position": position,
+                    "team": str(row.get("team") or ""),
+                    "_value": value,
+                }
+            )
     for players in out.values():
         players.sort(key=lambda p: -p["_value"])
     return out

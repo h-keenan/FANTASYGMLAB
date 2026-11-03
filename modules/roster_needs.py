@@ -1,42 +1,34 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
+"""Team-need vocabulary shared by every surface, and the K/DEF shallow-room check.
+
+The CORE_POSITIONS (QB/RB/WR/TE) need model is ``modules.roster_value_model``
+and nothing else: ``assessment_from_model`` below only reshapes its output into
+the ``TeamNeedsAssessment`` the Dashboard / My Team / glance / alerts already
+read. The coverage-count policy that used to live here compared player values
+to thresholds written for a 0-100 scale against a 0-11,000 valued frame, so it
+reported "covered" for nearly every dynasty roster; it is gone, not patched
+(``docs/suggested-drops-and-needs.md``).
+"""
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
 
 from modules import injury_status as injury_table
-from modules import runtime_trace
+from modules import model_status, runtime_trace
 
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
 
-# Shallow, single-starter rooms. Unlike CORE_POSITIONS -- where "how many
-# playable bodies do you have" sits on a real depth gradient (a second RB or
-# third WR has genuine bench/trade value) -- a league only ever starts one K
-# and one DEF. A second rostered kicker has ~zero roster-construction value
-# no matter how strong its raw score looks, so these positions get their own
-# binary-ish coverage model (classify_shallow_position_rooms /
-# true_shallow_position_needs below) instead of being folded into the
-# depth-gradient machinery that classify_roster_rooms/true_roster_needs use
-# for CORE_POSITIONS, or omitted from the needs model entirely (the latter is
-# the root cause of kicker/defense "acquire" trade suggestions being pushed
-# at teams that already have one of each and don't want another).
+# Shallow, single-starter rooms. A league only ever starts one K and one DEF,
+# and a second rostered kicker has ~zero roster-construction value no matter
+# how strong its raw score looks, so these positions get their own binary
+# coverage check (classify_shallow_position_rooms / true_shallow_position_needs
+# below) instead of the lineup/league-rank model that prices QB/RB/WR/TE.
+# Omitting them from the needs model entirely was the root cause of
+# kicker/defense "acquire" trade suggestions being pushed at teams that already
+# have one of each and don't want another.
 SHALLOW_POSITIONS = ("K", "DEF")
-STRONG_TIERS = {"elite", "star", "core starter", "starter"}
-PLAYABLE_OPPORTUNITIES = {
-    "elite opportunity",
-    "strong opportunity",
-    "starter at risk",
-    "committee back",
-    "backup with upside",
-}
-DEVELOPMENTAL_LABELS = {
-    "developmental",
-    "rookie",
-    "prospect",
-    "stash",
-    "backup with upside",
-}
-
 
 @dataclass(frozen=True)
 class PositionNeedAssessment:
@@ -68,6 +60,9 @@ class TeamNeedsAssessment:
     upgrade_opportunities: tuple[str, ...]
     temporary_injury_pressures: tuple[str, ...]
     future_risks: tuple[str, ...]
+    # "Degraded" only when no model result was available for this roster
+    # (``need_model_unavailable``); never a silent "everything is covered".
+    model_status: Mapping[str, Any] = field(default_factory=model_status.ok)
 
     def for_position(self, position: str) -> PositionNeedAssessment | None:
         normalized = str(position or "").strip().upper()
@@ -162,14 +157,6 @@ def select_need_headline(assessment: "TeamNeedsAssessment") -> dict[str, str]:
     }
 
 
-def _number(value, default: float = 0.0) -> float:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return default
-    return number if pd.notna(number) else default
-
-
 def _text(row, *fields: str) -> str:
     return " ".join(
         str(row.get(field) or "").strip().lower()
@@ -181,290 +168,119 @@ def _is_unavailable(row) -> bool:
     return injury_table.is_ruled_out(row.get("status"), row.get("injury_status"))
 
 
-def _is_developmental(row, position: str) -> bool:
-    age = _number(row.get("age"), 99.0)
-    years_exp = _number(row.get("years_exp"), 99.0)
-    role_text = _text(
-        row,
-        "role",
-        "role_label",
-        "player_tier",
-        "tier_label",
-        "opportunity_label",
-    )
-    age_limit = 25.0 if position == "QB" else 24.0
-    return (
-        age <= age_limit
-        and years_exp <= 2.0
-        and any(label in role_text for label in DEVELOPMENTAL_LABELS)
-    )
+_NEED_TIERS = {"primary": 1.0, "secondary": 0.8}
 
 
-def _is_core_young_asset(row, position: str) -> bool:
-    age = _number(row.get("age"), 99.0)
-    age_limit = 27.0 if position == "QB" else 25.0 if position == "TE" else 24.0
-    role_text = _text(row, "role", "role_label", "player_tier", "tier_label")
-    value = max(
-        _number(row.get("value_score")),
-        _number(row.get("dynasty_score")),
-        _number(row.get("market_score")),
-    )
-    return age <= age_limit and (
-        any(label in role_text for label in ("core", "elite", "star", "untouchable"))
-        or value >= 55.0
-    )
-
-
-def _is_weekly_starter(row, lineup_starter_ids: set[str]) -> bool:
-    player_id = str(row.get("player_id") or "").strip()
-    if player_id and player_id in lineup_starter_ids:
-        return True
-    depth_slot = _number(
-        row.get("depth_chart_slot", row.get("depth_chart_order")),
-        99.0,
-    )
-    role_text = _text(row, "role", "role_label", "player_tier", "tier_label")
-    opportunity = str(row.get("opportunity_label") or "").strip().lower()
-    return bool(
-        row.get("projected_starter")
-        or depth_slot == 1.0
-        or "starter" in role_text
-        or opportunity in {
-            "elite opportunity",
-            "strong opportunity",
-            "starter at risk",
-        }
-    )
-
-
-def _is_playable_cover(row, position: str) -> bool:
-    if _is_unavailable(row):
-        return False
-    tier = str(
-        row.get("player_tier")
-        or row.get("tier_label")
-        or ""
-    ).strip().lower()
-    opportunity = str(row.get("opportunity_label") or "").strip().lower()
-    value = max(
-        _number(row.get("value_score")),
-        _number(row.get("dynasty_score")),
-        _number(row.get("market_score")),
-    )
-    threshold = 24.0 if position == "QB" else 20.0 if position == "TE" else 18.0
-    return (
-        tier in STRONG_TIERS
-        or opportunity in PLAYABLE_OPPORTUNITIES
-        or value >= threshold
-    )
-
-
-@runtime_trace.traced("classify_roster_rooms", phase="team_needs")
-def classify_roster_rooms(
-    roster_df: pd.DataFrame,
-    lineup_df: pd.DataFrame | None = None,
-    league_settings: dict | None = None,
+def assessment_from_model(
+    model_result: Mapping[str, Any] | None,
     *,
-    taxi_player_ids: Iterable[object] | None = None,
-) -> dict[str, dict[str, Any]]:
-    roster = roster_df.copy() if roster_df is not None else pd.DataFrame()
-    settings = league_settings or {}
-    lineup = lineup_df if lineup_df is not None else pd.DataFrame()
-    # A taxi-squad player is never a legal weekly-lineup fill-in -- Sleeper
-    # (and every real dynasty ruleset) requires an explicit roster move to
-    # activate them first. Their NFL `status`/`injury_status` fields often
-    # still read "Active" (many are rookies on a real 53-man roster, just
-    # not promoted off taxi), so `_is_unavailable` alone never catches this:
-    # without this explicit set, a high-value taxi rookie gets scored as
-    # `playable_backups` and can fully mask a real short-term depth need
-    # (e.g. a one-deep RB room reads as "covered" because its only backup
-    # is parked on taxi and literally cannot be started). Callers that
-    # don't have taxi membership data simply omit this and get the prior
-    # behavior unchanged.
-    taxi_ids = {
-        str(player_id).strip()
-        for player_id in (taxi_player_ids or ())
-        if str(player_id or "").strip()
-    }
-    starter_ids = {
-        str(player_id)
-        for player_id in lineup.loc[
-            lineup.get(
-                "suggested_starter",
-                pd.Series(False, index=lineup.index),
-            ).fillna(False),
-            "player_id",
-        ].tolist()
-        if player_id is not None
-    } if not lineup.empty and "player_id" in lineup.columns else set()
+    status: Mapping[str, Any] | None = None,
+) -> TeamNeedsAssessment:
+    """Reshape one ``roster_value_model.assess_needs`` result for the
+    Dashboard / My Team / alerts ladder (``select_need_headline``).
 
-    superflex = (
-        int(settings.get("superflex_count") or 0) > 0
-        or int(settings.get("qb_count") or 1) >= 2
-        or str(settings.get("qb_format") or "").strip().lower()
-        in {"2qb", "superflex"}
+    primary / secondary tier -> ``short_term_need`` (a true need); a watch room
+    with aging starters and no young cover -> ``future_risk``; a room whose
+    weakest starter slot trails the league -> ``upgrade_opportunity`` when it
+    is not already a need; starters who are ruled out ->
+    ``temporary_injury_pressure``. ``None`` (no result for this roster) is
+    reported as ``need_model_unavailable``, never as a covered roster."""
+
+    merged_status = model_status.merge(status, (model_result or {}).get("model_status"))
+    available = model_result is not None
+    if not available:
+        model_status.add(merged_status, "need_model_unavailable")
+    by_position = {str(item["position"]): item for item in ((model_result or {}).get("positions") or [])}
+    ordered = [str(item["position"]) for item in ((model_result or {}).get("positions") or [])]
+
+    assessments: list[PositionNeedAssessment] = []
+    for position in CORE_POSITIONS:
+        item = by_position.get(position)
+        if item is None:
+            assessments.append(
+                PositionNeedAssessment(
+                    position=position, severity=0.0, classification="covered", starter_quality=None,
+                    backup_quality=None, depth_quality=None, future_stability=None, injury_pressure=0.0,
+                    replacement_gap=None, required_starters=0,
+                    reasons=(
+                        ("The need model is unavailable for this roster.",)
+                        if not available
+                        else (f"{position} is not a starting slot in this league.",)
+                    ),
+                    reason_codes=(("need_model_unavailable",) if not available else ("not_a_lineup_slot",)),
+                    data_quality="missing", true_need=False, relative_weakness=False,
+                    upgrade_opportunity=False, temporary_injury_pressure=False, future_risk=False,
+                )
+            )
+            continue
+        tier = str(item["tier"])
+        true_need = tier in _NEED_TIERS
+        future_risk = bool(item.get("future_gap")) and not true_need
+        relative_weakness = bool(item.get("relative_weakness"))
+        injury = bool(item.get("injured_starters"))
+        upgrade = bool(relative_weakness and not true_need)
+        if true_need:
+            classification, severity = "short_term_need", _NEED_TIERS[tier]
+        elif future_risk:
+            classification, severity = "future_risk", 0.65
+        else:
+            classification, severity = "covered", (0.3 if tier == "watch" else 0.0)
+        codes: list[str] = []
+        if true_need:
+            codes.append("insufficient_active_coverage")
+        if future_risk:
+            codes.append("insufficient_future_stability")
+        if injury:
+            codes.append("temporary_injury_pressure")
+        if upgrade:
+            codes.append("covered_relative_weakness")
+        elif relative_weakness:
+            codes.append("relative_weakness")
+        if not true_need and not relative_weakness:
+            codes.append("room_covered")
+        reasons = list(item.get("reasons") or ()) or [str(item.get("need_type") or "covered")]
+        assessments.append(
+            PositionNeedAssessment(
+                position=position, severity=severity, classification=classification,
+                starter_quality=None, backup_quality=None, depth_quality=None, future_stability=None,
+                injury_pressure=1.0 if injury else 0.0, replacement_gap=None,
+                required_starters=int(item.get("starters") or 0),
+                reasons=tuple(dict.fromkeys(str(r) for r in reasons)),
+                reason_codes=tuple(dict.fromkeys(codes)),
+                data_quality="complete", true_need=true_need, relative_weakness=relative_weakness,
+                upgrade_opportunity=upgrade, temporary_injury_pressure=injury, future_risk=future_risk,
+            )
+        )
+
+    rank = {position: index for index, position in enumerate(ordered)}
+    by_model_order = sorted(assessments, key=lambda a: rank.get(a.position, len(rank)))
+    return TeamNeedsAssessment(
+        positions=tuple(assessments),
+        true_needs=tuple(a.position for a in by_model_order if a.true_need),
+        relative_weaknesses=tuple(a.position for a in by_model_order if a.relative_weakness),
+        upgrade_opportunities=tuple(a.position for a in by_model_order if a.upgrade_opportunity),
+        temporary_injury_pressures=tuple(a.position for a in by_model_order if a.temporary_injury_pressure),
+        future_risks=tuple(a.position for a in by_model_order if a.future_risk),
+        model_status=merged_status,
     )
-    required = {
-        "QB": 2 if superflex else 1,
-        "RB": max(1, int(settings.get("rb_count") or 2)),
-        "WR": max(1, int(settings.get("wr_count") or 3)),
-        "TE": max(1, int(settings.get("te_count") or 1)),
-    }
-    if bool(settings.get("te_premium")):
-        required["TE"] = max(required["TE"], 1)
+
+
+def room_records(model_result: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Per-position room record for the trade copy (``need_type`` label, the
+    league rank behind it) from the same model result."""
 
     rooms: dict[str, dict[str, Any]] = {}
-    for position in CORE_POSITIONS:
-        position_df = (
-            roster[
-                roster.get("position", pd.Series("", index=roster.index))
-                .fillna("")
-                .astype(str)
-                .str.upper()
-                .eq(position)
-            ].copy()
-            if not roster.empty
-            else pd.DataFrame()
-        )
-        active_starters = []
-        playable_cover = []
-        developmental = []
-        developmental_depth = []
-        core_young = []
-        injured_active = []
-        injured_future = []
-        taxi_stashed = []
-
-        for _, row in position_df.iterrows():
-            player_id = str(row.get("player_id") or "").strip()
-            weekly_starter = _is_weekly_starter(row, starter_ids)
-            core_asset = _is_core_young_asset(row, position)
-            future_asset = _is_developmental(row, position) or core_asset
-            unavailable = _is_unavailable(row)
-            on_taxi = bool(taxi_ids) and player_id in taxi_ids
-            playable = _is_playable_cover(row, position)
-
-            if core_asset:
-                core_young.append(player_id)
-            if future_asset:
-                developmental.append(player_id)
-                if not weekly_starter or unavailable or on_taxi:
-                    developmental_depth.append(player_id)
-            if unavailable:
-                if weekly_starter and not future_asset:
-                    injured_active.append(player_id)
-                elif future_asset:
-                    injured_future.append(player_id)
-                continue
-            if on_taxi:
-                # Legally unstartable this week no matter how strong the
-                # prospect grade reads -- never credited toward active or
-                # playable weekly coverage, only toward future/developmental
-                # tracking above.
-                taxi_stashed.append(player_id)
-                continue
-            if weekly_starter and playable:
-                active_starters.append(player_id)
-            elif playable:
-                playable_cover.append(player_id)
-
-        active_count = len(active_starters)
-        playable_count = len(playable_cover)
-        future_count = len(set(developmental))
-        future_depth_count = len(set(developmental_depth))
-        core_count = len(set(core_young))
-        weekly_coverage = active_count + playable_count
-
-        short_term_need = weekly_coverage < required[position]
-        long_term_need = core_count == 0 and future_count == 0
-        true_need = short_term_need or long_term_need
-        need_type = ""
-        if short_term_need:
-            need_type = "short-term starter coverage"
-        elif long_term_need:
-            need_type = "long-term upside"
-        elif injured_future:
-            need_type = "active room covered; future asset injured"
-        elif playable_count:
-            need_type = "developmental depth already present"
-
-        if position == "QB" and not superflex:
-            if active_count >= 1 and (
-                playable_count >= 1 or future_depth_count >= 1
-            ):
-                true_need = False
-                short_term_need = False
-                long_term_need = False
-                need_type = "starter covered with backup/future depth"
-            elif active_count >= 1:
-                true_need = True
-                short_term_need = True
-                need_type = "short-term backup only"
-        if position == "TE":
-            if core_count >= 1 and weekly_coverage >= required[position]:
-                true_need = False
-                short_term_need = False
-                long_term_need = False
-                need_type = (
-                    "active room covered; future asset injured"
-                    if injured_future
-                    else "core asset with playable active cover"
-                )
-            elif bool(settings.get("te_premium")) and weekly_coverage < required[position] + 1:
-                true_need = True
-                need_type = "TE-premium depth"
-
-        rooms[position] = {
-            "position": position,
-            "required_starters": required[position],
-            "superflex": superflex if position == "QB" else False,
-            "active_starters": active_starters,
-            "playable_backups": playable_cover,
-            "developmental_assets": list(dict.fromkeys(developmental)),
-            "developmental_depth_assets": list(
-                dict.fromkeys(developmental_depth)
-            ),
-            "core_young_assets": list(dict.fromkeys(core_young)),
-            "injured_active_contributors": injured_active,
-            "injured_future_assets": injured_future,
-            "taxi_stashed_assets": taxi_stashed,
-            "active_coverage_count": weekly_coverage,
-            "future_coverage_count": future_count,
-            "short_term_need": short_term_need,
-            "long_term_need": long_term_need,
-            "true_need": true_need,
-            "need_type": need_type,
+    for item in (model_result or {}).get("positions") or []:
+        rooms[str(item["position"])] = {
+            "position": str(item["position"]),
+            "required_starters": int(item.get("starters") or 0),
+            "tier": str(item["tier"]),
+            "true_need": str(item["tier"]) in _NEED_TIERS,
+            "need_type": str(item.get("need_type") or ""),
+            "surplus": bool(item.get("surplus")),
+            "weakest_slot": dict(item.get("weakest_slot") or {}),
         }
     return rooms
-
-
-@runtime_trace.traced("true_roster_needs", phase="team_needs")
-def true_roster_needs(
-    roster_df: pd.DataFrame,
-    lineup_df: pd.DataFrame | None,
-    league_settings: dict | None,
-    baseline_needs: list[str] | None = None,
-    *,
-    taxi_player_ids: Iterable[object] | None = None,
-) -> tuple[list[str], dict[str, dict[str, Any]]]:
-    rooms = classify_roster_rooms(
-        roster_df,
-        lineup_df,
-        league_settings,
-        taxi_player_ids=taxi_player_ids,
-    )
-    needs: list[str] = []
-    for position in baseline_needs or []:
-        position = str(position).upper()
-        if position not in CORE_POSITIONS or position in needs:
-            continue
-        if position in {"QB", "TE"} and not rooms[position]["true_need"]:
-            continue
-        needs.append(position)
-    for position in CORE_POSITIONS:
-        if rooms[position]["true_need"] and position not in needs:
-            needs.append(position)
-    return needs, rooms
 
 
 def _is_shallow_position_disqualified(row) -> bool:
@@ -585,160 +401,3 @@ def true_shallow_position_needs(
     rooms = classify_shallow_position_rooms(roster_df, league_settings)
     needs = [position for position in SHALLOW_POSITIONS if rooms[position]["true_need"]]
     return needs, rooms
-
-
-def _position_data_quality(
-    roster_df: pd.DataFrame,
-    position: str,
-) -> str:
-    if roster_df is None or roster_df.empty or "position" not in roster_df.columns:
-        return "missing"
-    position_rows = roster_df[
-        roster_df["position"].fillna("").astype(str).str.upper().eq(position)
-    ]
-    if position_rows.empty:
-        return "missing"
-    expected_fields = {
-        "player_id",
-        "age",
-        "years_exp",
-        "status",
-        "value_score",
-        "player_tier",
-        "opportunity_label",
-    }
-    available_fields = expected_fields.intersection(position_rows.columns)
-    return "complete" if len(available_fields) >= 6 else "limited"
-
-
-@runtime_trace.traced("assess_team_needs", phase="team_needs")
-def assess_team_needs(
-    roster_df: pd.DataFrame,
-    lineup_df: pd.DataFrame | None = None,
-    league_settings: dict | None = None,
-    *,
-    relative_weaknesses: list[str] | tuple[str, ...] | None = None,
-    taxi_player_ids: Iterable[object] | None = None,
-) -> TeamNeedsAssessment:
-    """Return immutable need assessments without changing existing need policy.
-
-    Phase one deliberately derives classifications from ``true_roster_needs``
-    and leaves quality fields unset until the repository has a reliable,
-    centralized quality model. League-relative weakness is retained as
-    comparative intelligence and never upgrades a covered room to a true need.
-    """
-
-    normalized_relative = tuple(
-        dict.fromkeys(
-            str(position or "").strip().upper()
-            for position in (relative_weaknesses or ())
-            if str(position or "").strip().upper() in CORE_POSITIONS
-        )
-    )
-    true_needs, rooms = true_roster_needs(
-        roster_df,
-        lineup_df,
-        league_settings,
-        None,
-        taxi_player_ids=taxi_player_ids,
-    )
-    true_need_set = set(true_needs)
-    assessments: list[PositionNeedAssessment] = []
-
-    for position in CORE_POSITIONS:
-        room = rooms[position]
-        short_term_need = bool(room.get("short_term_need"))
-        long_term_need = bool(room.get("long_term_need"))
-        true_need = position in true_need_set
-        relative_weakness = position in normalized_relative
-        temporary_injury_pressure = bool(
-            room.get("injured_active_contributors")
-            or room.get("injured_future_assets")
-        )
-        future_risk = bool(long_term_need)
-        upgrade_opportunity = bool(relative_weakness and not true_need)
-        data_quality = _position_data_quality(roster_df, position)
-
-        if short_term_need:
-            classification = "short_term_need"
-            severity = 1.0
-        elif long_term_need:
-            classification = "future_risk"
-            severity = 0.65
-        else:
-            classification = "covered"
-            severity = 0.0
-
-        reasons: list[str] = []
-        reason_codes: list[str] = []
-        if short_term_need:
-            reasons.append(
-                f"Active {position} coverage is below the current lineup requirement."
-            )
-            reason_codes.append("insufficient_active_coverage")
-        if long_term_need:
-            reasons.append(
-                f"The {position} room lacks a recognized young core or developmental asset."
-            )
-            reason_codes.append("insufficient_future_stability")
-        if temporary_injury_pressure:
-            reasons.append(f"Current injuries are reducing dependable {position} coverage.")
-            reason_codes.append("temporary_injury_pressure")
-        if upgrade_opportunity:
-            reasons.append(
-                f"{position} is below the league comparison baseline but remains covered."
-            )
-            reason_codes.append("covered_relative_weakness")
-        elif relative_weakness:
-            reasons.append(f"{position} is below the league comparison baseline.")
-            reason_codes.append("relative_weakness")
-        if not true_need and not relative_weakness:
-            reasons.append(
-                str(room.get("need_type") or f"The {position} room meets current coverage policy.")
-            )
-            reason_codes.append("room_covered")
-        if data_quality != "complete":
-            reasons.append(
-                f"{position} assessment is conservative because player metadata is incomplete."
-            )
-            reason_codes.append("limited_player_metadata")
-
-        assessments.append(
-            PositionNeedAssessment(
-                position=position,
-                severity=severity,
-                classification=classification,
-                starter_quality=None,
-                backup_quality=None,
-                depth_quality=None,
-                future_stability=None,
-                injury_pressure=1.0 if temporary_injury_pressure else 0.0,
-                replacement_gap=None,
-                required_starters=int(room.get("required_starters") or 0),
-                reasons=tuple(dict.fromkeys(reasons)),
-                reason_codes=tuple(dict.fromkeys(reason_codes)),
-                data_quality=data_quality,
-                true_need=true_need,
-                relative_weakness=relative_weakness,
-                upgrade_opportunity=upgrade_opportunity,
-                temporary_injury_pressure=temporary_injury_pressure,
-                future_risk=future_risk,
-            )
-        )
-
-    return TeamNeedsAssessment(
-        positions=tuple(assessments),
-        true_needs=tuple(
-            position for position in CORE_POSITIONS if position in true_need_set
-        ),
-        relative_weaknesses=normalized_relative,
-        upgrade_opportunities=tuple(
-            item.position for item in assessments if item.upgrade_opportunity
-        ),
-        temporary_injury_pressures=tuple(
-            item.position for item in assessments if item.temporary_injury_pressure
-        ),
-        future_risks=tuple(
-            item.position for item in assessments if item.future_risk
-        ),
-    )

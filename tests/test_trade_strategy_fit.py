@@ -3,8 +3,11 @@ from unittest.mock import patch
 
 import pandas as pd
 
+from tests.need_model_fixtures import league_needs, room, team_needs
+
 from modules.trade_ideas import (
     _build_team_shape,
+    _surplus_positions_moved,
     _team_roster_size_context,
     _temporary_injury_trade_guardrail,
     _trade_confidence_context,
@@ -49,71 +52,69 @@ def pick(label="2027 1st", score=6500):
 
 
 class TestTradeStrategyFit(unittest.TestCase):
-    def test_trade_shape_filters_covered_te_from_relative_weaknesses(self):
+    def test_trade_shape_reads_needs_and_surplus_from_the_need_model(self):
         roster = pd.DataFrame(
             [
-                player(
-                    "Core TE",
-                    80,
-                    22,
-                    tier="Star",
-                    role="Core",
-                    position="TE",
-                )
-                | {
-                    "player_id": "te-core",
-                    "team": "DAL",
-                    "years_exp": 1,
-                    "status": "IR",
-                    "injury_status": "out",
-                },
-                player(
-                    "Active TE",
-                    35,
-                    28,
-                    tier="Contributor",
-                    position="TE",
-                )
-                | {
-                    "player_id": "te-cover",
-                    "team": "DAL",
-                    "years_exp": 6,
-                    "opportunity_label": "Strong Opportunity",
-                    "status": "Active",
-                    "injury_status": "",
-                },
+                player("Starter RB", 60, 26, position="RB") | {"player_id": "rb-1", "team": "DAL", "years_exp": 4},
+                player("Spare WR", 40, 25, position="WR") | {"player_id": "wr-spare", "team": "DAL", "years_exp": 3},
             ]
         )
         lineup = roster.copy()
-        lineup["suggested_starter"] = [False, True]
+        lineup["suggested_starter"] = [True, False]
+        league = league_needs(
+            {
+                1: team_needs(
+                    room("RB", "secondary", slot="RB1", rank=10),
+                    room("TE", "watch", rank=7),
+                    room("WR", "covered", surplus_ids=["wr-spare"]),
+                )
+            }
+        )
 
         with (
             patch(
                 "modules.trade_ideas.get_team_vs_league",
-                return_value={
-                    "strategy": "retool",
-                    "mode": "competitive",
-                    "weaknesses": ["TE"],
-                    "strengths": [],
-                },
+                return_value={"strategy": "retool", "mode": "competitive"},
             ),
-            patch(
-                "modules.trade_ideas.suggest_optimal_lineup",
-                return_value=lineup,
-            ),
+            patch("modules.trade_ideas.suggest_optimal_lineup", return_value=lineup),
         ):
             shape = _build_team_shape(
-                pd.DataFrame(),
-                1,
-                roster,
-                league_settings={"te_count": 1},
+                pd.DataFrame(), 1, roster, league_settings={"te_count": 1, "k_count": 0, "def_count": 0}, league_needs=league
             )
 
-        self.assertNotIn("TE", shape["needs"])
-        self.assertEqual(
-            shape["room_coverage"]["TE"]["need_type"],
-            "active room covered; future asset injured",
+        # A watch-list room (TE trails the league a little) is not a need.
+        self.assertEqual(shape["needs"], ["RB"])
+        self.assertEqual(shape["surplus"], ["WR"])
+        self.assertEqual(shape["surplus_player_ids"], {"WR": ["wr-spare"]})
+        self.assertEqual(shape["room_coverage"]["RB"]["need_type"], "short-term starter coverage")
+        self.assertFalse(shape["need_model_status"]["degraded"])
+
+    def test_trade_shape_without_a_model_result_says_so_instead_of_reading_covered(self):
+        roster = pd.DataFrame(
+            [player("Starter RB", 60, 26, position="RB") | {"player_id": "rb-1", "team": "DAL", "years_exp": 4}]
         )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True]
+        with (
+            patch("modules.trade_ideas.get_team_vs_league", return_value={"strategy": "retool", "mode": "competitive"}),
+            patch("modules.trade_ideas.suggest_optimal_lineup", return_value=lineup),
+        ):
+            shape = _build_team_shape(pd.DataFrame(), 7, roster, league_settings={"te_count": 1, "k_count": 0, "def_count": 0})
+
+        self.assertEqual(shape["needs"], [])
+        self.assertTrue(shape["need_model_status"]["degraded"])
+        self.assertEqual(shape["need_model_status"]["reasons"][0]["code"], "need_model_unavailable")
+
+    def test_surplus_claims_need_a_surplus_player_in_the_package(self):
+        shape = {"surplus": ["RB"], "surplus_player_ids": {"RB": ["rb-spare"]}}
+        spare = player("Spare RB", 30, 25, position="RB") | {"player_id": "rb-spare"}
+        starter = player("Starter RB", 60, 26, position="RB") | {"player_id": "rb-1"}
+        te = player("Some TE", 30, 25, position="TE") | {"player_id": "te-1"}
+
+        self.assertEqual(_surplus_positions_moved(shape, [spare, pick()]), {"RB"})
+        # The room is surplus, but a starter, another position or a pick says nothing about it.
+        self.assertEqual(_surplus_positions_moved(shape, [starter]), set())
+        self.assertEqual(_surplus_positions_moved(shape, [te, pick()]), set())
 
     def test_rebuild_prefers_picks_and_youth_over_old_win_now_return(self):
         shape = {"strategy": "rebuild", "archetype_label": "Full Rebuild"}

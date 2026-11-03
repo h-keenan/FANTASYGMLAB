@@ -61,7 +61,10 @@ MESSAGES: dict[str, str] = {
     ),
     "teams_skipped": "Some teams could not be graded and are missing from this board.",
     "need_model_failed": (
-        "Your roster's needs could not be fully modeled, so this uses a simpler coverage check."
+        "Your roster's needs could not be modeled, so no team need is shown."
+    ),
+    "need_model_unavailable": (
+        "League rosters were not available, so team needs are not shown for this roster."
     ),
     "untouchable_lookup_failed": (
         "Your untouchable players could not be loaded, so no drops are suggested."

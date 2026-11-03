@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 
 from modules import draft_assistant
+from tests.need_model_fixtures import room, team_needs
 
 
 def player(
@@ -369,9 +370,6 @@ class TestDraftAssistant(unittest.TestCase):
 
         buckets = draft_assistant.build_recommendation_buckets(
             board,
-            roster_df=pd.DataFrame(),
-            lineup_df=pd.DataFrame(),
-            league_settings={"qb_format": "1QB"},
             score_field="value_score",
         )
 
@@ -404,9 +402,6 @@ class TestDraftAssistant(unittest.TestCase):
 
         buckets = draft_assistant.build_recommendation_buckets(
             board,
-            roster_df=pd.DataFrame(),
-            lineup_df=pd.DataFrame(),
-            league_settings={},
             score_field="value_score",
         )
 
@@ -424,21 +419,12 @@ class TestDraftAssistant(unittest.TestCase):
             [],
             score_field="value_score",
         )
-        roster = pd.DataFrame(
-            [
-                player("qb1", "Starter QB", "QB", value=90, age=27, tier="Star"),
-                player("qb2", "Backup QB", "QB", value=35, age=29, opportunity="Strong Opportunity"),
-                player("rb1", "Only RB", "RB", value=30, age=27, tier="Contributor"),
-            ]
-        )
-        lineup = roster.copy()
-        lineup["suggested_starter"] = [True, False, True]
+        # One need model result: the QB room is covered, RB is a real need.
+        needs = team_needs(room("RB", "secondary", slot="RB2", rank=10), room("QB", "covered"))
 
         buckets = draft_assistant.build_recommendation_buckets(
             available,
-            roster_df=roster,
-            lineup_df=lineup,
-            league_settings={"qb_count": 1, "superflex_count": 0, "rb_count": 2},
+            team_needs=needs,
             score_field="value_score",
         )
         fit_buckets = {
@@ -447,7 +433,7 @@ class TestDraftAssistant(unittest.TestCase):
             if item["bucket"] in {"Best Team Fit", "Best Positional Fit"}
         }
 
-        self.assertNotEqual(fit_buckets.get("Best Team Fit"), "QB")
+        self.assertEqual(fit_buckets.get("Best Team Fit"), "RB")
         self.assertNotEqual(fit_buckets.get("Best Positional Fit"), "QB")
 
     def test_superflex_can_make_qb_a_positional_fit(self):
@@ -461,17 +447,12 @@ class TestDraftAssistant(unittest.TestCase):
             [],
             score_field="value_score",
         )
-        roster = pd.DataFrame(
-            [player("qb1", "Starter QB", "QB", value=90, age=27, tier="Star")]
-        )
-        lineup = roster.copy()
-        lineup["suggested_starter"] = True
+        # Superflex: the second QB slot is the weakest in the league, so QB is a need.
+        needs = team_needs(room("QB", "secondary", slot="QB2", rank=11), room("RB", "covered"))
 
         buckets = draft_assistant.build_recommendation_buckets(
             available,
-            roster_df=roster,
-            lineup_df=lineup,
-            league_settings={"qb_count": 1, "superflex_count": 1},
+            team_needs=needs,
             score_field="value_score",
         )
         fit_positions = [

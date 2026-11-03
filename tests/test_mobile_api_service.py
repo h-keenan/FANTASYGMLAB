@@ -16369,8 +16369,12 @@ def test_team_profile_composes_rooms_picks_direction_and_angle(monkeypatch):
     assert body["picks"]["firsts_acquired"] == 2
     assert body["trade_tendency"] is None
     assert body["direction"]["key"]
+    # The opponent's every starting slot trails mine, so the one need model calls
+    # all four rooms needs for them and the angle is what I can send them.
+    assert body["needs"] == ["QB", "RB", "WR", "TE"] and body["surplus"] == []
     assert body["trade_angle"] is not None
-    assert body["trade_angle"]["target"]["player_id"].startswith("opp")
+    assert body["trade_angle"]["target"]["side"] == "send"
+    assert body["trade_angle"]["target"]["player_id"].startswith("mine")
 
 
 def test_all_trades_reports_a_team_it_had_to_skip(monkeypatch):

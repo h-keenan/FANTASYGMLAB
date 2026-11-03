@@ -77,6 +77,23 @@ def _safe_location(filename: str, lineno: int) -> str:
         return f"{name}:{lineno}"
 
 
+def give_last_teams_depth(players: pd.DataFrame, *, teams: tuple[int, ...] = (10, 11, 12), keep_thin: str = "WR") -> None:
+    """Edit ``players`` in place so the weakest fixture teams are not the worst
+    at every position.
+
+    Every fixture team is the same shape, ranked 1..N at every position. The
+    need model (league ranks) therefore calls all four rooms a need for the
+    last teams, and market realism rightly refuses to pull any of their players
+    out of a room they need. Real partners need one or two rooms: this gives the
+    given teams real depth everywhere except ``keep_thin``."""
+
+    owners = players["player_id"].astype(str).str.slice(1, 3).astype(int)
+    mask = owners.isin(teams) & (players["position"] != keep_thin)
+    for column in ("value_score", "dynasty_score", "fantasycalc_value"):
+        if column in players.columns:
+            players.loc[mask, column] = players.loc[mask, column] + 1500
+
+
 def build_fixture(spec: FixtureSpec) -> dict[str, Any]:
     """Create anonymous stable fixtures without customer, league, or player data."""
 
@@ -375,7 +392,7 @@ def _instrumented_once(fixture: dict[str, Any]) -> dict[str, Any]:
     originals = {
         "team_shape": trade_ideas._build_team_shape,
         "lineup": trade_ideas.suggest_optimal_lineup,
-        "team_needs": trade_ideas.true_roster_needs,
+        "team_needs": trade_ideas._league_needs_for,
         "injury_context": trade_ideas.summarize_team_injuries,
         "team_metrics": trade_ideas.get_team_vs_league,
         "pick_team_context": trade_ideas._pick_team_context,
@@ -427,7 +444,7 @@ def _instrumented_once(fixture: dict[str, Any]) -> dict[str, Any]:
             (
                 ("_build_team_shape", originals["team_shape"]),
                 ("suggest_optimal_lineup", originals["lineup"]),
-                ("true_roster_needs", originals["team_needs"]),
+                ("_league_needs_for", originals["team_needs"]),
                 ("summarize_team_injuries", originals["injury_context"]),
                 ("get_team_vs_league", originals["team_metrics"]),
                 ("_pick_team_context", originals["pick_team_context"]),

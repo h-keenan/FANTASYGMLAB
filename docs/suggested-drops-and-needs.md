@@ -1,7 +1,11 @@
 # Suggested drops and the roster-value need model
 
-One shared roster-value model (`modules/roster_value_model.py`) feeds the Waivers team-need
-stat (`needs_model`) and the drop engine (`modules/drop_candidates.py`).
+One shared roster-value model (`modules/roster_value_model.py`) is the only team need / surplus model
+in the app. It feeds Waivers (`needs_model`), the drop engine (`modules/drop_candidates.py`), the
+Dashboard "Biggest Team Need" tile and Next Move briefing, My Team (strengths, pressure, position groups),
+the league glance, the waiver-reminder push, the opponent profile, the Trade Analyzer fit (filled /
+exposed needs, "moving from surplus") and Trade Hub / Finder (team shapes, partner needs and surplus,
+the rationale text and the share card's WHY line).
 
 ## Why Waivers said "None - Team need"
 
@@ -11,8 +15,8 @@ asset" with thresholds written for a 0-100 value scale (18 / 20 / 24 / 55) but t
 `metrics=None` in the waivers endpoint (no league-relative weakness, no upgrade or future-risk
 fallback), a roster only had a "need" when a position had fewer bodies than starter slots. Measured on two of the public dynasty leagues: 9 of 12 and 6 of 10 rosters returned an empty need list, and nothing ranked positions
 against each other, so there was never a "weakest position" to show. Nothing failed silently; the
-policy answered "covered" because of the unit mismatch. `roster_needs.py` itself is unchanged (trade
-fit and Dashboard still read it: follow-up).
+policy answered "covered" because of the unit mismatch. The policy has since been deleted from
+`roster_needs.py` and every consumer (see above) reads the model below; there is no second copy.
 
 ## Need model
 
@@ -21,6 +25,22 @@ points per week the best real free agent would add (lineup model, rest of season
 starters + one cover, injured starters, and (dynasty) aging starters with no young cover (repo age
 curve). Tiers: primary / secondary / watch / covered. "No need" only when no position is primary or
 secondary; the weakest slot is always surfaced.
+
+Surplus: healthy players beyond starters + one cover who would still start for a typical team in the
+league (at least the median weakest starter at the position). Only a room that is not a need can be a
+surplus. Trade copy says a side is "moving from X surplus" only when a player in the package is one of
+those players (`surplus_player_ids`); a surplus room alone, a starter at that position, a pick or a
+player at another position never makes the claim.
+
+Entry points: `roster_value_model.league_needs(...)` (every roster in a league from one calibration,
+memoized per frame and rosters) for everything except Waivers, which builds its own context with the
+caller's posture, projections and real free-agent pool and calls `assess_needs` directly (same
+function, same thresholds). `roster_needs.assessment_from_model` reshapes a result into the
+`TeamNeedsAssessment` the Dashboard / My Team ladder reads (public shape unchanged). With no result for
+a roster the assessment is degraded (`need_model_unavailable`), never "covered".
+
+K/DEF stay on the binary `roster_needs.classify_shallow_position_rooms` check (a league starts one of
+each; there is no depth gradient to rank).
 
 ## Drop engine
 

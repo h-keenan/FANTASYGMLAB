@@ -914,8 +914,6 @@ def get_team_vs_league(
             "strategy_label",
             team_strategy_label(t.get("strategy", t["mode"])),
         ),
-        "strengths": [],
-        "weaknesses": [],
     }
 
     for field, default in {
@@ -960,17 +958,6 @@ def get_team_vs_league(
             metrics[field] = default
         else:
             metrics[field] = value
-
-    for pos in ["qb", "rb", "wr", "te"]:
-        col = f"{pos}_score"
-        team_pos = float(t[col])
-        league_pos = float(df_summary[col].mean())
-        delta = team_pos - league_pos
-        threshold = max(500.0, abs(league_pos) * 0.12)
-        if delta >= threshold:
-            metrics["strengths"].append(pos.upper())
-        elif delta <= -threshold:
-            metrics["weaknesses"].append(pos.upper())
 
     return metrics
 

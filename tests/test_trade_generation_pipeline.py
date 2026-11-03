@@ -211,7 +211,7 @@ def test_trade_finder_surfaces_ideas_for_a_single_protected_asset_on_a_rebuild_t
     this doesn't pass for the wrong reason the way a deterministic-context
     mock would."""
 
-    from scripts.profile_trade_hub import FixtureSpec, build_fixture
+    from scripts.profile_trade_hub import FixtureSpec, build_fixture, give_last_teams_depth
 
     # Every package for this lone 8,600 asset costs the user ~1,000+ raw
     # value (the partner has nothing comparable), so the Analyzer grades
@@ -227,6 +227,7 @@ def test_trade_finder_surfaces_ideas_for_a_single_protected_asset_on_a_rebuild_t
     players.loc[idx, "fantasycalc_value"] = 8600.0
     players.loc[idx, "age"] = 23.0
     players.loc[idx, "player_tier"] = "Elite"
+    give_last_teams_depth(players)
 
     ideas = trade_ideas.build_trade_ideas(
         players,

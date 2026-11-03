@@ -238,6 +238,9 @@ class Context:
             strategy=STRATEGY,
             lineup_settings=self.settings,
             score_field=self.score_field,
+            # A generic reference roster has no league to rank against, so it
+            # has no needs or surplus (an empty result, not a missing one).
+            team_needs={},
         )
         if not fit or not fit.get("available"):
             return None

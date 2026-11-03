@@ -124,7 +124,7 @@ def test_the_fit_reports_degraded_baselines_carried_on_its_frames():
     model_status.mark_frame(universe, "projection_baselines_failed")
     send = [t._asset(roster.set_index("player_id", drop=False).loc["Jones"].to_dict())]
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
-        roster, universe, send, [_pick(4800)], None, "retool", t.SETTINGS, "dynasty_score"
+        roster, universe, send, [_pick(4800)], None, "retool", t.SETTINGS, "dynasty_score", team_needs={}
     )
     assert model_status.codes(fit["model_status"]) == ["projection_baselines_failed"]
     clean, _ = _evaluate(_thin_roster(), ["Jones"], [], receive_assets=[_pick(4800)])

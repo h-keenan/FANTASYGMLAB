@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import re
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
@@ -12,7 +12,7 @@ from modules.league_value_settings import _safe_positive_int
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_identity import ensure_identity_columns
-from modules.roster_needs import true_roster_needs
+from modules.roster_needs import assessment_from_model, room_records
 
 
 CORE_DRAFT_POSITIONS = ("QB", "RB", "WR", "TE", "K")
@@ -1015,28 +1015,6 @@ def _is_injury_flag(row: pd.Series | dict) -> bool:
     return _safe_text(row.get("injury_level")).lower() in {"minor", "moderate", "major"}
 
 
-def _effective_need_positions(needs: list[str], rooms: dict[str, dict[str, Any]]) -> list[str]:
-    effective: list[str] = []
-    for position in needs:
-        position = _safe_text(position).upper()
-        room = rooms.get(position) or {}
-        required = _safe_int(room.get("required_starters"), 1)
-        active_coverage = _safe_int(room.get("active_coverage_count"), 0)
-        future_coverage = _safe_int(room.get("future_coverage_count"), 0)
-        playable_backups = len(room.get("playable_backups") or [])
-        future_depth = len(room.get("developmental_depth_assets") or [])
-        if position == "QB" and not bool(room.get("superflex")):
-            if active_coverage >= 1 and (playable_backups or future_depth or future_coverage):
-                continue
-        if position == "TE" and active_coverage >= required and future_coverage:
-            continue
-        if active_coverage >= required and not room.get("long_term_need"):
-            continue
-        if position not in effective:
-            effective.append(position)
-    return effective
-
-
 def _dedupe_bucket_rows(items: list[dict]) -> list[dict]:
     seen: set[str] = set()
     result: list[dict] = []
@@ -1052,12 +1030,14 @@ def _dedupe_bucket_rows(items: list[dict]) -> list[dict]:
 def build_recommendation_buckets(
     available_pool: pd.DataFrame,
     *,
-    roster_df: pd.DataFrame | None = None,
-    lineup_df: pd.DataFrame | None = None,
-    league_settings: dict | None = None,
+    team_needs: Mapping[str, Any] | None = None,
     score_field: str = "value_score",
     limit: int = 7,
 ) -> list[dict]:
+    """``team_needs``: ``roster_value_model.assess_needs`` for the drafting
+    roster (the one need model); None means no roster context, so no
+    positional-fit buckets."""
+
     if available_pool is None or available_pool.empty:
         return []
     board = filter_current_fantasy_players(
@@ -1073,23 +1053,8 @@ def build_recommendation_buckets(
     board["_scarcity"] = pd.to_numeric(board.get("scarcity_score", 0), errors="coerce").fillna(0.0)
     board["_age"] = pd.to_numeric(board.get("age", 99), errors="coerce").fillna(99.0)
 
-    needs: list[str] = []
-    rooms: dict[str, dict[str, Any]] = {}
-    if roster_df is not None and not roster_df.empty:
-        baseline = []
-        for position in ("QB", "RB", "WR", "TE"):
-            position_count = int(
-                (
-                    roster_df.get("position", pd.Series("", index=roster_df.index))
-                    .fillna("")
-                    .astype(str)
-                    .str.upper()
-                    == position
-                ).sum()
-            )
-            if position_count <= 1:
-                baseline.append(position)
-        needs, rooms = true_roster_needs(roster_df, lineup_df, league_settings or {}, baseline)
+    needs = list(assessment_from_model(team_needs).true_needs) if team_needs is not None else []
+    rooms = room_records(team_needs)
 
     items: list[dict] = []
     used_player_ids: set[str] = set()
@@ -1123,11 +1088,7 @@ def build_recommendation_buckets(
     if best_value is not None:
         add_bucket("Best Value", best_value, _player_note(best_value, bucket="Best Value"))
 
-    need_positions = [
-        position
-        for position in _effective_need_positions(needs, rooms)
-        if position in {"QB", "RB", "WR", "TE"}
-    ]
+    need_positions = [position for position in needs if position in {"QB", "RB", "WR", "TE"}]
     need_board = board[board["position"].fillna("").astype(str).str.upper().isin(need_positions)].copy()
     if not need_board.empty:
         best_fit = first_unused(need_board)

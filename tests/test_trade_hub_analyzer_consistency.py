@@ -73,6 +73,8 @@ def _analyzer_verdict(fixture, pool, strategy, idea):
         strategy=strategy,
         lineup_settings=fixture["settings"],
         score_field=SCORE_FIELD,
+        # The Analyzer endpoint reads the same league-wide need model the Hub gate used.
+        team_needs=trade_ideas._league_needs_for(pool, fixture["rosters"], fixture["settings"], SCORE_FIELD).for_roster(1),
     )
     assert fit and fit.get("available")
     return trade_offer_analyzer.decide_offer_verdict(fit, send_assets=send, receive_assets=receive)

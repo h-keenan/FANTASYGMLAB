@@ -32,7 +32,7 @@ import pandas as pd
 import requests
 
 from modules import injury_status as injury_table
-from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
+from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, roster_value_model, sleeper, sleeper_leagues, team_stance
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -717,6 +717,7 @@ def league_briefing_push_items(
         league_settings=league_settings,
         score_field=score_field,
         rosters=rosters,
+        league=league,
         untouchable_player_ids=untouchable_player_ids,
         team_strategy=team_strategy,
     )
@@ -1000,13 +1001,14 @@ def waiver_reminder_push_item(
         all_rostered.update(str(pid) for pid in (roster.get("players") or []))
     league_settings = league_value_settings.detect_league_value_settings_from_payload(league)
     roster_df = players_df[players_df["player_id"].astype(str).isin(roster_ids)].copy()
-    lineup_df = dashboard_engine.suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
+    league_needs = roster_value_model.league_needs(
+        valued=players_df, rosters=rosters or [], league=league, settings=league_settings, score_field=score_field
+    )
     assessment = dashboard_engine.build_team_needs_assessment(
-        roster_df, None, league_settings, lineup_df=lineup_df, score_field=score_field
+        league_needs.for_roster(my_roster.get("roster_id")), status=league_needs.status
     )
-    needed = dashboard_engine.get_needed_positions(
-        roster_df, None, league_settings, assessment=assessment, lineup_df=lineup_df
-    )
+    # True needs only: this alert says "a clear need".
+    needed = dashboard_engine.get_needed_positions(assessment, include_fallback=False)
     if not needed:
         return None
     free_agents = players_df[~players_df["player_id"].astype(str).isin(all_rostered)]

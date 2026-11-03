@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 from modules import push_tokens, push_triggers
+from tests.need_model_fixtures import league_needs
 
 
 _real_count_recent_pushes = push_triggers.count_recent_pushes
@@ -1204,7 +1205,9 @@ def _waiver_item(monkeypatch, *, now, league=None, need_fit=True, needed=("RB",)
         ]
     )
     monkeypatch.setattr(push_triggers.league_value_settings, "detect_league_value_settings_from_payload", lambda lg: {})
-    monkeypatch.setattr(push_triggers.dashboard_engine, "suggest_optimal_lineup", lambda *a, **k: pd.DataFrame())
+    # The need model itself is covered in tests/test_roster_value_model.py; this
+    # test is about the reminder's timing and its use of the result.
+    monkeypatch.setattr(push_triggers.roster_value_model, "league_needs", lambda **k: league_needs({}))
     monkeypatch.setattr(push_triggers.dashboard_engine, "build_team_needs_assessment", lambda *a, **k: object())
     monkeypatch.setattr(push_triggers.dashboard_engine, "get_needed_positions", lambda *a, **k: list(needed))
     monkeypatch.setattr(

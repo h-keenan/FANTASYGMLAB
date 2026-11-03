@@ -657,6 +657,7 @@ def grade_trade_for_user(
     current_context: dict | None = None,
     waiver_df: pd.DataFrame | None = None,
     forced_drop_assets: list[dict] | None = None,
+    team_needs: dict | None = None,
 ):
     """The Trade Analyzer's own verdict for this package, from the user's side.
 
@@ -680,6 +681,7 @@ def grade_trade_for_user(
         current_context=current_context,
         waiver_df=waiver_df,
         forced_drop_assets=forced_drop_assets,
+        team_needs=team_needs,
     )
     if not fit or not fit.get("available"):
         return fit, None
