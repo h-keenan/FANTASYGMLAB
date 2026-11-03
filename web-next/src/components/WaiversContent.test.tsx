@@ -184,6 +184,41 @@ describe("WaiversContent", () => {
     expect(box).toHaveTextContent("Bench Guy");
   });
 
+  it("collapses repeated drops to one line on the list rows, details one tap away", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [
+        priorityAdd({ drop_suggestion: DROP_SUGGESTION }),
+        priorityAdd({ player_id: "p2", name: "Second Add", drop_suggestion: { ...DROP_SUGGESTION, add: { ...DROP_SUGGESTION.add, name: "Second Add" } } }),
+      ],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const compact = screen.getByTestId("suggested-drop-compact");
+    expect(compact).toHaveTextContent("Drop");
+    expect(compact).toHaveTextContent("Dead Weight · WR");
+    expect(screen.queryByTestId("suggested-drop-details")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Why/ }));
+    expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("never starts in your best lineup");
+  });
+
+  it("lists the same cut the cards name, with the adds it is the cut for", () => {
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [priorityAdd({ drop_suggestion: DROP_SUGGESTION })],
+      droppable_players: {
+        players: [{ ...DROP_SUGGESTION.drop!, named_for: ["Test Free Agent"] }],
+        total: 1, protected_count: 3, candidates_checked: 5, locked_count: 0,
+      },
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+
+    const section = screen.getByTestId("droppable-players");
+    expect(section).toHaveTextContent("Dead Weight");
+    expect(section).toHaveTextContent("The cut when you add Test Free Agent");
+    expect(section).not.toHaveTextContent(/Nobody on your roster is a free cut/);
+  });
+
   it("says 'No good drop' honestly and names the cheapest cut", () => {
     const data: WaiversResponse = {
       ...BASE_RESPONSE,

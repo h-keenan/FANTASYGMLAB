@@ -16409,7 +16409,7 @@ def test_all_trades_reports_a_team_it_had_to_skip(monkeypatch):
     assert body["model_status"]["reasons"][0]["code"] == "teams_skipped"
 
 
-def _get_waivers_for_drop_tests(monkeypatch, *, bundle_error=None, gm_error=""):
+def _get_waivers_for_drop_tests(monkeypatch, *, bundle_error=None, gm_error="", full_roster=False):
     client = _client(monkeypatch)
     monkeypatch.setattr(
         "services.mobile_api_service._fetch_gm_stance_with_set_flag", lambda *a, **k: ("retool", False)
@@ -16435,7 +16435,12 @@ def _get_waivers_for_drop_tests(monkeypatch, *, bundle_error=None, gm_error=""):
                     {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
                 ],
             ):
-                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                league = (
+                    {**_TRADE_ANALYZER_LEAGUE, "roster_positions": ["BN"] * len(my_roster_ids)}
+                    if full_roster
+                    else _TRADE_ANALYZER_LEAGUE
+                )
+                with patch("modules.sleeper.get_league", return_value=league):
                     with patch("modules.rankings.load_players", return_value=roster_frame):
                         with patch(
                             "modules.player_eligibility.filter_current_fantasy_players",
@@ -16485,3 +16490,18 @@ def test_waivers_suggest_no_drops_when_untouchables_cannot_be_read(monkeypatch):
     assert "untouchable_lookup_failed" in [r["code"] for r in body["model_status"]["reasons"]]
     assert all("drop_suggestion" not in item for item in body["priority_adds"])
     assert body["droppable_players"] is None
+
+
+def test_waiver_cards_and_the_droppable_list_come_from_one_definition(monkeypatch):
+    body = _get_waivers_for_drop_tests(monkeypatch, full_roster=True).json()
+    named = {
+        item["drop_suggestion"]["drop"]["player_id"]
+        for item in body["priority_adds"]
+        if (item.get("drop_suggestion") or {}).get("drop")
+    }
+    listed = {p["player_id"] for p in body["droppable_players"]["players"]}
+    assert named <= listed
+    if named:
+        assert listed, "the list must never read empty while a card names a drop"
+    if any((item.get("drop_suggestion") or {}).get("no_good_drop") for item in body["priority_adds"]):
+        assert all(p["named_for"] for p in body["droppable_players"]["players"])

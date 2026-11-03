@@ -319,3 +319,63 @@ def test_aging_starter_without_young_cover_is_a_dynasty_future_gap():
 def test_model_status_messages_exist_for_every_new_marker():
     for code in ("need_model_failed", "untouchable_lookup_failed", "drop_model_failed", "usage_trends_unavailable"):
         assert code in model_status.MESSAGES
+
+
+# --- one definition for cards and list ---------------------------------------
+
+
+def _board(roster, pool, *, cap=2):
+    rvc = _make(roster, pool, limit=len(roster))
+    adds = [(r["player_id"], r) for r in pool]
+    return rvc, *dc.build_drop_board(rvc, adds, untouchable=set(), usage={}, standalone_cap=cap)
+
+
+def _assert_consistent(suggestions, droppable, rvc):
+    named = {s["drop"]["player_id"] for s in suggestions.values() if s.get("drop")}
+    listed = {p["player_id"] for p in droppable["players"]}
+    # Every cut a card names is in the list, and the list is empty only if no card names one.
+    assert named <= listed
+    if named:
+        assert droppable["players"]
+    # A card that says "no good drop" never coexists with a free cut by the shared bar.
+    free = {p["player_id"] for p in droppable["players"] if not p["named_for"]}
+    if any(s.get("no_good_drop") for s in suggestions.values()):
+        assert not free
+
+
+def test_cards_and_list_share_one_definition_when_a_free_cut_exists():
+    bench = [_row("DEAD", "WR", 300, ppg=2, age=33)] + [_row(f"B{i}", "WR", 2600 + 50 * i, ppg=3, age=29) for i in range(5)]
+    roster = _core() + bench
+    rvc, suggestions, droppable = _board(roster, _pool(("WR", 1800, 9), ("WR", 1500, 8)))
+    _assert_consistent(suggestions, droppable, rvc)
+    assert {s["drop"]["player_id"] for s in suggestions.values()} == {"DEAD"}
+    assert droppable["players"][0]["player_id"] == "DEAD" and droppable["players"][0]["named_for"]
+
+
+def test_an_upgrade_swap_cut_is_listed_even_though_it_is_not_free():
+    # Bench players are worth real value (not free) but each add is worth more.
+    bench = [_row(f"B{i}", "WR", 1500 + 40 * i, ppg=3, age=29) for i in range(6)]
+    roster = _core() + bench
+    rvc, suggestions, droppable = _board(roster, _pool(("WR", 4200, 9)))
+    assert suggestions["FA_WR0"]["drop"] is not None
+    _assert_consistent(suggestions, droppable, rvc)
+    entry = next(p for p in droppable["players"] if p["named_for"])
+    assert "cheapest cut to make room for FA_WR0" in entry["reasons"][0]
+
+
+def test_no_good_drop_cards_never_coexist_with_a_free_cut_in_the_list():
+    bench = [_row(f"B{i}", "WR", 3000 + 10 * i, ppg=3, age=29) for i in range(6)]
+    roster = _core() + bench
+    rvc, suggestions, droppable = _board(roster, _pool(("WR", 400, 3)))
+    assert suggestions["FA_WR0"]["no_good_drop"] is True
+    assert droppable["players"] == []
+    _assert_consistent(suggestions, droppable, rvc)
+
+
+def test_named_cuts_are_listed_even_beyond_the_free_cap():
+    bench = [_row("DEAD", "WR", 300, ppg=2, age=33), _row("DEAD2", "RB", 350, ppg=2, age=33)]
+    roster = _core() + bench
+    rvc, suggestions, droppable = _board(roster, _pool(("WR", 1800, 9)), cap=0)
+    named = {s["drop"]["player_id"] for s in suggestions.values() if s.get("drop")}
+    assert named and named <= {p["player_id"] for p in droppable["players"]}
+    assert droppable["locked_count"] >= 0

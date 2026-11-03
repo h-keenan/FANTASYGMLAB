@@ -15346,19 +15346,18 @@ def get_league_waivers(
                 valued_by_id = value_bundle["valued"].drop_duplicates("player_id").set_index(
                     value_bundle["valued"].drop_duplicates("player_id")["player_id"].astype(str), drop=False
                 )
-                for item in priority_adds:
-                    pid = str(item.get("player_id"))
-                    if pid not in valued_by_id.index:
-                        continue
-                    item["drop_suggestion"] = drop_candidates.suggest_drop_for_add(
-                        rvc, valued_by_id.loc[pid].to_dict(), untouchable=untouchable_ids, usage=usage_guard
-                    )
+                adds = [
+                    (str(item.get("player_id")), valued_by_id.loc[str(item.get("player_id"))].to_dict())
+                    for item in priority_adds
+                    if str(item.get("player_id")) in valued_by_id.index
+                ]
                 standalone_cap = drop_candidates.MAX_STANDALONE if is_premium else drop_candidates.FREE_STANDALONE_LIMIT
-                droppable = drop_candidates.droppable_players(
-                    rvc, untouchable=untouchable_ids, usage=usage_guard, limit=drop_candidates.MAX_STANDALONE
+                suggestions, droppable = drop_candidates.build_drop_board(
+                    rvc, adds, untouchable=untouchable_ids, usage=usage_guard, standalone_cap=standalone_cap
                 )
-                droppable["locked_count"] = max(0, len(droppable["players"]) - standalone_cap)
-                droppable["players"] = droppable["players"][:standalone_cap]
+                for item in priority_adds:
+                    if str(item.get("player_id")) in suggestions:
+                        item["drop_suggestion"] = suggestions[str(item.get("player_id"))]
                 droppable["roster"] = rvc.limits.to_public()
         except model_status.LOOKUP_ERRORS:
             logger.warning("suggested drops failed (league=%s)", league_id, exc_info=True)

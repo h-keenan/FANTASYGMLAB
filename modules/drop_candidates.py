@@ -251,44 +251,67 @@ def _effect(result: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def passes_free_bar(rvc: rvm.RosterValueContext, player_id: str, standalone: Mapping[str, Any]) -> bool:
+    """THE bar for a "free" drop, shared by the standalone list and the per-add
+    suggestions: removing him costs at most ``DROP_MAX_POINTS_PER_WEEK`` lineup
+    points per week and at most ``DROP_MAX_VALUE_SHARE`` of the league's
+    high-value threshold in value (lineup model, real waiver pool as fill-in)."""
+
+    weeks = max(1, rvc.weeks)
+    pts = standalone["points"]["ros_delta"]
+    value = rvc.healthy_value.get(player_id, 0.0)
+    return not (pts / weeks < -DROP_MAX_POINTS_PER_WEEK or value > DROP_MAX_VALUE_SHARE * max(rvc.high_value, 0.0))
+
+
 def droppable_players(
     rvc: rvm.RosterValueContext,
     *,
     untouchable: set[str],
     usage: Mapping[str, Mapping[str, Any]],
     limit: int = MAX_STANDALONE,
+    named: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, Any]:
-    """"Players you could drop", worst first, only where it is true.
+    """"Players you could drop", worst first: ONE list for the whole screen.
 
-    A player qualifies when he is not protected, removing him costs almost no
-    lineup points (<= ``DROP_MAX_POINTS_PER_WEEK`` per week) and little value
-    (<= ``DROP_MAX_VALUE_SHARE`` of the league's high-value threshold), both
-    judged by the lineup model with the real waiver pool as the fill-in."""
+    It contains every player who passes the shared free bar
+    (``passes_free_bar``) AND every player a suggestion names as the cut for an
+    add (``named``: player id -> add names), so a card and this list can never
+    disagree. Named players are always listed; ``limit`` caps the rest."""
 
+    named = dict(named or {})
     ids, protected = candidate_pool(rvc, untouchable=untouchable, usage=usage)
-    weeks = max(1, rvc.weeks)
-    value_cap = DROP_MAX_VALUE_SHARE * max(rvc.high_value, 0.0)
+    # Named players passed the same protections to be suggested; include them even
+    # if the pool changed order (they are in ``ids`` by construction).
     rows: list[dict[str, Any]] = []
-    for pid in ids:
+    # A named cut that the pool excludes (e.g. an injured high-value player a card
+    # moves to IR) is still listed: the list must contain everything a card names.
+    extra = [pid for pid in named if pid not in ids and pid in rvc.profiles]
+    for pid in [*ids, *extra]:
         result = _score(rvc, pid)
-        pts = result["points"]["ros_delta"]
-        value = rvc.healthy_value.get(pid, 0.0)
-        if pts / weeks < -DROP_MAX_POINTS_PER_WEEK or value > value_cap:
+        free = passes_free_bar(rvc, pid, result)
+        if not free and pid not in named:
             continue
         ir_move = _ir_move_possible(rvc, pid)
+        reasons = _reasons(rvc, pid, result, usage, ir_move)
+        if pid in named and not free:
+            reasons = [f"cheapest cut to make room for {', '.join(list(named[pid])[:2])}", *reasons][:4]
         rows.append({
             **_facts(rvc, pid, usage),
-            "reasons": _reasons(rvc, pid, result, usage, ir_move),
+            "reasons": reasons,
             "effect": _effect(result),
             "action": "move_to_ir" if ir_move else "drop",
-            "_sort": (-result["trade_score"], value),
+            "named_for": list(named.get(pid, [])),
+            "_sort": (0 if pid in named else 1, -result["trade_score"], rvc.healthy_value.get(pid, 0.0)),
         })
     rows.sort(key=lambda r: r["_sort"])
     for r in rows:
         r.pop("_sort")
+    n_named = sum(1 for r in rows if r["named_for"])
+    shown = rows[: max(n_named, max(0, limit))]
     return {
-        "players": rows[: max(0, limit)],
+        "players": shown,
         "total": len(rows),
+        "locked_count": len(rows) - len(shown),
         "protected_count": len(protected),
         "candidates_checked": len(ids),
     }
@@ -373,7 +396,13 @@ def suggest_drop_for_add(
         item["why"] = _why_swap(base["add"], item, item["effect"], item["action"])
         return item
 
-    good = [s for s in scored if s[3] and s[0] == float("inf") or s[0] > threshold]
+    # A cut is good when it is an IR move, a real upgrade (net gain over the
+    # bar), or a free drop by the SAME bar the standalone list uses.
+    good = [
+        s for s in scored
+        if (s[3] and s[0] == float("inf")) or s[0] > threshold
+        or (s[1] in standalone and passes_free_bar(rvc, s[1], standalone[s[1]]))
+    ]
     result: dict[str, Any] = {**base, "status": "ok", "protected_count": len(protected)}
     if limits.active_limit is not None and not limits.is_full:
         result.update({
@@ -445,3 +474,29 @@ def drops_for_overflow(
         "satisfied": len(chosen) >= need,
         "effect": _effect(final) if final else None,
     }
+
+
+def build_drop_board(
+    rvc: rvm.RosterValueContext,
+    adds: Sequence[tuple[str, Mapping[str, Any]]],
+    *,
+    untouchable: set[str],
+    usage: Mapping[str, Mapping[str, Any]],
+    standalone_cap: int,
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """The whole drop surface from ONE definition: (suggestion per add id, the
+    standalone list). Every cut a suggestion names is in the list; the list is
+    empty only when no suggestion names a cut."""
+
+    suggestions = {
+        add_id: suggest_drop_for_add(rvc, row, untouchable=untouchable, usage=usage) for add_id, row in adds
+    }
+    named: dict[str, list[str]] = {}
+    for add_id, row in adds:
+        cut = suggestions[add_id].get("drop")
+        if cut:
+            named.setdefault(str(cut["player_id"]), []).append(rvm._text(row.get("name")))
+    droppable = droppable_players(
+        rvc, untouchable=untouchable, usage=usage, limit=standalone_cap, named=named
+    )
+    return suggestions, droppable

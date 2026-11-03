@@ -1396,6 +1396,8 @@ export interface DropPlayer {
   effect: DropEffect;
   action?: "drop" | "move_to_ir";
   why?: string;
+  /** Standalone list only: the adds whose card names this player as the cut. */
+  named_for?: string[];
 }
 
 /** "Add X, drop Y" for one waiver target (modules.drop_candidates.suggest_drop_for_add). */

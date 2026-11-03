@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel } from "@/lib/api";
 import { InfoTip } from "@/components/InfoTip";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -45,17 +46,62 @@ function DropPlayerLine({ player, lead, maxReasons = 3 }: { player: DropPlayer; 
   );
 }
 
-/** `compact` (list rows): the pick with its top reason and the alternatives' names; the top card shows everything. */
-export function SuggestedDrop({ suggestion, compact = false }: { suggestion: DropSuggestion; compact?: boolean }) {
+function dropBadge(suggestion: DropSuggestion) {
+  const { drop } = suggestion;
+  return drop != null
+    ? { label: dropActionLabel(drop), color: "var(--color-danger)" }
+    : suggestion.no_good_drop
+      ? { label: "No good drop", color: "var(--color-warning)" }
+      : suggestion.drop_required === false
+        ? { label: "Spot open", color: "var(--color-success)" }
+        : { label: "Roster", color: "var(--color-text-muted)" };
+}
+
+/** List rows: one line (badge + the full player name), details one tap away. The
+ * top target shows the full block. */
+function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
+  const [open, setOpen] = useState(false);
   const { drop, alternatives } = suggestion;
-  const badge =
-    drop != null
-      ? { label: dropActionLabel(drop), color: "var(--color-danger)" }
-      : suggestion.no_good_drop
-        ? { label: "No good drop", color: "var(--color-warning)" }
-        : suggestion.drop_required === false
-          ? { label: "Spot open", color: "var(--color-success)" }
-          : { label: "Roster", color: "var(--color-text-muted)" };
+  const badge = dropBadge(suggestion);
+  const label = drop ? `${drop.name} · ${drop.position}` : suggestion.drop_required === false ? "No drop needed" : "";
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="suggested-drop-compact">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-2 text-left w-full"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: "var(--touch-target-min)" }}
+      >
+        <ToneBadge label={badge.label} color={badge.color} />
+        <span className="text-sm font-bold flex-1 min-w-0 break-words" style={{ color: "var(--color-text-primary)" }}>
+          {label}
+        </span>
+        <span className="text-xs font-semibold shrink-0" style={{ color: "var(--color-accent)" }}>
+          {open ? "Hide" : "Why"}
+        </span>
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-2 pl-1" data-testid="suggested-drop-details">
+          <p className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+            {drop ? `Add ${suggestion.add.name}, ${drop.action === "move_to_ir" ? "move" : "drop"} ${drop.name}${drop.action === "move_to_ir" ? " to IR" : ""}` : suggestion.why}
+          </p>
+          {drop ? <DropPlayerLine player={drop} /> : suggestion.no_good_drop && suggestion.cheapest ? <DropPlayerLine player={suggestion.cheapest} lead="Cheapest cut:" /> : null}
+          {alternatives.length > 0 ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Or: {alternatives.map((alt) => alt.name).join(", ")}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SuggestedDrop({ suggestion, compact = false }: { suggestion: DropSuggestion; compact?: boolean }) {
+  if (compact) return <CompactSuggestedDrop suggestion={suggestion} />;
+  const { drop, alternatives } = suggestion;
+  const badge = dropBadge(suggestion);
   return (
     <div
       className="flex flex-col gap-2 p-3"
@@ -78,13 +124,8 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
               drop.action === "move_to_ir" ? " to IR" : ""
             }`}
           </p>
-          <DropPlayerLine player={drop} maxReasons={compact ? 1 : 3} />
-          {compact && alternatives.length > 0 ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Or: {alternatives.map((alt) => alt.name).join(", ")}
-            </span>
-          ) : null}
-          {!compact && alternatives.length > 0 ? (
+          <DropPlayerLine player={drop} />
+          {alternatives.length > 0 ? (
             <div className="flex flex-col gap-1.5 pt-1" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
               <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
                 Or
@@ -118,14 +159,22 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
       </SectionHeading>
       {data.players.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          No free drops right now: nobody is both useless to your lineup and low in value
-          {data.protected_count > 0 ? ` (${data.protected_count} players are starters, high-value, needed depth or upside)` : ""}. When
-          you add someone, the roster move above picks the cheapest cut.
+          Nobody on your roster is a free cut right now
+          {data.protected_count > 0 ? ` (${data.protected_count} players are starters, high-value, needed depth or upside)` : ""}. If you add
+          someone, their roster move shows the cheapest cut, or says there is no good one.
         </p>
       ) : (
         <div className="glass-surface flex flex-col gap-3 p-3">
           {data.players.map((player) => (
-            <DropPlayerLine key={player.player_id} player={player} lead={player.action === "move_to_ir" ? "Move to IR:" : undefined} />
+            <div key={player.player_id} className="flex flex-col gap-0.5">
+              <DropPlayerLine player={player} lead={player.action === "move_to_ir" ? "Move to IR:" : undefined} />
+              {player.named_for && player.named_for.length > 0 ? (
+                <span className="text-xs font-semibold" style={{ color: "var(--color-accent)" }}>
+                  The cut when you add {player.named_for.slice(0, 3).join(", ")}
+                  {player.named_for.length > 3 ? ` +${player.named_for.length - 3}` : ""}
+                </span>
+              ) : null}
+            </div>
           ))}
           {data.locked_count > 0 ? (
             <p className="text-xs" style={{ color: "var(--color-premium)" }}>

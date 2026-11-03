@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import AppText from './AppText';
 import ScreenInfoNote from './ScreenInfoNote';
@@ -43,19 +43,66 @@ function DropPlayerLine({ player, lead, maxReasons = 3 }: { player: DropPlayer; 
   );
 }
 
-/** `compact` (list rows): the pick with its top reason and the alternatives' names; the top card shows everything. */
+function useBadge(suggestion: DropSuggestion) {
+  const { colors } = useThemeMode();
+  const { drop } = suggestion;
+  return drop != null
+    ? { label: dropActionLabel(drop), color: colors.danger }
+    : suggestion.no_good_drop
+      ? { label: 'No good drop', color: colors.warning }
+      : suggestion.drop_required === false
+        ? { label: 'Spot open', color: colors.success }
+        : { label: 'Roster', color: colors.textTertiary };
+}
+
+/** List rows: one line (badge + full player name), details one tap away. The top target shows the full block. */
+function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
+  const badge = useBadge(suggestion);
+  const { drop, alternatives } = suggestion;
+  const label = drop ? `${drop.name} · ${drop.position}` : suggestion.drop_required === false ? 'No drop needed' : '';
+  return (
+    <View testID="suggested-drop-compact" style={styles.compactWrap}>
+      <TouchableOpacity
+        style={styles.compactRow}
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${badge.label} ${label}`}
+      >
+        <View style={[styles.badge, { borderColor: `${badge.color}70`, backgroundColor: `${badge.color}1A` }]}>
+          <AppText style={[styles.badgeText, { color: badge.color }]}>{badge.label}</AppText>
+        </View>
+        <AppText style={[styles.playerName, { flex: 1 }]}>{label}</AppText>
+        <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{open ? 'Hide' : 'Why'}</AppText>
+      </TouchableOpacity>
+      {open ? (
+        <View style={styles.compactDetails} testID="suggested-drop-details">
+          <AppText style={styles.body}>
+            {drop
+              ? `Add ${suggestion.add.name}, ${drop.action === 'move_to_ir' ? 'move' : 'drop'} ${drop.name}${drop.action === 'move_to_ir' ? ' to IR' : ''}`
+              : suggestion.why}
+          </AppText>
+          {drop ? (
+            <DropPlayerLine player={drop} />
+          ) : suggestion.no_good_drop && suggestion.cheapest ? (
+            <DropPlayerLine player={suggestion.cheapest} lead="Cheapest cut:" />
+          ) : null}
+          {alternatives.length > 0 ? <AppText style={styles.effect}>{`Or: ${alternatives.map((alt) => alt.name).join(', ')}`}</AppText> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function SuggestedDrop({ suggestion, compact = false }: { suggestion: DropSuggestion; compact?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const badge = useBadge(suggestion);
+  if (compact) return <CompactSuggestedDrop suggestion={suggestion} />;
   const { drop, alternatives } = suggestion;
-  const badge =
-    drop != null
-      ? { label: dropActionLabel(drop), color: colors.danger }
-      : suggestion.no_good_drop
-        ? { label: 'No good drop', color: colors.warning }
-        : suggestion.drop_required === false
-          ? { label: 'Spot open', color: colors.success }
-          : { label: 'Roster', color: colors.textTertiary };
   return (
     <View style={styles.box} testID="suggested-drop">
       <View style={styles.headRow}>
@@ -71,11 +118,8 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
               drop.action === 'move_to_ir' ? ' to IR' : ''
             }`}
           </AppText>
-          <DropPlayerLine player={drop} maxReasons={compact ? 1 : 3} />
-          {compact && alternatives.length > 0 ? (
-            <AppText style={styles.effect}>{`Or: ${alternatives.map((alt) => alt.name).join(', ')}`}</AppText>
-          ) : null}
-          {!compact && alternatives.length > 0 ? (
+          <DropPlayerLine player={drop} />
+          {alternatives.length > 0 ? (
             <View style={styles.alts}>
               <AppText style={styles.kicker}>OR</AppText>
               {alternatives.map((alt) => (
@@ -104,18 +148,23 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
     <View testID="droppable-players">
       {data.players.length === 0 ? (
         <AppText style={styles.body}>
-          {`No free drops right now: nobody is both useless to your lineup and low in value${
+          {`Nobody on your roster is a free cut right now${
             data.protected_count > 0 ? ` (${data.protected_count} players are starters, high-value, needed depth or upside)` : ''
-          }. When you add someone, the roster move above picks the cheapest cut.`}
+          }. If you add someone, their roster move shows the cheapest cut, or says there is no good one.`}
         </AppText>
       ) : (
         <View style={styles.listBox}>
           {data.players.map((player) => (
-            <DropPlayerLine
-              key={player.player_id}
-              player={player}
-              lead={player.action === 'move_to_ir' ? 'Move to IR:' : undefined}
-            />
+            <View key={player.player_id} style={{ gap: 2 }}>
+              <DropPlayerLine player={player} lead={player.action === 'move_to_ir' ? 'Move to IR:' : undefined} />
+              {player.named_for && player.named_for.length > 0 ? (
+                <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>
+                  {`The cut when you add ${player.named_for.slice(0, 3).join(', ')}${
+                    player.named_for.length > 3 ? ` +${player.named_for.length - 3}` : ''
+                  }`}
+                </AppText>
+              ) : null}
+            </View>
           ))}
           {data.locked_count > 0 ? <AppText style={styles.lock}>{`+${data.locked_count} more with Premium`}</AppText> : null}
         </View>
@@ -141,6 +190,9 @@ export function needsBreakdownText(needs: NeedsModel): string {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    compactWrap: { marginTop: spacing.xs, gap: spacing.xs },
+    compactRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 36 },
+    compactDetails: { gap: spacing.xs, paddingLeft: spacing.xs },
     box: {
       marginTop: spacing.sm,
       padding: spacing.sm,
