@@ -167,6 +167,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "player-compare": "Player Compare",
   "founder-analytics": "Founder Analytics",
   premium: "Pro",
+  features: "Features",
   account: "Account",
   legal: "Legal",
 };

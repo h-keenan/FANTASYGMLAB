@@ -501,6 +501,13 @@ export default function MoreScreen({ navigation }: Props) {
               trackOnboarding('replayed');
               navigation.navigate('Onboarding', { replay: true });
             }}
+            showDivider
+          />
+          <SettingsRow
+            icon="apps-outline"
+            iconColor={colors.accent}
+            label="See everything FantasyDesk can do"
+            onPress={() => navigation.navigate('Features')}
             showDivider={false}
           />
         </AnimatedCard>

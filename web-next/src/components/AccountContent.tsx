@@ -349,6 +349,9 @@ function AccountActionsSection({
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-actions-heading">
       <SectionHeading id="account-actions-heading">Account actions</SectionHeading>
+      <ButtonLink href="/features" variant="secondary">
+        See everything FantasyDesk can do
+      </ButtonLink>
       <button
         type="button"
         onClick={() => {

@@ -17,6 +17,7 @@ import {
   type StartHereRoute,
   type StartHereState,
 } from "@/lib/startHere";
+import { featuresPageHref } from "@/lib/featureCatalog";
 import { thisWeekHref } from "@/lib/thisWeek";
 
 const startHereListeners = new Set<() => void>();
@@ -143,6 +144,13 @@ export function StartHereCard({
             );
           })}
         </ul>
+        <Link
+          href={featuresPageHref({ id: leagueId, name: leagueName })}
+          className="text-sm font-bold inline-flex items-center min-h-[var(--touch-target-min)]"
+          style={{ color: "var(--color-accent)", borderTop: "1px solid var(--color-border)" }}
+        >
+          See everything FantasyDesk can do →
+        </Link>
       </AccentCard>
     </section>
   );
