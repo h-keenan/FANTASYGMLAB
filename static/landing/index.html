@@ -8,6 +8,7 @@
   <meta name="description" content="Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league. Try a full sample league with no account or card.">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://fantasygmlab.com/">
+  <link rel="preload" as="image" href="assets/landing/fantasydesk-lockup-white.png">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="FantasyDesk">
@@ -22,99 +23,70 @@
   <meta name="twitter:description" content="Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league. Try a full sample league with no account or card.">
   <meta name="twitter:image" content="https://fantasygmlab.com/assets/og.png">
   <link rel="stylesheet" href="landing.css">
+  <script>
+  /* Share-card QR visitors (utm_campaign=share_card): same page, only the hero line changes. */
+  if (/[?&]utm_campaign=share_card(&|$)/.test(location.search)) document.documentElement.className += " is-share";
+  </script>
 </head>
 <body data-fgl-static-landing="1">
   <main class="fgl-landing" data-fgl-static-landing="1">
-    <section class="fgl-landing__hero" aria-label="FantasyDesk introduction" data-fgl-shell-ready="1">
-      <div class="fgl-landing__brand-row">
-        <img class="fgl-landing__mark" src="assets/fantasygmlab-symbol-compact.png" width="48" height="48" alt="FantasyDesk">
-        <div class="fgl-landing__brand-copy">
-          <div class="fgl-landing__product">FantasyDesk</div>
-        </div>
-      </div>
-      <h1 class="fgl-landing__value">Create your account. Get the trade your leaguemate would actually accept.</h1>
+    <header class="fgl-landing__hero" aria-label="FantasyDesk introduction" data-fgl-shell-ready="1">
+      <img class="fgl-landing__logo" src="assets/landing/fantasydesk-lockup-white.png" width="280" height="41" alt="FantasyDesk">
+      <h1 class="fgl-landing__value"><span class="fgl-default-only">Get the trade your leaguemate would actually accept.</span><span class="fgl-share-only">Someone shared a FantasyDesk trade verdict. Get yours for your own league.</span></h1>
       <p class="fgl-landing__support">Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front office would.</p>
-      <p class="fgl-landing__trust">Sample league free, no account or card needed · Free plan has no card · Sleeper supported · <a href="https://app.fantasygmlab.com/trade-analyzer?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=trade_analyzer" data-fd-cta="secondary">Free trade analyzer</a> · <a href="https://play.google.com/store/apps/details?id=com.fantasygmlab.app" data-fd-cta="secondary">Android app on Google Play</a></p>
       <div class="fgl-landing__cta-row">
         <a class="fgl-landing__btn fgl-landing__btn--primary" data-fd-cta="primary" href="https://app.fantasygmlab.com/sample-league?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=sample_league">Try a sample league</a>
-        <a class="fgl-landing__btn fgl-landing__btn--secondary" data-fd-cta="secondary" href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=connect">Create your account</a>
+        <a class="fgl-landing__btn fgl-landing__btn--secondary" data-fd-cta="secondary" href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=connect">Import your league</a>
       </div>
+      <p class="fgl-landing__note">Look around a full sample league free: no account or card needed.</p>
+      <div class="fgl-landing__stores" role="group" aria-label="Get the app">
+        <div class="fgl-landing__store fgl-landing__store--soon" role="group" aria-label="App Store app for iPhone: coming soon"><span class="fgl-landing__store-name">App Store</span><span class="fgl-landing__store-sub">Coming soon</span></div>
+        <a class="fgl-landing__store" data-fd-cta="secondary" href="https://play.google.com/store/apps/details?id=com.fantasygmlab.app" aria-label="Get it on Google Play"><span class="fgl-landing__store-name">Google Play</span><span class="fgl-landing__store-sub fgl-landing__store-sub--live">Download</span></a>
+      </div>
+    </header>
+
+    <section class="fgl-landing__section" id="how-it-works" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <ol class="fgl-landing__steps">
+        <li><span class="fgl-landing__num" aria-hidden="true">1</span><div><h3>Connect your league</h3><p>Use your Sleeper username, or a public ESPN, Fleaflicker or MFL league.</p></div></li>
+        <li><span class="fgl-landing__num" aria-hidden="true">2</span><div><h3>We read your roster</h3><p>Real player values, matched to your lineup, depth and what each manager needs.</p></div></li>
+        <li><span class="fgl-landing__num" aria-hidden="true">3</span><div><h3>Get your next move</h3><p>A clear verdict on trades, waivers and your lineup, with the reasons why.</p></div></li>
+      </ol>
     </section>
 
-    <section class="fgl-landing__section" id="how-it-works">
-      <div class="fgl-landing__kicker">What it does</div>
-      <h2>Front-office tools for the league you manage</h2>
-      <ul>
-        <li>Today's Game Plan</li>
-        <li>GM Targets</li>
-        <li>Trade Hub</li>
-        <li>Waivers</li>
-        <li>Player rankings &amp; context</li>
-        <li>What Changed / Decision Memory</li>
+    <section class="fgl-landing__section" aria-labelledby="feat-h">
+      <h2 id="feat-h">Built for the decisions you actually make</h2>
+      <ul class="fgl-landing__cards">
+        <li><h3>Trade verdicts that know your roster</h3><p>See if a trade helps your team before you send it, based on your needs and what your partner would accept.</p></li>
+        <li><h3>Waivers that fit your team</h3><p>Pickups ranked for your roster, with FAAB ranges, so you stop chasing names that do not help you.</p></li>
+        <li><h3>Start/sit with weather and matchup</h3><p>Lineup calls that account for the opponent and game-day weather, with win odds for your week.</p></li>
+        <li><h3>League intelligence</h3><p>See how each manager trades, who is contending, and simulated playoff odds for every team.</p></li>
       </ul>
     </section>
 
-    <section class="fgl-landing__section" aria-label="Product surfaces">
-      <div class="fgl-landing__kicker">Product surfaces</div>
-      <h2>Real FantasyDesk screens</h2>
-      <p>Captured from the product UI — shown after the hero so the first fold stays light.</p>
-      <div class="fgl-landing__gallery">
-        <figure class="fgl-landing__shot">
-          <figcaption class="fgl-landing__shot-caption"><strong>GM Targets</strong> — Saved players to monitor — rank, ownership, and advice without changing recommendations.</figcaption>
-          <img src="assets/web/dashboard-desktop.jpg" alt="Dashboard and GM Targets surface" width="960" height="600" loading="lazy" decoding="async">
-        </figure>
-        <figure class="fgl-landing__shot">
-          <figcaption class="fgl-landing__shot-caption"><strong>Trade Hub</strong> — Generated trade paths with package review, partner context, and value change you can inspect.</figcaption>
-          <img src="assets/web/trade-share.jpg" alt="Trade Hub product surface" width="768" height="960" loading="lazy" decoding="async">
-        </figure>
-        <figure class="fgl-landing__shot">
-          <figcaption class="fgl-landing__shot-caption"><strong>Waivers</strong> — Priority Adds and deeper waiver boards so you can act before the window closes.</figcaption>
-          <img src="assets/web/waiver-share.jpg" alt="Waivers product surface" width="768" height="960" loading="lazy" decoding="async">
-        </figure>
-        <figure class="fgl-landing__shot">
-          <figcaption class="fgl-landing__shot-caption"><strong>Player rankings &amp; context</strong> — Player Quick View with current value, recommendation, and the context behind the call.</figcaption>
-          <img src="assets/web/player-share.jpg" alt="Player rankings product surface" width="768" height="960" loading="lazy" decoding="async">
-        </figure>
-      </div>
-    </section>
-
-    <section class="fgl-landing__section" id="pricing">
-      <div class="fgl-landing__kicker">Free vs Premium</div>
-      <h2>Start free. Premium adds depth on the same jobs.</h2>
-      <div class="fgl-landing__split">
-        <div class="fgl-landing__plan fgl-landing__plan--free">
-          <h3>Free includes</h3>
-          <ul>
-            <li>League import</li>
-            <li>Dashboard overview</li>
-            <li>What Changed</li>
-            <li>GM Targets (limited)</li>
-            <li>Share Recommendation</li>
-            <li>Players explorer</li>
-            <li>Trade preview</li>
-            <li>Priority Adds</li>
-            <li>Core roster view</li>
-          </ul>
-        </div>
-        <div class="fgl-landing__plan fgl-landing__plan--premium">
-          <h3>Included now with Premium</h3>
-          <ul>
-            <li>More next moves</li>
-            <li>League Pulse leaders (mobile app)</li>
-            <li>Full Trade Hub</li>
-            <li>Full waiver board</li>
-            <li>Advanced roster decisions</li>
-            <li>Decision Memory</li>
-            <li>GM Targets (full board)</li>
-          </ul>
-          <p class="fgl-landing__note">Premium is deeper decision support on the same FantasyDesk surfaces — not a separate product.</p>
-        </div>
-      </div>
-      <p class="fgl-landing__billing">Premium is optional. Checkout, plan changes and cancellation all happen inside your account.</p>
+    <section class="fgl-landing__section" aria-labelledby="see-h">
+      <h2 id="see-h">See it in action</h2>
+      <p class="fgl-landing__lede">Real screens, shown with a sample league.</p>
+      <ul class="fgl-landing__shots">
+        <li><div class="fgl-landing__device"><img src="assets/landing/onboarding-tradehub.webp" alt="Trade Hub screen, shown with sample league data" width="600" height="1298" loading="lazy" decoding="async"></div><h3>Trade Hub</h3><p>Trade ideas your league partners would actually accept.</p></li>
+        <li><div class="fgl-landing__device"><img src="assets/landing/onboarding-gameplan.webp" alt="Game Plan screen, shown with sample league data" width="600" height="1298" loading="lazy" decoding="async"></div><h3>Game Plan</h3><p>One clear top priority every time you open the app.</p></li>
+        <li><div class="fgl-landing__device"><img src="assets/landing/onboarding-matchup.webp" alt="Matchup screen, shown with sample league data" width="600" height="1298" loading="lazy" decoding="async"></div><h3>Matchup</h3><p>Win odds for your week, before kickoff.</p></li>
+        <li><div class="fgl-landing__device"><img src="assets/landing/onboarding-waivers.webp" alt="Waivers screen, shown with sample league data" width="600" height="1298" loading="lazy" decoding="async"></div><h3>Waivers</h3><p>Priority Adds ranked for your roster, with FAAB ranges.</p></li>
+      </ul>
+      <a class="fgl-landing__btn fgl-landing__btn--primary" data-fd-cta="primary" href="https://app.fantasygmlab.com/sample-league?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=sample_league_bottom">Try a sample league</a>
     </section>
 
     <footer class="fgl-landing__footer">
-      FantasyDesk · <a href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=footer">app.fantasygmlab.com</a>
+      <nav aria-label="Footer">
+        <a href="https://app.fantasygmlab.com/dynasty-tools?utm_source=static_landing&amp;utm_medium=footer">Dynasty tools</a>
+        <a href="https://app.fantasygmlab.com/trade-analyzer?utm_source=static_landing&amp;utm_medium=cta&amp;utm_content=trade_analyzer">Free trade analyzer</a>
+        <a href="https://app.fantasygmlab.com/methodology?utm_source=static_landing&amp;utm_medium=footer">How we evaluate</a>
+        <a href="https://app.fantasygmlab.com/legal/terms">Terms</a>
+        <a href="https://app.fantasygmlab.com/legal/privacy">Privacy</a>
+        <a href="https://app.fantasygmlab.com/legal/no_affiliation">No-affiliation disclaimer</a>
+        <a href="https://app.fantasygmlab.com/?utm_source=static_landing&amp;utm_medium=footer">app.fantasygmlab.com</a>
+      </nav>
+      <p>FantasyDesk · Values informed by <a href="https://fantasycalc.com" rel="noopener noreferrer">FantasyCalc</a></p>
     </footer>
   </main>
   <script>

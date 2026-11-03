@@ -252,6 +252,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
           </button>
         </div>
 
+        <div className="onboarding-scroll">
         {feature ? (
           <div key={step} className={`onboarding-section onboarding-section--center onboarding-feature onboarding-slide onboarding-slide--${direction}`}>
             <span className="onboarding-eyebrow">{feature.title}</span>
@@ -341,6 +342,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
             />
           </div>
         ) : null}
+        </div>
 
         <div className="onboarding-footer">
           {step > 0 ? (

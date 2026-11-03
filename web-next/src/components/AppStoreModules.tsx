@@ -29,9 +29,9 @@ export function AppStoreModules({ links = APP_STORE_LINKS }: { links?: AppStoreL
       <h2
         id="app-store-modules-heading"
         className="text-xs font-bold uppercase"
-        style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
+        style={{ color: "var(--color-text-secondary)", letterSpacing: "0.03em" }}
       >
-        Mobile apps
+        Get the app
       </h2>
       <ul className="grid grid-cols-2 gap-2">
         <li>
@@ -84,13 +84,13 @@ function StoreSlot({
   const body = (
     <>
       <span aria-hidden="true" style={{ color: url ? "var(--color-accent)" : "var(--color-text-muted)" }}>
-        <DeviceGlyph />
+        <DeviceGlyph size={26} />
       </span>
       <span className="flex flex-col min-w-0">
-        <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+        <span className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>
           {storeName}
         </span>
-        <span className="text-xs" style={{ color: url ? "var(--color-accent)" : "var(--color-text-muted)" }}>
+        <span className="text-xs font-semibold" style={{ color: url ? "var(--color-accent)" : "var(--color-text-secondary)" }}>
           {url ? "Download" : "Coming soon"}
         </span>
       </span>
@@ -104,7 +104,7 @@ function StoreSlot({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={liveCallToAction}
-        className="onboarding-glass flex items-center gap-2 px-3 py-2 h-full"
+        className="onboarding-glass flex items-center gap-3 px-3 py-2 h-full min-h-[56px]"
       >
         {body}
       </a>
@@ -113,7 +113,7 @@ function StoreSlot({
 
   return (
     <div
-      className="onboarding-glass flex items-center gap-2 px-3 py-2 h-full"
+      className="onboarding-glass flex items-center gap-3 px-3 py-2 h-full min-h-[56px]"
       aria-label={`${storeName} app for ${platform}: coming soon`}
       role="group"
     >
