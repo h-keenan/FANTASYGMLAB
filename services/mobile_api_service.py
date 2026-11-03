@@ -2245,7 +2245,7 @@ _FREE_LEAGUE_CAP_UPSELL = {
     "title": "Your Free plan includes one league",
     "body": (
         "Free accounts keep one league. This one isn't it, so its data is "
-        "locked. Upgrade to Premium to use all of your leagues."
+        "locked. Upgrade to Pro to use all of your leagues."
     ),
 }
 
@@ -3001,7 +3001,7 @@ def get_league_playoff_odds(
 _GAMES_WHAT_IF_UPSELL = {
     "title": "See how a move changes your season",
     "body": (
-        "What-if is a Premium feature: add or drop players and see the change "
+        "What-if is a Pro feature: add or drop players and see the change "
         "in your playoff odds, seed and wins before you make the move."
     ),
 }
@@ -3239,7 +3239,7 @@ def post_games_what_if(
 _TRADE_ODDS_UPSELL = {
     "title": "See how a trade moves your odds",
     "body": (
-        "Premium shows the change in your playoff and championship odds for any "
+        "Pro shows the change in your playoff and championship odds for any "
         "trade, from the same season simulation as the Games tab."
     ),
 }
@@ -6427,9 +6427,9 @@ def get_league_storylines(
 _MANAGER_TENDENCIES_UPSELL = {
     "title": "How every manager in your league trades",
     "body": (
-        "Manager Tendencies is a Premium feature: each manager's real trade "
+        "Manager Tendencies is a Pro feature: each manager's real trade "
         "and waiver history across past seasons, with the trades behind "
-        "every read. Upgrade to Premium to unlock it."
+        "every read. Upgrade to Pro to unlock it."
     ),
 }
 
@@ -11306,8 +11306,8 @@ _PORTFOLIO_FANOUT_TIMEOUT_SECONDS = 25
 _PORTFOLIO_UPSELL = {
     "title": "See every league at a glance",
     "body": (
-        "Portfolio is a Premium feature — free accounts keep one saved league, "
-        "so there's nothing to aggregate yet. Upgrade to Premium to save every "
+        "Portfolio is a Pro feature — free accounts keep one saved league, "
+        "so there's nothing to aggregate yet. Upgrade to Pro to save every "
         "league you're in and see your record, rank, and top need or "
         "opportunity across all of them in one place."
     ),
@@ -11320,17 +11320,17 @@ _PORTFOLIO_UPSELL = {
 _GM_PLAN_UPSELL = {
     "title": "Your season-arc roadmap",
     "body": (
-        "GM Plan is a Premium feature: where you stand, your best trade "
+        "GM Plan is a Pro feature: where you stand, your best trade "
         "paths, and your roster construction — framed by your declared "
-        "Team Situation. Upgrade to Premium to unlock it."
+        "Team Situation. Upgrade to Pro to unlock it."
     ),
 }
 _TRADE_FINDER_UPSELL = {
     "title": "Build and search for a trade",
     "body": (
-        "Trade Finder is a Premium feature — build a custom package and "
+        "Trade Finder is a Pro feature — build a custom package and "
         "search every roster in your league for a real match. Upgrade to "
-        "Premium to unlock it."
+        "Pro to unlock it."
     ),
 }
 
@@ -11341,9 +11341,9 @@ _TRADE_FINDER_UPSELL = {
 _LIVE_DRAFT_UPSELL = {
     "title": "Draft with real-time recommendations",
     "body": (
-        "Live Draft is a Premium feature — Best Available/Best Fit picks, "
+        "Live Draft is a Pro feature — Best Available/Best Fit picks, "
         "a live roster-strength board, and positional-run alerts while "
-        "your draft is actually happening. Upgrade to Premium to unlock it."
+        "your draft is actually happening. Upgrade to Pro to unlock it."
     ),
 }
 
@@ -11956,7 +11956,7 @@ _LEAGUE_GLANCE_FANOUT_TIMEOUT_SECONDS = 25
 _LEAGUE_GLANCE_UPSELL = {
     "title": "All your leagues at a glance",
     "body": (
-        "Premium keeps every league you're in and shows each one's record, top "
+        "Pro keeps every league you're in and shows each one's record, top "
         "waiver add, top trade idea, news, and biggest need side by side."
     ),
 }

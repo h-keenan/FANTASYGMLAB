@@ -192,10 +192,10 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertTrue(premium.debug_auth_enabled(environ={}, secrets={"DYNASTYGM_DEBUG_AUTH": "yes"}))
 
     def test_premium_lock_component_renders_without_checkout(self):
-        html = premium.premium_lock_html("Full trade board", "More ideas.", feature="Premium Trade Hub")
+        html = premium.premium_lock_html("Full trade board", "More ideas.", feature="Pro Trade Hub")
         self.assertIn("premium-lock", html)
         self.assertIn("premium-badge", html)
-        self.assertIn("Premium Trade Hub", html)
+        self.assertIn("Pro Trade Hub", html)
         self.assertNotIn("stripe", html.casefold())
         self.assertNotIn("checkout", html.casefold())
         self.assertNotIn("subscribe", html.casefold())
@@ -205,12 +205,12 @@ class TestPremiumEntitlements(unittest.TestCase):
         html = premium.premium_lock_html(
             "Full waiver board",
             "Stash candidates, watchlist depth, and deeper add/drop context.",
-            feature="Premium Waivers",
+            feature="Pro Waivers",
         )
 
         self.assertIn("Full waiver board", html)
-        self.assertIn("Upgrade to Premium", html)
-        self.assertIn("Included with Premium", html)
+        self.assertIn("Upgrade to Pro", html)
+        self.assertIn("Included with Pro", html)
         self.assertIn("Stash candidates", html)
         for blocked_word in ("checkout", "stripe", "subscribe now", "payment link"):
             self.assertNotIn(blocked_word, html.casefold())

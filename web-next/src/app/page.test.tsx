@@ -423,7 +423,7 @@ describe("LandingPage SEO metadata", () => {
   it("states the card rule truthfully next to the trial line", () => {
     mockAuth(null);
     render(<LandingPage />);
-    expect(screen.getByText(/The Premium trial needs a card/)).toBeInTheDocument();
+    expect(screen.getByText(/The Pro trial needs a card/)).toBeInTheDocument();
     expect(screen.getByText(/The free plan needs no card/)).toBeInTheDocument();
   });
 });

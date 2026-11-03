@@ -37,7 +37,7 @@ function pick(overrides: Partial<DraftPickAsset>): DraftPickAsset {
     owner_roster_id: "1",
     original_team_name: "Dynasty Overlords",
     owner_team_name: "Dynasty Overlords",
-    pick_tier: "Premium",
+    pick_tier: "Pro",
     projected_pick_range: "Picks 1-4",
     projection_confidence: 0.72,
     ...overrides,

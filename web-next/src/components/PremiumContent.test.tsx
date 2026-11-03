@@ -75,7 +75,7 @@ describe("PremiumContent", () => {
   it("shows Manage Billing for a premium account, alongside the same 3 plans", () => {
     render(<PremiumContent entitlement="premium" plans={PLANS} publishableKey="pk_test_123" />);
 
-    expect(screen.getByText("You're on Premium.")).toBeInTheDocument();
+    expect(screen.getByText("You're on Pro.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage Billing" })).toBeInTheDocument();
     expect(screen.getByText("$99.99")).toBeInTheDocument();
   });

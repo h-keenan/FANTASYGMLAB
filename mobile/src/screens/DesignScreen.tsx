@@ -174,8 +174,8 @@ export default function DesignScreen() {
             <Button label="Danger outline" variant="dangerOutline" onPress={noop} />
             <Button label="Disabled" disabled onPress={noop} />
             <Button label="Loading" loading onPress={noop} />
-            <Button label="Premium (Manage / Upgrade)" variant="premium" onPress={noop} />
-            <Button label="Premium disabled" variant="premium" disabled onPress={noop} />
+            <Button label="Pro (Manage / Upgrade)" variant="premium" onPress={noop} />
+            <Button label="Pro disabled" variant="premium" disabled onPress={noop} />
             <Button label="Restore purchases" variant="premiumOutline" onPress={noop} />
           </Spec>
         </Family>
@@ -202,7 +202,7 @@ export default function DesignScreen() {
               <ToneBadge label="Starter" color={colors.success} />
               <ToneBadge label="Bench" color={colors.violet} />
               <ToneBadge label="Risk" color={colors.danger} />
-              <ToneBadge label="Premium" color={colors.premium} />
+              <ToneBadge label="Pro" color={colors.premium} />
               <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} />
               <ToneBadge size="xs" icon="arrow-up" label="12%" color={colors.success} />
             </View>

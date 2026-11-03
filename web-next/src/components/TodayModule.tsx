@@ -142,7 +142,7 @@ export function TodayModule({
           style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
         >
           <p className="text-sm font-bold">
-            {hidden} more move{hidden === 1 ? "" : "s"} available on Premium.
+            {hidden} more move{hidden === 1 ? "" : "s"} available on Pro.
           </p>
           <ButtonLink href="/premium" variant="premium" size="sm">
             Upgrade →

@@ -18,7 +18,7 @@ function report(overrides: Partial<FounderAnalyticsReport> = {}): FounderAnalyti
       { module: "trade_hub", users: 10, sessions: 12, views: 20, meaningful_interactions: 5 },
     ],
     decision_engagement: [{ event: "trade_hub_opened", label: "Trade Hub opened", count: 7 }],
-    premium: [{ event: "premium_viewed", label: "Premium page opens", count: 3 }],
+    premium: [{ event: "premium_viewed", label: "Pro page opens", count: 3 }],
     checkout_intervals: { monthly: 2 },
     errors: { ValueError: 1 },
     error_sessions: 1,
@@ -55,7 +55,7 @@ describe("FounderAnalyticsContent", () => {
 
     expect(screen.getByText("trade hub")).toBeInTheDocument();
     expect(screen.getByText("Trade Hub opened")).toBeInTheDocument();
-    expect(screen.getByText("Premium page opens")).toBeInTheDocument();
+    expect(screen.getByText("Pro page opens")).toBeInTheDocument();
     expect(screen.getByText("ValueError")).toBeInTheDocument();
   });
 

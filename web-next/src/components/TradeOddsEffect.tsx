@@ -85,7 +85,7 @@ export function TradeOddsEffect({
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="trade-odds-upsell">
         {response.upsell?.title ?? "See how a trade moves your odds"}.{" "}
         <Link href="/premium" className="font-bold" style={{ color: "var(--color-premium)" }}>
-          Premium →
+          Pro →
         </Link>
       </p>
     );

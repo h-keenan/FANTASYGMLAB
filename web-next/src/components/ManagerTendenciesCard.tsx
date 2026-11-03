@@ -53,7 +53,7 @@ export function ManagerTendenciesCard({
         size="sm"
         onClick={() => trackUse("manager_tendencies", "upsell_tapped", { leagueId, tier: "free" })}
       >
-        How this manager trades · Premium →
+        How this manager trades · Pro →
       </ButtonLink>
     );
   }

@@ -29,7 +29,9 @@ PRODUCT_TAGLINE = "Your fantasy football front office."
 PRODUCT_TAGLINE_LEGACY = "Franchise decisions with clear leverage."
 EXPERIMENTAL_LABEL = "[EXPERIMENTAL]"
 EXPERIMENTAL_NOTE = "Early access capability"
+# Legal copy (held 2026-11-03) still reads this; user-facing UI uses PRO_LABEL.
 PREMIUM_LABEL = "Premium"
+PRO_LABEL = "Pro"
 GM_ORB_LABEL = "GM"  # legacy short label; visible control uses the compact mark image
 GM_ORB_ARIA_LABEL = "Open GM menu"
 GM_ORB_HELP = (
@@ -291,8 +293,8 @@ def experimental_caption(heading: str = "Experimental") -> str:
 
 def premium_chip_html() -> str:
     return (
-        f"<span class='dg-premium-chip' title='{escape(PREMIUM_LABEL)} tier of {escape(PRODUCT_NAME)}'>"
-        f"{escape(PREMIUM_LABEL)}</span>"
+        f"<span class='dg-premium-chip' title='{escape(PRO_LABEL)} tier of {escape(PRODUCT_NAME)}'>"
+        f"{escape(PRO_LABEL)}</span>"
     )
 
 

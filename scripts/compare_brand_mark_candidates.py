@@ -200,7 +200,7 @@ def premium(name: str) -> Image.Image:
     draw.rounded_rectangle((16, 16, 464, 144), radius=8, fill=(15, 17, 20), outline=(250, 204, 21))
     mark = _mark(name, 40)
     _paste(canvas, mark, (36, 40))
-    draw.text((92, 40), "FantasyDesk Premium", font=_font(24, bold=True), fill=WHITE)
+    draw.text((92, 40), "FantasyDesk Pro", font=_font(24, bold=True), fill=WHITE)
     draw.text((92, 78), "Tier of the same brand — not a separate logo.", font=_font(16), fill=SLATE1)
     draw.rounded_rectangle((92, 108, 168, 132), radius=2, fill=(42, 32, 8), outline=(250, 204, 21))
     draw.text((104, 112), "PREMIUM", font=_font(12, bold=True), fill=(250, 204, 21))
@@ -249,7 +249,7 @@ def candidate_board(name: str) -> Image.Image:
         ("Share Waiver card", share_card(name, "waiver")),
         ("OG 1200×630 (half)", og(name).resize((600, 315), Image.Resampling.LANCZOS)),
         ("Founder Beta lockup", founder_lockup(name)),
-        ("Premium surface", premium(name)),
+        ("Pro surface", premium(name)),
         ("Dark / light", dark_light(name)),
     ]
     return stack_labeled(parts)

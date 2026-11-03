@@ -262,7 +262,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     <>
       <PremiumLock
         title={plan?.upsell?.title || 'Your season-arc roadmap'}
-        description={plan?.upsell?.body || 'GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction.'}
+        description={plan?.upsell?.body || 'GM Plan is a Pro feature: where you stand, your best trade paths, and your roster construction.'}
       />
       <AnimatedCard style={styles.situation}>
         <AppText style={styles.stanceLabel}>{PLAIN_COPY.gmPlanProTitle}</AppText>

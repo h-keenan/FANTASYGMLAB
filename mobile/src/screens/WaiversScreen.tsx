@@ -600,7 +600,7 @@ function SecondaryWaiverBoard({
       <View style={styles.secondaryLockWrap}>
         <PremiumLock
           title="Full waiver board and FAAB shortlist"
-          description="Priority Adds stay free — Premium adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim."
+          description="Priority Adds stay free — Pro adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim."
         />
       </View>
     );

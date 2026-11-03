@@ -284,7 +284,7 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
           subtitle: 'Change or cancel your plan',
         }
       : {
-          label: 'Premium',
+          label: 'Pro',
           route: 'Paywall',
           icon: 'star-outline',
           color: colors.premium,

@@ -477,7 +477,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     {me.profile_status === 'error'
                       ? "Couldn't verify your plan — tap to retry"
                       : me.entitlement === 'premium'
-                        ? 'Premium'
+                        ? 'Pro'
                         : 'Free — Upgrade'}
                   </AppText>
                 </TouchableOpacity>

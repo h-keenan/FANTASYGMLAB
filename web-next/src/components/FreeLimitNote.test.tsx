@@ -24,7 +24,7 @@ describe("FreeLimitNote", () => {
     expect(screen.queryByRole("link", { name: /Upgrade/ })).not.toBeInTheDocument();
   });
 
-  it("renders nothing for Premium or when the server sent no limit", () => {
+  it("renders nothing for Pro or when the server sent no limit", () => {
     const { container, rerender } = render(<FreeLimitNote kind="cap" noun="x" limit={3} used={1} isPremium />);
     expect(container).toBeEmptyDOMElement();
     rerender(<FreeLimitNote kind="cap" noun="x" limit={undefined} used={1} isPremium={false} />);

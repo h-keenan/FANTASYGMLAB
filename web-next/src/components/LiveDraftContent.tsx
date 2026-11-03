@@ -362,7 +362,7 @@ export function LiveDraftContent({
         kicker="Live Draft"
         upsell={discovery.upsell}
         fallbackTitle="Draft with real-time recommendations"
-        fallbackBody="Live Draft is a Premium feature — Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening. Upgrade to Premium to unlock it."
+        fallbackBody="Live Draft is a Pro feature — Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening. Upgrade to Pro to unlock it."
       />
     );
   }

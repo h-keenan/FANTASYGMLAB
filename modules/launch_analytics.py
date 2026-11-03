@@ -301,7 +301,7 @@ FUNNEL_STEPS: tuple[tuple[str, str], ...] = (
     ("Game Plan", "first_game_plan_seen"),
     ("Trade Hub", "trade_hub_opened"),
     ("Core Feature Use", "_core_feature_use"),
-    ("Premium View", "premium_viewed"),
+    ("Pro View", "premium_viewed"),
     ("Checkout Start", "checkout_started"),
     ("Checkout Complete", "checkout_completed"),
     ("Entitlement Active", "premium_entitlement_activated"),
@@ -371,7 +371,7 @@ FEATURE_EVENT_MAP: dict[str, frozenset[str]] = {
     "News": frozenset({"news_opened", "news_item_opened"}),
     "Alerts": frozenset({"notification_center_opened", "notification_item_opened"}),
     "GM Orb": frozenset({"gm_orb_opened", "gm_destination_selected"}),
-    "Premium": frozenset(
+    "Pro": frozenset(
         {
             "premium_viewed",
             "premium_cta_clicked",

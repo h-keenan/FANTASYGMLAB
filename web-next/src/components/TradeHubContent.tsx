@@ -172,7 +172,7 @@ export function TradeHubContent({
           style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
         >
           <p className="text-sm font-bold">
-            {entitlement.hidden_count} more trade idea{entitlement.hidden_count === 1 ? "" : "s"} available on Premium.
+            {entitlement.hidden_count} more trade idea{entitlement.hidden_count === 1 ? "" : "s"} available on Pro.
           </p>
           <ButtonLink href="/premium" variant="premium" size="sm">
             Upgrade →

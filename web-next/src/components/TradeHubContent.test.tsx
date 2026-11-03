@@ -85,14 +85,14 @@ describe("TradeHubContent", () => {
     expect(screen.getByRole("img", { name: "Realism: Realistic" })).toBeInTheDocument();
   });
 
-  it("shows the Premium upsell banner when ideas are hidden", () => {
+  it("shows the Pro upsell banner when ideas are hidden", () => {
     const gated: TradeHubResponse = {
       ...RESPONSE,
       entitlement: { is_premium: false, approved_count: 5, visible_count: 2, hidden_count: 3, free_limit: 2 },
     };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={gated} />);
 
-    expect(screen.getByText("3 more trade ideas available on Premium.")).toBeInTheDocument();
+    expect(screen.getByText("3 more trade ideas available on Pro.")).toBeInTheDocument();
   });
 
   // New-user guidance audit, 2026-10: plain-English posture line replaces the

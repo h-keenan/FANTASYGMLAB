@@ -81,7 +81,7 @@ const DRAFT_PICK = {
   owner_roster_id: "1",
   original_team_name: "Gridiron Ghosts",
   owner_team_name: "Gridiron Ghosts",
-  pick_tier: "Premium",
+  pick_tier: "Pro",
   projected_pick_range: "Early 1st",
   projection_confidence: 0.64,
 } as DraftPickAsset;
@@ -522,10 +522,10 @@ export function DesignSystemContent() {
       </Family>
 
       {/* PREMIUM */}
-      <Family id="premium" title="Premium" note="Everything premium is gold with a soft glow (owner, 2026-10-23). Primary cyan stays for non-premium actions.">
+      <Family id="premium" title="Pro" note="Everything premium is gold with a soft glow (owner, 2026-10-23). Primary cyan stays for non-premium actions.">
         <Spec name="Button premium" path="web-next/src/components/Button.tsx" note="variant premium | premiumOutline. Dark ink on gold; glow pulses like the prestige rings (static under reduced motion).">
           <div className="grid grid-cols-2 gap-3">
-            <Variant label="Premium">
+            <Variant label="Pro">
               <Button variant="premium">Manage Billing</Button>
             </Variant>
             <Variant label="Disabled">
@@ -558,10 +558,10 @@ export function DesignSystemContent() {
         >
           <PremiumUpsellCard
             bare
-            kicker="Premium"
+            kicker="Pro"
             upsell={null}
             fallbackTitle="Unlock Trade Finder"
-            fallbackBody="Static sample copy for the lock card. Premium members get every trade partner ranked."
+            fallbackBody="Static sample copy for the lock card. Pro members get every trade partner ranked."
           />
         </Spec>
       </Family>
@@ -592,7 +592,7 @@ export function DesignSystemContent() {
                 <ToneBadge label="Bench" color="var(--color-opportunity)" />
                 <ToneBadge label="Sell high" color="var(--color-warning)" />
                 <ToneBadge label="Risk" color="var(--color-danger)" />
-                <ToneBadge label="Premium" color="var(--color-premium)" />
+                <ToneBadge label="Pro" color="var(--color-premium)" />
                 <ToneBadge label="Info" color="var(--color-information)" />
               </div>
             </Variant>

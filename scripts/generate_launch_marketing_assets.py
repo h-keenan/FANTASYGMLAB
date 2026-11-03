@@ -340,10 +340,10 @@ def compose_free_vs_premium() -> Image.Image:
     mark = draw_brand_mark(96)
     canvas.paste(mark, (64, 48), mark)
     draw.text((184, 62), PRODUCT, font=_font(40, bold=True), fill=WHITE)
-    draw.text((64, 170), "Free vs Premium", font=_font(44, bold=True), fill=WHITE)
+    draw.text((64, 170), "Free vs Pro", font=_font(44, bold=True), fill=WHITE)
     draw.text(
         (64, 230),
-        "Free is useful. Premium is deeper — not a separate product.",
+        "Free is useful. Pro is deeper — not a separate product.",
         font=_font(26),
         fill=SLATE1,
     )
@@ -374,10 +374,10 @@ def compose_free_vs_premium() -> Image.Image:
             yy += 18
 
     column(64, "Free", free_items, CYAN)
-    column(556, "Premium", prem_items, (250, 204, 21))
+    column(556, "Pro", prem_items, (250, 204, 21))
     draw.text(
         (64, 1230),
-        f"Experimental lanes require flags + Premium where configured. {FOUNDER_BETA}.",
+        f"Experimental lanes require flags + Pro where configured. {FOUNDER_BETA}.",
         font=_font(22),
         fill=MUTED,
     )

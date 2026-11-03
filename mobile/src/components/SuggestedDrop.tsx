@@ -167,7 +167,7 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
               ) : null}
             </View>
           ))}
-          {data.locked_count > 0 ? <AppText style={styles.lock}>{`+${data.locked_count} more with Premium`}</AppText> : null}
+          {data.locked_count > 0 ? <AppText style={styles.lock}>{`+${data.locked_count} more with Pro`}</AppText> : null}
         </View>
       )}
       <ScreenInfoNote

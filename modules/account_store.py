@@ -85,14 +85,14 @@ def customer_safe_error(
             if context == "profile":
                 return (
                     "Account access could not be verified right now. "
-                    "Premium stays locked until this clears; try signing in again."
+                    "Pro stays locked until this clears; try signing in again."
                 )
             return "Something went wrong. Please try again in a moment."
         return SESSION_EXPIRED_COPY
     if context == "profile" and ("rls" in lower or "row-level security" in lower):
         return (
             "Account access could not be verified right now. "
-            "Premium stays locked until this clears; try signing in again."
+            "Pro stays locked until this clears; try signing in again."
         )
     if context == "saved_leagues":
         return "Saved leagues could not be loaded right now. Please try again in a moment."

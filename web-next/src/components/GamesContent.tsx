@@ -270,7 +270,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
   const ready = adds.length > 0 || drops.length > 0;
   return (
     <section className="flex flex-col gap-3">
-      <SectionHeading kicker="Premium" note={`Up to ${MAX_PLAYERS} players on each side.`}>
+      <SectionHeading kicker="Pro" note={`Up to ${MAX_PLAYERS} players on each side.`}>
         What if
       </SectionHeading>
 

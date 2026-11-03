@@ -318,7 +318,7 @@ export default function MoreScreen({ navigation }: Props) {
                       me?.entitlement === 'premium' && { color: colors.premium },
                     ]}
                   >
-                    {me ? (me.entitlement === 'premium' ? 'Premium' : 'Free') : '—'}
+                    {me ? (me.entitlement === 'premium' ? 'Pro' : 'Free') : '—'}
                   </AppText>
                 }
                 showDivider={false}
@@ -400,7 +400,7 @@ export default function MoreScreen({ navigation }: Props) {
             icon="timer-outline"
             iconColor={colors.premium}
             label="Live Draft"
-            description="Real-time pick recommendations while your Sleeper draft is running (Premium)"
+            description="Real-time pick recommendations while your Sleeper draft is running (Pro)"
             onPress={() => onOpenLeagueScreen('LiveDraft', 'to use Live Draft')}
             showDivider
           />

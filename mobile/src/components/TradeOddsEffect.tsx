@@ -73,7 +73,7 @@ export default function TradeOddsEffect({
     return (
       <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Paywall')} testID="trade-odds-upsell">
         <AppText style={styles.caption}>
-          {response.upsell?.title ?? 'See how a trade moves your odds'}. <AppText style={styles.upgrade}>Premium</AppText>
+          {response.upsell?.title ?? 'See how a trade moves your odds'}. <AppText style={styles.upgrade}>Pro</AppText>
         </AppText>
       </TouchableOpacity>
     );
