@@ -6,6 +6,7 @@ import { handle as checkout } from "../create-checkout-session/handler.ts";
 import { handle as portal } from "../billing-portal-session/handler.ts";
 import { launchWeekActive, priceIdForPlan, safeReturnPath, encodeForm } from "./stripe_api.ts";
 import { parseTrialDays } from "./config.ts";
+import { FALLBACK_PLAN_PRICES } from "./plan_prices.ts";
 import {
   BASE_ENV, envOf, fakeFetch, j, stripeConfig, subscriptionEvent, USER_ID, WEBHOOK_SECRET, PRICE_PRO_MONTHLY, PRICE_PRO_ANNUAL, PRICE_LAUNCH,
 } from "./fixtures.ts";
@@ -451,7 +452,7 @@ Deno.test("billing-plans: Stripe failure or missing config falls back to default
   const r1 = await plans(plansReq(), { env: envOf(BASE_ENV), fetch: bad.fn });
   const b1 = await r1.json();
   assertEquals(r1.status, 200);
-  assertEquals(b1.plans.map((p: { price: string }) => p.price), ["$3.99", "$19.99"]);
+  assertEquals(b1.plans.map((p: { price: string }) => p.price), [FALLBACK_PLAN_PRICES.monthly.price, FALLBACK_PLAN_PRICES.annual.price]);
   resetPriceCacheForTests();
   const none = fakeFetch({});
   const r2 = await plans(plansReq(), { env: envOf({ SUPABASE_URL: "https://proj.supabase.test" }), fetch: none.fn });
@@ -466,7 +467,7 @@ Deno.test("billing-plans: price without a usable amount falls back to defaults",
     [`GET https://api.stripe.com/v1/prices/${PRICE_PRO_ANNUAL}`]: () => j({ unit_amount: null, currency: "usd" }),
   });
   const body = await (await plans(plansReq(), { env: envOf(BASE_ENV), fetch: f.fn })).json();
-  assertEquals(body.plans.map((p: { price: string }) => p.price), ["$3.99", "$19.99"]);
+  assertEquals(body.plans.map((p: { price: string }) => p.price), [FALLBACK_PLAN_PRICES.monthly.price, FALLBACK_PLAN_PRICES.annual.price]);
 });
 
 Deno.test("billing-plans: signed-in account with no billing history is trial-eligible; with history is not", async () => {
@@ -567,4 +568,106 @@ Deno.test("stripe-webhook: profile create retries without trial_ends_at on an ol
   const res = await stripeWebhook(await signedRequest(subscriptionEvent("customer.subscription.created")), deps);
   assertEquals(res.status, 200);
   assertEquals(posts, 2);
+});
+
+// ---------- delete-account: cancel Stripe first, then delete ----------
+import { handle as deleteAccount } from "../delete-account/handler.ts";
+
+const delReq = (jwt: string | null = "good-jwt") =>
+  new Request("https://x.test/delete-account", {
+    method: "POST",
+    headers: { ...(jwt ? { authorization: `Bearer ${jwt}` } : {}), origin: "https://app.example.test" },
+    body: "{}",
+  });
+const SUBS = "https://api.stripe.com/v1/subscriptions";
+function delRoutes(profile: Record<string, unknown>, over: Record<string, () => Response> = {}) {
+  return {
+    ...userRoutes(profile),
+    [`GET ${SUBS}?customer=cus_1`]: () => j({ data: [{ id: "sub_1", status: "active" }, { id: "sub_old", status: "canceled" }] }),
+    [`GET ${SUBS}/sub_1`]: () => j({ id: "sub_1", status: "active" }),
+    [`DELETE ${SUBS}/sub_1`]: () => j({ id: "sub_1", status: "canceled" }),
+    "POST /rest/v1/rpc/delete_user": () => new Response(null, { status: 204 }),
+    ...over,
+  };
+}
+
+Deno.test("delete-account: cancels the live Stripe subscription, then deletes with the caller's JWT", async () => {
+  const f = fakeFetch(delRoutes({ stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1" }));
+  const res = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ok, true);
+  assertEquals(body.canceled_subscriptions, 1);
+  const urls = f.calls.map((c) => `${c.init.method ?? "GET"} ${c.url}`);
+  const del = urls.findIndex((u) => u === `DELETE ${SUBS}/sub_1`);
+  const rpc = urls.findIndex((u) => u.includes("/rest/v1/rpc/delete_user"));
+  assert(del >= 0 && rpc > del, "cancel must happen before the account delete");
+  assertEquals(urls.filter((u) => u.startsWith("DELETE")).length, 1); // the canceled sub_old is not touched
+  const rpcCall = f.calls[rpc];
+  assertEquals((rpcCall.init.headers as Record<string, string>).Authorization, "Bearer good-jwt");
+  assertEquals((f.calls[del].init.headers as Record<string, string>)["Idempotency-Key"], "delete-account-cancel-sub_1");
+});
+
+Deno.test("delete-account: a failed Stripe cancel blocks the delete and surfaces an error", async () => {
+  const f = fakeFetch(delRoutes(
+    { stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1" },
+    { [`DELETE ${SUBS}/sub_1`]: () => j({ error: { type: "api_error" } }, 500) },
+  ));
+  const res = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(res.status, 502);
+  assertEquals((await res.json()).code, "cancel_failed");
+  assert(!f.calls.some((c) => c.url.includes("/rpc/delete_user")), "must not delete the account");
+});
+
+Deno.test("delete-account: Stripe unreachable or unconfigured with a customer on file never deletes", async () => {
+  const down = fakeFetch(delRoutes({ stripe_customer_id: "cus_1" }, { [`GET ${SUBS}?customer=cus_1`]: () => j({}, 503) }));
+  const r1 = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: down.fn });
+  assertEquals(r1.status, 502);
+  assert(!down.calls.some((c) => c.url.includes("/rpc/delete_user")));
+  const noKey = fakeFetch(delRoutes({ stripe_customer_id: "cus_1" }));
+  const r2 = await deleteAccount(delReq(), { env: envOf({ ...BASE_ENV, STRIPE_SECRET_KEY: "" }), fetch: noKey.fn });
+  assertEquals(r2.status, 502);
+  assert(!noKey.calls.some((c) => c.url.includes("/rpc/delete_user")));
+});
+
+Deno.test("delete-account: idempotent re-run (subscription already gone) still deletes; no billing needs no Stripe", async () => {
+  const gone = fakeFetch(delRoutes(
+    { stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1" },
+    { [`GET ${SUBS}?customer=cus_1`]: () => j({ data: [] }), [`GET ${SUBS}/sub_1`]: () => j({ error: { code: "resource_missing" } }, 404) },
+  ));
+  const r1 = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: gone.fn });
+  assertEquals(r1.status, 200);
+  assertEquals((await r1.json()).canceled_subscriptions, 0);
+  assert(!gone.calls.some((c) => c.init.method === "DELETE" && c.url.includes("stripe")));
+
+  const free = fakeFetch(delRoutes({}));
+  const r2 = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: free.fn });
+  assertEquals(r2.status, 200);
+  assert(!free.calls.some((c) => c.url.includes("api.stripe.com")));
+});
+
+Deno.test("delete-account: unreadable billing profile blocks; RevenueCat user is flagged; bad JWT is 401", async () => {
+  const unreadable = fakeFetch(delRoutes({}, { "GET /rest/v1/profiles": () => j({ message: "boom" }, 500) }));
+  const r1 = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: unreadable.fn });
+  assertEquals(r1.status, 502);
+  assert(!unreadable.calls.some((c) => c.url.includes("/rpc/delete_user")));
+
+  const rc = fakeFetch(delRoutes({ revenuecat_app_user_id: USER_ID }));
+  const r2 = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: rc.fn });
+  assertEquals((await r2.json()).store_subscription, true);
+
+  const anon = fakeFetch({});
+  const r3 = await deleteAccount(delReq(null), { env: envOf(BASE_ENV), fetch: anon.fn });
+  assertEquals(r3.status, 401);
+  assertEquals(anon.calls.length, 0);
+});
+
+Deno.test("delete-account: RPC failure after cancel reports an error (retry is safe)", async () => {
+  const f = fakeFetch(delRoutes(
+    { stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1" },
+    { "POST /rest/v1/rpc/delete_user": () => j({ message: "x" }, 500) },
+  ));
+  const res = await deleteAccount(delReq(), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(res.status, 502);
+  assertEquals((await res.json()).code, "delete_failed");
 });

@@ -17,6 +17,7 @@ import {
   storeReturnPath,
   type GuestUpgradeFailure,
 } from "@/lib/guestUpgrade";
+import { deleteAccountOnServer } from "@/lib/accountDeletion";
 import { supabase } from "@/lib/supabase";
 
 /** Current in-app location (path + query + hash) to come back to after auth. */
@@ -66,9 +67,10 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Account page (2026-10-19) — self-service account deletion, Apple App
    * Store Guideline 5.1.1(v) parity with mobile's existing "Delete
-   * account" flow (mobile/src/context/AuthContext.tsx). Calls the same
-   * `public.delete_user()` Supabase RPC (docs/supabase_delete_account.sql)
-   * directly with the caller's own session — security-definer but
+   * account" flow (mobile/src/context/AuthContext.tsx). Calls the
+   * `delete-account` Edge Function, which cancels the Stripe subscription and
+   * then runs `public.delete_user()` (docs/supabase_delete_account.sql) with
+   * the caller's own session — security-definer but
    * auth.uid()-scoped inside the function body, so this can only ever
    * delete the caller's own row. Deleting auth.users cascades to every
    * app table referencing it (profiles, saved_leagues, gm_targets, etc.),
@@ -271,8 +273,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
       },
       deleteAccount: async () => {
-        const { error } = await supabase.rpc("delete_user");
-        if (error) return { error: error.message };
+        // Cancels the Stripe subscription first, then deletes (server side).
+        // Any failure returns an error and deletes nothing.
+        const { error } = await deleteAccountOnServer(supabase);
+        if (error) return { error };
         await supabase.auth.signOut();
         return { error: null };
       },

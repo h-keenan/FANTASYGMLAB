@@ -40,6 +40,7 @@ import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
+import { DELETE_ACCOUNT_BILLING_NOTE } from '../lib/accountDeletion';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -267,7 +268,7 @@ export default function MoreScreen({ navigation }: Props) {
   const onDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
-      'This permanently deletes your account and all data — saved leagues, GM Targets, trade history. This cannot be undone.',
+      `This permanently deletes your account and all data — saved leagues, GM Targets, trade history. This cannot be undone.\n\n${DELETE_ACCOUNT_BILLING_NOTE}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -278,7 +279,7 @@ export default function MoreScreen({ navigation }: Props) {
             const { error } = await deleteAccount();
             setDeleting(false);
             if (error) {
-              Alert.alert('Could not delete account', 'Please try again in a moment.');
+              Alert.alert('Could not delete account', error);
             }
             // On success there's nothing else to do here — clearing the
             // session flips RootNavigator back to the Auth stack on its own.

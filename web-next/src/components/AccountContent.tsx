@@ -18,6 +18,7 @@ import { Button, ButtonLink } from "@/components/Button";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { trackOnboarding } from "@/lib/onboardingAnalytics";
 import { Toggle } from "@/components/Toggle";
+import { DELETE_ACCOUNT_BILLING_NOTE } from "@/lib/accountDeletion";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same six categories, same copy — so a user who's seen this in the app
@@ -402,7 +403,7 @@ function DeleteAccountSection({ onDeleteAccount }: { onDeleteAccount: () => Prom
       </SectionHeading>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Permanently deletes your account and all data, saved leagues, GM Targets, trade history. This cannot be
-        undone.
+        undone. {DELETE_ACCOUNT_BILLING_NOTE}
       </p>
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>

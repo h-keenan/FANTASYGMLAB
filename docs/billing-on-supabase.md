@@ -90,6 +90,7 @@ supabase secrets list                            # names + digests only
 supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy revenuecat-webhook --no-verify-jwt
 supabase functions deploy create-checkout-session
+supabase functions deploy delete-account   # MUST be deployed before the web/app build that calls it ships
 supabase functions deploy billing-portal-session
 supabase functions deploy billing-plans --no-verify-jwt   # public; new in Phase 2
 ```

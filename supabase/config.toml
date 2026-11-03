@@ -18,6 +18,10 @@ verify_jwt = true
 [functions.billing-portal-session]
 verify_jwt = true
 
+# Cancels the caller's Stripe subscription(s), then deletes the account.
+[functions.delete-account]
+verify_jwt = true
+
 # Public price display + publishable key + trial copy. Anonymous callers are
 # fine (landing page); a valid user JWT only adds per-account trial eligibility.
 [functions.billing-plans]
