@@ -15,11 +15,12 @@ def test_static_landing_exists_with_brand_and_cta():
     assert 'data-fgl-shell-ready="1"' in html
     assert "FantasyDesk" in html
     assert "Founder Beta" not in html
-    assert "Create your account" in html
-    # The first step is account creation, so the hero must not promise a
-    # username paste, and must not claim "no card" for the paid trial.
+    # Hero: one primary CTA (sample league = value before the account wall)
+    # and a secondary that opens the app's connect flow.
+    assert "Import your league" in html
     assert "Paste your Sleeper username" not in html
     assert "Free to start, no card" not in html
+    assert "Android app on Google Play" not in html
     assert "utm_source=static_landing" in html
     assert "app.fantasygmlab.com" in html
     assert "www.fantasygmlab.com/?utm_source" not in html
@@ -33,12 +34,17 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "fonts.googleapis" not in css
     assert "FantasyDesk — The dynasty trade your leaguemate would accept" in html
     assert "Get the trade your leaguemate would actually accept." in html
-    # Roster-aware trade verdict leads; no unverifiable superlatives and no
-    # stale "coming soon"/billing-disabled copy (marketing pass 2026-10-26).
+    # Share-card QR variant: copy-only swap, flagged before first paint.
+    assert "Someone shared a FantasyDesk trade verdict. Get yours for your own league." in html
+    assert "utm_campaign=share_card" in html and "is-share" in html
+    assert ".is-share .fgl-share-only" in css
+    # No unverifiable superlatives and no stale billing-disabled copy.
     assert "The only dynasty tool" not in html
-    assert "Coming soon" not in html
     assert "Live billing is not enabled" not in html
-    # Value before the account wall: the sample league is the primary CTA.
+    # App Store slot is honest: no live listing yet, so no link and no badge.
+    assert "App Store app for iPhone: coming soon" in html
+    assert "apps.apple.com" not in html
+    assert "https://play.google.com/store/apps/details?id=com.fantasygmlab.app" in html
     assert 'data-fd-cta="primary" href="https://app.fantasygmlab.com/sample-league?utm_source=static_landing' in html
     # First-party beacon only, no third-party pixels.
     assert "/api/lp" in html
@@ -46,34 +52,28 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "og.png" in html
     assert "Trade Calculator" not in html
     assert "Trade Evaluator" not in html
-    # Feature order: GM Plan, then GM Targets, then Trade Hub, then Decision
-    # Memory (relaunch positioning — the sell is strategy + continuity, not
-    # the trade evaluator, which is table-stakes free functionality).
-    how_it_works_block = html.split('id="how-it-works"', 1)[1].split("</ul>", 1)[0]
-    assert how_it_works_block.index("Today's Game Plan") < how_it_works_block.index(
-        "GM Targets"
-    )
-    assert how_it_works_block.index("GM Targets") < how_it_works_block.index("Trade Hub")
-    assert how_it_works_block.index("Trade Hub") < how_it_works_block.index(
-        "Decision Memory"
-    )
-    assert (LANDING / "assets" / "fantasygmlab-symbol-compact.png").exists()
+    # 3 steps, then 4 plain-English feature cards, in this order.
+    steps = html.split('id="how-it-works"', 1)[1].split("</ol>", 1)[0]
+    assert steps.index("Connect your league") < steps.index("We read your roster") < steps.index("Get your next move")
+    cards = html.split('id="feat-h"', 1)[1].split("</ul>", 1)[0]
+    order = [
+        "Trade verdicts that know your roster",
+        "Waivers that fit your team",
+        "Start/sit with weather and matchup",
+        "League intelligence",
+    ]
+    assert [cards.index(t) for t in order] == sorted(cards.index(t) for t in order)
+    assert (LANDING / "assets" / "landing" / "fantasydesk-lockup-white.png").exists()
     assert (LANDING / "assets" / "favicon.png").exists()
-    # Premium included-now advertises graduated Premium depth (#232).
-    premium_block = html.split("Included now with Premium", 1)[1].split("</ul>", 1)[0]
-    assert "Decision Memory" in premium_block
-    assert "GM Targets (full board)" in premium_block
-    assert "Full Trade Hub" in premium_block
-    free_block = html.split("Free includes", 1)[1].split("</ul>", 1)[0]
-    assert "Share Recommendation" in free_block
-    assert "GM Targets (limited)" in free_block
+    # Legal pages are linked, never restated here.
+    assert "/legal/terms" in html and "/legal/privacy" in html and "/legal/no_affiliation" in html
 
 
 def test_static_landing_first_fold_transfer_budget():
     first_fold = [
         LANDING / "index.html",
         LANDING / "landing.css",
-        LANDING / "assets" / "fantasygmlab-symbol-compact.png",
+        LANDING / "assets" / "landing" / "fantasydesk-lockup-white.png",
         LANDING / "assets" / "favicon.png",
     ]
     total = sum(path.stat().st_size for path in first_fold)
@@ -82,8 +82,10 @@ def test_static_landing_first_fold_transfer_budget():
 
 def test_static_landing_lazy_loads_gallery_images():
     html = (LANDING / "index.html").read_text(encoding="utf-8")
-    assert 'loading="lazy"' in html
-    assert "assets/web/" in html
+    assert html.count('loading="lazy"') >= 4
+    assert html.count("assets/landing/onboarding-") == 4
+    # Hero (lockup) must not be lazy: it is the LCP candidate.
+    assert 'src="assets/landing/fantasydesk-lockup-white.png" width="280" height="41" alt="FantasyDesk">' in html
 
 
 def test_static_landing_search_crawler_contract():
