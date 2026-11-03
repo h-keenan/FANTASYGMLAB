@@ -44,6 +44,22 @@ def test_suggestion_bar_is_the_even_rung_of_the_one_score_ladder(ui, score, expe
     assert trade_value_bands.band_for_score(-trade_value_bands.EDGE).id == "even"
 
 
+def test_with_a_lineup_model_the_bar_reads_only_the_score_and_agrees_with_its_own_rung():
+    """No label check: for every score the verdict's UI rung is a function of that score, and the
+    bar (score >= -EDGE) is exactly "that rung is FAIR/ACCEPT and not the edge-to-them band"."""
+
+    for score in trade_value_bands.GOLDEN_SCORES:
+        rung = trade_value_bands.band_for_score(score)
+        verdict = _verdict(rung.ui_verdict, score)
+        assert trade_grade.clears_suggestion_bar(verdict) is (
+            rung.ui_verdict in trade_grade.PASSING_UI_VERDICTS and rung.id != "edge_them"
+        ), score
+        # The score alone decides; whatever UI string rides along cannot change the answer.
+        assert trade_grade.clears_suggestion_bar(_verdict("ACCEPT", score)) is trade_grade.clears_suggestion_bar(
+            _verdict("DECLINE", score)
+        )
+
+
 def test_legacy_verdicts_without_a_lineup_model_keep_their_own_rules():
     assert trade_grade.clears_suggestion_bar(_verdict("FAIR", -600, model=False)) is True
     assert trade_grade.clears_suggestion_bar(_verdict("COUNTER", -600, model=False)) is False

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from modules import nfl_schedule, trade_analyzer_fit, trade_offer_analyzer, trade_posture, trade_value_bands
+from modules import nfl_schedule, trade_analyzer_fit, trade_grade, trade_offer_analyzer, trade_posture, trade_value_bands
 from tests import test_trade_lineup_model as T
 
 ACCEPT_UI = "ACCEPT"
@@ -61,13 +61,25 @@ def _higgins(strategy, posture=None):
 # --- the owner's scenario -----------------------------------------------------
 
 
+def _assert_verdict_is_the_rung_of_the_score(verdict):
+    """The one-number rule: band, UI verdict, tone and score_band all come from
+    ``band_for_score(trade_score)``; no label or rung is applied after it."""
+
+    rung = trade_value_bands.band_for_score(verdict.trade_score)
+    assert (verdict.band, verdict.ui_verdict, verdict.tone) == (rung.verdict, rung.ui_verdict, rung.tone)
+    assert verdict.score_band == verdict.band
+
+
 def test_contender_is_not_told_smash_accept_for_a_lineup_costing_value_win():
     fit, verdict = _higgins("contender")
     assert fit["value_delta"] >= 3000  # the market really says "you win"
     assert fit["lineup_model"]["points"]["ros_delta"] < -60
-    assert verdict.band == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
+    # The window cost is IN the score, so the verdict is simply the rung that
+    # score lands in: not an accept, and nothing was relabelled afterwards.
+    assert verdict.trade_score < trade_value_bands.ACCEPT
+    _assert_verdict_is_the_rung_of_the_score(verdict)
     assert verdict.ui_verdict != "ACCEPT" and verdict.tone != "accept"
-    assert verdict.score_band in {"COUNTER", "FAIR / PREFERENCE"}
+    assert trade_posture.tradeoff_tag(verdict.posture, verdict.posture_assessment) == "Costs your lineup"
     # The line under the verdict still states the market value honestly.
     assert verdict.value_summary == "You win big on value"
     # The card names the posture and the trade-off with numbers, never "Helps".
@@ -152,7 +164,8 @@ def test_supplied_posture_drives_the_verdict_over_the_strategy_key():
     fit, verdict = _higgins("retool", posture=posture)
     assert verdict.posture["source"] == "auto"
     assert "You're a contender (#2 of 12, 4-2)" in verdict.posture_note
-    assert verdict.band == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
+    _assert_verdict_is_the_rung_of_the_score(verdict)
+    assert verdict.ui_verdict != ACCEPT_UI
 
 
 # --- the model itself ---------------------------------------------------------
@@ -256,9 +269,8 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
     assert len(ui_changed & win_now) / len(win_now) <= 0.15
     # Rebuild/tank move more by design: their lineup weight drops (PRESENT_ADJUST).
     assert len(ui_changed) / len(after) <= 0.25
-    # Labels move a little more than UI verdicts: a win-now ACCEPT/SMASH whose lineup
-    # cost is material is relabelled (and lands on FAIR), and the window cost scales
-    # with the league's price scale (value_per_point), not a fixed 700/win.
+    # There is no separate label any more: the band IS the UI rung of the score.
+    assert ui_changed <= label_changed
     assert len(label_changed) / len(after) <= 0.35
     for key in ui_changed:
         _, name, strat = key
@@ -270,11 +282,11 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
             assert a.trade_score <= b.trade_score, key
         else:
             assert a.posture_assessment["present_term"] != 0 or a.posture_assessment["direction_term"] != 0, key
-    # Win-now teams never read "ACCEPT" on a trade whose market value is an accept
-    # but whose lineup cost is material.
+    # A win-now team's accept with a material lineup cost has to clear a real
+    # score: the cost is inside the number, not a flag next to a green card.
     for key, v in after.items():
         if key[2] == "contender" and v.posture_assessment["lineup_costly"]:
-            assert v.ui_verdict != ACCEPT_UI or v.trade_score >= 1500, key
+            assert v.ui_verdict != ACCEPT_UI or v.trade_score >= trade_value_bands.ACCEPT, key
     # Sensible trades keep their verdicts: even swaps and upgrades are untouched for every posture.
     for strat in POSTURES:
         for name in ("even-swap", "pick-for-starter", "2for1 up", "overpay"):
@@ -354,34 +366,26 @@ def test_window_cost_scales_with_the_leagues_value_per_point():
     assert _assess("rebuild", ros_delta=-100.0, k=40.0)["window_term"] == 0
 
 
-def test_a_contender_selling_its_best_player_for_picks_is_never_a_clean_accept():
-    # Gibbs-shaped: a huge market win on paper, ~150 lineup points gone.
+def test_a_contender_selling_its_best_player_for_picks_scores_below_an_accept():
+    """Gibbs-shaped (fringe contender, ~156 lineup points / ~2 wins, +5.6k market
+    value) used to score +1269 and be relabelled afterwards. The window term is
+    now big enough that the same score is simply not an accept, and a win-now
+    team never gets a clean accept from a material lineup cost alone."""
+
+    deep, trades = _grid()["deep"]
+    send, recv, picks = trades["sell RB for bust+pick"]
+    out = {s: _grade(deep, send, recv, strategy=s, receive_picks=picks)[1] for s in POSTURES}
     for key in ("contender", "fringe_contender"):
-        assessment = _assess(key, ros_delta=-150.0, k=30.0)
-        assessment["direction"] = "toward_future"
-        assert assessment["lineup_costly"]
-        for final in ("smash", "accept"):
-            label = trade_posture.verdict_label_override(
-                value_band_id="smash",
-                final_band_id=final,
-                posture={"key": key, "group": "contender"},
-                assessment={**assessment, "adjustment": -1},
-            )
-            assert label == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
-    # A rebuilder keeps the clean accept.
-    reb = _assess("rebuild", ros_delta=-150.0, k=30.0)
-    assert (
-        trade_posture.verdict_label_override(
-            value_band_id="smash", final_band_id="smash", posture={"key": "rebuild", "group": "rebuild"},
-            assessment={**reb, "adjustment": -1},
-        )
-        == ""
-    )
+        v = out[key]
+        assert v.posture_assessment["lineup_costly"], key
+        assert v.trade_score < trade_value_bands.ACCEPT, key
+        _assert_verdict_is_the_rung_of_the_score(v)
+        assert not trade_grade.clears_suggestion_bar(v), key
+    # A rebuilder keeps the clean accept for the same package.
+    assert out["rebuild"].ui_verdict == ACCEPT_UI
+    assert trade_grade.clears_suggestion_bar(out["rebuild"])
 
 
-def test_a_costly_accept_degrades_the_ui_verdict_for_old_clients():
-    for strategy in ("contender", "fringe_contender"):
-        _, verdict = _higgins(strategy)
-        if verdict.score_band in {"SMASH ACCEPT", "ACCEPT"} and verdict.posture_assessment["lineup_costly"]:
-            assert verdict.band == trade_value_bands.VERDICT_VALUE_COSTS_LINEUP
-            assert verdict.ui_verdict != ACCEPT_UI and verdict.tone != "accept"
+def test_every_verdict_in_the_grid_is_the_rung_of_its_own_score():
+    for key, v in _run_grid(None, enabled=True).items():
+        _assert_verdict_is_the_rung_of_the_score(v)

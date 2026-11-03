@@ -572,13 +572,14 @@ def clears_suggestion_bar(verdict) -> bool:
 
     if verdict is None:
         return True
-    if verdict.ui_verdict not in PASSING_UI_VERDICTS:
-        return False
     if not getattr(verdict, "lineup_model", None):
         # No lineup model (offseason / no weekly data): the verdict was decided by
         # the legacy value + fit rules, not the score ladder, so the ladder's
         # "essentially even" rung is not the yardstick for it.
-        return True
+        return verdict.ui_verdict in PASSING_UI_VERDICTS
+    # The score is the single yardstick: the verdict's band, UI verdict and tone
+    # are the rung this same number lands in (the window and direction cost are
+    # terms of it), so no separate label check is needed or possible.
     try:
         score = float(verdict.trade_score)
     except (TypeError, ValueError):

@@ -19,8 +19,12 @@ rather than patched:
 
 Everything here is a consequence of two small tables (``WINDOW_WIN_WEIGHT`` and
 ``ORIENTATION``) plus a win-probability slope. There is no per-position or
-per-player rule, and no hard cap on a verdict: the score moves, and the label
-simply reports when the score and the market value disagree.
+per-player rule, no hard cap on a verdict and no relabelling after the fact:
+the window and direction cost are terms of the ONE trade score, so the verdict
+band, the UI verdict, the Hub/Finder suggestion bar and the Analyzer all read
+the same number against the same rungs. When the market value alone would say
+accept and the window cost pulls the score below it, ``window_overrules_value``
+reports that as a fact for the words around the verdict; it never changes it.
 """
 
 from __future__ import annotations
@@ -40,13 +44,28 @@ from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
 # scale -- ``win_value = weight * value_per_point / WIN_PROB_PER_POINT`` (value
 # units per point x points per win), not an absolute number of value units. The
 # old absolute 700/win was calibrated on a market where a first-round pick was
-# ~3k; in a league whose R1 picks price at 5.5-9.8k it was a rounding error, so a
-# contender could be told SMASH ACCEPT for selling its best player for picks
-# while losing ~156 lineup points. Scaling by k keeps the window cost
-# proportional to what the same market charges for the points themselves.
+# ~3k; in a league whose R1 picks price at 5.5-9.8k it was a rounding error.
+#
+# The scaled weights (0.5 / 0.35 / 0.15) fixed the scale but were still too
+# small to be the *whole* window cost: a fringe contender selling its best
+# player for two R1s (~156 lineup points, ~2 expected wins, +5.6k market value)
+# still scored +1269 (an ACCEPT-level number), and the verdict was patched
+# afterwards with a relabel (GOOD VALUE, COSTS YOUR LINEUP) and a forced FAIR UI
+# verdict while every consumer of the score (counter search, Hub/Finder gate,
+# bot feeds) still saw an accept. The cost now lives in the score: a win-now
+# team pays a window premium equal to the market price of the points
+# themselves (contender 1.0), on top of the w_now emphasis, with the ladder
+# kept in the same proportions as before (x2); retool is not a window team and
+# stays at 0.15 (doubling it turned a sensible thin-roster 2-for-1 upgrade from
+# COUNTER into DECLINE). Calibration evidence, 4 public
+# leagues, "sell the top skill player for two R1s": at x1 the fringe-contender
+# sale scored +1269, at x1.5 +456, at x2 -357, at x3 -1984; the same x2 turns
+# a +4.2k contender sale that cost 107 lineup points from +252 into -1601. It
+# does not touch trades that keep or add lineup (gains are credited at a
+# quarter), nor sales that cost under a win and clear a very large value gap.
 WINDOW_WIN_WEIGHT: dict[str, float] = {
-    "contender": 0.5,
-    "fringe_contender": 0.35,
+    "contender": 1.0,
+    "fringe_contender": 0.7,
     "retool": 0.15,
     "rebuild": 0.0,
     "tank": 0.0,
@@ -338,41 +357,46 @@ def posture_sentence(posture: Mapping[str, Any], assessment: Mapping[str, Any], 
     return ""
 
 
-def verdict_label_override(
-    *, value_band_id: str, final_band_id: str, posture: Mapping[str, Any], assessment: Mapping[str, Any]
-) -> str:
-    """Honest verdict label when the market value says accept but the posture
-    cost pulled the score below an accept. "" when no override applies."""
+def window_overrules_value(
+    value_delta: float, trade_score: float, assessment: Mapping[str, Any] | None
+) -> bool:
+    """True when the market value alone would say accept but the posture
+    (window / direction / present) terms pulled the SAME score below an accept.
+
+    A fact about two numbers the verdict already has, used for the words around
+    it (the line under the verdict keeps saying what the market says, the
+    heading becomes "The trade-off"). It decides nothing: band, UI verdict and
+    tone are always the rung ``trade_score`` lands in.
+    """
 
     from modules import trade_value_bands as bands
 
-    if value_band_id not in {"smash", "accept"}:
+    if not assessment or _num(assessment.get("adjustment")) >= 0:
+        return False
+    return (
+        bands.band_for_score(value_delta).id in {"smash", "accept"}
+        and bands.band_for_score(trade_score).id not in {"smash", "accept"}
+    )
+
+
+def tradeoff_tag(posture: Mapping[str, Any] | None, assessment: Mapping[str, Any] | None) -> str:
+    """Short descriptive tag for a card whose posture terms are material.
+
+    Not a verdict: the tag sits next to the score's own rung and names the
+    reason from facts ``assess`` computed. "" when nothing is material.
+    """
+
+    if not assessment or not assessment.get("available"):
         return ""
-    if assessment.get("adjustment", 0) >= 0:
-        return ""
-    group = posture.get("group")
-    if final_band_id in {"smash", "accept"}:
-        # Still an accept after the posture terms. A win-now team whose lineup
-        # takes a material hit (selling its best player for picks) is never told
-        # "you win": the clean ACCEPT / SMASH ACCEPT is reserved for trades that
-        # do not cost the window. It reads as the honest trade-off instead, so no
-        # surface (Analyzer, Hub, Finder) presents it as a clean win. A SMASH
-        # that moves a contender's present into the future is held to the same
-        # standard. Structural, not a cap on the number: the score is untouched
-        # and the label only reports that market value and window disagree.
-        if group == "contender" and assessment.get("lineup_costly"):
-            return bands.VERDICT_VALUE_COSTS_LINEUP
-        if final_band_id == "smash" and group == "contender" and assessment.get("direction") == "toward_future":
-            return bands.VERDICT_VALUE_MOVES_REBUILD
-        return ""
-    if group == "contender" and assessment.get("lineup_costly"):
-        return bands.VERDICT_VALUE_COSTS_LINEUP
-    if group == "contender" and assessment.get("direction") == "toward_future":
-        return bands.VERDICT_VALUE_MOVES_REBUILD
-    if group == "rebuild" and assessment.get("direction") == "toward_present":
-        return bands.VERDICT_VALUE_AGAINST_REBUILD
+    group = (posture or {}).get("group")
+    direction = assessment.get("direction")
+    misaligned = bool(assessment.get("direction_misaligned"))
     if assessment.get("lineup_costly"):
-        return bands.VERDICT_VALUE_COSTS_LINEUP
+        return "Costs your lineup"
+    if group == "contender" and misaligned and direction == "toward_future":
+        return "Moves you toward a rebuild"
+    if group == "rebuild" and misaligned and direction == "toward_present":
+        return "Against your rebuild"
     return ""
 
 
@@ -439,16 +463,13 @@ def alignment(posture: Mapping[str, Any] | None, assessment: Mapping[str, Any] |
 def idea_fields_from_verdict(verdict: Any, *, weeks_text: str = "") -> dict[str, Any]:
     """The posture facts of an Analyzer ``OfferVerdict`` to carry on an idea."""
 
-    from modules import trade_value_bands as bands
-
     posture = dict(getattr(verdict, "posture", None) or {})
     assessment = dict(getattr(verdict, "posture_assessment", None) or {})
-    band = str(getattr(verdict, "band", "") or "")
     return {
         "posture": posture or None,
         "posture_assessment": assessment or None,
         "posture_note": str(getattr(verdict, "posture_note", "") or ""),
-        "posture_label": band if band in bands.POSTURE_VERDICTS else "",
+        "posture_label": tradeoff_tag(posture, assessment),
         "posture_alignment": alignment(posture, assessment),
         "posture_lineup_points": assessment.get("lineup_points"),
         "posture_wins_delta": assessment.get("wins_delta"),
