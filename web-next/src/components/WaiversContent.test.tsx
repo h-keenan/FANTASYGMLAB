@@ -177,7 +177,7 @@ describe("WaiversContent", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
     const box = screen.getByTestId("suggested-drop");
-    expect(box).toHaveTextContent("Add Test Free Agent, drop Dead Weight.");
+    expect(box).toHaveTextContent("Add Test Free Agent, drop Dead Weight");
     expect(box).toHaveTextContent("never starts in your best lineup");
     expect(box).toHaveTextContent("+4 lineup pts over 9 weeks");
     expect(box).toHaveTextContent("Value +1,263");
