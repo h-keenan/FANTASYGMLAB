@@ -72,3 +72,46 @@ export function groupNewsByDate(items: NewsItem[], nowMs: number = Date.now()): 
     groups: groupConsecutiveByEventType(buckets.get(bucket) ?? []),
   }));
 }
+
+export interface NewsDaySection {
+  /** "Today", "Yesterday", or a calendar date such as "Tue, Oct 28". */
+  label: string;
+  items: NewsItem[];
+}
+
+/** Per-calendar-day label for one story. Undated stories fall to "Earlier". */
+export function newsDayLabel(publishedTs: number | null, nowMs: number = Date.now()): string {
+  if (!publishedTs) return "Earlier";
+  const now = new Date(nowMs);
+  const published = new Date(publishedTs * 1000);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  if (published >= startOfToday) return "Today";
+  if (published >= startOfYesterday) return "Yesterday";
+  return published.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(published.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+  });
+}
+
+/** Groups a newest-first list by calendar day, preserving order. Appending a
+ * later page keeps working because a day that spans pages merges. */
+export function groupNewsByDay(items: NewsItem[], nowMs: number = Date.now()): NewsDaySection[] {
+  const sections: NewsDaySection[] = [];
+  for (const item of items) {
+    const label = newsDayLabel(item.published_ts, nowMs);
+    const last = sections[sections.length - 1];
+    if (last && last.label === label) last.items.push(item);
+    else sections.push({ label, items: [item] });
+  }
+  return sections;
+}
+
+/** Concatenates a further page onto a list without repeating a story. */
+export function appendNewsPage(existing: NewsItem[], next: NewsItem[]): NewsItem[] {
+  const seen = new Set(existing.map((item) => `${item.link ?? ""}|${item.title ?? ""}`));
+  return [...existing, ...next.filter((item) => !seen.has(`${item.link ?? ""}|${item.title ?? ""}`))];
+}

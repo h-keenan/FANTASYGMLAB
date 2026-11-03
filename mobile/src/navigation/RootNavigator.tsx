@@ -83,7 +83,13 @@ export type RootStackParamList = {
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string };
-  PlayerDetail: { player: RankedPlayer; leagueId: string; leagueName: string };
+  PlayerDetail: {
+    player: RankedPlayer;
+    leagueId: string;
+    leagueName: string;
+    /** Tab to open on (the quick view's "See all news" opens 'news'). */
+    initialTab?: 'stats' | 'trends' | 'schedule' | 'career' | 'model' | 'news';
+  };
   PlayerCompare: { player: RankedPlayer; leagueId: string; leagueName: string };
   GmTargets: { leagueId: string; leagueName: string };
   TeamStance: { leagueId: string; leagueName: string };

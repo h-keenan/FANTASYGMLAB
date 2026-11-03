@@ -3548,7 +3548,103 @@ def test_player_news_returns_empty_for_unknown_player(monkeypatch):
             )
 
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "items": [], "injury_item": None}
+    assert response.json() == {
+        "ok": True,
+        "items": [],
+        "injury_item": None,
+        "total": 0,
+        "has_more": False,
+        "next_offset": None,
+    }
+
+
+def _player_news_pool(count: int) -> list[dict]:
+    pool = []
+    for n in range(count):
+        pool.append(
+            {
+                "title": f"Nico Collins (hamstring) update number {n} for the Texans",
+                "summary": f"Collins injury report {n}: limited in practice with a hamstring issue.",
+                "link": f"https://example.com/collins-{n}",
+                "source": "https://www.espn.com/espn/rss/nfl/news",
+                "published_ts": 5000.0 + n * 100000.0,
+            }
+        )
+    return pool
+
+
+def _get_player_news(client, query: str, pool: list[dict]):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
+    from modules import news as news_module
+
+    news_module.clear_enriched_news_pool_cache()
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+                with patch("modules.news.load_cached_news_pool", return_value=pool):
+                    return client.get(f"/v1/players/9001/news{query}", headers={"Authorization": "Bearer good-token"})
+
+
+def test_player_news_paginates_newest_first_with_offset(monkeypatch):
+    client = _client(monkeypatch)
+    pool = _player_news_pool(7)
+
+    first = _get_player_news(client, "?limit=3", pool).json()
+    assert [i["link"] for i in first["items"]] == [f"https://example.com/collins-{n}" for n in (6, 5, 4)]
+    assert first["total"] == 7 and first["has_more"] is True and first["next_offset"] == 3
+    assert first["status"]["state"] in {"ok", "warming_up", "stale"}
+
+    last = _get_player_news(client, "?limit=3&offset=6", pool).json()
+    assert [i["link"] for i in last["items"]] == ["https://example.com/collins-0"]
+    assert last["has_more"] is False and last["next_offset"] is None
+
+    # Backward compatible: no offset == the first page.
+    legacy = _get_player_news(client, "?limit=3", pool).json()
+    assert legacy["items"] == first["items"]
+
+
+def test_player_news_rejects_bad_offset(monkeypatch):
+    client = _client(monkeypatch)
+    assert _get_player_news(client, "?offset=-1", []).status_code == 422
+    assert _get_player_news(client, "?offset=999999", []).status_code == 422
+
+
+def test_player_news_groups_syndicated_duplicates_only_when_asked(monkeypatch):
+    client = _client(monkeypatch)
+    pool = [
+        {
+            "title": "Nico Collins (hamstring) expected to miss Sunday's game against the Titans",
+            "summary": "Collins hamstring injury will keep him out.",
+            "link": "https://espn.example/a",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 9000.0,
+        },
+        {
+            "title": "Nico Collins (hamstring) expected to miss Sunday's game against the Titans - RotoWire",
+            "summary": "Collins hamstring injury will keep him out.",
+            "link": "https://roto.example/a",
+            "source": "https://www.rotowire.com/rss/news.php?sport=NFL",
+            "published_ts": 8500.0,
+        },
+        {
+            "title": "Nico Collins placed on injured reserve with a knee injury",
+            "summary": "Collins knee injury, IR.",
+            "link": "https://espn.example/b",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 100.0,
+        },
+    ]
+    plain = _get_player_news(client, "", pool).json()
+    assert len(plain["items"]) == 3
+    assert all("also_reported_by" not in i for i in plain["items"])
+
+    grouped = _get_player_news(client, "?group_duplicates=true", pool).json()
+    assert grouped["total"] == 2
+    assert grouped["items"][0]["link"] == "https://espn.example/a"
+    assert grouped["items"][0]["also_reported_by"] == [{"source": "RotoWire", "link": "https://roto.example/a"}]
+    assert "also_reported_by" not in grouped["items"][1]
 
 
 def test_player_news_rejects_bad_limit(monkeypatch):

@@ -62,18 +62,20 @@ import { tradeShortcutsFor } from '../lib/tradeShortcuts';
 import { useRosterOwnership } from '../lib/useRosterOwnership';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import PlayerNewsSection from '../components/PlayerNewsSection';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 
-type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model';
+export type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model' | 'news';
 const TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'stats', label: 'Stats' },
   { key: 'trends', label: 'Trends' },
   { key: 'schedule', label: 'Schedule' },
   { key: 'career', label: 'Career' },
   { key: 'model', label: 'Model' },
+  { key: 'news', label: 'News' },
 ];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDetail'>;
@@ -965,7 +967,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   // background refetch after data already painted never reverts this to
   // true, same as Dashboard/Matchup/Teams/MyTeam.
   const loading = isRestoring || quickViewQuery.isPending;
-  const [activeTab, setActiveTab] = useState<DetailTab>('stats');
+  const [activeTab, setActiveTab] = useState<DetailTab>(route.params.initialTab ?? 'stats');
   const [explorer, setExplorer] = useState<{ key: string; label: string } | null>(null);
   // Tiles with a percentile open the Percentile Explorer; others stay plain.
   const openExplorerPlayer = (other: ExplorerPlayer) => {
@@ -1456,7 +1458,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       </View>,
     );
   } else {
-    const showTabs = Boolean(stats?.seasons.length || model);
+    // Always shown once loaded: the News tab needs neither stats nor a model
+    // (a rookie or free agent still has stories), and the Stats tab already
+    // renders nothing when there are no seasons.
+    const showTabs = true;
     if (showTabs) {
       tabBarIndex = content.length;
       content.push(
@@ -1518,6 +1523,16 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
     if (activeTab === 'career') {
       content.push(<CareerSection key="career-tab" playerId={player.player_id} />);
+    }
+
+    if (activeTab === 'news') {
+      content.push(
+        <PlayerNewsSection
+          key="news-tab"
+          playerId={player.player_id}
+          availability={quickViewQuery.data?.identity?.availability ?? null}
+        />,
+      );
     }
 
     if (activeTab === 'model') {

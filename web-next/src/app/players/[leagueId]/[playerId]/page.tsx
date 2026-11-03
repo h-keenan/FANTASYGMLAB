@@ -9,7 +9,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { PlayerProfileContent } from "@/components/PlayerProfileContent";
+import { PlayerProfileContent, profileTabFromParam } from "@/components/PlayerProfileContent";
 
 /**
  * Route for the full Player Profile page (the "PQV parity gap" —
@@ -80,5 +80,11 @@ export default function PlayerProfilePage() {
     );
   }
 
-  return <PlayerProfileContent player={player} leagueId={leagueId} leagueName={leagueName} lens={lens} />;
+  return <PlayerProfileContent
+      player={player}
+      leagueId={leagueId}
+      leagueName={leagueName}
+      lens={lens}
+      initialTab={profileTabFromParam(searchParams.get("tab"))}
+    />;
 }

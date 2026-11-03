@@ -193,7 +193,11 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
 
   const openPlayerNews = () => {
     onClose();
-    if (navigationRef.isReady()) navigationRef.navigate('News', { playerId: player.player_id, playerName: name });
+    if (!navigationRef.isReady()) return;
+    // With a league the full profile can open, so land on its News tab;
+    // otherwise fall back to the player-filtered News screen.
+    if (target) navigationRef.navigate('PlayerDetail', { ...target, initialTab: 'news' });
+    else navigationRef.navigate('News', { playerId: player.player_id, playerName: name });
   };
 
   const openFullProfile = () => {

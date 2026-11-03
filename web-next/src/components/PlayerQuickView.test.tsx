@@ -492,6 +492,21 @@ describe("PlayerQuickView", () => {
       expect(api.getPlayerNews).toHaveBeenCalledWith("p1", 3);
     });
 
+    it("points See all news at the full profile's News tab when a league is known", async () => {
+      const items = [1, 2].map((n) => ({ ...injuryItem, title: `Item ${n}`, link: `https://example.com/${n}` }));
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items, injury_item: null });
+
+      render(<PlayerQuickView identity={identity({ leagueId: "league-1", leagueName: "My League" })} onClose={vi.fn()} />);
+
+      await screen.findByTestId("pqv-news");
+      expect(screen.getByText("See all news").closest("a")).toHaveAttribute(
+        "href",
+        "/players/league-1/p1?name=My%20League&tab=news",
+      );
+    });
+
     it("shows a skeleton while news loads and never blocks the sheet; a news failure renders nothing", async () => {
       vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());

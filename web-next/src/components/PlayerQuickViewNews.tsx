@@ -69,7 +69,10 @@ export function LatestNewsSection({
   playerId,
   name,
   hideItem,
+  seeAllHref,
 }: {
+  /** Overrides the default /news?player link (the full profile's News tab). */
+  seeAllHref?: string;
   hideItem?: NewsItem | null;
   items: NewsItem[] | null;
   loading: boolean;
@@ -107,7 +110,7 @@ export function LatestNewsSection({
           {item.summary ? <p className="pqv-news-summary">{item.summary}</p> : null}
         </div>
       ))}
-      <Link className="pqv-action-link" href={newsPageHref(playerId, name)}>
+      <Link className="pqv-action-link" href={seeAllHref ?? newsPageHref(playerId, name)}>
         See all news
       </Link>
     </section>
