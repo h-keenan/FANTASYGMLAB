@@ -90,7 +90,7 @@ describe("LeagueRankingsContent", () => {
   it("renders the league name and every board's section heading", () => {
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
 
-    expect(screen.getByRole("heading", { name: "My League" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "League Rankings" })).toBeInTheDocument();
     expect(screen.getByText("2026 Standings")).toBeInTheDocument();
     expect(screen.getByText("Playoff Odds")).toBeInTheDocument();
     expect(screen.getByText("Roster Power Rankings")).toBeInTheDocument();
@@ -100,6 +100,12 @@ describe("LeagueRankingsContent", () => {
     expect(screen.getByText("Bench Depth")).toBeInTheDocument();
     expect(screen.getAllByText("Dynasty Overlords").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Rival Squad").length).toBeGreaterThan(0);
+  });
+
+  it("ends with next-step links instead of a dead end", () => {
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    expect(screen.getByRole("link", { name: /See trade ideas/ })).toHaveAttribute("href", "/trade-hub/L1?name=My%20League");
+    expect(screen.getByRole("link", { name: /Check your lineup/ })).toHaveAttribute("href", "/matchup/L1?name=My%20League");
   });
 
   it("shows the not-ready message instead of boards when there are no teams", () => {

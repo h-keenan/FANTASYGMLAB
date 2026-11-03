@@ -15,6 +15,7 @@ import SharedTradesFeed from '../components/SharedTradesFeed';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type PastTradeOutcome, type SharedCommunityTrade, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -54,6 +55,7 @@ const VERDICT_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']
  */
 export default function TradeHistoryScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const lastLeague = useLastLeague();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -114,6 +116,17 @@ export default function TradeHistoryScreen({ navigation }: Props) {
               icon="swap-horizontal-outline"
               title="No trade history yet"
               subtitle="Confirm a trade to see it here."
+              actionLabel={lastLeague ? 'Analyze a trade' : undefined}
+              onPressAction={
+                lastLeague
+                  ? () =>
+                      navigation.navigate('Trades', {
+                        leagueId: lastLeague.leagueId,
+                        leagueName: lastLeague.leagueName,
+                        initialTab: 'make',
+                      })
+                  : undefined
+              }
             />
           ) : null
         }

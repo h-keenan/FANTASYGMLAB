@@ -14,6 +14,7 @@ import {
   type PickScope,
 } from "@/lib/draftCenterPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports mobile's DraftCenterScreen.tsx (the GM_TOOLS "Draft Center" nav
@@ -49,10 +50,7 @@ export function DraftCenterContent({
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Draft Center
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="Draft Center" leagueName={leagueName} />
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Draft posture and pick values.
         </p>

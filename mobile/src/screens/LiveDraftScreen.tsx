@@ -229,6 +229,7 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
               'Live Draft is a Pro feature: Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening.'
             }
             feature="live_draft"
+            leagueName={leagueName}
           />
         </ScrollView>
       </View>

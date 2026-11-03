@@ -15,6 +15,7 @@ import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValueSignalsCard } from "@/components/ValueSignalsCard";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports modules/trade_hub_ui.py's render_trade_idea_card (the "You Send /
@@ -100,7 +101,7 @@ export function TradeHubContent({
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
       <header className="flex flex-col gap-1">
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="Trade Hub" leagueName={leagueName} />
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Ideas built around your roster.
         </p>

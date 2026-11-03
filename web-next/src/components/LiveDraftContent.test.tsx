@@ -156,7 +156,7 @@ describe("LiveDraftContent", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Draft with real-time recommendations" })).toBeInTheDocument();
+    expect(screen.getByText("Draft with real-time recommendations")).toBeInTheDocument();
     expect(screen.queryByText("No Sleeper drafts were found for this league yet.")).not.toBeInTheDocument();
   });
 
@@ -174,7 +174,7 @@ describe("LiveDraftContent", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Custom title" })).toBeInTheDocument();
+    expect(screen.getByText("Custom title")).toBeInTheDocument();
     expect(screen.getByText("Custom body")).toBeInTheDocument();
   });
 

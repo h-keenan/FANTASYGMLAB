@@ -171,6 +171,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <PremiumLock
             feature="draft_center"
+            leagueName={leagueName}
             title={locked.title || 'Know where you stand on draft capital'}
             description={
               locked.body ||

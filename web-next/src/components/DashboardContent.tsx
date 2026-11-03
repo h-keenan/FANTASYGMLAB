@@ -4,6 +4,7 @@ import type { MouseEvent } from "react";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
 import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GlossaryNote } from "@/components/GlossaryNote";
@@ -111,6 +112,8 @@ export function DashboardContent({
       {sample ? null : <h1 className="sr-only">{leagueName}</h1>}
 
       {userId ? <StartHereCard userId={userId} accountCreatedAt={accountCreatedAt} leagueId={leagueId} leagueName={leagueName} /> : null}
+
+      {userId && !sample ? <SinceLastVisitStrip userId={userId} leagueId={leagueId} leagueName={leagueName} /> : null}
 
       {data.platform_notice ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-notice">

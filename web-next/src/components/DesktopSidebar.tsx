@@ -6,7 +6,9 @@ import { usePathname, useParams } from "next/navigation";
 import { useSearchParams } from "@/lib/useSearchParams";
 
 import { useAuth } from "@/context/AuthContext";
+import { NavProMarker } from "@/components/NavProMarker";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
+import { useIsPro } from "@/lib/useIsPro";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 
 /**
@@ -27,7 +29,8 @@ export function DesktopSidebar() {
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || leagueId || "";
-  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations } = useNavDestinations(leagueId, leagueName);
+  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName);
+  const showProMarkers = useIsPro() === false;
 
   if (!session) return null;
   // Founder-only (app_metadata.founder_ops); session is already resolved
@@ -54,7 +57,7 @@ export function DesktopSidebar() {
       </Link>
 
       {leagueId ? (
-        <SidebarSection label={leagueName || "League"} destinations={coreLeagueDestinations} pathname={pathname} />
+        <SidebarSection label={leagueName || "League"} destinations={coreLeagueDestinations} pathname={pathname} showPro={showProMarkers} />
       ) : (
         <p className="text-xs px-1" style={{ color: "var(--color-text-muted)" }}>
           Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
@@ -62,13 +65,15 @@ export function DesktopSidebar() {
       )}
 
       {leagueId ? (
-        <SidebarSection label="GM Tools" destinations={gmToolsDestinations} pathname={pathname} />
+        <SidebarSection label="GM Tools" destinations={gmToolsDestinations} pathname={pathname} showPro={showProMarkers} />
       ) : null}
 
-      <SidebarSection label="General" destinations={generalDestinations} pathname={pathname} />
+      <SidebarSection label="General" destinations={generalDestinations} pathname={pathname} showPro={showProMarkers} />
+
+      <SidebarSection label="Account" destinations={accountDestinations} pathname={pathname} showPro={showProMarkers} />
 
       {founderCapable ? (
-        <SidebarSection label="Founder" destinations={[FOUNDER_DESTINATION]} pathname={pathname} />
+        <SidebarSection label="Founder" destinations={[FOUNDER_DESTINATION]} pathname={pathname} showPro={showProMarkers} />
       ) : null}
     </nav>
   );
@@ -78,10 +83,12 @@ function SidebarSection({
   label,
   destinations,
   pathname,
+  showPro = false,
 }: {
   label: string;
   destinations: NavDestination[];
   pathname: string | null;
+  showPro?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -95,8 +102,8 @@ function SidebarSection({
         {destinations.map((destination) => {
           // Strip the ?name=... query before comparing — pathname never
           // carries it, so an exact-string match would always miss.
-          const destinationPath = destination.path.split("?")[0];
-          const active = pathname === destinationPath;
+          const destinationPath = destination.path.split(/[?#]/)[0];
+          const active = pathname === destinationPath && !destination.anchor;
           return (
             <Link
               key={destination.path}
@@ -115,6 +122,7 @@ function SidebarSection({
               >
                 {destination.label}
               </span>
+              {showPro && destination.pro ? <NavProMarker /> : null}
             </Link>
           );
         })}

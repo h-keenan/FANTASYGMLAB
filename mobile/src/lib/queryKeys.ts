@@ -87,6 +87,8 @@ export const queryKeys = {
   // row instantly and only refetches what's stale.
   portfolioIndex: () => [...userScopeKey(), 'portfolio', 'index'] as const,
   portfolioExposure: () => [...userScopeKey(), 'portfolio', 'exposure'] as const,
+  // GET /v1/me, read by the GM orb for the PRO tags on paid destinations.
+  mePlan: () => [...userScopeKey(), 'me-plan'] as const,
   founderAnalytics: (window: string) => [...userScopeKey(), 'founder-analytics', window] as const,
   portfolioLeague: (leagueId: string) => [...userScopeKey(), 'portfolio', 'league', leagueId] as const,
 };

@@ -1,6 +1,7 @@
 import { TRADE_SIDE_LABEL } from '../lib/tradeSideLabels';
 import ExchangeSide from '../components/ExchangeSide';
 import { dropRepeatedSentences, shortSummary } from '../lib/verdictText';
+import NextSteps from '../components/NextSteps';
 import ShareToCommunityToggle from '../components/ShareToCommunityToggle';
 import type { SharedTradeAssetInput } from '../lib/sharedTrades';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -1023,6 +1024,8 @@ function VerdictCard({
         send={toShareAssets(sendIds, sendPicks)}
         receive={toShareAssets(receiveIds, receivePicks)}
       />
+
+      <NextSteps title="Want other options?" steps={['trade-finder', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
 
       <TradeSharePreviewModal
         visible={shareOpen}

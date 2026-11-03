@@ -14,6 +14,12 @@ export interface NavDestination {
   // --color-danger, analytics-flavored surfaces use --color-diagnostic,
   // ranking/prestige surfaces use --color-premium.
   color: string;
+  /** Paid destination: the nav shows a gold "Pro" marker to anyone not on
+   * Pro, so the lock is visible before the tap (UX audit 2026-11-03, 4.2). */
+  pro?: boolean;
+  /** Same page as another row, scrolled to a section (a `#hash` path): it
+   * never takes the "current page" highlight from its parent row. */
+  anchor?: boolean;
 }
 
 /**
@@ -34,6 +40,10 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
         { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents", glyph: "waivers", color: "var(--color-opportunity)" },
         { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights", glyph: "players", color: "var(--color-diagnostic)" },
         { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league", glyph: "leagueRankings", color: "var(--color-premium)" },
+        // Web had no nav row for this (it lived behind a button inside
+        // League Rankings); the app already did. Same page, scrolled to the
+        // section, so no new route.
+        { label: "Playoff Odds", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}#playoff-odds`, subtitle: "Every team's chance at the playoffs", glyph: "playoffOdds", color: "var(--color-premium)", pro: true, anchor: true },
       ]
     : [];
 
@@ -66,20 +76,20 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
           glyph: "gmPlan",
           color: "var(--color-success)",
         },
-        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter", color: "var(--color-danger)" },
-        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: "var(--color-danger)" },
+        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter", color: "var(--color-danger)", pro: true },
+        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: "var(--color-danger)", pro: true },
         { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: "var(--color-information)" },
         { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: "var(--color-opportunity)" },
-        { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: "var(--color-diagnostic)" },
+        { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: "var(--color-diagnostic)", pro: true },
       ]
     : [];
 
   const generalDestinations: NavDestination[] = [
     { label: "Home", path: "/", subtitle: "Switch leagues and manage account", glyph: "home", color: "var(--color-accent)" },
-    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio", color: "var(--color-premium)" },
+    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio", color: "var(--color-premium)", pro: true },
     { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news", color: "var(--color-information)" },
     { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory", color: "var(--color-diagnostic)" },
-    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting", color: "var(--color-success)" },
+    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting", color: "var(--color-success)", pro: true },
     {
       // Social/community layer (docs/roadmap.md), coridian_ 2026-10-19 —
       // deliberately league-independent like Portfolio/Trade History/
@@ -93,7 +103,14 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
     },
   ];
 
-  return { coreLeagueDestinations, gmToolsDestinations, generalDestinations };
+  // Account-wide chrome that used to be reachable only through the header
+  // MENU (Account) or from inside an upsell card (Pro). Not league-scoped.
+  const accountDestinations: NavDestination[] = [
+    { label: "Pro", path: "/premium", subtitle: "Plans, trial, and billing", glyph: "pro", color: "var(--color-premium)" },
+    { label: "Account", path: "/account", subtitle: "Sign-in, preferences, and settings", glyph: "account", color: "var(--color-text-secondary)" },
+  ];
+
+  return { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations };
 }
 
 /**

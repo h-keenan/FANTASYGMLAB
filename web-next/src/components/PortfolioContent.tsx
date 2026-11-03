@@ -417,7 +417,7 @@ function PortfolioHeader({ title }: { title: string }) {
   return (
     <header className="flex flex-col gap-1">
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        Portfolio
+        Your leagues
       </span>
       <h1 style={{ font: "var(--font-page-title)" }}>{title}</h1>
       <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -433,7 +433,7 @@ function PortfolioHeader({ title }: { title: string }) {
 export function PortfolioShell() {
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto" data-portfolio-shell="">
-      <PortfolioHeader title="Your leagues" />
+      <PortfolioHeader title="Portfolio" />
       <div className="flex flex-col gap-4">
         {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, index) => (
           <PortfolioLeagueSkeleton key={index} />
@@ -493,9 +493,9 @@ export function PortfolioContent({
       <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
         <header className="flex flex-col gap-1">
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Portfolio
+            Your leagues
           </span>
-          <h1 style={{ font: "var(--font-page-title)" }}>Your leagues</h1>
+          <h1 style={{ font: "var(--font-page-title)" }}>Portfolio</h1>
         </header>
         <EmptyState
           title="No saved leagues yet"
@@ -514,7 +514,7 @@ export function PortfolioContent({
 
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
-      <PortfolioHeader title="Your leagues" />
+      <PortfolioHeader title="Portfolio" />
 
       <PillRow
         options={[

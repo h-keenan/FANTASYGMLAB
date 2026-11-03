@@ -38,6 +38,7 @@ import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import GmPlanScreen from '../screens/GmPlanScreen';
 import TradeHistoryScreen from '../screens/TradeHistoryScreen';
+import CommunityScreen from '../screens/CommunityScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradesScreen from '../screens/TradesScreen';
 import TeamsScreen from '../screens/TeamsScreen';
@@ -95,6 +96,7 @@ export type RootStackParamList = {
   TeamStance: { leagueId: string; leagueName: string };
   GmPlan: { leagueId: string; leagueName: string; initialTab?: 'overview' | 'trades' | 'core' | 'watching' };
   TradeHistory: undefined;
+  Community: undefined;
   Waivers: { leagueId: string; leagueName: string; playerId?: string };
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
@@ -302,7 +304,7 @@ export default function RootNavigator() {
                   <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8} accessibilityRole="button" accessibilityLabel="News">
                     <Ionicons name="globe-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8} accessibilityRole="button" accessibilityLabel="More">
+                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account">
                     <Ionicons name="ellipsis-horizontal-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
@@ -312,7 +314,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="LeagueDetail" component={LeagueDetailRedirect} />
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
-          <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
+          <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'Account' }} />
           <AppStack.Screen name="Design" component={DesignScreen} options={{ title: 'Design' }} />
           <AppStack.Screen name="SampleLeague" component={SampleLeagueScreen} options={{ title: 'Sample league' }} />
           <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
@@ -343,6 +345,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="TeamStance" component={TeamStanceRedirect} />
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
+          <AppStack.Screen name="Community" component={CommunityScreen} options={{ title: 'Community' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
           <AppStack.Screen name="FounderAnalytics" component={FounderAnalyticsScreen} options={{ title: 'Founder Analytics' }} />
           <AppStack.Screen name="LiveDraft" component={EspnLiveDraftScreen} />

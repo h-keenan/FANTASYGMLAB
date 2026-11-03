@@ -79,6 +79,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
     body = (
       <PremiumLock
         feature="commissioner"
+        leagueName={leagueName}
         title={data.upsell?.title || 'Spot tanking and lineup problems early'}
         description={data.upsell?.body || 'League integrity is a Pro feature: lineup efficiency, tanking signals with the evidence behind them, repeated lopsided trades and inactive managers.'}
       />

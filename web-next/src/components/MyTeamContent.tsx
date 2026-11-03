@@ -22,6 +22,8 @@ import {
 } from "@/lib/myTeamPresentation";
 import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { NextSteps } from "@/components/NextSteps";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports modules/my_team_ui.py's render_my_team_workspace for Revision 2 —
@@ -74,6 +76,7 @@ const KEEPER_BASIS_LABEL: Record<string, string> = {
 };
 
 export function MyTeamContent({
+  leagueId = "",
   leagueName,
   myTeam,
   needs,
@@ -83,6 +86,8 @@ export function MyTeamContent({
   keepers = null,
   onKeeperRoundPenalty,
 }: {
+  /** Enables the "Act on a need" links; omitted: no links. */
+  leagueId?: string;
   leagueName: string;
   myTeam: MyTeamResponse;
   needs: MyTeamNeedsResponse | null;
@@ -215,10 +220,7 @@ export function MyTeamContent({
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          My Team
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="My Team" leagueName={leagueName} />
         <BeginnerHelp term="myTeamIntro" />
         <BeginnerHelp term="myTeamValueTiers" />
       </header>
@@ -305,6 +307,9 @@ export function MyTeamContent({
                 ))}
               </div>
             </InfoTip>
+          ) : null}
+          {needs && needs.weaknesses.length > 0 ? (
+            <NextSteps title="Act on a need" steps={["waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />
           ) : null}
         </section>
       ) : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/EmptyState";
+import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 import { useState } from "react";
 
 import type { CommunityTradeItem } from "@/lib/api";
@@ -153,9 +154,9 @@ export function CommunityTradesContent({
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-2">
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Community
+          Craziest trades this week
         </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>Craziest trades this week</h1>
+        <h1 style={{ font: "var(--font-page-title)" }}>Community</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Real confirmed trades from other users&apos; leagues — always shown as &quot;Team A&quot; and &quot;Team
           B&quot;, never a real team or user name. Flagged here because our own trade-grading system found an
@@ -180,7 +181,11 @@ export function CommunityTradesContent({
       </header>
 
       {trades.length === 0 ? (
-        <EmptyState title="No standout trades yet." subtitle="Check back once more confirmed trades across the app have had a few weeks to play out." />
+        <EmptyState title="No standout trades yet." subtitle="Check back once more confirmed trades across the app have had a few weeks to play out.">
+          <div className="mt-2">
+            <LeagueLinkStep step="trade-analyzer" label="Analyze a trade of your own" pickLabel="Pick a league to analyze a trade" />
+          </div>
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
           {trades.map((item) => (

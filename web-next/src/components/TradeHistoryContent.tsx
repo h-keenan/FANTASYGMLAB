@@ -13,6 +13,7 @@ import {
 } from "@/lib/tradeHistoryPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
+import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 
 /**
  * Ports modules/trade_outcomes_page.py's render_trade_history_page — the
@@ -77,13 +78,10 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Trade History
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>Did it work out?</h1>
+        <h1 style={{ font: "var(--font-page-title)" }}>Trade History</h1>
         <div className="flex flex-col gap-1">
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            Trades you&apos;ve confirmed you made.
+            Did it work out? The trades you&apos;ve confirmed you made.
           </p>
           <InfoTip label="How outcomes are read">
             Once a confirmed trade has had a few weeks to play out, we&apos;ll show a real before/after read here,
@@ -94,7 +92,11 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
       </header>
 
       {data.outcomes.length === 0 ? (
-        <EmptyState title="No trade history yet. Confirm a trade to see it here." />
+        <EmptyState title="No trade history yet. Confirm a trade to see it here.">
+          <div className="mt-2">
+            <LeagueLinkStep step="trade-analyzer" label="Analyze a trade" pickLabel="Pick a league to analyze a trade" variant="primary" />
+          </div>
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
           {data.outcomes.map((outcome) => (

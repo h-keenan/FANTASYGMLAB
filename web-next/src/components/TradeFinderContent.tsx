@@ -28,6 +28,7 @@ import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { TRADE_DEADLINE_PASSED_MESSAGE, tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { Button } from "@/components/Button";
+import { PageTitle } from "@/components/PageTitle";
 
 /** Mirrors modules.trade_ideas.TRADE_FINDER_MAX_SELECTED_PICKS — the server
  * ignores any selected pick past this many, so the picker stops there too. */
@@ -360,6 +361,7 @@ export function TradeFinderContent({
     return (
       <PremiumUpsellCard
         kicker="Trade Finder"
+        leagueName={leagueName}
         upsell={premiumUpsell.upsell}
         fallbackTitle="Build and search for a trade"
         fallbackBody="Trade Finder is a Pro feature — build a custom package and search every roster in your league for a real match. Upgrade to Pro to unlock it."
@@ -371,10 +373,7 @@ export function TradeFinderContent({
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_finder" />
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Trade Finder
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="Trade Finder" leagueName={leagueName} />
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Pick what you&apos;d move; find realistic packages.
         </p>

@@ -261,6 +261,12 @@ export function LandingAuthIsland() {
             You&apos;re in. Pro is unlocked. Connect your league to get started.
           </p>
         ) : null}
+        {/* Signed in with no league: the one job is connecting one, so the
+            page leads with exactly that (UX audit 2026-11-03, 4.1). */}
+        <header className="flex flex-col gap-1" data-testid="connect-first-heading">
+          <h1 className="lp-h2">Connect your league</h1>
+          <p className="lp-body">Pick where your league lives. We read your real roster and build your first Game Plan.</p>
+        </header>
         <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
         <SampleLeagueButton surface="connect_step" />
       </>

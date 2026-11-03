@@ -311,6 +311,7 @@ export function CommissionerContent({ leagueId, leagueName }: { leagueId: string
       ) : data.is_premium === false ? (
         <PremiumUpsellCard
           kicker="League integrity"
+          leagueName={leagueName}
           upsell={data.upsell ?? null}
           fallbackTitle="Spot tanking and lineup problems early"
           fallbackBody="League integrity is a Pro feature: lineup efficiency, tanking signals with the evidence behind them, repeated lopsided trades and inactive managers."

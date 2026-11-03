@@ -23,8 +23,10 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ToneBadge } from "@/components/ToneBadge";
+import { NextSteps } from "@/components/NextSteps";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
+import { PageTitle } from "@/components/PageTitle";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -226,7 +228,15 @@ function PlayoffOddsRow({ team, rankLabel, myRosterId }: { team: PlayoffOddsTeam
   );
 }
 
-function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRosterId: string }) {
+/** The one real fact the Playoff Odds wall can show a Free user: where they
+ * stand right now, straight from this page's own standings. */
+function playoffOddsExample(team: TeamRanking | undefined, leagueName: string): string | undefined {
+  if (!team || team.standing_rank == null || !team.record_label) return undefined;
+  const status = team.playoff_status ? ` (${team.playoff_status})` : "";
+  return `Right now you're ${formatRank(team.standing_rank)} in ${leagueName} at ${team.record_label}${status}. Playoff Odds turns that into a real playoff chance.`;
+}
+
+function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leagueId: string; leagueName: string; myRosterId: string; myTeam?: TeamRanking }) {
   const [state, setState] = useState<"idle" | "loading" | "error" | "ready">("idle");
   const [result, setResult] = useState<PlayoffOddsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +257,7 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
   };
 
   return (
-    <section className="flex flex-col gap-3">
+    <section id="playoff-odds" className="flex flex-col gap-3 scroll-mt-4">
       <SectionHeading
         kicker="What might happen next"
         note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes."
@@ -280,6 +290,8 @@ function PlayoffOddsSection({ leagueId, myRosterId }: { leagueId: string; myRost
         <PremiumUpsellCard
           bare
           kicker="Playoff Odds"
+          leagueName={leagueName}
+          example={playoffOddsExample(myTeam, leagueName)}
           upsell={result.upsell ?? null}
           fallbackTitle="Your real shot at the playoffs"
           fallbackBody="Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
@@ -365,10 +377,7 @@ export function LeagueRankingsContent({
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          League Rankings
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
+        <PageTitle page="League Rankings" leagueName={leagueName} />
       </header>
 
       {notReady ? (
@@ -378,7 +387,7 @@ export function LeagueRankingsContent({
       ) : (
         <>
           <StandingsSection data={data} myRosterId={myRosterId} onOpenManager={openManager} />
-          <PlayoffOddsSection leagueId={leagueId} myRosterId={myRosterId} />
+          <PlayoffOddsSection leagueId={leagueId} leagueName={leagueName} myRosterId={myRosterId} myTeam={data.teams.find((team) => team.roster_id === myRosterId)} />
           <RankBoardSection board="power" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
           <RankBoardSection board="franchise" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
           <RankBoardSection board="draft_capital" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
@@ -397,6 +406,7 @@ export function LeagueRankingsContent({
           onClose={() => setProfile(null)}
         />
       ) : null}
+      {notReady ? null : <NextSteps title="Make a move" steps={["trade-hub", "matchup"]} leagueId={leagueId} leagueName={leagueName} />}
       <ValuesCredit />
     </main>
   );
