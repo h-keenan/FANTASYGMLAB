@@ -117,7 +117,7 @@ export default function LeaguesGlanceSection({
   if (state === 'locked') {
     const upsell = upsellFallback ?? {
       title: 'All your leagues at a glance',
-      body: "Premium keeps every league you're in and shows each one's record, top add, trade idea, news, and biggest need side by side.",
+      body: "Pro keeps every league you're in and shows each one's record, top add, trade idea, news, and biggest need side by side.",
     };
     return (
       <View style={styles.section}>

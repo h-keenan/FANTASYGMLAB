@@ -149,7 +149,7 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
   );
 }
 
-const FREE_LOCK_NOTE = "more with Premium";
+const FREE_LOCK_NOTE = "more with Pro";
 
 export function DroppablePlayersSection({ data }: { data: DroppablePlayers | null | undefined }) {
   if (!data) return null;

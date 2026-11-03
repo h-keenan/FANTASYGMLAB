@@ -34,7 +34,7 @@ export default function PremiumPage() {
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Premium.");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Pro.");
       });
 
     return () => {
@@ -43,7 +43,7 @@ export default function PremiumPage() {
   }, [authLoading, session]);
 
   if (authLoading) {
-    return <LoadingScreen status="Loading Premium…" />;
+    return <LoadingScreen status="Loading Pro…" />;
   }
 
   // P0 UX audit, 2026-10-27: this used to `router.replace("/")` a signed-out
@@ -56,12 +56,12 @@ export default function PremiumPage() {
   }
 
   if (!me && !plans && !error) {
-    return <LoadingScreen status="Loading Premium…" />;
+    return <LoadingScreen status="Loading Pro…" />;
   }
 
   if (error || !me || !plans) {
     return (
-      <ErrorState message={error || "Could not load Premium."} onRetry={reloadPage} />
+      <ErrorState message={error || "Could not load Pro."} onRetry={reloadPage} />
     );
   }
 

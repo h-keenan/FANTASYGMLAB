@@ -246,7 +246,7 @@ describe("WaiversContent", () => {
     expect(box).toHaveTextContent("Cheapest cut: Dead Weight");
   });
 
-  it("lists 'Players you could drop' and the Premium count for Free", () => {
+  it("lists 'Players you could drop' and the Pro count for Free", () => {
     const data: WaiversResponse = {
       ...BASE_RESPONSE,
       droppable_players: { players: [DROP_SUGGESTION.drop!], total: 3, protected_count: 12, candidates_checked: 8, locked_count: 2 },
@@ -255,17 +255,17 @@ describe("WaiversContent", () => {
 
     const section = screen.getByTestId("droppable-players");
     expect(section).toHaveTextContent("Dead Weight");
-    expect(section).toHaveTextContent("+2 more with Premium");
+    expect(section).toHaveTextContent("+2 more with Pro");
   });
 
-  it("shows the Premium upsell instead of the secondary board when not premium", () => {
+  it("shows the Pro upsell instead of the secondary board when not premium", () => {
     const free: WaiversResponse = { ...BASE_RESPONSE, entitlement: { is_premium: false } };
     render(<WaiversContent leagueName="Dynasty Overlords" data={free} />);
 
     expect(screen.getByText("Full waiver board and FAAB shortlist")).toBeInTheDocument();
   });
 
-  it("shows the secondary board for Premium users when candidates exist", () => {
+  it("shows the secondary board for Pro users when candidates exist", () => {
     const premium: WaiversResponse = {
       ...BASE_RESPONSE,
       stash_candidates: [player({ player_id: "stash1", name: "Stash Target" })],

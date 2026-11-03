@@ -446,7 +446,7 @@ describe("TradeFinderContent", () => {
       ideas: [],
       reason: "",
       is_premium: false,
-      upsell: { title: "Build and search for a trade", body: "Upgrade to Premium to unlock it." },
+      upsell: { title: "Build and search for a trade", body: "Upgrade to Pro to unlock it." },
     };
     vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
 
@@ -476,13 +476,13 @@ describe("TradeFinderContent", () => {
       expect(screen.getByText("Rival GM")).toBeInTheDocument();
     });
 
-    it("shows the Premium upsell for a Free caller, same as a manual search", async () => {
+    it("shows the Pro upsell for a Free caller, same as a manual search", async () => {
       vi.mocked(api.getTradeFinderIdeas).mockResolvedValue({
         ok: true,
         ideas: [],
         reason: "",
         is_premium: false,
-        upsell: { title: "Build and search for a trade", body: "Upgrade to Premium to unlock it." },
+        upsell: { title: "Build and search for a trade", body: "Upgrade to Pro to unlock it." },
       });
 
       render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} initialPlayerId="p1" />);

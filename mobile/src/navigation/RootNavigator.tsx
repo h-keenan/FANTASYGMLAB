@@ -350,7 +350,7 @@ export default function RootNavigator() {
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}
-            options={{ presentation: 'modal', title: 'Premium', animation: 'default', contentStyle: { backgroundColor: colors.background } }}
+            options={{ presentation: 'modal', title: 'Pro', animation: 'default', contentStyle: { backgroundColor: colors.background } }}
           />
           <AppStack.Screen
             name="TrialLapsed"

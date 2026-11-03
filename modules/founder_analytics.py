@@ -41,8 +41,8 @@ DECISION_EVENTS: dict[str, str] = {
 }
 
 PREMIUM_EVENTS: dict[str, str] = {
-    "premium_viewed": "Premium page opens",
-    "premium_cta_clicked": "Premium CTA clicks",
+    "premium_viewed": "Pro page opens",
+    "premium_cta_clicked": "Pro CTA clicks",
     "checkout_started": "Checkout starts",
     "checkout_completed": "Checkout completed (recorded)",
     "premium_entitlement_activated": "Entitlement activated (recorded)",

@@ -351,7 +351,7 @@ describe("PortfolioContent", () => {
     expect(screen.getByText("Broken League")).toBeInTheDocument();
   });
 
-  it("shows the exact Premium upsell copy for a free account", () => {
+  it("shows the exact Pro upsell copy for a free account", () => {
     render(
       <PortfolioContent
         data={{
@@ -363,8 +363,8 @@ describe("PortfolioContent", () => {
           upsell: {
             title: "See every league at a glance",
             body:
-              "Portfolio is a Premium feature — free accounts keep one saved league, so there's nothing to aggregate yet. " +
-              "Upgrade to Premium to save every league you're in and see your record, rank, and top need or " +
+              "Portfolio is a Pro feature — free accounts keep one saved league, so there's nothing to aggregate yet. " +
+              "Upgrade to Pro to save every league you're in and see your record, rank, and top need or " +
               "opportunity across all of them in one place.",
           },
         }}

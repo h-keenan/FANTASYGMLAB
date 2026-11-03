@@ -317,7 +317,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
 
       {/* Headline/subtitle match web-next: OnboardingPaywall ("Start your
           7-day free trial" / "Full access to the GM toolkit...") when a real
-          store trial exists, otherwise the Premium page's "Unlock the full
+          store trial exists, otherwise the Pro page's "Unlock the full
           GM toolkit". */}
       <AppText style={styles.title}>
         {trial ? `Try Pro free for ${trial.lengthLabel.replace('-day', ' days')}` : 'Unlock the full GM toolkit'}
@@ -328,9 +328,9 @@ export default function PaywallScreen({ navigation, route }: Props) {
           : 'Your price is locked in for as long as you stay subscribed.'}
       </AppText>
 
-      <SectionHeading title="Free vs Premium" icon="checkmark-done" />
+      <SectionHeading title="Free vs Pro" icon="checkmark-done" />
       <AppText style={styles.featuresIntro}>
-        Free keeps working. Premium removes the caps.
+        Free keeps working. Pro removes the caps.
       </AppText>
       <View style={styles.featuresCard} accessibilityLabel="Free compared with Pro">
         <View style={[styles.compareRow, styles.compareHeaderRow]}>

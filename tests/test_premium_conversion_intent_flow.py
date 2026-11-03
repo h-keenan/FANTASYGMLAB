@@ -49,11 +49,11 @@ def test_premium_lock_uses_upgrade_cta_and_included_line():
     html = premium.premium_lock_html(
         "Full trade board",
         "More ideas.",
-        feature="Premium Trade Hub",
+        feature="Pro Trade Hub",
     )
-    assert "Upgrade to Premium" in html
-    assert "Included with Premium" in html
-    assert "Unlock with Premium" not in html
+    assert "Upgrade to Pro" in html
+    assert "Included with Pro" in html
+    assert "Unlock with Pro" not in html
 
 
 def test_analytics_allowlist_covers_premium_funnel():

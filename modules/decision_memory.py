@@ -541,8 +541,8 @@ def empty_state_copy(*, has_baseline: bool, premium_access: bool) -> tuple[str, 
 
     if not premium_access:
         return (
-            "Decision Memory · Premium",
-            "Premium keeps a durable history of how your GM priorities evolve after you leave and come back.",
+            "Decision Memory · Pro",
+            "Pro keeps a durable history of how your GM priorities evolve after you leave and come back.",
         )
     if not has_baseline:
         return (

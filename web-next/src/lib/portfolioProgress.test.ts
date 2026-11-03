@@ -89,7 +89,7 @@ describe("composePortfolio", () => {
   });
 
   it("passes a Free caller's upsell straight through with nothing pending", () => {
-    const upsell = { title: "Portfolio is Premium", body: "Upgrade." };
+    const upsell = { title: "Portfolio is Pro", body: "Upgrade." };
     const composed = composePortfolio(
       { ...INDEX, is_premium: false, saved_leagues: [], upsell },
       {},

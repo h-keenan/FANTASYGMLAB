@@ -54,7 +54,7 @@ describe("AccountContent", () => {
 
     expect(screen.getByText("zach@example.com")).toBeInTheDocument();
     expect(screen.getByText("zachgm")).toBeInTheDocument();
-    expect(screen.getByText("Premium")).toBeInTheDocument();
+    expect(screen.getByText("Pro")).toBeInTheDocument();
   });
 
   it("shows 'Not linked' when no Sleeper username is on the profile", () => {
@@ -64,7 +64,7 @@ describe("AccountContent", () => {
 
   it("shows an Upgrade link (not Manage Billing) for a free account", () => {
     renderContent({ user: user({ entitlement: "free" }) });
-    expect(screen.getByRole("link", { name: "Upgrade to Premium" })).toHaveAttribute("href", "/premium");
+    expect(screen.getByRole("link", { name: "Upgrade to Pro" })).toHaveAttribute("href", "/premium");
     expect(screen.queryByText("Manage Billing")).not.toBeInTheDocument();
   });
 
@@ -84,7 +84,7 @@ describe("AccountContent", () => {
     const onOpenBillingPortal = vi.fn().mockResolvedValue(undefined);
     renderContent({ user: user({ entitlement: "premium" }), onOpenBillingPortal });
 
-    expect(screen.queryByRole("link", { name: "Upgrade to Premium" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Upgrade to Pro" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Manage Billing" }));
     expect(onOpenBillingPortal).toHaveBeenCalledTimes(1);
   });

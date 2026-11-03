@@ -33,12 +33,12 @@ test('glanceSectionState: Free accounts with a saved league see the locked tease
   assert.equal(glanceSectionState({ entitlement: 'free', profileStatus: 'ok', savedLeagueCount: 1 }), 'locked');
 });
 
-test('glanceSectionState: Premium with 2+ leagues is active', () => {
+test('glanceSectionState: Pro with 2+ leagues is active', () => {
   assert.equal(glanceSectionState({ entitlement: 'premium', profileStatus: 'ok', savedLeagueCount: 2 }), 'active');
   assert.equal(glanceSectionState({ entitlement: 'premium', profileStatus: 'ok', savedLeagueCount: 5 }), 'active');
 });
 
-test('glanceSectionState: Premium with a single league has nothing to compare', () => {
+test('glanceSectionState: Pro with a single league has nothing to compare', () => {
   assert.equal(glanceSectionState({ entitlement: 'premium', profileStatus: 'ok', savedLeagueCount: 1 }), 'hidden');
 });
 

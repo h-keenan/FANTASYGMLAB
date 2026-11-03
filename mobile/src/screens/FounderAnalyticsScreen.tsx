@@ -146,7 +146,7 @@ export default function FounderAnalyticsScreen() {
         <SectionHeading title="Decision engagement" />
         {rows(namedCountRows(report.decision_engagement), 'No events recorded in this window.')}
 
-        <SectionHeading title="Premium funnel" />
+        <SectionHeading title="Pro funnel" />
         {rows(namedCountRows(report.premium), 'No events recorded in this window.')}
         {Object.keys(report.checkout_intervals).length > 0 ? (
           <AppText style={styles.muted}>

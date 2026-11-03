@@ -606,7 +606,7 @@ export function WaiversContent({
             >
               <p className="text-sm font-bold">Full waiver board and FAAB shortlist</p>
               <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                Priority Adds stay free. Premium adds stashes, depth and FAAB.
+                Priority Adds stay free. Pro adds stashes, depth and FAAB.
               </p>
               <ButtonLink href="/premium" variant="premium" size="sm">
                 Upgrade →

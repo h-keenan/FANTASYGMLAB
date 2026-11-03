@@ -151,7 +151,7 @@ def cap_message(cap: int) -> str:
     if int(cap) <= MAX_LEAGUES_FREE:
         return (
             "Free accounts keep one saved league. "
-            "Upgrade to Premium to manage all of your leagues here."
+            "Upgrade to Pro to manage all of your leagues here."
         )
     return (
         f"You've reached the saved-league limit ({int(cap)}). "

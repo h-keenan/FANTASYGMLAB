@@ -72,7 +72,7 @@ describe("DashboardContent", () => {
     expect(screen.getByText("#2")).toBeInTheDocument(); // power rank
     expect(screen.getByText("T-1")).toBeInTheDocument(); // franchise rank, tied
 
-    expect(screen.getByText(/2 more moves available on Premium/)).toBeInTheDocument();
+    expect(screen.getByText(/2 more moves available on Pro/)).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-18: "you can just put them all under watch... to

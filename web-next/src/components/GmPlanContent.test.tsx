@@ -284,7 +284,7 @@ describe("GmPlanContent", () => {
       reason: "",
       focus_areas: [],
       is_premium: false,
-      upsell: { title: "Your season-arc roadmap", body: "Upgrade to Premium to unlock it." },
+      upsell: { title: "Your season-arc roadmap", body: "Upgrade to Pro to unlock it." },
     };
     render(<GmPlanContent leagueName="Dynasty Overlords" data={locked} />);
 

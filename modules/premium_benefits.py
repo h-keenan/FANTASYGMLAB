@@ -95,7 +95,7 @@ def mobile_premium_benefit_lines() -> list[str]:
     for entry in MOBILE_PREMIUM_BENEFIT_LINES:
         title = entry["title"]
         if title not in known_titles:
-            raise ValueError(f"Mobile Premium benefit line references unknown title: {title!r}")
+            raise ValueError(f"Mobile Pro benefit line references unknown title: {title!r}")
         lines.append(entry["line"])
     return lines
 

@@ -33,7 +33,7 @@ describe("freeLimitNote", () => {
     expect(note).toMatchObject({ cta: "create_account", ctaLabel: "Create an account" });
   });
 
-  it("stays silent for Premium, unknown plans and missing or invalid limits", () => {
+  it("stays silent for Pro, unknown plans and missing or invalid limits", () => {
     expect(freeLimitNote({ kind: "cap", noun: "x", limit: 3, used: 1, isPremium: true })).toBeNull();
     expect(freeLimitNote({ kind: "cap", noun: "x", limit: 3, used: 1, isPremium: null })).toBeNull();
     expect(freeLimitNote({ kind: "cap", noun: "x", limit: 3, used: 1, isPremium: undefined })).toBeNull();

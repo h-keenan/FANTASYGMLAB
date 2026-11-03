@@ -465,7 +465,7 @@ def add_target(
             f"GM Targets is full for this league ({cap}). "
             "Remove a target before adding another."
             + (
-                " Upgrade to Premium for a larger board."
+                " Upgrade to Pro for a larger board."
                 if cap <= MAX_TARGETS_FREE
                 else ""
             )
@@ -974,7 +974,7 @@ def sort_enriched_targets(
 def discovery_copy() -> tuple[str, str]:
     return (
         FEATURE_LABEL,
-        "Sign in to save a short Free board, or upgrade to Premium for a full Targets list.",
+        "Sign in to save a short Free board, or upgrade to Pro for a full Targets list.",
     )
 
 

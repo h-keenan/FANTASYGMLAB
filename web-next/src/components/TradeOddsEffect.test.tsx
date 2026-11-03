@@ -56,7 +56,7 @@ describe("TradeOddsEffect", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("points Free accounts at Premium instead of showing odds", async () => {
+  it("points Free accounts at Pro instead of showing odds", async () => {
     vi.spyOn(api, "postTradeOddsEffect").mockResolvedValue({
       ok: true,
       reason: "premium_required",

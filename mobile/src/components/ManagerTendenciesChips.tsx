@@ -54,7 +54,7 @@ export default function ManagerTendenciesChips({
         }}
         hitSlop={6}
       >
-        <AppText style={styles.upsell}>How this manager trades · Premium</AppText>
+        <AppText style={styles.upsell}>How this manager trades · Pro</AppText>
       </TouchableOpacity>
     );
   }

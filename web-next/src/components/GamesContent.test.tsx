@@ -96,14 +96,14 @@ describe("GamesContent season sim", () => {
 
   it("shows the upgrade card instead of the what-if builder for Free", async () => {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(
-      sim({ is_premium: false, upsell: { title: "See how a move changes your season", body: "Premium feature." } }),
+      sim({ is_premium: false, upsell: { title: "See how a move changes your season", body: "Pro feature." } }),
     );
     render(<GamesContent leagueId="9" leagueName="Test League" />);
     expect(await screen.findByText("See how a move changes your season")).toBeInTheDocument();
     expect(screen.queryByText("Run what-if")).not.toBeInTheDocument();
   });
 
-  it("runs a what-if for Premium and reports the change", async () => {
+  it("runs a what-if for Pro and reports the change", async () => {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
     vi.mocked(api.postGamesWhatIf).mockResolvedValue({
       ok: true,

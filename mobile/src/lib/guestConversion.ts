@@ -69,7 +69,7 @@ export function validateGuestConversionInput(email: string, password: string): s
  */
 export const GUEST_PURCHASE_CTA = 'Create an account to start your free trial';
 export const GUEST_PURCHASE_HINT =
-  'Free trials and subscriptions need an account so your Premium follows you across devices.';
+  'Free trials and subscriptions need an account so your Pro follows you across devices.';
 
 export function guestMustCreateAccountToBuy(session: GuestSessionLike | null | undefined): boolean {
   return canConvertGuestToAccount(session);

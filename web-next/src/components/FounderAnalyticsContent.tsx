@@ -285,7 +285,7 @@ export function FounderAnalyticsContent({
       </section>
 
       <section className="flex flex-col gap-2">
-        {sectionLabel("Premium funnel")}
+        {sectionLabel("Pro funnel")}
         <NamedCountList items={data.premium} />
         {checkoutEntries.length > 0 ? (
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

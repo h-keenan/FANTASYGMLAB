@@ -256,16 +256,9 @@ export function LandingAuthIsland() {
       <>
         {returnedFromCheckout ? (
           <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
-            {/* P0 UX audit, 2026-10-27: was "Pro is unlocked" -- the site's
-                one consistent term for the paid tier everywhere else (nav
-                label, Account page, every upsell line: "Upgrade to
-                Premium") is "Premium", and this line also used to say "Pro"
-                for a Front Office subscriber too, which isn't even the
-                plan they bought. "Pro"/"Front Office" stay correct as the
-                two specific plan names inside the Premium page itself
-                (PremiumContent's TIER_LABELS) -- this is the one umbrella
-                completion message, tier-agnostic by design. */}
-            You&apos;re in. Premium is unlocked. Connect your league to get started.
+            {/* One umbrella completion message for the paid tier (the site says "Pro"
+                everywhere, 2026-11-03); tier-agnostic by design. */}
+            You&apos;re in. Pro is unlocked. Connect your league to get started.
           </p>
         ) : null}
         <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />

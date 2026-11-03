@@ -59,7 +59,7 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
         <div className="flex items-center justify-between gap-3">
           <dt style={{ color: "var(--color-text-secondary)" }}>Plan</dt>
           <dd className="font-semibold" style={{ color: user.entitlement === "premium" ? "var(--color-premium)" : "var(--color-text-primary)" }}>
-            {user.entitlement === "premium" ? "Premium" : "Free"}
+            {user.entitlement === "premium" ? "Pro" : "Free"}
           </dd>
         </div>
       </dl>
@@ -124,7 +124,7 @@ function BillingSection({
             href="/premium"
             variant="premium"
           >
-            Upgrade to Premium
+            Upgrade to Pro
           </ButtonLink>
         </>
       )}

@@ -264,7 +264,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
   const toneColor = tone === 'positive' ? colors.success : tone === 'negative' ? colors.danger : colors.textTertiary;
   return (
     <View style={styles.section}>
-      <SectionHeading title="What if" caption={`Premium. Up to ${MAX_PLAYERS} players on each side.`} />
+      <SectionHeading title="What if" caption={`Pro. Up to ${MAX_PLAYERS} players on each side.`} />
       <View style={styles.card2}>
         <AppText style={styles.label}>DROP</AppText>
         {data.roster.map((player) => (

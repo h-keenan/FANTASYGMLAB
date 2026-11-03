@@ -434,8 +434,8 @@ def premium_enabled(*args, **kwargs) -> bool:
     return is_premium_user(*args, **kwargs)
 
 
-def premium_badge_html(label: str = "Premium") -> str:
-    return f"<span class='premium-badge'>{escape(_safe_text(label, 'Premium'))}</span>"
+def premium_badge_html(label: str = "Pro") -> str:
+    return f"<span class='premium-badge'>{escape(_safe_text(label, 'Pro'))}</span>"
 
 
 def premium_lock_html(
@@ -443,12 +443,12 @@ def premium_lock_html(
     body: str = "",
     *,
     feature: str = "",
-    cta: str = "Upgrade to Premium",
+    cta: str = "Upgrade to Pro",
 ) -> str:
-    title_text = _safe_text(title, "Premium feature")
+    title_text = _safe_text(title, "Pro feature")
     body_text = _safe_text(body, "Upgrade later to unlock this deeper analysis.")
-    feature_text = _safe_text(feature, "Premium")
-    cta_text = _safe_text(cta, "Upgrade to Premium")
+    feature_text = _safe_text(feature, "Pro")
+    cta_text = _safe_text(cta, "Upgrade to Pro")
     return (
         "<div class='premium-lock dg-preset-secondary'>"
         "<div class='premium-lock-top'>"
@@ -457,7 +457,7 @@ def premium_lock_html(
         "</div>"
         f"<div class='premium-lock-title'>{escape(title_text)}</div>"
         f"<div class='premium-lock-body'>{escape(body_text)}</div>"
-        "<div class='premium-lock-included'>Included with Premium</div>"
+        "<div class='premium-lock-included'>Included with Pro</div>"
         "</div>"
     )
 

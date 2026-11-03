@@ -483,7 +483,7 @@ export function PortfolioContent({
         kicker="Portfolio"
         upsell={data.upsell}
         fallbackTitle="See every league at a glance"
-        fallbackBody="Portfolio is a Premium feature — free accounts keep one saved league, so there's nothing to aggregate yet. Upgrade to Premium to save every league you're in and see your record, rank, and top need or opportunity across all of them in one place."
+        fallbackBody="Portfolio is a Pro feature — free accounts keep one saved league, so there's nothing to aggregate yet. Upgrade to Pro to save every league you're in and see your record, rank, and top need or opportunity across all of them in one place."
       />
     );
   }

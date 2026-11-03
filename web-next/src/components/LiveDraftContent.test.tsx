@@ -142,7 +142,7 @@ const STATE: LiveDraftStateResponse = {
 };
 
 describe("LiveDraftContent", () => {
-  it("shows the Premium upsell instead of the empty-drafts message for a Free caller", () => {
+  it("shows the Pro upsell instead of the empty-drafts message for a Free caller", () => {
     render(
       <LiveDraftContent
         leagueId="league-1"
@@ -160,7 +160,7 @@ describe("LiveDraftContent", () => {
     expect(screen.queryByText("No Sleeper drafts were found for this league yet.")).not.toBeInTheDocument();
   });
 
-  it("shows the Premium upsell even when a live draft actually exists for a Free caller", () => {
+  it("shows the Pro upsell even when a live draft actually exists for a Free caller", () => {
     render(
       <LiveDraftContent
         leagueId="league-1"

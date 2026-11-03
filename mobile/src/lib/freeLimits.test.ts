@@ -25,7 +25,7 @@ test('window note uses what is shown, and guests create an account first', () =>
   assert.equal(note?.ctaLabel, 'Create an account');
 });
 
-test('silent for Premium, unknown plan, or no server limit', () => {
+test('silent for Pro, unknown plan, or no server limit', () => {
   assert.equal(freeLimitNote({ kind: 'cap', noun: 'x', limit: 3, used: 1, isPremium: true }), null);
   assert.equal(freeLimitNote({ kind: 'cap', noun: 'x', limit: 3, used: 1, isPremium: null }), null);
   assert.equal(freeLimitNote({ kind: 'cap', noun: 'x', limit: undefined, used: 1, isPremium: false }), null);

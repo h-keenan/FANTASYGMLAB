@@ -548,7 +548,7 @@ export function GmPlanContent({
         kicker="GM Plan"
         upsell={data.upsell}
         fallbackTitle="Your season-arc roadmap"
-        fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
+        fallbackBody="GM Plan is a Pro feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Pro to unlock it."
         bare
       />
       <section className="glass-surface flex flex-col gap-1 p-4 premium-glow-card" data-testid="gm-plan-pro-preview">

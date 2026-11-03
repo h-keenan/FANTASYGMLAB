@@ -236,12 +236,12 @@ export default function PortfolioScreen() {
         <GridBackground />
         <EmptyState
           icon="star-outline"
-          title={index.upsell?.title ?? 'Portfolio is a Premium feature'}
+          title={index.upsell?.title ?? 'Portfolio is a Pro feature'}
           subtitle={
             index.upsell?.body ??
-            'Upgrade to Premium to see your standing across every saved league in one place.'
+            'Upgrade to Pro to see your standing across every saved league in one place.'
           }
-          actionLabel="Upgrade to Premium"
+          actionLabel="Upgrade to Pro"
           actionVariant="premium"
           onPressAction={() => navigation.navigate('Paywall')}
         />
