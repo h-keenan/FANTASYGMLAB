@@ -1,3 +1,4 @@
+import type { OfferPrefill } from "@/lib/tradeOffer";
 import { bridgeNotice, resolveBridgeTrade, type BridgeTrade } from "@/lib/tradeBridge";
 import { VerdictTrust } from "@/components/VerdictTrust";
 import type { VerdictAssumptions } from "@/lib/verdictTrust";
@@ -621,6 +622,7 @@ export function TradeAnalyzerContent({
   quickAddPlayerId,
   bridgeTrade,
   lens = "Dynasty",
+  offerPrefill,
 }: {
   leagueId: string;
   leagueName: string;
@@ -638,6 +640,9 @@ export function TradeAnalyzerContent({
   bridgeTrade?: BridgeTrade | null;
   /** Valuation lens recorded with a shared trade. */
   lens?: string;
+  /** A built offer ("Build an offer", ?send=&receive=&sendPicks=&receivePicks=)
+   * to load into the builder so it can be tweaked, regraded and shared. */
+  offerPrefill?: OfferPrefill | null;
 }) {
   const reasonMessage = myRoster.reason ? tradeAnalyzerReasonMessage(myRoster.reason) : null;
   const myRosterId = String((myRoster.roster?.roster_id as string | number | undefined) ?? "");
@@ -799,6 +804,27 @@ export function TradeAnalyzerContent({
     // Next thing to pick is whichever side is still empty.
     setActiveSide(resolution.send.length === 0 ? "send" : "receive");
     setBridgeMessage(bridgeNotice(resolution));
+  }
+
+  // "Build an offer" hand-off: same render-time "apply once" pattern as the
+  // bridge above. Ids that are not in this league's pool are skipped, never
+  // invented; the verdict is always the Analyzer's own regrade.
+  const offerKey = offerPrefill
+    ? [offerPrefill.send, offerPrefill.receive, offerPrefill.sendPicks, offerPrefill.receivePicks].map((l) => l.join(",")).join("|")
+    : null;
+  const [appliedOfferKey, setAppliedOfferKey] = useState<string | null>(null);
+  if (offerPrefill && offerKey !== appliedOfferKey) {
+    setAppliedOfferKey(offerKey);
+    const byId = new Map(rankings.map((p) => [p.player_id, p]));
+    const pickById = new Map(picks.map((p) => [p.pick_id, p]));
+    const sendList = offerPrefill.send.map((id) => byId.get(id)).filter((p): p is RankedPlayer => Boolean(p));
+    const receiveList = offerPrefill.receive.map((id) => byId.get(id)).filter((p): p is RankedPlayer => Boolean(p));
+    setSendPlayers(sendList);
+    setReceivePlayers(receiveList);
+    setSendPicks(offerPrefill.sendPicks.map((id) => pickById.get(id)).filter((p): p is DraftPickAsset => Boolean(p)));
+    setReceivePicks(offerPrefill.receivePicks.map((id) => pickById.get(id)).filter((p): p is DraftPickAsset => Boolean(p)));
+    const owner = otherTeams.find((team) => receiveList.some((p) => team.playerIds.has(p.player_id)));
+    if (owner) setSelectedTeamId(owner.rosterId);
   }
 
   function addPick(pick: DraftPickAsset) {

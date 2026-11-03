@@ -3253,6 +3253,38 @@ export interface TradeFinderSearch {
   partners_checked?: number;
 }
 
+/** One built offer from GET .../trade-target (modules.trade_target_offers). */
+export interface TradeTargetOffer {
+  rank: number;
+  title: string;
+  send: Array<{ kind: 'player' | 'pick'; id: string; label: string; position: string; value: number }>;
+  receive: Array<{ kind: 'player' | 'pick'; id: string; label: string; position: string; value: number }>;
+  package: TradePackage;
+  send_value: number;
+  receive_value: number;
+  verdict: string;
+  value_delta: number | null;
+  lineup_points: number | null;
+  posture_label: string;
+  acceptance: { label: 'Likely' | 'Possible' | 'Long shot'; reason: string };
+  why: string[];
+  they_gain: string;
+  you_gain: string;
+}
+
+/** GET .../trade-target: 2-3 built offers to get a player off another roster. */
+export interface TradeTargetResponse {
+  ok: boolean;
+  /** found | none | locked | own_player | not_rostered | unavailable | no_roster | deadline_passed | error */
+  status: string;
+  headline?: string;
+  offers: TradeTargetOffer[];
+  target?: { id: string; label: string; position: string; value: number; roster_id: number };
+  partner?: { roster_id: number; team_name: string };
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+}
+
 export type TradeFinderClosestIdea = TradeIdea & { finder_note?: TradeFinderNote };
 
 export interface TradeFinderResponse extends Omit<TradeHubResponse, 'ideas'> {
@@ -3836,6 +3868,11 @@ export const api = {
   ) =>
     authorizedFetch<TradeFinderResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(','))}&strategy=${strategy}&lens=${encodeURIComponent(lens)}${options.pickIds && options.pickIds.length > 0 ? `&pick_ids=${encodeURIComponent(options.pickIds.join(','))}` : ''}${options.returnPicks ? '&return_picks=true' : ''}`,
+    ),
+  /** "Build an offer": 2-3 built packages to get a player off another team. Pro. */
+  getTradeTargetOffers: (leagueId: string, playerId: string, lens: ValuationLens = 'Dynasty') =>
+    authorizedFetch<TradeTargetResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-target?player_id=${encodeURIComponent(playerId)}&strategy=auto&lens=${encodeURIComponent(lens)}`,
     ),
   getAllTrades: (
     leagueId: string,

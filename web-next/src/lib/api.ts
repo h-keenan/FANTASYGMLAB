@@ -1214,6 +1214,39 @@ export interface TradeHubResponse {
   trade_window?: TradeWindow;
 }
 
+/** One built offer from GET .../trade-target (modules.trade_target_offers). */
+export interface TradeTargetOffer {
+  rank: number;
+  title: string;
+  send: Array<{ kind: "player" | "pick"; id: string; label: string; position: string; value: number }>;
+  receive: Array<{ kind: "player" | "pick"; id: string; label: string; position: string; value: number }>;
+  /** Same display shape as every trade card (ExchangeSide rows). */
+  package: TradePackage;
+  send_value: number;
+  receive_value: number;
+  verdict: string;
+  value_delta: number | null;
+  lineup_points: number | null;
+  posture_label: string;
+  acceptance: { label: "Likely" | "Possible" | "Long shot"; reason: string };
+  why: string[];
+  they_gain: string;
+  you_gain: string;
+}
+
+/** GET .../trade-target: 2-3 built offers to get a player off another roster. */
+export interface TradeTargetResponse {
+  ok: boolean;
+  /** found | none | locked | own_player | not_rostered | unavailable | no_roster | deadline_passed | error */
+  status: string;
+  headline?: string;
+  offers: TradeTargetOffer[];
+  target?: { id: string; label: string; position: string; value: number; roster_id: number };
+  partner?: { roster_id: number; team_name: string };
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
+}
+
 /** GET .../trade-finder's response — the same TradeIdea card shape as
  * Trade Hub (both serialize through modules.trade_hub_engine's shared card
  * projection), restricted to whatever player_ids the caller selected.
@@ -4179,6 +4212,12 @@ export const api = {
     authorizedBinaryRequest(
       `/share-card/player?leagueId=${encodeURIComponent(leagueId)}&playerId=${encodeURIComponent(playerId)}&lens=${encodeURIComponent(lens)}`,
       "",
+    ),
+
+  /** "Build an offer": 2-3 built packages to get a player off another team. Pro. */
+  getTradeTargetOffers: (leagueId: string, playerId: string, strategy: string = "retool", lens: string = "Dynasty") =>
+    authorizedRequest<TradeTargetResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-target?player_id=${encodeURIComponent(playerId)}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
     ),
 
   // "Select these specific players, find who'd want them" — same engine/

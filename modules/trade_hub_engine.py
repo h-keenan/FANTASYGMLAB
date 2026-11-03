@@ -1045,6 +1045,67 @@ def generate_trade_finder_records(
     return trade_posture_module.stamp_records(records, posture)
 
 
+def generate_target_offer_result(
+    *,
+    league_id: str,
+    roster_id: int,
+    target_player_id: str,
+    strategy: str,
+    lens: str,
+    players_db_path: str,
+    untouchable_player_ids: tuple[str, ...] = (),
+    keeper_round_penalty: int = 0,
+) -> dict[str, Any]:
+    """"Get this player": 2-3 Analyzer-graded offers for a player on another
+    roster (modules.trade_target_offers wraps the target-player search in
+    modules.trade_ideas). Same frame, strategy curve, keeper context, league
+    summary and pick pricing as the Hub/Finder, so an offer here and an
+    Analyzer run of the same package agree. On demand, so not cached."""
+
+    from modules import trade_target_offers
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return {"status": "unavailable", "headline": "League not found.", "offers": []}
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    if valued.empty:
+        return {"status": "unavailable", "headline": "Player values are not ready yet.", "offers": []}
+    score_field = league_value_settings.valuation_score_field(lens)
+    rosters = sleeper.get_rosters(league_id)
+    df_summary, _capital = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    if df_summary.empty:
+        return {"status": "unavailable", "headline": "League data is not ready yet.", "offers": []}
+    players_df = exclude_idp_rows(valued)
+    strategy_df = apply_strategy_age_curve(players_df, strategy, score_field)
+    keeper_context = (
+        _keeper_context_for_league(league, league_id, keeper_round_penalty) if settings.get("_keeper_mode") else None
+    )
+    strategy_df = _apply_keeper_context(strategy_df, score_field, keeper_context)
+    untouchable_ids = {str(pid) for pid in untouchable_player_ids if str(pid)}
+    untouchable_names: list[str] = []
+    if untouchable_ids and "name" in strategy_df.columns:
+        matches = strategy_df[strategy_df["player_id"].astype(str).isin(untouchable_ids)]
+        untouchable_names = [str(name) for name in matches["name"].tolist() if str(name)]
+    return trade_target_offers.build_target_offers(
+        df_players=strategy_df,
+        league_id=league_id,
+        df_summary=df_summary,
+        my_roster_id=roster_id,
+        target_player_id=target_player_id,
+        rosters=rosters,
+        untouchable_names=untouchable_names,
+        league_settings=settings,
+        score_field=score_field,
+        pick_score_multiplier=strategy_adjusted_pick_score_multiplier(1.0, strategy),
+        team_strategy=strategy,
+    )
+
+
 def generate_trade_ideas(
     *,
     league_id: str,

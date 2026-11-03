@@ -18,6 +18,7 @@ import { idpTradePoolPlayers } from "@/lib/idpPresentation";
 import { TradeAnalyzerContent } from "@/components/TradeAnalyzerContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { bridgeTradeFromSearch } from "@/lib/tradeBridge";
+import { offerPrefillFromSearch } from "@/lib/tradeOffer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 interface LoadedData {
@@ -43,6 +44,8 @@ export default function TradeAnalyzerPage() {
   const quickAddPlayerId = searchParams.get("playerId") || undefined;
   // Public Trade Analyzer bridge: ?a=&b= carried through sign-up (lib/tradeBridge.ts).
   const bridgeTrade = bridgeTradeFromSearch(`a=${searchParams.get("a") ?? ""}&b=${searchParams.get("b") ?? ""}`);
+  // "Build an offer" hand-off: ?send=&receive=&sendPicks=&receivePicks= (lib/tradeOffer.ts).
+  const offerPrefill = offerPrefillFromSearch(searchParams);
   const { lens } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
@@ -122,6 +125,7 @@ export default function TradeAnalyzerPage() {
       teamProfiles={data.teamProfiles}
       quickAddPlayerId={quickAddPlayerId}
       bridgeTrade={bridgeTrade}
+      offerPrefill={offerPrefill}
           lens={lens}
     />
   );

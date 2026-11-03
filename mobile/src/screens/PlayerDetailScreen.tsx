@@ -1334,6 +1334,17 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />
             <AppText style={styles.compareButtonText}>Add to Trade</AppText>
           </TouchableOpacity>
+          {!tradeShortcuts.canFindTrades ? (
+            <TouchableOpacity
+              style={styles.compareButton}
+              onPress={() => navigation.push('TradeOffer', { leagueId, leagueName, playerId: player.player_id })}
+              accessibilityRole="button"
+              accessibilityLabel={`Build an offer for ${player.name ?? 'this player'}`}
+            >
+              <Ionicons name="hammer-outline" size={14} color={colors.accent} />
+              <AppText style={styles.compareButtonText}>Build an offer</AppText>
+            </TouchableOpacity>
+          ) : null}
           {tradeShortcuts.canFindTrades ? (
             <TouchableOpacity
               style={styles.compareButton}

@@ -54,6 +54,7 @@ Deployment topology (Render):
   - GET  /v1/portfolio/exposure     — which players the caller owns across saved leagues, with concentration (Pro)
   - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
+  - GET  /v1/leagues/{id}/trade-target — 2-3 built offers to get a player off another roster (Pro)
   - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
   - GET  /v1/leagues/{id}/managers/{roster_id}/tendencies — one manager's full tendency profile + evidence (Premium)
   - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
@@ -16252,6 +16253,107 @@ def get_trade_finder_ideas(
             overpay=overpay_count,
         ),
         "posture": trade_posture.public_posture(posture),
+    }
+
+
+_TRADE_TARGET_UPSELL = {
+    "title": "Build an offer for any player",
+    "body": (
+        "Pick a player on another team and Pro builds the offer for you: "
+        "what to send, what they should add back, and how likely they are to "
+        "say yes. Upgrade to Pro to unlock it."
+    ),
+}
+
+
+@app.get("/v1/leagues/{league_id}/trade-target")
+def get_trade_target_offers(
+    league_id: str = Depends(resolve_league_path_id),
+    player_id: str = "",
+    strategy: str = "retool",
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """"Build an offer": 2-3 ranked, Analyzer-graded packages that get a player
+    off ANOTHER team's roster (modules.trade_target_offers).
+
+    The engine is the Hub's target-player search plus the Analyzer's own
+    verdict for the caller and the Analyzer's sweetener ranking for what the
+    other side should add back; nothing here is a separate valuation. Gated
+    exactly like Trade Finder (Pro). Free agents are not trade targets (the
+    response says so and clients send the user to Waivers); a player already
+    on the caller's roster returns ``own_player``.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    target_id = str(player_id or "").strip()
+    if not target_id:
+        raise HTTPException(status_code=422, detail="player_id is required.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {"ok": True, "status": "locked", "offers": [], "is_premium": False, "upsell": _TRADE_TARGET_UPSELL}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None or my_roster.get("roster_id") is None:
+        return {"ok": True, "status": "no_roster", "offers": [], "reason": reason or "empty_roster", "is_premium": True, "upsell": None}
+
+    league = sleeper.get_league(league_id) or {}
+    trade_window = league_calendar.trade_window(league)
+    if trade_window["trade_deadline_passed"]:
+        return {
+            "ok": True,
+            "status": "deadline_passed",
+            "offers": [],
+            "headline": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
+            "is_premium": True,
+            "upsell": None,
+            "trade_window": trade_window,
+        }
+
+    _gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
+    declared_team_stance = _fetch_team_stance(config, user_id, str(user.get("_access_token") or ""), league_id)
+    posture = _resolve_trade_posture(
+        user, league_id, league, my_roster, lens=lens,
+        client_strategy="" if strategy == TRADE_HUB_AUTO_STRATEGY else strategy,
+        declared_stance=declared_team_stance,
+    )
+    try:
+        result = trade_hub_engine.generate_target_offer_result(
+            league_id=league_id,
+            roster_id=int(my_roster["roster_id"]),
+            target_player_id=target_id,
+            strategy=posture["key"],
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            untouchable_player_ids=gm_untouchable_ids,
+            keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+        )
+    except Exception:
+        logger.exception("trade-target search failed for league %s", league_id)
+        return {
+            "ok": True,
+            "status": "error",
+            "offers": [],
+            "headline": "The search hit a problem on our side, so this is not a real \"no offer\" result. Try again in a moment.",
+            "is_premium": True,
+            "upsell": None,
+        }
+    return {
+        "ok": True,
+        "is_premium": True,
+        "upsell": None,
+        "trade_window": trade_window,
+        "posture": trade_posture.public_posture(posture),
+        **result,
     }
 
 

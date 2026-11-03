@@ -59,6 +59,7 @@ const LEAGUE_SCOPED_SEGMENTS = new Set([
   "league-rankings",
   "trade-hub",
   "trade-finder",
+  "trade-offer",
   "trade-analyzer",
   "gm-plan",
   "gm-targets",

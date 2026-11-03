@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
+import { canBuildOffer, offerBuilderHref } from "@/lib/tradeOffer";
 import { rosterOwnershipFrom, tradeShortcutsFor, type RosterOwnership } from "@/lib/tradeShortcuts";
 
 /**
@@ -14,6 +15,9 @@ import { rosterOwnershipFrom, tradeShortcutsFor, type RosterOwnership } from "@/
  * - "Add to Trade" (every player): Trade Analyzer with this player
  *   pre-filled on the right side, the owning team selected, and the empty
  *   side focused. Same ?playerId= deep link the Players list already uses.
+ * - "Build an offer" (players on ANOTHER team's roster, never mine, never a
+ *   free agent): the engine builds 2-3 packages to get him (Trade Offer page,
+ *   Pro like Trade Finder). One primary button, shown first.
  * - "Find trades" (players on my roster): Trade Finder with this player
  *   selected and the search already run. Trade Finder's own Premium gate
  *   applies, exactly as for a manual search.
@@ -122,8 +126,19 @@ export function PlayerLeagueActions({
   const ready = loadedFor === key;
   const shortcuts = ready ? tradeShortcutsFor(playerId, ownership) : { canAddToTrade: false, canFindTrades: false };
 
+  const showBuildOffer = ready && !hideAddToTrade && canBuildOffer(playerId, ownership);
+
   return (
     <>
+      {showBuildOffer ? (
+        <a
+          className="pqv-action-link pqv-action-link--primary"
+          href={offerBuilderHref(leagueId, leagueName, playerId)}
+          onClick={() => trackFeatureUse("pqv_build_offer", { leagueId, dedupe: false })}
+        >
+          Build an offer
+        </a>
+      ) : null}
       {shortcuts.canAddToTrade && !hideAddToTrade ? (
         <a
           className="pqv-action-link pqv-action-link--primary"
