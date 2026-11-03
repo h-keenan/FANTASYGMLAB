@@ -41,7 +41,7 @@ import { SkeletonBlock } from "@/components/Skeleton";
 // is the chart's exact footprint, so the swap does not move anything.
 const ModelRadarChart = dynamic(() => import("@/components/ModelRadarChart").then((m) => m.ModelRadarChart), {
   ssr: false,
-  loading: () => <div style={{ width: "100%", maxWidth: "15rem", height: 220, margin: "0 auto" }} aria-hidden="true" />,
+  loading: () => <div style={{ width: "100%", maxWidth: "16rem", height: 220, margin: "0 auto" }} aria-hidden="true" />,
 });
 
 /**

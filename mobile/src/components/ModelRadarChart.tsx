@@ -8,12 +8,15 @@ import type { SubRating } from '../lib/subRatings';
 
 const SIZE = 220;
 const CENTER = SIZE / 2;
+// A pentagon's visual mass sits below its circumcentre; nudge it down so the
+// shape (not just the circle) is centered in its box, labels included.
+const CENTER_Y = CENTER + 6;
 const RADIUS = 76;
 const RINGS = [0.33, 0.66, 1];
 
 function pointAt(index: number, count: number, fraction: number): { x: number; y: number } {
   const angle = -Math.PI / 2 + (index * 2 * Math.PI) / count;
-  return { x: CENTER + Math.cos(angle) * RADIUS * fraction, y: CENTER + Math.sin(angle) * RADIUS * fraction };
+  return { x: CENTER + Math.cos(angle) * RADIUS * fraction, y: CENTER_Y + Math.sin(angle) * RADIUS * fraction };
 }
 
 /**
@@ -55,7 +58,7 @@ export default function ModelRadarChart({ ratings }: { ratings: SubRating[] }) {
         ))}
         {points.map((_, index) => {
           const p = pointAt(index, count, 1);
-          return <Line key={`axis-${index}`} x1={CENTER} y1={CENTER} x2={p.x} y2={p.y} stroke={colors.border} strokeWidth={1} />;
+          return <Line key={`axis-${index}`} x1={CENTER} y1={CENTER_Y} x2={p.x} y2={p.y} stroke={colors.border} strokeWidth={1} />;
         })}
         <Polygon points={polygon} fill={colors.accent} fillOpacity={0.28} stroke={colors.accent} strokeWidth={1.5} />
         {points.map((point, index) => {

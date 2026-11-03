@@ -135,6 +135,11 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     // Outlined accent pill with a soft fill: web's .pqv-action-link--primary.
     chip: {
+      // Two equal columns that fill the sheet gutters (one shared grid with
+      // the profile/waivers buttons below), content centered in each cell.
+      flexBasis: '47%',
+      flexGrow: 1,
+      justifyContent: 'center',
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,

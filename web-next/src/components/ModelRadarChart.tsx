@@ -28,9 +28,9 @@ export function ModelRadarChart({ model }: { model: RadarRatings }) {
   if (data.some((point) => point.value == null)) return null;
 
   return (
-    <div style={{ width: "100%", maxWidth: "15rem", height: 220, margin: "0 auto" }} aria-hidden="true">
+    <div style={{ width: "100%", maxWidth: "16rem", height: 220, margin: "0 auto", display: "block" }} aria-hidden="true">
       <ResponsiveContainer>
-        <RadarChart data={data} outerRadius="70%">
+        <RadarChart data={data} outerRadius="68%" cx="50%" cy="54%">
           <PolarGrid stroke="var(--color-border)" />
           <PolarAngleAxis
             dataKey="abbr"

@@ -372,10 +372,12 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                   hideAddToTrade={insideTradeAnalyzer()}
                 />
               ) : null}
-              {onWaivers ? (
-                <Button label="View on Waivers" variant="secondary" onPress={openWaivers} />
-              ) : null}
-              {target ? <Button label="Open Full Profile" onPress={openFullProfile} /> : null}
+              <View style={styles.actionButtons}>
+                {onWaivers ? (
+                  <Button label="View on Waivers" variant="secondary" onPress={openWaivers} style={styles.actionButton} />
+                ) : null}
+                {target ? <Button label="Open Full Profile" onPress={openFullProfile} style={styles.actionButton} /> : null}
+              </View>
             </View>
             <ValuesCredit />
           </SheetScrollView>
@@ -429,6 +431,8 @@ function createStyles(colors: ThemeColors) {
     groupTitle: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
     tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     muted: { fontSize: 13, color: colors.textSecondary },
+    actionButtons: { flexDirection: 'row', gap: spacing.sm },
+    actionButton: { flex: 1 },
     actions: {
       gap: spacing.sm,
       borderTopWidth: StyleSheet.hairlineWidth,
