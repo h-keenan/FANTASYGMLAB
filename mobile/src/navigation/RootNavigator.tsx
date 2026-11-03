@@ -39,6 +39,7 @@ import AlertsScreen from '../screens/AlertsScreen';
 import GmPlanScreen from '../screens/GmPlanScreen';
 import TradeHistoryScreen from '../screens/TradeHistoryScreen';
 import CommunityScreen from '../screens/CommunityScreen';
+import FeaturesScreen from '../screens/FeaturesScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradesScreen from '../screens/TradesScreen';
 import TeamsScreen from '../screens/TeamsScreen';
@@ -97,6 +98,8 @@ export type RootStackParamList = {
   GmPlan: { leagueId: string; leagueName: string; initialTab?: 'overview' | 'trades' | 'core' | 'watching' };
   TradeHistory: undefined;
   Community: undefined;
+  /** "What FantasyDesk can do". League params only when a link carries one (else the last league). */
+  Features: { leagueId?: string; leagueName?: string } | undefined;
   Waivers: { leagueId: string; leagueName: string; playerId?: string };
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
@@ -346,6 +349,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Community" component={CommunityScreen} options={{ title: 'Community' }} />
+          <AppStack.Screen name="Features" component={FeaturesScreen} options={{ title: 'What FantasyDesk can do' }} />
           <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
           <AppStack.Screen name="FounderAnalytics" component={FounderAnalyticsScreen} options={{ title: 'Founder Analytics' }} />
           <AppStack.Screen name="LiveDraft" component={EspnLiveDraftScreen} />

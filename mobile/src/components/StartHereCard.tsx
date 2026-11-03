@@ -106,6 +106,15 @@ export default function StartHereCard({
             </Pressable>
           );
         })}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="See everything FantasyDesk can do"
+          onPress={() => onNavigate('Features', { leagueId, leagueName })}
+          style={[styles.row, styles.rowDivider]}
+        >
+          <AppText style={[styles.headline, { color: colors.accent }]}>See everything FantasyDesk can do</AppText>
+          <AppText style={styles.arrow}>→</AppText>
+        </Pressable>
       </AccentCard>
     </View>
   );
