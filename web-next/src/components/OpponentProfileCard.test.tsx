@@ -27,13 +27,13 @@ const base: OpponentProfileResponse = {
 };
 
 describe("OpponentProfileCard", () => {
-  it("renders reads and an Offer this link prefilled with the target player", () => {
+  it("renders reads and an Offer this link to Build an offer for the target player", () => {
     render(<OpponentProfileCard profile={base} leagueId="L1" leagueName="My League" />);
     expect(screen.getByText("Strongest: RB, 1st of 12")).toBeTruthy();
     expect(screen.getByText("Weakest: WR, 11th of 12")).toBeTruthy();
     expect(screen.getByText(/Starter-heavy/)).toBeTruthy();
     const offer = screen.getByRole("link", { name: "Offer this" });
-    expect(offer.getAttribute("href")).toBe("/trade-analyzer/L1?name=My+League&playerId=p9");
+    expect(offer.getAttribute("href")).toBe("/trade-offer/L1?name=My+League&playerId=p9");
   });
 
   it("hides the Offer button when there is no target player", () => {

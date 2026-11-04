@@ -5,7 +5,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
-import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
+import { offerBuilderHref } from "@/lib/tradeOffer";
 import {
   firstsFlowText,
   hasProfileContent,
@@ -135,7 +135,7 @@ export function OpponentProfileCard({
               <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {offerCaption(angle.target)}
               </span>
-              <ButtonLink href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, angle.target.player_id)} variant="primary" size="sm">
+              <ButtonLink href={offerBuilderHref(leagueId, leagueName, angle.target.player_id)} variant="primary" size="sm">
                 Offer this
               </ButtonLink>
             </>
