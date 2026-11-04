@@ -112,6 +112,7 @@ export default function TradeOfferScreen({ route, navigation }: Props) {
                 </View>
                 <ExchangeSide side="send" assets={offer.package.send} total={offer.send_value} />
                 <ExchangeSide side="get" assets={offer.package.receive} total={offer.receive_value} />
+                {offer.price_note ? <AppText style={styles.priceNote}>{offer.price_note}</AppText> : null}
                 {offer.why.map((line) => (
                   <AppText key={line} style={styles.why}>
                     {'• '}
@@ -152,6 +153,7 @@ function createStyles(colors: ThemeColors) {
     headline: { fontSize: 14, color: colors.textSecondary },
     titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     offerTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    priceNote: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
     why: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
     acceptReason: { fontSize: 12, color: colors.textTertiary },
   });

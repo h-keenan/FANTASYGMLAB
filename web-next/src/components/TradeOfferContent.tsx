@@ -151,6 +151,11 @@ export function OfferCard({ offer, leagueId, leagueName }: { offer: TradeTargetO
           total={{ text: formatValue(offer.receive_value), color: "var(--color-text-secondary)" }}
         />
       </div>
+      {offer.price_note ? (
+        <p className="text-sm font-semibold" data-testid="offer-price-note">
+          {offer.price_note}
+        </p>
+      ) : null}
       <ul className="flex flex-col gap-1 list-disc pl-5 text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {offer.why.map((line) => (
           <li key={line}>{line}</li>
