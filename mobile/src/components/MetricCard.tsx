@@ -30,6 +30,7 @@ export default function MetricCard({
   note,
   periodLabel,
   onPress,
+  centered = false,
   style,
 }: {
   label: string;
@@ -65,6 +66,10 @@ export default function MetricCard({
    * tiles, which drill into the Teams screen) while leaving every other
    * caller — anything that omits this — a plain, non-interactive View. */
   onPress?: () => void;
+  /** Equal-column strip form (DashboardStatRow): label + value centered, and the
+   * value shrinks to fit instead of touching the tile edge ("36,414" in a 4-up
+   * row at phone width). Off by default so every other caller is unchanged. */
+  centered?: boolean;
   /** Overrides the tile's own sizing (e.g. a fixed one-third `flexBasis`
    * for a caller that always renders exactly three tiles in one compact
    * row) without touching the default `minWidth: '46%'` two-up layout every
@@ -78,10 +83,10 @@ export default function MetricCard({
   const trendIcon = percentileTrendIcon(percentile);
   const content = (
     <>
-      <View style={styles.labelRow}>
-        <View style={styles.labelTextRow}>
+      <View style={[styles.labelRow, centered && styles.labelRowCentered]}>
+        <View style={[styles.labelTextRow, centered && styles.centeredText]}>
           {icon ? <Ionicons name={icon} size={11} color={colors.accent} style={styles.labelIcon} /> : null}
-          <AppText style={styles.label} numberOfLines={1}>
+          <AppText style={[styles.label, centered && styles.centeredText]} numberOfLines={1}>
             {label}
           </AppText>
         </View>
@@ -101,7 +106,12 @@ export default function MetricCard({
           <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} />
         ) : null}
       </View>
-      <AppText style={[styles.value, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
+      <AppText
+        style={[styles.value, centered && styles.valueCentered, valueColor ? { color: valueColor } : null]}
+        numberOfLines={1}
+        adjustsFontSizeToFit={centered}
+        minimumFontScale={centered ? 0.6 : undefined}
+      >
         {display}
       </AppText>
       {pctl && trendIcon ? (
@@ -146,6 +156,9 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       marginBottom: 3,
     },
+    labelRowCentered: { justifyContent: 'center' },
+    centeredText: { textAlign: 'center', justifyContent: 'center' },
+    valueCentered: { textAlign: 'center', fontVariant: ['tabular-nums'] },
     labelTextRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
     labelIcon: { marginRight: 4 },
     label: {
