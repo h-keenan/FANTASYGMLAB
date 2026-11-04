@@ -280,6 +280,27 @@ export function vetoSideDirection(side: { posture?: string | null; posture_label
   return String(side.posture_label || "").trim() || vetoPostureLabel(side.posture);
 }
 
+/** Band cut-offs on the 0-100 outrage meter (docs/commissioner-tools.md: 20 / 45 / 70). */
+export const VETO_BAND_TICKS: number[] = [20, 45, 70];
+
+/** Meter fill, clamped to 0-100. */
+export function vetoMeterPercent(outrage: number | null | undefined): number {
+  const n = Number(outrage);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+/** Gains read success, losses read danger, zero stays neutral. */
+export function vetoDeltaTone(n: number): "positive" | "risk" | "neutral" {
+  const rounded = Math.round(n * 10) / 10;
+  return rounded > 0 ? "positive" : rounded < 0 ? "risk" : "neutral";
+}
+
+/** "0-7 · #12 of 12" from whatever the server sent; empty when it sent neither. */
+export function vetoStandingLine(side: { record?: string | null; standing?: string | null }): string {
+  return [side.record, side.standing].map((v) => String(v || "").trim()).filter(Boolean).join(" · ");
+}
+
 /** Whole-number market change with an explicit sign, e.g. "+1,240" / "-310". */
 export function formatSigned(n: number, digits = 0): string {
   const rounded = digits > 0 ? Number(n.toFixed(digits)) : Math.round(n);
