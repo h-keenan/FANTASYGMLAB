@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildVetoRequest,
+  formatSigned,
+  vetoBandTone,
+  vetoHasResult,
+  vetoPointsLine,
+  vetoPostureLabel,
+  vetoStatusMessage,
+  vetoWorstPositionLine,
   bandTone,
   integrityReasonMessage,
   calendarLines,
@@ -69,5 +77,44 @@ describe("calendarLines", () => {
     expect(calendarLines({ ...base, deadline_phase: "passed", trade_deadline_passed: true })[1]).toContain("passed");
     expect(calendarLines({ ...base, trade_deadline_week: null, deadline_phase: "none", playoff_week_start: null })).toEqual(["Week 8 now", "No trade deadline set"]);
     expect(calendarLines(null)).toEqual([]);
+  });
+});
+
+describe("trade veto calculator helpers", () => {
+  it("maps bands to the same fixed tones as the integrity view", () => {
+    expect(vetoBandTone("fair")).toBe("success");
+    expect(vetoBandTone("explainable")).toBe("muted");
+    expect(vetoBandTone("lopsided")).toBe("warning");
+    expect(vetoBandTone("outrage")).toBe("danger");
+  });
+  it("labels postures and formats signed numbers", () => {
+    expect(vetoPostureLabel("rebuild")).toBe("Rebuild");
+    expect(vetoPostureLabel("")).toBe("");
+    expect(formatSigned(1240)).toBe("+1,240");
+    expect(formatSigned(-310)).toBe("-310");
+    expect(formatSigned(0)).toBe("0");
+    expect(formatSigned(-3.24, 1)).toBe("-3.2");
+  });
+  it("describes lineup change and the worst position hit", () => {
+    expect(vetoPointsLine({ points_per_week: -3.2 })).toBe("Lineup -3.2 pts/wk");
+    expect(vetoWorstPositionLine({ worst_position: { position: "WR", per_week_delta: -2.5 } })).toBe("Biggest hit: WR (-2.5 pts/wk)");
+    expect(vetoWorstPositionLine({ worst_position: { position: "WR", per_week_delta: 1 } })).toBe("");
+    expect(vetoWorstPositionLine({ worst_position: null })).toBe("");
+  });
+  it("builds the request and rejects empty or same-team trades", () => {
+    const base = { rosterA: "1", rosterB: "2", aPlayers: ["p1"], bPlayers: [], aPicks: [], bPicks: ["pick9"] };
+    expect(buildVetoRequest(base)).toEqual({
+      roster_a: 1, roster_b: 2, a_sends_player_ids: ["p1"], b_sends_player_ids: [],
+      a_sends_pick_ids: [], b_sends_pick_ids: ["pick9"], lens: "Dynasty",
+    });
+    expect(buildVetoRequest({ ...base, rosterB: "1" })).toBeNull();
+    expect(buildVetoRequest({ ...base, aPlayers: [], bPicks: [] })).toBeNull();
+    expect(buildVetoRequest({ ...base, rosterA: "" })).toBeNull();
+  });
+  it("detects results and explains non-ok statuses", () => {
+    expect(vetoHasResult({ ok: true, status: "invalid", headline: "Pick two different teams." })).toBe(false);
+    expect(vetoStatusMessage({ ok: true, status: "invalid", headline: "Pick two different teams." })).toBe("Pick two different teams.");
+    expect(vetoStatusMessage({ ok: true, status: "unsupported_platform" })).toMatch(/Sleeper/);
+    expect(vetoStatusMessage({ ok: true, status: "error" })).toMatch(/Try again/);
   });
 });

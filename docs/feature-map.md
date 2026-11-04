@@ -31,7 +31,7 @@ The user-facing version of this list is the in-app page "What FantasyDesk can do
 | League Recaps | `/league-recaps/[id]` | `Recap` | Nav, orb, recap-ready card, push | Free | |
 | Games (season sim, pick'em) | `/games/[id]` | `Games` | Nav, orb | Part (what-if sim is Pro) | |
 | Guess the Player leaderboard | `/guess-the-player-leaderboard/[id]` | `GuessThePlayerLeaderboard` | **W: only from the Guess the Player cards. A: only More > Your Team** | Free | **One way in on each platform** |
-| Commissioner | `/commissioner/[id]` | `Commissioner` | Nav, orb | **Pro** (open to any league member with Pro, as shipped) | |
+| Commissioner | `/commissioner/[id]` | `Commissioner` | Nav, orb | **Pro** (open to any league member with Pro, as shipped) | Includes the Trade veto calculator (section on the same screen) |
 | Manager tendencies / manager profile | Sheet from team names in Rankings, Trade Hub | Modal from team names | Only via tapping a manager | Pro (tendencies gate) | Sheet, no page; one way in per surface |
 | Evaluation lens (Dynasty / Rebuild / Redraft) | Header chip | Header button | Header only | Free | One door, always visible |
 

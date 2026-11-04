@@ -1,14 +1,22 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CommissionerContent } from "./CommissionerContent";
 import { api } from "@/lib/api";
-import type { CommissionerIntegrityResponse, IntegrityTeam } from "@/lib/commissionerIntegrity";
+import type { CommissionerIntegrityResponse, IntegrityTeam, VetoCheckResponse } from "@/lib/commissionerIntegrity";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { ...actual.api, getCommissionerIntegrity: vi.fn() } };
+  return { ...actual, api: {
+      ...actual.api,
+      getCommissionerIntegrity: vi.fn(),
+      getLeagueRankings: vi.fn(),
+      getLeagueDraftPicks: vi.fn(),
+      getLeagueRosters: vi.fn(),
+      getLeagueTeamProfiles: vi.fn(),
+      postCommissionerVetoCheck: vi.fn(),
+    } };
 });
 
 const tanker: IntegrityTeam = {
@@ -104,5 +112,69 @@ describe("CommissionerContent", () => {
     expect(screen.getByText("Playoffs start week 15")).toBeTruthy();
     fireEvent.click(screen.getByText("Show 12 teams"));
     expect(screen.getByText("Team 12")).toBeTruthy();
+  });
+
+  describe("trade veto calculator", () => {
+    const vetoOk: VetoCheckResponse = {
+      ok: true, status: "ok", is_premium: true, outrage: 52, band: "lopsided", label: "Lopsided", advice: "Worth a conversation before it processes.",
+      hurt_roster_id: "1", reasons: ["Alpha's lineup loses about 4.0 points a week."], limits: ["A signal to look at a trade; the league's rules decide."],
+      sides: [
+        { roster_id: 1, team_name: "Alpha", posture: "contender", sends: ["Star WR"], receives: ["2027 1st"], market_delta: -900, team_score: -1500, points_per_week: -4, worst_position: { position: "WR", per_week_delta: -4 } },
+        { roster_id: 2, team_name: "Bravo", posture: "rebuild", sends: ["2027 1st"], receives: ["Star WR"], market_delta: 900, team_score: 800, points_per_week: 1.2, worst_position: null },
+      ],
+    };
+
+    async function openAndBuild() {
+      vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body());
+      vi.mocked(api.getLeagueRankings).mockResolvedValue({ players: [{ player_id: "p1", name: "Star WR", position: "WR", team: "KC", age: 25, score: 5000 }] } as never);
+      vi.mocked(api.getLeagueDraftPicks).mockResolvedValue({ ok: true, picks: [], reason: "" } as never);
+      vi.mocked(api.getLeagueRosters).mockResolvedValue({ ok: true, rosters: [{ roster_id: 1, players: ["p1"] }, { roster_id: 2, players: [] }] });
+      vi.mocked(api.getLeagueTeamProfiles).mockResolvedValue({
+        ok: true,
+        profiles: {
+          "1": { team_name: "Alpha", owner_name: "", username: "", avatar_id: "", avatar_url: "", roster_id: 1, owner_id: "" },
+          "2": { team_name: "Bravo", owner_name: "", username: "", avatar_id: "", avatar_url: "", roster_id: 2, owner_id: "" },
+        },
+      });
+      render(<CommissionerContent leagueId="L1" leagueName="My League" />);
+      fireEvent.click(await screen.findByText("Check a proposed trade"));
+      const teamA = await screen.findByRole("tablist", { name: "Team A" });
+      fireEvent.click(within(teamA).getByText("Alpha"));
+      fireEvent.click(within(screen.getByRole("tablist", { name: "Team B" })).getByText("Bravo"));
+      fireEvent.click(await screen.findByText("Star WR"));
+      fireEvent.click(screen.getByText("Check this trade"));
+    }
+
+    it("shows the score, band, per-team cards, reasons and limits", async () => {
+      vi.mocked(api.postCommissionerVetoCheck).mockResolvedValue(vetoOk);
+      await openAndBuild();
+      expect(await screen.findByTestId("veto-result")).toBeTruthy();
+      expect(screen.getByTestId("veto-outrage").textContent).toBe("52");
+      expect(screen.getByText("Lopsided: worth a conversation")).toBeTruthy();
+      expect(screen.getByText("Worth a conversation before it processes.")).toBeTruthy();
+      expect(screen.getByText("Rebuild")).toBeTruthy();
+      expect(screen.getByText("Contender")).toBeTruthy();
+      expect(screen.getByText("Market value -900")).toBeTruthy();
+      expect(screen.getByText("Biggest hit: WR (-4.0 pts/wk)")).toBeTruthy();
+      expect(screen.getByText("Alpha's lineup loses about 4.0 points a week.")).toBeTruthy();
+      expect(screen.getByTestId("veto-limits").textContent).toContain("the league's rules decide");
+      expect(vi.mocked(api.postCommissionerVetoCheck)).toHaveBeenCalledWith(
+        "L1",
+        expect.objectContaining({ roster_a: 1, roster_b: 2, a_sends_player_ids: ["p1"], lens: "Dynasty" }),
+      );
+    });
+
+    it("shows the upsell when the check is locked", async () => {
+      vi.mocked(api.postCommissionerVetoCheck).mockResolvedValue({ ok: true, status: "locked", is_premium: false, upsell: { title: "Veto check is Pro", body: "Upgrade." } });
+      await openAndBuild();
+      expect(await screen.findByText("Veto check is Pro")).toBeTruthy();
+    });
+
+    it("shows the server headline for an invalid trade", async () => {
+      vi.mocked(api.postCommissionerVetoCheck).mockResolvedValue({ ok: true, status: "invalid", headline: "A player in the trade is not on that team's roster any more." });
+      await openAndBuild();
+      expect(await screen.findByText("A player in the trade is not on that team's roster any more.")).toBeTruthy();
+      expect(screen.queryByTestId("veto-result")).toBeNull();
+    });
   });
 });

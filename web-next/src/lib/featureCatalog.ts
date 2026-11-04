@@ -60,7 +60,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
   { id: "college-scouting", group: "scout", name: "College Scouting", line: "Grade incoming prospects and keep a watchlist.", pro: true, segment: "college-scouting", leagueScoped: false, glyph: "collegeScouting", color: "var(--color-success)" },
   { id: "league-rankings", group: "scout", name: "League Rankings", line: "Power rankings for every team in your league.", segment: "league-rankings", leagueScoped: true, glyph: "leagueRankings", color: "var(--color-premium)" },
 
-  { id: "commissioner", group: "league", name: "Commissioner", line: "League integrity: lineups, tanking signals, trades.", pro: true, segment: "commissioner", leagueScoped: true, glyph: "commissioner", color: "var(--color-diagnostic)" },
+  { id: "commissioner", group: "league", name: "Commissioner", line: "League integrity, plus a trade veto calculator.", pro: true, segment: "commissioner", leagueScoped: true, glyph: "commissioner", color: "var(--color-diagnostic)" },
   { id: "playoff-odds", group: "league", name: "Playoff Odds", line: "Every team's chance at the playoffs.", pro: true, segment: "league-rankings", leagueScoped: true, hash: "playoff-odds", glyph: "playoffOdds", color: "var(--color-premium)" },
   { id: "games", group: "league", name: "Games", line: "Season simulator and weekly pick'em.", segment: "games", leagueScoped: true, glyph: "games", color: "var(--color-opportunity)" },
   { id: "league-recaps", group: "league", name: "League Recaps", line: "Your league's weekly recap and stories.", segment: "league-recaps", leagueScoped: true, glyph: "leagueRecaps", color: "var(--color-information)" },
