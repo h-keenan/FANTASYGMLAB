@@ -54,6 +54,7 @@ Deployment topology (Render):
   - GET  /v1/portfolio/exposure     — which players the caller owns across saved leagues, with concentration (Pro)
   - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
+  - POST /v1/leagues/{id}/commissioner/veto-check — outrage read on a proposed trade, whole-roster (Pro)
   - GET  /v1/leagues/{id}/trade-target — 2-3 built offers to get a player off another roster (Pro)
   - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
   - GET  /v1/leagues/{id}/managers/{roster_id}/tendencies — one manager's full tendency profile + evidence (Premium)
@@ -13385,6 +13386,58 @@ def get_commissioner_integrity(
     except league_integrity_data.SleeperUnavailable:
         raise HTTPException(status_code=503, detail="Sleeper did not return this league's data. Try again in a minute.")
     return {**report, "is_premium": True, "upsell": None}
+
+
+class VetoCheckRequest(BaseModel):
+    roster_a: int
+    roster_b: int
+    a_sends_player_ids: list[str] = Field(default_factory=list)
+    b_sends_player_ids: list[str] = Field(default_factory=list)
+    # pick_id values from GET /v1/leagues/{id}/draft-picks.
+    a_sends_pick_ids: list[str] = Field(default_factory=list)
+    b_sends_pick_ids: list[str] = Field(default_factory=list)
+    lens: str = "Dynasty"
+
+
+@app.post("/v1/leagues/{league_id}/commissioner/veto-check")
+def post_commissioner_veto_check(
+    body: VetoCheckRequest,
+    league_id: str = Depends(require_league_access),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Trade veto calculator (modules.trade_veto, docs/commissioner-tools.md).
+
+    Grades a proposed two-team trade for BOTH whole rosters with the Analyzer's
+    lineup model at each team's own posture, then reads one outrage score and
+    band. Same access as the integrity view (Pro, any league the user can
+    open); a decision aid, never a verdict."""
+
+    if body.lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if not _is_pro_caller(user):
+        return {"ok": True, "status": "locked", "is_premium": False, "upsell": _COMMISSIONER_UPSELL}
+    if external_leagues.is_external_league_key(league_id):
+        return {"ok": True, "status": "unsupported_platform", "is_premium": True, "upsell": None}
+    try:
+        result = trade_hub_engine.generate_veto_check(
+            league_id=league_id,
+            roster_a=body.roster_a,
+            roster_b=body.roster_b,
+            a_sends_player_ids=body.a_sends_player_ids,
+            b_sends_player_ids=body.b_sends_player_ids,
+            a_sends_pick_ids=body.a_sends_pick_ids,
+            b_sends_pick_ids=body.b_sends_pick_ids,
+            lens=body.lens,
+            players_db_path=PLAYERS_DB_PATH,
+        )
+    except Exception:
+        logger.exception("veto check failed for league %s", league_id)
+        return {"ok": True, "status": "error", "is_premium": True, "upsell": None,
+                "headline": "The check hit a problem on our side. Try again in a moment."}
+    return {"ok": True, "is_premium": True, "upsell": None, **result}
 
 
 class LeagueTypeRequest(BaseModel):

@@ -1106,6 +1106,197 @@ def generate_target_offer_result(
     )
 
 
+def _veto_pick_assets(
+    *, league_id: str, lens: str, players_db_path: str, df_summary: pd.DataFrame, settings: Mapping[str, Any],
+    strategy_by_roster: Mapping[str, str], pick_ids_by_roster: Mapping[str, list[str]],
+) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
+    """Resolve each sender's picks (``{season}:{round}:{original_roster_id}``)
+    to the Analyzer's pick assets, priced at that team's own posture. Returns
+    (assets by sender, ids that the sender does not own)."""
+
+    from modules.trade_analyzer_assembly import pick_asset_from_mapping
+
+    picks = trade_ideas_module.list_draft_pick_assets(league_id, df_summary, league_settings=dict(settings))
+    by_id = {f"{p.get('season')}:{p.get('round')}:{p.get('original_roster_id')}": p for p in picks}
+    out: dict[str, list[dict[str, Any]]] = {}
+    missing: list[str] = []
+    for rid, ids in pick_ids_by_roster.items():
+        mult = strategy_adjusted_pick_score_multiplier(1.0, strategy_by_roster.get(rid, "retool"))
+        assets = []
+        for pick_id in ids:
+            pick = by_id.get(pick_id)
+            if pick is None or str(pick.get("owner_roster_id")) != str(rid):
+                missing.append(pick_id)
+                continue
+            assets.append(pick_asset_from_mapping(pick, pick_score_multiplier=mult))
+        out[rid] = assets
+    return out, missing
+
+
+def generate_veto_check(
+    *,
+    league_id: str,
+    roster_a: int,
+    roster_b: int,
+    a_sends_player_ids: list[str],
+    b_sends_player_ids: list[str],
+    a_sends_pick_ids: list[str],
+    b_sends_pick_ids: list[str],
+    lens: str,
+    players_db_path: str,
+) -> dict[str, Any]:
+    """Commissioner "trade veto calculator": grade a proposed two-team trade
+    for BOTH rosters and combine it into one outrage read (modules.trade_veto).
+
+    Each side is graded by the Analyzer's own lineup model on that team's whole
+    roster, at that team's own auto posture (a rebuilding team's youth and picks
+    count for what they are worth to a rebuild). On demand, not cached."""
+
+    from modules import roster_value_model as rvm
+    from modules import trade_grade, trade_veto
+    from modules.trade_analyzer_assembly import player_asset_from_mapping
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return {"status": "unavailable", "headline": "League not found."}
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    if valued.empty:
+        return {"status": "unavailable", "headline": "Player values are not ready yet."}
+    score_field = league_value_settings.valuation_score_field(lens)
+    rosters = sleeper.get_rosters(league_id) or []
+    by_rid = {str(r.get("roster_id")): r for r in rosters}
+    rid_a, rid_b = str(roster_a), str(roster_b)
+    if rid_a == rid_b or rid_a not in by_rid or rid_b not in by_rid:
+        return {"status": "invalid", "headline": "Pick two different teams from this league."}
+    sends = {rid_a: [str(p) for p in a_sends_player_ids], rid_b: [str(p) for p in b_sends_player_ids]}
+    pick_ids = {rid_a: list(a_sends_pick_ids), rid_b: list(b_sends_pick_ids)}
+    for rid, ids in sends.items():
+        owned = {str(p) for p in (by_rid[rid].get("players") or [])}
+        if any(pid not in owned for pid in ids):
+            return {"status": "invalid", "headline": "A player in the trade is not on that team's roster any more."}
+    if not any(sends.values()) and not any(pick_ids.values()):
+        return {"status": "invalid", "headline": "Add at least one player or pick to the trade."}
+
+    df_summary, _capital = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    if df_summary.empty:
+        return {"status": "unavailable", "headline": "League data is not ready yet."}
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    postures = {
+        rid: roster_posture(
+            league_id=league_id, roster=by_rid[rid], lens=lens, players_db_path=players_db_path,
+            rankings_frame=rankings_frame,
+        )
+        for rid in (rid_a, rid_b)
+    }
+    strategies = {rid: str(p.get("key") or "retool") for rid, p in postures.items()}
+    pick_assets, missing = _veto_pick_assets(
+        league_id=league_id, lens=lens, players_db_path=players_db_path, df_summary=df_summary,
+        settings=settings, strategy_by_roster=strategies, pick_ids_by_roster=pick_ids,
+    )
+    if missing:
+        return {"status": "invalid", "headline": "A draft pick in the trade is not owned by that team any more."}
+
+    players_df = exclude_idp_rows(valued)
+    window = trade_grade.season_window(settings)
+    all_ids = {pid for r in (rid_a, rid_b) for pid in (by_rid[r].get("players") or [])}
+    rostered_ids = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
+    status = model_status.ok()
+    names = {}
+    try:
+        profiles = sleeper.get_league_roster_profiles(league_id)
+    except Exception:
+        profiles = {}
+    for rid in (rid_a, rid_b):
+        prof = (profiles or {}).get(rid) or (profiles or {}).get(int(rid)) or {}
+        names[rid] = str(prof.get("team_name") or prof.get("owner_name") or f"Team {rid}")
+
+    results: list[dict[str, Any]] = []
+    for me, other in ((rid_a, rid_b), (rid_b, rid_a)):
+        strategy_df = apply_strategy_age_curve(players_df, strategies[me], score_field)
+        frame, _pool = trade_grade.attach_projection_baselines(
+            strategy_df, None, {str(p) for p in all_ids}, score_field
+        )
+        my_ids = {str(p) for p in (by_rid[me].get("players") or []) if p is not None}
+        roster_df = frame[frame["player_id"].astype(str).isin(my_ids)].copy()
+        if roster_df.empty:
+            return {"status": "unavailable", "headline": f"{names[me]}'s roster could not be read."}
+        values = pd.to_numeric(
+            frame[frame["player_id"].astype(str).isin(rostered_ids)][score_field], errors="coerce"
+        ).dropna().tolist()
+        rvc = rvm.build_context(
+            roster_df=roster_df, all_players_df=frame, pool=None, my_roster=by_rid[me], league=league,
+            settings=settings, score_field=score_field, strategy=strategies[me], window=window,
+            league_rostered_values=values, status=status,
+        )
+        incoming_ids = {str(p) for p in sends[other]}
+        incoming = frame[frame["player_id"].astype(str).isin(incoming_ids)]
+        add_rows = [row for _, row in incoming.iterrows()]
+        if len(add_rows) != len(incoming_ids):
+            return {"status": "unavailable", "headline": "A player in the trade has no value data yet."}
+        swap = rvm.evaluate_swap(rvc, sends[me], add_rows)
+        pick_in = sum(int(a.get("score") or 0) for a in pick_assets.get(other, []))
+        pick_out = sum(int(a.get("score") or 0) for a in pick_assets.get(me, []))
+        market = float(swap["raw_value_delta"]) + pick_in - pick_out
+        team_score = float(swap["trade_score"]) + pick_in - pick_out
+        positions = swap.get("positions") or {}
+        worst = min(
+            ((pos, v) for pos, v in positions.items()), key=lambda kv: kv[1].get("per_week_delta", 0.0), default=None
+        )
+        sent_names = [rvc.profiles[p].name for p in sends[me] if p in rvc.profiles] + [
+            str(a.get("label") or "Draft pick") for a in pick_assets.get(me, [])
+        ]
+        got_names = [str(r.get("name") or "") for r in add_rows] + [
+            str(a.get("label") or "Draft pick") for a in pick_assets.get(other, [])
+        ]
+        results.append({
+            "roster_id": me,
+            "team_name": names[me],
+            "posture": strategies[me],
+            "posture_source": postures[me].get("source") or "",
+            "sends": sent_names,
+            "receives": got_names,
+            "market_delta": round(market),
+            "team_score": round(team_score),
+            "points_per_week": float(swap["points"]["per_week_delta"]),
+            "worst_position": (
+                {"position": worst[0], "per_week_delta": float(worst[1].get("per_week_delta", 0.0))} if worst else None
+            ),
+            "confidence": swap.get("confidence_label"),
+        })
+    prior = _veto_prior_lopsided_wins(league_id, league, rid_a, rid_b, valued=valued)
+    verdict = trade_veto.assess(results, prior_lopsided_wins=prior)
+    return {"status": "ok", "sides": results, **verdict, "model_status": status}
+
+
+def _veto_prior_lopsided_wins(
+    league_id: str, league: Mapping[str, Any], rid_a: str, rid_b: str, *, valued: pd.DataFrame
+) -> dict[str, int]:
+    """How many earlier lopsided two-party trades each roster won from the other
+    this season (the integrity view's own trade legs). Fails open to none."""
+
+    try:
+        from modules import league_history, league_integrity
+
+        profiles = sleeper.get_league_roster_profiles(league_id)
+        lookup = league_history.player_lookup_from_rows(valued.to_dict("records"))
+        payload = league_history.collect_season_transactions(
+            league_id, fetch_league=sleeper.get_league, fetch_transactions=sleeper.get_transactions
+        )
+        txs = league_history.normalize_season_payload(payload, profiles=profiles, player_lookup=lookup)
+        legs = league_integrity.trade_legs(txs, lookup)
+        return league_integrity.lopsided_wins_between(legs, rid_a, rid_b)
+    except Exception:
+        logger.warning("veto history lookup failed (league=%s)", league_id, exc_info=True)
+        return {}
+
+
 def generate_trade_ideas(
     *,
     league_id: str,

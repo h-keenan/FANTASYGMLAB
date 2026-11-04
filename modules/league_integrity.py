@@ -547,6 +547,17 @@ def _lopsided_losers(legs: Sequence[Mapping[str, Any]]) -> list[tuple[int, int, 
     return result
 
 
+def lopsided_wins_between(legs: Sequence[Mapping[str, Any]], roster_a: Any, roster_b: Any) -> dict[str, int]:
+    """Earlier valued lopsided two-party trades each roster won from the other."""
+
+    pair = {_int(roster_a), _int(roster_b)}
+    wins = {str(_int(roster_a)): 0, str(_int(roster_b)): 0}
+    for _loser, winner, _delta, trade in _lopsided_losers(legs):
+        if set(trade["roster_ids"]) == pair:
+            wins[str(winner)] += 1
+    return wins
+
+
 def _back_and_forth(trades: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Assets that moved between the same two managers and then came back soon.
 
