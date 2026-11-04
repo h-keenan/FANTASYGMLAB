@@ -121,3 +121,13 @@ test('radii and spacing scales match web tokens', () => {
   for (const k of ['xs', 'sm', 'md', 'lg', 'xl']) assert.equal(scale('spacing', k), num(darkCss, `space-${k}`), `space-${k}`);
   for (const k of ['sm', 'md', 'lg']) assert.equal(scale('radii', k), num(darkCss, `radius-${k}`), `radius-${k}`);
 });
+
+test('app background wash is neutral: top stop equals web --color-bg (no blue tint)', () => {
+  const grad = (name: string, key: string) => {
+    const m = theme.slice(theme.indexOf(`export const ${name}`)).match(new RegExp(`${key}:\\s*\\['(#[0-9a-fA-F]{6})',\\s*'(#[0-9a-fA-F]{6})'\\]`));
+    assert.ok(m, `${name}.${key}`);
+    return [m[1].toLowerCase(), m[2].toLowerCase()];
+  };
+  assert.deepEqual(grad('gradients', 'hero'), [cssVar(darkCss, 'color-bg'), cssVar(darkCss, 'color-bg')]);
+  assert.deepEqual(grad('lightGradients', 'headerWash'), [cssVar(lightCss, 'color-bg'), cssVar(lightCss, 'color-bg')]);
+});

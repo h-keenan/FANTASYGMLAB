@@ -419,7 +419,8 @@ export function awardTierColor(
 }
 
 export const gradients = {
-  hero: ['#16202C', '#000000'] as const,
+  // Neutral: top stop equals --color-bg so no navy tint at the top (2026-11-04).
+  hero: ['#000000', '#000000'] as const,
   // web-next --color-accent -> --color-accent-strong
   accent: ['#67e8f9', '#22d3ee'] as const,
 };
@@ -456,7 +457,7 @@ export const lightGradients = {
    * this is already near the practical ceiling). `textPrimary` clears
    * ~15.5:1 against it, no concern there.
    */
-  headerWash: ['#D2FAFF', '#EAF3F8'] as const,
+  headerWash: ['#EEF3F6', '#EEF3F6'] as const,
 };
 
 /**

@@ -53,7 +53,7 @@ function linePath(periodPx: number, width: number, height: number): string {
 }
 
 export default function AppBackground() {
-  const { colors, isDark } = useThemeMode();
+  const { isDark } = useThemeMode();
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
 
@@ -105,8 +105,8 @@ export default function AppBackground() {
             <Stop offset="1" stopColor={wash[1]} stopOpacity={1} />
           </SvgLinearGradient>
           <RadialGradient id="appBloom" cx="0.5" cy="0" r="0.65">
-            <Stop offset="0" stopColor={colors.accent} stopOpacity={isDark ? 0.12 : 0.1} />
-            <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
+            <Stop offset="0" stopColor={isDark ? '#ffffff' : '#101820'} stopOpacity={isDark ? 0.05 : 0.03} />
+            <Stop offset="1" stopColor={isDark ? '#ffffff' : '#101820'} stopOpacity={0} />
           </RadialGradient>
         </Defs>
         <Rect x={0} y={0} width="100%" height="100%" fill="url(#appWash)" />
