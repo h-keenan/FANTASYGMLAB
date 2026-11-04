@@ -1217,11 +1217,17 @@ def generate_veto_check(
         prof = (profiles or {}).get(rid) or (profiles or {}).get(int(rid)) or {}
         names[rid] = str(prof.get("team_name") or prof.get("owner_name") or f"Team {rid}")
 
+    # The league's real free agents fill lineup holes, as in the Analyzer.
+    try:
+        free_agents = trade_grade.league_waiver_pool(rosters, players_df)
+    except Exception:
+        logger.warning("veto waiver pool unavailable (league=%s)", league_id, exc_info=True)
+        free_agents = None
     results: list[dict[str, Any]] = []
     for me, other in ((rid_a, rid_b), (rid_b, rid_a)):
         strategy_df = apply_strategy_age_curve(players_df, strategies[me], score_field)
-        frame, _pool = trade_grade.attach_projection_baselines(
-            strategy_df, None, {str(p) for p in all_ids}, score_field
+        frame, pool = trade_grade.attach_projection_baselines(
+            strategy_df, free_agents, {str(p) for p in all_ids}, score_field
         )
         my_ids = {str(p) for p in (by_rid[me].get("players") or []) if p is not None}
         roster_df = frame[frame["player_id"].astype(str).isin(my_ids)].copy()
@@ -1231,7 +1237,7 @@ def generate_veto_check(
             frame[frame["player_id"].astype(str).isin(rostered_ids)][score_field], errors="coerce"
         ).dropna().tolist()
         rvc = rvm.build_context(
-            roster_df=roster_df, all_players_df=frame, pool=None, my_roster=by_rid[me], league=league,
+            roster_df=roster_df, all_players_df=frame, pool=pool, my_roster=by_rid[me], league=league,
             settings=settings, score_field=score_field, strategy=strategies[me], window=window,
             league_rostered_values=values, status=status,
         )

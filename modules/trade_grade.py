@@ -587,6 +587,25 @@ def clears_suggestion_bar(verdict) -> bool:
     return score >= -trade_value_bands.EDGE
 
 
+def league_waiver_pool(rosters, valued: pd.DataFrame) -> pd.DataFrame | None:
+    """The league's real free agents (unrostered, waiver-actionable), valued like
+    ``valued``. None when rosters cannot be read, so the lineup model falls back
+    to the market replacement level rather than assuming an empty pool. The one
+    implementation behind the Analyzer and the commissioner veto calculator."""
+
+    rosters = rosters or []
+    if not rosters:
+        return None
+    roster_map = {str(r.get("roster_id")): list(r.get("players") or []) for r in rosters}
+    rostered = {str(pid) for players in roster_map.values() for pid in players}
+    pool = valued[~valued["player_id"].astype(str).isin(rostered)]
+    if pool.empty:
+        return pool
+    from modules.player_state_authority import waiver_actionable_player_pool
+
+    return waiver_actionable_player_pool(pool, roster_map, surface="trade_analyzer_lineup_hole")
+
+
 def attach_projection_baselines(
     valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids, score_field: str
 ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
