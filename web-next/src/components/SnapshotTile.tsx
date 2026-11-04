@@ -1,3 +1,4 @@
+import { compactValueFontSize } from "@/lib/snapshotTileSizing";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
 
 function formatRank(rank: number | null, tied: boolean): string {
@@ -66,23 +67,28 @@ export function SnapshotTile({
 
   return (
     <div
-      className={`glass-surface flex flex-col gap-1 ${compact ? "p-2 min-w-0" : `p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}`}
+      className={`glass-surface flex flex-col gap-1 ${compact ? "px-1.5 py-2 min-w-0 items-center text-center" : `p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}`}
       style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
     >
       <span
-        className={compact ? "flex items-start gap-1 text-[0.6875rem] leading-tight" + (reserveLabelLines ? " min-h-[2.125rem]" : "") : "flex items-center gap-1 text-xs"}
+        className={compact ? "flex flex-col items-center gap-0.5 text-[0.6875rem] leading-tight text-center min-w-0 max-w-full" + (reserveLabelLines ? " min-h-[3.25rem]" : "") : "flex items-center gap-1 text-xs"}
         style={{ color: "var(--color-text-muted)" }}
       >
         {glyph ? (
-          <span className={compact ? "shrink-0 mt-px" : undefined} style={{ color: tone === "neutral" ? GLYPH_ACCENT[glyph] : toneColor }}>
+          <span className={compact ? "shrink-0" : undefined} style={{ color: tone === "neutral" ? GLYPH_ACCENT[glyph] : toneColor }}>
             <SnapshotTileGlyph name={glyph} />
           </span>
         ) : null}
         {label}
       </span>
-      <span style={{ font: "var(--type-primary-metric)", color: toneColor, ...(compact ? { fontSize: "1.25rem" } : {}) }}>{value}</span>
+      <span
+        className={compact ? "flex h-6 max-w-full items-center justify-center whitespace-nowrap tabular-nums" : undefined}
+        style={{ font: "var(--type-primary-metric)", color: toneColor, ...(compact ? { fontSize: compactValueFontSize(value) } : {}) }}
+      >
+        {value}
+      </span>
       {note ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        <span className={compact ? "text-xs text-center" : "text-xs"} style={{ color: "var(--color-text-muted)" }}>
           {note}
         </span>
       ) : null}

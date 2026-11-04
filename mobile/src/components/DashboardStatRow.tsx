@@ -38,6 +38,7 @@ export default function DashboardStatRow({ items, style }: { items: StatStripIte
             item.valueColor ?? (item.tone === 'positive' ? colors.successBright : item.tone === 'risk' ? colors.danger : undefined)
           }
           onPress={item.onPress}
+          centered
           style={styles.tile}
         />
       ))}
