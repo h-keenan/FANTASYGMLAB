@@ -99,8 +99,12 @@ def history_bonus(prior_lopsided_wins: int) -> float:
     return min(HISTORY_MAX, HISTORY_PER_TRADE * max(0, int(prior_lopsided_wins)))
 
 
-def _direction_text(posture: str) -> str:
-    return {"contend": "a contender", "rebuild": "rebuilding", "retool": "retooling"}.get(posture, "")
+def _direction_text(side: Mapping[str, Any]) -> str:
+    """"a contender" / "rebuilding" / "retooling" from the posture group
+    (fringe contender reads as a contender, tank as rebuilding)."""
+
+    group = str(side.get("posture_group") or side.get("posture") or "")
+    return {"contender": "a contender", "rebuild": "rebuilding", "tank": "rebuilding", "retool": "retooling"}.get(group, "")
 
 
 def side_reasons(side: Mapping[str, Any]) -> list[str]:
@@ -111,7 +115,7 @@ def side_reasons(side: Mapping[str, Any]) -> list[str]:
     market = float(side.get("market_delta") or 0)
     score = float(side.get("team_score") or 0)
     ppw = float(side.get("points_per_week") or 0)
-    posture = _direction_text(str(side.get("posture") or ""))
+    posture = _direction_text(side)
     if market <= bands.DECLINE:
         out.append(f"{name} gives up {abs(round(market)):,} more in market value than they get back.")
     elif market >= bands.ACCEPT:
@@ -139,7 +143,8 @@ def assess(
     """Outrage score and band from two evaluated sides.
 
     ``sides`` carry ``roster_id``, ``team_name``, ``market_delta``,
-    ``team_score``, ``points_per_week``, ``posture`` and optionally
+    ``team_score``, ``points_per_week``, ``posture`` (strategy key),
+    ``posture_group`` (contender / retool / rebuild) and optionally
     ``worst_position``. ``prior_lopsided_wins`` maps roster id to how many
     earlier lopsided trades that roster won from this same partner."""
 

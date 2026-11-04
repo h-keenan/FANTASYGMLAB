@@ -207,6 +207,10 @@ export interface VetoSide {
   roster_id: number;
   team_name: string;
   posture: VetoPosture | string;
+  /** Server's own label and standing for this team (the keys above are not the only ones). */
+  posture_label?: string;
+  record?: string;
+  standing?: string;
   sends: string[];
   receives: string[];
   market_delta: number;
@@ -261,12 +265,40 @@ export function vetoBandTone(band: VetoBand): IntegrityTone {
 
 export const VETO_POSTURE_LABEL: Record<string, string> = {
   contender: "Contender",
+  fringe_contender: "Fringe Contender",
   retool: "Retool",
   rebuild: "Rebuild",
+  tank: "Tank/Rebuild",
 };
 
 export function vetoPostureLabel(posture: string | null | undefined): string {
   return VETO_POSTURE_LABEL[String(posture || "").toLowerCase()] || "";
+}
+
+/** The direction badge for a side: the server's label wins; a missing label never hides the badge. */
+export function vetoSideDirection(side: { posture?: string | null; posture_label?: string | null }): string {
+  return String(side.posture_label || "").trim() || vetoPostureLabel(side.posture);
+}
+
+/** Band cut-offs on the 0-100 outrage meter (docs/commissioner-tools.md: 20 / 45 / 70). */
+export const VETO_BAND_TICKS: number[] = [20, 45, 70];
+
+/** Meter fill, clamped to 0-100. */
+export function vetoMeterPercent(outrage: number | null | undefined): number {
+  const n = Number(outrage);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+/** Gains read success, losses read danger, zero stays neutral. */
+export function vetoDeltaTone(n: number): "positive" | "risk" | "neutral" {
+  const rounded = Math.round(n * 10) / 10;
+  return rounded > 0 ? "positive" : rounded < 0 ? "risk" : "neutral";
+}
+
+/** "0-7 · #12 of 12" from whatever the server sent; empty when it sent neither. */
+export function vetoStandingLine(side: { record?: string | null; standing?: string | null }): string {
+  return [side.record, side.standing].map((v) => String(v || "").trim()).filter(Boolean).join(" · ");
 }
 
 /** Whole-number market change with an explicit sign, e.g. "+1,240" / "-310". */

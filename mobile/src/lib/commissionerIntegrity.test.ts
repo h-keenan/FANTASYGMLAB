@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import {
+  VETO_BAND_TICKS,
+  vetoDeltaTone,
+  vetoMeterPercent,
+  vetoStandingLine,
   buildVetoRequest,
   formatSigned,
   vetoBandTone,
@@ -116,4 +120,15 @@ test('non-ok veto statuses show the server headline or honest copy', () => {
   assert.equal(vetoHasResult({ ok: true, status: 'invalid' }), false);
   assert.equal(vetoStatusMessage({ ok: true, status: 'invalid', headline: 'Pick two different teams.' }), 'Pick two different teams.');
   assert.match(vetoStatusMessage({ ok: true, status: 'unsupported_platform' }), /Sleeper/);
+});
+
+test('veto result helpers: meter, delta tone, standing line', () => {
+  assert.deepEqual(VETO_BAND_TICKS, [20, 45, 70]);
+  assert.equal(vetoMeterPercent(150), 100);
+  assert.equal(vetoMeterPercent(-3), 0);
+  assert.equal(vetoDeltaTone(900), 'positive');
+  assert.equal(vetoDeltaTone(-1), 'risk');
+  assert.equal(vetoDeltaTone(0), 'neutral');
+  assert.equal(vetoStandingLine({ record: '0-7', standing: '#12 of 12' }), '0-7 · #12 of 12');
+  assert.equal(vetoStandingLine({}), '');
 });

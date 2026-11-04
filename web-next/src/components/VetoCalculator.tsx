@@ -10,6 +10,7 @@ import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
+import { SnapshotTile } from "@/components/SnapshotTile";
 import { TradeAssetRow } from "@/components/TradeAssetExchange";
 import { api, type DraftPickAsset, type RankedPlayer, type TeamProfile } from "@/lib/api";
 import {
@@ -17,8 +18,11 @@ import {
   formatSigned,
   vetoBandTone,
   vetoHasResult,
-  vetoPointsLine,
-  vetoPostureLabel,
+  vetoSideDirection,
+  vetoStandingLine,
+  vetoDeltaTone,
+  vetoMeterPercent,
+  VETO_BAND_TICKS,
   vetoStatusMessage,
   vetoWorstPositionLine,
   VETO_BAND_LABEL,
@@ -70,25 +74,89 @@ function Caption({ children }: { children: string }) {
   );
 }
 
+function AssetChips({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div className="flex flex-col gap-1" data-testid={`veto-${label.toLowerCase()}`}>
+      <Caption>{label}</Caption>
+      {items.length ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {items.map((name, i) => (
+            <li
+              key={`${name}-${i}`}
+              className="glass-surface px-2 py-1 text-sm"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              {name}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          Nothing
+        </span>
+      )}
+    </div>
+  );
+}
+
 function VetoSideCard({ side, hurt }: { side: VetoSide; hurt: boolean }) {
-  const posture = vetoPostureLabel(side.posture);
+  const posture = vetoSideDirection(side);
+  const standing = vetoStandingLine(side);
   const worst = vetoWorstPositionLine(side);
   return (
     <AccentCard accent={hurt ? "var(--color-warning)" : "var(--color-border)"} as="article">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          {side.team_name}
-        </span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            {side.team_name}
+          </span>
+          {standing ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {standing}
+            </span>
+          ) : null}
+        </div>
         {posture ? <ToneBadge label={posture} color="var(--color-text-muted)" /> : null}
       </div>
-      <div className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        <span>Sends: {side.sends.length ? side.sends.join(", ") : "nothing"}</span>
-        <span>Receives: {side.receives.length ? side.receives.join(", ") : "nothing"}</span>
-        <span>Market value {formatSigned(side.market_delta)}</span>
-        <span>{vetoPointsLine(side)}</span>
-        {worst ? <span>{worst}</span> : null}
+      <AssetChips label="Gives" items={side.sends} />
+      <AssetChips label="Gets" items={side.receives} />
+      <div className="grid grid-cols-2 gap-2">
+        <SnapshotTile compact label="Market value" value={formatSigned(side.market_delta)} tone={vetoDeltaTone(side.market_delta)} glyph="power" />
+        <SnapshotTile compact label="Lineup pts/wk" value={formatSigned(side.points_per_week, 1)} tone={vetoDeltaTone(side.points_per_week)} glyph="starter" />
       </div>
+      {worst ? (
+        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          {worst}
+        </span>
+      ) : null}
     </AccentCard>
+  );
+}
+
+function OutrageMeter({ outrage, color }: { outrage: number; color: string }) {
+  const pct = vetoMeterPercent(outrage);
+  return (
+    <div
+      className="relative w-full"
+      style={{ height: 8 }}
+      role="meter"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(pct)}
+      aria-label="Outrage score"
+      data-testid="veto-meter"
+    >
+      <div className="absolute inset-0" style={{ background: "var(--color-border)", borderRadius: 4 }} />
+      <div className="absolute inset-y-0 left-0" style={{ width: `${pct}%`, background: color, borderRadius: 4 }} />
+      {VETO_BAND_TICKS.map((tick) => (
+        <div
+          key={tick}
+          className="absolute"
+          style={{ left: `${tick}%`, top: -2, bottom: -2, width: 2, background: "var(--color-text-muted)", opacity: 0.6 }}
+          data-testid="veto-tick"
+        />
+      ))}
+    </div>
   );
 }
 
@@ -100,28 +168,31 @@ export function VetoResult({ result }: { result: VetoCheckResponse }) {
     <section className="flex flex-col gap-3" aria-label="Veto check result" data-testid="veto-result">
       <AccentCard accent={color} as="section">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-col">
+          <div className="flex items-baseline gap-1.5">
             <span className="font-black" style={{ fontSize: "2.5rem", lineHeight: 1, color }} data-testid="veto-outrage">
               {Math.round(result.outrage ?? 0)}
             </span>
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              out of 100
+              / 100
             </span>
           </div>
           <ToneBadge label={VETO_BAND_LABEL[band] ?? result.label ?? band} color={color} wrap />
         </div>
+        <OutrageMeter outrage={result.outrage ?? 0} color={color} />
         {result.advice ? (
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {result.advice}
           </p>
         ) : null}
       </AccentCard>
-      {(result.sides ?? []).map((side) => (
-        <VetoSideCard key={side.roster_id} side={side} hurt={String(side.roster_id) === String(result.hurt_roster_id)} />
-      ))}
+      <div className="grid gap-3 md:grid-cols-2">
+        {(result.sides ?? []).map((side) => (
+          <VetoSideCard key={side.roster_id} side={side} hurt={String(side.roster_id) === String(result.hurt_roster_id)} />
+        ))}
+      </div>
       {result.reasons?.length ? (
         <div className="flex flex-col gap-1">
-          <Caption>Why</Caption>
+          <SectionHeading>Why</SectionHeading>
           <ul className="flex flex-col gap-1 list-disc pl-4">
             {result.reasons.map((reason) => (
               <li key={reason} className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
@@ -132,13 +203,18 @@ export function VetoResult({ result }: { result: VetoCheckResponse }) {
         </div>
       ) : null}
       {result.limits?.length ? (
-        <ul className="flex flex-col gap-1" data-testid="veto-limits">
-          {result.limits.map((limit) => (
-            <li key={limit} className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {limit}
-            </li>
-          ))}
-        </ul>
+        <details className="glass-surface p-4" data-testid="veto-limits">
+          <summary className="text-sm font-bold cursor-pointer" style={{ color: "var(--color-text-primary)" }}>
+            How this is calculated
+          </summary>
+          <ul className="flex flex-col gap-1 list-disc pl-4 mt-2">
+            {result.limits.map((limit) => (
+              <li key={limit} className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                {limit}
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
     </section>
   );
@@ -234,11 +310,15 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
     const setPlayers = which === "a" ? setAPlayers : setBPlayers;
     const setPicks = which === "a" ? setAPicks : setBPicks;
     return (
-      <div className="flex flex-col gap-1 min-w-0">
+      <div
+        className="glass-surface flex flex-col gap-1 min-w-0 p-3"
+        style={side === which ? { borderColor: "var(--color-accent)" } : undefined}
+        data-testid={`veto-send-${which}`}
+      >
         <Caption>{`${nameOf(which === "a" ? teamA : teamB) || (which === "a" ? "Team A" : "Team B")} sends`}</Caption>
         {players.length + picks.length === 0 ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            None selected
+            None selected yet
           </span>
         ) : (
           <div className="flex flex-col divide-y" style={{ borderColor: "var(--color-border)" }}>
@@ -300,6 +380,7 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
             {sendList("b")}
           </div>
           <div className="flex flex-col gap-2">
+            <Caption>Add to the trade</Caption>
             <PillRow
               options={[
                 { label: `${nameOf(teamA)} sends`, value: "a" },
@@ -330,6 +411,9 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
               className="glass-input w-full px-3 py-2 text-sm"
               style={{ color: "var(--color-text-primary)" }}
             />
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Tap an asset to add it. Tap a selected one to remove it.
+            </span>
             <div className="flex flex-col divide-y max-h-72 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
               {assetType === "picks" ? (
                 pickResults.length ? (

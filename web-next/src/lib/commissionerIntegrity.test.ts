@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  VETO_BAND_TICKS,
+  vetoDeltaTone,
+  vetoMeterPercent,
+  vetoStandingLine,
   buildVetoRequest,
   formatSigned,
   vetoBandTone,
@@ -116,5 +120,26 @@ describe("trade veto calculator helpers", () => {
     expect(vetoStatusMessage({ ok: true, status: "invalid", headline: "Pick two different teams." })).toBe("Pick two different teams.");
     expect(vetoStatusMessage({ ok: true, status: "unsupported_platform" })).toMatch(/Sleeper/);
     expect(vetoStatusMessage({ ok: true, status: "error" })).toMatch(/Try again/);
+  });
+});
+
+describe("veto result presentation helpers", () => {
+  it("clamps the meter and exposes the band ticks", () => {
+    expect(VETO_BAND_TICKS).toEqual([20, 45, 70]);
+    expect(vetoMeterPercent(150)).toBe(100);
+    expect(vetoMeterPercent(-3)).toBe(0);
+    expect(vetoMeterPercent(undefined)).toBe(0);
+    expect(vetoMeterPercent(52.4)).toBe(52.4);
+  });
+  it("tones deltas by sign", () => {
+    expect(vetoDeltaTone(900)).toBe("positive");
+    expect(vetoDeltaTone(-1)).toBe("risk");
+    expect(vetoDeltaTone(0)).toBe("neutral");
+    expect(vetoDeltaTone(-0.04)).toBe("neutral");
+  });
+  it("joins record and standing, tolerating either missing", () => {
+    expect(vetoStandingLine({ record: "0-7", standing: "#12 of 12" })).toBe("0-7 · #12 of 12");
+    expect(vetoStandingLine({ record: "3-4" })).toBe("3-4");
+    expect(vetoStandingLine({})).toBe("");
   });
 });
