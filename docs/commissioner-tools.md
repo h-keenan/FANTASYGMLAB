@@ -188,5 +188,4 @@ review before it processes. Weights, cutoffs and the 2,200 rung are judgment cal
 ### Limits (shown with every result)
 
 Estimates from projections and the market; a manager may have reasons the numbers cannot see; a signal to look at
-a trade, never proof of collusion; the league's rules decide. No free-agent pool is used for the lineup fill (a
-league-wide pool per request is too heavy), so holes fill at market replacement level.
+a trade, never proof of collusion; the league's rules decide. Lineup holes fill from the league's real free-agent pool (`trade_grade.league_waiver_pool`, the same one the Analyzer uses), falling back to market replacement level only when the pool cannot be read.
