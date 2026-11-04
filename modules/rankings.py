@@ -4911,29 +4911,37 @@ def _player_universe_cache_currency_report(db_path: str) -> dict[str, Any]:
     expected = _player_universe_metadata_payload()
     sleeper_legacy = _public_file_legacy_mtime_token(sleeper_module.PLAYERS_CACHE_PATH)
     inputs_legacy = _player_universe_legacy_input_cache_key()
-    for row in rows:
+    def _mismatch(row: dict[str, str]) -> str:
         valuation_stored = str(row.get("valuation_authority") or "")
         if str(row.get("eligibility_contract") or "") != expected["eligibility_contract"]:
-            report["reason"] = "eligibility_contract_mismatch"
-        elif valuation_stored and valuation_stored != expected["valuation_authority"]:
-            report["reason"] = "valuation_authority_mismatch"
-        elif not _stored_token_matches(
+            return "eligibility_contract_mismatch"
+        if valuation_stored and valuation_stored != expected["valuation_authority"]:
+            return "valuation_authority_mismatch"
+        if not _stored_token_matches(
             str(row.get("sleeper_universe") or ""),
             expected["sleeper_universe"],
             sleeper_legacy,
         ):
-            report["reason"] = "sleeper_universe_mismatch"
-        elif not _stored_token_matches(
+            return "sleeper_universe_mismatch"
+        if not _stored_token_matches(
             str(row.get("canonical_inputs") or ""),
             expected["canonical_inputs"],
             inputs_legacy,
         ):
-            report["reason"] = "canonical_inputs_mismatch"
-        else:
-            report["current"] = True
-            report["reason"] = "validated"
-            report["source"] = "sqlite_or_sidecar"
-            break
+            return "canonical_inputs_mismatch"
+        return ""
+
+    reason = _mismatch(rows[0])
+    report["reason"] = reason or "validated"
+    if not reason:
+        report["current"] = True
+        report["source"] = "sqlite_or_sidecar"
+        # The sidecar was re-stamped for new inputs without rewriting SQLite, so
+        # the persisted rows still hold the previous structured state (team,
+        # status, injury, ...). Membership is current; field values are not.
+        report["requires_structured_refresh"] = bool(
+            sqlite_row and rows[0] is sidecar_row and _mismatch(sqlite_row)
+        )
     report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
     performance.record_timing(
         "public_player_metadata_validation",
@@ -4987,6 +4995,12 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
             result_size=int(len(current)) if current is not None else 0,
         )
         if current is not None and required.issubset(current.columns):
+            if currency.get("requires_structured_refresh"):
+                with player_hydrate_stages.stage("structured_refresh", kind="cpu"):
+                    current = refresh_structured_player_state_from_disk(
+                        current,
+                        reconcile_universe=False,
+                    )
             identity_started = time.perf_counter()
             with player_hydrate_stages.stage("identity_columns", kind="cpu"):
                 current = _public_result(current)
