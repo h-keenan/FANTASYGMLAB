@@ -9,13 +9,40 @@ a thin position.
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
+from freezegun import freeze_time
 
-from modules import trade_ideas, trade_target_offers as tto, trade_value_bands
+from modules import nfl_schedule, trade_ideas, trade_target_offers as tto, trade_value_bands
 from modules.trade_hub_engine import apply_strategy_age_curve, strategy_adjusted_pick_score_multiplier
 from scripts.profile_trade_hub import FixtureSpec, build_fixture
 
 SCORE = "value_score"
+
+# The fixture league is a 2026 dynasty league in week 8 (see _league). Whether
+# a fair package exists for a given target depends on pick values and pick
+# actionability, which read the real calendar (trade_ideas: as_of_year, the
+# Analyzer's season window, bye weeks). Pin the clock to that league's week 8
+# so the outcome is a property of the fixture, not of the day CI runs.
+FIXTURE_NOW = "2026-10-28T12:00:00"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _pinned_world():
+    """Frozen clock, no live NFL schedule, no memos carried over from other tests.
+
+    The fixture teams (T01..) are fictional, so an empty schedule is the true
+    answer for them; leaving the real one would make the module fetch
+    data/nfl_games.csv over the network. Player values come from the fixture
+    frame itself; nothing here reads data/players.db.
+    """
+    trade_ideas.clear_team_shape_memos()
+    nfl_schedule.clear_load_games_cache()
+    with freeze_time(FIXTURE_NOW), pytest.MonkeyPatch.context() as mp:
+        mp.setattr(nfl_schedule, "load_games", lambda *a, **k: pd.DataFrame())
+        yield
+    trade_ideas.clear_team_shape_memos()
+    nfl_schedule.clear_load_games_cache()
 
 
 def _league(strategy="contender"):
@@ -55,8 +82,8 @@ def test_fair_packages_are_fair_for_both_sides(league):
     found = 0
     for target in ("F02-06", "F02-12", "F05-09", "F05-16", "F05-19"):
         result = _offers(league, target)
-        # A target may honestly have no fair package (pick values move with the
-        # calendar), but a package that is shown is never unfair.
+        # A target may honestly have no fair package, but a package that is
+        # shown is never unfair.
         assert result["status"] in {"found", "none"}, result
         found += 1 if result["offers"] else 0
         _assert_fair(league, target, result["offers"])
