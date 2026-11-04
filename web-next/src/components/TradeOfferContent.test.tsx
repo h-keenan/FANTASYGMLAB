@@ -73,6 +73,16 @@ describe("TradeOfferContent", () => {
     );
   });
 
+  it("shows the plain-English price line on a closest offer", async () => {
+    respond({
+      headline: "No clean fit for Their RB, but these are the closest ways to get him from Rivals.",
+      offers: [{ ...OFFER, closest: true, price_note: "You'd pay about 700 more than Their RB's value." }],
+    });
+    await renderContent();
+    expect(screen.getByTestId("offer-price-note")).toHaveTextContent("You'd pay about 700 more than Their RB's value.");
+    expect(screen.getByTestId("offer-headline")).toHaveTextContent("closest ways to get him");
+  });
+
   it("shows the Pro upsell, not offers, for a locked caller", async () => {
     respond({ status: "locked", is_premium: false, upsell: { title: "Build an offer for any player", body: "Upgrade to Pro to unlock it." } });
     await renderContent();

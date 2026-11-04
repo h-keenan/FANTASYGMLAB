@@ -262,3 +262,145 @@ def test_why_lines_use_real_numbers_and_name_what_the_partner_adds():
     assert "3,800" in text and "5,000" in text
     assert "Rivals adds 2027 Round 3" in text
     assert "Draft Picks screen" in text
+
+
+# ------------------------------------------- trading up for a superstar (never empty)
+#
+# Owner report: "Build an offer" on a young superstar returned "none of them grade
+# as a fair trade" although the user had the capital. The cause was not capital:
+# the generator compared RAW sums (shortest package first), while the Analyzer
+# credits the user a consolidation premium for several pieces into one star, so
+# every package it tried read as the user underpaying (+1,000 or more) and the
+# "don't skim the partner" cap threw them all out. The generator now prices
+# packages the way the Analyzer does and searches up to four assets.
+
+STAR = "F02-02"
+
+
+def _star_world(star_value, *, scale=0.75):
+    """The user holds many mid-value assets (no single one near the star); one
+    partner player is the superstar."""
+
+    fx = _league()
+    players = fx["players"].copy()
+    mine = {str(p) for p in fx["rosters"][0]["players"]}
+    for col in ("value_score", "dynasty_score", "fantasycalc_value"):
+        owned = players["player_id"].astype(str).isin(mine)
+        players.loc[owned, col] = (players.loc[owned, col] * scale).round()
+        players.loc[players["player_id"] == STAR, col] = star_value
+    players.loc[players["player_id"] == STAR, "player_tier"] = "Elite"
+    players.loc[players["player_id"] == STAR, "age"] = 23.0
+    fx["players"] = players
+    return fx
+
+
+def test_superstar_with_enough_capital_returns_consolidation_offers():
+    fx = _star_world(10500)
+    result = _offers(fx, STAR)
+    assert result["status"] == "found", result["headline"]
+    assert result["offers"]
+    mine = _mine(fx)
+    # A consolidation (3+ pieces for the one star) is reachable.
+    assert any(len(o["send"]) >= 3 for o in result["offers"])
+    for offer in result["offers"]:
+        assert [a["id"] for a in offer["receive"] if a["id"] == STAR]
+        assert len(offer["send"]) <= tto.MAX_SEND_ASSETS
+        assert all(a["id"] in mine for a in offer["send"] if a["kind"] == "player")
+        # The partner is not skimmed; the user pays at most a modest premium.
+        assert offer["value_delta"] <= tto.PARTNER_MAX_USER_VALUE_GAIN
+        assert offer["price_note"]
+        assert offer["acceptance"]["label"] in {tto.ACCEPT_LIKELY, tto.ACCEPT_POSSIBLE, tto.ACCEPT_LONG_SHOT}
+        assert offer["acceptance"]["reason"]
+
+
+def test_pre_fix_failure_mode_is_gone_the_analyzer_prices_consolidation_above_raw_value():
+    # A 3-for-1 that sends MORE raw value than the star still reads as the user
+    # underpaying: the premium is what has to be paid on top.
+    star = {"asset_type": "player", "player_id": "s", "label": "Star", "score": 10500}
+    send = [_p("a", 4000), _p("b", 3800), _p("c", 3700)]
+    assert sum(a["score"] for a in send) > star["score"]
+    assert trade_ideas.estimated_user_delta(send, [star]) > 0
+    # Priced to the Analyzer, the package that clears is the one that pays the premium.
+    bigger = send + [_p("d", 2000)]
+    assert trade_ideas.estimated_user_delta(bigger, [star]) < trade_ideas.estimated_user_delta(send, [star])
+
+
+def test_priced_generator_searches_up_to_four_assets_closest_from_above():
+    star = {"asset_type": "player", "player_id": "s", "label": "Star", "score": 10500}
+    players = [_p(f"p{i}", 3000 + 150 * i) for i in range(8)]
+    picks = [_pk(2026, 1), _pk(2027, 1)]
+    for pick in picks:
+        pick["score"] = 2200
+    packages = trade_ideas._iter_priced_send_packages(players, picks, star, {})
+    assert packages
+    assert max(len(p) for p in packages) <= tto.MAX_SEND_ASSETS
+    assert any(len(p) == 4 for p in packages)
+    deltas = [trade_ideas.estimated_user_delta(p, [star]) for p in packages]
+    assert all(-trade_ideas.PRICED_MAX_OVERPAY <= d <= trade_value_bands.ACCEPT for d in deltas)
+    # Ordered by closeness to the price: the first package is nearer than the last.
+    assert abs(deltas[0]) <= abs(deltas[-1])
+
+
+def test_no_clean_package_still_returns_the_closest_labelled_offers():
+    fx = _star_world(18000)
+    result = _offers(fx, STAR)
+    assert result["status"] == "found", result["headline"]
+    assert result["diagnostics"]["tier"] == "closest"
+    assert "closest" in result["headline"]
+    assert 1 <= len(result["offers"]) <= tto.MAX_OFFERS
+    mine = _mine(fx)
+    for offer in result["offers"]:
+        assert offer["closest"] is True
+        assert offer["price_note"]
+        assert offer["acceptance"]["label"] in {tto.ACCEPT_LIKELY, tto.ACCEPT_POSSIBLE, tto.ACCEPT_LONG_SHOT}
+        assert all(a["id"] in mine for a in offer["send"] if a["kind"] == "player")
+        assert offer["value_delta"] <= tto.PARTNER_MAX_USER_VALUE_GAIN
+
+
+def test_unaffordable_star_names_the_shortfall():
+    result = _offers(_star_world(30000), STAR)
+    assert result["status"] == "none" and result["offers"] == []
+    assert "You don't have enough total trade value" in result["headline"]
+    assert "you'd need about" in result["headline"]
+    digits = "".join(ch for ch in result["headline"].split("about")[-1] if ch.isdigit())
+    assert int(digits) >= 1000
+
+
+def test_paying_in_full_would_strip_the_lineup_is_not_offered():
+    # The user can pay, but only by sending the starters the lineup needs:
+    # nothing is shown and the reason says so (not "can't afford").
+    result = _offers(_star_world(19000), STAR)
+    assert result["status"] == "none"
+    assert "lineup" in result["headline"]
+    assert "don't have enough" not in result["headline"]
+
+
+def test_untouchables_are_never_in_a_star_package():
+    fx = _star_world(10500)
+    first = _offers(fx, STAR)
+    sent = {a["label"] for o in first["offers"] for a in o["send"] if a["kind"] == "player"}
+    assert sent
+    again = _offers(fx, STAR, untouchables=sorted(sent))
+    for offer in again["offers"]:
+        assert not ({a["label"] for a in offer["send"]} & sent)
+
+
+def test_affordability_shortfall_is_zero_when_the_user_can_pay():
+    star = {"asset_type": "player", "player_id": "s", "label": "Star", "score": 10000}
+    rich = [_p(f"r{i}", 4500) for i in range(5)]
+    poor = [_p(f"q{i}", 1500) for i in range(5)]
+    assert tto.affordability_shortfall(rich, star) == 0
+    short = tto.affordability_shortfall(poor, star)
+    assert short > 0 and short % 100 == 0
+    assert tto.affordability_shortfall([], star) >= 10000
+
+
+def test_price_note_says_how_much_the_user_pays_over():
+    assert "more than Star's value" in tto.price_note({"analyzer_value_delta": -700}, "Star")
+    assert "about right" in tto.price_note({"analyzer_value_delta": 40}, "Star")
+    assert "expect them to ask for more" in tto.price_note({"analyzer_value_delta": 400}, "Star")
+
+
+def test_a_realism_stretch_is_never_better_than_a_long_shot():
+    idea = _idea([_p("a")], hub_stretch_reasons=["market_realism: best_asset_problem"])
+    assert tto.acceptance_read(idea)["label"] == tto.ACCEPT_LONG_SHOT

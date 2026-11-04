@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 MAX_OFFERS = 3
 # Candidates graded through the Analyzer (each costs one lineup-model run).
-MAX_GRADED_CANDIDATES = 14
+MAX_GRADED_CANDIDATES = 20
 # How many overpaying packages get a "they add something back" attempt, and
 # how many sweeteners are tried for each.
 MAX_BALANCE_BASES = 3
@@ -52,6 +52,13 @@ MAX_BALANCE_ADDITIONS = 3
 # The partner may not lose more than this on the market (the same
 # "not a package they can say yes to" line the counter builder uses).
 PARTNER_MAX_USER_VALUE_GAIN = trade_value_bands.ACCEPT
+
+# When no package clears the strict bar, the closest ones are still shown, but
+# never one the lineup model says costs the team real points (that is the
+# protection against stripping a thin position to pay for a star).
+CLOSEST_MAX_LINEUP_LOSS = 10.0
+# Most assets one offer may send (players + picks).
+MAX_SEND_ASSETS = ti.PRICED_MAX_ASSETS
 
 ACCEPT_LIKELY = "Likely"
 ACCEPT_POSSIBLE = "Possible"
@@ -80,6 +87,13 @@ def acceptance_read(idea: Mapping[str, Any]) -> dict[str, str]:
     # They are the side giving up market value: one rung down.
     if gain_to_user > trade_value_bands.EDGE * 2:
         label = {ACCEPT_LIKELY: ACCEPT_POSSIBLE, ACCEPT_POSSIBLE: ACCEPT_LONG_SHOT}.get(label, label)
+    # The realism check flagged the package itself (e.g. a pile of mid pieces
+    # for their cornerstone): a stretch, never better than a long shot.
+    stretch = [str(r) for r in (idea.get("hub_stretch_reasons") or [])]
+    if any(r.startswith("market_realism") for r in stretch):
+        label = ACCEPT_LONG_SHOT
+    elif stretch and label == ACCEPT_LIKELY:
+        label = ACCEPT_POSSIBLE
     if label == ACCEPT_LIKELY:
         reason = "The value is close to even and the return helps their roster."
     elif label == ACCEPT_POSSIBLE:
@@ -198,7 +212,29 @@ def why_lines(idea: Mapping[str, Any], *, target_name: str, partner_name: str) -
     return lines
 
 
-def public_offer(idea: Mapping[str, Any], *, target_name: str, partner_name: str, rank: int) -> dict[str, Any]:
+def price_note(idea: Mapping[str, Any], target_name: str) -> str:
+    """One plain sentence on what this costs against the target's value."""
+
+    delta = idea.get("analyzer_value_delta")
+    if delta is None:
+        return ""
+    delta = int(delta)
+    if delta < -trade_value_bands.EDGE:
+        return f"You'd pay about {_fmt_value(-delta)} more than {target_name}'s value."
+    if delta > trade_value_bands.EDGE:
+        return f"This is about {_fmt_value(delta)} under {target_name}'s value, so expect them to ask for more."
+    raw_gap = int(idea.get("my_score") or 0) - int(idea.get("their_score") or 0)
+    if raw_gap > trade_value_bands.EDGE and len(idea.get("send_assets") or []) > len(idea.get("receive_assets") or []):
+        return (
+            f"Priced about right for {target_name}: several pieces for one star are worth less than "
+            "their sum, so you send more in total."
+        )
+    return f"This is priced about right for {target_name}."
+
+
+def public_offer(
+    idea: Mapping[str, Any], *, target_name: str, partner_name: str, rank: int, closest: bool = False
+) -> dict[str, Any]:
     send = [_asset_payload(a) for a in (idea.get("send_assets") or [])]
     receive = [_asset_payload(a) for a in (idea.get("receive_assets") or [])]
     structure = _structure(idea.get("send_assets") or [])
@@ -221,6 +257,8 @@ def public_offer(idea: Mapping[str, Any], *, target_name: str, partner_name: str
         "lineup_points": idea.get("posture_lineup_points"),
         "posture_label": str(idea.get("posture_label") or ""),
         "acceptance": acceptance_read(idea),
+        "price_note": price_note(idea, target_name),
+        "closest": closest,
         "why": why_lines(idea, target_name=target_name, partner_name=partner_name),
         "they_gain": str(idea.get("hub_partner_reason") or ""),
         "you_gain": str(idea.get("hub_target_fit_reason") or ""),
@@ -228,10 +266,42 @@ def public_offer(idea: Mapping[str, Any], *, target_name: str, partner_name: str
     }
 
 
-def _empty_message(diagnostics: Mapping[str, Any], target_name: str) -> str:
+def _round_up_100(n: int) -> int:
+    return int(-(-max(0, int(n)) // 100) * 100)
+
+
+def affordability_shortfall(
+    sendable: Sequence[Mapping[str, Any]], target_asset: Mapping[str, Any]
+) -> int:
+    """How much more trade value the user would need, 0 when they can afford him.
+
+    The user's best ``MAX_SEND_ASSETS`` assets (players not marked untouchable,
+    plus owned picks, at the engine's own prices) are priced against the target
+    the way the Analyzer prices a consolidation (``estimated_user_delta``): a
+    positive delta is value the user still lacks.
+    """
+
+    best = sorted(sendable, key=lambda a: int(a.get("score") or 0), reverse=True)[:MAX_SEND_ASSETS]
+    if not best:
+        return _round_up_100(int(target_asset.get("score") or 0))
+    delta = ti.estimated_user_delta(best, [target_asset])
+    return _round_up_100(delta) if delta > trade_value_bands.EDGE else 0
+
+
+def _no_offer_message(
+    *, target_name: str, shortfall: int, lineup_blocked: bool, diagnostics: Mapping[str, Any]
+) -> str:
+    if shortfall > 0:
+        return (
+            f"You don't have enough total trade value for {target_name}: "
+            f"you'd need about {_fmt_value(shortfall)} more."
+        )
+    if lineup_blocked:
+        return (
+            f"You have the value for {target_name}, but every way to pay for him would cost your "
+            "lineup real points. Try a package that keeps your starters, in the Trade Analyzer."
+        )
     reason = str(diagnostics.get("empty_reason") or "")
-    if reason == "insufficient_owned_value":
-        return f"Nothing on your roster or in your picks adds up to {target_name} without gutting your team."
     if reason in {"rejected_value_window", "rejected_after_blockbuster_envelope"}:
         return f"Every package we tried for {target_name} was too lopsided for one side."
     return f"We could not build a realistic offer for {target_name} right now."
@@ -336,6 +406,7 @@ def build_target_offers(
         adapter=platform_adapter,
         prefetched_roster_map=roster_players_map,
         prefetched_pick_assets=roster_pick_assets,
+        priced_search=True,
     )
     diagnostics = dict(result.get("diagnostics") or {})
     ideas = [
@@ -347,6 +418,17 @@ def build_target_offers(
         match = df_summary[pd.to_numeric(df_summary["roster_id"], errors="coerce").fillna(0).astype(int) == partner_key]
         partner_name = str(match.iloc[0].get("team_name") or "their team") if not match.empty else "their team"
 
+    # Everything the user could send: players not marked untouchable plus owned picks.
+    my_ids_for_pool = {str(p) for p in roster_players_map.get(my_key, [])}
+    untouchable = {str(n) for n in untouchable_names}
+    sendable = [
+        ti._player_asset(r, "Flex", score_field=score_field)
+        for _, r in df_players[df_players["player_id"].astype(str).isin(my_ids_for_pool)].iterrows()
+        if ti._row_score(r, score_field) > 0 and str(r.get("name") or "") not in untouchable
+    ] + [
+        ti._pick_asset(p, score_multiplier=pick_score_multiplier) for p in roster_pick_assets.get(my_key, [])
+    ]
+
     base = {
         "target": {**_asset_payload(target_asset), "roster_id": partner_key},
         "partner": {"roster_id": partner_key, "team_name": partner_name},
@@ -356,7 +438,10 @@ def build_target_offers(
         },
     }
     if not ideas:
-        return {**base, "status": "none", "headline": _empty_message(diagnostics, target_name), "offers": []}
+        return {**base, "status": "none", "headline": _no_offer_message(
+            target_name=target_name, shortfall=affordability_shortfall(sendable, target_asset),
+            lineup_blocked=False, diagnostics=diagnostics,
+        ), "offers": []}
 
     # Grade through the Analyzer, from the user's side, exactly like the Hub.
     league_needs = ti._league_needs_for(df_players, rosters, league_settings, score_field)
@@ -405,14 +490,31 @@ def build_target_offers(
         ),
     )
 
+    def _triage(idea: dict[str, Any]) -> int:
+        """Grade first the packages the Analyzer is most likely to call fair for both sides."""
+        est = ti.estimated_user_delta(idea.get("send_assets") or [], idea.get("receive_assets") or [])
+        in_band = -2 * trade_value_bands.EDGE <= est <= PARTNER_MAX_USER_VALUE_GAIN
+        stretch = bool(idea.get("hub_stretch"))
+        if in_band:
+            return 1 if stretch else 0
+        return 3 if stretch else 2
+
+    ideas = sorted(ideas, key=_triage)  # stable: the search's own ranking is kept inside each group
+
     passed: list[dict[str, Any]] = []
     overpay: list[dict[str, Any]] = []
+    graded_ideas: list[dict[str, Any]] = []
     graded = 0
     for idea in ideas:
         if graded >= MAX_GRADED_CANDIDATES:
             break
+        if len(idea.get("send_assets") or []) > MAX_SEND_ASSETS:
+            continue
         graded += 1
-        if gate.passes(idea):
+        ok = gate.passes(idea)
+        if idea.get("analyzer_value_delta") is not None:
+            graded_ideas.append(idea)
+        if ok:
             passed.append(idea)
         elif idea.get("analyzer_value_delta") is not None and int(idea["analyzer_value_delta"]) < -trade_value_bands.EDGE:
             overpay.append(idea)
@@ -458,32 +560,74 @@ def build_target_offers(
                     break
                 variant = _rebuild_with_return(base_idea, sweet)
                 graded += 1
-                if gate.passes(variant):
+                ok = gate.passes(variant)
+                if variant.get("analyzer_value_delta") is not None:
+                    graded_ideas.append(variant)
+                if ok:
                     passed.append(variant)
 
-    # Fair for both sides: the caller must not be skimming the partner.
+    # Fair for both sides: the partner's value in is the primary test (the
+    # caller must not be skimming them), the caller's own grade the secondary
+    # one. Packages the realism check flagged as a stretch are held back.
     fair = [
         i for i in passed
         if int(i.get("analyzer_value_delta") or 0) <= PARTNER_MAX_USER_VALUE_GAIN
     ]
-    fair.sort(key=ti.posture_surface_sort_key, reverse=True)
-    chosen = select_offers(fair, max_offers)
+    clean = [i for i in fair if not i.get("hub_stretch")]
+    clean.sort(key=ti.posture_surface_sort_key, reverse=True)
+    chosen = select_offers(clean, max_offers)
+    closest = False
+    lineup_blocked = False
+    if not chosen:
+        # Never empty when the user can afford him: the best 1-3 closest
+        # packages, labelled. Closest = the partner is not skimmed (value delta
+        # at or below the ACCEPT line), the user pays the least over the
+        # target's value, and the lineup model does not say it costs real
+        # points. Untouchables were never in the pool, and a thin position that
+        # would be stripped shows up as lineup points lost.
+        near = [
+            i for i in graded_ideas
+            if int(i.get("analyzer_value_delta")) <= PARTNER_MAX_USER_VALUE_GAIN
+        ]
+        affordable = [
+            i for i in near
+            if not isinstance(i.get("posture_lineup_points"), (int, float))
+            or float(i["posture_lineup_points"]) >= -CLOSEST_MAX_LINEUP_LOSS
+        ]
+        lineup_blocked = bool(near) and not affordable
+        affordable.sort(
+            key=lambda i: (
+                max(0, -int(i.get("analyzer_value_delta") or 0)),  # how much you overpay
+                1 if i.get("hub_stretch") else 0,
+                len(i.get("send_assets") or []),
+            )
+        )
+        chosen = select_offers(affordable, max_offers)
+        closest = bool(chosen)
     offers = [
-        public_offer(idea, target_name=target_name, partner_name=partner_name, rank=n + 1)
+        public_offer(idea, target_name=target_name, partner_name=partner_name, rank=n + 1, closest=closest)
         for n, idea in enumerate(chosen)
     ]
     base["diagnostics"]["graded"] = graded
     base["diagnostics"]["passed"] = len(passed)
+    base["diagnostics"]["tier"] = "closest" if closest else ("fair" if offers else "none")
     if not offers:
         return {
             **base,
             "status": "none",
-            "headline": (
-                f"We found packages for {target_name}, but none of them grade as a fair trade for your team. "
-                "Try the Trade Analyzer to build your own."
+            "headline": _no_offer_message(
+                target_name=target_name,
+                shortfall=affordability_shortfall(sendable, target_asset),
+                lineup_blocked=lineup_blocked,
+                diagnostics=diagnostics,
             ),
             "offers": [],
         }
+    if closest:
+        headline = (
+            f"No clean fit for {target_name}, but these are the closest ways to get him from {partner_name}."
+        )
+        return {**base, "status": "found", "headline": headline, "offers": offers}
     return {
         **base,
         "status": "found",

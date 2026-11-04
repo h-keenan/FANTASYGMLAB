@@ -514,3 +514,50 @@ thin position fails on lineup points (the lineup model and posture), not on a po
   roster (web `PlayerLeagueActions`, mobile `PlayerLeagueActions` and Player Detail), a result page
   (web `/trade-offer/[leagueId]`, mobile `TradeOffer`) and "Open in Trade Analyzer", which carries ids
   only (`send/receive/sendPicks/receivePicks`); the Analyzer regrades the package.
+
+### Trading up for a star: why "Build an offer" returned nothing, and the fix (coridian_, Jahmyr Gibbs)
+
+Reported: a user with plenty of total value tapped "Build an offer" on a young superstar and got
+"none of them grade as a fair trade". Reproduced with a fixture (user holds many mid-value assets
+and picks, no single asset near the star). Reasons the pipeline could end in `none`:
+
+1. **The generator priced packages on raw sums, the grade on the Analyzer's price.** The Analyzer
+   credits the user a consolidation premium (`trade_grade.user_consolidation_adjustment`, up to
+   ~8-32% of the star) for several pieces into one. A 3-for-1 sending MORE raw value than the star
+   still graded +1,000 or more for the user, and the partner-fairness cap (user gain at most +500)
+   threw every candidate out. The packages that clear were never generated.
+2. The value-window generators rank the shortest packages first and stop early; the blockbuster
+   path allowed at most 2 players, 3 firsts, 2 seconds, a 96-combination budget and kept only the
+   top 16 shortest, so a 4-asset consolidation was out of reach.
+3. Partner market-realism hard fails (best_asset_problem, throw_in_problem, cornerstone_protection,
+   scarcity_problem) and partner-fit / acceptance floors reject piles of mid pieces for a
+   cornerstone. 197 of 521 candidates in the fixture.
+4. Roster-fit floor from the lineup model and posture, and the Analyzer's suggestion bar.
+5. The clients showed one generic sentence for every dead end, even "you cannot afford him".
+
+Rule now (`trade_ideas._iter_priced_send_packages`, `trade_target_offers.build_target_offers`):
+
+- **Priced search** (opt-in `priced_search=True`, only Build an offer; Hub/Finder candidate sets are unchanged). Every target gets a bounded search of up to 4 send assets (top 10 players + 6
+  picks, round <= 4, each worth >= 900). Each combination is priced as the Analyzer will price it
+  (`trade_ideas.estimated_user_delta` = value in - value out + the consolidation premium), kept when
+  the user pays at most 1,500 over and does not skim the partner (delta <= +500), and ranked by
+  closeness to the price, from above first, at most 4 per lead asset. Pure arithmetic, so it is cheap.
+  Survivors go through the same fit / realism / Analyzer gate as everything else.
+- **Partner value-in is the primary test, the user's roster fit secondary.** A priced package that
+  misses a realism / fit / acceptance floor is a "stretch", not a rejection; stretches are held back
+  while any clean package exists.
+- **Never empty.** If no clean package clears the bar, the best 1-3 closest packages are shown with
+  `closest: true` and the headline "No clean fit ... closest ways to get him". Closest = not
+  skimming the partner, least overpay first, no stretch before stretch, and the lineup model must not
+  say it costs more than 10 lineup points (`CLOSEST_MAX_LINEUP_LOSS`), so a thin position is still
+  not stripped. Untouchables are never in the pool; picks use the Draft Picks screen price.
+- **Labels.** Each offer carries `price_note` ("You'd pay about 700 more than X's value", "priced
+  about right ...", "expect them to ask for more") and the usual Likely / Possible / Long shot read; a
+  package flagged by market realism is never better than Long shot.
+- **`none` only with a reason.** `affordability_shortfall` prices the user's best 4 assets against the
+  target: "You don't have enough total trade value for X: you'd need about N more." If he is
+  affordable but every way to pay costs the lineup, the message says that instead.
+
+Limits: the 4-asset cap and the 10-point lineup tolerance are judgment values, not calibrated;
+shortfall is an estimate (it excludes the lineup model); consolidation offers read as Long shot
+because partners genuinely dislike a pile of mid pieces for a cornerstone.

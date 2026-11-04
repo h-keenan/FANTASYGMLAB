@@ -6362,6 +6362,89 @@ def _iter_blockbuster_send_packages(
     return [item[-1] for item in ranked[:16]]
 
 
+PRICED_MAX_ASSETS = 4
+PRICED_PLAYER_POOL = 10
+PRICED_PICK_POOL = 6
+PRICED_MIN_ASSET_VALUE = 900
+PRICED_CANDIDATE_LIMIT = 24
+PRICED_PER_LEAD_LIMIT = 4
+# How far above the Analyzer's price a package may sit and still be offered
+# (the partner can add one asset back to even it out).
+PRICED_MAX_OVERPAY = 1500
+
+
+def estimated_user_delta(
+    send_assets: Sequence[Mapping[str, Any]],
+    receive_assets: Sequence[Mapping[str, Any]],
+) -> int:
+    """The user's value delta as the Analyzer will price it, without a lineup run.
+
+    Raw value in minus raw value out, plus the Analyzer's own signed
+    consolidation premium (``trade_grade.user_consolidation_adjustment``): in
+    dynasty, several pieces for one star are worth less than their sum, so the
+    price of a star in pieces is the star's value plus that premium. The lineup
+    model and injury terms are left to the real grade.
+    """
+
+    send_total = sum(_asset_score(a) for a in send_assets)
+    receive_total = sum(_asset_score(a) for a in receive_assets)
+    adjustment, _note = trade_grade.user_consolidation_adjustment(send_assets, receive_assets)
+    return int(receive_total - send_total + adjustment)
+
+
+def _iter_priced_send_packages(
+    players: Sequence[Dict[str, Any]],
+    picks: Sequence[Dict[str, Any]],
+    target_asset: Dict[str, Any],
+    diagnostics: Dict[str, Any],
+) -> List[List[Dict[str, Any]]]:
+    """Packages of up to four of the user's own assets priced to the target.
+
+    Unlike the value-window generators (which compare raw sums and rank the
+    shortest package first), this prices every combination the way the
+    Analyzer will (``estimated_user_delta``) and keeps the ones that bring the
+    partner's value in closest to the target's price from above: the user
+    trading up is expected to pay a little over, never to be rejected for it.
+    Pure arithmetic over a bounded pool, so it is cheap; the realism / fit /
+    lineup checks run afterwards on the survivors.
+    """
+
+    from modules import trade_value_bands
+
+    meaningful = [
+        a for a in sorted(players, key=_asset_score, reverse=True)
+        if _asset_score(a) >= PRICED_MIN_ASSET_VALUE
+    ][:PRICED_PLAYER_POOL]
+    pool_picks = [
+        a for a in sorted(picks, key=_asset_score, reverse=True)
+        if _asset_score(a) >= PRICED_MIN_ASSET_VALUE and _safe_int(a.get("round"), 99) <= 4
+    ][:PRICED_PICK_POOL]
+    pool = meaningful + pool_picks
+    scored: List[tuple] = []
+    for size in range(1, PRICED_MAX_ASSETS + 1):
+        for package in combinations(pool, size):
+            delta = estimated_user_delta(package, [target_asset])
+            if delta > trade_value_bands.ACCEPT or delta < -PRICED_MAX_OVERPAY:
+                continue
+            # Closest to the price first; from above (user pays) beats from below.
+            scored.append((abs(delta) + (0 if delta <= 0 else 250), size, list(package), delta))
+    scored.sort(key=lambda item: (item[0], item[1]))
+    diagnostics["priced_pool_size"] = len(pool)
+    diagnostics["priced_in_band"] = len(scored)
+    chosen: List[List[Dict[str, Any]]] = []
+    lead_counts: Dict[str, int] = {}
+    for _rank, _size, package, _delta in scored:
+        lead = max(package, key=_asset_score)
+        lead_key = str(lead.get("player_id") or lead.get("label") or "")
+        if lead_counts.get(lead_key, 0) >= PRICED_PER_LEAD_LIMIT:
+            continue
+        lead_counts[lead_key] = lead_counts.get(lead_key, 0) + 1
+        chosen.append(package)
+        if len(chosen) >= PRICED_CANDIDATE_LIMIT:
+            break
+    return chosen
+
+
 def _median_int(values: List[int]) -> int:
     nums = sorted(int(value) for value in values)
     if not nums:
@@ -7632,6 +7715,7 @@ def build_player_trade_hub_ideas(
     prefetched_roster_map=None,
     prefetched_pick_assets=None,
     hot_path_state=None,
+    priced_search: bool = False,
 ) -> Dict[str, Any]:
     mode_key = str(mode or "").strip().lower()
     player_id = str(selected_player_id or "").strip()
@@ -8163,20 +8247,29 @@ def build_player_trade_hub_ideas(
             focused_player_ids=[player_id],
             explicit_acquisition_target=True,
         )
+        # A "priced" package is already sized to the Analyzer's price for the
+        # target (see _iter_priced_send_packages). Its realism, fit and
+        # acceptance misses are not rejections: they mark it a stretch, which
+        # the caller labels, so the search never ends empty for a target the
+        # user can afford.
+        stretch_reasons: List[str] = []
         if market_context.get("hard_fail"):
-            diagnostics["no_market_realism"] += 1
             flags_list = list(market_context.get("hard_fail_flags") or [])
-            _count_market_hard_fail(diagnostics, flags_list)
-            diagnostics["combinations_market_rejected"] = (
-                _safe_int(diagnostics.get("combinations_market_rejected"), 0) + 1
-            )
-            if any(str(flag) in _BLOCKBUSTER_TRUST_FLAGS for flag in flags_list):
-                diagnostics["combinations_trust_rejected"] = (
-                    _safe_int(diagnostics.get("combinations_trust_rejected"), 0) + 1
-                )
             flags = ", ".join(str(flag) for flag in flags_list)
-            record_rejection(send_assets, "market_realism", flags or "canonical market hard fail")
-            return
+            if source == "priced":
+                stretch_reasons.append(f"market_realism: {flags or 'hard fail'}")
+            else:
+                diagnostics["no_market_realism"] += 1
+                _count_market_hard_fail(diagnostics, flags_list)
+                diagnostics["combinations_market_rejected"] = (
+                    _safe_int(diagnostics.get("combinations_market_rejected"), 0) + 1
+                )
+                if any(str(flag) in _BLOCKBUSTER_TRUST_FLAGS for flag in flags_list):
+                    diagnostics["combinations_trust_rejected"] = (
+                        _safe_int(diagnostics.get("combinations_trust_rejected"), 0) + 1
+                    )
+                record_rejection(send_assets, "market_realism", flags or "canonical market hard fail")
+                return
 
         def stash_exploratory(stage: str, reason: str) -> None:
             exploratory_pool.append(
@@ -8189,16 +8282,24 @@ def build_player_trade_hub_ideas(
             )
             record_rejection(send_assets, stage, reason)
 
+        def miss(stage: str, reason: str, counter: str | None = None) -> bool:
+            """True when the candidate is rejected; priced candidates only note the miss."""
+            if source == "priced":
+                stretch_reasons.append(f"{stage}: {reason}")
+                return False
+            if counter:
+                diagnostics[counter] = _safe_int(diagnostics.get(counter), 0) + 1
+            return True
+
         if source != "exploratory":
             user_floor = 0 if source == "primary" else -8
             if fit_bonus < user_floor:
                 diagnostics["no_roster_fit"] += 1
-                diagnostics["rejected_user_roster_fit"] = (
-                    _safe_int(diagnostics.get("rejected_user_roster_fit"), 0) + 1
-                )
-                stash_exploratory("user_fit", f"roster-fit score {fit_bonus} is below {user_floor}")
-                return
-            diagnostics["user_fit_pass"] += 1
+                if miss("user_fit", f"roster-fit score {fit_bonus} is below {user_floor}", "rejected_user_roster_fit"):
+                    stash_exploratory("user_fit", f"roster-fit score {fit_bonus} is below {user_floor}")
+                    return
+            else:
+                diagnostics["user_fit_pass"] += 1
             allow_negative_partner = (
                 allow_soft_partner_fit
                 and partner_score >= -30
@@ -8210,38 +8311,33 @@ def build_player_trade_hub_ideas(
             partner_floor = 1 if source == "primary" else -30
             if partner_score < partner_floor and not allow_negative_partner:
                 diagnostics["no_partner_fit"] += 1
-                diagnostics["rejected_partner_fit"] = (
-                    _safe_int(diagnostics.get("rejected_partner_fit"), 0) + 1
-                )
-                stash_exploratory("partner_fit", f"partner-fit score {partner_score} is below {partner_floor}")
-                return
-            if partner_score <= 0:
-                diagnostics["soft_partner_fit_widened"] = int(
-                    diagnostics.get("soft_partner_fit_widened") or 0
-                ) + 1
-            diagnostics["partner_fit_pass"] += 1
+                if miss("partner_fit", f"partner-fit score {partner_score} is below {partner_floor}", "rejected_partner_fit"):
+                    stash_exploratory("partner_fit", f"partner-fit score {partner_score} is below {partner_floor}")
+                    return
+            else:
+                if partner_score <= 0:
+                    diagnostics["soft_partner_fit_widened"] = int(
+                        diagnostics.get("soft_partner_fit_widened") or 0
+                    ) + 1
+                diagnostics["partner_fit_pass"] += 1
             if reasoning["score"] < min_reason_score:
                 diagnostics["no_reasoning_fit"] += 1
-                diagnostics["rejected_acceptance"] = (
-                    _safe_int(diagnostics.get("rejected_acceptance"), 0) + 1
-                )
-                diagnostics["rejected_strategy"] = (
-                    _safe_int(diagnostics.get("rejected_strategy"), 0) + 1
-                )
-                stash_exploratory("acceptance", f"reasoning score {reasoning['score']} is below {min_reason_score}")
-                return
-            diagnostics["acceptance_pass"] += 1
+                if miss("acceptance", f"reasoning score {reasoning['score']} is below {min_reason_score}", "rejected_acceptance"):
+                    diagnostics["rejected_strategy"] = (
+                        _safe_int(diagnostics.get("rejected_strategy"), 0) + 1
+                    )
+                    stash_exploratory("acceptance", f"reasoning score {reasoning['score']} is below {min_reason_score}")
+                    return
+            else:
+                diagnostics["acceptance_pass"] += 1
             if int(market_context.get("score") or 0) < min_acceptance_score:
                 diagnostics["no_market_realism"] += 1
-                diagnostics["rejected_acceptance"] = (
-                    _safe_int(diagnostics.get("rejected_acceptance"), 0) + 1
-                )
-                stash_exploratory(
-                    "market_realism",
-                    f"market score {market_context.get('score', 0)} is below {min_acceptance_score}",
-                )
-                return
-            diagnostics["market_realism_pass"] += 1
+                reason = f"market score {market_context.get('score', 0)} is below {min_acceptance_score}"
+                if miss("market_realism", reason, "rejected_acceptance"):
+                    stash_exploratory("market_realism", reason)
+                    return
+            else:
+                diagnostics["market_realism_pass"] += 1
         final_rationale = " ".join(
             part
             for part in [reasoning.get("summary", ""), rationale, fit_context.get("rationale", ""), market_context.get("summary", "")]
@@ -8284,6 +8380,12 @@ def build_player_trade_hub_ideas(
         )
         idea["hub_mode"] = "target_player"
         idea["hub_search_source"] = source
+        if source == "priced":
+            idea["hub_priced"] = True
+            idea["hub_stretch"] = bool(stretch_reasons)
+            idea["hub_stretch_reasons"] = list(stretch_reasons)
+            source = "stretch" if stretch_reasons else "expanded"
+            idea["hub_search_source"] = source
         idea["partner_roster_id"] = int(target_roster_id)
         idea["hub_path"] = _player_hub_path_label(selected_asset, send_assets, [selected_asset], active_strategy, "target_player")
         idea["hub_partner_reason"] = _target_partner_reason(selected_asset, partner_shape, send_assets, partner_name)
@@ -8483,6 +8585,41 @@ def build_player_trade_hub_ideas(
         _add_stage_ms(diagnostics, "stage_ms_construction", blockbuster_started)
         ideas.sort(key=_target_player_sort_key, reverse=True)
         primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
+    # Priced search: up to four of the user's assets, sized to the Analyzer's
+    # price for this target (consolidation premium included), closest from
+    # above. Opt-in (``priced_search``): only "Build an offer" needs it; the
+    # other surfaces keep their existing candidate set.
+    if priced_search:
+        priced_started = time.perf_counter()
+        for send_assets in _iter_priced_send_packages(
+            expanded_player_assets or my_player_assets,
+            my_pick_assets,
+            selected_asset,
+            diagnostics,
+        ):
+            if not value_candidate(send_assets, low=-PRICED_MAX_OVERPAY - 3500, high=PRICED_MAX_OVERPAY + 4500):
+                continue
+            add_hub_idea(
+                send_assets,
+                "Priced package",
+                f"Sized to what {partner_name} should expect for a {target_pos} asset of this value.",
+                75 - (3 * len(send_assets)),
+                min_reason_score=6,
+                min_acceptance_score=50,
+                source="priced",
+                allow_soft_partner_fit=True,
+            )
+        diagnostics["priced_candidates"] = sum(1 for idea in ideas if idea.get("hub_priced"))
+        _add_stage_ms(diagnostics, "stage_ms_construction", priced_started)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
+        # Priced packages are already bounded and ranked by closeness to the
+        # price; keep all of them visible to the caller (they would otherwise
+        # compete for the generic per-path slots).
+        visible = {id(idea) for idea in primary_selected}
+        primary_selected = primary_selected + [
+            idea for idea in ideas if idea.get("hub_priced") and id(idea) not in visible
+        ]
     if not ideas and exploratory_pool:
         for item in exploratory_pool[:12]:
             add_hub_idea(

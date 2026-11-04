@@ -1229,6 +1229,10 @@ export interface TradeTargetOffer {
   lineup_points: number | null;
   posture_label: string;
   acceptance: { label: "Likely" | "Possible" | "Long shot"; reason: string };
+  /** Plain-English cost against his value, e.g. "You'd pay about 700 more than his value." */
+  price_note?: string;
+  /** True when no package cleared the strict bar and these are the closest ones. */
+  closest?: boolean;
   why: string[];
   they_gain: string;
   you_gain: string;
