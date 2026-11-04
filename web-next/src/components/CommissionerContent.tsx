@@ -214,10 +214,11 @@ export function CommissionerView({
           options={DRAFT_ORDER_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
           active={draftOrder}
           onSelect={(value) => onDraftOrder(value as DraftOrderRule)}
+          variant="fill"
           ariaLabel="Draft order rule"
         />
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Sleeper does not publish this, so it changes how a flagged team is described, not the lineup math.
+          Worst record means the worst team picks first; Lottery covers any other order. Sleeper does not publish this, so it changes how a flagged team is described, not the lineup math.
         </span>
       </div>
 

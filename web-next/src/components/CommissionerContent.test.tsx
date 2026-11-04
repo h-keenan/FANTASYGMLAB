@@ -52,7 +52,7 @@ describe("CommissionerContent", () => {
     vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body());
     render(<CommissionerContent leagueId="L1" leagueName="My League" />);
     await screen.findByText("Tanker");
-    fireEvent.click(screen.getByText("Worst record picks first"));
+    fireEvent.click(screen.getByText("Worst record"));
     await waitFor(() => expect(api.getCommissionerIntegrity).toHaveBeenLastCalledWith("L1", "record"));
   });
 
@@ -119,8 +119,8 @@ describe("CommissionerContent", () => {
       ok: true, status: "ok", is_premium: true, outrage: 52, band: "lopsided", label: "Lopsided", advice: "Worth a conversation before it processes.",
       hurt_roster_id: "1", reasons: ["Alpha's lineup loses about 4.0 points a week."], limits: ["A signal to look at a trade; the league's rules decide."],
       sides: [
-        { roster_id: 1, team_name: "Alpha", posture: "contender", record: "0-7", standing: "#12 of 12", sends: ["Star WR"], receives: ["2027 1st"], market_delta: -900, team_score: -1500, points_per_week: -4, worst_position: { position: "WR", per_week_delta: -4 } },
-        { roster_id: 2, team_name: "Bravo", posture: "rebuild", sends: ["2027 1st"], receives: ["Star WR"], market_delta: 900, team_score: 800, points_per_week: 1.2, worst_position: null },
+        { roster_id: 1, team_name: "Alpha", posture: "contender", record: "0-7", standing: "#12 of 12", sends: ["Star WR"], receives: ["2027 Round 1 (Bravo)"], market_delta: -900, team_score: -1500, points_per_week: -4, worst_position: { position: "WR", per_week_delta: -4 } },
+        { roster_id: 2, team_name: "Bravo", posture: "rebuild", sends: ["2027 Round 1 (Bravo)"], receives: ["Star WR"], market_delta: 900, team_score: 800, points_per_week: 1.2, worst_position: null },
       ],
     };
 
@@ -163,6 +163,9 @@ describe("CommissionerContent", () => {
       expect(screen.getAllByTestId("veto-tick")).toHaveLength(3);
       expect(screen.getByTestId("veto-meter").getAttribute("aria-valuenow")).toBe("52");
       expect(screen.getByText("How this is calculated")).toBeTruthy();
+      // The owning team is not repeated on its own pick.
+      expect(screen.getAllByText("2027 Round 1")).toHaveLength(2);
+      expect(screen.queryByText("2027 Round 1 (Bravo)")).toBeNull();
       expect(screen.getByText("Biggest hit: WR (-4.0 pts/wk)")).toBeTruthy();
       expect(screen.getByText("Alpha's lineup loses about 4.0 points a week.")).toBeTruthy();
       expect(screen.getByTestId("veto-limits").textContent).toContain("the league's rules decide");
