@@ -19,6 +19,7 @@ import {
   vetoBandTone,
   vetoHasResult,
   vetoSideDirection,
+  vetoAssetLabel,
   vetoStandingLine,
   vetoDeltaTone,
   vetoMeterPercent,
@@ -66,6 +67,11 @@ interface PoolData {
 
 const MAX_RESULTS = 40;
 
+/** A pick on the owner's own list: no owner line, and no "(owner)" repeated in the label. */
+function ownedPickAsset(pick: DraftPickAsset) {
+  return { ...pickToTradeAsset(pick), label: vetoAssetLabel(pick.label, pick.owner_team_name), owner_team_name: undefined };
+}
+
 function Caption({ children }: { children: string }) {
   return (
     <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
@@ -74,7 +80,7 @@ function Caption({ children }: { children: string }) {
   );
 }
 
-function AssetChips({ label, items }: { label: string; items: string[] }) {
+function AssetChips({ label, items, fromTeam }: { label: string; items: string[]; fromTeam: string }) {
   return (
     <div className="flex flex-col gap-1" data-testid={`veto-${label.toLowerCase()}`}>
       <Caption>{label}</Caption>
@@ -86,7 +92,7 @@ function AssetChips({ label, items }: { label: string; items: string[] }) {
               className="glass-surface px-2 py-1 text-sm"
               style={{ color: "var(--color-text-primary)" }}
             >
-              {name}
+              {vetoAssetLabel(name, fromTeam)}
             </li>
           ))}
         </ul>
@@ -99,7 +105,7 @@ function AssetChips({ label, items }: { label: string; items: string[] }) {
   );
 }
 
-function VetoSideCard({ side, hurt }: { side: VetoSide; hurt: boolean }) {
+function VetoSideCard({ side, hurt, otherName }: { side: VetoSide; hurt: boolean; otherName: string }) {
   const posture = vetoSideDirection(side);
   const standing = vetoStandingLine(side);
   const worst = vetoWorstPositionLine(side);
@@ -118,8 +124,8 @@ function VetoSideCard({ side, hurt }: { side: VetoSide; hurt: boolean }) {
         </div>
         {posture ? <ToneBadge label={posture} color="var(--color-text-muted)" /> : null}
       </div>
-      <AssetChips label="Gives" items={side.sends} />
-      <AssetChips label="Gets" items={side.receives} />
+      <AssetChips label="Gives" items={side.sends} fromTeam={side.team_name} />
+      <AssetChips label="Gets" items={side.receives} fromTeam={otherName} />
       <div className="grid grid-cols-2 gap-2">
         <SnapshotTile compact label="Market value" value={formatSigned(side.market_delta)} tone={vetoDeltaTone(side.market_delta)} glyph="power" />
         <SnapshotTile compact label="Lineup pts/wk" value={formatSigned(side.points_per_week, 1)} tone={vetoDeltaTone(side.points_per_week)} glyph="starter" />
@@ -168,7 +174,7 @@ export function VetoResult({ result }: { result: VetoCheckResponse }) {
     <section className="flex flex-col gap-3" aria-label="Veto check result" data-testid="veto-result">
       <AccentCard accent={color} as="section">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 shrink-0 whitespace-nowrap">
             <span className="font-black" style={{ fontSize: "2.5rem", lineHeight: 1, color }} data-testid="veto-outrage">
               {Math.round(result.outrage ?? 0)}
             </span>
@@ -186,12 +192,17 @@ export function VetoResult({ result }: { result: VetoCheckResponse }) {
         ) : null}
       </AccentCard>
       <div className="grid gap-3 md:grid-cols-2">
-        {(result.sides ?? []).map((side) => (
-          <VetoSideCard key={side.roster_id} side={side} hurt={String(side.roster_id) === String(result.hurt_roster_id)} />
+        {(result.sides ?? []).map((side, i, all) => (
+          <VetoSideCard
+            key={side.roster_id}
+            side={side}
+            hurt={String(side.roster_id) === String(result.hurt_roster_id)}
+            otherName={all[1 - i]?.team_name ?? ""}
+          />
         ))}
       </div>
       {result.reasons?.length ? (
-        <div className="flex flex-col gap-1">
+        <div className="glass-surface p-4 flex flex-col gap-2">
           <SectionHeading>Why</SectionHeading>
           <ul className="flex flex-col gap-1 list-disc pl-4">
             {result.reasons.map((reason) => (
@@ -347,7 +358,7 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
                   clearResult();
                 }}
               >
-                <TradeAssetRow asset={pickToTradeAsset(p)} />
+                <TradeAssetRow asset={ownedPickAsset(p)} />
               </button>
             ))}
           </div>
@@ -427,7 +438,7 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
                         clearResult();
                       }}
                     >
-                      <TradeAssetRow asset={pickToTradeAsset(pick)} />
+                      <TradeAssetRow asset={ownedPickAsset(pick)} />
                     </button>
                   ))
                 ) : (

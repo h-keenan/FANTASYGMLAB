@@ -96,8 +96,8 @@ export interface CommissionerIntegrityResponse {
 
 export const DRAFT_ORDER_OPTIONS: { value: DraftOrderRule; label: string }[] = [
   { value: "unknown", label: "Not sure" },
-  { value: "record", label: "Worst record picks first" },
-  { value: "lottery", label: "Lottery / other" },
+  { value: "record", label: "Worst record" },
+  { value: "lottery", label: "Lottery" },
 ];
 
 export type IntegrityTone = "success" | "warning" | "danger" | "muted";
@@ -299,6 +299,15 @@ export function vetoDeltaTone(n: number): "positive" | "risk" | "neutral" {
 /** "0-7 · #12 of 12" from whatever the server sent; empty when it sent neither. */
 export function vetoStandingLine(side: { record?: string | null; standing?: string | null }): string {
   return [side.record, side.standing].map((v) => String(v || "").trim()).filter(Boolean).join(" · ");
+}
+
+/** Pick labels carry the original team in parentheses ("2027 Round 1 (Blitz Bureau)"); drop it when it is the team that owns the pick. */
+export function vetoAssetLabel(label: string | null | undefined, ownerName: string | null | undefined): string {
+  const text = String(label || "").trim();
+  const owner = String(ownerName || "").trim().toLowerCase();
+  const m = text.match(/^(.*?)\s*\(([^()]*)\)$/);
+  if (m && owner && m[2].trim().toLowerCase() === owner) return m[1].trim();
+  return text;
 }
 
 /** Whole-number market change with an explicit sign, e.g. "+1,240" / "-310". */

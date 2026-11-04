@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  vetoAssetLabel,
   VETO_BAND_TICKS,
   vetoDeltaTone,
   vetoMeterPercent,
@@ -141,5 +142,15 @@ describe("veto result presentation helpers", () => {
     expect(vetoStandingLine({ record: "0-7", standing: "#12 of 12" })).toBe("0-7 · #12 of 12");
     expect(vetoStandingLine({ record: "3-4" })).toBe("3-4");
     expect(vetoStandingLine({})).toBe("");
+  });
+});
+
+describe("vetoAssetLabel", () => {
+  it("drops the owner from a pick label only when it matches", () => {
+    expect(vetoAssetLabel("2027 Round 1 (Blitz Bureau)", "Blitz Bureau")).toBe("2027 Round 1");
+    expect(vetoAssetLabel("2027 Round 1 (blitz bureau)", "Blitz Bureau ")).toBe("2027 Round 1");
+    expect(vetoAssetLabel("2027 Round 1 (Other Team)", "Blitz Bureau")).toBe("2027 Round 1 (Other Team)");
+    expect(vetoAssetLabel("Saquon Barkley", "Blitz Bureau")).toBe("Saquon Barkley");
+    expect(vetoAssetLabel(null, "x")).toBe("");
   });
 });
