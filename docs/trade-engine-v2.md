@@ -537,7 +537,7 @@ and picks, no single asset near the star). Reasons the pipeline could end in `no
 
 Rule now (`trade_ideas._iter_priced_send_packages`, `trade_target_offers.build_target_offers`):
 
-- **Priced search.** Every target gets a bounded search of up to 4 send assets (top 10 players + 6
+- **Priced search** (opt-in `priced_search=True`, only Build an offer; Hub/Finder candidate sets are unchanged). Every target gets a bounded search of up to 4 send assets (top 10 players + 6
   picks, round <= 4, each worth >= 900). Each combination is priced as the Analyzer will price it
   (`trade_ideas.estimated_user_delta` = value in - value out + the consolidation premium), kept when
   the user pays at most 1,500 over and does not skim the partner (delta <= +500), and ranked by

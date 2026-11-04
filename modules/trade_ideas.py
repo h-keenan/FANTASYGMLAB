@@ -7715,6 +7715,7 @@ def build_player_trade_hub_ideas(
     prefetched_roster_map=None,
     prefetched_pick_assets=None,
     hot_path_state=None,
+    priced_search: bool = False,
 ) -> Dict[str, Any]:
     mode_key = str(mode or "").strip().lower()
     player_id = str(selected_player_id or "").strip()
@@ -8586,38 +8587,39 @@ def build_player_trade_hub_ideas(
         primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
     # Priced search: up to four of the user's assets, sized to the Analyzer's
     # price for this target (consolidation premium included), closest from
-    # above. Runs for every target so trading up for a star is never limited
-    # to the shortest raw-value packages above.
-    priced_started = time.perf_counter()
-    for send_assets in _iter_priced_send_packages(
-        expanded_player_assets or my_player_assets,
-        my_pick_assets,
-        selected_asset,
-        diagnostics,
-    ):
-        if not value_candidate(send_assets, low=-PRICED_MAX_OVERPAY - 3500, high=PRICED_MAX_OVERPAY + 4500):
-            continue
-        add_hub_idea(
-            send_assets,
-            "Priced package",
-            f"Sized to what {partner_name} should expect for a {target_pos} asset of this value.",
-            75 - (3 * len(send_assets)),
-            min_reason_score=6,
-            min_acceptance_score=50,
-            source="priced",
-            allow_soft_partner_fit=True,
-        )
-    diagnostics["priced_candidates"] = sum(1 for idea in ideas if idea.get("hub_priced"))
-    _add_stage_ms(diagnostics, "stage_ms_construction", priced_started)
-    ideas.sort(key=_target_player_sort_key, reverse=True)
-    primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
-    # Priced packages are already bounded and ranked by closeness to the
-    # price; keep all of them visible to the caller (they would otherwise
-    # compete for the generic per-path slots).
-    visible = {id(idea) for idea in primary_selected}
-    primary_selected = primary_selected + [
-        idea for idea in ideas if idea.get("hub_priced") and id(idea) not in visible
-    ]
+    # above. Opt-in (``priced_search``): only "Build an offer" needs it; the
+    # other surfaces keep their existing candidate set.
+    if priced_search:
+        priced_started = time.perf_counter()
+        for send_assets in _iter_priced_send_packages(
+            expanded_player_assets or my_player_assets,
+            my_pick_assets,
+            selected_asset,
+            diagnostics,
+        ):
+            if not value_candidate(send_assets, low=-PRICED_MAX_OVERPAY - 3500, high=PRICED_MAX_OVERPAY + 4500):
+                continue
+            add_hub_idea(
+                send_assets,
+                "Priced package",
+                f"Sized to what {partner_name} should expect for a {target_pos} asset of this value.",
+                75 - (3 * len(send_assets)),
+                min_reason_score=6,
+                min_acceptance_score=50,
+                source="priced",
+                allow_soft_partner_fit=True,
+            )
+        diagnostics["priced_candidates"] = sum(1 for idea in ideas if idea.get("hub_priced"))
+        _add_stage_ms(diagnostics, "stage_ms_construction", priced_started)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
+        # Priced packages are already bounded and ranked by closeness to the
+        # price; keep all of them visible to the caller (they would otherwise
+        # compete for the generic per-path slots).
+        visible = {id(idea) for idea in primary_selected}
+        primary_selected = primary_selected + [
+            idea for idea in ideas if idea.get("hub_priced") and id(idea) not in visible
+        ]
     if not ideas and exploratory_pool:
         for item in exploratory_pool[:12]:
             add_hub_idea(

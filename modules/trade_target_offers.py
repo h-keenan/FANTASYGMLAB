@@ -406,6 +406,7 @@ def build_target_offers(
         adapter=platform_adapter,
         prefetched_roster_map=roster_players_map,
         prefetched_pick_assets=roster_pick_assets,
+        priced_search=True,
     )
     diagnostics = dict(result.get("diagnostics") or {})
     ideas = [
