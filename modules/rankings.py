@@ -4841,8 +4841,7 @@ def _write_player_universe_cache_metadata(
         _stamp_player_universe_sidecar(db_path)
 
 
-def _read_player_universe_metadata_row(db_path: str) -> dict[str, str]:
-    row: dict[str, str] = {}
+def _read_player_universe_sqlite_metadata_row(db_path: str) -> dict[str, str]:
     try:
         with sqlite3.connect(db_path) as connection:
             metadata = pd.read_sql_query(
@@ -4851,11 +4850,13 @@ def _read_player_universe_metadata_row(db_path: str) -> dict[str, str]:
             )
         if not metadata.empty:
             raw = metadata.iloc[0].to_dict()
-            row = {str(key): str(value or "") for key, value in raw.items()}
+            return {str(key): str(value or "") for key, value in raw.items()}
     except Exception:
-        row = {}
-    if row:
-        return row
+        pass
+    return {}
+
+
+def _read_player_universe_sidecar_row(db_path: str) -> dict[str, str]:
     sidecar = _player_universe_sidecar_path(db_path)
     try:
         with open(sidecar, encoding="utf-8") as handle:
@@ -4865,6 +4866,10 @@ def _read_player_universe_metadata_row(db_path: str) -> dict[str, str]:
     if not isinstance(payload, dict):
         return {}
     return {str(key): str(value or "") for key, value in payload.items()}
+
+
+def _read_player_universe_metadata_row(db_path: str) -> dict[str, str]:
+    return _read_player_universe_sqlite_metadata_row(db_path) or _read_player_universe_sidecar_row(db_path)
 
 
 def _stored_token_matches(stored: str, current: str, legacy: str) -> bool:
@@ -4881,35 +4886,54 @@ def _player_universe_cache_currency_report(db_path: str) -> dict[str, Any]:
     if not os.path.exists(db_path):
         report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
         return report
-    row = _read_player_universe_metadata_row(db_path)
-    if not row:
+    # Two stamps can exist: the row inside SQLite and the sidecar JSON.
+    # ``_persist_reconciled_player_universe`` deliberately leaves SQLite
+    # untouched (no mtime bump) when reconciliation did not change membership
+    # and only refreshes the sidecar, so the SQLite row alone goes stale as
+    # soon as a non-membership input (e.g. the hourly injury sync rewriting
+    # sleeper_players.json) changes. The most recently written stamp is
+    # authoritative: the sidecar when it is at least as new as the database
+    # file, otherwise the row inside SQLite (e.g. a rebuild that rewrote it).
+    sqlite_row = _read_player_universe_sqlite_metadata_row(db_path)
+    sidecar_row = _read_player_universe_sidecar_row(db_path)
+    try:
+        sidecar_is_newer = os.stat(_player_universe_sidecar_path(db_path)).st_mtime_ns >= os.stat(
+            db_path
+        ).st_mtime_ns
+    except OSError:
+        sidecar_is_newer = False
+    ordered = (sidecar_row, sqlite_row) if sidecar_is_newer else (sqlite_row, sidecar_row)
+    rows = [row for row in ordered[:1] if row] or [row for row in ordered[1:] if row]
+    if not rows:
         report["reason"] = "missing_metadata"
         report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
         return report
     expected = _player_universe_metadata_payload()
     sleeper_legacy = _public_file_legacy_mtime_token(sleeper_module.PLAYERS_CACHE_PATH)
     inputs_legacy = _player_universe_legacy_input_cache_key()
-    valuation_stored = str(row.get("valuation_authority") or "")
-    if str(row.get("eligibility_contract") or "") != expected["eligibility_contract"]:
-        report["reason"] = "eligibility_contract_mismatch"
-    elif valuation_stored and valuation_stored != expected["valuation_authority"]:
-        report["reason"] = "valuation_authority_mismatch"
-    elif not _stored_token_matches(
-        str(row.get("sleeper_universe") or ""),
-        expected["sleeper_universe"],
-        sleeper_legacy,
-    ):
-        report["reason"] = "sleeper_universe_mismatch"
-    elif not _stored_token_matches(
-        str(row.get("canonical_inputs") or ""),
-        expected["canonical_inputs"],
-        inputs_legacy,
-    ):
-        report["reason"] = "canonical_inputs_mismatch"
-    else:
-        report["current"] = True
-        report["reason"] = "validated"
-        report["source"] = "sqlite_or_sidecar"
+    for row in rows:
+        valuation_stored = str(row.get("valuation_authority") or "")
+        if str(row.get("eligibility_contract") or "") != expected["eligibility_contract"]:
+            report["reason"] = "eligibility_contract_mismatch"
+        elif valuation_stored and valuation_stored != expected["valuation_authority"]:
+            report["reason"] = "valuation_authority_mismatch"
+        elif not _stored_token_matches(
+            str(row.get("sleeper_universe") or ""),
+            expected["sleeper_universe"],
+            sleeper_legacy,
+        ):
+            report["reason"] = "sleeper_universe_mismatch"
+        elif not _stored_token_matches(
+            str(row.get("canonical_inputs") or ""),
+            expected["canonical_inputs"],
+            inputs_legacy,
+        ):
+            report["reason"] = "canonical_inputs_mismatch"
+        else:
+            report["current"] = True
+            report["reason"] = "validated"
+            report["source"] = "sqlite_or_sidecar"
+            break
     report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
     performance.record_timing(
         "public_player_metadata_validation",
