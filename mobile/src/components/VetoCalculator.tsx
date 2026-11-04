@@ -23,7 +23,7 @@ import {
   vetoBandTone,
   vetoHasResult,
   vetoPointsLine,
-  vetoPostureLabel,
+  vetoSideDirection,
   vetoStatusMessage,
   vetoWorstPositionLine,
   VETO_BAND_LABEL,
@@ -69,7 +69,7 @@ function useToneColor() {
 
 function SideCard({ side, hurt, styles }: { side: VetoSide; hurt: boolean; styles: Styles }) {
   const { colors } = useThemeMode();
-  const posture = vetoPostureLabel(side.posture);
+  const posture = vetoSideDirection(side);
   const worst = vetoWorstPositionLine(side);
   return (
     <AccentCard accent={hurt ? colors.warning : colors.glassBorder}>

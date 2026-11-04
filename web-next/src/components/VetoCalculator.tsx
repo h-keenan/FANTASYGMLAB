@@ -18,7 +18,7 @@ import {
   vetoBandTone,
   vetoHasResult,
   vetoPointsLine,
-  vetoPostureLabel,
+  vetoSideDirection,
   vetoStatusMessage,
   vetoWorstPositionLine,
   VETO_BAND_LABEL,
@@ -71,7 +71,7 @@ function Caption({ children }: { children: string }) {
 }
 
 function VetoSideCard({ side, hurt }: { side: VetoSide; hurt: boolean }) {
-  const posture = vetoPostureLabel(side.posture);
+  const posture = vetoSideDirection(side);
   const worst = vetoWorstPositionLine(side);
   return (
     <AccentCard accent={hurt ? "var(--color-warning)" : "var(--color-border)"} as="article">

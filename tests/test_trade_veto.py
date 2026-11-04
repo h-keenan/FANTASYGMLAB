@@ -178,3 +178,21 @@ def test_empty_trade_and_same_team_are_rejected(fixture_league):
 def test_reasons_do_not_call_a_tiny_gap_a_loss():
     out = trade_veto.assess([_side("1", 49, 49), _side("2", -49, -49)])
     assert out["reasons"] == ["Both rosters come out close to even on value and lineup points."]
+
+
+def test_direction_text_uses_the_posture_group_so_tank_and_fringe_read_correctly():
+    # Real posture keys are contender / fringe_contender / retool / rebuild / tank;
+    # the group collapses them. A rebuild-group team's explainable gap names it.
+    out = trade_veto.assess([
+        {**_side("1", 1500, 400), "posture_group": "contender"},
+        {**_side("2", -1500, 80, ppw=-2.0, name="Tank FC"), "posture": "tank", "posture_group": "rebuild"},
+    ])
+    assert any("As rebuilding, Tank FC" in r for r in out["reasons"])
+
+
+def test_sides_carry_the_server_posture_label_and_record(fixture_league):
+    fx = fixture_league
+    out = _check(fx, _top(fx, 0)[:1], _top(fx, 1)[:1])
+    for side in out["sides"]:
+        assert side["posture_label"] and side["posture_group"] in {"contender", "retool", "rebuild"}
+        assert "record" in side and "standing" in side

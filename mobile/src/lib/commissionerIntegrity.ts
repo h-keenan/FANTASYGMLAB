@@ -207,6 +207,10 @@ export interface VetoSide {
   roster_id: number;
   team_name: string;
   posture: VetoPosture | string;
+  /** Server's own label and standing for this team (the keys above are not the only ones). */
+  posture_label?: string;
+  record?: string;
+  standing?: string;
   sends: string[];
   receives: string[];
   market_delta: number;
@@ -261,12 +265,19 @@ export function vetoBandTone(band: VetoBand): IntegrityTone {
 
 export const VETO_POSTURE_LABEL: Record<string, string> = {
   contender: "Contender",
+  fringe_contender: "Fringe Contender",
   retool: "Retool",
   rebuild: "Rebuild",
+  tank: "Tank/Rebuild",
 };
 
 export function vetoPostureLabel(posture: string | null | undefined): string {
   return VETO_POSTURE_LABEL[String(posture || "").toLowerCase()] || "";
+}
+
+/** The direction badge for a side: the server's label wins; a missing label never hides the badge. */
+export function vetoSideDirection(side: { posture?: string | null; posture_label?: string | null }): string {
+  return String(side.posture_label || "").trim() || vetoPostureLabel(side.posture);
 }
 
 /** Whole-number market change with an explicit sign, e.g. "+1,240" / "-310". */
