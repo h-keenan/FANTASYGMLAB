@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useSearchParams } from "@/lib/useSearchParams";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { useAuth } from "@/context/AuthContext";
 import { CommissionerContent } from "@/components/CommissionerContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -17,10 +18,12 @@ export default function CommissionerPage() {
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
 
+  const { lens } = useValuationLens(leagueId);
+
   useEffect(() => {
     if (!authLoading && !session) router.replace("/");
   }, [authLoading, session, router]);
 
   if (authLoading || !session) return <LoadingScreen status="Loading League integrity…" />;
-  return <CommissionerContent leagueId={leagueId} leagueName={leagueName} />;
+  return <CommissionerContent leagueId={leagueId} leagueName={leagueName} lens={lens} />;
 }

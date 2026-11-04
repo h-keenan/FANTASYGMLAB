@@ -15,7 +15,9 @@ import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import ToneBadge from '../components/ToneBadge';
+import VetoCalculator from '../components/VetoCalculator';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { api } from '../lib/api';
 import {
   BAND_LABEL,
@@ -58,6 +60,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { lens } = useValuationLens(leagueId);
   const [draftOrder, setDraftOrder] = useState<DraftOrderRule>('unknown');
   useScreenHeaderTitle(navigation, 'Commissioner', leagueName);
 
@@ -102,7 +105,10 @@ export default function CommissionerScreen({ route, navigation }: Props) {
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>{body}</ScrollView>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+        {body}
+        {data && !query.isLoading && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
+      </ScrollView>
     </View>
   );
 }

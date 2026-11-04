@@ -147,3 +147,46 @@ golden synthetic leagues in `tests/test_league_integrity.py` (obvious tank,
 injury-ridden innocent team, one-off bad week, post-elimination vs alive,
 playoff-week exclusion, collusion pair, balanced/pick trades, inactive
 manager) pin the behaviour.
+
+## Trade veto calculator (outrage fairness, whole team)
+
+Request (coridian_, 2026-11-04): "in the commissioner section we need a trade veto calculator for outrage
+fairness that takes into account their whole team", plus: teams that are doing badly or have no future will
+want youth and picks, which can lose market value and still be a good trade, so the logic has to account for it.
+
+Engine: `modules/trade_veto.py` (pure scoring) + `trade_hub_engine.generate_veto_check` (data). Endpoint:
+`POST /v1/leagues/{id}/commissioner/veto-check` with `{roster_a, roster_b, a_sends_player_ids,
+b_sends_player_ids, a_sends_pick_ids, b_sends_pick_ids, lens}` (pick ids as in `GET .../draft-picks`). Same access
+as the integrity view (Pro, any league the user can open; ESPN/MFL `unsupported_platform`).
+
+Input is a PROPOSED trade between two current rosters (players and picks each team still owns). Sleeper does not
+publish pending trades, so the commissioner enters the trade; completed trades are not re-graded (rosters have
+moved since, so a re-grade would be wrong; the integrity view already flags lopsided completed trades).
+
+### What it computes (nothing new is valued)
+
+Per side, with that team's whole roster at that team's OWN auto posture (contender / retool / rebuild from the
+rankings classification; a declared Team Situation is private to its owner, so it is not used here):
+
+* `market_delta`: value received minus value sent (players at healthy value, picks at the Analyzer's pick price at
+  that posture, so a rebuild prices picks and youth as a rebuild would).
+* `team_score`: `roster_value_model.evaluate_swap` -> `trade_lineup_model.evaluate_trade` trade score: lineup
+  points (slots, byes, injuries, depth, holes), plus the posture weights on now vs future value. A rebuilding
+  team that sells a vet for youth or picks loses market value but can read fine here; that is the point.
+* `points_per_week` and the worst position (where the hit lands).
+
+Outrage (0-100) reads the side that comes out worst on `team_score`:
+
+* team read within the "essentially even" edge (150): only 40% of the market gap counts (explainable);
+* otherwise 60% market gap + 40% team gap, each normalised to the "hard decline" rung (2,200);
+* repeat pattern: +6 per earlier lopsided trade the other side won from this team this season (max +15), only
+  once the trade already reads 25+ and is not explained by the roster. History never turns a fair trade into a flag.
+
+Bands: under 20 Fair; 20-44 Uneven but explainable; 45-69 Lopsided: worth a conversation; 70+ Outrage-level:
+review before it processes. Weights, cutoffs and the 2,200 rung are judgment calls, not backtested.
+
+### Limits (shown with every result)
+
+Estimates from projections and the market; a manager may have reasons the numbers cannot see; a signal to look at
+a trade, never proof of collusion; the league's rules decide. No free-agent pool is used for the lineup fill (a
+league-wide pool per request is too heavy), so holes fill at market replacement level.

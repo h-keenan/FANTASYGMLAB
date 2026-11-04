@@ -8,6 +8,8 @@ import type { OpponentProfileResponse } from "./opponentProfile";
 import type {
   CommissionerIntegrityResponse,
   DraftOrderRule,
+  VetoCheckRequest,
+  VetoCheckResponse,
 } from "./commissionerIntegrity";
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
@@ -4159,6 +4161,13 @@ export const api = {
     authorizedRequest<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ),
+
+  // Trade veto calculator: a POST that grades a proposed trade on demand (not cacheable).
+  postCommissionerVetoCheck: (leagueId: string, body: VetoCheckRequest) =>
+    authorizedRequest<VetoCheckResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/veto-check`, {
+      method: "POST",
+      jsonBody: body,
+    }),
 
   getGamesSeasonSim: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<GamesSeasonSimResponse>(

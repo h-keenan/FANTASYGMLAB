@@ -198,4 +198,134 @@ export function calendarLines(cal: IntegrityCalendar | null | undefined): string
   if (cal.playoff_week_start) lines.push(`Playoffs start week ${cal.playoff_week_start}`);
   return lines;
 }
+// ---- Trade veto calculator (modules/trade_veto.py, docs/commissioner-tools.md) ----
+export type VetoBand = "fair" | "explainable" | "lopsided" | "outrage";
+export type VetoStatus = "ok" | "locked" | "invalid" | "unavailable" | "error" | "unsupported_platform";
+export type VetoPosture = "contender" | "retool" | "rebuild";
+
+export interface VetoSide {
+  roster_id: number;
+  team_name: string;
+  posture: VetoPosture | string;
+  sends: string[];
+  receives: string[];
+  market_delta: number;
+  team_score: number;
+  points_per_week: number;
+  worst_position: { position: string; per_week_delta: number } | null;
+  confidence?: string | null;
+}
+
+export interface VetoCheckResponse {
+  ok: boolean;
+  is_premium?: boolean;
+  upsell?: { title: string; body: string } | null;
+  status: VetoStatus;
+  headline?: string;
+  sides?: VetoSide[];
+  outrage?: number;
+  band?: VetoBand;
+  label?: string;
+  advice?: string;
+  explained_by_roster?: boolean;
+  hurt_roster_id?: string;
+  reasons?: string[];
+  history_points?: number;
+  limits?: string[];
+}
+
+export interface VetoCheckRequest {
+  roster_a: number;
+  roster_b: number;
+  a_sends_player_ids: string[];
+  b_sends_player_ids: string[];
+  a_sends_pick_ids: string[];
+  b_sends_pick_ids: string[];
+  lens: string;
+}
+
+export const VETO_BAND_LABEL: Record<VetoBand, string> = {
+  fair: "Fair",
+  explainable: "Uneven but explainable",
+  lopsided: "Lopsided: worth a conversation",
+  outrage: "Outrage-level: review before it processes",
+};
+
+/** Same fixed semantic tones as the integrity view; no new colors. */
+export function vetoBandTone(band: VetoBand): IntegrityTone {
+  if (band === "outrage") return "danger";
+  if (band === "lopsided") return "warning";
+  if (band === "fair") return "success";
+  return "muted";
+}
+
+export const VETO_POSTURE_LABEL: Record<string, string> = {
+  contender: "Contender",
+  retool: "Retool",
+  rebuild: "Rebuild",
+};
+
+export function vetoPostureLabel(posture: string | null | undefined): string {
+  return VETO_POSTURE_LABEL[String(posture || "").toLowerCase()] || "";
+}
+
+/** Whole-number market change with an explicit sign, e.g. "+1,240" / "-310". */
+export function formatSigned(n: number, digits = 0): string {
+  const rounded = digits > 0 ? Number(n.toFixed(digits)) : Math.round(n);
+  const text = Math.abs(rounded).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  if (rounded === 0) return text;
+  return `${rounded > 0 ? "+" : "-"}${text}`;
+}
+
+/** Lineup change for one side, e.g. "Lineup -3.2 pts/wk". */
+export function vetoPointsLine(side: Pick<VetoSide, "points_per_week">): string {
+  return `Lineup ${formatSigned(side.points_per_week, 1)} pts/wk`;
+}
+
+/** Where the hit lands, or "" when no position is hurt. */
+export function vetoWorstPositionLine(side: Pick<VetoSide, "worst_position">): string {
+  const w = side.worst_position;
+  if (!w || w.per_week_delta >= 0) return "";
+  return `Biggest hit: ${w.position} (${formatSigned(w.per_week_delta, 1)} pts/wk)`;
+}
+
+/** Build the request body; empty trades are rejected client-side so the button can stay disabled. */
+export function buildVetoRequest(input: {
+  rosterA: number | string;
+  rosterB: number | string;
+  aPlayers: string[];
+  bPlayers: string[];
+  aPicks: string[];
+  bPicks: string[];
+  lens?: string;
+}): VetoCheckRequest | null {
+  if (String(input.rosterA).trim() === "" || String(input.rosterB).trim() === "") return null;
+  const a = Number(input.rosterA);
+  const b = Number(input.rosterB);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return null;
+  if (input.aPlayers.length + input.bPlayers.length + input.aPicks.length + input.bPicks.length === 0) return null;
+  return {
+    roster_a: a,
+    roster_b: b,
+    a_sends_player_ids: input.aPlayers,
+    b_sends_player_ids: input.bPlayers,
+    a_sends_pick_ids: input.aPicks,
+    b_sends_pick_ids: input.bPicks,
+    lens: input.lens || "Dynasty",
+  };
+}
+
+/** True when the response carries a gradable result. */
+export function vetoHasResult(resp: VetoCheckResponse | null | undefined): boolean {
+  return !!resp && resp.status === "ok" && !!resp.band && Array.isArray(resp.sides) && resp.sides.length > 0;
+}
+
+/** Plain message for the non-ok statuses; the server headline wins when it sent one. */
+export function vetoStatusMessage(resp: VetoCheckResponse): string {
+  if (resp.headline) return resp.headline;
+  if (resp.status === "unsupported_platform") return "The trade veto calculator is only available for Sleeper leagues for now.";
+  if (resp.status === "unavailable") return "League data is not ready yet. Try again in a moment.";
+  if (resp.status === "invalid") return "That trade could not be checked. Check the teams and assets and try again.";
+  return "The check hit a problem. Try again in a moment.";
+}
 // SHARED END

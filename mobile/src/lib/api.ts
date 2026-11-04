@@ -12,6 +12,8 @@ import type { PercentileExplorerResponse } from './percentileExplorer';
 import type {
   CommissionerIntegrityResponse,
   DraftOrderRule,
+  VetoCheckRequest,
+  VetoCheckResponse,
 } from './commissionerIntegrity';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
 import type {
@@ -3684,6 +3686,9 @@ export const api = {
     authorizedFetch<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ),
+  // Trade veto calculator: a POST that grades a proposed trade on demand (not cacheable).
+  postCommissionerVetoCheck: (leagueId: string, body: VetoCheckRequest) =>
+    authorizedPost<VetoCheckResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/veto-check`, body),
   getGamesSeasonSim: (leagueId: string) =>
     authorizedFetch<GamesSeasonSimResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/season-sim`),
   postTradeOddsEffect: (leagueId: string, packages: TradeOddsPackageRequest[]) =>

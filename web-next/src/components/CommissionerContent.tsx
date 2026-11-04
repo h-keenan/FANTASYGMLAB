@@ -10,6 +10,7 @@ import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
+import { VetoCalculator } from "@/components/VetoCalculator";
 import { api } from "@/lib/api";
 import {
   BAND_LABEL,
@@ -288,7 +289,7 @@ export function CommissionerView({
   );
 }
 
-export function CommissionerContent({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
+export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: string; leagueName: string; lens?: string }) {
   const [draftOrder, setDraftOrder] = useState<DraftOrderRule>("unknown");
   const [state, setState] = useState<{ key: string; data: CommissionerIntegrityResponse | null; error: string | null }>({
     key: "",
@@ -350,6 +351,7 @@ export function CommissionerContent({ leagueId, leagueName }: { leagueId: string
       ) : (
         <CommissionerView data={data} draftOrder={draftOrder} onDraftOrder={setDraftOrder} />
       )}
+      {ready && data && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
     </main>
   );
 }
