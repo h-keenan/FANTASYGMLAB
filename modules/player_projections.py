@@ -1142,6 +1142,50 @@ def _games_ahead(schedule: List[Dict[str, Any]], week: int) -> int:
     )
 
 
+# A QB the depth chart lists behind a healthy starter plays only when the
+# starter is hurt or pulled. His usage-based baseline reflects past starts, not
+# the role he has now (Brissett, 8 starts, was projected 16.2 over the
+# depth-chart-1 Minshew at 10.3). This prior is uncalibrated, like the
+# game-time probabilities above, so the range and confidence say so.
+BACKUP_QB_PLAY_SHARE = 0.2
+
+
+def _role_adjustment(player: Dict[str, Any], players: Dict[str, Any]) -> Dict[str, Any]:
+    """Role layer: a QB behind a healthy depth-chart starter -> multiplier."""
+
+    none = {"multiplier": 1.0, "reason": None, "applied": False, "starter_player_id": None}
+    if str(player.get("position") or "").upper() != "QB":
+        return none
+    try:
+        order = int(float(player.get("depth_chart_order")))
+    except (TypeError, ValueError):
+        return none
+    team = player.get("team")
+    if order < 2 or not team:
+        return none
+    for pid, other in players.items():
+        if other is player or str(other.get("team") or "") != str(team):
+            continue
+        if str(other.get("position") or "").upper() != "QB":
+            continue
+        try:
+            other_order = int(float(other.get("depth_chart_order")))
+        except (TypeError, ValueError):
+            continue
+        if other_order >= order:
+            continue
+        cls = injury_status.classify(str(other.get("status") or ""), str(other.get("injury_status") or ""))
+        if cls.ruled_out:
+            continue  # the starter is out, so this QB is the one playing
+        return {
+            "multiplier": BACKUP_QB_PLAY_SHARE,
+            "reason": "backup_qb",
+            "applied": True,
+            "starter_player_id": str(pid),
+        }
+    return none
+
+
 def _availability_adjustment(player: Dict[str, Any], games_ahead: int) -> Dict[str, Any]:
     """Availability layer: roster/injury status -> multiplier on the estimate."""
 
@@ -1414,13 +1458,14 @@ def project_player_week(
     # (docs/projections-v2-backtest.md).
     raw_point_estimate = trend["baseline_ppr"]
     availability = _availability_adjustment(player, _games_ahead(schedule, week))
-    point_estimate = max(0.0, raw_point_estimate) * availability["multiplier"]
+    role = _role_adjustment(player, players)
+    point_estimate = max(0.0, raw_point_estimate) * availability["multiplier"] * role["multiplier"]
     confidence = _v2_confidence(trend["games_played"])
     low, high = _v2_range(max(0.0, raw_point_estimate), position, confidence)
     if availability["multiplier"] == 0.0:
         low = high = 0.0
         confidence = "high"
-    elif availability["applied"]:
+    elif availability["applied"] or role["applied"]:
         # Doubtful/Questionable: he may sit (0) or play a full game (the
         # unadjusted high), and the play probability itself is an uncalibrated
         # prior, so the label drops to "low".
@@ -1459,6 +1504,7 @@ def project_player_week(
             "efficiency_weight": round(trend["efficiency_weight"], 3),
             "interval_nominal_coverage": 0.68,
             "availability": availability,
+            "role": role,
             "opponent_multiplier_applied": False,
             "team_qb_quality_multiplier_applied": False,
             "opponent_multiplier": round(multiplier, 3),
