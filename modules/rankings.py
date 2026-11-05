@@ -4938,7 +4938,8 @@ def _player_universe_cache_currency_report(db_path: str) -> dict[str, Any]:
         report["source"] = "sqlite_or_sidecar"
         # The sidecar was re-stamped for new inputs without rewriting SQLite, so
         # the persisted rows still hold the previous structured state (team,
-        # status, injury, ...). Membership is current; field values are not.
+        # status, injury, eligibility, ...). Membership is current; field
+        # values are not, so raw SQLite rows must not be served as-is.
         report["requires_structured_refresh"] = bool(
             sqlite_row and rows[0] is sidecar_row and _mismatch(sqlite_row)
         )
@@ -4984,7 +4985,10 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         "dynasty_score",
         "value_score",
     }
-    if not reconcile_universe:
+    # A sidecar-only stamp certifies the inputs were reconciled, not that the
+    # SQLite rows hold the reconciled values (membership-unchanged runs never
+    # rewrite SQLite), so only a SQLite-validated stamp may serve raw rows.
+    if not reconcile_universe and not currency.get("requires_structured_refresh"):
         fast_started = time.perf_counter()
         with player_hydrate_stages.stage("sqlite_validated_read", kind="disk"):
             current = _load_snapshot_base_frame(db_path)
@@ -4995,12 +4999,6 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
             result_size=int(len(current)) if current is not None else 0,
         )
         if current is not None and required.issubset(current.columns):
-            if currency.get("requires_structured_refresh"):
-                with player_hydrate_stages.stage("structured_refresh", kind="cpu"):
-                    current = refresh_structured_player_state_from_disk(
-                        current,
-                        reconcile_universe=False,
-                    )
             identity_started = time.perf_counter()
             with player_hydrate_stages.stage("identity_columns", kind="cpu"):
                 current = _public_result(current)
