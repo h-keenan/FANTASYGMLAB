@@ -86,3 +86,40 @@ def test_project_player_week_reports_opponent_signal_as_context_only(extended_sc
     )
     assert result["basis"]["opponent_multiplier_applied"] is False
     assert result["low"] <= result["point_estimate"] <= result["high"]
+
+
+def _qb(order, **extra):
+    return {"position": "QB", "team": "AAA", "depth_chart_order": order, "status": "Active", **extra}
+
+
+def test_backup_qb_behind_healthy_starter_is_scaled_down():
+    players = {"qb1": _qb(1), "qb2": _qb(2)}
+    out = pp._role_adjustment(players["qb2"], players)
+    assert out["applied"] and out["multiplier"] == pp.BACKUP_QB_PLAY_SHARE
+    assert out["starter_player_id"] == "qb1"
+    assert pp._role_adjustment(players["qb1"], players)["applied"] is False
+
+
+def test_backup_qb_is_not_scaled_when_the_starter_is_out():
+    players = {"qb1": _qb(1, status="Inactive", injury_status="IR"), "qb2": _qb(2)}
+    assert pp._role_adjustment(players["qb2"], players)["applied"] is False
+
+
+def test_role_adjustment_leaves_other_positions_and_missing_depth_alone():
+    rb = {"position": "RB", "team": "AAA", "depth_chart_order": 2}
+    assert pp._role_adjustment(rb, {"rb": rb})["applied"] is False
+    qb = _qb(None)
+    assert pp._role_adjustment(qb, {"qb": qb, "qb1": _qb(1)})["applied"] is False
+
+
+def test_project_player_week_backup_qb_projects_below_the_starter(extended_schedule):  # noqa: F811
+    players = {"qb1": _qb(1), "qb2": _qb(2)}
+    kwargs = dict(
+        week=5, season=2099, players=players,
+        player_weekly_rows=_rows([18, 20, 17]), defense_strength={}, team_qb_quality={}, weekly_stats={},
+    )
+    starter = pp.project_player_week("qb1", **kwargs)
+    backup = pp.project_player_week("qb2", **kwargs)
+    assert backup["point_estimate"] < starter["point_estimate"] * 0.5
+    assert backup["basis"]["role"]["reason"] == "backup_qb"
+    assert backup["confidence"] == "low"
