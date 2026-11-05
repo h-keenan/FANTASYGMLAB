@@ -109,9 +109,9 @@ def test_injury_level_treats_suspension_as_major_but_not_as_an_injury():
     Sleeper's real `injury_status` field carries a literal "Sus" value for
     currently-suspended players (confirmed against data/sleeper_players.json
     — e.g. C.J. Gardner-Johnson, `status` "Active", no injury_notes/
-    injury_start_date; ~8 real rostered players carry this value right now,
-    though the exact roster drifts week to week — this is a vocabulary
-    check, never a hardcoded player list beyond this one real example).
+    injury_start_date). Suspensions come and go week to week and
+    data/sleeper_players.json is refreshed hourly, so the record below is a
+    frozen copy of that real shape rather than a lookup in the live file.
 
     rankings.py's `_injury_level_cached` didn't recognize "Sus" as its own
     category, so it fell through to the generic "minor" severity catch-all
@@ -128,8 +128,13 @@ def test_injury_level_treats_suspension_as_major_but_not_as_an_injury():
     its own explicit "Suspended" label rather than a generic injury word.
     """
 
-    cjgj = _actual_record("C.J. Gardner-Johnson")
-    assert cjgj["injury_status"] == "Sus"
+    cjgj = {
+        "full_name": "C.J. Gardner-Johnson",
+        "status": "Active",
+        "injury_status": "Sus",
+        "injury_notes": None,
+        "injury_start_date": None,
+    }
     assert player_state_authority.is_suspended(cjgj["status"], cjgj["injury_status"]) is True
     assert rankings.injury_level(cjgj["status"], cjgj["injury_status"]) == "major"
     assert rankings.is_ruled_out(cjgj["status"], cjgj["injury_status"]) is True
