@@ -61,7 +61,8 @@ export default function ManagerTendenciesChips({
   const chips = headlineChips(findManagerRow(data, teamName, rosterId)?.headline);
   if (chips.length === 0) return null;
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessibilityLabel="How this manager trades">
+      <AppText style={styles.label}>Their history</AppText>
       {chips.map((chip) => (
         <View key={chip} style={styles.chip}>
           <AppText style={styles.chipText} numberOfLines={1}>
@@ -76,6 +77,7 @@ export default function ManagerTendenciesChips({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+    label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, alignSelf: 'center' },
     chip: {
       paddingHorizontal: spacing.sm,
       paddingVertical: 2,
