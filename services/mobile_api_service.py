@@ -5571,22 +5571,9 @@ class TradeAnalyzerRequest(BaseModel):
 
 
 def _league_waiver_pool(league_id: str, valued: pd.DataFrame) -> pd.DataFrame | None:
-    """The league's real free agents (unrostered, waiver-actionable), valued
-    like ``valued``. None when rosters cannot be read, so the lineup model
-    falls back to the market replacement level rather than assuming an empty
-    pool."""
+    """The league's real free agents (see ``trade_grade.league_waiver_pool``)."""
 
-    rosters = sleeper.get_rosters(league_id) or []
-    if not rosters:
-        return None
-    roster_map = {str(r.get("roster_id")): list(r.get("players") or []) for r in rosters}
-    rostered = {str(pid) for players in roster_map.values() for pid in players}
-    pool = valued[~valued["player_id"].astype(str).isin(rostered)]
-    if pool.empty:
-        return pool
-    from modules.player_state_authority import waiver_actionable_player_pool
-
-    return waiver_actionable_player_pool(pool, roster_map, surface="trade_analyzer_lineup_hole")
+    return trade_grade.league_waiver_pool(sleeper.get_rosters(league_id), valued)
 
 
 def _lineup_hole_waiver_options(

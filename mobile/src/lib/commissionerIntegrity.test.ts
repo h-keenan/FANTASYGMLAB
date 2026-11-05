@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import {
+  vetoAssetLabel,
   VETO_BAND_TICKS,
   vetoDeltaTone,
   vetoMeterPercent,
@@ -131,4 +132,10 @@ test('veto result helpers: meter, delta tone, standing line', () => {
   assert.equal(vetoDeltaTone(0), 'neutral');
   assert.equal(vetoStandingLine({ record: '0-7', standing: '#12 of 12' }), '0-7 · #12 of 12');
   assert.equal(vetoStandingLine({}), '');
+});
+
+test('vetoAssetLabel drops the owner from a pick label only when it matches', () => {
+  assert.equal(vetoAssetLabel('2027 Round 1 (Blitz Bureau)', 'Blitz Bureau'), '2027 Round 1');
+  assert.equal(vetoAssetLabel('2027 Round 1 (Other Team)', 'Blitz Bureau'), '2027 Round 1 (Other Team)');
+  assert.equal(vetoAssetLabel('Saquon Barkley', 'Blitz Bureau'), 'Saquon Barkley');
 });

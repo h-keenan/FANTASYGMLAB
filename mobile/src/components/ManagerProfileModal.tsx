@@ -56,28 +56,8 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
   });
   const offer = (target: OpponentTradeTarget) => {
     onClose();
-    // A lean RankedPlayer is enough: the Analyzer resolves the id against the
-    // league's loaded rankings and only falls back to this row.
-    navigation.navigate('Trades', {
-      leagueId,
-      leagueName,
-      initialTab: 'make',
-      tradePlayer: {
-        player_id: target.player_id,
-        name: target.name,
-        position: target.position,
-        team: target.team,
-        age: null,
-        status: null,
-        injury_status: null,
-        tier: null,
-        score: null,
-        overall_rank: null,
-        position_rank: null,
-        rank_unavailable_reason: null,
-        opportunity_label: null,
-      },
-    });
+    // The target is on this manager's roster: Build an offer builds the package.
+    navigation.navigate('TradeOffer', { leagueId, leagueName, playerId: target.player_id });
   };
   const data = query.data;
   const signals = data?.manager?.signals ?? {};

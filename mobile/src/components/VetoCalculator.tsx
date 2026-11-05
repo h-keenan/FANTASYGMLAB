@@ -24,6 +24,7 @@ import {
   vetoBandTone,
   vetoHasResult,
   vetoSideDirection,
+  vetoAssetLabel,
   vetoStandingLine,
   vetoDeltaTone,
   vetoMeterPercent,
@@ -71,7 +72,7 @@ function useToneColor() {
   };
 }
 
-function AssetChips({ label, items, styles }: { label: string; items: string[]; styles: Styles }) {
+function AssetChips({ label, items, fromTeam, styles }: { label: string; items: string[]; fromTeam: string; styles: Styles }) {
   return (
     <View style={styles.bullets}>
       <AppText style={styles.caption}>{label}</AppText>
@@ -79,7 +80,7 @@ function AssetChips({ label, items, styles }: { label: string; items: string[]; 
         <View style={styles.chipRow}>
           {items.map((name, i) => (
             <View key={`${name}-${i}`} style={styles.chip}>
-              <AppText style={styles.chipText}>{name}</AppText>
+              <AppText style={styles.chipText}>{vetoAssetLabel(name, fromTeam)}</AppText>
             </View>
           ))}
         </View>
@@ -90,7 +91,7 @@ function AssetChips({ label, items, styles }: { label: string; items: string[]; 
   );
 }
 
-function SideCard({ side, hurt, styles }: { side: VetoSide; hurt: boolean; styles: Styles }) {
+function SideCard({ side, hurt, otherName, styles }: { side: VetoSide; hurt: boolean; otherName: string; styles: Styles }) {
   const { colors } = useThemeMode();
   const posture = vetoSideDirection(side);
   const standing = vetoStandingLine(side);
@@ -104,8 +105,8 @@ function SideCard({ side, hurt, styles }: { side: VetoSide; hurt: boolean; style
         </View>
         {posture ? <ToneBadge label={posture} color={colors.textTertiary} /> : null}
       </View>
-      <AssetChips label="Gives" items={side.sends} styles={styles} />
-      <AssetChips label="Gets" items={side.receives} styles={styles} />
+      <AssetChips label="Gives" items={side.sends} fromTeam={side.team_name} styles={styles} />
+      <AssetChips label="Gets" items={side.receives} fromTeam={otherName} styles={styles} />
       <DashboardStatRow
         items={[
           { label: 'Market value', icon: 'pricetag-outline', value: formatSigned(side.market_delta), tone: vetoTileTone(side.market_delta) },
@@ -137,6 +138,7 @@ function OutrageMeter({ outrage, color, styles }: { outrage: number; color: stri
 
 function VetoResult({ result, styles }: { result: VetoCheckResponse; styles: Styles }) {
   const toneColor = useToneColor();
+  const { colors } = useThemeMode();
   const [showLimits, setShowLimits] = useState(false);
   if (!vetoHasResult(result)) return null;
   const band = result.band as VetoBand;
@@ -145,8 +147,10 @@ function VetoResult({ result, styles }: { result: VetoCheckResponse; styles: Sty
     <View style={styles.stack}>
       <AccentCard accent={color}>
         <View style={styles.scoreRow}>
-          <AppText style={[styles.score, { color }]}>{Math.round(result.outrage ?? 0)}</AppText>
-          <AppText style={styles.muted}>/ 100</AppText>
+          <AppText style={[styles.score, { color }]} numberOfLines={1}>
+            {Math.round(result.outrage ?? 0)}
+            <AppText style={styles.muted}>{' / 100'}</AppText>
+          </AppText>
           <View style={styles.badgeEnd}>
             <ToneBadge label={(VETO_BAND_LABEL[band] ?? result.label ?? band).split(':')[0]} color={color} />
           </View>
@@ -154,18 +158,24 @@ function VetoResult({ result, styles }: { result: VetoCheckResponse; styles: Sty
         <OutrageMeter outrage={result.outrage ?? 0} color={color} styles={styles} />
         {result.advice ? <AppText style={styles.body}>{result.advice}</AppText> : null}
       </AccentCard>
-      {(result.sides ?? []).map((side) => (
-        <SideCard key={side.roster_id} side={side} hurt={String(side.roster_id) === String(result.hurt_roster_id)} styles={styles} />
+      {(result.sides ?? []).map((side, i, all) => (
+        <SideCard
+          key={side.roster_id}
+          side={side}
+          hurt={String(side.roster_id) === String(result.hurt_roster_id)}
+          otherName={all[1 - i]?.team_name ?? ''}
+          styles={styles}
+        />
       ))}
       {result.reasons?.length ? (
-        <View style={styles.bullets}>
+        <AccentCard accent={colors.glassBorder}>
           <SectionHeading title="Why" />
           {result.reasons.map((reason) => (
             <AppText key={reason} style={styles.bullet}>
               {'•'} {reason}
             </AppText>
           ))}
-        </View>
+        </AccentCard>
       ) : null}
       {result.limits?.length ? (
         <View style={styles.bullets}>
@@ -283,7 +293,7 @@ function VetoBuilder({ leagueId, lens, pool, styles }: { leagueId: string; lens:
             key={p.pick_id}
             pickId={p.pick_id}
             round={p.round}
-            label={p.label}
+            label={vetoAssetLabel(p.label, p.owner_team_name)}
             projectedRange={p.projected_pick_range}
             pickTier={p.pick_tier}
             onPress={() => {
@@ -374,7 +384,7 @@ function VetoBuilder({ leagueId, lens, pool, styles }: { leagueId: string; lens:
                       key={p.pick_id}
                       pickId={p.pick_id}
                       round={p.round}
-                      label={p.label}
+                      label={vetoAssetLabel(p.label, p.owner_team_name)}
                       projectedRange={p.projected_pick_range}
                       pickTier={p.pick_tier}
                       onPress={() => {
