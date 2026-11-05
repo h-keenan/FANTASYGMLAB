@@ -77,7 +77,7 @@ export default function ManagerTendenciesChips({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
-    label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textMuted, alignSelf: 'center' },
+    label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, alignSelf: 'center' },
     chip: {
       paddingHorizontal: spacing.sm,
       paddingVertical: 2,
