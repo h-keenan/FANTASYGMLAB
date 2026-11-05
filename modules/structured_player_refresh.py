@@ -330,8 +330,17 @@ def refresh_structured_player_state(
     *,
     source_mtime: int = 0,
     reconcile_universe: bool = True,
+    scores_baseline_frame: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Patch Sleeper structured metadata and recompute local football state.
+
+    ``scores_baseline_frame`` is the frame whose structured fields the stored
+    role/opportunity/score columns were derived from (the persisted SQLite
+    rows). A public-player snapshot rehydrates already-patched structured
+    fields (depth chart, injury, status) onto those rows while role/opportunity
+    /score still come from SQLite, so diffing against ``persisted_frame`` would
+    see "no change" and skip the recompute, leaving scores inconsistent with
+    the depth chart they are displayed beside. Default: ``persisted_frame``.
 
     Join is strictly ``player_id``. Unmatched rows are preserved. The input
     frame is not mutated. Market and production columns are left in place.
@@ -342,7 +351,9 @@ def refresh_structured_player_state(
         return persisted_frame
 
     with player_hydrate_stages.stage("structured_fingerprint_before", kind="cpu"):
-        before = structured_state_fingerprint(persisted_frame)
+        before = structured_state_fingerprint(
+            scores_baseline_frame if scores_baseline_frame is not None else persisted_frame
+        )
     patch_started = time.perf_counter()
     with player_hydrate_stages.stage("structured_patch_fields", kind="cpu"):
         patched = _patch_structured_fields(
@@ -432,6 +443,7 @@ def refresh_structured_player_state_from_disk(
     *,
     path: str | None = None,
     reconcile_universe: bool = True,
+    scores_baseline_frame: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Disk-only structured refresh. Never calls ``requests`` / ``get_players``."""
 
@@ -442,4 +454,5 @@ def refresh_structured_player_state_from_disk(
         players,
         source_mtime=mtime_ns,
         reconcile_universe=reconcile_universe,
+        scores_baseline_frame=scores_baseline_frame,
     )

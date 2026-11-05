@@ -5041,6 +5041,9 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
             patched = refresh_structured_player_state_from_disk(
                 snapshot_frame,
                 reconcile_universe=reconcile_universe,
+                # Stored role/opportunity/score derive from the SQLite rows'
+                # structured state, not the snapshot's already-patched one.
+                scores_baseline_frame=schema,
             )
         performance.record_timing(
             "public_player_structured_refresh",

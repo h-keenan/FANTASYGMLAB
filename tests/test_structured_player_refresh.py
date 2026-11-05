@@ -313,6 +313,30 @@ def test_depth_slot_two_to_one_changes_opportunity_without_injury():
     assert int(rb2_after["score"]) != int(rb2_before["score"])
 
 
+def test_scores_baseline_recomputes_when_frame_structured_fields_already_patched():
+    """A snapshot rehydrates patched depth onto rows whose stored scores are
+    stale; diffing against the baseline (not the patched frame) must recompute."""
+    stored = _rb_room()
+    meta = _sleeper_room()
+    meta["rb1"]["depth_chart_order"] = 2
+    meta["rb1"]["depth_chart_position"] = "RB2"
+    meta["rb2"]["depth_chart_order"] = 1
+    meta["rb2"]["depth_chart_position"] = "RB1"
+    expected = _refresh(stored, meta)
+    already_patched = stored.copy()
+    patched_rows = expected.set_index("player_id")
+    for column in spr.STRUCTURED_PATCH_FIELDS:
+        already_patched[column] = already_patched["player_id"].map(patched_rows[column])
+    naive = _refresh(already_patched, meta)
+    assert not naive["score"].equals(expected["score"])
+    fixed = spr.refresh_structured_player_state(
+        already_patched, meta, scores_baseline_frame=stored
+    )
+    pd.testing.assert_series_equal(
+        fixed.set_index("player_id")["score"], expected.set_index("player_id")["score"]
+    )
+
+
 def test_risk_and_opportunity_update_together():
     healthy = _refresh(_rb_room(), _sleeper_room())
     out = _refresh(_rb_room(), _sleeper_room(starter_status="Out", starter_injury="Out"))
