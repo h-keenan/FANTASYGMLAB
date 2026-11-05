@@ -65,7 +65,7 @@ export function ManagerTendenciesCard({
         className="text-xs uppercase font-bold"
         style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
       >
-        Trades
+        Their history
       </span>
       {chips.map((chip) => (
         <span
