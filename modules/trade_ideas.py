@@ -5202,6 +5202,63 @@ def _build_trade_ideas_impl(
                         add_idea(idea)
                         break
 
+        # 1a. Consolidate depth INSIDE a stacked position into a better player
+        # at that same position. Judged player by player, never by the room's
+        # total: the target must beat the best player you already have there,
+        # and a pile of mid-value bench players is only the price, never the
+        # reason the room "looks deep". Pattern 1 above cannot reach this --
+        # its targets are limited to a need position, a partner surplus or an
+        # elite (6,500+) player, and a team stacked at WR has no WR need.
+        my_best_by_pos: Dict[str, int] = {}
+        for _, my_row in my_team_df.iterrows():
+            row_pos = str(my_row.get("position") or "").upper()
+            my_best_by_pos[row_pos] = max(my_best_by_pos.get(row_pos, 0), _row_score(my_row, score_field))
+        stacked_targets = [
+            asset
+            for asset in partner_player_assets
+            if str(asset.get("position") or "").upper() in my_surplus
+            and int(asset["score"]) >= my_best_by_pos.get(str(asset.get("position") or "").upper(), 0) + 500
+            and asset["score"] >= 2500
+        ]
+        for target in stacked_targets[:target_cap]:
+            target_pos = str(target.get("position") or "").upper()
+            same_pos_pieces = [
+                asset
+                for asset in my_player_assets[: outgoing_cap + 4]
+                if str(asset.get("position") or "").upper() == target_pos
+                and _is_surplus_asset(my_shape, asset)
+                and int(asset["score"]) < int(target["score"])
+            ]
+            for i, first in enumerate(same_pos_pieces):
+                for second in same_pos_pieces[i + 1 :]:
+                    send_assets = make_package(first, second)
+                    receive_assets = make_package(target)
+                    send_score = profile.score(send_assets)
+                    if not _value_fits(send_score, target["score"], low=-1800, high=900):
+                        continue
+                    fit_context = package_fit_context(send_assets, receive_assets)
+                    if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                        continue
+                    idea = make_reasoned_idea(
+                        send_assets,
+                        receive_assets,
+                        "Consolidate depth for a better starter",
+                        (
+                            f"You are stacked at {target_pos}; this turns two spare {target_pos}s into the best "
+                            f"{target_pos} on your roster. {fit_context['rationale']}"
+                        ).strip(),
+                        86 + fit_context["score"],
+                        min_reason_score=12,
+                        min_acceptance_score=58,
+                        fit_context=fit_context,
+                    )
+                    if idea:
+                        add_idea(idea)
+                        break
+                else:
+                    continue
+                break
+
         # 1b. Trade one movable piece directly for a comparable partner piece
         # — the plain value-for-value swap real leagues make constantly.
         # Patterns 1, 2, 3, and 4 all require either a second outgoing player
