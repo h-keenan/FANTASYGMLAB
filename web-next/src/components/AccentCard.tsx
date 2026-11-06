@@ -9,6 +9,7 @@ import type { CSSProperties, ReactNode, Ref } from "react";
 export function AccentCard({
   accent,
   compact = false,
+  glow = false,
   as: Tag = "article",
   className = "",
   style,
@@ -18,6 +19,8 @@ export function AccentCard({
 }: {
   accent: string;
   compact?: boolean;
+  /** Urgent / immediate-action card: the shared premium glow. Use sparingly (one or two per screen). */
+  glow?: boolean;
   as?: "article" | "section" | "div";
   className?: string;
   style?: CSSProperties;
@@ -28,7 +31,7 @@ export function AccentCard({
   return (
     <Tag
       ref={ref as Ref<HTMLDivElement>}
-      className={`glass-surface flex flex-col ${compact ? "gap-1 p-3" : "gap-3 p-4"} ${className}`.trim()}
+      className={`glass-surface flex flex-col ${compact ? "gap-1 p-3" : "gap-3 p-4"} ${glow ? "premium-glow-card " : ""}${className}`.trim()}
       style={{ borderLeft: `var(--border-width-semantic) solid ${accent}`, ...style }}
       {...rest}
     >

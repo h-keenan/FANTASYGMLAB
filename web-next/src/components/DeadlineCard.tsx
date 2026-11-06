@@ -31,7 +31,7 @@ export function DeadlineCard({
   if (!copy) return null;
   return (
     <div
-      className="glass-surface px-4 py-3 flex flex-col gap-0.5"
+      className={`glass-surface px-4 py-3 flex flex-col gap-0.5${copy.urgent ? " premium-glow-card" : ""}`}
       data-testid="deadline-card"
       style={{ borderLeft: `4px solid ${copy.urgent ? "var(--color-danger)" : "var(--color-accent)"}` }}
     >
