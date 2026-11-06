@@ -202,7 +202,7 @@ export function TradeIdeaCardView({
       data-highlighted={highlighted ? "true" : undefined}
       style={highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : undefined}
     >
-      {tags.length > 0 ? (
+      {tags.length > 0 || copy.impactTagHelp(idea.impact_tag) ? (
         <div className="flex items-center gap-2 flex-wrap">
           {tags.map((tag) => (
             <span
@@ -218,9 +218,9 @@ export function TradeIdeaCardView({
               {tag.label}
             </span>
           ))}
+          <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} />
         </div>
       ) : null}
-      <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} />
 
       {/* Team posture this idea was graded and ranked under: the same chip, label and
           one-line trade-off the Trade Analyzer shows for this package. */}

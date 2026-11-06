@@ -60,8 +60,17 @@ export interface IdeaTag {
  * Relief, ...) and the impact tag (Buy Low / Sell High / High Impact). */
 export function ideaTags(idea: TradeIdea): IdeaTag[] {
   const tags: IdeaTag[] = [];
-  if (idea.category) tags.push({ label: idea.category, color: categoryColor(idea.category), kind: "category" });
   const impact = impactTagConfig(idea.impact_tag);
+  // Raw snake_case categories ("sell_high") are shown as words, and a category
+  // that just restates the impact tag is dropped so the pair never doubles.
+  const rawCategory = (idea.category || "").trim();
+  const categoryLabel = rawCategory.includes("_")
+    ? rawCategory.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    : rawCategory;
+  const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (categoryLabel && !(impact && norm(categoryLabel) === norm(impact.label))) {
+    tags.push({ label: categoryLabel, color: categoryColor(idea.category), kind: "category" });
+  }
   if (impact) tags.push({ label: impact.label, color: impact.color, kind: "impact" });
   return tags;
 }
