@@ -99,6 +99,8 @@ logger = logging.getLogger(__name__)
 
 CONSOLIDATION_BASE_RATE = 0.08
 CONSOLIDATION_GAP_RATE = 0.24
+# Equal-count deals only carry a premium when the headliners differ clearly.
+CONSOLIDATION_EVEN_COUNT_RATIO = 0.85
 # Trade Hub's partner-side check already credited each first-round pick as
 # this much consolidation premium paid (see trade_ideas._explicit_* and
 # _cornerstone_consolidation_premium).
@@ -147,20 +149,34 @@ def user_consolidation_adjustment(
 ) -> tuple[int, str]:
     """Signed consolidation premium for the user's side, plus a short note.
 
-    Only uneven-count deals carry one, and only for the side that ends up
-    with the best single asset: the user is credited when they send more
-    pieces for the best asset, and debited when they break the best asset up
-    into more pieces. `values` optionally overrides each asset's score (keyed
+    Only the side that ends up with the best single asset carries one. With
+    uneven counts the user is credited when they send more pieces for the best
+    asset, and debited when they break it up into more pieces; with even
+    counts a (gap-only) premium applies only when the headliners clearly
+    differ. `values` optionally overrides each asset's score (keyed
     by id(asset)), so the healthy-equivalent injury values are what get
     compared.
     """
 
     send = [asset for asset in send_assets or () if isinstance(asset, Mapping)]
     receive = [asset for asset in receive_assets or () if isinstance(asset, Mapping)]
-    if not send or not receive or len(send) == len(receive):
+    if not send or not receive:
         return 0, ""
     best_in = max(_asset_value(asset, values) for asset in receive)
     best_out = max(_asset_value(asset, values) for asset in send)
+    if len(send) == len(receive):
+        # Even counts can still concentrate value: the side that lands the
+        # clearly better headliner is paid for it (gap premium only; there is
+        # no piece-count consolidation to price).
+        if best_in > best_out and best_out / best_in <= CONSOLIDATION_EVEN_COUNT_RATIO:
+            gap = 1.0 - best_out / best_in
+            premium = int(round(best_in * CONSOLIDATION_GAP_RATE * gap))
+            return premium, f"lands the best asset in the deal (+{premium:,})"
+        if best_out > best_in and best_in / best_out <= CONSOLIDATION_EVEN_COUNT_RATIO:
+            gap = 1.0 - best_in / best_out
+            premium = int(round(best_out * CONSOLIDATION_GAP_RATE * gap))
+            return -premium, f"gives up the best asset in the deal (-{premium:,})"
+        return 0, ""
     if len(send) > len(receive) and best_in > best_out:
         premium = consolidation_premium(best_in, best_out / best_in if best_in else 0.0)
         return premium, f"consolidates {len(send)} pieces into the best asset in the deal (+{premium:,})"
