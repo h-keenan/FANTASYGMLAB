@@ -20,8 +20,24 @@ import {
  * alternatives. Nothing is ranked or filtered here.
  */
 
-function DropPlayerLine({ player, lead, maxReasons = 3 }: { player: DropPlayer; lead?: string; maxReasons?: number }) {
-  const effect = [lineupEffectText(player.effect), valueEffectText(player.effect)].filter(Boolean).join(" · ");
+function DropPlayerLine({
+  player,
+  lead,
+  maxReasons = 3,
+  swap = false,
+  skipReasons,
+}: {
+  player: DropPlayer;
+  lead?: string;
+  maxReasons?: number;
+  /** The effect is for the whole swap (add minus drop), so say so. */
+  swap?: boolean;
+  /** Reasons already shown on the main pick, so alternatives don't repeat them. */
+  skipReasons?: string[];
+}) {
+  const effectText = [lineupEffectText(player.effect), valueEffectText(player.effect)].filter(Boolean).join(" · ");
+  const effect = swap && effectText ? `Whole swap: ${effectText}` : effectText;
+  const reasons = player.reasons.filter((reason) => !skipReasons?.includes(reason));
   return (
     <div className="flex flex-col gap-0.5" data-testid="drop-player">
       <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
@@ -33,9 +49,9 @@ function DropPlayerLine({ player, lead, maxReasons = 3 }: { player: DropPlayer; 
           {player.age ? ` · ${Math.round(player.age)}` : ""}
         </span>
       </span>
-      {player.reasons.length > 0 ? (
+      {reasons.length > 0 ? (
         <ul className="text-xs flex flex-col gap-0.5 pl-4 list-disc" style={{ color: "var(--color-text-secondary)" }}>
-          {player.reasons.slice(0, maxReasons).map((reason) => (
+          {reasons.slice(0, maxReasons).map((reason) => (
             <li key={reason}>{reason}</li>
           ))}
         </ul>
@@ -125,14 +141,14 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
               drop.action === "move_to_ir" ? " to IR" : ""
             }`}
           </p>
-          <DropPlayerLine player={drop} />
+          <DropPlayerLine player={drop} lead="Best cut:" swap />
           {alternatives.length > 0 ? (
             <div className="flex flex-col gap-1.5 pt-1" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
               <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-                Or
+                Or cut instead
               </span>
               {alternatives.map((alt) => (
-                <DropPlayerLine key={alt.player_id} player={alt} maxReasons={1} />
+                <DropPlayerLine key={alt.player_id} player={alt} lead="Drop" maxReasons={1} swap skipReasons={drop.reasons} />
               ))}
             </div>
           ) : null}

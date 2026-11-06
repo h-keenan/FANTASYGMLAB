@@ -281,8 +281,10 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
           </PlayerMetaLine>
         </span>
       </span>
-      <ReasonChips chips={waiverReasonChips(player)} />
-      <UsageFlagChip player={player} />
+      <span className="flex flex-col gap-1.5 pl-8 w-full empty:hidden">
+        <ReasonChips chips={waiverReasonChips(player)} />
+        <UsageFlagChip player={player} />
+      </span>
       <span className="flex items-center gap-3 pl-8 w-full">
         <ValueWithRing player={player} />
         <span className="ml-auto">
@@ -294,7 +296,7 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
       </span>
     </button>
     {player.drop_suggestion ? (
-      <div className="pb-2.5">
+      <div className="pb-2.5 pl-8">
         <SuggestedDrop suggestion={player.drop_suggestion} compact />
       </div>
     ) : null}

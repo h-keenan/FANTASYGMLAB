@@ -23,10 +23,26 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * ranked or filtered here.
  */
 
-function DropPlayerLine({ player, lead, maxReasons = 3 }: { player: DropPlayer; lead?: string; maxReasons?: number }) {
+function DropPlayerLine({
+  player,
+  lead,
+  maxReasons = 3,
+  swap = false,
+  skipReasons,
+}: {
+  player: DropPlayer;
+  lead?: string;
+  maxReasons?: number;
+  /** The effect is for the whole swap (add minus drop), so say so. */
+  swap?: boolean;
+  /** Reasons already shown on the main pick, so alternatives don't repeat them. */
+  skipReasons?: string[];
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const effect = [lineupEffectText(player.effect), valueEffectText(player.effect)].filter(Boolean).join(' · ');
+  const effectText = [lineupEffectText(player.effect), valueEffectText(player.effect)].filter(Boolean).join(' · ');
+  const effect = swap && effectText ? `Whole swap: ${effectText}` : effectText;
+  const reasons = player.reasons.filter((reason) => !skipReasons?.includes(reason));
   const meta = [player.position, player.team, player.age ? String(Math.round(player.age)) : ''].filter(Boolean).join(' · ');
   return (
     <View style={styles.playerLine}>
@@ -34,7 +50,7 @@ function DropPlayerLine({ player, lead, maxReasons = 3 }: { player: DropPlayer; 
         {lead ? `${lead} ` : ''}
         {player.name} <AppText style={styles.meta}>{meta}</AppText>
       </AppText>
-      {player.reasons.slice(0, maxReasons).map((reason) => (
+      {reasons.slice(0, maxReasons).map((reason) => (
         <AppText key={reason} style={styles.reason}>
           {`• ${reason}`}
         </AppText>
@@ -119,12 +135,12 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
               drop.action === 'move_to_ir' ? ' to IR' : ''
             }`}
           </AppText>
-          <DropPlayerLine player={drop} />
+          <DropPlayerLine player={drop} lead="Best cut:" swap />
           {alternatives.length > 0 ? (
             <View style={styles.alts}>
-              <AppText style={styles.kicker}>OR</AppText>
+              <AppText style={styles.kicker}>OR CUT INSTEAD</AppText>
               {alternatives.map((alt) => (
-                <DropPlayerLine key={alt.player_id} player={alt} maxReasons={1} />
+                <DropPlayerLine key={alt.player_id} player={alt} lead="Drop" maxReasons={1} swap skipReasons={drop.reasons} />
               ))}
             </View>
           ) : null}
