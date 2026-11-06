@@ -263,19 +263,19 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --color-bg: #e2e9ee;
+    --color-bg: #ecf1f5;
     --color-shell: #d8e1e7;
-    --color-surface-primary: #f2f6f8;
-    --color-surface-secondary: #e8eff3;
-    --color-surface-raised: #f6f9fb;
-    --color-surface-muted: #dbe3e9;
+    --color-surface-primary: #d5dfe6;
+    --color-surface-secondary: #cbd7df;
+    --color-surface-raised: #dde6ec;
+    --color-surface-muted: #bfcdd7;
     --color-text-primary: #101820;
-    --color-text-secondary: #3b4a56;
-    --color-text-muted: #57646f;
-    --color-border: #b3c2cb;
+    --color-text-secondary: #34424d;
+    --color-text-muted: #4a5762;
+    --color-border: #9eaeb9;
     --color-border-strong: #5d6b77;
 
-    --color-accent: #056e7c;
+    --color-accent: #045f6c;
     --color-accent-strong: #08616e;
     --color-on-accent: #ffffff;
     --color-accent-soft: rgba(6, 110, 124, 0.16);
@@ -400,13 +400,13 @@ body {
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --glass-bg: linear-gradient(165deg, rgba(244, 248, 250, 0.8), rgba(232, 239, 243, 0.7));
-    --glass-border: rgba(10, 30, 45, 0.1);
+    --glass-bg: linear-gradient(165deg, rgba(221, 230, 236, 0.92), rgba(205, 217, 225, 0.9));
+    --glass-border: rgba(10, 30, 45, 0.2);
     --glass-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      0 20px 40px rgba(10, 30, 45, 0.08);
-    --glass-input-bg: rgba(255, 255, 255, 0.6);
-    --glass-input-border: rgba(10, 30, 45, 0.12);
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 12px 28px rgba(10, 30, 45, 0.16);
+    --glass-input-bg: rgba(255, 255, 255, 0.5);
+    --glass-input-border: rgba(10, 30, 45, 0.22);
   }
 }
 /* Write backdrop-filter WITHOUT a hand-written -webkit- twin: with both, the
@@ -482,9 +482,9 @@ body {
 }
 @media (prefers-color-scheme: light) {
   body {
-    --color-surface-primary: rgba(242, 246, 248, 0.7);
-    --color-surface-secondary: rgba(232, 239, 243, 0.7);
-    --color-surface-raised: rgba(246, 249, 251, 0.72);
+    --color-surface-primary: rgba(213, 223, 230, 0.88);
+    --color-surface-secondary: rgba(203, 215, 223, 0.88);
+    --color-surface-raised: rgba(221, 230, 236, 0.9);
   }
 }
 
