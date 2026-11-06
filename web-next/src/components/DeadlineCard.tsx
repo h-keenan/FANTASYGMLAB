@@ -31,12 +31,12 @@ export function DeadlineCard({
   if (!copy) return null;
   return (
     <div
-      className="glass-surface p-4 flex flex-col gap-1"
+      className="glass-surface px-4 py-3 flex flex-col gap-0.5"
       data-testid="deadline-card"
       style={{ borderLeft: `4px solid ${copy.urgent ? "var(--color-danger)" : "var(--color-accent)"}` }}
     >
       <p className="m-0 text-sm font-bold">{copy.headline}</p>
-      <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+      <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
         {copy.body}
       </p>
       {href && ctaLabel ? (

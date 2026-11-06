@@ -39,12 +39,12 @@ export function TradeHubFilters({
   const positions = boardPositions(ideas);
   const allActive = !filter.impact && !filter.position;
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter trade ideas">
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1" role="group" aria-label="Filter trade ideas">
       <button
         type="button"
         onClick={() => onChange({ impact: null, position: null })}
         aria-pressed={allActive}
-        className="px-4 text-sm font-bold"
+        className="px-4 text-sm font-bold shrink-0 whitespace-nowrap"
         style={chipStyle(allActive)}
       >
         All ({ideas.length})
@@ -57,7 +57,7 @@ export function TradeHubFilters({
             type="button"
             onClick={() => onChange({ ...filter, impact: active ? null : entry.tag })}
             aria-pressed={active}
-            className="px-4 text-sm font-bold"
+            className="px-4 text-sm font-bold shrink-0 whitespace-nowrap"
             style={chipStyle(active)}
           >
             {entry.label} ({entry.count})
@@ -69,7 +69,7 @@ export function TradeHubFilters({
           aria-label="Positions"
           value={filter.position ?? ""}
           onChange={(event) => onChange({ ...filter, position: event.target.value || null })}
-          className="px-3 text-sm font-bold"
+          className="px-3 text-sm font-bold shrink-0"
           style={chipStyle(Boolean(filter.position))}
         >
           <option value="">Positions</option>
