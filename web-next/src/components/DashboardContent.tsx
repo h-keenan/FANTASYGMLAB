@@ -181,7 +181,9 @@ export function DashboardContent({
               {
                 glyph: "injury",
                 label: "Injuries",
-                value: snapshot.health_flag || "Stable",
+                // A count, not the long health_flag wording ("Future Asset Health Watch"
+                // overflowed the tile); the why lives in Watchlist & Alerts.
+                value: snapshot.injured_starters && snapshot.injured_starters > 0 ? String(snapshot.injured_starters) : "Stable",
                 tone: snapshot.injured_starters && snapshot.injured_starters > 0 ? "risk" : "positive",
               },
             ]}
