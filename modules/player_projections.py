@@ -207,7 +207,7 @@ _MIN_TEAMS_FOR_QB_QUALITY_LEAGUE_AVERAGE = 2
 _MIN_BAND_HALF_WIDTH = 2.5
 
 # Bumped whenever the estimator changes; surfaced in ``basis.model_version``.
-PROJECTION_MODEL_VERSION = "v3-usage-eb-2026-10"
+PROJECTION_MODEL_VERSION = "v3-usage-eb-2026-11"
 
 
 def _recency_weight(weeks_ago: int, half_life_weeks: float) -> float:
@@ -1026,6 +1026,17 @@ _V2_DOUBTFUL_MULTIPLIER = injury_status.ROWS_BY_KEY["doubtful"].p_play
 _V2_QUESTIONABLE_MULTIPLIER = injury_status.ROWS_BY_KEY["questionable"].p_play
 _V2_RESERVE_MIN_GAMES_OUT = injury_status.RESERVE_MIN_GAMES_OUT
 
+# A Questionable player who DOES play scores less than his usage baseline says:
+# walk-forward on nflverse point-in-time injury reports (2021-26, constants fitted
+# on earlier seasons only, docs/projections-v3-signals.md) the actual/estimate
+# ratio of Questionable players who played was 0.86-0.89 in every fold, and
+# applying it cut MAE by >= 0.01 on both pools in 3 of 5 seasons. This is a
+# conditional-on-playing factor and is separate from ``p_play`` above (the
+# chance he plays at all); expected points are p_play x this x the baseline.
+# Doubtful players who played came out at ~1.0 and the practice-limited tag
+# is not in Sleeper's feed, so neither gets a factor.
+_V2_QUESTIONABLE_PLAYS_FACTOR = 0.87
+
 
 def _interp(x: float, xs: tuple, ys: tuple) -> float:
     if x <= xs[0]:
@@ -1211,6 +1222,17 @@ def _availability_adjustment(player: Dict[str, Any], games_ahead: int) -> Dict[s
         # Zeros for confirmed-out statuses are certain; game-time probabilities
         # are priors that could not be backtested (no point-in-time injury data).
         "calibrated": reason is None or cls.row.calibrated,
+    }
+
+
+def _questionable_plays_adjustment(player: Dict[str, Any], games_ahead: int) -> Dict[str, Any]:
+    """Conditional-on-playing factor for a Questionable designation (next game only)."""
+
+    cls = injury_status.classify(str(player.get("status") or ""), str(player.get("injury_status") or ""))
+    applies = games_ahead == 0 and not cls.ruled_out and cls.row.key == "questionable"
+    return {
+        "multiplier": _V2_QUESTIONABLE_PLAYS_FACTOR if applies else 1.0,
+        "applied": applies,
     }
 
 
@@ -1459,7 +1481,10 @@ def project_player_week(
     raw_point_estimate = trend["baseline_ppr"]
     availability = _availability_adjustment(player, _games_ahead(schedule, week))
     role = _role_adjustment(player, players)
-    point_estimate = max(0.0, raw_point_estimate) * availability["multiplier"] * role["multiplier"]
+    plays = _questionable_plays_adjustment(player, _games_ahead(schedule, week))
+    point_estimate = (
+        max(0.0, raw_point_estimate) * availability["multiplier"] * role["multiplier"] * plays["multiplier"]
+    )
     confidence = _v2_confidence(trend["games_played"])
     low, high = _v2_range(max(0.0, raw_point_estimate), position, confidence)
     if availability["multiplier"] == 0.0:
@@ -1505,6 +1530,7 @@ def project_player_week(
             "interval_nominal_coverage": 0.68,
             "availability": availability,
             "role": role,
+            "questionable_plays": plays,
             "opponent_multiplier_applied": False,
             "team_qb_quality_multiplier_applied": False,
             "opponent_multiplier": round(multiplier, 3),

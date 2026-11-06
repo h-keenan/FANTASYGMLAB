@@ -100,7 +100,7 @@ def load_table(cache: Path) -> pd.DataFrame:
                 continue
             rows.append(dict(season=s, week=w, pid=r["player_id"], pos=pos, pts=float(st.get("pts_ppr") or 0.0),
                              pass_att=float(st.get("pass_att") or 0), rush_att=float(st.get("rush_att") or 0),
-                             rec_tgt=float(st.get("rec_tgt") or 0), sproj=sp.get(r["player_id"])))
+                             rec_tgt=float(st.get("rec_tgt") or 0), sproj=sp.get(r["player_id"]), team=r.get("team")))
     return pd.DataFrame(rows)
 
 
@@ -140,8 +140,11 @@ def _w(age, hl):
     return np.ones_like(age) if hl >= INF else 0.5 ** (age / hl)
 
 
-def estimate(p: Panel, coef, hu, hr, k, weeks=WEEKS) -> pd.DataFrame:
-    """One row per player-week with >=1 earlier game who played that week."""
+def estimate(p: Panel, coef, hu, hr, k, weeks=WEEKS, include_absent=False) -> pd.DataFrame:
+    """One row per player-week with >=1 earlier game who played that week.
+
+    ``include_absent`` also returns players who did NOT play that week (``played`` False,
+    ``actual`` 0): used only to size the role a missing teammate leaves behind."""
     implied = coef[0] + (p.F @ coef[1:] if len(coef) > 1 else 0.0)
     implied = np.broadcast_to(implied, p.A.shape)
     out = []
@@ -149,7 +152,7 @@ def estimate(p: Panel, coef, hu, hr, k, weeks=WEEKS) -> pd.DataFrame:
         c = w - 1
         mask = p.P[:, :c]
         games = mask.sum(1)
-        ok = (games > 0) & p.P[:, c]
+        ok = (games > 0) & (True if include_absent else p.P[:, c])
         if not ok.any():
             continue
         last = np.where(mask.any(1), c - 1 - np.argmax(mask[:, ::-1], axis=1), 0)
@@ -162,8 +165,8 @@ def estimate(p: Panel, coef, hu, hr, k, weeks=WEEKS) -> pd.DataFrame:
         est = imean + games / (games + k) * rmean
         naive = (m * p.A[:, :c]).sum(1) / np.maximum(games, 1)
         for i in np.where(ok)[0]:
-            out.append((p.season, w, p.pos, p.pids[i], est[i], int(games[i]), p.A[i, c], p.S[i, c], naive[i]))
-    return pd.DataFrame(out, columns=["season", "week", "pos", "pid", "est", "games", "actual", "sproj", "naive"])
+            out.append((p.season, w, p.pos, p.pids[i], est[i], int(games[i]), p.A[i, c], p.S[i, c], naive[i], bool(p.P[i, c])))
+    return pd.DataFrame(out, columns=["season", "week", "pos", "pid", "est", "games", "actual", "sproj", "naive", "played"])
 
 
 def add_pool(f: pd.DataFrame) -> pd.DataFrame:
