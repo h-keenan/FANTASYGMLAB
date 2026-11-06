@@ -20,15 +20,18 @@ is deliberately a narrow, honest slice rather than a second platform layer:
   alerts, ...) is refused by the API with ``ESPN_NOT_AVAILABLE_MESSAGE``
   rather than quietly running on empty data.
 
-Private ESPN leagues are out of scope. Reading one needs the user's
-``espn_s2`` and ``SWID`` cookies on every request, which means storing a live
-ESPN session credential server side. There is no encrypted secret store for
-user credentials in this service, so this module never accepts, logs or
-persists those cookies. A private league comes back as ``private_league``.
+Private ESPN leagues need the user's ``espn_s2`` and ``SWID`` cookies on every
+read. Those are stored encrypted by ``modules.espn_credentials`` and handed to
+this module only per request (``bind_request_credentials``); this module never
+persists or logs them. A private league loads through ``credentials`` and its
+snapshot is cached per user, never in the shared cache, so one user's private
+roster can't be served to another. Without saved credentials a private league
+still comes back as ``private_league``.
 """
 
 from __future__ import annotations
 
+import contextvars
 import re
 import threading
 import time
@@ -165,9 +168,13 @@ class ESPNLeagueError(RuntimeError):
 ERROR_MESSAGES = {
     "invalid_input": "Enter an ESPN league ID (numbers only) and a season.",
     "private_league": (
-        "This ESPN league is private. FantasyDesk can only read ESPN leagues that are viewable "
-        "to the public. Your league manager can turn that on in ESPN under League Settings > "
-        "Make League Viewable to Public."
+        "This ESPN league is private. Connect your ESPN login so FantasyDesk can read it, or ask "
+        "your league manager to make it viewable to the public (League Settings > Make League "
+        "Viewable to Public)."
+    ),
+    "espn_login_rejected": (
+        "ESPN didn't accept your saved login, or that account can't see this league. Reconnect "
+        "ESPN with fresh values and check you're using the account that's in the league."
     ),
     "league_not_found": "We couldn't find that ESPN league for that season. Check the league ID and season.",
     "no_teams": "That ESPN league loaded, but it has no teams or rosters yet.",
@@ -557,7 +564,7 @@ sleeper_players_provider: Callable[[], dict[str, Any]] = _default_sleeper_player
 espn_crosswalk_provider: Callable[[dict[str, Any]], dict[str, str]] = _default_espn_crosswalk
 
 
-def _classify_load_error(exc: Exception) -> ESPNLeagueError:
+def _classify_load_error(exc: Exception, *, used_credentials: bool = False) -> ESPNLeagueError:
     name = type(exc).__name__
     # ESPN answers a private league with HTTP 401 (espn_api: ESPNAccessDenied)
     # and a nonexistent league/season with 404 (ESPNInvalidLeague). Anything
@@ -566,14 +573,63 @@ def _classify_load_error(exc: Exception) -> ESPNLeagueError:
     if status is None:
         status = getattr(getattr(exc, "response", None), "status_code", None)
     if name == "ESPNAccessDenied" or status in (401, 403):
+        if used_credentials:
+            return ESPNLeagueError("espn_login_rejected", ERROR_MESSAGES["espn_login_rejected"])
         return ESPNLeagueError("private_league", ERROR_MESSAGES["private_league"])
     if name == "ESPNInvalidLeague" or status == 404:
         return ESPNLeagueError("league_not_found", ERROR_MESSAGES["league_not_found"])
     return ESPNLeagueError("espn_unavailable", ERROR_MESSAGES["espn_unavailable"])
 
 
-def load_league_snapshot(league_key: str) -> dict[str, Any]:
-    """Load a public ESPN league live and translate it. Raises ESPNLeagueError."""
+class RequestLogin:
+    """The caller's ESPN login for this request, resolved lazily.
+
+    The API binds one per request without any network call; ``resolve`` runs
+    the (cached) user + credential lookup only if a league turns out to be
+    private. Returns ``(user_id, credentials)`` or None."""
+
+    def __init__(self, resolver: Callable[[], tuple[str, Any] | None]):
+        self._resolver = resolver
+        self._done = False
+        self._value: tuple[str, Any] | None = None
+
+    def resolve(self) -> tuple[str, Any] | None:
+        if not self._done:
+            try:
+                self._value = self._resolver()
+            except Exception:
+                self._value = None
+            self._done = True
+        return self._value
+
+
+_REQUEST_LOGIN: contextvars.ContextVar[RequestLogin | None] = contextvars.ContextVar(
+    "espn_request_login", default=None
+)
+# League keys that answered "private" recently, so a signed-in user's request
+# goes straight to the login path instead of failing a public load first.
+_KNOWN_PRIVATE: dict[str, float] = {}
+
+
+def bind_request_login(login: RequestLogin) -> contextvars.Token:
+    return _REQUEST_LOGIN.set(login)
+
+
+def bind_request_credentials(user_id: str, credentials: Any) -> contextvars.Token:
+    """Bind an already-known login (preview/save, which just resolved it)."""
+
+    return _REQUEST_LOGIN.set(RequestLogin(lambda: (str(user_id), credentials)))
+
+
+def reset_request_login(token: contextvars.Token) -> None:
+    _REQUEST_LOGIN.reset(token)
+
+
+def load_league_snapshot(league_key: str, credentials: Any = None) -> dict[str, Any]:
+    """Load an ESPN league live and translate it. Raises ESPNLeagueError.
+
+    ``credentials`` (an ``espn_credentials.EspnCredentials``) is passed only to
+    read a private league; without it only public leagues load."""
 
     parsed = parse_espn_league_key(league_key)
     if not parsed:
@@ -581,11 +637,17 @@ def load_league_snapshot(league_key: str) -> dict[str, Any]:
     espn_league_id, season = parsed
     try:
         factory = league_factory_provider()
-        # Public leagues only: no espn_s2/swid is ever passed (see module
-        # docstring for why private leagues are out of scope).
-        raw_league = factory(league_id=int(espn_league_id), year=season)
+        if credentials is not None:
+            raw_league = factory(
+                league_id=int(espn_league_id),
+                year=season,
+                espn_s2=credentials.espn_s2,
+                swid=credentials.swid,
+            )
+        else:
+            raw_league = factory(league_id=int(espn_league_id), year=season)
     except Exception as exc:
-        raise _classify_load_error(exc) from None
+        raise _classify_load_error(exc, used_credentials=credentials is not None) from None
     try:
         df_players = players_frame_provider()
     except Exception:
@@ -607,6 +669,8 @@ def load_league_snapshot(league_key: str) -> dict[str, Any]:
     )
     if not snapshot["rosters"]:
         raise ESPNLeagueError("no_teams", ERROR_MESSAGES["no_teams"])
+    # A snapshot read with a login is private data: it is cached per user only.
+    snapshot["private"] = credentials is not None
     return snapshot
 
 
@@ -615,40 +679,86 @@ _SNAPSHOT_LOCKS: dict[str, threading.Lock] = {}
 _SNAPSHOT_GUARD = threading.Lock()
 
 
+def _private_cache_key(league_key: str, user_id: str) -> str:
+    return f"{league_key}\x00{user_id}"
+
+
 def get_league_snapshot(league_key: str, *, refresh: bool = False) -> dict[str, Any] | None:
     """Cached snapshot, or None when the league can't be loaded.
 
     One load per key per ESPN_SNAPSHOT_TTL_SECONDS per process, single-flight
-    so a page firing several league requests at once pays one ESPN call."""
+    so a page firing several league requests at once pays one ESPN call.
+
+    Public leagues share one cache entry. A league that only loads with the
+    caller's ESPN login is cached under (league key, user id) and is served to
+    that user alone."""
 
     if not parse_espn_league_key(league_key):
         return None
-    now = time.time()
-    cached = _SNAPSHOT_CACHE.get(league_key)
-    if cached and not refresh and now - cached[0] < ESPN_SNAPSHOT_TTL_SECONDS:
-        return cached[1]
+    login = _REQUEST_LOGIN.get()
+
+    def fresh(entry):
+        return bool(entry) and not refresh and time.time() - entry[0] < ESPN_SNAPSHOT_TTL_SECONDS
+
+    def private_load() -> dict[str, Any] | None:
+        resolved = login.resolve() if login else None
+        if not resolved:
+            return None
+        user_id, credentials = resolved
+        key = _private_cache_key(league_key, user_id)
+        with _SNAPSHOT_GUARD:
+            lock = _SNAPSHOT_LOCKS.setdefault(key, threading.Lock())
+        with lock:
+            entry = _SNAPSHOT_CACHE.get(key)
+            if fresh(entry):
+                return entry[1]
+            try:
+                snapshot = load_league_snapshot(league_key, credentials)
+            except ESPNLeagueError:
+                return None
+            _SNAPSHOT_CACHE[key] = (time.time(), snapshot)
+            return snapshot
+
+    entry = _SNAPSHOT_CACHE.get(league_key)
+    if fresh(entry):
+        return entry[1]
+    private_seen = _KNOWN_PRIVATE.get(league_key)
+    if private_seen and time.time() - private_seen < ESPN_SNAPSHOT_TTL_SECONDS * 6:
+        return private_load()
     with _SNAPSHOT_GUARD:
         lock = _SNAPSHOT_LOCKS.setdefault(league_key, threading.Lock())
     with lock:
-        cached = _SNAPSHOT_CACHE.get(league_key)
-        if cached and not refresh and time.time() - cached[0] < ESPN_SNAPSHOT_TTL_SECONDS:
-            return cached[1]
+        entry = _SNAPSHOT_CACHE.get(league_key)
+        if fresh(entry):
+            return entry[1]
         try:
             snapshot = load_league_snapshot(league_key)
-        except ESPNLeagueError:
-            return None
-        _SNAPSHOT_CACHE[league_key] = (time.time(), snapshot)
-        return snapshot
+            _SNAPSHOT_CACHE[league_key] = (time.time(), snapshot)
+            return snapshot
+        except ESPNLeagueError as exc:
+            if exc.reason != "private_league":
+                return None
+            _KNOWN_PRIVATE[league_key] = time.time()
+    return private_load()
 
 
 def store_snapshot(league_key: str, snapshot: dict[str, Any]) -> None:
     """Seed the cache with a snapshot the caller just loaded (preview/save)."""
 
+    if snapshot.get("private"):
+        login = _REQUEST_LOGIN.get()
+        resolved = login.resolve() if login else None
+        if not resolved:
+            return  # never put private data in the shared cache
+        _KNOWN_PRIVATE[league_key] = time.time()
+        _SNAPSHOT_CACHE[_private_cache_key(league_key, resolved[0])] = (time.time(), snapshot)
+        return
     _SNAPSHOT_CACHE[league_key] = (time.time(), snapshot)
 
 
 def clear_snapshot_cache() -> None:
     _SNAPSHOT_CACHE.clear()
+    _KNOWN_PRIVATE.clear()
 
 
 def league_payload(league_key: str) -> dict[str, Any]:

@@ -151,6 +151,7 @@ import pandas as pd
 import requests
 
 from modules import (
+    espn_credentials,
     free_tier_ledger,
     trade_eval_usage,
     account_store,
@@ -889,6 +890,55 @@ def require_user(
                 pass
     _maybe_schedule_players_refresh()
     return normalized
+
+
+_ESPN_LOGIN_MEMO: dict[str, tuple[float, tuple[str, Any] | None]] = {}
+_ESPN_LOGIN_MEMO_SECONDS = 120.0
+
+
+def _resolve_espn_login(token: str) -> tuple[str, Any] | None:
+    """Bearer token -> (user_id, saved ESPN login) or None. Memoized briefly
+    (keyed by a hash of the token, never the token) because one page load
+    fires several league requests."""
+
+    memo_key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    cached = _ESPN_LOGIN_MEMO.get(memo_key)
+    if cached and time.time() - cached[0] < _ESPN_LOGIN_MEMO_SECONDS:
+        return cached[1]
+    config = auth_supabase.get_supabase_config()
+    found: tuple[str, Any] | None = None
+    if auth_supabase.is_configured(config):
+        user, _error = auth_supabase.fetch_auth_user(config, token)
+        user_id = str((user or {}).get("id") or "")
+        if user_id:
+            credentials = espn_credentials.load(config, token, user_id=user_id)
+            if credentials:
+                found = (user_id, credentials)
+    if len(_ESPN_LOGIN_MEMO) > 512:
+        _ESPN_LOGIN_MEMO.clear()
+    _ESPN_LOGIN_MEMO[memo_key] = (time.time(), found)
+    return found
+
+
+async def _bind_espn_login(authorization: str | None = Header(default=None)) -> None:
+    """Make the caller's saved ESPN login available to this request, lazily.
+
+    Binding does no network work: the login is only looked up if an ESPN
+    league turns out to be private (modules.espn_leagues.RequestLogin). Runs
+    before the route so the sync route's worker thread inherits it. A missing
+    or bad token, no saved login or an unset ESPN_CREDENTIAL_KEY simply binds
+    nothing; require_user still decides auth."""
+
+    if not espn_credentials.is_configured():
+        return
+    scheme, _, token = (authorization or "").strip().partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return
+    clean = token.strip()
+    espn_leagues.bind_request_login(espn_leagues.RequestLogin(lambda: _resolve_espn_login(clean)))
+
+
+app.router.dependencies.append(Depends(_bind_espn_login))
 
 
 def optional_user(
@@ -1858,9 +1908,9 @@ class EspnLeaguePreviewRequest(BaseModel):
 @app.post("/v1/espn/leagues/preview")
 def preview_espn_league(
     body: EspnLeaguePreviewRequest,
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    """Load a public ESPN league and show what importing it would give.
+    """Load an ESPN league and show what importing it would give.
 
     Read-only (saves nothing): league name, every team (so the user can
     pick theirs), how many roster players matched FantasyDesk's player
@@ -1868,10 +1918,10 @@ def preview_espn_league(
     (modules.espn_leagues.ESPN_FEATURE_SUPPORT). The returned
     `league.league_key` is what POST /v1/leagues/save takes as league_id.
 
-    Public leagues only. This endpoint takes no espn_s2/SWID cookies, and a
-    private league answers `private_league` (see modules.espn_leagues for
-    why private leagues are out of scope). Everyday failures are a 200 with
-    `ok: false` and a `reason`, like GET /v1/sleeper/leagues."""
+    Public leagues load as-is. A private league loads with the caller's saved
+    ESPN login (POST /v1/espn/credentials); without one it answers
+    `private_league`. Everyday failures are a 200 with `ok: false` and a
+    `reason`, like GET /v1/sleeper/leagues."""
 
     league_key = espn_leagues.build_espn_league_key(body.league_id, body.season)
     if not league_key:
@@ -1879,11 +1929,106 @@ def preview_espn_league(
     try:
         snapshot = espn_leagues.load_league_snapshot(league_key)
     except espn_leagues.ESPNLeagueError as exc:
-        return {"ok": False, "reason": exc.reason, "message": exc.message}
+        if exc.reason != "private_league":
+            return {"ok": False, "reason": exc.reason, "message": exc.message}
+        config = auth_supabase.get_supabase_config()
+        saved = espn_credentials.load(
+            config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or "")
+        )
+        if saved is None:
+            return {
+                "ok": False,
+                "reason": "private_league",
+                "message": exc.message,
+                "can_connect": espn_credentials.is_configured(),
+            }
+        try:
+            snapshot = espn_leagues.load_league_snapshot(league_key, saved)
+        except espn_leagues.ESPNLeagueError as private_exc:
+            return {"ok": False, "reason": private_exc.reason, "message": private_exc.message}
+        # Bind this user so the private snapshot is cached under them alone.
+        espn_leagues.bind_request_credentials(str(user.get("id") or ""), saved)
     # Saving right after previewing (the normal flow) reuses this load
     # instead of calling ESPN again.
     espn_leagues.store_snapshot(league_key, snapshot)
     return espn_leagues.preview_payload(snapshot)
+
+
+class EspnCredentialsRequest(BaseModel):
+    espn_s2: str = Field(default="", max_length=8192)
+    swid: str = Field(default="", max_length=256)
+    # Optional: prove the login works by loading this league before saving.
+    league_id: str = ""
+    season: int = 0
+
+
+@app.get("/v1/espn/credentials")
+def get_espn_credentials_status(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Whether the caller has an ESPN login saved, and whether saving is
+    available. Never returns the cookie values."""
+
+    configured = espn_credentials.is_configured()
+    saved = False
+    if configured:
+        config = auth_supabase.get_supabase_config()
+        saved = espn_credentials.has_saved(
+            config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or "")
+        )
+    return {"ok": True, "available": configured, "saved": saved}
+
+
+@app.post("/v1/espn/credentials")
+def save_espn_credentials(
+    body: EspnCredentialsRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Save the caller's ESPN login (espn_s2 + SWID), encrypted.
+
+    With `league_id` + `season`, the login is first proven against that league
+    and nothing is saved if ESPN rejects it, so a typo is caught here instead
+    of later as an empty league."""
+
+    if not espn_credentials.is_configured():
+        return {
+            "ok": False,
+            "reason": "not_configured",
+            "message": "Connecting private ESPN leagues isn't available yet.",
+        }
+    try:
+        credentials = espn_credentials.normalize(body.espn_s2, body.swid)
+    except espn_credentials.EspnCredentialError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    if body.league_id:
+        league_key = espn_leagues.build_espn_league_key(body.league_id, body.season)
+        if not league_key:
+            return {"ok": False, "reason": "invalid_input", "message": espn_leagues.ERROR_MESSAGES["invalid_input"]}
+        try:
+            espn_leagues.load_league_snapshot(league_key, credentials)
+        except espn_leagues.ESPNLeagueError as exc:
+            return {"ok": False, "reason": exc.reason, "message": exc.message}
+    config = auth_supabase.get_supabase_config()
+    try:
+        espn_credentials.save(
+            config,
+            str(user.get("_access_token") or ""),
+            user_id=str(user.get("id") or ""),
+            credentials=credentials,
+        )
+    except espn_credentials.EspnCredentialError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    return {"ok": True, "saved": True}
+
+
+@app.delete("/v1/espn/credentials")
+def delete_espn_credentials(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Remove the caller's saved ESPN login."""
+
+    config = auth_supabase.get_supabase_config()
+    try:
+        espn_credentials.delete(config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or ""))
+    except espn_credentials.EspnCredentialError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    return {"ok": True, "saved": False}
 
 
 class ImportLeaguePreviewRequest(BaseModel):
