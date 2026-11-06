@@ -82,7 +82,7 @@ export function SnapshotTile({
         {label}
       </span>
       <span
-        className={compact ? "flex h-6 max-w-full items-center justify-center whitespace-nowrap tabular-nums" : undefined}
+        className={compact ? "flex h-6 max-w-full items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap tabular-nums" : undefined}
         style={{ font: "var(--type-primary-metric)", color: toneColor, ...(compact ? { fontSize: compactValueFontSize(value) } : {}) }}
       >
         {value}
