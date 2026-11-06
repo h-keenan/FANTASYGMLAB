@@ -370,13 +370,10 @@ export function TradeFinderContent({
   }
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-3xl w-full mx-auto">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_finder" />
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade Finder" leagueName={leagueName} />
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Pick what you&apos;d move; find realistic packages.
-        </p>
       </header>
 
       {roster.length === 0 ? (

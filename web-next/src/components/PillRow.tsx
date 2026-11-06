@@ -29,6 +29,7 @@ export function PillRow({
   fullWidth = false,
   variant,
   ariaLabel,
+  sticky = false,
 }: {
   options: { label: string; value: string; href?: string }[];
   active: string;
@@ -36,6 +37,8 @@ export function PillRow({
   fullWidth?: boolean;
   variant?: PillRowVariant;
   ariaLabel?: string;
+  /** Pin the strip under the top of the viewport and use the compact height. For page-level tab bars. */
+  sticky?: boolean;
 }) {
   const mode: PillRowVariant = variant ?? (fullWidth ? "fill" : "compact");
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -97,8 +100,12 @@ export function PillRow({
 
   return (
     <div
-      className={mode === "compact" ? "flex max-w-full self-start" : "flex w-full"}
-      style={{ border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-surface-muted)" }}
+      className={`${mode === "compact" ? "flex max-w-full self-start" : "flex w-full"}${sticky ? " sticky z-20" : ""}`}
+      style={{
+        border: "var(--border-width-default) solid var(--color-border)",
+        background: "var(--color-surface-muted)",
+        ...(sticky ? { top: 0 } : null),
+      }}
     >
       <div
         ref={scrollerRef}
@@ -119,7 +126,7 @@ export function PillRow({
           const tabbable = isActive || (!hasActive && index === 0);
           const className = `${segment} flex items-center justify-center whitespace-nowrap text-center font-bold uppercase text-[length:var(--segmented-font-size)]`;
           const style = {
-            minHeight: "var(--segmented-height)",
+            minHeight: sticky ? "var(--segmented-height-compact)" : "var(--segmented-height)",
             padding: "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: isActive ? "var(--color-information-soft)" : "transparent",

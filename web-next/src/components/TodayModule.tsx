@@ -89,7 +89,7 @@ export function TodayModule({
       />
 
       {nextAction ? (
-        <AccentCard accent="var(--color-accent)" compact>
+        <AccentCard accent="var(--color-accent)" compact glow>
           <h3 className="text-sm font-bold">{nextAction.headline}</h3>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {nextAction.why}

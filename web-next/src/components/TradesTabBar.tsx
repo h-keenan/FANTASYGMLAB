@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PillRow } from "@/components/PillRow";
 
 /**
@@ -10,12 +9,8 @@ import { PillRow } from "@/components/PillRow";
  * and Trade Analyzer in Revision 17) — none of them deep-link out to
  * Streamlit anymore.
  *
- * Trade History (Revision 18) is a genuinely separate GM_TOOLS destination,
- * not a fourth tab in this segmented control — it isn't part of
- * TRADES_TAB_ROUTE_ORDER on Streamlit, and mobile's TradesScreen.tsx reaches
- * it via a small header icon beside the tabs (navigation.navigate to a
- * screen outside this tab group), not a fourth tab. The trailing link below
- * mirrors that same "beside, not inside" placement.
+ * Trade History is a pill in the same row, linking out to its own
+ * league-independent page. The bar is sticky and compact.
  */
 export function TradesTabBar({
   leagueId,
@@ -27,23 +22,16 @@ export function TradesTabBar({
   active: "trade_hub" | "trade_finder" | "trade_analyzer";
 }) {
   const suffix = `?name=${encodeURIComponent(leagueName)}`;
-  const tabs: { key: "trade_hub" | "trade_finder" | "trade_analyzer"; label: string; href: string }[] = [
-    { key: "trade_hub", label: "Trade Hub", href: `/trade-hub/${encodeURIComponent(leagueId)}${suffix}` },
-    { key: "trade_finder", label: "Trade Finder", href: `/trade-finder/${encodeURIComponent(leagueId)}${suffix}` },
-    { key: "trade_analyzer", label: "Trade Analyzer", href: `/trade-analyzer/${encodeURIComponent(leagueId)}${suffix}` },
+  const id = encodeURIComponent(leagueId);
+  // Short labels: the page <h1> carries the full name, and four pills have to
+  // fit one phone-width row. Trade History is a destination pill in the same
+  // row (it is not part of TRADES_TAB_ROUTE_ORDER) and is never "active" here.
+  const tabs: { label: string; value: string; href: string }[] = [
+    { value: "trade_hub", label: "Hub", href: `/trade-hub/${id}${suffix}` },
+    { value: "trade_finder", label: "Finder", href: `/trade-finder/${id}${suffix}` },
+    { value: "trade_analyzer", label: "Analyzer", href: `/trade-analyzer/${id}${suffix}` },
+    { value: "trade_history", label: "History", href: "/trade-history" },
   ];
 
-  return (
-    <div className="flex flex-col gap-2">
-      <PillRow
-        fullWidth
-        ariaLabel="Trades section"
-        options={tabs.map((tab) => ({ label: tab.label, value: tab.key, href: tab.href }))}
-        active={active}
-      />
-      <Link href="/trade-history" className="text-xs font-bold uppercase self-end inline-flex items-center min-h-[var(--touch-target-min)]" style={{ color: "var(--color-accent)" }}>
-        Trade History →
-      </Link>
-    </div>
-  );
+  return <PillRow sticky fullWidth ariaLabel="Trades section" options={tabs} active={active} />;
 }
