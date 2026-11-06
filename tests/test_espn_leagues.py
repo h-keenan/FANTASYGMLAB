@@ -280,7 +280,12 @@ def test_preview_rejects_bad_input_and_reports_private_leagues(api, monkeypatch)
 
     monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda: factory)
     body = api.client.post("/v1/espn/leagues/preview", json={"league_id": "1", "season": 2026}).json()
-    assert body == {"ok": False, "reason": "private_league", "message": espn_leagues.ERROR_MESSAGES["private_league"]}
+    assert body == {
+        "ok": False,
+        "reason": "private_league",
+        "message": espn_leagues.ERROR_MESSAGES["private_league"],
+        "can_connect": False,
+    }
 
 
 def test_save_requires_a_team_and_stores_the_platform_in_the_league_id(api):
@@ -331,3 +336,153 @@ def test_portfolio_reports_espn_leagues_as_not_supported_without_computing(api):
 def test_rollover_resolution_never_loads_an_espn_league(api):
     with patch.object(api.svc.sleeper, "get_league", Mock(side_effect=AssertionError("loaded"))):
         assert api.svc.resolve_league_path_id(KEY, user=USER) == KEY
+
+
+# --- private leagues: encrypted login, per-user cache --------------------------
+
+S2 = "AEB" + "x" * 60 + "%2Fabc"
+SWID = "{12345678-ABCD-4EF0-9876-0123456789AB}"
+
+
+@pytest.fixture
+def espn_key(monkeypatch):
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("ESPN_CREDENTIAL_KEY", Fernet.generate_key().decode())
+
+
+def test_credentials_are_encrypted_round_trip_and_never_in_the_clear(espn_key):
+    from modules import espn_credentials
+
+    creds = espn_credentials.normalize(f"espn_s2={S2}", SWID.strip("{}"))
+    assert creds.swid == SWID  # braces repaired, cookie name stripped
+    row = espn_credentials.encrypt(creds)
+    assert S2 not in row["espn_s2_enc"] and SWID not in row["swid_enc"]
+    assert espn_credentials.decrypt(row) == creds
+    assert "redacted" in repr(creds) and S2 not in repr(creds)
+
+
+def test_credentials_feature_is_off_without_a_key_and_rejects_bad_shapes(monkeypatch):
+    from modules import espn_credentials
+
+    monkeypatch.delenv("ESPN_CREDENTIAL_KEY", raising=False)
+    assert not espn_credentials.is_configured()
+    with pytest.raises(espn_credentials.EspnCredentialError) as off:
+        espn_credentials.encrypt(espn_credentials.EspnCredentials(S2, SWID))
+    assert off.value.reason == "not_configured"
+    with pytest.raises(espn_credentials.EspnCredentialError) as bad_s2:
+        espn_credentials.normalize("short", SWID)
+    assert bad_s2.value.reason == "invalid_espn_s2"
+    with pytest.raises(espn_credentials.EspnCredentialError) as bad_swid:
+        espn_credentials.normalize(S2, "not-a-guid")
+    assert bad_swid.value.reason == "invalid_swid"
+
+
+def test_a_wrong_key_cannot_read_the_stored_login(monkeypatch, espn_key):
+    from cryptography.fernet import Fernet
+    from modules import espn_credentials
+
+    row = espn_credentials.encrypt(espn_credentials.normalize(S2, SWID))
+    monkeypatch.setenv("ESPN_CREDENTIAL_KEY", Fernet.generate_key().decode())
+    assert espn_credentials.decrypt(row) is None
+
+
+def _private_factory(calls):
+    class ESPNAccessDenied(Exception):
+        pass
+
+    def factory(**kwargs):
+        calls.append(kwargs)
+        if not kwargs.get("espn_s2"):
+            raise ESPNAccessDenied("espn_s2 and swid are required")
+        return _league()
+
+    return factory
+
+
+def test_private_league_loads_with_a_login_and_is_cached_for_that_user_only(monkeypatch, espn_key):
+    from modules import espn_credentials
+
+    calls: list[dict] = []
+    monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda: _private_factory(calls))
+    creds = espn_credentials.normalize(S2, SWID)
+
+    token = espn_leagues.bind_request_credentials("user-a", creds)
+    try:
+        assert espn_leagues.get_league_snapshot(KEY)["private"] is True
+        espn_leagues.get_league_snapshot(KEY)  # served from the per-user cache
+        assert [bool(c.get("espn_s2")) for c in calls] == [False, True]
+    finally:
+        espn_leagues.reset_request_login(token)
+
+    # Another user, no login: the private snapshot must not be served to them.
+    other = espn_leagues.bind_request_credentials("user-b", None)
+    try:
+        assert espn_leagues.get_league_snapshot(KEY) is None
+    finally:
+        espn_leagues.reset_request_login(other)
+    assert espn_leagues.get_league_snapshot(KEY) is None  # no login at all
+
+
+def test_a_rejected_login_is_reported_as_such_not_as_private(monkeypatch, espn_key):
+    from modules import espn_credentials
+
+    class ESPNAccessDenied(Exception):
+        pass
+
+    def factory(**_kwargs):
+        raise ESPNAccessDenied("denied")
+
+    monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda: factory)
+    with pytest.raises(espn_leagues.ESPNLeagueError) as exc:
+        espn_leagues.load_league_snapshot(KEY, espn_credentials.normalize(S2, SWID))
+    assert exc.value.reason == "espn_login_rejected"
+
+
+def test_credentials_endpoints_never_return_values(api, monkeypatch, espn_key):
+    from services import mobile_api_service as svc
+    from modules import espn_credentials
+
+    stored: dict = {}
+
+    def upsert(_config, _token, table, payload, *, on_conflict):
+        stored.update(payload)
+        return True, ""
+
+    monkeypatch.setattr(svc.espn_credentials.account_store, "upsert_row", upsert)
+    monkeypatch.setattr(
+        svc.espn_credentials.account_store, "fetch_rows",
+        lambda *a, **k: ([dict(stored, user_id="u")] if stored else [], ""),
+    )
+    monkeypatch.setattr(svc.espn_credentials.account_store, "delete_rows", lambda *a, **k: (stored.clear() or True, ""))
+
+    assert api.client.get("/v1/espn/credentials").json() == {"ok": True, "available": True, "saved": False}
+    bad = api.client.post("/v1/espn/credentials", json={"espn_s2": "x", "swid": SWID}).json()
+    assert bad["ok"] is False and bad["reason"] == "invalid_espn_s2" and not stored
+
+    ok = api.client.post("/v1/espn/credentials", json={"espn_s2": S2, "swid": SWID})
+    assert ok.json() == {"ok": True, "saved": True}
+    assert S2 not in ok.text and SWID not in ok.text
+    assert S2 not in str(stored) and espn_credentials.decrypt(stored).espn_s2 == S2
+    status = api.client.get("/v1/espn/credentials")
+    assert status.json()["saved"] is True and S2 not in status.text
+    assert api.client.delete("/v1/espn/credentials").json() == {"ok": True, "saved": False}
+
+
+def test_request_login_reaches_the_sync_route_and_serves_only_that_user(api, monkeypatch, espn_key):
+    """The app-level dependency binds the login lazily; a private league's own
+    route must see it, and a caller with no saved login must get nothing."""
+
+    from modules import espn_credentials
+    from services import mobile_api_service as svc
+
+    calls: list[dict] = []
+    monkeypatch.setattr(espn_leagues, "league_factory_provider", lambda: _private_factory(calls))
+    creds = espn_credentials.normalize(S2, SWID)
+    monkeypatch.setattr(svc, "_resolve_espn_login", lambda token: ("user-a", creds) if token == "token-a" else None)
+
+    mine = api.client.get(f"/v1/leagues/{KEY}/rosters", headers={"Authorization": "Bearer token-a"})
+    assert mine.status_code == 200 and len(mine.json()["rosters"]) == 2
+    espn_leagues._SNAPSHOT_CACHE.clear()  # keep the per-user entry out of the second call
+    theirs = api.client.get(f"/v1/leagues/{KEY}/rosters", headers={"Authorization": "Bearer token-b"})
+    assert theirs.status_code == 200 and theirs.json()["rosters"] == []

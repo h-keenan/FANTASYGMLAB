@@ -125,6 +125,7 @@ _TABLE_SETUP_DOCS: dict[str, str] = {
     "profiles": "docs/supabase_accounts.sql",
     "saved_leagues": "docs/supabase_accounts.sql",
     "user_settings": "docs/supabase_accounts.sql",
+    "espn_credentials": "docs/supabase_espn_credentials.sql",
     "gm_targets": "docs/supabase_gm_targets.sql",
     "mobile_alert_reads": "docs/supabase_mobile_alert_reads.sql",
     "trade_outcomes": "docs/supabase_trade_outcomes.sql",
