@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+const noopSubscribe = () => () => {};
 
 /** DOM id of the slot Header.tsx renders next to the page name. */
 export const PAGE_INFO_SLOT_ID = "page-info-slot";
@@ -20,11 +22,14 @@ export const PAGE_INFO_SLOT_ID = "page-info-slot";
  * signed-out pages) it falls back to inline.
  */
 export function PageTitle({ page, info }: { page: string; leagueName?: string; info?: ReactNode }) {
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // The header slot only exists in the browser, after the shell mounts: read it
+  // as an external value (null on the server) instead of syncing it via an effect.
+  const slot = useSyncExternalStore(
+    noopSubscribe,
+    () => document.getElementById(PAGE_INFO_SLOT_ID),
+    () => null,
+  );
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    setSlot(document.getElementById(PAGE_INFO_SLOT_ID));
-  }, []);
   const button = info ? (
     <>
       <button
