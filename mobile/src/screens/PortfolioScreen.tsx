@@ -32,6 +32,8 @@ import {
   PORTFOLIO_SPLASH_DELAY_MS,
 } from '../lib/portfolioLoader';
 import { useDelayedFlag } from '../lib/useDelayedFlag';
+
+const SLOW_LEAGUE_MS = 10_000;
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
 import { ESPN_NOT_SUPPORTED } from '../lib/leaguesGlance';
@@ -350,6 +352,7 @@ export default function PortfolioScreen() {
               isFirst={position === 0}
               isLast={position === rows.length - 1}
               styles={styles}
+              onRetry={retryLeague}
             />
           )
         }
@@ -482,12 +485,17 @@ function PortfolioLeagueSkeleton({
   isFirst,
   isLast,
   styles,
+  onRetry,
 }: {
   league?: PortfolioSavedLeague;
   isFirst: boolean;
   isLast: boolean;
   styles: ReturnType<typeof createStyles>;
+  onRetry?: (leagueId: string) => void;
 }) {
+  // A league's row can take a long time to build server-side; after a beat,
+  // say so and offer a retry instead of an unexplained skeleton.
+  const slow = useDelayedFlag(Boolean(league && onRetry), SLOW_LEAGUE_MS);
   return (
     <View
       accessibilityLabel={`Loading ${league ? league.league_name : 'your leagues'}`}
@@ -513,6 +521,14 @@ function PortfolioLeagueSkeleton({
         <SkeletonBlock width="80%" height={14} style={styles.skeletonGap} />
         <SkeletonBlock width="60%" height={12} />
       </View>
+      {slow && league && onRetry ? (
+        <View style={styles.slowRow}>
+          <AppText style={styles.slowText}>Taking longer than usual…</AppText>
+          <TouchableOpacity onPress={() => onRetry(league.league_id)} accessibilityRole="button" accessibilityLabel={`Retry ${league.league_name}`}>
+            <AppText style={styles.slowRetry}>Retry</AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -715,6 +731,9 @@ function createStyles(colors: ThemeColors) {
     rankValue: { fontSize: 12, fontWeight: '800' },
     rankPillFirst: {},
     skeletonGap: { marginTop: spacing.xs },
+    slowRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
+    slowText: { color: colors.textTertiary, fontSize: 13 },
+    slowRetry: { color: colors.accent, fontSize: 13, fontWeight: '700' },
     skeletonSignals: { gap: spacing.xs, paddingBottom: spacing.md },
   });
 }

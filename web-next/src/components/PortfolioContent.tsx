@@ -2,7 +2,7 @@
 
 import { GlossaryNote } from "@/components/GlossaryNote";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   api,
@@ -369,7 +369,21 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
  * loading treatment. The league name is real (it comes from the index), so
  * it's shown instead of a bar.
  */
-export function PortfolioLeagueSkeleton({ league }: { league?: PortfolioSavedLeague }) {
+export function PortfolioLeagueSkeleton({
+  league,
+  onRetry,
+}: {
+  league?: PortfolioSavedLeague;
+  onRetry?: (leagueId: string) => void;
+}) {
+  // A league's row can take a long time to build server-side; after a beat,
+  // say so and offer a retry instead of an unexplained skeleton.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!league || !onRetry) return;
+    const id = setTimeout(() => setSlow(true), 10_000);
+    return () => clearTimeout(id);
+  }, [league, onRetry]);
   return (
     <article
       className="glass-surface flex flex-col p-4"
@@ -396,6 +410,14 @@ export function PortfolioLeagueSkeleton({ league }: { league?: PortfolioSavedLea
         <SkeletonBlock width="60%" height={12} />
       </div>
       <SkeletonBlock width="45%" height={14} className="mt-4" />
+      {slow && league && onRetry ? (
+        <p className="text-xs mt-3 flex items-center gap-2" style={{ color: "var(--color-text-muted)" }}>
+          Taking longer than usual…
+          <button type="button" className="tap-link font-bold" style={{ color: "var(--color-accent)" }} onClick={() => onRetry(league.league_id)}>
+            Retry
+          </button>
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -548,7 +570,7 @@ export function PortfolioContent({
             slot.kind === "league" ? (
               <PortfolioLeagueCard key={slot.league.league_id} league={slot.league} />
             ) : (
-              <PortfolioLeagueSkeleton key={slot.league.league_id} league={slot.league} />
+              <PortfolioLeagueSkeleton key={slot.league.league_id} league={slot.league} onRetry={onRetryLeague} />
             ),
           )}
         </div>
