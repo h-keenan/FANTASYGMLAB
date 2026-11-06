@@ -399,15 +399,22 @@ def build_startup_roster_insights(
             pd.to_numeric, errors="coerce"
         ).rank(pct=True)
         frame["_startup_balance_spread"] = balance.max(axis=1) - balance.min(axis=1)
+        # "Balanced" must not reward uniformly weak rosters: a flat profile
+        # only counts when even the weakest room is at least league-median.
+        # Falls back to the whole league when no roster clears that bar.
+        solid_mask = balance.min(axis=1) >= 0.5
         balanced = _pick_row(
-            frame, "_startup_balance_spread", ascending=True
+            frame,
+            "_startup_balance_spread",
+            ascending=True,
+            mask=solid_mask if bool(solid_mask.any()) else None,
         )
         insights.append(
             _startup_insight(
                 "Most Balanced Roster",
                 balanced,
                 "positional_score_spread",
-                "Smallest percentile spread across the existing QB, RB, WR, and TE room scores.",
+                "Smallest percentile spread across the QB, RB, WR, and TE room scores among rosters whose weakest room is at least league-median.",
                 tone="franchise",
             )
         )

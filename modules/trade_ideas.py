@@ -29,6 +29,7 @@ from modules.record_signal import (
 )
 from modules.team_eval import (
     MAX_KNOWN_PLAYER_AGE,
+    REPLACEMENT_LEVEL,
     get_team_vs_league,
     normalize_team_strategy,
     suggest_optimal_lineup,
@@ -216,6 +217,9 @@ def _pick_league_settings(league_settings: Dict[str, Any] | None = None) -> Dict
     if not settings.get("taxi_count") and settings.get("taxi_slots"):
         settings["taxi_count"] = max(0, _safe_int(settings.get("taxi_slots"), 0))
     return settings
+
+
+_BENCH_DEPTH_CREDIT_SLOTS = 2
 
 
 def _team_position_minimums(league_settings: Dict[str, Any] | None = None) -> Dict[str, int]:
@@ -958,6 +962,20 @@ def _pick_asset(pick: Dict[str, Any], score_multiplier: float = 1.0) -> Dict[str
 
 def _score_assets(assets: List[Dict[str, Any]]) -> int:
     return int(sum(int(asset.get("score") or 0) for asset in assets))
+
+
+# Roster spots are scarce, so the extra pieces of a RETURN bundle are worth
+# less than face value: the headliner counts in full, every other piece at this
+# fraction. Without it, two mid assets "add up" to a star in the Finder's
+# fairness band even though they cost the user a roster spot.
+PACKAGE_DEPTH_PIECE_WEIGHT = 0.85
+
+
+def _package_fairness_value(assets: List[Dict[str, Any]]) -> int:
+    scores = sorted((int(asset.get("score") or 0) for asset in assets), reverse=True)
+    if not scores:
+        return 0
+    return int(round(scores[0] + PACKAGE_DEPTH_PIECE_WEIGHT * sum(scores[1:])))
 
 
 def _asset_labels(assets: List[Dict[str, Any]]) -> str:
@@ -2416,11 +2434,24 @@ def _normalize_pos_list(values) -> List[str]:
     return [str(value).upper() for value in values or [] if isinstance(value, str)]
 
 
-def _position_value_map(df_team: pd.DataFrame, score_field: str = "value_score") -> Dict[str, float]:
+def _position_value_map(
+    df_team: pd.DataFrame,
+    score_field: str = "value_score",
+    minimums: Dict[str, int] | None = None,
+) -> Dict[str, float]:
+    """Per-position room value, measured on quality rather than headcount.
+
+    The room's starters (its position minimum) count in full; at most
+    ``_BENCH_DEPTH_CREDIT_SLOTS`` reserves add only their value above
+    replacement level. A deep room of fillers therefore cannot outscore a
+    short room with a real top end.
+    """
+
     values: Dict[str, float] = {}
     if df_team is None or df_team.empty:
         return values
     resolved_score_field = score_field if score_field in df_team.columns else "value_score"
+    resolved_minimums = minimums or POSITION_MINIMUMS
     for pos in CORE_POSITIONS:
         pos_df = df_team[df_team["position"] == pos]
         series = (
@@ -2428,8 +2459,13 @@ def _position_value_map(df_team: pd.DataFrame, score_field: str = "value_score")
             if resolved_score_field in pos_df.columns
             else pd.Series(dtype="float64")
         )
+        ordered = sorted(
+            pd.to_numeric(series, errors="coerce").fillna(0).tolist(), reverse=True
+        )
+        starters = max(1, int(resolved_minimums.get(pos, 1) or 1))
+        bench = ordered[starters : starters + _BENCH_DEPTH_CREDIT_SLOTS]
         values[pos] = float(
-            pd.to_numeric(series, errors="coerce").fillna(0).sum()
+            sum(ordered[:starters]) + sum(max(0.0, v - REPLACEMENT_LEVEL) for v in bench)
         )
     return values
 
@@ -2823,7 +2859,10 @@ def _build_team_shape(
         "need_model_status": dict(need_assessment.model_status),
         "counts": counts,
         "minimums": _team_position_minimums(league_settings),
-        "position_values": _position_value_map(work_team, score_field),
+        "startable_counts": _startable_position_counts(work_team, score_field),
+        "position_values": _position_value_map(
+            work_team, score_field, _team_position_minimums(league_settings)
+        ),
         "avg_age": metrics.get("avg_age"),
         "league_age_mean": metrics.get("league_age_mean"),
         "injury_burden": injury_burden,
@@ -3273,10 +3312,36 @@ def _fit_priority(
     return total
 
 
-def _asset_position_counts(assets: List[Dict[str, Any]]) -> Dict[str, int]:
+def _startable_position_counts(
+    df_team: pd.DataFrame | None, score_field: str = "value_score"
+) -> Dict[str, int]:
+    """Players per core position worth at least replacement level.
+
+    Depth is about usable bodies, not roster spots: a sixth 600-value WR does
+    not make a WR room deeper.
+    """
+
+    if df_team is None or df_team.empty or "position" not in df_team.columns:
+        return {}
+    field = score_field if score_field in df_team.columns else "value_score"
+    if field not in df_team.columns:
+        return {}
+    values = pd.to_numeric(df_team[field], errors="coerce").fillna(0)
+    positions = df_team["position"].astype(str).str.upper()
+    return {
+        pos: int(((positions == pos) & (values >= REPLACEMENT_LEVEL)).sum())
+        for pos in CORE_POSITIONS
+    }
+
+
+def _asset_position_counts(
+    assets: List[Dict[str, Any]], *, startable_only: bool = False
+) -> Dict[str, int]:
     counts: Dict[str, int] = {}
     for asset in assets:
         if asset.get("asset_type") != "player":
+            continue
+        if startable_only and float(asset.get("score") or 0) < REPLACEMENT_LEVEL:
             continue
         pos = str(asset.get("position") or "").upper()
         if pos in CORE_POSITIONS:
@@ -3307,11 +3372,14 @@ def _team_fit_assessment(
     negatives: List[str] = []
     score = 0
 
-    outgoing_counts = _asset_position_counts(outgoing_assets)
-    incoming_counts = _asset_position_counts(incoming_assets)
+    # Depth is judged on startable players (>= replacement level) when the
+    # shape carries them; older shapes fall back to raw headcount.
+    startable = shape.get("startable_counts")
+    outgoing_counts = _asset_position_counts(outgoing_assets, startable_only=bool(startable))
+    incoming_counts = _asset_position_counts(incoming_assets, startable_only=bool(startable))
     current_counts = {
         str(pos).upper(): int(count or 0)
-        for pos, count in (shape.get("counts") or {}).items()
+        for pos, count in (startable or shape.get("counts") or {}).items()
     }
     minimums = {
         str(pos).upper(): int(count or 0)
@@ -5619,10 +5687,16 @@ def _build_trade_ideas_impl(
                             continue
                     elif first.get("asset_type") == "pick" and second.get("asset_type") == "pick":
                         continue
-                    pair_value = int(first.get("score") or 0) + int(second.get("score") or 0)
+                    face_value = int(first.get("score") or 0) + int(second.get("score") or 0)
+                    # The bundle must still reach the band after its extra
+                    # piece is discounted (it costs a roster spot), and it
+                    # must not exceed the band's ceiling at face value.
+                    pair_value = _package_fairness_value([first, second])
                     if not _value_fits(send_value, pair_value, low=low, high=high):
                         continue
-                    pair_packages.append((first, second, abs(pair_value - send_value)))
+                    if face_value - send_value > high:
+                        continue
+                    pair_packages.append((first, second, abs(face_value - send_value)))
                 pair_packages.sort(key=lambda row: row[2])
                 for first, second, _gap in pair_packages[:6]:
                     if accept(

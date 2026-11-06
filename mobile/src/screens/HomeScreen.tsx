@@ -31,7 +31,7 @@ import IconCircle from '../components/IconCircle';
 import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
 import EspnLeagueImport from '../components/EspnLeagueImport';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import PlatformPicker from '../components/PlatformPicker';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { useAuth } from '../context/AuthContext';
@@ -664,13 +664,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             <>
             <ModalFormTitle>Add a league</ModalFormTitle>
             <View style={styles.platformTabs}>
-              <SegmentedTabBar<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>
-                options={[
-                  { key: 'sleeper', label: 'Sleeper' },
-                  { key: 'espn', label: 'ESPN' },
-                  { key: 'fleaflicker', label: 'Fleaflicker' },
-                  { key: 'mfl', label: 'MFL' },
-                ]}
+              <PlatformPicker
                 active={addPlatform}
                 onChange={(platform) => {
                   setAddPlatform(platform);
