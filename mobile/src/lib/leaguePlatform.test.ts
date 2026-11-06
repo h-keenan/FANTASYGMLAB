@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { espnRouteSupported, importedPlatformLabel, isEspnLeagueId, leagueHomeRoute, notAvailableMessage } from './leaguePlatform.ts';
+import { ESPN_COOKIE_STEPS, ESPN_LOGIN_WHY, espnCredentialFailureMessage, espnRouteSupported, importedPlatformLabel, isEspnLeagueId, leagueHomeRoute, notAvailableMessage } from './leaguePlatform.ts';
 import { glanceEspnNote, glanceFailedNote } from './leaguesGlance.ts';
 
 test('recognises ESPN league ids by their prefix', () => {
@@ -42,4 +42,13 @@ test('ESPN leagues get their own glance note, not the "Couldn\'t load" one', () 
   assert.equal(glanceFailedNote(failed), "Couldn't load 1 league right now: Broken.");
   assert.equal(glanceEspnNote(failed), 'Not available for ESPN leagues yet: ESPN Dynasty. Open it from My Team.');
   assert.equal(glanceEspnNote([failed[1]]), '');
+});
+
+test('ESPN login copy explains both cookies and prefers the server message', () => {
+  assert.match(ESPN_COOKIE_STEPS.join(' '), /espn_s2/);
+  assert.match(ESPN_COOKIE_STEPS.join(' '), /SWID/);
+  assert.match(ESPN_LOGIN_WHY, /encrypted/);
+  assert.equal(espnCredentialFailureMessage({ reason: 'x', message: 'Server says.' }), 'Server says.');
+  assert.match(espnCredentialFailureMessage({ reason: 'not_configured' }), /isn't available yet/);
+  assert.match(espnCredentialFailureMessage(null), /Check both values/);
 });
