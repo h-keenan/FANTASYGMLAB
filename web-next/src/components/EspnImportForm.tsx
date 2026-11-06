@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
@@ -10,6 +10,7 @@ import { Button } from "@/components/Button";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LEAGUE_CAP_UPSELL, saveFailureMessage } from "@/lib/leagueSave";
 import { Input, Select } from "@/components/Input";
+import { EspnLoginPanel, EspnLoginStatus } from "@/components/EspnLoginPanel";
 
 export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
 
@@ -22,12 +23,11 @@ const PLATFORM_COPY: Record<
     label: "ESPN",
     idHelp: (
       <>
-        FantasyDesk can read <strong>public</strong> ESPN leagues. Your league ID is the number after <code>leagueId=</code>{" "}
-        in your ESPN league&apos;s web address.
+        Your league ID is the number after <code>leagueId=</code> in your ESPN league&apos;s web address.
       </>
     ),
     privateNote:
-      "Private ESPN leagues aren't supported yet. Your league manager can make the league viewable to the public in ESPN's league settings.",
+      "Public league: just the ID. Private league: we'll ask you to connect your ESPN login (stored encrypted), only if needed.",
     notFound: "Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.",
     placeholder: "e.g. 12345678",
     findLabel: "Find my ESPN league",
@@ -66,8 +66,9 @@ const PLATFORM_COPY: Record<
  * team, and saves. ESPN has no username lookup for public leagues, so the
  * team pick is how "my roster" is known later.
  *
- * Private leagues would need the user's espn_s2/SWID cookies stored on our
- * server, so they're out of scope and this form never asks for them.
+ * Private leagues: when the preview says `private_league` and the server can
+ * store a login (`can_connect`), EspnLoginPanel asks for espn_s2/SWID, proves
+ * them on this league, and the preview is retried. Nothing asks for them up front.
  */
 export function EspnImportForm({
   onLeagueChosen,
@@ -87,6 +88,23 @@ export function EspnImportForm({
   const [rosterId, setRosterId] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [atCap, setAtCap] = useState(false);
+  const [canConnect, setCanConnect] = useState(false);
+  const [loginSaved, setLoginSaved] = useState(false);
+
+  // Whether an ESPN login is already saved, so the user sees (and can remove) it.
+  useEffect(() => {
+    if (platform !== "espn" || !session) return;
+    let live = true;
+    api
+      .getEspnCredentialStatus()
+      .then((result) => {
+        if (live && result?.ok) setLoginSaved(Boolean(result.saved));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [platform, session]);
 
   const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -98,6 +116,7 @@ export function EspnImportForm({
     setStatus("loading");
     setMessage(null);
     setIsPrivate(false);
+    setCanConnect(false);
     setPreview(null);
     setRosterId("");
     trackFeatureUse("league_import_started", { props: { platform } });
@@ -116,7 +135,8 @@ export function EspnImportForm({
       if (!result.league) {
         const espnPrivate = platform === "espn" && result.reason === "private_league";
         setIsPrivate(espnPrivate);
-        setMessage(espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
+        setCanConnect(espnPrivate && Boolean(result.can_connect));
+        setMessage(espnPrivate && result.can_connect ? null : espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
         if (platform === "espn") trackUse("league_import", "failed", { props: { result: espnImportFailureResult(result.reason) } });
         trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
         return;
@@ -270,6 +290,25 @@ export function EspnImportForm({
     );
   }
 
+  if (canConnect) {
+    return (
+      <div className="flex flex-col gap-3">
+        <EspnLoginPanel
+          leagueId={leagueId.trim()}
+          season={season}
+          onConnected={() => {
+            setLoginSaved(true);
+            setCanConnect(false);
+            void handleSubmit();
+          }}
+        />
+        <button type="button" onClick={() => setCanConnect(false)} className="text-xs font-bold self-start" style={{ color: "var(--color-text-muted)" }}>
+          Use a different league
+        </button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div
@@ -305,6 +344,7 @@ export function EspnImportForm({
           ))}
         </Select>
       </label>
+      {platform === "espn" ? <EspnLoginStatus saved={loginSaved} onRemoved={() => setLoginSaved(false)} /> : null}
       {message ? (
         <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>
           {message}

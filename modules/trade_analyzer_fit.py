@@ -33,6 +33,7 @@ import pandas as pd
 from modules import runtime_trace
 from modules.frame_records import frame_records
 from modules import trade_grade
+from modules.team_eval import REPLACEMENT_LEVEL
 from modules import model_status, trade_lineup_impact, trade_lineup_model, trade_posture
 from modules import trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
@@ -137,9 +138,21 @@ def _lineup_depth_thresholds(league_settings: dict | None = None) -> dict[str, i
     }
 
 
-def _team_position_counts(df_team: pd.DataFrame) -> dict[str, int]:
+def _team_position_counts(
+    df_team: pd.DataFrame, score_column: str | None = None
+) -> dict[str, int]:
+    """Players per core position.
+
+    With `score_column`, only startable players (value at or above replacement
+    level) count: depth is usable bodies, not roster spots, so a trade that
+    swaps a real starter for filler reads as the depth loss it is.
+    """
+
     if df_team is None or df_team.empty or "position" not in df_team.columns:
         return {pos: 0 for pos in ["QB", "RB", "WR", "TE"]}
+    if score_column and score_column in df_team.columns:
+        values = pd.to_numeric(df_team[score_column], errors="coerce").fillna(0)
+        df_team = df_team[values >= REPLACEMENT_LEVEL]
     counts = (
         df_team["position"]
         .fillna("")
@@ -705,8 +718,8 @@ def evaluate_trade_analyzer_fit(
     }
     surplus_moves = sorted(pos for pos, ids in surplus_ids.items() if ids & sent_player_ids)
 
-    current_counts = _team_position_counts(my_team_df)
-    post_counts = _team_position_counts(post_team_df)
+    current_counts = _team_position_counts(my_team_df, score_column)
+    post_counts = _team_position_counts(post_team_df, score_column)
     depth_thresholds = _lineup_depth_thresholds(lineup_settings)
     depth_losses = [
         pos

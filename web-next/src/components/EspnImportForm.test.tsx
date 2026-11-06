@@ -23,6 +23,9 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       previewEspnLeague: vi.fn(),
       previewImportedLeague: vi.fn(),
+      getEspnCredentialStatus: vi.fn().mockResolvedValue({ ok: true, available: true, saved: false }),
+      saveEspnCredentials: vi.fn(),
+      deleteEspnCredentials: vi.fn(),
       saveLeague: vi.fn(),
     },
   };
@@ -53,7 +56,7 @@ const PREVIEW: EspnLeaguePreviewResponse = {
 
 function openEspn() {
   render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-  fireEvent.click(screen.getByRole("tab", { name: "ESPN" }));
+  fireEvent.click(screen.getByRole("radio", { name: "ESPN" }));
 }
 
 const onLeagueChosen = vi.fn();
@@ -73,10 +76,10 @@ describe("ESPN import in the Connect League flow", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
     expect(screen.getByPlaceholderText("Sleeper username")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "ESPN" }));
+    fireEvent.click(screen.getByRole("radio", { name: "ESPN" }));
     expect(screen.getByLabelText(/espn league id/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/swid|espn_s2/i)).toBeNull();
-    expect(screen.getByText(/private espn leagues aren't supported yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/private league: we'll ask you to connect your espn login/i)).toBeInTheDocument();
   });
 
   it("rejects a non-numeric league id without calling the API", () => {
@@ -129,7 +132,7 @@ describe("ESPN import in the Connect League flow", () => {
     });
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 1 });
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-    fireEvent.click(screen.getByRole("tab", { name: "MFL" }));
+    fireEvent.click(screen.getByRole("button", { name: "MFL" }));
     fireEvent.change(screen.getByLabelText(/mfl league id/i), { target: { value: "10015" } });
     fireEvent.click(screen.getByRole("button", { name: /find my mfl league/i }));
 
@@ -215,5 +218,56 @@ describe("ESPN import in the Connect League flow", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/too few of this league/i));
     expect(onLeagueChosen).not.toHaveBeenCalled();
+  });
+
+  it("offers the ESPN login form for a private league when the server can store one, then retries", async () => {
+    vi.mocked(api.previewEspnLeague)
+      .mockResolvedValueOnce({ ok: false, reason: "private_league", message: "x", can_connect: true })
+      .mockResolvedValueOnce(PREVIEW);
+    vi.mocked(api.saveEspnCredentials).mockResolvedValue({ ok: true, saved: true });
+    openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+
+    await waitFor(() => expect(screen.getByText(/connect your espn login to read it/i)).toBeInTheDocument());
+    expect(screen.getByText("How to find espn_s2 and SWID")).toBeInTheDocument();
+    expect(screen.getByText(/never shown back/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("espn_s2"), { target: { value: "AEB" + "x".repeat(60) } });
+    fireEvent.change(screen.getByLabelText("SWID"), { target: { value: "{12345678-1234-1234-1234-123456789ABC}" } });
+    fireEvent.click(screen.getByRole("button", { name: /test on my league and connect/i }));
+
+    await waitFor(() => expect(screen.getByText("FFLR Test League")).toBeInTheDocument());
+    expect(api.saveEspnCredentials).toHaveBeenCalledWith({
+      espnS2: "AEB" + "x".repeat(60),
+      swid: "{12345678-1234-1234-1234-123456789ABC}",
+      leagueId: "42654852",
+      season: expect.any(Number),
+    });
+    expect(api.previewEspnLeague).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the server's message and stays on the login form when ESPN rejects the login", async () => {
+    vi.mocked(api.previewEspnLeague).mockResolvedValue({ ok: false, reason: "private_league", message: "x", can_connect: true });
+    vi.mocked(api.saveEspnCredentials).mockResolvedValue({ ok: false, reason: "espn_login_rejected", message: "ESPN didn't accept your saved login." });
+    openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    await waitFor(() => screen.getByLabelText("espn_s2"));
+    fireEvent.change(screen.getByLabelText("espn_s2"), { target: { value: "abc" } });
+    fireEvent.change(screen.getByLabelText("SWID"), { target: { value: "{x}" } });
+    fireEvent.click(screen.getByRole("button", { name: /test on my league and connect/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/didn't accept/i));
+    expect(api.previewEspnLeague).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a saved ESPN login and removes it", async () => {
+    vi.mocked(api.getEspnCredentialStatus).mockResolvedValueOnce({ ok: true, available: true, saved: true });
+    vi.mocked(api.deleteEspnCredentials).mockResolvedValue({ ok: true, saved: false });
+    openEspn();
+    await waitFor(() => expect(screen.getByText(/espn login connected/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByText(/espn login connected/i)).toBeNull());
+    expect(api.deleteEspnCredentials).toHaveBeenCalled();
   });
 });

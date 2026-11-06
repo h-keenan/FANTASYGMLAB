@@ -83,3 +83,24 @@ export function espnImportFailureResult(reason: string | null | undefined): "esp
   if (reason === "league_not_found") return "espn_not_found";
   return "espn_error";
 }
+
+/** Why ESPN private leagues need a login, shown above the espn_s2 / SWID fields. */
+export const ESPN_LOGIN_WHY =
+  "ESPN doesn't let other apps read a private league. Two cookies from your own signed-in ESPN session (espn_s2 and SWID) do. They are stored encrypted, used only to read your ESPN leagues, and never shown back. Remove them anytime.";
+
+/** Step-by-step for finding the two cookies in a desktop browser. */
+export const ESPN_COOKIE_STEPS: readonly string[] = [
+  "On a computer, sign in to ESPN Fantasy in your browser.",
+  "Open Developer Tools (F12, or right-click > Inspect).",
+  "Go to the Application tab (Chrome/Edge) or Storage tab (Firefox/Safari).",
+  "Open Cookies > espn.com (or fantasy.espn.com).",
+  "Copy the Value of espn_s2 (a very long string) and of SWID (looks like {XXXXXXXX-XXXX-...}, braces included).",
+  "Paste both below.",
+];
+
+/** Message for a failed credentials save/delete; the server's own message wins. */
+export function espnCredentialFailureMessage(result: { reason?: string; message?: string } | null | undefined): string {
+  if (result?.message) return result.message;
+  if (result?.reason === "not_configured") return "Connecting private ESPN leagues isn't available yet.";
+  return "Couldn't save your ESPN login. Check both values and try again.";
+}
