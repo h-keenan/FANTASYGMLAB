@@ -350,7 +350,7 @@ export function Header() {
 
   return (
     <header
-      className="flex flex-col px-4 py-3 relative gap-2"
+      className="flex flex-col px-4 py-2 relative gap-1.5"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
       <div className="flex items-center justify-between gap-3">

@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTitle } from "@/components/PageTitle";
 import { useEffect, useState } from "react";
 
 import { api, type GuessThePlayerLeaderboardEntry, type GuessThePlayerLeaderboardResponse } from "@/lib/api";
@@ -109,15 +110,11 @@ export function GuessThePlayerLeaderboardContent({ leagueId }: { leagueId: strin
   const entries = data[mode].entries;
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-2">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Guess the Player
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>League Leaderboard</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Real, persisted streaks among the other FantasyDesk users in this league — ranked by current streak, then
-          best streak.
+        <PageTitle page="League Leaderboard" />
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Guess the Player streaks in this league
         </p>
       </header>
 

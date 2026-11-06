@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTitle } from "@/components/PageTitle";
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -319,17 +320,9 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
   const data = ready ? state.data : null;
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {leagueName}
-        </span>
-        <h1 className="uppercase" style={{ font: "var(--font-page-title)", letterSpacing: "var(--letter-spacing-tight)" }}>
-          Commissioner
-        </h1>
-        <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          League integrity: lineups, tanking signals, trades and inactive managers.
-        </span>
+        <PageTitle page="Commissioner" leagueName={leagueName} />
       </header>
       {!ready ? (
         <LoadingScreen status="Reading the league’s weekly lineups…" />

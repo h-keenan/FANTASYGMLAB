@@ -60,7 +60,7 @@ export default function PlayerComparePage() {
 
   if (!playerAId) {
     return (
-      <main className="flex-1 flex flex-col px-4 py-6 max-w-3xl w-full mx-auto">
+      <main className="flex-1 flex flex-col px-4 py-3 max-w-3xl w-full mx-auto">
         <EmptyState
           title="No player selected to compare"
           subtitle="Pick a player from the list, then tap Compare."

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TradeHubContent } from "./TradeHubContent";
@@ -25,10 +25,15 @@ const DATA: TradeHubResponse = {
   },
 };
 
+function expandHelp() {
+  for (const b of screen.queryAllByRole("button", { name: "What does this mean?" })) fireEvent.click(b);
+}
+
 describe("TradeHubContent for a beginner", () => {
   it("explains the posture term and what holding means", () => {
     render(<TradeHubContent leagueId="1" leagueName="L" data={DATA} />);
 
+    expandHelp();
     expect(screen.getByText("You're competing now, so ideas favor current value.")).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.tradeHubPosture)).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.tradeHubHold)).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/EmptyState";
+import { PageTitle } from "@/components/PageTitle";
 import type { NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -185,17 +186,12 @@ export function NewsContent({ data, playerName }: { data: NewsResponse; playerNa
   const sections = groupNewsByDate(data.items);
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Around the league
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>{playerName ? `News: ${playerName}` : "News"}</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {playerName
-            ? "Recent injury, role, transaction, and off-field items that mention this player."
-            : "General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your rosters."}
-        </p>
+        <PageTitle page={playerName ? `News: ${playerName}` : "News"} />
+        {playerName ? (
+          <p className="text-sm font-bold">News: {playerName}</p>
+        ) : null}
         {playerName ? (
           <a className="text-sm underline" href="/news">
             All news

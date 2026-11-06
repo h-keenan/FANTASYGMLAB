@@ -3434,3 +3434,15 @@ button.sr {
     transition: none;
   }
 }
+
+/* A page <header> whose only child is the visually hidden PageTitle h1
+   must not take a flex-gap slot above the content. */
+main > header:has(> h1.sr-only:only-child) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

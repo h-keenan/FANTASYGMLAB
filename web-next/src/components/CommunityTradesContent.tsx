@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/InfoTip";
+import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 import { useState } from "react";
@@ -151,19 +153,16 @@ export function CommunityTradesContent({
   const [togglingOptOut, setTogglingOptOut] = useState(false);
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-2">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Craziest trades this week
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>Community</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        <PageTitle page="Community" />
+        <InfoTip label="Craziest trades this week: how this works">
           Real confirmed trades from other users&apos; leagues — always shown as &quot;Team A&quot; and &quot;Team
           B&quot;, never a real team or user name. Flagged here because our own trade-grading system found an
           unexpectedly good or bad outcome once the trade had a few weeks to play out, the same system behind your
           own Trade History.
-        </p>
-        <div className="flex items-center justify-between gap-3 mt-2 p-3" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
+        </InfoTip>
+        <div className="flex items-center justify-between gap-3 mt-1 p-3" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
           <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             I don&apos;t want MY trades to appear in this feed
           </span>

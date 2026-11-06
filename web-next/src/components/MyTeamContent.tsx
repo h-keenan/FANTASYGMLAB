@@ -218,11 +218,13 @@ export function MyTeamContent({
   ];
 
   return (
-    <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
         <PageTitle page="My Team" leagueName={leagueName} />
-        <BeginnerHelp term="myTeamIntro" />
-        <BeginnerHelp term="myTeamValueTiers" />
+        <div className="flex flex-wrap gap-2">
+          <BeginnerHelp term="myTeamIntro" />
+          <BeginnerHelp term="myTeamValueTiers" />
+        </div>
       </header>
 
       <section className="flex flex-col gap-3" aria-labelledby="team-snapshot-heading">

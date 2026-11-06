@@ -37,6 +37,7 @@ export function BeginnerHelp({
   const copy = useExperienceCopy();
   const resolved = text !== undefined ? (copy.isBeginner ? text : null) : term ? copy.help(term) : null;
   const [dismissed, setDismissed] = useState(false);
+  const [open, setOpen] = useState(false);
   const seen = useSyncExternalStore(
     noopSubscribe,
     () => (resolved ? readSeen(resolved) : false),
@@ -51,12 +52,35 @@ export function BeginnerHelp({
     }
     setDismissed(true);
   }
+  // Collapsed by default behind a small "?" so beginner copy never pushes the
+  // page's real content down; one tap reveals it, "Got it" hides it for good.
   return (
-    <p data-beginner-help="true" className={`text-xs ${className}`.trim()} style={{ color: "var(--color-text-muted)" }}>
-      {resolved}{" "}
-      <button type="button" onClick={dismiss} className="font-bold underline" style={{ color: "var(--color-accent)" }}>
-        Got it
+    <div data-beginner-help="true" className={`flex flex-wrap items-start gap-x-2 text-xs ${open ? "w-full" : ""} ${className}`.trim()} style={{ color: "var(--color-text-muted)" }}>
+      <button
+        type="button"
+        aria-label={open ? "Hide explanation" : "What does this mean?"}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center justify-center font-bold shrink-0"
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 9999,
+          border: "var(--border-width-default) solid var(--color-border)",
+          color: "var(--color-accent)",
+          lineHeight: 1,
+        }}
+      >
+        ?
       </button>
-    </p>
+      {open ? (
+        <p className="flex-1 min-w-0">
+          {resolved}{" "}
+          <button type="button" onClick={dismiss} className="font-bold underline" style={{ color: "var(--color-accent)" }}>
+            Got it
+          </button>
+        </p>
+      ) : null}
+    </div>
   );
 }

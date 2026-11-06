@@ -12,6 +12,7 @@ import type {
   MatchupSuggestedMove,
 } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { reloadPage } from "@/components/ErrorState";
 import { PillRow } from "@/components/PillRow";
@@ -79,7 +80,7 @@ function signedTone(value: number | null | undefined): "positive" | "risk" | "ne
 function MatchupHeader({ week, live, leagueName }: { week: number | null; live: boolean; leagueName: string }) {
   return (
     <header className="flex items-baseline gap-3 flex-wrap">
-      <h1 style={{ font: "var(--font-page-title)" }}>Matchup</h1>
+      <PageTitle page="Matchup" leagueName={leagueName} />
       {week != null ? (
         <span className="text-sm font-bold" style={{ color: "var(--color-text-secondary)" }}>
           Week {week}
@@ -90,9 +91,10 @@ function MatchupHeader({ week, live, leagueName }: { week: number | null; live: 
           <ToneBadge label="● Live" color="var(--color-success)" />
         </span>
       ) : null}
-      <span className="ml-auto text-xs break-words max-w-full" style={{ color: "var(--color-text-muted)" }}>
-        {leagueName}
+      <span className="ml-auto">
+        <BeginnerHelp term="matchupIntro" />
       </span>
+      <BeginnerHelp term="matchupWinProbability" />
     </header>
   );
 }
@@ -743,7 +745,7 @@ export function MatchupContent({
   if (guillotine) {
     // No head-to-head in guillotine leagues: survival replaces win probability.
     return (
-      <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
+      <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
         <MatchupHeader week={guillotine.week ?? matchup.week} live={false} leagueName={leagueName} />
         <GuillotineCard data={guillotine} />
       </main>
@@ -758,7 +760,7 @@ export function MatchupContent({
       return router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`);
     };
     return (
-      <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+      <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
         <MatchupHeader week={matchup.week} live={false} leagueName={leagueName} />
         <EmptyState
           title={matchupReasonMessage(matchup.reason)}
@@ -771,12 +773,8 @@ export function MatchupContent({
   }
 
   return (
-    <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
-      <div className="flex flex-col gap-1">
-        <BeginnerHelp term="matchupIntro" />
-        <BeginnerHelp term="matchupWinProbability" />
-      </div>
       <Scoreboard matchup={shown} />
       {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">

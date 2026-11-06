@@ -92,7 +92,7 @@ export function DashboardContent({
     // (it only restated what the heading already said; the real content —
     // the actionable cards below — is what should hit the fold).
     <Shell
-      className={sample ? "flex flex-col gap-6" : "flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto"}
+      className={sample ? "flex flex-col gap-6" : "flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto"}
       {...(sample
         ? {
             "data-testid": "sample-dashboard",
@@ -191,11 +191,13 @@ export function DashboardContent({
           {sample ? null : <DashboardOddsStrip leagueId={leagueId} leagueName={leagueName} />}
           {/* Beginner term explanations as short lines under the strips (as
               per-tile captions inside narrow columns they pushed Today below the fold). */}
-          <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
-          <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
-          <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
-          <BeginnerHelp text={copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null} />
-          <BeginnerHelp text={copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null} />
+          <div className="flex flex-wrap gap-2 empty:hidden">
+            <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
+            <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
+            <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
+            <BeginnerHelp text={copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null} />
+            <BeginnerHelp text={copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null} />
+          </div>
           <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
         </section>
       ) : null}

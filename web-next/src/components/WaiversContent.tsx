@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { PageTitle } from "@/components/PageTitle";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { InfoTip } from "@/components/InfoTip";
@@ -486,22 +487,18 @@ export function WaiversContent({
   ];
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {leagueName}
-          </span>
-          <h1 style={{ font: "var(--font-page-title)" }}>Waivers</h1>
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            Ranked by fit for your team.
-          </p>
-          <BeginnerHelp term="waiversIntro" />
+          <PageTitle page="Waivers" leagueName={leagueName} />
+          <div className="flex flex-wrap gap-2">
+            <BeginnerHelp term="waiversIntro" />
+            {data.faab_enabled !== false ? <BeginnerHelp term="faab" /> : null}
+            {copy.isBeginner ? <BeginnerHelp text={copy.help("averageWireValue")} /> : null}
+          </div>
         </div>
         <StatStrip items={stats} />
       </header>
-      {data.faab_enabled !== false ? <BeginnerHelp term="faab" /> : null}
-      {copy.isBeginner ? <BeginnerHelp text={copy.help("averageWireValue")} /> : null}
 
       <PillRow options={TAB_OPTIONS} active={tab} onSelect={(value) => setTab(value as WaiverTab)} fullWidth />
 

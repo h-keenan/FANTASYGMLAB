@@ -229,7 +229,7 @@ export function AlertsContent({
   const notice = data.reason ? alertsReasonMessage(data.reason) : null;
   if (notice) {
     return (
-      <main className="flex-1 flex flex-col justify-center px-4 py-8 max-w-3xl w-full mx-auto">
+      <main className="flex-1 flex flex-col justify-center px-4 py-3 max-w-3xl w-full mx-auto">
         <EmptyState
           title={data.reason === "empty_roster" ? "No players to watch yet" : "Connect a league to get alerts"}
           subtitle={notice}
@@ -253,12 +253,9 @@ export function AlertsContent({
   const groups = groupAlertsByType(items);
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
         <PageTitle page="Alerts" leagueName={leagueName} />
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          News on your rostered players.
-        </p>
       </header>
 
       {groups.length === 0 ? (

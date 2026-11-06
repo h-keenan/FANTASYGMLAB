@@ -1,4 +1,5 @@
 import { InfoTip } from "@/components/InfoTip";
+import { PageTitle } from "@/components/PageTitle";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -78,7 +79,7 @@ export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryRespons
   return (
     <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <h1 style={{ font: "var(--font-page-title)" }}>Trade History</h1>
+        <PageTitle page="Trade History" />
         <div className="flex flex-col gap-1">
           <InfoTip label="How outcomes are read">
             Once a confirmed trade has had a few weeks to play out, we&apos;ll show a real before/after read here,
