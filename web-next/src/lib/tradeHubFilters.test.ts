@@ -60,6 +60,14 @@ describe("tradeHubFilters", () => {
     expect(ideaTags(idea({}))).toEqual([]);
   });
 
+  it("never doubles a category that restates the impact tag (raw SELL_HIGH + Sell High)", () => {
+    expect(ideaTags(idea({ category: "SELL_HIGH", impact_tag: "sell_high" })).map((t) => t.label)).toEqual(["Sell High"]);
+    expect(ideaTags(idea({ category: "age_optimization", impact_tag: "buy_low" })).map((t) => t.label)).toEqual([
+      "Age Optimization",
+      "Buy Low",
+    ]);
+  });
+
   it("keeps one short reason sentence", () => {
     expect(shortReason("Fills your RB need. Also young.")).toBe("Fills your RB need.");
     expect(shortReason("")).toBe("");

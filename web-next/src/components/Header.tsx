@@ -12,9 +12,10 @@ import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
 import { maskSavedLeagueRows } from "@/lib/privacy";
-import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
+import { VALUATION_LENS_OPTIONS, useValuationLens, type ValuationLens } from "@/context/ValuationLensContext";
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
+import { PAGE_INFO_SLOT_ID } from "@/components/PageTitle";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -32,6 +33,52 @@ export interface SavedLeagueRow {
 /** Shared look for the league / evaluation-lens chips in the header's second row. */
 const HEADER_CHIP_CLASS = "inline-flex items-center gap-1.5 px-3 text-xs font-bold min-h-[var(--touch-target-min)]";
 
+/** The saved-league list + "Add another league" link, shared by the standalone
+ * switcher and the combined League · Lens picker so both show the same options. */
+function LeagueMenuItems({ leagueId, leagues, onDone }: { leagueId: string; leagues: SavedLeagueRow[]; onDone: () => void }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  return (
+    <>
+            {leagues.length === 0 ? (
+              <span className="px-3 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                No other saved leagues
+              </span>
+            ) : (
+              leagues.map((row) => (
+                <button
+                  key={row.league_id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onDone();
+                    const newPath = swapLeagueIdInPath(pathname || "", leagueId, row.league_id);
+                    router.push(`${newPath}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
+                  }}
+                  className="px-3 py-3 text-xs font-semibold text-left"
+                  style={{ color: row.league_id === leagueId ? "var(--color-accent)" : "var(--color-text-secondary)" }}
+                >
+                  {row.league_name || row.league_id}
+                </button>
+              ))
+            )}
+            {/* coridian_, screenshot of this exact menu: "how do i add
+                leauges" — there was no way to, once already past
+                onboarding ("/" auto-redirects anyone with a saved league
+                away before SleeperImportForm ever renders again). */}
+            <Link
+              href="/connect-league"
+              role="menuitem"
+              onClick={() => onDone()}
+              className="px-3 py-3 text-xs font-bold text-left"
+              style={{ color: "var(--color-accent)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
+            >
+              + Add another league
+            </Link>
+    </>
+  );
+}
+
 export function LeagueSwitcherButton({
   leagueId,
   leagueName,
@@ -41,8 +88,6 @@ export function LeagueSwitcherButton({
   leagueName: string | null;
   leagues: SavedLeagueRow[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   return (
@@ -74,41 +119,7 @@ export function LeagueSwitcherButton({
               league button clips off screen"). left-0 keeps it growing
               rightward into the header's own open space instead. */}
           <div role="menu" className="glass-surface absolute left-0 top-full mt-1 flex flex-col py-1 w-56" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
-            {leagues.length === 0 ? (
-              <span className="px-3 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
-                No other saved leagues
-              </span>
-            ) : (
-              leagues.map((row) => (
-                <button
-                  key={row.league_id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setOpen(false);
-                    const newPath = swapLeagueIdInPath(pathname || "", leagueId, row.league_id);
-                    router.push(`${newPath}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
-                  }}
-                  className="px-3 py-3 text-xs font-semibold text-left"
-                  style={{ color: row.league_id === leagueId ? "var(--color-accent)" : "var(--color-text-secondary)" }}
-                >
-                  {row.league_name || row.league_id}
-                </button>
-              ))
-            )}
-            {/* coridian_, screenshot of this exact menu: "how do i add
-                leauges" — there was no way to, once already past
-                onboarding ("/" auto-redirects anyone with a saved league
-                away before SleeperImportForm ever renders again). */}
-            <Link
-              href="/connect-league"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="px-3 py-3 text-xs font-bold text-left"
-              style={{ color: "var(--color-accent)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
-            >
-              + Add another league
-            </Link>
+            <LeagueMenuItems leagueId={leagueId} leagues={leagues} onDone={() => setOpen(false)} />
           </div>
         </>
       ) : null}
@@ -138,6 +149,34 @@ function chooseDropdownAnchor(buttonLeft: number, buttonRight: number, viewportW
   // Neither side fully fits — pick whichever has more room; the
   // `maxWidth: calc(100vw - 2rem)` clamp below keeps it from overflowing.
   return spaceRight >= spaceLeft ? "left-0" : "right-0";
+}
+
+/** The evaluation-lens options, shared by the standalone lens button and the combined picker. */
+function LensMenuItems({ lens, setLens, onDone }: { lens: ValuationLens; setLens: (value: ValuationLens) => void; onDone: () => void }) {
+  return (
+    <>
+            {VALUATION_LENS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setLens(option.value);
+                  onDone();
+                }}
+                className="flex flex-col px-3 py-2 text-left"
+                style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+              >
+                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-premium)" : "var(--color-text-primary)" }}>
+                  {option.label}
+                </span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {option.hint}
+                </span>
+              </button>
+            ))}
+    </>
+  );
 }
 
 export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
@@ -180,26 +219,54 @@ export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
             className={`glass-surface absolute ${anchor} top-full mt-1 flex flex-col py-1 w-64`}
             style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}
           >
-            {VALUATION_LENS_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setLens(option.value);
-                  setOpen(false);
-                }}
-                className="flex flex-col px-3 py-2 text-left"
-                style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-              >
-                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-premium)" : "var(--color-text-primary)" }}>
-                  {option.label}
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {option.hint}
-                </span>
-              </button>
-            ))}
+            <LensMenuItems lens={lens} setLens={setLens} onDone={() => setOpen(false)} />
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One compact "League · Lens ▾" chip for the single header row. Tapping it
+ * opens one popover with the same two option sets as before (saved leagues +
+ * "Add another league", then the evaluation lens list).
+ */
+export function LeagueLensPicker({ leagueId, leagueName, leagues }: { leagueId: string; leagueName: string | null; leagues: SavedLeagueRow[] }) {
+  const { lens, setLens } = useValuationLens(leagueId);
+  const [open, setOpen] = useState(false);
+  const current = VALUATION_LENS_OPTIONS.find((option) => option.value === lens);
+  const done = () => setOpen(false);
+  return (
+    <div className="relative min-w-0 flex-1 flex justify-end">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`League and lens: ${leagueName || "Switch league"}, ${current?.label ?? "Dynasty"}`}
+        className="inline-flex items-center gap-0.5 px-1.5 font-bold min-w-0 max-w-full min-h-[var(--touch-target-min)] text-left"
+        style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        {/* League over lens: one compact "League · Lens ▾" chip that still fits beside the page name. */}
+        <span className="flex flex-col min-w-0 leading-tight" style={{ fontSize: "0.6875rem" }}>
+          <span className="truncate">{leagueName || "Switch league"}</span>
+          <span className="truncate" style={{ color: "var(--color-premium)" }}>
+            <span aria-hidden style={{ color: "var(--color-text-muted)" }}>· </span>
+            {current?.label ?? "Dynasty"}
+          </span>
+        </span>
+        <span aria-hidden className="shrink-0 text-xs">▾</span>
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={done} />
+          <div role="menu" className="glass-surface absolute right-0 top-full mt-1 flex flex-col py-1 w-64" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+            <LeagueMenuItems leagueId={leagueId} leagues={leagues} onDone={done} />
+            <span className="px-3 pt-3 pb-1 text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", borderTop: "var(--border-width-default) solid var(--color-border)" }}>
+              Evaluation lens
+            </span>
+            <LensMenuItems lens={lens} setLens={setLens} onDone={done} />
           </div>
         </>
       ) : null}
@@ -253,12 +320,7 @@ function HeaderLeagueControls() {
   const resolvedName = nameParam || savedLeagues.find((row) => row.league_id === leagueId)?.league_name || null;
   const leagueName = resolvedName || leagueId;
 
-  return (
-    <>
-      <LeagueSwitcherButton leagueId={leagueId} leagueName={leagueName} leagues={savedLeagues} />
-      <EvaluationLensButton leagueId={leagueId} />
-    </>
-  );
+  return <LeagueLensPicker leagueId={leagueId} leagueName={leagueName} leagues={savedLeagues} />;
 }
 
 /**
@@ -279,8 +341,12 @@ function HeaderPageTitle() {
   const title = PAGE_TITLE_BY_SEGMENT[segment];
   if (!title) return null;
   return (
-    <span className="text-xs font-bold uppercase break-words leading-tight" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
-      {title}
+    <span className="flex items-center shrink-0">
+      <span className="text-xs font-bold uppercase leading-tight whitespace-nowrap" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
+        {title}
+      </span>
+      {/* Pages portal their "?" explainer here (PageTitle `info`). */}
+      <span id={PAGE_INFO_SLOT_ID} className="inline-flex" />
     </span>
   );
 }
@@ -350,12 +416,12 @@ export function Header() {
 
   return (
     <header
-      className="flex flex-col px-4 py-2 relative gap-1.5"
+      className="flex flex-col px-2 py-0.5 relative"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <Link href="/" className="flex items-center gap-2 p-2 -m-2">
+      <div className="flex items-center justify-between gap-1">
+      <div className="flex items-center shrink-0">
+        <Link href="/" className="flex items-center gap-2 p-2 -m-2 mr-0">
           <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="hidden sm:inline text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
             {BRAND_NAME}
@@ -364,7 +430,11 @@ export function Header() {
         <HeaderPageTitle />
       </div>
 
-      <div className="flex items-center gap-2">
+      <Suspense fallback={null}>
+        <HeaderLeagueControls />
+      </Suspense>
+
+      <div className="flex items-center shrink-0">
         <Suspense fallback={null}>
           <HeaderIconActions />
         </Suspense>
@@ -375,10 +445,14 @@ export function Header() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            className="px-3 py-2.5 text-xs font-bold uppercase min-h-[var(--touch-target-min)]"
-            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", letterSpacing: "0.03em" }}
+            aria-label="Account"
+            className="inline-flex items-center justify-center"
+            style={ICON_BUTTON_STYLE}
           >
-            Account
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
+            </svg>
           </button>
 
           {menuOpen ? (
@@ -461,11 +535,6 @@ export function Header() {
           ) : null}
         </div>
       </div>
-      </div>
-      <div className="flex items-center gap-2 min-w-0 empty:hidden">
-        <Suspense fallback={null}>
-          <HeaderLeagueControls />
-        </Suspense>
       </div>
     </header>
   );

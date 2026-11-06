@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/Button";
 import { useMemo, useState } from "react";
 
 import type { TradeHubResponse } from "@/lib/api";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { EmptyState } from "@/components/EmptyState";
 import { TradeHubFilters } from "@/components/TradeHubFilters";
 import { filterTradeIdeas } from "@/lib/tradeHubFilters";
@@ -38,16 +38,16 @@ import { PageTitle } from "@/components/PageTitle";
  * PNG-export feature, not core page parity).
  */
 
-/** Plain-English posture line (server: trade_hub_engine.posture_sentence).
- * Beginners get the term explained under it via the shared BeginnerHelp;
- * advanced users see just the sentence. */
-function PostureLine({ sentence }: { sentence: string }) {
+/** The posture sentence (server: trade_hub_engine.posture_sentence), plus the
+ * beginner explanation, shown behind the "?" next to the page name. */
+function TradeHubInfo({ sentence }: { sentence?: string | null }) {
+  const copy = useExperienceCopy();
+  const help = sentence ? copy.help("tradeHubPosture") : copy.help("tradeHubIntro");
   return (
-    <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-      <p className="text-xs flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>
-        {sentence}
-      </p>
-      <BeginnerHelp term="tradeHubPosture" />
+    <div className="flex flex-col gap-1">
+      {sentence ? <p>{sentence}</p> : null}
+      {help ? <p style={{ color: "var(--color-text-muted)" }}>{help}</p> : null}
+      {!sentence && !help ? <p>Ideas are built around your roster and your team plan.</p> : null}
     </div>
   );
 }
@@ -98,16 +98,15 @@ export function TradeHubContent({
   const entitlement = data.entitlement;
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-4 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-2 px-4 pt-1 pb-4 max-w-3xl w-full mx-auto">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
-      <header className="flex flex-col gap-1">
-        <PageTitle page="Trade Hub" leagueName={leagueName} />
-        {data.posture_sentence ? (
-          <PostureLine sentence={data.posture_sentence} />
-        ) : (
-          <BeginnerHelp term="tradeHubIntro" />
-        )}
-      </header>
+      <PageTitle
+        page="Trade Hub"
+        leagueName={leagueName}
+        info={<TradeHubInfo sentence={data.posture_sentence} />}
+      />
+      {data.ideas.length > 0 ? <TradeHubFilters ideas={data.ideas} filter={filter} onChange={setFilter} /> : null}
+
 
       {entitlement ? (
         <FreeLimitNote
@@ -123,8 +122,6 @@ export function TradeHubContent({
       <DeadlineCard window={data.trade_window} strategy={data.team_strategy} />
 
       {data.hold ? <TradeHubHoldCard hold={data.hold} /> : null}
-
-      {data.ideas.length > 0 ? <TradeHubFilters ideas={data.ideas} filter={filter} onChange={setFilter} /> : null}
 
       {data.ideas.length === 0 && data.hold ? (
         <Link href={`/trade-finder/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} className="tap-link text-sm font-bold" style={{ color: "var(--color-accent)" }}>

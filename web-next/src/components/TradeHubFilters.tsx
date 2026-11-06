@@ -39,7 +39,7 @@ export function TradeHubFilters({
   const positions = boardPositions(ideas);
   const allActive = !filter.impact && !filter.position;
   return (
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto -mx-4 px-4 pb-1" role="group" aria-label="Filter trade ideas">
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto -mx-4 px-4" role="group" aria-label="Filter trade ideas">
       <button
         type="button"
         onClick={() => onChange({ impact: null, position: null })}
