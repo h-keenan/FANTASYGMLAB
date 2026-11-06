@@ -1,7 +1,7 @@
 "use client";
 
 import { RangeCompare } from "@/components/RangeCompare";
-import { rangeDisplayRows } from "@/lib/startSitRange";
+import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -567,7 +567,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
     tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
   return (
     <li
-      className="flex flex-col gap-3 p-3"
+      className="flex flex-col gap-2 p-3"
       style={{ border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-muted-soft)" }}
     >
       <div className="flex items-center gap-3">
@@ -598,7 +598,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {moveOverLine(move)}
           </span>
-          <WeatherReasonChip notes={move.weather_notes} />
+          <WeatherReasonChip notes={move.weather_notes?.filter((note) => note.applied)} />
         </div>
       </PlayerIdentityTrigger>
       <div className="flex flex-col items-center gap-1 shrink-0">
@@ -619,16 +619,34 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         {move.locked ? <ToneBadge label="Locked" color="var(--color-text-muted)" /> : null}
       </div>
       </div>
-      <RangeCompare
-        rows={rangeDisplayRows(
-          [
-            { key: "start", label: "Start", range: move.range?.start ?? null },
-            { key: "over", label: "Over", range: move.range?.over ?? null },
-          ],
-          move.range?.lean?.favors ?? null,
-        )}
-        lean={move.range?.lean ?? null}
-      />
+      {move.range?.lean ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="range-lean">
+          <span className="font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            {leanLabel(move.range.lean.kind)}
+          </span>
+          {" · "}
+          {move.range.lean.why}
+        </p>
+      ) : null}
+      <details className="text-xs">
+        <summary className="cursor-pointer font-bold" style={{ color: "var(--color-text-muted)" }}>
+          Weekly range
+        </summary>
+        <div className="pt-2">
+          <RangeCompare
+            rows={rangeDisplayRows(
+              [
+                { key: "start", label: "Start", range: move.range?.start ?? null },
+                { key: "over", label: "Over", range: move.range?.over ?? null },
+              ],
+              move.range?.lean?.favors ?? null,
+            )}
+            lean={move.range?.lean ?? null}
+            hideLean
+            hideCaption
+          />
+        </div>
+      </details>
     </li>
   );
 }
@@ -673,6 +691,9 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
           ))}
         </ul>
       )}
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {RANGE_CAPTION} Weather shows only when it changes a projection.
+      </p>
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         The suggested lineup ranks by this week&apos;s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk
         can&apos;t change your Sleeper lineup, so make any swap in Sleeper.

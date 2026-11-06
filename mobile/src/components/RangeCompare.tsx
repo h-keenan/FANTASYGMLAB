@@ -17,9 +17,15 @@ import { spacing, type ThemeColors } from '../theme';
 export default function RangeCompare({
   rows,
   lean,
+  hideCaption = false,
+  hideLean = false,
 }: {
   rows: RangeDisplayRow[];
   lean: { kind: 'ceiling' | 'floor'; why: string } | null;
+  /** A list of cards shows the caption once instead of on every card. */
+  hideCaption?: boolean;
+  /** The caller renders the lean note itself. */
+  hideLean?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -51,13 +57,13 @@ export default function RangeCompare({
           </AppText>
         </View>
       ))}
-      {lean ? (
+      {lean && !hideLean ? (
         <View style={styles.lean} testID="range-lean">
           <ToneBadge label={leanLabel(lean.kind)} color={colors.accent} />
           <AppText style={styles.why}>{lean.why}</AppText>
         </View>
       ) : null}
-      <AppText style={styles.caption}>{RANGE_CAPTION}</AppText>
+      {hideCaption ? null : <AppText style={styles.caption}>{RANGE_CAPTION}</AppText>}
     </View>
   );
 }

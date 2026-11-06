@@ -14,9 +14,15 @@ const HEAD = { color: "var(--color-text-muted)", letterSpacing: "var(--letter-sp
 export function RangeCompare({
   rows,
   lean,
+  hideCaption = false,
+  hideLean = false,
 }: {
   rows: RangeDisplayRow[];
   lean: { kind: "ceiling" | "floor"; why: string } | null;
+  /** A list of cards shows the caption once instead of on every card. */
+  hideCaption?: boolean;
+  /** The caller renders the lean note itself. */
+  hideLean?: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -50,7 +56,7 @@ export function RangeCompare({
           </span>
         </div>
       ))}
-      {lean ? (
+      {lean && !hideLean ? (
         <div className="flex flex-col gap-1 pt-0.5" data-testid="range-lean">
           <span className="self-start">
             <ToneBadge label={leanLabel(lean.kind)} color="var(--color-accent)" />
@@ -60,9 +66,11 @@ export function RangeCompare({
           </span>
         </div>
       ) : null}
-      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {RANGE_CAPTION}
-      </span>
+      {hideCaption ? null : (
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {RANGE_CAPTION}
+        </span>
+      )}
     </div>
   );
 }
