@@ -14,8 +14,8 @@ import { BEGINNER_HELP } from './experienceCopy.ts';
  *   build_league_display_frame (power_score = team_eval
  *   _score_starter_weighted_roster total_score = best starting lineup + the
  *   top few bench players at BENCH_WEIGHT 0.18), ranked highest first.
- * - Franchise Rank: franchise_score = the unweighted value of the whole
- *   roster (raw_roster_score) + draft_capital.
+ * - Franchise Rank: franchise_score = the unweighted value of starters + top bench above replacement
+ *   (raw_roster_score; depth is capped, not headcount) + draft_capital.
  * - Starter / Bench Strength: starter_rank / bench_rank in
  *   add_league_detail_ranks, from starter_score / bench_score.
  * - OVR: modules/player_quick_view.py _overall_rating (0-99 percentile of

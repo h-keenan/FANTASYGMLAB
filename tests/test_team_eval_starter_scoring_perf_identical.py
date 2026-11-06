@@ -35,8 +35,12 @@ def _reference(df_team, lineup_settings=None, score_field="dynasty_score"):
     mask = df.index.isin(starters)
     bench = ~mask
     starter_score = float(df.loc[mask, score_field].sum())
-    bench_score = float(df.loc[bench, score_field].nlargest(team_eval._bench_score_limit(lineup_settings)).sum()) * team_eval.BENCH_WEIGHT
-    weighted = df[score_field].where(mask, df[score_field] * team_eval.BENCH_WEIGHT)
+    top = df.loc[bench, score_field].nlargest(team_eval._bench_score_limit(lineup_settings))
+    bench_score = float(top.sum()) * team_eval.BENCH_WEIGHT
+    # Quality-over-volume: only starters + the capped bench count anywhere.
+    weighted = pd.Series(0.0, index=df.index)
+    weighted[top.index] = (top - team_eval.REPLACEMENT_LEVEL).clip(lower=0) * team_eval.BENCH_WEIGHT
+    weighted[mask] = df.loc[mask, score_field]
 
     def ps(pos):
         m = df["position"] == pos
@@ -46,7 +50,7 @@ def _reference(df_team, lineup_settings=None, score_field="dynasty_score"):
         "total_score": starter_score + bench_score,
         "starter_score": starter_score,
         "bench_score": bench_score,
-        "raw_roster_score": float(df[score_field].sum()),
+        "raw_roster_score": starter_score + float((top - team_eval.REPLACEMENT_LEVEL).clip(lower=0).sum()),
         "qb_score": ps("QB"),
         "rb_score": ps("RB"),
         "wr_score": ps("WR"),

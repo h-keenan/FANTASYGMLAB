@@ -25,6 +25,10 @@ STARTER_SLOTS = {
 GAME_LOCKED_REASON = "Game started"
 BENCH_WEIGHT = 0.18
 MAX_BENCH_PLAYERS = 4
+# Value-score level (0-10000 scale) of a freely available replacement player.
+# A bench body only adds roster value for what he is worth ABOVE this, so ten
+# 1,200-value fillers add nothing while one 5,000-value reserve adds real depth.
+REPLACEMENT_LEVEL = 1500.0
 TEAM_STRATEGY_LABELS = {
     "contender": "Contender",
     "fringe_contender": "Fringe Contender",
@@ -319,11 +323,25 @@ def _score_starter_weighted_roster(
     starter_mask = df.index.isin(starter_idx)
     bench_mask = ~starter_mask
     starter_score = float(df.loc[starter_mask, score_field].sum())
-    bench_scores = df.loc[bench_mask, score_field].nlargest(_bench_score_limit(lineup_settings))
-    raw_bench_score = float(df.loc[bench_mask, score_field].sum())
-    bench_score = float(bench_scores.sum()) * BENCH_WEIGHT
+    # Only the best few reserves count (the lineup-relevant bench), so roster
+    # headcount cannot buy a score: quality at the top of the bench is what
+    # carries over, and everything below the cap is ignored.
+    bench_top = df.loc[bench_mask, score_field].nlargest(_bench_score_limit(lineup_settings))
+    bench_score = float(bench_top.sum()) * BENCH_WEIGHT
+    bench_top_idx = set(bench_top.index)
+    # Unweighted roster value = full starters + the capped bench measured above
+    # replacement level (not the sum of every rostered player).
+    raw_roster_score = starter_score + float((bench_top - REPLACEMENT_LEVEL).clip(lower=0).sum())
 
-    weighted_scores = df[score_field].where(starter_mask, df[score_field] * BENCH_WEIGHT)
+    # Room scores: starters in full; only the capped bench, and only its value
+    # above replacement level, at BENCH_WEIGHT. Filler depth adds nothing.
+    score_values = df[score_field]
+    weighted_scores = score_values.where(
+        df.index.isin(starter_idx),
+        ((score_values - REPLACEMENT_LEVEL).clip(lower=0) * BENCH_WEIGHT).where(
+            df.index.isin(list(bench_top_idx)), 0.0
+        ),
+    )
 
     def pos_score(pos: str) -> float:
         mask = position_array == pos
@@ -335,7 +353,7 @@ def _score_starter_weighted_roster(
         "total_score": starter_score + bench_score,
         "starter_score": starter_score,
         "bench_score": bench_score,
-        "raw_roster_score": float(df[score_field].sum()),
+        "raw_roster_score": raw_roster_score,
         "qb_score": pos_score("QB"),
         "rb_score": pos_score("RB"),
         "wr_score": pos_score("WR"),
