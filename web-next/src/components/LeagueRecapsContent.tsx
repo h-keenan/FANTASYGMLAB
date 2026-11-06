@@ -341,6 +341,47 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
   );
 }
 
+/** One player in a trade side: a single compact row (avatar, name and team,
+ * position). Picks are grouped onto one line by HistorySideBlock instead. */
+function TradePlayerRow({ asset }: { asset: HistoryTransaction["draft_picks"][number] }) {
+  const nameColor = asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)";
+  const row = (
+    <span className="flex items-center gap-2 min-w-0 w-full">
+      {asset.player_id ? <PlayerAvatar playerId={asset.player_id} size={24} /> : <span style={{ width: 24 }} />}
+      <span className="text-sm font-bold min-w-0 break-words" style={{ color: nameColor }}>
+        {asset.name}
+        {asset.team ? (
+          <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>
+            {" "}
+            {asset.team}
+          </span>
+        ) : null}
+      </span>
+      <span className="flex-1" />
+      <PositionBadge position={asset.position} />
+    </span>
+  );
+  if (!asset.player_id) return <div className="flex min-w-0">{row}</div>;
+  return (
+    <PlayerIdentityTrigger identity={{ ...asset, sourceLabel: "League History" }} className="flex w-full text-left min-w-0">
+      {row}
+    </PlayerIdentityTrigger>
+  );
+}
+
+/** A side's picks as one wrapped line ("2028 R1 · 2027 R1"), not a row each. */
+function TradePickLine({ picks }: { picks: HistoryTransaction["draft_picks"] }) {
+  if (!picks.length) return null;
+  return (
+    <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+      <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>
+        Picks{" "}
+      </span>
+      {picks.map((pick) => (pick.season && pick.round ? `${pick.season} R${pick.round}` : pickLabel(pick))).join(" · ")}
+    </p>
+  );
+}
+
 function faabLine(side: HistorySide, txType: string): string {
   const bits: string[] = [];
   if (side.faab_spent !== null && side.faab_spent > 0) bits.push(`FAAB $${side.faab_spent}`);
@@ -352,7 +393,10 @@ function faabLine(side: HistorySide, txType: string): string {
 function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string }) {
   const faab = faabLine(side, txType);
   return (
-    <div className="flex flex-col gap-1 min-w-0">
+    <div
+      className="flex flex-col gap-2 min-w-0"
+      style={txType === "trade" ? { background: "var(--color-surface-muted)", padding: "0.5rem 0.75rem" } : undefined}
+    >
       <div className="flex items-center gap-2 min-w-0">
         <TeamAvatar avatarUrl={side.avatar_url} size={28} />
         <div className="flex flex-col min-w-0">
@@ -365,17 +409,25 @@ function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string 
             </span>
           ) : null}
         </div>
+        {txType === "trade" ? (
+          <>
+            <span className="flex-1" />
+            <span className="text-xs uppercase shrink-0" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              Received
+            </span>
+          </>
+        ) : null}
       </div>
       {txType === "trade" ? (
         <>
-          <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            Received
-          </span>
           {side.receives.length ? (
-            <div className="flex flex-wrap gap-1">
-              {side.receives.map((asset, i) => (
-                <AssetChip key={`${asset.player_id || asset.label}-${i}`} asset={asset} />
-              ))}
+            <div className="flex flex-col gap-1.5">
+              {side.receives
+                .filter((asset) => asset.kind !== "pick")
+                .map((asset, i) => (
+                  <TradePlayerRow key={`${asset.player_id || asset.label}-${i}`} asset={asset} />
+                ))}
+              <TradePickLine picks={side.receives.filter((asset) => asset.kind === "pick")} />
             </div>
           ) : (
             <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
@@ -430,17 +482,20 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
     if (grade.pending || grade.partial_evidence || allPending) {
       const why = sides.map((side) => side.why).find(Boolean) || "Future pick value is unresolved.";
       return (
-        <div
-          className="mt-2 flex flex-col gap-1 pl-2"
-          style={{ borderLeft: "var(--border-width-semantic) solid var(--color-warning)" }}
-        >
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            Grade Pending
-          </span>
-          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+        <p className="mt-1 flex items-start gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <span
+            aria-hidden="true"
+            className="inline-block shrink-0"
+            style={{ width: 8, height: 8, marginTop: 4, background: "var(--color-warning)" }}
+          />
+          <span>
+            <span className="font-bold uppercase" style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              Grade pending
+            </span>
+            {" · "}
             {why}
-          </p>
-        </div>
+          </span>
+        </p>
       );
     }
     let primaryWhy = "";
@@ -526,6 +581,9 @@ function HistoryItemCard({ transaction }: { transaction: HistoryTransaction }) {
   const when = formatHistoryWhen(transaction.week, transaction.timestamp);
   const sides = transaction.sides || [];
   if (!sides.length) return null;
+  // The pick list repeats picks each side already shows; only list the rest.
+  const shownInSides = new Set(sides.flatMap((side) => side.receives.map((asset) => pickLabel(asset))));
+  const extraPicks = (transaction.draft_picks || []).filter((pick) => !shownInSides.has(pickLabel(pick)));
   return (
     <article
       className="p-3 flex flex-col gap-2"
@@ -539,14 +597,14 @@ function HistoryItemCard({ transaction }: { transaction: HistoryTransaction }) {
           {when}
         </span>
       </header>
-      <div className="grid gap-3" style={{ gridTemplateColumns: sides.length > 1 ? "repeat(auto-fit, minmax(10rem, 1fr))" : "1fr" }}>
+      <div className="grid gap-2" style={{ gridTemplateColumns: sides.length > 1 ? "repeat(auto-fit, minmax(16rem, 1fr))" : "1fr" }}>
         {sides.map((side) => (
           <HistorySideBlock key={side.roster_id} side={side} txType={transaction.type} />
         ))}
       </div>
-      {transaction.draft_picks?.length ? (
+      {extraPicks.length ? (
         <div className="flex flex-wrap gap-1">
-          {transaction.draft_picks.map((pick, i) => (
+          {extraPicks.map((pick, i) => (
             <AssetChip key={`${pick.label}-${i}`} asset={pick} />
           ))}
         </div>

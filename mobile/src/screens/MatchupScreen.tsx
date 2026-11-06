@@ -29,7 +29,7 @@ import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
-import { rangeDisplayRows } from '../lib/startSitRange';
+import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from '../lib/startSitRange';
 import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
 import {
@@ -668,6 +668,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tone = signedTone(move.gain);
   const gainColor = toneColor(colors, tone);
+  const [showRange, setShowRange] = useState(false);
   return (
     <View style={styles.moveCard}>
       <View style={styles.moveTop}>
@@ -686,7 +687,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         <AppText style={styles.moveSub} numberOfLines={2}>
           {moveOverLine(move)}
         </AppText>
-        <WeatherReasonChip notes={move.weather_notes} />
+        <WeatherReasonChip notes={move.weather_notes?.filter((note) => note.applied)} />
       </View>
       <View style={[styles.gainBox, { borderColor: gainColor }]}>
         <AppText style={[styles.gainValue, { color: gainColor }]}>
@@ -695,16 +696,30 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
         <AppText style={styles.gainCaption}>{move.locked ? 'Locked' : 'Proj pts'}</AppText>
       </View>
       </View>
-      <RangeCompare
-        rows={rangeDisplayRows(
-          [
-            { key: 'start', label: 'Start', range: move.range?.start ?? null },
-            { key: 'over', label: 'Over', range: move.range?.over ?? null },
-          ],
-          move.range?.lean?.favors ?? null,
-        )}
-        lean={move.range?.lean ?? null}
-      />
+      {move.range?.lean ? (
+        <AppText style={styles.moveSub} testID="range-lean">
+          <AppText style={{ color: colors.accent, fontWeight: '800' }}>{leanLabel(move.range.lean.kind).toUpperCase()}</AppText>
+          {' · '}
+          {move.range.lean.why}
+        </AppText>
+      ) : null}
+      <TouchableOpacity onPress={() => setShowRange((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: showRange }}>
+        <AppText style={styles.rangeToggle}>{showRange ? 'Hide weekly range' : 'Weekly range'}</AppText>
+      </TouchableOpacity>
+      {showRange ? (
+        <RangeCompare
+          rows={rangeDisplayRows(
+            [
+              { key: 'start', label: 'Start', range: move.range?.start ?? null },
+              { key: 'over', label: 'Over', range: move.range?.over ?? null },
+            ],
+            move.range?.lean?.favors ?? null,
+          )}
+          lean={move.range?.lean ?? null}
+          hideLean
+          hideCaption
+        />
+      ) : null}
     </View>
   );
 }
@@ -746,6 +761,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
           ))}
         </View>
       )}
+      <AppText style={styles.footnote}>{RANGE_CAPTION} Weather shows only when it changes a projection.</AppText>
       <AppText style={styles.footnote}>
         The suggested lineup ranks by this week’s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk can’t
         change your Sleeper lineup, so make any swap in Sleeper.
@@ -812,6 +828,7 @@ function createStyles(colors: ThemeColors) {
     edgeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     edgeValue: { marginLeft: 'auto', fontSize: 13, fontWeight: '800' },
     footnote: { fontSize: 11, lineHeight: 15, color: colors.textTertiary },
+    rangeToggle: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     emptyNote: { fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingVertical: spacing.md },
     tableRow: {
       flexDirection: 'row',
