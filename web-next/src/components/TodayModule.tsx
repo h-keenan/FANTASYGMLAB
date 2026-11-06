@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 
 import type { BriefingItem, DashboardResponse, ThisWeekRow } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
@@ -90,6 +91,12 @@ export function TodayModule({
 
       {nextAction ? (
         <AccentCard accent="var(--color-accent)" compact glow>
+          {"status" in nextAction ? ((row: ThisWeekRow) => (
+            <div className="flex items-center gap-2">
+              {row.player_id ? <PlayerAvatar playerId={row.player_id} size={36} /> : null}
+              <ToneBadge label={row.status} color={thisWeekToneColor(row.tone)} />
+            </div>
+          ))(nextAction as ThisWeekRow) : null}
           <h3 className="text-sm font-bold">{nextAction.headline}</h3>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {nextAction.why}
@@ -162,6 +169,7 @@ function MoveRows({ rows, leagueId, leagueName }: { rows: ThisWeekRow[]; leagueI
         const body = (
           <>
             <ToneBadge label={row.status} color={color} />
+            {row.player_id ? <PlayerAvatar playerId={row.player_id} size={28} /> : null}
             <span className="min-w-0 flex-1 flex flex-col">
               <span className="text-sm font-bold truncate">{row.headline}</span>
               <span

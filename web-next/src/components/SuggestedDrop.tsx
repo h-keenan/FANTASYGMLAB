@@ -40,15 +40,18 @@ function DropPlayerLine({
   const effectText = [lineupEffectText(player.effect), valueEffectText(player.effect)].filter(Boolean).join(" · ");
   const effect = swap && effectText ? `Whole swap: ${effectText}` : effectText;
   const reasons = player.reasons.filter((reason) => !skipReasons?.includes(reason));
+  const pills = effectPills(player.effect);
   return (
-    <div className="flex flex-col gap-0.5" data-testid="drop-player">
-      <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-        {lead ? `${lead} ` : ""}
-        {player.name}{" "}
+    <div className="flex flex-col gap-1" data-testid="drop-player">
+      <span className="flex items-center gap-2 min-w-0">
+        <PlayerAvatar playerId={player.player_id} size={32} />
+        <span className="text-sm font-bold min-w-0 break-words" style={{ color: "var(--color-text-primary)" }}>
+          {lead ? `${lead} ` : ""}
+          {player.name}
+        </span>
+        <PositionBadge position={player.position} />
         <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
-          {player.position}
-          {player.team ? ` · ${player.team}` : ""}
-          {player.age ? ` · ${Math.round(player.age)}` : ""}
+          {[player.team, player.age ? Math.round(player.age) : null].filter(Boolean).join(" · ")}
         </span>
       </span>
       {reasons.length > 0 ? (
@@ -58,8 +61,16 @@ function DropPlayerLine({
           ))}
         </ul>
       ) : null}
-      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {effect}
+      <span className="flex items-center gap-1.5 flex-wrap">
+        <span className="sr-only">{effect}</span>
+        {swap ? (
+          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+            Whole swap
+          </span>
+        ) : null}
+        {pills.map((pill) => (
+          <ToneBadge key={pill.label} label={pill.label} color={pill.color} title={pill.title} />
+        ))}
       </span>
     </div>
   );

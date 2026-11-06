@@ -9,6 +9,7 @@ import { IdeaPosture } from "@/components/IdeaPosture";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
@@ -228,9 +229,24 @@ export function TradeIdeaCardView({
       {idea.roster_overflow ? <RosterOverflowNote overflow={idea.roster_overflow} compact /> : null}
 
       {landedNames.length > 0 ? (
-        <p className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>
-          Lands your target: {landedNames.join(", ")}
-        </p>
+        <div className="flex items-center gap-1.5 flex-wrap" data-testid="lands-target">
+          <span className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>
+            Lands your target:
+          </span>
+          {(idea.landed_gm_target_player_ids || []).map((playerId) => {
+            const asset = idea.package.receive.find((a) => a.player_id === playerId);
+            return asset ? (
+              <span
+                key={playerId}
+                className="inline-flex items-center gap-1 pr-2 text-xs font-bold"
+                style={{ border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
+              >
+                <PlayerAvatar playerId={playerId} size={22} />
+                {asset.name}
+              </span>
+            ) : null;
+          })}
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-start justify-between gap-2">

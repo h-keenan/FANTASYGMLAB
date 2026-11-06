@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ToneBadge } from "@/components/ToneBadge";
 import { deadlineCopy, deadlinePosture, deadlineState, type DeadlineWindow } from "@/lib/deadlineMode";
 
 /**
@@ -35,6 +36,30 @@ export function DeadlineCard({
       data-testid="deadline-card"
       style={{ borderLeft: `4px solid ${copy.urgent ? "var(--color-danger)" : "var(--color-accent)"}` }}
     >
+      {state.weeksLeft !== null ? (
+        <div className="flex items-center gap-2" data-testid="deadline-pips">
+          <ToneBadge
+            label={state.weeksLeft === 0 ? "Last call" : `${state.weeksLeft} wk${state.weeksLeft === 1 ? "" : "s"} left`}
+            color={copy.urgent ? "var(--color-danger)" : "var(--color-accent)"}
+            srLabel={`${state.weeksLeft} weeks left until the week ${state.deadlineWeek} trade deadline`}
+          />
+          <span className="flex gap-1 flex-1 max-w-[8rem]" aria-hidden="true">
+            {Array.from({ length: 6 }, (_, i) => (
+              <span
+                key={i}
+                className="flex-1 h-1.5"
+                style={{
+                  borderRadius: "var(--radius-pill)",
+                  background: i < Math.max(1, 6 - state.weeksLeft!) ? (copy.urgent ? "var(--color-danger)" : "var(--color-accent)") : "var(--color-surface-muted)",
+                }}
+              />
+            ))}
+          </span>
+          <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+            Wk {state.deadlineWeek}
+          </span>
+        </div>
+      ) : null}
       <p className="m-0 text-sm font-bold">{copy.headline}</p>
       <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
         {copy.body}
