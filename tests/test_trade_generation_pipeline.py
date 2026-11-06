@@ -836,3 +836,74 @@ def test_trade_finder_pick_controls_default_off_leave_the_board_unchanged():
     baseline = _finder_ideas(fixture)
     explicit_off = _finder_ideas(fixture, pick_ids=[], return_picks=False)
     assert baseline == explicit_off
+
+
+def _stacked_wr_roster(target_score):
+    class Adapter:
+        def get_rosters(self, _league_id):
+            return [
+                {"roster_id": 1, "players": ["wr-best", "wr-spare-a", "wr-spare-b"]},
+                {"roster_id": 2, "players": ["wr-target", "rb-elite"]},
+            ]
+
+    players = pd.DataFrame(
+        [
+            {"player_id": "wr-best", "name": "Best WR", "position": "WR", "value_score": 4500, "age": 26, "player_tier": "Starter"},
+            {"player_id": "wr-spare-a", "name": "Spare A", "position": "WR", "value_score": 3000, "age": 27, "player_tier": "Depth"},
+            {"player_id": "wr-spare-b", "name": "Spare B", "position": "WR", "value_score": 2800, "age": 27, "player_tier": "Depth"},
+            # An elite non-WR keeps pattern 1's own target filter non-empty, so
+            # its "fall back to everyone" branch cannot produce the WR deal.
+            {"player_id": "rb-elite", "name": "Elite RB", "position": "RB", "value_score": 9000, "age": 24, "player_tier": "Elite"},
+            {"player_id": "wr-target", "name": "Target WR", "position": "WR", "value_score": target_score, "age": 25, "player_tier": "Starter"},
+        ]
+    )
+    summary = pd.DataFrame(
+        [
+            {"roster_id": 1, "team_name": "Mine", "mode": "contender", "strategy": "contender", "strengths": ["WR"]},
+            {"roster_id": 2, "team_name": "Partner", "mode": "balanced", "strategy": "balanced", "strengths": []},
+        ]
+    )
+    return Adapter(), players, summary
+
+
+def _stacked_wr_ideas(monkeypatch, target_score):
+    _install_deterministic_context(monkeypatch)
+    _bypass_analyzer_gate(monkeypatch)
+    monkeypatch.setattr(trade_ideas, "_build_roster_pick_assets", lambda *args, **kwargs: {1: [], 2: []})
+
+    def shape(_summary, roster_id, *_args, **_kwargs):
+        mine = int(roster_id) == 1
+        return {
+            "strategy": "contender" if mine else "balanced",
+            "mode": "contender" if mine else "balanced",
+            "needs": [],
+            "surplus": ["WR"] if mine else [],
+            "surplus_player_ids": {"WR": ["wr-spare-a", "wr-spare-b"]} if mine else {},
+            "counts": {},
+            "minimums": {},
+            "position_values": {},
+            "roster_over_limit": False,
+            "roster_at_limit": False,
+        }
+
+    monkeypatch.setattr(trade_ideas, "_build_team_shape", shape)
+    adapter, players, summary = _stacked_wr_roster(target_score)
+    return trade_ideas.build_trade_ideas(
+        players, "league", summary, 1, [], [], {}, max_ideas=20, team_strategy="contender", adapter=adapter,
+        _pipeline_cache_enabled=False,
+    )
+
+
+def test_stacked_position_depth_buys_a_better_player_at_that_position(monkeypatch):
+    ideas = _stacked_wr_ideas(monkeypatch, 5600)
+    match = [i for i in ideas if i.get("tag") == "Consolidate depth for a better starter"]
+    assert match, [i.get("tag") for i in ideas]
+    assert {a["player_id"] for a in match[0]["send_assets"]} == {"wr-spare-a", "wr-spare-b"}
+    assert match[0]["receive_assets"][0]["player_id"] == "wr-target"
+
+
+def test_stacked_position_consolidation_needs_a_real_upgrade_over_the_best_player(monkeypatch):
+    # Target is no better than the best WR already owned: a pile of spare
+    # WRs must not be turned into a sideways or downgrade "consolidation".
+    ideas = _stacked_wr_ideas(monkeypatch, 4600)
+    assert not [i for i in ideas if i.get("tag") == "Consolidate depth for a better starter"]
