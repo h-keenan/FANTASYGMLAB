@@ -12,7 +12,6 @@ import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { describeSleeperConnectError, isConnectivityFailure, type SleeperConnectError } from "@/lib/sleeperConnectErrors";
 import { EspnImportForm } from "@/components/EspnImportForm";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
-import { PillRow } from "@/components/PillRow";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 
@@ -40,11 +39,14 @@ import { Input } from "@/components/Input";
  */
 type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl";
 
-const PLATFORM_OPTIONS: { label: string; value: LeaguePlatform }[] = [
-  { label: "Sleeper", value: "sleeper" },
-  { label: "ESPN", value: "espn" },
-  { label: "Fleaflicker", value: "fleaflicker" },
-  { label: "MFL", value: "mfl" },
+/** The two main platforms get cards (same treatment); the smaller ones are quiet links below. */
+const MAIN_PLATFORMS: { value: LeaguePlatform; label: string; monogram: string; blurb: string }[] = [
+  { value: "sleeper", label: "Sleeper", monogram: "S", blurb: "Use your username" },
+  { value: "espn", label: "ESPN", monogram: "E", blurb: "League ID. Public or private" },
+];
+const OTHER_PLATFORMS: { value: LeaguePlatform; label: string }[] = [
+  { value: "fleaflicker", label: "Fleaflicker" },
+  { value: "mfl", label: "MFL" },
 ];
 
 /**
@@ -70,7 +72,59 @@ export function SleeperImportForm({
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
           Your league is on
         </span>
-        <PillRow options={PLATFORM_OPTIONS} active={platform} onSelect={(value) => setPlatform(value as LeaguePlatform)} fullWidth />
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="League platform">
+          {MAIN_PLATFORMS.map((option) => {
+            const selected = platform === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={option.label}
+                onClick={() => setPlatform(option.value)}
+                className="glass-surface flex flex-col items-start gap-1 px-3 py-3 text-left"
+                style={{
+                  color: "var(--color-text-primary)",
+                  borderLeft: selected ? "var(--border-width-semantic) solid var(--color-accent)" : undefined,
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex items-center justify-center font-bold"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "var(--radius-control)",
+                    background: selected ? "var(--color-accent)" : "var(--color-surface-secondary)",
+                    color: selected ? "var(--color-on-accent)" : "var(--color-text-primary)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  {option.monogram}
+                </span>
+                <span className="font-bold">{option.label}</span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {option.blurb}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <span>Also:</span>
+          {OTHER_PLATFORMS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPlatform(option.value)}
+              className="font-bold"
+              style={{ color: platform === option.value ? "var(--color-accent)" : "var(--color-text-secondary)" }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
       {platform !== "sleeper" ? (
         // key: switching platform resets the form (league id, preview, team pick).

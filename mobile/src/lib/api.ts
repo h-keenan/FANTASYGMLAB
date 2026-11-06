@@ -227,10 +227,21 @@ export interface EspnLeagueTeam {
   matched_player_count: number;
 }
 
+/** /v1/espn/credentials. The API never returns the cookie values, only whether a login is saved. */
+export interface EspnCredentialsResponse {
+  ok: boolean;
+  available?: boolean;
+  saved?: boolean;
+  reason?: string;
+  message?: string;
+}
+
 export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
+  /** reason 'private_league' only: true when the server can store an ESPN login. */
+  can_connect?: boolean;
   platform?: 'fleaflicker' | 'mfl';
   platform_label?: string;
   league?: {
@@ -3959,6 +3970,16 @@ export const api = {
     ),
   previewImportedLeague: (platform: 'fleaflicker' | 'mfl', leagueId: string, season: number) =>
     authorizedPost<EspnLeaguePreviewResponse>('/v1/import/preview', { platform, league_id: leagueId, season }),
+  getEspnCredentialStatus: () => authorizedFetch<EspnCredentialsResponse>('/v1/espn/credentials'),
+  /** With leagueId + season the server first proves the login on that league and saves nothing if ESPN refuses it. */
+  saveEspnCredentials: (input: { espnS2: string; swid: string; leagueId?: string; season?: number }) =>
+    authorizedPost<EspnCredentialsResponse>('/v1/espn/credentials', {
+      espn_s2: input.espnS2,
+      swid: input.swid,
+      league_id: input.leagueId ?? '',
+      season: input.season ?? 0,
+    }),
+  deleteEspnCredentials: () => authorizedDelete<EspnCredentialsResponse>('/v1/espn/credentials'),
   previewEspnLeague: (leagueId: string, season: number) =>
     authorizedPost<EspnLeaguePreviewResponse>('/v1/espn/leagues/preview', { league_id: leagueId, season }),
   getGmTargets: (leagueId: string) =>

@@ -55,3 +55,15 @@ describe("espnImportFailureResult", () => {
     expect(espnImportFailureResult(undefined)).toBe("espn_error");
   });
 });
+
+describe("ESPN login copy", () => {
+  it("explains the cookies and prefers the server's failure message", async () => {
+    const { ESPN_COOKIE_STEPS, ESPN_LOGIN_WHY, espnCredentialFailureMessage } = await import("./leaguePlatform");
+    expect(ESPN_COOKIE_STEPS.join(" ")).toMatch(/espn_s2/);
+    expect(ESPN_COOKIE_STEPS.join(" ")).toMatch(/SWID/);
+    expect(ESPN_LOGIN_WHY).toMatch(/encrypted/);
+    expect(espnCredentialFailureMessage({ reason: "x", message: "Server says." })).toBe("Server says.");
+    expect(espnCredentialFailureMessage({ reason: "not_configured" })).toMatch(/isn't available yet/);
+    expect(espnCredentialFailureMessage(null)).toMatch(/Check both values/);
+  });
+});

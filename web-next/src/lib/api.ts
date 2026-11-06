@@ -303,6 +303,8 @@ export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
+  /** reason "private_league" only: true when the server can store an ESPN login (see EspnCredentialsResponse). */
+  can_connect?: boolean;
   /** Fleaflicker / MFL previews (POST /v1/import/preview) only. */
   platform?: "fleaflicker" | "mfl";
   platform_label?: string;
@@ -327,6 +329,15 @@ export interface EspnLeaguePreviewResponse {
     unmapped_players?: Array<{ name: string; position: string; team: string; fantasy_team: string; reason: string }>;
   };
   features?: EspnFeatureSupport[];
+}
+
+/** /v1/espn/credentials. The API never returns the cookie values, only whether a login is saved. */
+export interface EspnCredentialsResponse {
+  ok: boolean;
+  available?: boolean;
+  saved?: boolean;
+  reason?: string;
+  message?: string;
 }
 
 export interface MyRosterResponse {
@@ -4016,6 +4027,17 @@ export const api = {
       method: "POST",
       jsonBody: { platform, league_id: leagueId, season },
     }),
+
+  getEspnCredentialStatus: () => authorizedRequest<EspnCredentialsResponse>("/v1/espn/credentials"),
+
+  /** Saves the ESPN login. With leagueId + season the server first proves it by loading that league and saves nothing if ESPN refuses it. */
+  saveEspnCredentials: (input: { espnS2: string; swid: string; leagueId?: string; season?: number }) =>
+    authorizedRequest<EspnCredentialsResponse>("/v1/espn/credentials", {
+      method: "POST",
+      jsonBody: { espn_s2: input.espnS2, swid: input.swid, league_id: input.leagueId ?? "", season: input.season ?? 0 },
+    }),
+
+  deleteEspnCredentials: () => authorizedRequest<EspnCredentialsResponse>("/v1/espn/credentials", { method: "DELETE" }),
 
   previewEspnLeague: (leagueId: string, season: number) =>
     authorizedRequest<EspnLeaguePreviewResponse>("/v1/espn/leagues/preview", {

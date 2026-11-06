@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,7 +14,7 @@ export type ImportPlatform = 'espn' | 'fleaflicker' | 'mfl';
 const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFound: string; placeholder: string }> = {
   espn: {
     label: 'ESPN',
-    hint: "FantasyDesk can read public ESPN leagues. Your league ID is the number after leagueId= in your ESPN league's web address. Private ESPN leagues aren't supported yet; your league manager can make the league viewable to the public in ESPN's league settings.",
+    hint: "Your league ID is the number after leagueId= in your ESPN league's web address. Public league: just the ID. Private league: we'll ask you to connect your ESPN login (stored encrypted), only if needed.",
     notFound: "Enter your ESPN league ID. It's the number after leagueId= in your ESPN league's web address.",
     placeholder: 'e.g. 12345678',
   },
@@ -34,6 +34,7 @@ const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFo
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
 import Input from './Input';
+import { EspnLoginPanel, EspnLoginStatus } from './EspnLoginPanel';
 
 /**
  * ESPN half of Home's "Add a league" sheet (same sheet, platform chosen at
@@ -66,6 +67,23 @@ export default function EspnLeagueImport({
   const [preview, setPreview] = useState<EspnLeaguePreviewResponse | null>(null);
   const [rosterId, setRosterId] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [canConnect, setCanConnect] = useState(false);
+  const [loginSaved, setLoginSaved] = useState(false);
+
+  // Whether an ESPN login is already saved, so the user sees (and can remove) it.
+  useEffect(() => {
+    if (platform !== 'espn') return;
+    let live = true;
+    api
+      .getEspnCredentialStatus()
+      .then((result) => {
+        if (live && result?.ok) setLoginSaved(Boolean(result.saved));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [platform]);
 
   const findLeague = async () => {
     const clean = leagueId.trim();
@@ -76,6 +94,7 @@ export default function EspnLeagueImport({
     setBusy(true);
     setMessage(null);
     setIsPrivate(false);
+    setCanConnect(false);
     setPreview(null);
     setRosterId('');
     try {
@@ -86,7 +105,8 @@ export default function EspnLeagueImport({
       if (!result.league) {
         const espnPrivate = platform === 'espn' && result.reason === 'private_league';
         setIsPrivate(espnPrivate);
-        setMessage(espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
+        setCanConnect(espnPrivate && Boolean(result.can_connect));
+        setMessage(espnPrivate && result.can_connect ? null : espnPrivate ? ESPN_PRIVATE_LEAGUE_HINT : result.message || `That ${copy.label} league couldn't be loaded.`);
         if (platform === 'espn') trackUse('league_import', 'failed', { props: { result: espnImportFailureResult(result.reason) } });
         return;
       }
@@ -219,9 +239,31 @@ export default function EspnLeagueImport({
     );
   }
 
+  if (canConnect) {
+    return (
+      <View>
+        <EspnLoginPanel
+          leagueId={leagueId.trim()}
+          season={Number(season)}
+          onConnected={() => {
+            setLoginSaved(true);
+            setCanConnect(false);
+            void findLeague();
+          }}
+        />
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => setCanConnect(false)}>
+            <AppText style={styles.cancelText}>Use a different league</AppText>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View>
       <AppText style={styles.hint}>{copy.hint}</AppText>
+      {platform === 'espn' ? <EspnLoginStatus saved={loginSaved} onRemoved={() => setLoginSaved(false)} /> : null}
       <Input
         style={styles.input}
         value={leagueId}
