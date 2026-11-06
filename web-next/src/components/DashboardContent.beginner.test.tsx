@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DashboardContent } from "./DashboardContent";
@@ -58,11 +58,16 @@ const FIXTURE: DashboardResponse = {
   entitlement: { is_premium: false, visible_count: 1, hidden_count: 2 },
 };
 
+function expandHelp() {
+  for (const b of screen.queryAllByRole("button", { name: "What does this mean?" })) fireEvent.click(b);
+}
+
 describe("DashboardContent for a beginner", () => {
   it("explains rank terms in short lines under the strip, not inside the 4-column tiles", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expandHelp();
     const strip = screen.getByLabelText("Team summary");
-    const lines = Array.from(strip.querySelectorAll("p[data-beginner-help]")).map((p) => p.textContent);
+    const lines = Array.from(strip.querySelectorAll("[data-beginner-help] p")).map((p) => p.textContent);
     expect(lines.some((l) => l?.startsWith("Power Rank: "))).toBe(true);
     expect(lines.some((l) => l?.startsWith("Average Age: "))).toBe(true);
     expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument();
@@ -71,11 +76,13 @@ describe("DashboardContent for a beginner", () => {
   it("tells a beginner no move is needed when nothing is urgent", () => {
     const quiet: DashboardResponse = { ...FIXTURE, items: [], entitlement: { is_premium: true, visible_count: 0, hidden_count: 0 } };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={quiet} />);
+    expandHelp();
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
   });
 
   it("explains trades to a beginner, with a line for their season goal", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expandHelp();
     const block = screen.getByTestId("dashboard-trades-block");
     expect(block.textContent).toMatch(/who you give, who you get/);
     expect(block.textContent).toMatch(/Tuned for winning this season/);

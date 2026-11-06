@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTitle } from "@/components/PageTitle";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -55,14 +56,9 @@ type Tab = "sim" | "pickem";
 export function GamesContent({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
   const [tab, setTab] = useState<Tab>("sim");
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {leagueName}
-        </span>
-        <h1 className="uppercase" style={{ font: "var(--font-page-title)", letterSpacing: "var(--letter-spacing-tight)" }}>
-          Games
-        </h1>
+        <PageTitle page="Games" leagueName={leagueName} />
       </header>
       <PillRow
         fullWidth

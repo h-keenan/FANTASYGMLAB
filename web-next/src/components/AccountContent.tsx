@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTitle } from "@/components/PageTitle";
 import { useState } from "react";
 
 import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
@@ -469,9 +470,9 @@ export function AccountContent({
   onSignOut: () => void;
 }) {
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-2xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-2xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <h1 style={{ font: "var(--font-page-title)" }}>Account</h1>
+        <PageTitle page="Account" />
       </header>
 
       <IdentitySection user={user} />

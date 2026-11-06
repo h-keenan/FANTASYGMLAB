@@ -43,12 +43,12 @@ import { PageTitle } from "@/components/PageTitle";
  * advanced users see just the sentence. */
 function PostureLine({ sentence }: { sentence: string }) {
   return (
-    <>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+    <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+      <p className="text-xs flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>
         {sentence}
       </p>
       <BeginnerHelp term="tradeHubPosture" />
-    </>
+    </div>
   );
 }
 

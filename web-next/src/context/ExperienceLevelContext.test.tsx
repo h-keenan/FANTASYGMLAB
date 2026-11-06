@@ -126,11 +126,17 @@ beforeEach(() => {
   vi.mocked(api.setExperienceGoal).mockReset();
 });
 
+async function expandHelp() {
+  await screen.findAllByRole("button", { name: "What does this mean?" });
+  for (const b of screen.queryAllByRole("button", { name: "What does this mean?" })) fireEvent.click(b);
+}
+
 describe("experience level copy on Dashboard", () => {
   it("adds plain-language helper text and spells out labels for a beginner", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
     render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
 
+    await expandHelp();
     expect(await screen.findByText(`Power Rank: ${BEGINNER_HELP.powerRank}`)).toBeInTheDocument();
     expect(screen.getByText(`Franchise Rank: ${BEGINNER_HELP.franchiseRank}`)).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.dashboardSnapshot)).toBeInTheDocument();
@@ -157,8 +163,10 @@ describe("experience level copy on Trade Hub idea cards", () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
     render(withProvider(<TradeIdeaCardView idea={IDEA} leagueId="abc" />));
 
+    await expandHelp();
     expect(await screen.findByText(BEGINNER_HELP.impactSellHigh)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /view details/i }));
+    await expandHelp();
     expect(screen.getByText(BEGINNER_HELP.ideaBalance)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Partner Acceptance: Plausible" })).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.ideaRealism)).toBeInTheDocument();

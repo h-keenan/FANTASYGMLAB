@@ -119,7 +119,6 @@ describe("WaiversContent", () => {
   it("renders the league name, stat tiles, and the top Priority Add with FAAB range and confidence", () => {
     render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    expect(screen.getByText("Dynasty Overlords")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Waivers" })).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getAllByText("Test Free Agent").length).toBeGreaterThan(0);

@@ -2,12 +2,9 @@
 
 import { useId, useState, type ReactNode } from "react";
 
-import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-
 /**
  * Shared "short label + ⓘ" affordance. Replaces always-visible explanatory
  * paragraphs: the label stays on screen, the full explanation opens on tap.
- * Beginner accounts (useExperienceCopy) see the full explanation inline.
  * Mirrors mobile's ScreenInfoNote.
  */
 export function InfoTip({
@@ -22,10 +19,9 @@ export function InfoTip({
   tone?: "muted" | "warning";
 }) {
   const [open, setOpen] = useState(false);
-  const copy = useExperienceCopy();
   const id = useId();
   const color = tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)";
-  const expanded = open || copy.isBeginner;
+  const expanded = open;
   return (
     <div className={`flex flex-col gap-1 ${className}`.trim()} data-info-tip="true">
       <button

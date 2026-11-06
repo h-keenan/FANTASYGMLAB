@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/InfoTip";
+import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { useMemo, useState } from "react";
 
@@ -317,17 +319,14 @@ export function CollegeScoutingContent({ data }: { data: CollegeProspectsRespons
   };
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          College Scouting
-        </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>College Scouting</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        <PageTitle page="College Scouting" />
+        <InfoTip label="How grades are used">
           Every signed-in user&apos;s grade on a prospect pools into one shared signal — that shared aggregate, not
           any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to
           edit any time.
-        </p>
+        </InfoTip>
       </header>
 
       {prospects.length === 0 ? (

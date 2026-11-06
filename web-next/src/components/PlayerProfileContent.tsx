@@ -193,7 +193,7 @@ export function PlayerProfileContent({
   const name = player.name || `Player ${player.player_id}`;
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <PlayerHeroHeader
         playerId={player.player_id}
         name={name}

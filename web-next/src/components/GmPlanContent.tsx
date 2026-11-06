@@ -622,12 +622,9 @@ export function GmPlanContent({
     );
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
         <PageTitle page="GM Plan" leagueName={leagueName} />
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Roadmap, stance, and watched players.
-        </p>
       </header>
 
       <PillRow

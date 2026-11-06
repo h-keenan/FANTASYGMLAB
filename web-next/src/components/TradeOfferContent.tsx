@@ -69,7 +69,7 @@ export function TradeOfferContent({
 
   if (error) {
     return (
-      <main className="flex-1 flex flex-col gap-4 px-4 py-8 max-w-3xl w-full mx-auto">
+      <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
         <EmptyState title="Could not build an offer." subtitle={error} actionLabel="Try again" onAction={load} />
       </main>
     );
@@ -90,7 +90,7 @@ export function TradeOfferContent({
 
   const target = result.target;
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
         <PageTitle page="Build an Offer" leagueName={leagueName} />
         {result.offers.length > 0 ? (
