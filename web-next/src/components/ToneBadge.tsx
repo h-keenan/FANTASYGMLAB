@@ -35,7 +35,8 @@ export function ToneBadge({
       className={`${size === "xs" ? "px-1.5 text-[0.625rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${wrap ? "min-w-0 max-w-full break-words" : "whitespace-nowrap shrink-0"}`}
       style={{
         borderRadius: "var(--radius-pill)",
-        background: `color-mix(in srgb, ${color} 15%, transparent)`,
+        background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} var(--chip-ring-pct, 0%), transparent)`,
         color,
         letterSpacing: "var(--letter-spacing-badge)",
       }}

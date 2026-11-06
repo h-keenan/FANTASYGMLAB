@@ -32,11 +32,11 @@ export const darkGlass: GlassTokens = {
 };
 
 export const lightGlass: GlassTokens = {
-  glass: 'rgba(255,255,255,0.68)',
+  glass: 'rgba(255,255,255,0.85)',
   glassInset: 'rgba(10,30,45,0.05)',
-  glassBorder: 'rgba(10,30,45,0.12)',
-  glassInput: 'rgba(255,255,255,0.6)',
-  glassInputBorder: 'rgba(10,30,45,0.12)',
+  glassBorder: 'rgba(10,30,45,0.3)',
+  glassInput: 'rgba(255,255,255,0.7)',
+  glassInputBorder: 'rgba(10,30,45,0.38)',
 };
 
 export function parseRgba(value: string): { r: number; g: number; b: number; a: number } {
