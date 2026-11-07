@@ -49,9 +49,26 @@ export function TradeFinderNoResults({
         subtitle={search?.headline || undefined}
       >
         {reasons.length > 0 ? (
-          <ul className="flex flex-col gap-1 mt-2 list-disc pl-4 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <ul className="flex flex-col gap-2 mt-3 w-full">
             {reasons.map((reason) => (
-              <li key={reason.code}>{reason.text}</li>
+              <li key={reason.code} className="flex items-start gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                <span
+                  className="inline-flex items-center justify-center shrink-0"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "var(--radius-pill)",
+                    background: "color-mix(in srgb, var(--color-warning) 15%, transparent)",
+                    color: "var(--color-warning)",
+                  }}
+                  aria-hidden="true"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 8v5M12 17h.01" />
+                  </svg>
+                </span>
+                <span className="min-w-0">{reason.text}</span>
+              </li>
             ))}
           </ul>
         ) : null}
