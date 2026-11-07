@@ -149,16 +149,16 @@ const darkColors = {
  */
 const lightColors = {
   background: '#d9e3ea',
-  backgroundElevated: '#cbd8e1',
-  surface: '#ffffff',
-  surfaceSolid: '#ffffff',
+  backgroundElevated: '#cddae4',
+  surface: '#f8fbfd',
+  surfaceSolid: '#f8fbfd',
   border: '#8497a5',
   borderStrong: '#475765',
   cardBorder: 'rgba(5,110,124,0.25)',
   hairline: 'rgba(10,30,45,0.08)',
   ...lightGlass,
   textPrimary: '#101820',
-  textSecondary: '#3b4a56',
+  textSecondary: '#34424d',
   // Color-system audit (2026-09-25): darkened from #6B8494 — that value hit
   // only 3.13:1 against `backgroundElevated` and 3.92:1 against `surface`,
   // both under WCAG AA's 4.5:1 (this is the light-mode "secondary text is
@@ -167,7 +167,7 @@ const lightColors = {
   // `background`) while staying a visible step above the new `textDisabled`
   // below and a visible step below `textSecondary`. Old value preserved as
   // `textDisabled` rather than discarded — same rationale as darkColors.
-  textTertiary: '#57646f',
+  textTertiary: '#4a5762',
   // Genuinely inactive/disabled content — see darkColors.textDisabled for
   // the split rationale. Intentionally under AA (3.13-3.92:1 depending on
   // surface): WCAG's text-contrast minimums don't apply to disabled
@@ -457,7 +457,7 @@ export const lightGradients = {
    * this is already near the practical ceiling). `textPrimary` clears
    * ~15.5:1 against it, no concern there.
    */
-  headerWash: ['#EEF3F6', '#EEF3F6'] as const,
+  headerWash: ['#d9e3ea', '#d9e3ea'] as const,
 };
 
 /**
