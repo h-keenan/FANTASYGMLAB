@@ -129,8 +129,8 @@ export function PillRow({
             minHeight: sticky ? "var(--segmented-height-compact)" : "var(--segmented-height)",
             padding: "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
-            background: isActive ? "var(--color-information-soft)" : "transparent",
-            color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+            background: isActive ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
+            color: isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
             boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
             borderLeft: index === 0 ? "none" : "var(--border-width-default) solid var(--color-border)",
           } as const;
