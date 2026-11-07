@@ -7,6 +7,9 @@ import {
   lineupComparisonRows,
   lineupPlayerPoints,
   matchupVerdict,
+  headToHeadShare,
+  rowWinner,
+  lineupTotals,
   moveOverLine,
   moveSlotLabel,
   slotDisplayLabel,
@@ -223,5 +226,25 @@ describe("suggested moves (suggested vs actual diff)", () => {
     const rbMove = { ...move, slot: "RB", over: { ...move.over!, player_id: "r2" } };
     const rbs = [real({ player_id: "r1", slot: "RB" }), real({ player_id: "r2", slot: "RB" })];
     expect(moveSlotLabel(rbMove, rbs)).toBe("RB2");
+  });
+});
+
+describe("lineup head-to-head helpers", () => {
+  it("splits and picks winners, tolerating missing numbers", () => {
+    expect(headToHeadShare(10, 30)).toBe(25);
+    expect(headToHeadShare(null, 30)).toBeNull();
+    expect(headToHeadShare(0, 0)).toBeNull();
+    expect(rowWinner(12.04, 12.0)).toBe("tie");
+    expect(rowWinner(15, 12)).toBe("mine");
+    expect(rowWinner(null, 12)).toBeNull();
+  });
+  it("totals only players with a number", () => {
+    const p = (pts: number) => ({ actual_points: pts, game_started: true }) as never;
+    expect(
+      lineupTotals([
+        { slot: "QB", mine: p(20), opponent: p(15) },
+        { slot: "RB", mine: "empty", opponent: null },
+      ]),
+    ).toEqual({ mine: 20, opponent: 15, margin: 5 });
   });
 });

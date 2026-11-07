@@ -11,6 +11,7 @@ import type {
   MatchupSide,
   MatchupSuggestedMove,
 } from "@/lib/api";
+import { Button } from "@/components/Button";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
@@ -33,6 +34,9 @@ import {
   formatSeasonValue,
   formatSigned,
   hasKickedOff,
+  headToHeadShare,
+  lineupTotals,
+  rowWinner,
   lineupComparisonRows,
   lineupPlayerPoints,
   matchupActionLabel,
@@ -327,51 +331,33 @@ function MatchupInsights({ matchup }: { matchup: MatchupResponse }) {
   );
 }
 
-function PointsBar({ value, max, mine }: { value: number | null; max: number; mine: boolean }) {
-  const pct = value != null && max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
-  return (
-    <span
-      className="block h-1 w-full"
-      style={{ background: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}
-      aria-hidden="true"
-    >
-      <span
-        className="block h-full"
-        style={{
-          width: `${pct}%`,
-          marginLeft: mine ? 0 : "auto",
-          background: mine ? "var(--color-accent)" : "var(--color-text-muted)",
-        }}
-      />
-    </span>
-  );
-}
+type CellEmphasis = "win" | "lose" | "even";
 
 function LineupCell({
   player,
   mine,
-  maxValue,
+  emphasis,
   onEdit,
 }: {
   player: LineupPlayer | "empty" | null;
   mine: boolean;
-  maxValue: number;
+  emphasis: CellEmphasis;
   /** Planner mode: tapping the cell opens the swap sheet instead of Quick View. */
   onEdit?: () => void;
 }) {
   if (player === null) return <div />;
   if (player === "empty") {
     const label = (
-      <span className="text-xs italic" style={{ color: onEdit ? "var(--color-accent)" : "var(--color-text-muted)" }}>
-        {onEdit ? "Empty slot, tap to fill" : "Empty slot"}
+      <span className="text-xs italic truncate" style={{ color: onEdit ? "var(--color-accent)" : "var(--color-text-muted)" }}>
+        {onEdit ? "Empty, tap to fill" : "Empty slot"}
       </span>
     );
     return onEdit ? (
-      <button type="button" onClick={onEdit} className="flex items-center py-2 w-full text-left">
+      <button type="button" onClick={onEdit} className="flex items-center py-2 w-full text-left min-w-0">
         {label}
       </button>
     ) : (
-      <div className={`flex items-center py-2 ${mine ? "" : "justify-end"}`}>{label}</div>
+      <div className={`flex items-center py-2 min-w-0 ${mine ? "" : "justify-end"}`}>{label}</div>
     );
   }
   const points = lineupPlayerPoints(player);
@@ -380,57 +366,78 @@ function LineupCell({
   const body = (
     <>
       <span className="inline-flex shrink-0">
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={28} />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={24} />
       </span>
-      <div className={`flex-1 flex flex-col gap-1 min-w-0 ${mine ? "" : "items-end"}`}>
-        {/* Name gets its own full-width line so it survives phone widths;
-            team + number share the second line, the bar the third. */}
+      <span className={`flex flex-col min-w-0 flex-1 ${mine ? "" : "items-end text-right"}`}>
         <span
-          className={`text-sm font-bold break-words w-full ${mine ? "" : "text-right"}`}
+          className="text-[13px] font-bold truncate w-full leading-tight"
           style={{ color: "var(--color-text-primary)" }}
         >
           {player.name || "Unknown player"}
         </span>
-        <div className={`flex items-center justify-between gap-1 w-full ${reverse}`}>
-          <span className={`flex items-center gap-1 min-w-0 ${reverse}`}>
-            <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-              {player.team || "FA"}
-            </span>
-            <PlayerInjuryBadge status={player.injury_label} />
+        <span className={`flex items-center gap-1 min-w-0 text-[11px] leading-tight ${mine ? "" : "flex-row-reverse"}`}>
+          <span className="truncate" style={{ color: "var(--color-text-muted)" }}>
+            {player.team || "FA"}
           </span>
-          {valueText ? (
-            <span
-              className="text-sm font-extrabold tabular-nums shrink-0"
-              style={{ color: points.kind === "pts" ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
-              title={points.kind === "pts" ? "Real points" : "Projected points"}
-            >
-              {valueText}
-            </span>
-          ) : (
-            <ToneBadge label="Bye" color="var(--color-warning)" />
-          )}
-        </div>
-        <PointsBar value={points.value} max={maxValue} mine={mine} />
-      </div>
+          <PlayerInjuryBadge status={player.injury_label} />
+        </span>
+      </span>
+      <span className={`shrink-0 w-[2.1rem] ${mine ? "text-right" : "text-left"}`}>
+        {valueText ? (
+          <span
+            className="text-sm tabular-nums"
+            style={{
+              color: emphasis === "lose" ? "var(--color-text-muted)" : "var(--color-text-primary)",
+              fontWeight: emphasis === "win" ? 800 : emphasis === "lose" ? 500 : 700,
+            }}
+            title={points.kind === "pts" ? "Real points" : "Projected points"}
+          >
+            {valueText}
+          </span>
+        ) : (
+          <ToneBadge label="Bye" color="var(--color-warning)" size="xs" />
+        )}
+      </span>
     </>
   );
+  const cls = `flex items-center gap-1 py-2 w-full min-w-0 ${reverse}`;
   return onEdit ? (
     <button
       type="button"
       onClick={onEdit}
       aria-label={`Swap ${player.name || "player"}`}
-      className={`flex items-center gap-1.5 sm:gap-2 py-2 w-full text-left ${reverse}`}
+      className={`${cls} text-left`}
     >
       {body}
     </button>
   ) : (
-    <PlayerIdentityTrigger
-      identity={{ ...player, sourceLabel: "Matchup" }}
-      className={`flex items-center gap-1.5 sm:gap-2 py-2 w-full ${reverse}`}
-    >
+    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Matchup" }} className={cls}>
       {body}
     </PlayerIdentityTrigger>
   );
+}
+
+/** One thin edge-to-edge bar splitting the row's points between the sides. */
+function HeadToHeadBar({ share }: { share: number | null }) {
+  return (
+    <span
+      className="flex h-[3px] w-full"
+      style={{ background: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}
+      aria-hidden="true"
+    >
+      {share != null ? (
+        <>
+          <span style={{ width: `${share}%`, background: "var(--color-accent)" }} />
+          <span style={{ flex: 1, background: "var(--color-border-strong)" }} />
+        </>
+      ) : null}
+    </span>
+  );
+}
+
+function emphasisFor(winner: ReturnType<typeof rowWinner>, side: "mine" | "opponent"): CellEmphasis {
+  if (winner == null || winner === "tie") return "even";
+  return winner === side ? "win" : "lose";
 }
 
 type LineupView = "suggested" | "actual";
@@ -454,6 +461,7 @@ function LineupComparison({
   const actual = bestBall || view === "actual";
   const plan = planner?.plan ?? null;
   const canPlan = Boolean(planner && leagueId && !bestBall && plannerBase(matchup, view));
+  const [helpOpen, setHelpOpen] = useState(false);
   const rows = plan
     ? lineupComparisonRows(
         plan.starters ?? [],
@@ -469,52 +477,75 @@ function LineupComparison({
         opponent.real_empty_slots ?? [],
       )
     : lineupComparisonRows(mine.starters, opponent.starters);
-  const maxValue = Math.max(
-    0,
-    ...rows.flatMap((row) =>
-      [row.mine, row.opponent].map((cell) =>
-        cell && cell !== "empty" ? (lineupPlayerPoints(cell).value ?? 0) : 0,
-      ),
-    ),
-  );
+  const totals = lineupTotals(rows);
+  const pointsOf = (cell: LineupPlayer | "empty" | null) =>
+    cell && cell !== "empty" ? lineupPlayerPoints(cell).value : null;
   const caption = plan
     ? "Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper."
     : actual
     ? "Lineups as set in Sleeper."
     : "Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.";
+  const marginTone =
+    Math.abs(totals.margin) < 0.05 ? "var(--color-text-muted)" : totals.margin > 0 ? "var(--color-success)" : "var(--color-danger)";
+  const gridCols = "grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)]";
 
   return (
-    <section className="glass-surface flex flex-col gap-3 p-3 sm:p-4" aria-labelledby="lineup-comparison-title">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <section className="glass-surface flex flex-col gap-2 p-3 sm:p-4" aria-labelledby="lineup-comparison-title">
+      <div className="flex items-center justify-between gap-2">
         <SectionHeading id="lineup-comparison-title">Lineup Comparison</SectionHeading>
-        {bestBall || plan ? null : (
-        <PillRow
-          options={[
-            { label: "Suggested Lineup", value: "suggested" },
-            { label: "Actual Lineup", value: "actual" },
-          ]}
-          active={view}
-          onSelect={(value) => onViewChange(value as LineupView)}
-        />
-        )}
+        <button
+          type="button"
+          aria-label={helpOpen ? "Hide explanation" : "How this works"}
+          aria-expanded={helpOpen}
+          onClick={() => setHelpOpen((v) => !v)}
+          className="inline-flex items-center justify-center font-bold shrink-0 text-xs"
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 9999,
+            border: "var(--border-width-default) solid var(--color-border)",
+            color: "var(--color-accent)",
+            lineHeight: 1,
+          }}
+        >
+          ?
+        </button>
       </div>
-      {canPlan || plan ? (
+      {helpOpen ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {caption}
+          {hasKickedOff(matchup) ? " Started games show real points; the rest show projections." : " Numbers are this week's projections."}
+        </p>
+      ) : null}
+      {plan ? (
         <PlannerBar
-          editing={Boolean(plan)}
-          busy={plan?.busy ?? false}
-          error={plan?.error ?? null}
-          baselinePct={plan?.baselinePct ?? null}
-          currentPct={winPercent(plan?.result?.win_probability)}
+          editing
+          busy={plan.busy}
+          error={plan.error ?? null}
+          baselinePct={plan.baselinePct ?? null}
+          currentPct={winPercent(plan.result?.win_probability)}
           leagueId={leagueId!}
           onEdit={() => planner!.start(view)}
           onReset={() => planner!.resetToSuggested()}
           onDone={() => planner!.exit()}
         />
-      ) : null}
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {caption}
-        {hasKickedOff(matchup) ? " Started games show real points; the rest show projections." : " Numbers are this week's projections."}
-      </p>
+      ) : bestBall ? null : (
+        <div className="flex items-center justify-between gap-2">
+          <PillRow
+            options={[
+              { label: "Suggested", value: "suggested" },
+              { label: "Actual", value: "actual" },
+            ]}
+            active={view}
+            onSelect={(value) => onViewChange(value as LineupView)}
+          />
+          {canPlan ? (
+            <Button variant="secondary" size="sm" onClick={() => planner!.start(view)}>
+              Edit lineup
+            </Button>
+          ) : null}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <p className="text-sm py-4 text-center" style={{ color: "var(--color-text-muted)" }}>
@@ -524,39 +555,78 @@ function LineupComparison({
         </p>
       ) : (
         <div role="table" aria-label={actual ? "Actual lineups" : "Suggested lineups"} className="flex flex-col">
+          <div role="row" className={`grid ${gridCols} gap-1 items-end pb-1 text-[11px] font-bold uppercase tracking-wide`}>
+            <span role="columnheader" className="truncate" style={{ color: "var(--color-accent)" }}>
+              {mine.team_name || "You"}
+            </span>
+            <span />
+            <span role="columnheader" className="truncate text-right" style={{ color: "var(--color-text-muted)" }}>
+              {opponent.team_name || "Opponent"}
+            </span>
+          </div>
           {rows.map((row, index) => {
             const emptyOrdinal =
               row.mine === "empty"
                 ? rows.slice(0, index).filter((r) => r.slot === row.slot && r.mine === "empty").length
                 : 0;
             const editIndex = plan ? slotIndexFor(plan.slots, row.mine, row.slot, emptyOrdinal) : -1;
+            const myPts = pointsOf(row.mine);
+            const theirPts = pointsOf(row.opponent);
+            const winner = rowWinner(myPts, theirPts);
             return (
-            <div
-              role="row"
-              key={`${row.slot}-${index}`}
-              className="grid grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] gap-1.5 sm:gap-2 items-center"
-              style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-            >
-              <div role="cell" className="min-w-0">
-                <LineupCell
-                  player={row.mine}
-                  mine
-                  maxValue={maxValue}
-                  onEdit={plan && editIndex >= 0 ? () => void planner!.openSlot(editIndex) : undefined}
-                />
-              </div>
               <div
-                role="cell"
-                className="self-stretch flex items-center justify-center"
+                role="row"
+                key={`${row.slot}-${index}`}
+                className="flex flex-col"
               >
-                <PositionBadge position={row.slot} />
+                <div className={`grid ${gridCols} gap-1 items-center`}>
+                  <div role="cell" className="min-w-0">
+                    <LineupCell
+                      player={row.mine}
+                      mine
+                      emphasis={emphasisFor(winner, "mine")}
+                      onEdit={plan && editIndex >= 0 ? () => void planner!.openSlot(editIndex) : undefined}
+                    />
+                  </div>
+                  <div role="cell" className="flex items-center justify-center">
+                    <PositionBadge position={row.slot} />
+                  </div>
+                  <div role="cell" className="min-w-0">
+                    <LineupCell player={row.opponent} mine={false} emphasis={emphasisFor(winner, "opponent")} />
+                  </div>
+                </div>
+                <HeadToHeadBar share={headToHeadShare(myPts, theirPts)} />
               </div>
-              <div role="cell" className="min-w-0">
-                <LineupCell player={row.opponent} mine={false} maxValue={maxValue} />
-              </div>
-            </div>
             );
           })}
+          <div
+            role="row"
+            className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 items-center pt-3"
+          >
+            <span role="cell" className="flex items-baseline gap-1.5 min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
+                Total
+              </span>
+              <span className="text-base font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
+                {totals.mine.toFixed(1)}
+              </span>
+            </span>
+            <span role="cell">
+              <ToneBadge
+                label={Math.abs(totals.margin) < 0.05 ? "Even" : formatSigned(totals.margin)}
+                color={marginTone}
+                title="Your margin over this lineup's total"
+              />
+            </span>
+            <span role="cell" className="flex items-baseline justify-end gap-1.5 min-w-0">
+              <span className="text-base font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
+                {totals.opponent.toFixed(1)}
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
+                Total
+              </span>
+            </span>
+          </div>
         </div>
       )}
     </section>

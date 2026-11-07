@@ -9,6 +9,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import Button from '../components/Button';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import BeginnerHelp from '../components/BeginnerHelp';
 import EmptyState from '../components/EmptyState';
 import AnimatedCard from '../components/AnimatedCard';
@@ -44,6 +46,9 @@ import {
   formatSeasonValue,
   formatSigned,
   hasKickedOff,
+  headToHeadShare,
+  lineupTotals,
+  rowWinner,
   lineupComparisonRows,
   lineupPlayerPoints,
   matchupActionLabel,
@@ -470,33 +475,18 @@ function Insights({ matchup }: { matchup: MatchupResponse }) {
   );
 }
 
-function PointsBar({ value, max, mine }: { value: number | null; max: number; mine: boolean }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const pct = value != null && max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
-  return (
-    <View style={styles.barTrack}>
-      <View
-        style={[
-          styles.barFill,
-          { width: `${pct}%`, backgroundColor: mine ? colors.accent : colors.textTertiary },
-          !mine && { alignSelf: 'flex-end' },
-        ]}
-      />
-    </View>
-  );
-}
+type CellEmphasis = 'win' | 'lose' | 'even';
 
 function LineupCell({
   player,
   mine,
-  maxValue,
+  emphasis,
   onPress,
   onEdit,
 }: {
   player: LineupPlayer | 'empty' | null;
   mine: boolean;
-  maxValue: number;
+  emphasis: CellEmphasis;
   onPress: (player: LineupPlayer) => void;
   /** Planner mode: tapping the cell opens the swap sheet instead of Player Detail. */
   onEdit?: () => void;
@@ -507,10 +497,12 @@ function LineupCell({
   if (player === 'empty') {
     return onEdit ? (
       <TouchableOpacity style={[styles.cell, styles.cellCenter]} onPress={onEdit} accessibilityRole="button">
-        <AppText style={[styles.emptySlot, { color: colors.accent }]}>Empty slot, tap to fill</AppText>
+        <AppText style={[styles.emptySlot, { color: colors.accent }]} numberOfLines={1}>
+          Empty, tap to fill
+        </AppText>
       </TouchableOpacity>
     ) : (
-      <View style={[styles.cell, styles.cellCenter]}>
+      <View style={[styles.cell, styles.cellCenter, !mine && { alignItems: 'flex-end' }]}>
         <AppText style={styles.emptySlot}>Empty slot</AppText>
       </View>
     );
@@ -525,26 +517,54 @@ function LineupCell({
       accessibilityRole="button"
       accessibilityLabel={onEdit ? `Swap ${player.name ?? 'player'}` : `${player.name ?? 'Player'}, ${player.team ?? 'free agent'}`}
     >
-      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={30} />
+      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={24} />
       <View style={[styles.cellBody, { alignItems: align }]}>
         <AppText style={[styles.cellName, !mine && styles.textRight]} numberOfLines={1}>
           {player.name || 'Unknown player'}
         </AppText>
-        <View style={[styles.cellMeta, mine ? styles.cellRow : styles.cellRowReverse]}>
-          <AppText style={styles.cellTeam} numberOfLines={1}>
-            {player.team || 'FA'}
-            {player.injury_label ? ` · ${player.injury_label}` : ''}
+        <AppText style={[styles.cellTeam, !mine && styles.textRight]} numberOfLines={1}>
+          {player.team || 'FA'}
+          {player.injury_label ? ` · ${player.injury_label}` : ''}
+        </AppText>
+      </View>
+      <View style={[styles.cellPointsBox, { alignItems: mine ? 'flex-end' : 'flex-start' }]}>
+        {valueText ? (
+          <AppText
+            style={[
+              styles.cellPoints,
+              emphasis === 'win' && styles.cellPointsWin,
+              emphasis === 'lose' && styles.cellPointsLose,
+            ]}
+          >
+            {valueText}
           </AppText>
-          {valueText ? (
-            <AppText style={styles.cellPoints}>{valueText}</AppText>
-          ) : (
-            <ToneBadge label="Bye" color={colors.premium} />
-          )}
-        </View>
-        <PointsBar value={points.value} max={maxValue} mine={mine} />
+        ) : (
+          <ToneBadge label="Bye" color={colors.premium} />
+        )}
       </View>
     </TouchableOpacity>
   );
+}
+
+/** One thin edge-to-edge bar splitting the row's points between the sides. */
+function HeadToHeadBar({ share }: { share: number | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.barTrack}>
+      {share != null ? (
+        <>
+          <View style={{ width: `${share}%`, backgroundColor: colors.accent }} />
+          <View style={{ flex: 1, backgroundColor: colors.borderStrong }} />
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+function emphasisFor(winner: ReturnType<typeof rowWinner>, side: 'mine' | 'opponent'): CellEmphasis {
+  if (winner == null || winner === 'tie') return 'even';
+  return winner === side ? 'win' : 'lose';
 }
 
 function LineupComparison({
@@ -585,78 +605,115 @@ function LineupComparison({
         opponent.real_empty_slots ?? [],
       )
     : lineupComparisonRows(mine.starters, opponent.starters);
-  const maxValue = Math.max(
-    0,
-    ...rows.flatMap((row) =>
-      [row.mine, row.opponent].map((cell) => (cell && cell !== 'empty' ? (lineupPlayerPoints(cell).value ?? 0) : 0)),
-    ),
-  );
-  const caption = plan
-    ? 'Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper.'
-    : actual
-    ? 'Lineups as set in Sleeper.'
-    : 'Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.';
+  const totals = lineupTotals(rows);
+  const pointsOf = (cell: LineupPlayer | 'empty' | null) =>
+    cell && cell !== 'empty' ? lineupPlayerPoints(cell).value : null;
+  const caption =
+    (plan
+      ? 'Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper.'
+      : actual
+      ? 'Lineups as set in Sleeper.'
+      : 'Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.') +
+    (hasKickedOff(matchup)
+      ? ' Started games show real points; the rest show projections.'
+      : ' Numbers are this week’s projections.');
+  const evenMargin = Math.abs(totals.margin) < 0.05;
+  const marginColor = evenMargin ? colors.textTertiary : totals.margin > 0 ? colors.successBright : colors.danger;
 
   return (
     <AnimatedCard style={styles.card}>
-      <SectionHeading title="Lineup Comparison" icon="git-compare-outline" />
-      {bestBall || plan ? null : (
-        <SegmentedTabBar
-          options={[
-            { key: 'suggested' as const, label: 'Suggested Lineup' },
-            { key: 'actual' as const, label: 'Actual Lineup' },
-          ]}
-          active={view}
-          onChange={onViewChange}
-        />
-      )}
-      {canPlan || plan ? (
+      <View style={styles.lineupHeader}>
+        <View style={{ flex: 1 }}>
+          <SectionHeading title="Lineup Comparison" icon="git-compare-outline" />
+        </View>
+        <ScreenInfoNote text={caption} label="How it works" />
+      </View>
+      {plan ? (
         <PlannerBar
-          editing={Boolean(plan)}
-          busy={plan?.busy ?? false}
-          error={plan?.error ?? null}
-          baselinePct={plan?.baselinePct ?? null}
-          currentPct={winPercent(plan?.result?.win_probability)}
+          editing
+          busy={plan.busy}
+          error={plan.error ?? null}
+          baselinePct={plan.baselinePct ?? null}
+          currentPct={winPercent(plan.result?.win_probability)}
           leagueId={leagueId}
           onEdit={() => planner.start(view)}
           onReset={planner.resetToSuggested}
           onDone={planner.exit}
         />
-      ) : null}
-      <AppText style={styles.footnote}>
-        {caption}
-        {hasKickedOff(matchup)
-          ? ' Started games show real points; the rest show projections.'
-          : ' Numbers are this week’s projections.'}
-      </AppText>
+      ) : bestBall ? null : (
+        <View style={styles.lineupControls}>
+          <View style={{ flex: 1 }}>
+            <SegmentedTabBar
+              options={[
+                { key: 'suggested' as const, label: 'Suggested' },
+                { key: 'actual' as const, label: 'Actual' },
+              ]}
+              active={view}
+              onChange={onViewChange}
+            />
+          </View>
+          {canPlan ? <Button label="Edit lineup" variant="secondary" size="sm" onPress={() => planner.start(view)} /> : null}
+        </View>
+      )}
       {rows.length === 0 ? (
         <AppText style={styles.emptyNote}>
           {actual ? 'Sleeper hasn’t posted lineups for this week yet.' : 'No startable players on either roster right now.'}
         </AppText>
       ) : (
         <View>
+          <View style={styles.teamHeaderRow}>
+            <AppText style={[styles.teamHeader, { color: colors.accent }]} numberOfLines={1}>
+              {mine.team_name || 'You'}
+            </AppText>
+            <View style={styles.slotCell} />
+            <AppText style={[styles.teamHeader, styles.textRight]} numberOfLines={1}>
+              {opponent.team_name || 'Opponent'}
+            </AppText>
+          </View>
           {rows.map((row, index) => {
             const emptyOrdinal =
               row.mine === 'empty'
                 ? rows.slice(0, index).filter((r) => r.slot === row.slot && r.mine === 'empty').length
                 : 0;
             const editIndex = plan ? slotIndexFor(plan.slots, row.mine, row.slot, emptyOrdinal) : -1;
+            const myPts = pointsOf(row.mine);
+            const theirPts = pointsOf(row.opponent);
+            const winner = rowWinner(myPts, theirPts);
             return (
-            <View key={`${row.slot}-${index}`} style={styles.tableRow}>
-              <LineupCell
-                player={row.mine}
-                mine
-                maxValue={maxValue}
-                onPress={onPressPlayer}
-                onEdit={plan && editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined}
-              />
-              <View style={styles.slotCell}>
-                <PositionBadge position={row.slot} />
+              <View key={`${row.slot}-${index}`}>
+                <View style={styles.tableRow}>
+                  <LineupCell
+                    player={row.mine}
+                    mine
+                    emphasis={emphasisFor(winner, 'mine')}
+                    onPress={onPressPlayer}
+                    onEdit={plan && editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined}
+                  />
+                  <View style={styles.slotCell}>
+                    <PositionBadge position={row.slot} />
+                  </View>
+                  <LineupCell
+                    player={row.opponent}
+                    mine={false}
+                    emphasis={emphasisFor(winner, 'opponent')}
+                    onPress={onPressPlayer}
+                  />
+                </View>
+                <HeadToHeadBar share={headToHeadShare(myPts, theirPts)} />
               </View>
-              <LineupCell player={row.opponent} mine={false} maxValue={maxValue} onPress={onPressPlayer} />
-            </View>
             );
           })}
+          <View style={styles.totalRow}>
+            <View style={styles.totalSide}>
+              <AppText style={styles.totalLabel}>Total</AppText>
+              <AppText style={styles.totalValue}>{totals.mine.toFixed(1)}</AppText>
+            </View>
+            <ToneBadge label={evenMargin ? 'Even' : formatSigned(totals.margin)} color={marginColor} />
+            <View style={[styles.totalSide, { justifyContent: 'flex-end' }]}>
+              <AppText style={styles.totalValue}>{totals.opponent.toFixed(1)}</AppText>
+              <AppText style={styles.totalLabel}>Total</AppText>
+            </View>
+          </View>
         </View>
       )}
     </AnimatedCard>
@@ -830,31 +887,49 @@ function createStyles(colors: ThemeColors) {
     footnote: { fontSize: 11, lineHeight: 15, color: colors.textTertiary },
     rangeToggle: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     emptyNote: { fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingVertical: spacing.md },
-    tableRow: {
-      flexDirection: 'row',
-      alignItems: 'stretch',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+    lineupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    lineupControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    teamHeaderRow: { flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 4 },
+    teamHeader: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      color: colors.textTertiary,
     },
+    tableRow: { flexDirection: 'row', alignItems: 'stretch' },
     cell: { flex: 1, paddingVertical: spacing.sm, minWidth: 0 },
     cellCenter: { justifyContent: 'center' },
-    cellRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    cellRowReverse: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-    cellBody: { flex: 1, gap: 3, minWidth: 0 },
-    cellMeta: { justifyContent: 'space-between', alignSelf: 'stretch' },
+    cellRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    cellRowReverse: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+    cellBody: { flex: 1, minWidth: 0 },
     cellName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, alignSelf: 'stretch' },
     textRight: { textAlign: 'right' },
-    cellTeam: { fontSize: 11, color: colors.textTertiary, flexShrink: 1 },
-    cellPoints: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+    cellTeam: { fontSize: 11, color: colors.textTertiary, alignSelf: 'stretch' },
+    cellPointsBox: { width: 36, justifyContent: 'center' },
+    cellPoints: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    cellPointsWin: { fontWeight: '800' },
+    cellPointsLose: { fontWeight: '500', color: colors.textTertiary },
     emptySlot: { fontSize: 12, fontStyle: 'italic', color: colors.textTertiary },
-    barTrack: { height: 4, alignSelf: 'stretch', borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
-    barFill: { height: '100%' },
+    barTrack: {
+      height: 3,
+      alignSelf: 'stretch',
+      flexDirection: 'row',
+      borderRadius: radii.pill,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
     slotCell: {
       width: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      marginHorizontal: 4,
+      marginHorizontal: 2,
     },
+    totalRow: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.md },
+    totalSide: { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+    totalLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: colors.textTertiary },
+    totalValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
     viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
     moveList: { gap: spacing.sm },
     moveTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
