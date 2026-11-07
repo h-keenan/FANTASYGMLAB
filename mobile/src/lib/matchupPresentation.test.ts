@@ -9,6 +9,9 @@ import {
   lineupComparisonRows,
   lineupPlayerPoints,
   matchupVerdict,
+  headToHeadShare,
+  rowWinner,
+  lineupTotals,
   moveOverLine,
 } from './matchupPresentation.ts';
 
@@ -83,4 +86,22 @@ test("matchupNextAction gives every dead end one next step", () => {
   assert.equal(matchupNextAction("not_a_member_of_league").action, "connect");
   assert.equal(matchupNextAction("something_new").action, "retry");
   assert.equal(matchupActionLabel("retry"), "Try again");
+});
+
+test('headToHeadShare and rowWinner handle missing and zero numbers', () => {
+  assert.equal(headToHeadShare(10, 30), 25);
+  assert.equal(headToHeadShare(null, 30), null);
+  assert.equal(headToHeadShare(0, 0), null);
+  assert.equal(rowWinner(12.04, 12.0), 'tie');
+  assert.equal(rowWinner(15, 12), 'mine');
+  assert.equal(rowWinner(null, 12), null);
+});
+
+test('lineupTotals sums only players with a number', () => {
+  const p = (pts: number) => ({ actual_points: pts, game_started: true }) as never;
+  const totals = lineupTotals([
+    { slot: 'QB', mine: p(20), opponent: p(15) },
+    { slot: 'RB', mine: 'empty', opponent: null },
+  ]);
+  assert.deepEqual(totals, { mine: 20, opponent: 15, margin: 5 });
 });
