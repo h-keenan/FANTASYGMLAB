@@ -139,6 +139,25 @@ function SortedStatTile({
   );
 }
 
+/** Icon-only row actions (compare / add to trade): labelled via aria-label + title on the link. */
+function RowActionGlyph({ name }: { name: "compare" | "trade" }) {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {name === "compare" ? (
+        <>
+          <path d="M8 4v16M4 8l4-4 4 4" />
+          <path d="M16 20V4M12 16l4 4 4-4" />
+        </>
+      ) : (
+        <>
+          <path d="M4 8h13M13 4l4 4-4 4" />
+          <path d="M20 16H7M11 12l-4 4 4 4" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function PlayerRow({
   player,
   leagueId,
@@ -194,15 +213,15 @@ function PlayerRow({
         {player.position && player.position_rank ? (
           <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league or your roster.`} />
         ) : null}
-      </div>
-      <div className="flex items-center gap-2">
         {idpConfidence ? null : (
           <a
             href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold "
-            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+            aria-label="Compare"
+            title="Compare"
+            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] min-w-[var(--touch-target-min)]"
+            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", borderRadius: "var(--radius-control)" }}
           >
-            Compare
+            <RowActionGlyph name="compare" />
           </a>
         )}
         {/* coridian_, 2026-10-20: "a way when searching for players to
@@ -217,10 +236,17 @@ function PlayerRow({
         {idpConfidence ? null : (
           <a
             href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
-            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] px-3 text-xs font-bold "
-            style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
+            aria-label="Add to Trade"
+            title="Add to Trade"
+            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] min-w-[var(--touch-target-min)]"
+            style={{
+              color: "var(--color-accent)",
+              border: "var(--border-width-default) solid var(--color-accent)",
+              borderRadius: "var(--radius-control)",
+              background: "color-mix(in srgb, var(--color-accent) 12%, transparent)",
+            }}
           >
-            Add to Trade
+            <RowActionGlyph name="trade" />
           </a>
         )}
       </div>

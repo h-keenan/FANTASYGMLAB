@@ -8,6 +8,8 @@ export type StatStripItem = {
   tone?: "neutral" | "risk" | "positive" | "premium";
   /** Beginner-only plain-language caption (omit for advanced). */
   note?: string;
+  /** 0..1 standing drawn as a thin meter under the value (see SnapshotTile). */
+  fill?: number | null;
 };
 
 /**

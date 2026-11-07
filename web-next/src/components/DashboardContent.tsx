@@ -1,6 +1,6 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
-import type { MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -11,7 +11,7 @@ import { GlossaryNote } from "@/components/GlossaryNote";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
-import { formatRank } from "@/components/SnapshotTile";
+import { formatRank, rankFill } from "@/components/SnapshotTile";
 import { StatStrip } from "@/components/StatStrip";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
@@ -66,6 +66,22 @@ export function DashboardContent({
   sample?: { onBlockedLink: () => void };
 }) {
   const snapshot = data.team_snapshot;
+  // League size for the rank meters: the team-rankings request the page already
+  // has in flight (no new fetch); the meters simply stay off until it lands.
+  const [leagueSize, setLeagueSize] = useState<number | null>(null);
+  useEffect(() => {
+    if (!teamRankings) return;
+    let cancelled = false;
+    teamRankings.then(
+      (res) => {
+        if (!cancelled && res?.teams?.length) setLeagueSize(res.teams.length);
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [teamRankings]);
   const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(sample ? undefined : leagueId);
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
@@ -136,25 +152,49 @@ export function DashboardContent({
 
       {snapshot ? (
         <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true" aria-label="Team summary">
-          <SectionHeading id="snapshot-heading" action={<ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />}>
+          <SectionHeading
+            id="snapshot-heading"
+            action={
+              <span className="inline-flex items-center gap-3">
+                <BeginnerHelp
+                  popover
+                  lines={[
+                    copy.help("dashboardSnapshot"),
+                    copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null,
+                    copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null,
+                    copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null,
+                    copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null,
+                    copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null,
+                  ]}
+                />
+                <ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />
+              </span>
+            }
+          >
             My Team
           </SectionHeading>
-          <BeginnerHelp term="dashboardSnapshot" />
           <StatStrip
             columns={4}
             items={[
-              { glyph: "record", label: "Record", value: `${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}` },
+              {
+                glyph: "record",
+                label: "Record",
+                value: `${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`,
+                fill: winShare(snapshot.wins, snapshot.losses, snapshot.ties),
+              },
               {
                 glyph: "power",
                 label: "Power Rank",
                 value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
                 tone: snapshot.power_rank === 1 ? "premium" : "neutral",
+                fill: rankFill(snapshot.power_rank, leagueSize),
               },
               {
                 glyph: "franchise",
                 label: "Franchise Rank",
                 value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
                 tone: snapshot.franchise_rank === 1 ? "premium" : "neutral",
+                fill: rankFill(snapshot.franchise_rank, leagueSize),
               },
               {
                 glyph: "age",
@@ -171,12 +211,14 @@ export function DashboardContent({
                 label: "Starter Strength",
                 value: formatRank(snapshot.starter_rank, snapshot.starter_rank_tied),
                 tone: snapshot.starter_rank === 1 ? "premium" : "neutral",
+                fill: rankFill(snapshot.starter_rank, leagueSize),
               },
               {
                 glyph: "bench",
                 label: "Bench Strength",
                 value: formatRank(snapshot.bench_rank, snapshot.bench_rank_tied),
                 tone: snapshot.bench_rank === 1 ? "premium" : "neutral",
+                fill: rankFill(snapshot.bench_rank, leagueSize),
               },
               {
                 glyph: "injury",
@@ -189,15 +231,6 @@ export function DashboardContent({
             ]}
           />
           {sample ? null : <DashboardOddsStrip leagueId={leagueId} leagueName={leagueName} />}
-          {/* Beginner term explanations as short lines under the strips (as
-              per-tile captions inside narrow columns they pushed Today below the fold). */}
-          <div className="flex flex-wrap gap-2 empty:hidden">
-            <BeginnerHelp text={copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null} />
-            <BeginnerHelp text={copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null} />
-            <BeginnerHelp text={copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null} />
-            <BeginnerHelp text={copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null} />
-            <BeginnerHelp text={copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null} />
-          </div>
           <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
         </section>
       ) : null}
@@ -228,6 +261,15 @@ export function DashboardContent({
       )}
     </Shell>
   );
+}
+
+/** Share of decided games won (ties count half); null before any game is played. */
+function winShare(wins: number | null, losses: number | null, ties: number | null): number | null {
+  const w = wins ?? 0;
+  const l = losses ?? 0;
+  const t = ties ?? 0;
+  const games = w + l + t;
+  return games > 0 ? (w + t / 2) / games : null;
 }
 
 function ViewAllLink({ href, label, label2 = "View All →" }: { href: string; label: string; label2?: string }) {
