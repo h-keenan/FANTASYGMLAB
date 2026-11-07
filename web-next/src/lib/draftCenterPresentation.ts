@@ -57,3 +57,36 @@ export function groupPicksBySeason(picks: DraftPickAsset[]): [number, DraftPickA
   }
   return [...bySeason.entries()].sort(([a], [b]) => a - b);
 }
+
+/** Draft card/posture tone -> the same semantic color the `.tone-*` CSS classes use (globals.css). */
+export function draftToneColor(tone: string): string {
+  switch (tone) {
+    case "strength":
+      return "var(--color-success)";
+    case "power":
+    case "strategy":
+      return "var(--color-information)";
+    case "franchise":
+      return "var(--color-premium)";
+    case "need":
+    case "health":
+    case "risk":
+    case "warning":
+    case "weakness":
+      return "var(--color-warning)";
+    case "opportunity":
+      return "var(--color-opportunity)";
+    default:
+      return "var(--color-accent)";
+  }
+}
+
+/** Distinct pick-owning rosters, used as a league-size proxy for rank -> percentile (null under 2). */
+export function leagueSizeFromPicks(picks: DraftPickAsset[]): number | null {
+  const owners = new Set<string>();
+  for (const pick of picks) {
+    if (pick.owner_roster_id) owners.add(pick.owner_roster_id);
+    if (pick.original_roster_id) owners.add(pick.original_roster_id);
+  }
+  return owners.size >= 2 ? owners.size : null;
+}

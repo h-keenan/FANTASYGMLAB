@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -113,15 +114,31 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   );
 }
 
-function Bullets({ title, items, styles }: { title: string; items: string[]; styles: ReturnType<typeof createStyles> }) {
+function Bullets({
+  title,
+  items,
+  styles,
+  icon = 'information-circle',
+  color,
+}: {
+  title: string;
+  items: string[];
+  styles: ReturnType<typeof createStyles>;
+  icon?: keyof typeof Ionicons.glyphMap;
+  color?: string;
+}) {
+  const { colors } = useThemeMode();
   if (!items.length) return null;
   return (
     <View style={styles.bullets}>
       <AppText style={styles.bulletsTitle}>{title}</AppText>
       {items.map((text) => (
-        <AppText key={text} style={styles.bullet}>
-          {'•'} {text}
-        </AppText>
+        <View key={text} style={styles.bulletRow}>
+          <View style={[styles.bulletIcon, color ? { backgroundColor: `${color}26` } : null]}>
+            <Ionicons name={icon} size={12} color={color ?? colors.textSecondary} />
+          </View>
+          <AppText style={styles.bullet}>{text}</AppText>
+        </View>
       ))}
     </View>
   );
@@ -189,7 +206,7 @@ function TeamCard({
           </TouchableOpacity>
           {open ? (
             <>
-              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} />
+              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert-circle" color={toneColor(team.band)} />
               <EfficiencyBars team={team} colors={colors} styles={styles} />
               <Bullets title="Could be innocent" items={team.innocent_explanations} styles={styles} />
             </>
@@ -365,7 +382,16 @@ function createStyles(colors: ThemeColors) {
     link: { fontSize: 12, fontWeight: '700', color: colors.accent },
     bullets: { gap: spacing.xs },
     bulletsTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.textTertiary },
-    bullet: { fontSize: 13, color: colors.textSecondary },
+    bullet: { flex: 1, fontSize: 13, color: colors.textSecondary },
+    bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    bulletIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.border,
+    },
     bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 44 },
     barCol: { flex: 1, alignItems: 'center', gap: 2 },
     barLabel: { fontSize: 10, color: colors.textTertiary },
