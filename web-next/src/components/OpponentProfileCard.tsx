@@ -15,6 +15,7 @@ import {
   rankText,
   type OpponentProfileResponse,
 } from "@/lib/opponentProfile";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 const LABEL_STYLE = { color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" } as const;
 
@@ -125,7 +126,7 @@ export function OpponentProfileCard({
             <>
               <div className="flex items-center gap-2 min-w-0">
                 <PositionBadge position={angle.target.position} />
-                <span className="text-sm font-bold break-words">{angle.target.name}</span>
+                <PlayerNameText name={angle.target.name} threshold={Infinity} className="text-sm font-bold" />
                 {angle.target.team ? (
                   <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                     {angle.target.team}

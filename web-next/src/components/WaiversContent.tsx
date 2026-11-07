@@ -40,6 +40,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { DroppablePlayersSection, NeedsBreakdown, SuggestedDrop } from "@/components/SuggestedDrop";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -273,9 +274,7 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <span className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
+          <PlayerNameText name={player.name || "Unknown player"} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
           <PlayerMetaLine injuryStatus={injury.label}>
             {player.team || "FA"}
             {contextLine ? ` · ${contextLine}` : ""}
@@ -334,9 +333,7 @@ function PlayerTile({ position, player, note }: { position: string; player: Waiv
         <PositionBadge position={position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="md" />
-        <span className="text-sm font-extrabold break-words max-w-full" style={{ color: "var(--color-text-primary)" }}>
-          {player.name || "Unknown"}
-        </span>
+        <PlayerNameText name={player.name || "Unknown"} className="text-sm font-extrabold text-center" style={{ color: "var(--color-text-primary)" }} />
         <div className="flex flex-col items-center gap-0.5">
           <ValueStat value={formatWaiverScore(player.score)} align="center" />
           {note ? (

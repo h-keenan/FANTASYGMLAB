@@ -199,7 +199,9 @@ describe("WaiversContent", () => {
 
     const box = screen.getByTestId("suggested-drop");
     expect(box).toHaveTextContent("Add Test Free Agent, drop Dead Weight");
-    expect(screen.getByTestId("swap-add")).toHaveTextContent("Test Free Agent");
+    // 15 chars is over the narrow-tile threshold: shown as "F. Lastname", full name kept in title.
+    expect(screen.getByTestId("swap-add")).toHaveTextContent("T. Free Agent");
+    expect(screen.getByTestId("swap-add").querySelector('[title="Test Free Agent"]')).not.toBeNull();
     expect(screen.getByTestId("swap-drop")).toHaveTextContent("Dead Weight");
     expect(screen.getByTestId("swap-reasons")).toHaveTextContent("never starts in your best lineup");
     expect(screen.getByTestId("swap-effect")).toHaveTextContent("+4 pts / 9 wks");
