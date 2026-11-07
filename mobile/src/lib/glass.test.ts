@@ -23,7 +23,7 @@ test('secondary and muted text stay AA-readable on glass over their normal backg
     assert.ok(contrastRatio([0xe5, 0xe7, 0xeb], fill) >= 4.5, `dark secondary on ${bg}`);
     assert.ok(contrastRatio([0xa8, 0xad, 0xb7], fill) >= 4.5, `dark muted on ${bg}`);
   }
-  for (const bg of ['#eef3f6', '#e6edf1']) {
+  for (const bg of ['#d9e3ea', '#cbd8e1']) {
     const fill = compositeOver(lightGlass.glass, bg);
     assert.ok(contrastRatio([0x3b, 0x4a, 0x56], fill) >= 4.5, `light secondary on ${bg}`);
     assert.ok(contrastRatio([0x57, 0x64, 0x6f], fill) >= 4.5, `light muted on ${bg}`);

@@ -148,17 +148,17 @@ const darkColors = {
  * text here).
  */
 const lightColors = {
-  background: '#eef3f6',
-  backgroundElevated: '#e6edf1',
-  surface: '#ffffff',
-  surfaceSolid: '#ffffff',
-  border: '#c7d3da',
-  borderStrong: '#5d6b77',
+  background: '#d9e3ea',
+  backgroundElevated: '#cddae4',
+  surface: '#f8fbfd',
+  surfaceSolid: '#f8fbfd',
+  border: '#8497a5',
+  borderStrong: '#475765',
   cardBorder: 'rgba(5,110,124,0.25)',
   hairline: 'rgba(10,30,45,0.08)',
   ...lightGlass,
   textPrimary: '#101820',
-  textSecondary: '#3b4a56',
+  textSecondary: '#34424d',
   // Color-system audit (2026-09-25): darkened from #6B8494 — that value hit
   // only 3.13:1 against `backgroundElevated` and 3.92:1 against `surface`,
   // both under WCAG AA's 4.5:1 (this is the light-mode "secondary text is
@@ -167,7 +167,7 @@ const lightColors = {
   // `background`) while staying a visible step above the new `textDisabled`
   // below and a visible step below `textSecondary`. Old value preserved as
   // `textDisabled` rather than discarded — same rationale as darkColors.
-  textTertiary: '#57646f',
+  textTertiary: '#4a5762',
   // Genuinely inactive/disabled content — see darkColors.textDisabled for
   // the split rationale. Intentionally under AA (3.13-3.92:1 depending on
   // surface): WCAG's text-contrast minimums don't apply to disabled
@@ -180,23 +180,23 @@ const lightColors = {
   // own comments describe; reusing its exact values keeps both platforms'
   // light themes in sync instead of maintaining two independently-tuned
   // answers to the same contrast problem.
-  accent: '#056e7c',
+  accent: '#005f70',
   accentSoft: '#0891a3',
-  accentMuted: 'rgba(6,110,124,0.16)',
+  accentMuted: 'rgba(0,95,112,0.2)',
   // On-tint text/icon variant for cyan content painted over an
   // `accentMuted` fill or the pale `backgroundElevated` sheet surface —
   // web-next's --color-accent-strong, its own stronger/on-tint variant.
-  accentOnTint: '#08616e',
-  accentStrong: '#08616e',
+  accentOnTint: '#00505f',
+  accentStrong: '#00505f',
   // Light theme's accent is a dark teal, so white reads cleanly on it.
   onAccent: '#FFFFFF',
-  danger: '#c81111',
-  dangerMuted: 'rgba(239,68,68,0.16)',
-  success: '#147337',
+  danger: '#ab0a1c',
+  dangerMuted: 'rgba(225,30,50,0.2)',
+  success: '#066626',
   successBright: '#22C55E',
-  successMuted: 'rgba(34,197,94,0.16)',
-  warning: '#8a5906',
-  warningMuted: 'rgba(245,158,11,0.16)',
+  successMuted: 'rgba(10,150,60,0.22)',
+  warning: '#8f4200',
+  warningMuted: 'rgba(235,110,0,0.22)',
   // Color-system audit (2026-09-25): darkened from #B8860B, which measured
   // only 3.25:1 on a plain white surface (fails AA's 4.5:1) and a
   // near-invisible 2.86:1 when used as chip text directly on its own
@@ -205,15 +205,15 @@ const lightColors = {
   // #8A6508 clears 5.32:1 on white and 4.68:1 on the premiumMuted-tinted
   // composite, matching the ~AA-plus target `danger`/`success` already hit
   // as plain text (4.81:1 / 4.42:1) without drifting the hue toward brown.
-  premium: '#8A6508',
-  premiumMuted: 'rgba(184,134,11,0.12)',
+  premium: '#7a5200',
+  premiumMuted: 'rgba(240,170,0,0.28)',
   // onPremium on premiumFill is ~9.8:1 (AA). The glow is a deeper amber so it reads on white.
-  premiumFill: '#D79A14',
+  premiumFill: '#F2A900',
   onPremium: '#140E00',
   premiumGlow: '#BE7D00',
-  badgeBackground: 'rgba(5,110,124,0.12)',
-  badgeText: '#056e7c',
-  violet: '#5f52c8',
+  badgeBackground: 'rgba(0,95,112,0.18)',
+  badgeText: '#005f70',
+  violet: '#4535c4',
   // Color-system audit (2026-10-03): see darkColors.diagnosticText for why
   // this is its own token rather than `success`. Unlike every other pair in
   // this file, dark and light share one literal value on purpose: this text
@@ -457,7 +457,7 @@ export const lightGradients = {
    * this is already near the practical ceiling). `textPrimary` clears
    * ~15.5:1 against it, no concern there.
    */
-  headerWash: ['#EEF3F6', '#EEF3F6'] as const,
+  headerWash: ['#d9e3ea', '#d9e3ea'] as const,
 };
 
 /**

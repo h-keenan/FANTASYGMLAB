@@ -263,32 +263,32 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --color-bg: #ecf1f5;
-    --color-shell: #d8e1e7;
-    --color-surface-primary: #d5dfe6;
-    --color-surface-secondary: #cbd7df;
-    --color-surface-raised: #dde6ec;
-    --color-surface-muted: #bfcdd7;
+    --color-bg: #d9e3ea;
+    --color-shell: #cbd8e1;
+    --color-surface-primary: #f8fbfd;
+    --color-surface-secondary: #e9f0f5;
+    --color-surface-raised: #ffffff;
+    --color-surface-muted: #cddae4;
     --color-text-primary: #101820;
     --color-text-secondary: #34424d;
     --color-text-muted: #4a5762;
-    --color-border: #9eaeb9;
-    --color-border-strong: #5d6b77;
+    --color-border: #8497a5;
+    --color-border-strong: #475765;
 
-    --color-accent: #045f6c;
-    --color-accent-strong: #08616e;
+    --color-accent: #005f70;
+    --color-accent-strong: #00505f;
     --color-on-accent: #ffffff;
-    --color-accent-soft: rgba(6, 110, 124, 0.16);
-    --color-success: #147337;
-    --color-opportunity: #0c7065;
-    --color-action: #796103;
-    --color-warning: #8a5906;
-    --color-danger: #c81111;
-    --color-diagnostic: #5f52c8;
+    --color-accent-soft: rgba(0, 95, 112, 0.2);
+    --color-success: #066626;
+    --color-opportunity: #00645a;
+    --color-action: #7a5200;
+    --color-warning: #8f4200;
+    --color-danger: #ab0a1c;
+    --color-diagnostic: #4535c4;
     --color-muted: rgba(16, 24, 32, 0.45);
     --color-information: var(--color-accent);
     --color-premium: var(--color-action);
-    --color-premium-fill: #d79a14;
+    --color-premium-fill: #f2a900;
     --color-on-premium: #140e00;
     --color-premium-glow: rgba(190, 125, 0, 0.8);
     --color-premium-glow-soft: rgba(190, 125, 0, 0.42);
@@ -321,17 +321,32 @@
     --color-position-db: #4338ca;
     --color-position-flex: #3f3f46;
 
-    --color-success-soft: rgba(34, 197, 94, 0.16);
-    --color-opportunity-soft: rgba(20, 184, 166, 0.16);
-    --color-action-soft: rgba(250, 204, 21, 0.18);
-    --color-warning-soft: rgba(245, 158, 11, 0.16);
-    --color-danger-soft: rgba(239, 68, 68, 0.16);
-    --color-information-soft: rgba(103, 232, 249, 0.2);
-    --color-diagnostic-soft: rgba(139, 147, 255, 0.16);
-    --color-muted-soft: rgba(16, 24, 32, 0.06);
+    --color-success-soft: rgba(10, 150, 60, 0.22);
+    --color-opportunity-soft: rgba(0, 160, 145, 0.22);
+    --color-action-soft: rgba(240, 170, 0, 0.28);
+    --color-warning-soft: rgba(235, 110, 0, 0.22);
+    --color-danger-soft: rgba(225, 30, 50, 0.2);
+    --color-information-soft: rgba(0, 150, 175, 0.22);
+    --color-diagnostic-soft: rgba(90, 70, 240, 0.2);
+    --color-muted-soft: rgba(16, 24, 32, 0.1);
 
-    --focus-ring: 0 0 0 3px rgba(6, 110, 124, 0.45);
-    --shadow-surface-inset: inset 0 1px 0 rgba(10, 30, 45, 0.05);
+    --focus-ring: 0 0 0 3px rgba(0, 95, 112, 0.5);
+    --shadow-surface-inset: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+    /* Real elevation in light mode: dark's hard 3px offset reads as a
+       smudge on a pale page, so light uses a tight contact shadow plus a
+       soft ambient one, tinted to the page hue. */
+    --shadow-control: 0 1px 2px rgba(15, 40, 60, 0.28), 0 2px 6px rgba(15, 40, 60, 0.12);
+    --shadow-card: 0 1px 2px rgba(15, 40, 60, 0.24), 0 6px 18px rgba(15, 40, 60, 0.16);
+    --shadow-overlay: 0 12px 36px rgba(15, 40, 60, 0.34);
+    /* Tone chips: stronger fill plus a hairline ring so they separate from
+       the card the way dark's saturated tints do. */
+    --pill-active-bg: var(--color-accent);
+    --pill-active-fg: var(--color-on-accent);
+    --segmented-active-bg: var(--color-accent);
+    --segmented-active-fg: var(--color-on-accent);
+    --chip-fill-pct: 18%;
+    --chip-ring-pct: 40%;
 
     color-scheme: light;
   }
@@ -400,13 +415,14 @@ body {
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --glass-bg: linear-gradient(165deg, rgba(221, 230, 236, 0.92), rgba(205, 217, 225, 0.9));
-    --glass-border: rgba(10, 30, 45, 0.2);
+    --glass-bg: linear-gradient(165deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 250, 0.94));
+    --glass-border: rgba(10, 30, 45, 0.3);
     --glass-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.45),
-      0 12px 28px rgba(10, 30, 45, 0.16);
-    --glass-input-bg: rgba(255, 255, 255, 0.5);
-    --glass-input-border: rgba(10, 30, 45, 0.22);
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 2px 4px rgba(15, 40, 60, 0.18),
+      0 14px 30px rgba(15, 40, 60, 0.2);
+    --glass-input-bg: rgba(255, 255, 255, 0.95);
+    --glass-input-border: rgba(10, 30, 45, 0.38);
   }
 }
 /* Write backdrop-filter WITHOUT a hand-written -webkit- twin: with both, the
@@ -482,9 +498,9 @@ body {
 }
 @media (prefers-color-scheme: light) {
   body {
-    --color-surface-primary: rgba(213, 223, 230, 0.88);
-    --color-surface-secondary: rgba(203, 215, 223, 0.88);
-    --color-surface-raised: rgba(221, 230, 236, 0.9);
+    --color-surface-primary: rgba(250, 252, 254, 0.94);
+    --color-surface-secondary: rgba(233, 240, 245, 0.94);
+    --color-surface-raised: rgba(255, 255, 255, 0.97);
   }
 }
 
@@ -1889,6 +1905,15 @@ body:has(.fd-landing-dark) {
   --color-muted-soft: rgba(229, 231, 235, 0.06);
   --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
   --shadow-surface-inset: inset 0 1px 0 rgba(248, 250, 252, 0.025);
+  --shadow-control: 0 2px 0 rgba(0, 0, 0, 0.32);
+  --shadow-card: 0 3px 0 rgba(0, 0, 0, 0.34);
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.46);
+  --chip-fill-pct: 15%;
+  --chip-ring-pct: 0%;
+  --segmented-active-bg: var(--color-information-soft);
+  --segmented-active-fg: var(--color-text-primary);
+  --pill-active-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --pill-active-fg: var(--color-accent);
   color-scheme: dark;
 }
 body:has(.fd-landing-dark) {

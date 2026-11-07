@@ -5,9 +5,9 @@ import { SkeletonBlock } from "@/components/Skeleton";
 
 function chipStyle(active: boolean) {
   return {
-    color: active ? "var(--color-accent)" : "var(--color-text-secondary)",
+    color: active ? "var(--pill-active-fg, var(--color-accent))" : "var(--color-text-secondary)",
     border: `1px solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
-    background: active ? "color-mix(in srgb, var(--color-accent) 12%, transparent)" : "var(--color-surface-muted)",
+    background: active ? "var(--pill-active-bg, color-mix(in srgb, var(--color-accent) 12%, transparent))" : "var(--color-surface-muted)",
     borderRadius: "var(--radius-pill)",
     minHeight: "2.5rem",
   } as const;
