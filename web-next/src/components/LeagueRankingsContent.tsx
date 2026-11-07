@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 
+import { AccentCard } from "@/components/AccentCard";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { Button } from "@/components/Button";
+import { ValueRing } from "@/components/ValueRing";
 import { api, type LeagueTeamRankingsResponse, type PlayoffOddsResponse, type PlayoffOddsTeam, type TeamRanking } from "@/lib/api";
 import {
   boardSecondaryParts,
@@ -136,6 +139,81 @@ export function RankingRow({
   );
 }
 
+function ringTone(percent: number): "low" | "mid" | "high" {
+  return percent < 34 ? "low" : percent < 67 ? "mid" : "high";
+}
+
+/** "You" hero above the boards: Roster Power percentile ring, record, and the other four ranks as mini bars. */
+function YourStandingCard({ teams, myRosterId }: { teams: TeamRanking[]; myRosterId: string }) {
+  const me = myRosterId ? teams.find((team) => team.roster_id === myRosterId) : undefined;
+  if (!me) return null;
+  const total = teams.length;
+  const powerPercent = percentileFromRank(me.power_rank, total);
+  const ring = powerPercent === null ? null : Math.round(powerPercent);
+  const minis: { key: RankBoardKey; label: string }[] = [
+    { key: "franchise", label: "Franchise" },
+    { key: "draft_capital", label: "Draft Capital" },
+    { key: "starter", label: "Starters" },
+    { key: "bench", label: "Bench" },
+  ];
+  return (
+    <section aria-label="Your standing" data-testid="your-standing">
+    <AccentCard accent="var(--color-accent)" as="div">
+      <div className="flex items-center gap-3">
+        <ValueRing
+          percent={ring}
+          tone={ring === null ? "mid" : ringTone(ring)}
+          display={ring === null ? "—" : `${ring}`}
+          ariaLabel={ring === null ? "Roster Power percentile unavailable" : `Roster Power percentile ${ring}`}
+          size="md"
+        />
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-xs font-extrabold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            Your standing
+          </span>
+          <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            Roster Power {formatRank(me.power_rank, me.power_rank_tied)} of {total}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {me.record_label ? `Record ${me.record_label}` : "Record not available"}
+            {me.standing_rank != null ? ` · Standings ${formatRank(me.standing_rank)}` : ""}
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+        {minis.map(({ key, label }) => {
+          const config = RANK_BOARD_CONFIG[key];
+          const rank = me[config.rankField] as number | null;
+          const tied = Boolean(me[config.tiedField]);
+          const percentile = percentileFromRank(rank, total);
+          return (
+            <div key={key} className="flex flex-col gap-1 min-w-0">
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
+                <span className="font-extrabold" style={{ color: metricToneColor(percentile) }}>
+                  {formatRank(rank, tied)}
+                </span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={`${label} percentile`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percentile === null ? 0 : Math.round(percentile)}
+                className="h-1.5 w-full"
+                style={{ background: "var(--color-surface-muted)" }}
+              >
+                <div className="h-full" style={{ width: `${percentile === null ? 0 : Math.round(percentile)}%`, background: metricToneColor(percentile) }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </AccentCard>
+    </section>
+  );
+}
+
 type OpenManager = (rosterId: string, teamName: string, ownerName: string | null, avatarUrl: string | null) => void;
 
 function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTeamRankingsResponse; myRosterId: string; onOpenManager: OpenManager }) {
@@ -150,9 +228,7 @@ function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTea
         >
           {title}
         </SectionHeading>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {data.standings_message || "Standings will populate once regular-season results are available."}
-        </p>
+        <EmptyState title={data.standings_message || "Standings will populate once regular-season results are available."} />
       </section>
     );
   }
@@ -269,14 +345,9 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
         <BeginnerHelp term="playoffOddsTerms" />
       </div>
       {state === "idle" ? (
-        <button
-          type="button"
-          onClick={calculate}
-          className="self-start px-4 py-2.5 text-sm font-bold"
-          style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
-        >
+        <Button onClick={calculate} className="self-start">
           Calculate playoff odds
-        </button>
+        </Button>
       ) : null}
       {state === "loading" ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -383,11 +454,10 @@ export function LeagueRankingsContent({
       </header>
 
       {notReady ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {teamRankingsReasonMessage(data.reason)}
-        </p>
+        <EmptyState title="Rankings aren't ready yet" subtitle={teamRankingsReasonMessage(data.reason)} />
       ) : (
         <>
+          <YourStandingCard teams={data.teams} myRosterId={myRosterId} />
           <StandingsSection data={data} myRosterId={myRosterId} onOpenManager={openManager} />
           <PlayoffOddsSection leagueId={leagueId} leagueName={leagueName} myRosterId={myRosterId} myTeam={data.teams.find((team) => team.roster_id === myRosterId)} />
           <RankBoardSection board="power" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
