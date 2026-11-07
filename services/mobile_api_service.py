@@ -871,7 +871,7 @@ def require_user(
     config = auth_supabase.get_supabase_config()
     if not auth_supabase.is_configured(config):
         raise HTTPException(status_code=503, detail="Accounts are not configured.")
-    user, error = auth_supabase.fetch_auth_user(config, token)
+    user, error = auth_supabase.fetch_auth_user_cached(config, token)
     if not user:
         raise HTTPException(status_code=401, detail=error or "Invalid or expired session.")
     normalized = auth_supabase.normalize_auth_user(user, access_token=token)
@@ -908,7 +908,7 @@ def _resolve_espn_login(token: str) -> tuple[str, Any] | None:
     config = auth_supabase.get_supabase_config()
     found: tuple[str, Any] | None = None
     if auth_supabase.is_configured(config):
-        user, _error = auth_supabase.fetch_auth_user(config, token)
+        user, _error = auth_supabase.fetch_auth_user_cached(config, token)
         user_id = str((user or {}).get("id") or "")
         if user_id:
             credentials = espn_credentials.load(config, token, user_id=user_id)
@@ -971,7 +971,7 @@ def optional_user(
         config = auth_supabase.get_supabase_config()
         if not auth_supabase.is_configured(config):
             return None
-        user, _error = auth_supabase.fetch_auth_user(config, token)
+        user, _error = auth_supabase.fetch_auth_user_cached(config, token)
     except Exception:
         return None
     if not user:
