@@ -12,9 +12,15 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
+const lastLeague: { current: { league_id: string; league_name: string } | null } = { current: null };
+vi.mock("@/lib/api", () => ({
+  api: { getDevicePreferences: () => Promise.resolve({ last_league: lastLeague.current }) },
+}));
+
 describe("LeagueLinkStep", () => {
   beforeEach(() => {
     rows.current = [];
+    lastLeague.current = null;
   });
 
   it("links straight into the only saved league", async () => {
@@ -30,6 +36,16 @@ describe("LeagueLinkStep", () => {
     ];
     render(<LeagueLinkStep step="alerts" label="See news on your players" pickLabel="Pick a league for your alerts" />);
     expect(await screen.findByRole("link", { name: /Pick a league for your alerts/ })).toHaveAttribute("href", "/portfolio");
+  });
+
+  it("links into the last-opened league when there are several", async () => {
+    rows.current = [
+      { league_id: "L1", league_name: "A" },
+      { league_id: "L2", league_name: "B" },
+    ];
+    lastLeague.current = { league_id: "L2", league_name: "B" };
+    render(<LeagueLinkStep step="trade-analyzer" label="Analyze a trade" pickLabel="Pick a league" />);
+    expect(await screen.findByRole("link", { name: /Analyze a trade/ })).toHaveAttribute("href", "/trade-analyzer/L2?name=B");
   });
 
   it("renders nothing when there is no saved league", async () => {
