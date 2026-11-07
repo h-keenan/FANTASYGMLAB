@@ -11,6 +11,8 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
+import { AccentCard } from "@/components/AccentCard";
+import { EventTypeGlyph, EventTypePill } from "@/components/EventTypeGlyph";
 import {
   ROSTER_RELATIONSHIP_LABEL,
   alertsReasonMessage,
@@ -62,16 +64,20 @@ import { PageTitle } from "@/components/PageTitle";
 function AlertIdentityChip({ alert }: { alert: AlertItem }) {
   const row = (
     <>
-      <PositionBadge position={alert.matched_player_position} />
-      <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={28} />
-      <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-        {alert.matched_player}
-      </span>
-      {alert.matched_player_team ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {alert.matched_player_team}
+      <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={40} />
+      <span className="flex flex-col min-w-0">
+        <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
+          {alert.matched_player}
         </span>
-      ) : null}
+        <span className="flex items-center gap-1.5">
+          <PositionBadge position={alert.matched_player_position} />
+          {alert.matched_player_team ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {alert.matched_player_team}
+            </span>
+          ) : null}
+        </span>
+      </span>
     </>
   );
   if (!alert.matched_player_id) {
@@ -99,15 +105,34 @@ export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: 
   const sourceBit = alert.source ? `Source: ${alert.source}` : null;
   const time = relativeTime(alert.published_ts);
   const hasLink = Boolean(alert.link);
+  const accent = eventTypeColorVar(alert.event_type);
 
   const body = (
     <>
       <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className="inline-flex items-center justify-center shrink-0"
+          style={{
+            width: "1.5rem",
+            height: "1.5rem",
+            borderRadius: "var(--radius-pill)",
+            color: accent,
+            background: `color-mix(in srgb, ${accent} 15%, transparent)`,
+          }}
+        >
+          <EventTypeGlyph eventType={alert.event_type} size={13} />
+        </span>
         {!alert.read ? (
           <span
             aria-label="Unread"
             className="inline-block"
-            style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--color-accent)" }}
+            style={{
+              width: "9px",
+              height: "9px",
+              borderRadius: "50%",
+              background: "var(--color-accent)",
+              boxShadow: "0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent)",
+            }}
           />
         ) : null}
         {relationship ? (
@@ -131,7 +156,7 @@ export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: 
       ) : null}
 
       <p
-        className="text-sm font-bold mt-1"
+        className={`text-sm mt-1 ${alert.read ? "font-bold" : "font-extrabold"}`}
         style={{ color: alert.read ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}
       >
         {alert.title}
@@ -166,7 +191,7 @@ export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: 
     // it and wins the tap), same "stretched link" layout noted on
     // AlertIdentityChip above.
     return (
-      <div className="relative block py-3" style={{ ...rowStyle, borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+      <AccentCard accent={alert.read ? "var(--color-border-strong)" : accent} compact className="relative" style={rowStyle}>
         {body}
         <a
           href={alert.link ?? "#"}
@@ -176,11 +201,12 @@ export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: 
           aria-label={alert.title ?? "Open article"}
           className="absolute inset-0"
         />
-      </div>
+      </AccentCard>
     );
   }
 
   return (
+    <AccentCard accent={alert.read ? "var(--color-border-strong)" : accent} compact style={rowStyle}>
     <div
       role="button"
       tabIndex={0}
@@ -188,11 +214,11 @@ export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: 
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") onOpen(alert);
       }}
-      className="block py-3 cursor-pointer"
-      style={{ ...rowStyle, borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+      className="block cursor-pointer"
     >
       {body}
     </div>
+    </AccentCard>
   );
 }
 
@@ -267,17 +293,9 @@ export function AlertsContent({
             return (
               <section key={`${group.eventType ?? "other"}-${index}`} className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="inline-block" style={{ width: "3px", height: "0.8rem", background: accent }} />
-                  <span
-                    className="uppercase font-extrabold text-xs"
-                    style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}
-                  >
-                    {eventTypeLabel(group.eventType)}
-                  </span>
+                  <EventTypePill eventType={group.eventType} label={eventTypeLabel(group.eventType)} color={accent} />
                 </div>
-                <div
-                  className="glass-surface px-3"
-                >
+                <div className="flex flex-col gap-2">
                   {group.alerts.map((alert) => (
                     <AlertRow key={alert.alert_key} alert={alert} onOpen={openAndMarkRead} />
                   ))}

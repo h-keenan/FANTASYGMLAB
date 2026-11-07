@@ -15,6 +15,8 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { SharedTradesFeed } from "@/components/SharedTradesFeed";
 import type { SharedCommunityTrade } from "@/lib/api";
 import { Toggle } from "@/components/Toggle";
+import { AccentCard } from "@/components/AccentCard";
+import { AnonymousTeamPair, NetEdgeBar } from "@/components/TradeOutcomeHeader";
 
 /**
  * Social/community layer (docs/roadmap.md), coridian_ 2026-10-19: an
@@ -96,9 +98,13 @@ function CommunityTradeCard({
     value: item.value,
   });
 
+  const accent = verdictToneColorVar(item.verdict);
+  const netPct = item.value?.net_delta_pct ?? null;
+
   return (
-    <article className="glass-surface flex flex-col gap-2 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <AccentCard accent={accent} className="gap-2">
+      <div className="flex items-start gap-3">
+        <AnonymousTeamPair color={accent} />
         <div className="flex flex-col min-w-0">
           <h3 style={{ font: "var(--font-card-title)" }}>Team A traded with Team B</h3>
           {date ? (
@@ -109,7 +115,18 @@ function CommunityTradeCard({
         </div>
       </div>
 
-      <VerdictCallout color={verdictToneColorVar(item.verdict)} label={item.verdict_label} detail={detailText} />
+      <VerdictCallout color={accent} label={item.verdict_label} detail={detailText} />
+      {netPct !== null ? (
+        <NetEdgeBar
+          netPct={netPct}
+          label={
+            <>
+              <span>Team B ahead</span>
+              <span>Team A ahead</span>
+            </>
+          }
+        />
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
         <ExchangeSide label="Team A sent" dotColor="var(--color-danger)" assets={toCommunityTradeAssets(item.send)} />
@@ -125,7 +142,7 @@ function CommunityTradeCard({
         reactionEmoji={reactionEmoji}
         onReact={(emoji, active) => onReact(item.id, emoji, active)}
       />
-    </article>
+    </AccentCard>
   );
 }
 
@@ -162,8 +179,13 @@ export function CommunityTradesContent({
           unexpectedly good or bad outcome once the trade had a few weeks to play out, the same system behind your
           own Trade History.
         </InfoTip>
-        <div className="flex items-center justify-between gap-3 mt-1 p-3" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
-          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+        <AccentCard accent="var(--color-information)" compact className="mt-1">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0" style={{ color: "var(--color-information)" }}>
+              <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+              <path d="M5.5 7V5a2.5 2.5 0 015 0v2" />
+            </svg>
             I don&apos;t want MY trades to appear in this feed
           </span>
           <Toggle
@@ -177,6 +199,7 @@ export function CommunityTradesContent({
             }}
           />
         </div>
+        </AccentCard>
       </header>
 
       {trades.length === 0 ? (
