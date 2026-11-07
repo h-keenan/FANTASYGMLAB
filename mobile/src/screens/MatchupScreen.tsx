@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import PlayerNameText from '../components/PlayerNameText';
 import PageTitle from '../components/PageTitle';
 import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
@@ -519,9 +520,7 @@ function LineupCell({
     >
       <PlayerAvatar playerId={player.player_id} tier={player.tier} size={24} />
       <View style={[styles.cellBody, { alignItems: align }]}>
-        <AppText style={[styles.cellName, !mine && styles.textRight]} numberOfLines={1}>
-          {player.name || 'Unknown player'}
-        </AppText>
+        <PlayerNameText name={player.name || 'Unknown player'} style={[styles.cellName, !mine && styles.textRight]} />
         <AppText style={[styles.cellTeam, !mine && styles.textRight]} numberOfLines={1}>
           {player.team || 'FA'}
           {player.injury_label ? ` · ${player.injury_label}` : ''}
@@ -734,10 +733,10 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
       </View>
       <PlayerAvatar playerId={move.start.player_id} tier={move.start.tier} size={40} />
       <View style={styles.moveBody}>
-        <AppText style={styles.moveTitle} numberOfLines={1}>
-          <AppText style={{ color: colors.successBright }}>Start </AppText>
-          {move.start.name || 'Unknown player'}
-        </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+          <AppText style={[styles.moveTitle, { color: colors.successBright }]}>Start </AppText>
+          <PlayerNameText name={move.start.name || 'Unknown player'} style={[styles.moveTitle, { flexShrink: 1 }]} threshold={20} />
+        </View>
         <AppText style={styles.moveSub} numberOfLines={1}>
           {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : move.start_note || 'No projection yet'}
         </AppText>
