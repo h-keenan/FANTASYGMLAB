@@ -7,7 +7,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
-import AnimatedCard from '../components/AnimatedCard';
+import AccentCard from '../components/AccentCard';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -295,17 +295,22 @@ export default function AlertsScreen({ route, navigation }: Props) {
                   {eventTypeLabel(group.eventType)}
                 </AppText>
               </View>
-              <AnimatedCard style={styles.groupCard}>
-                {group.alerts.map((alert, index) => (
-                  <AlertRow
+              <View style={styles.groupCards}>
+                {group.alerts.map((alert) => (
+                  <AccentCard
                     key={alert.alert_key}
-                    alert={alert}
-                    showDivider={index < group.alerts.length - 1}
-                    onPress={() => openAndMarkRead(alert)}
-                    onPressPlayer={() => openPlayer(alert)}
-                  />
+                    accent={alert.read ? colors.border : accentColor}
+                    compact
+                  >
+                    <AlertRow
+                      alert={alert}
+                      showDivider={false}
+                      onPress={() => openAndMarkRead(alert)}
+                      onPressPlayer={() => openPlayer(alert)}
+                    />
+                  </AccentCard>
                 ))}
-              </AnimatedCard>
+              </View>
             </View>
           );
         }}
@@ -397,17 +402,17 @@ function AlertRow({
 
 function createRowStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    row: { paddingVertical: spacing.sm + 2 },
+    row: { paddingVertical: 0 },
     rowRead: { opacity: 0.6 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-    unreadDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.accent },
+    unreadDot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: colors.accent },
     relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
     relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
     metaSpacer: { flex: 1 },
     time: { fontSize: 11, color: colors.textTertiary },
     linkChevron: { marginLeft: spacing.xs },
-    title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: 3 },
+    title: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: 3 },
     titleRead: { fontWeight: '500', color: colors.textSecondary },
     summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
     // Matches PlayerDetailScreen's modalSpeculative treatment for the same
@@ -442,7 +447,7 @@ function createStyles(colors: ThemeColors) {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
+    groupCards: { gap: spacing.sm },
     error: {
       color: colors.danger,
       paddingHorizontal: spacing.lg,
