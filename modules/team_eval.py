@@ -435,6 +435,16 @@ def _value_matched_points(
     return estimates
 
 
+def _listed_backup(df: pd.DataFrame) -> List[bool]:
+    """True for a player the team's own depth chart lists behind a starter
+    (``depth_chart_order`` >= 2). Missing/unknown order is not a backup."""
+
+    if "depth_chart_order" not in df.columns:
+        return [False] * len(df)
+    order = pd.to_numeric(df["depth_chart_order"], errors="coerce")
+    return [bool(v >= 2) if pd.notna(v) else False for v in order]
+
+
 def _assign_weekly_lineup(
     df: pd.DataFrame,
     assign_slots,
@@ -509,10 +519,22 @@ def _assign_weekly_lineup(
         # the tiebreak. Locked-in starters are placed first: they keep their
         # slots no matter what this week's projections say.
         sort_scores = df["sort_score"].tolist()
+        listed_backup = _listed_backup(df)
+        unprojected_backup = [
+            listed_backup[i] and not projected_mask[i] and not (idp_rows[i] or def_rows[i]) for i in range(n)
+        ]
         selection_order = sorted(
             eligible,
             key=lambda i: (
                 not locked_in[i],
+                # An unprojected depth-chart backup is a value-matched guess,
+                # not a forecast (coridian_, 2026-11-07: "suggested lineup
+                # wants me to start someone with no projection" - a backup QB
+                # with a dynasty-value estimate beat projected players). He
+                # only starts when no projected player can fill the slot. A
+                # player with no depth listing (e.g. back from injury) keeps
+                # the value-matched estimate.
+                unprojected_backup[i],
                 -float(sort_scores[i] if (idp_rows[i] or def_rows[i]) else estimates[i]),
             ),
         )

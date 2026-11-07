@@ -225,3 +225,19 @@ def test_weekly_mode_respects_1330_slot_rules():
     assert lineup["rb3"]["slot"] == "WR/RB"
     assert lineup["te2"]["slot"] == "FLEX"
     assert lineup_open_slots(lineup_df, settings) == []
+
+
+def test_unprojected_depth_chart_backup_does_not_start_over_projected_player():
+    # coridian_, 2026-11-07: a QB2 with no projection (listed behind the
+    # starter) was suggested over projected players. His value-matched
+    # estimate (5.0) beats the weak projected leftovers for SUPER_FLEX.
+    roster = _roster()
+    roster["depth_chart_order"] = [2 if pid == "qb2" else 1 for pid in roster["player_id"]]
+    points = {"qb1": 20.0, "rb1": 10.0, "rb2": 16.0, "rb3": 1.0, "wr1": 15.0, "wr2": 12.0, "wr3": 4.0, "te1": 9.0, "te2": 3.0}
+    settings = {**_SETTINGS, "superflex_count": 1}
+    lineup = _by_id(suggest_optimal_lineup(roster, settings, score_field="value_score", weekly_points=points))
+    assert lineup["qb2"]["slot"] == "BENCH"
+
+    roster["depth_chart_order"] = 1
+    lineup = _by_id(suggest_optimal_lineup(roster, settings, score_field="value_score", weekly_points=points))
+    assert lineup["qb2"]["slot"] != "BENCH"
