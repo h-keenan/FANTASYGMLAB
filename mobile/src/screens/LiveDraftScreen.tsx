@@ -6,6 +6,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
+import PlayerNameText from '../components/PlayerNameText';
 import BrandedSpinner from '../components/BrandedSpinner';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import Button from '../components/Button';
@@ -482,9 +483,7 @@ function DraftBoard({
                 <PickPlate round={row.round} pickNo={row.pick_no} />
                 <PositionBadge position={row.position} />
                 <View style={styles.flex}>
-                  <AppText style={styles.rowName} numberOfLines={1}>
-                    {row.player_name}
-                  </AppText>
+                  <PlayerNameText name={row.player_name} style={styles.rowName} threshold={22} />
                   <AppText style={styles.muted} numberOfLines={1}>
                     {row.team} · {row.fantasy_team}
                   </AppText>

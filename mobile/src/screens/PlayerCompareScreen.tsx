@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import PlayerNameText from '../components/PlayerNameText';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -162,17 +163,13 @@ function NarrativeCompareBlock({
     <View style={styles.narrativeGroup}>
       {narrative.a ? (
         <View style={styles.narrativeBlock}>
-          <AppText style={styles.narrativeName} numberOfLines={1}>
-            {sideA.player.name ?? 'Player A'}
-          </AppText>
+          <PlayerNameText name={sideA.player.name ?? 'Player A'} style={styles.narrativeName} threshold={16} />
           <AppText style={styles.narrativeText}>{narrative.a}</AppText>
         </View>
       ) : null}
       {narrative.b ? (
         <View style={styles.narrativeBlock}>
-          <AppText style={styles.narrativeName} numberOfLines={1}>
-            {sideB.player.name ?? 'Player B'}
-          </AppText>
+          <PlayerNameText name={sideB.player.name ?? 'Player B'} style={styles.narrativeName} threshold={16} />
           <AppText style={styles.narrativeText}>{narrative.b}</AppText>
         </View>
       ) : null}
