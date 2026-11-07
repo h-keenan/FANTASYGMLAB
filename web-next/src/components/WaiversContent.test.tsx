@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WaiversContent } from "./WaiversContent";
@@ -199,10 +199,18 @@ describe("WaiversContent", () => {
 
     const box = screen.getByTestId("suggested-drop");
     expect(box).toHaveTextContent("Add Test Free Agent, drop Dead Weight");
-    expect(box).toHaveTextContent("never starts in your best lineup");
-    expect(box).toHaveTextContent("+4 lineup pts over 9 weeks");
-    expect(box).toHaveTextContent("Value +1,263");
-    expect(box).toHaveTextContent("Bench Guy");
+    expect(screen.getByTestId("swap-add")).toHaveTextContent("Test Free Agent");
+    expect(screen.getByTestId("swap-drop")).toHaveTextContent("Dead Weight");
+    expect(screen.getByTestId("swap-reasons")).toHaveTextContent("never starts in your best lineup");
+    expect(screen.getByTestId("swap-effect")).toHaveTextContent("+4 pts / 9 wks");
+    expect(screen.getByTestId("swap-effect")).toHaveTextContent("Value +1,263");
+    expect(screen.getByTestId("swap-effect")).toHaveAttribute("aria-label", expect.stringContaining("+4 lineup pts over 9 weeks"));
+    expect(screen.getByTestId("swap-alternatives")).toHaveTextContent("Bench Guy");
+    fireEvent.click(screen.getByRole("button", { name: /Why this cut/ }));
+    expect(screen.getByTestId("swap-why")).toHaveTextContent("+4 lineup pts over 9 weeks");
+    fireEvent.click(screen.getByRole("button", { name: /Cut Bench Guy instead/ }));
+    expect(screen.getByTestId("swap-drop")).toHaveTextContent("Bench Guy");
+    expect(screen.getByTestId("swap-alternatives")).toHaveTextContent("Dead Weight");
   });
 
   it("collapses repeated drops to one line on the list rows, details one tap away", () => {
@@ -217,10 +225,12 @@ describe("WaiversContent", () => {
 
     const compact = screen.getByTestId("suggested-drop-compact");
     expect(compact).toHaveTextContent("Drop");
-    expect(compact).toHaveTextContent("Dead Weight · WR");
+    expect(compact).toHaveTextContent("Dead Weight");
+    expect(compact).toHaveTextContent("WR");
     expect(screen.queryByTestId("suggested-drop-details")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Why/ }));
+    fireEvent.click(within(compact).getByRole("button", { name: /Why/ }));
     expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("never starts in your best lineup");
+    expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("Add Second Add, drop Dead Weight");
   });
 
   it("lists the same cut the cards name, with the adds it is the cut for", () => {
