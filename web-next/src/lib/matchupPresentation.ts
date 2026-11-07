@@ -279,6 +279,32 @@ export function lineupComparisonRows(
   return rows;
 }
 
+
+/** Share of a head-to-head bar that belongs to my side (0-100), or null when
+ * either number is missing or both are zero, so the bar shows a neutral track. */
+export function headToHeadShare(mine: number | null, opponent: number | null): number | null {
+  if (mine == null || opponent == null) return null;
+  const a = Math.max(0, mine);
+  const b = Math.max(0, opponent);
+  if (a + b <= 0) return null;
+  return (a / (a + b)) * 100;
+}
+
+/** Which side wins a row on points; "tie" inside a rounding hair, null when a number is missing. */
+export function rowWinner(mine: number | null, opponent: number | null): "mine" | "opponent" | "tie" | null {
+  if (mine == null || opponent == null) return null;
+  const diff = Math.round((mine - opponent) * 10) / 10;
+  return diff > 0 ? "mine" : diff < 0 ? "opponent" : "tie";
+}
+
+/** Column totals for the lineup table (players with a number only) and my margin. */
+export function lineupTotals(rows: LineupComparisonRow[]): { mine: number; opponent: number; margin: number } {
+  const sum = (cell: LineupPlayer | "empty" | null) =>
+    cell && cell !== "empty" ? (lineupPlayerPoints(cell).value ?? 0) : 0;
+  const mine = rows.reduce((acc, row) => acc + sum(row.mine), 0);
+  const opponent = rows.reduce((acc, row) => acc + sum(row.opponent), 0);
+  return { mine, opponent, margin: mine - opponent };
+}
 /** Plain-English position group: "WRs" for a multi-starter room, "QB" for one. */
 function positionGroupName(edge: MatchupPositionEdge): string {
   return edge.my_count > 1 ? `${edge.position}s` : edge.position;
