@@ -486,16 +486,27 @@ export function WaiversContent({
     { label: "Team need", value: teamNeedStat(data) },
   ];
 
+  // Beginner explanations ride behind the "?" next to the page name (PageTitle
+  // `info`) instead of three orphan chips on their own row.
+  const helpLines = [
+    copy.help("waiversIntro"),
+    data.faab_enabled !== false ? copy.help("faab") : null,
+    copy.isBeginner ? copy.help("averageWireValue") : null,
+  ].filter((line): line is string => Boolean(line));
+  const helpInfo =
+    helpLines.length > 0 ? (
+      <div className="flex flex-col gap-1">
+        {helpLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+    ) : undefined;
+
   return (
     <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <PageTitle page="Waivers" leagueName={leagueName} />
-          <div className="flex flex-wrap gap-2">
-            <BeginnerHelp term="waiversIntro" />
-            {data.faab_enabled !== false ? <BeginnerHelp term="faab" /> : null}
-            {copy.isBeginner ? <BeginnerHelp text={copy.help("averageWireValue")} /> : null}
-          </div>
+          <PageTitle page="Waivers" leagueName={leagueName} info={helpInfo} />
         </div>
         <StatStrip items={stats} />
       </header>
@@ -508,9 +519,18 @@ export function WaiversContent({
             <span id="priority-adds-heading" className="sr-only">
               Priority Adds
             </span>
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="needs-headline">
-              {needsHeadline(data)}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm min-w-0" style={{ color: "var(--color-text-secondary)" }} data-testid="needs-headline">
+                {needsHeadline(data)}
+              </p>
+              {data.needed_positions.length > 0 ? (
+                <span className="inline-flex flex-wrap items-center gap-1" data-testid="needs-badges">
+                  {data.needed_positions.map((pos) => (
+                    <PositionBadge key={pos} position={pos} />
+                  ))}
+                </span>
+              ) : null}
+            </div>
             {data.needs_model ? <NeedsBreakdown needs={data.needs_model} /> : null}
             {limitedNote ? (
               <p className="text-xs" style={{ color: "var(--color-warning)" }} data-testid="limited-data-note">
@@ -520,20 +540,22 @@ export function WaiversContent({
             <InfoTip label="How Priority Adds rank">
               Need fits and injury cover rank first, then value. {DISCLOSURE_TEXT}
             </InfoTip>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Place claims in Sleeper — we don&apos;t submit them.
-            </p>
-            {leagueId && !isEspnLeagueId(leagueId) ? (
-              <a
-                href={sleeperLeagueUrl(leagueId)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tap-link self-start text-sm font-bold"
-                style={{ color: "var(--color-accent)" }}
-              >
-                Open your league in Sleeper ↗
-              </a>
-            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-x-3">
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Place claims in Sleeper — we don&apos;t submit them.
+              </p>
+              {leagueId && !isEspnLeagueId(leagueId) ? (
+                <a
+                  href={sleeperLeagueUrl(leagueId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tap-link text-sm font-bold"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  Open your league in Sleeper ↗
+                </a>
+              ) : null}
+            </div>
             {data.team_defense?.empty_slot ? (
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper&apos;s free agents for one.

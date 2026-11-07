@@ -4,7 +4,9 @@ import { useEffect } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
+import { FeatureIncludedGlyph } from "@/components/PremiumGlyph";
 import { SectionHeading } from "@/components/SectionHeading";
+import { ToneBadge } from "@/components/ToneBadge";
 import { trackUse } from "@/lib/analytics";
 import type { PremiumUpsell } from "@/lib/api";
 import { paidPreview } from "@/lib/paidPreviews";
@@ -83,15 +85,23 @@ export function PremiumUpsellCard({
         </header>
       )}
       <AccentCard accent="var(--color-premium)" as="div" className="premium-glow-card">
+        <div>
+          <ToneBadge label="Pro" color="var(--color-premium)" />
+        </div>
         <p className="text-sm">{body}</p>
         {preview ? (
           <div className="flex flex-col gap-1.5" data-testid="paid-preview">
             <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
               What you get with Pro
             </span>
-            <ul className="flex flex-col gap-1 text-sm list-disc pl-5">
+            <ul className="flex flex-col gap-2 text-sm">
               {preview.bullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
+                <li key={bullet} className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0" style={{ color: "var(--color-premium)" }}>
+                    <FeatureIncludedGlyph size={16} />
+                  </span>
+                  <span className="min-w-0">{bullet}</span>
+                </li>
               ))}
             </ul>
             {example ? (
