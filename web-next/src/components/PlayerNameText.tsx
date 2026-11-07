@@ -46,6 +46,8 @@ export function PlayerNameText({
       if (el.scrollWidth > el.clientWidth + 1) setOverflowName(text);
     };
     check();
+    // Web fonts swap in without resizing the box, so re-measure once they load.
+    void document.fonts?.ready.then(check);
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(check);
     observer.observe(el);

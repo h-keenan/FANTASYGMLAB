@@ -328,12 +328,12 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
 /** Small tile used by Position Snapshot and the Stash / depth / FAAB rows. */
 function PlayerTile({ position, player, note }: { position: string; player: WaiverPlayer; note?: string }) {
   return (
-    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[7.5rem]">
+    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[8.5rem]">
       <div className="glass-surface flex flex-col items-center gap-1 p-3">
         <PositionBadge position={position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="md" />
-        <PlayerNameText name={player.name || "Unknown"} className="text-sm font-extrabold text-center" style={{ color: "var(--color-text-primary)" }} />
+        <PlayerNameText name={player.name || "Unknown"} className="text-[13px] font-extrabold text-center" style={{ color: "var(--color-text-primary)" }} />
         <div className="flex flex-col items-center gap-0.5">
           <ValueStat value={formatWaiverScore(player.score)} align="center" />
           {note ? (

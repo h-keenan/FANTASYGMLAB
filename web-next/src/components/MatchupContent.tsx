@@ -365,16 +365,15 @@ function LineupCell({
   const reverse = mine ? "" : "flex-row-reverse";
   const body = (
     <>
-      <span className="inline-flex shrink-0">
+      <span className="hidden min-[430px]:inline-flex shrink-0">
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={24} />
       </span>
       <span className={`flex flex-col min-w-0 flex-1 ${mine ? "" : "items-end text-right"}`}>
-        <span
-          className="text-[13px] font-bold truncate w-full leading-tight"
+        <PlayerNameText
+          name={player.name || "Unknown player"}
+          className="text-[13px] font-bold w-full leading-tight"
           style={{ color: "var(--color-text-primary)" }}
-        >
-          {player.name || "Unknown player"}
-        </span>
+        />
         <span className={`flex items-center gap-1 min-w-0 text-[11px] leading-tight ${mine ? "" : "flex-row-reverse"}`}>
           <span className="truncate" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "FA"}
@@ -775,6 +774,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
 }
 
 import { GuillotineCard, useGuillotine } from "@/components/GuillotineCard";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 export function MatchupContent({
   leagueName,
