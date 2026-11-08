@@ -23,15 +23,13 @@ def test_players_with_games_needs_a_recorded_game():
     assert waivers_logic.players_with_games(stats) == {"a", "c"}
 
 
-def test_unplayed_high_value_player_is_only_a_trailing_stash():
-    free_agents = pd.DataFrame([_fa("played", 2000), _fa("benched", 9000), _fa("benched2", 8000)])
+def test_priority_adds_skip_players_with_no_game_this_season():
+    free_agents = pd.DataFrame([_fa("played", 2000), _fa("benched", 9000)])
     kwargs = dict(
         score_field="value_score", needed_positions=["WR"], league_settings={}, roster_df=pd.DataFrame(), max_items=6
     )
+    ungated = waivers_logic.rank_priority_add_candidates(free_agents, **kwargs)
+    assert "benched" in set(ungated["player_id"])
     gated = waivers_logic.rank_priority_add_candidates(free_agents, played_ids={"played"}, **kwargs)
-    ids = gated["player_id"].tolist()
-    assert ids[0] == "played"
-    assert sum(1 for i in ids if i.startswith("benched")) <= waivers_logic.MAX_UNPLAYED_STASHES
-    assert gated["priority_unplayed"].any()
-    for _, row in gated[gated["priority_unplayed"]].iterrows():
-        assert waivers_logic.waiver_recommendation_label(row, 1) == ("Stash", "information")
+    assert "benched" not in set(gated["player_id"])
+    assert "played" in set(gated["player_id"])
