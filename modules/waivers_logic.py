@@ -416,6 +416,25 @@ def _score_series(frame: pd.DataFrame, score_field: str) -> pd.Series:
     return pd.to_numeric(frame.get(score_field, 0), errors="coerce").fillna(0.0)
 
 
+def players_with_games(season_stats: Mapping[str, Any] | None) -> set[str]:
+    """Player ids with at least one game recorded this season."""
+
+    out: set[str] = set()
+    for pid, row in (season_stats or {}).items():
+        if not isinstance(row, Mapping):
+            continue
+        weekly = row.get("weekly")
+        if weekly:
+            played = any(
+                isinstance(e, Mapping) and float(e.get("games_played", 1) or 0) > 0 for e in weekly
+            )
+        else:
+            played = float(row.get("games_played", 0) or 0) > 0
+        if played:
+            out.add(str(pid))
+    return out
+
+
 def rank_priority_add_candidates(
     free_agents: pd.DataFrame,
     *,
@@ -427,6 +446,7 @@ def rank_priority_add_candidates(
     league: Mapping[str, Any] | None = None,
     rosters: list[Mapping[str, Any]] | None = None,
     needs_model: Mapping[str, Any] | None = None,
+    played_ids: set[str] | None = None,
 ) -> pd.DataFrame:
     """Order Priority Adds for THIS roster — not bare dynasty-score tops.
 
@@ -443,6 +463,10 @@ def rank_priority_add_candidates(
     stash at the top need is kept on the board when nobody on the wire would
     actually start there. Without it (model unavailable) the older
     positions-list behaviour applies.
+
+    ``played_ids`` (optional, from ``players_with_games``): when given, a player
+    with no game this season is never a Priority Add. A value score alone must
+    not recommend someone who has not scored a point (coridian_, 2026-11-08).
 
     `league`/`rosters` (both optional, for callers that already have them —
     the real Waivers endpoint does) let this detect a pre-/mid-draft league
@@ -570,7 +594,12 @@ def rank_priority_add_candidates(
             elif top_need.get("stash"):
                 stash_ids[str(top_need["stash"]["player_id"])] = str(top_need["position"]).upper()
 
-    positive = candidates[(~stale) & (~role_blocked) & (scores > 0)].copy()
+    has_played = (
+        candidates["player_id"].astype(str).isin(played_ids)
+        if played_ids is not None and "player_id" in candidates.columns
+        else pd.Series(True, index=candidates.index)
+    )
+    positive = candidates[(~stale) & (~role_blocked) & (scores > 0) & has_played].copy()
     if positive.empty:
         return candidates.iloc[0:0].copy()
 
