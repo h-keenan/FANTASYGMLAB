@@ -276,8 +276,6 @@ def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
 
     if bool(row.get("stale_free_agent")):
         return "Watch", "neutral"
-    if bool(row.get("priority_unplayed")):
-        return "Stash", "information"
     if bool(row.get("injury_replacement_fit")) or position_rank <= 3:
         return "Add", "opportunity"
     opportunity = _safe_text(row.get("opportunity_label")).strip()
@@ -418,9 +416,6 @@ def _score_series(frame: pd.DataFrame, score_field: str) -> pd.Series:
     return pd.to_numeric(frame.get(score_field, 0), errors="coerce").fillna(0.0)
 
 
-MAX_UNPLAYED_STASHES = 1
-
-
 def players_with_games(season_stats: Mapping[str, Any] | None) -> set[str]:
     """Player ids with at least one game recorded this season."""
 
@@ -470,10 +465,8 @@ def rank_priority_add_candidates(
     positions-list behaviour applies.
 
     ``played_ids`` (optional, from ``players_with_games``): when given, a player
-    with no game this season is never an "Add" on need or value alone. A
-    high-value one may still appear as a long-term Stash (coridian_,
-    2026-11-08): ranked after every player who has played, labelled Stash, and
-    at most ``MAX_UNPLAYED_STASHES`` of them.
+    with no game this season is never a Priority Add. A value score alone must
+    not recommend someone who has not scored a point (coridian_, 2026-11-08).
 
     `league`/`rosters` (both optional, for callers that already have them —
     the real Waivers endpoint does) let this detect a pre-/mid-draft league
@@ -606,8 +599,7 @@ def rank_priority_add_candidates(
         if played_ids is not None and "player_id" in candidates.columns
         else pd.Series(True, index=candidates.index)
     )
-    positive = candidates[(~stale) & (~role_blocked) & (scores > 0)].copy()
-    positive["priority_unplayed"] = ~has_played.reindex(positive.index).fillna(True).astype(bool)
+    positive = candidates[(~stale) & (~role_blocked) & (scores > 0) & has_played].copy()
     if positive.empty:
         return candidates.iloc[0:0].copy()
 
@@ -654,14 +646,9 @@ def rank_priority_add_candidates(
             is_need = False
             is_elite_value = False
         is_stash = bool(use_model and pid in stash_ids and not is_need)
-        if bool(positive.at[idx, "priority_unplayed"]):
-            # No game yet: never an add for need or bigger-upgrade; only a
-            # high-value long-term stash.
-            is_need = False
-            is_stash = False
         # The shared model's "bigger upgrade than your need" (roster_value_model.
         # outsized_adds): always actionable and ranked first, whatever its tag.
-        is_bigger = bool(use_model and pid in bigger_ids and not positive.at[idx, "priority_unplayed"])
+        is_bigger = bool(use_model and pid in bigger_ids)
         bigger_flags.append(is_bigger)
         stash_flags.append(is_stash)
         need_fit.append(is_need)
@@ -705,13 +692,10 @@ def rank_priority_add_candidates(
             ascending=[False, False, False, False],
         )
 
-    positive = positive.sort_values("priority_unplayed", kind="stable")
-
     # Soft diversity: prefer decision utility across rooms without a rigid 1-of-each rule.
     selected_indices: list = []
     position_counts: dict[str, int] = {}
     soft_cap = 2
-    unplayed_taken = 0
     for idx, row in positive.iterrows():
         position = str(row.get("position") or "").upper()
         count = position_counts.get(position, 0)
@@ -728,9 +712,6 @@ def rank_priority_add_candidates(
                     continue
                 if not exceptional:
                     continue
-        if bool(row.get("priority_unplayed")) and unplayed_taken >= MAX_UNPLAYED_STASHES:
-            continue
-        unplayed_taken += int(bool(row.get("priority_unplayed")))
         selected_indices.append(idx)
         position_counts[position] = count + 1
         if len(selected_indices) >= max_items:
@@ -740,9 +721,6 @@ def rank_priority_add_candidates(
         for idx in positive.index:
             if idx in selected_indices:
                 continue
-            if bool(positive.at[idx, "priority_unplayed"]) and unplayed_taken >= MAX_UNPLAYED_STASHES:
-                continue
-            unplayed_taken += int(bool(positive.at[idx, "priority_unplayed"]))
             selected_indices.append(idx)
             if len(selected_indices) >= max_items:
                 break
