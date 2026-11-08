@@ -308,8 +308,10 @@ export default function WaiverRecommendationCard({
           <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
         </View>
         <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
-        <View style={styles.compactSpacer} />
-        <FAABGuidance faab={player.faab} size="compact" />
+        <View style={styles.metricsDivider} />
+        <View style={styles.compactSpacer}>
+          <FAABGuidance faab={player.faab} size="compact" />
+        </View>
         <Ionicons name="chevron-forward" size={16} color={colors.accentSoft} />
       </View>
     </TouchableOpacity>
@@ -367,12 +369,20 @@ function createStyles(colors: ThemeColors) {
     },
     breakdownText: { fontSize: 12, fontWeight: '700', color: colors.accentSoft },
     compactRow: {
-      paddingVertical: spacing.xs,
-      gap: spacing.xs,
+      paddingVertical: spacing.md,
+      gap: spacing.sm,
     },
-    compactPress: { gap: spacing.xs },
-    compactMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs },
-    compactSpacer: { flex: 1 },
+    compactPress: { gap: spacing.sm },
+    compactMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+      backgroundColor: colors.backgroundElevated,
+    },
+    compactSpacer: { flex: 1, alignItems: 'flex-end' },
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     compactIdentity: { alignSelf: 'stretch' },
     // A bare chevron read as an unlabeled affordance — the concept image

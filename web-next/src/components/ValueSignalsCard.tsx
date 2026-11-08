@@ -45,7 +45,11 @@ export function ValueSignalsCard({ leagueId }: { leagueId: string }) {
       <SectionHeading id="value-signals-heading" note="Value rating trend against this season's production.">
         Buy low / Sell high
       </SectionHeading>
-      {status ? (
+      {!status && data.buy_low.length === 0 && data.sell_high.length === 0 ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }} data-testid="value-signals-none">
+          No buy-low or sell-high candidates right now. Nobody clears both the value-trend and production bars.
+        </p>
+      ) : status ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {status}
         </p>

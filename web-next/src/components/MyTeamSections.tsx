@@ -39,7 +39,28 @@ function Chevron({ open = false }: { open?: boolean }) {
   );
 }
 
-/** One row per position room: status dot + short status; tap for the full
+const TONE_LEVEL: Record<TeamAnalysisRow["tone"], number> = { success: 4, information: 3, warning: 2, danger: 1 };
+
+/** Four-segment strength meter for a position room, filled and tinted from the row's tone. */
+function RoomMeter({ tone, position }: { tone: TeamAnalysisRow["tone"]; position: string }) {
+  const level = TONE_LEVEL[tone];
+  return (
+    <span className="flex w-full max-w-[9rem] gap-1" role="img" aria-label={`${position} room strength ${level} of 4`}>
+      {[1, 2, 3, 4].map((i) => (
+        <span
+          key={i}
+          className="flex-1 h-1.5"
+          style={{
+            borderRadius: "var(--radius-pill)",
+            background: i <= level ? TONE_VAR[tone] : "var(--color-surface-muted)",
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** One row per position room: status badge + strength meter; tap for the full
  * sentence. */
 export function TeamAnalysisList({ rows }: { rows: TeamAnalysisRow[] }) {
   const [openPosition, setOpenPosition] = useState<string | null>(null);
@@ -63,13 +84,9 @@ export function TeamAnalysisList({ rows }: { rows: TeamAnalysisRow[] }) {
               style={{ background: "none", border: "none", cursor: "pointer" }}
             >
               <PositionBadge position={row.position} />
-              <span
-                aria-hidden="true"
-                className="shrink-0"
-                style={{ width: 10, height: 10, borderRadius: 999, background: TONE_VAR[row.tone] }}
-              />
-              <span className="flex-1 text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-                {row.status}
+              <span className="flex flex-1 flex-col items-start gap-1.5 min-w-0">
+                <ToneBadge label={row.status} color={TONE_VAR[row.tone]} />
+                <RoomMeter tone={row.tone} position={row.position} />
               </span>
               <Chevron open={open} />
             </button>

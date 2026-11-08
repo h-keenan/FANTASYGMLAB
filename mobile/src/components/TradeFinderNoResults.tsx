@@ -1,5 +1,6 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import EmptyState from './EmptyState';
@@ -59,9 +60,12 @@ export default function TradeFinderNoResults({
       {reasons.length > 0 ? (
         <View style={styles.reasons}>
           {reasons.map((reason) => (
-            <AppText key={reason.code} style={styles.reason}>
-              {`• ${reason.text}`}
-            </AppText>
+            <View key={reason.code} style={styles.reasonRow}>
+              <View style={[styles.reasonGlyph, { backgroundColor: colors.warningMuted }]}>
+                <Ionicons name="alert-outline" size={12} color={colors.warning} />
+              </View>
+              <AppText style={styles.reason}>{reason.text}</AppText>
+            </View>
           ))}
         </View>
       ) : null}
@@ -124,7 +128,9 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.sm },
     reasons: { gap: spacing.xs, paddingHorizontal: spacing.xs },
-    reason: { fontSize: 12, lineHeight: 17, color: colors.textTertiary },
+    reasonRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    reasonGlyph: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    reason: { flex: 1, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
     option: { gap: spacing.xs },
     noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     noteText: { flex: 1, fontSize: 12, lineHeight: 17, color: colors.textTertiary },

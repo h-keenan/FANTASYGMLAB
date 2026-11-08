@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import base64
+import copy
+import hashlib
 import json
 import re
+import threading
 import time
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse
@@ -849,6 +852,59 @@ def fetch_auth_user(config: dict, access_token: str) -> tuple[dict | None, str]:
         return None, _safe_error(response)
     payload = response.json()
     return (payload if isinstance(payload, dict) else None), ""
+
+
+_AUTH_USER_CACHE_SECONDS = 10.0
+_AUTH_USER_CACHE_MAX = 2048
+_AUTH_USER_CACHE: dict[str, tuple[float, dict]] = {}
+_AUTH_USER_LOCKS: dict[str, threading.Lock] = {}
+_AUTH_USER_GUARD = threading.Lock()
+
+
+def clear_auth_user_cache() -> None:
+    with _AUTH_USER_GUARD:
+        _AUTH_USER_CACHE.clear()
+        _AUTH_USER_LOCKS.clear()
+
+
+def fetch_auth_user_cached(config: dict, access_token: str) -> tuple[dict | None, str]:
+    """``fetch_auth_user`` with a short per-process, per-token memo.
+
+    One page load fires several authenticated API calls in parallel and each
+    used to pay its own GoTrue round trip.  Only successful lookups are kept
+    (never errors), for ``_AUTH_USER_CACHE_SECONDS``, keyed by a hash of the
+    token; concurrent callers for the same token share one in-flight lookup.
+    A revoked session therefore keeps working for at most that window.
+    """
+
+    token = _safe_text(access_token)
+    if not token or not is_configured(config):
+        return fetch_auth_user(config, access_token)
+    key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def _hit() -> dict | None:
+        entry = _AUTH_USER_CACHE.get(key)
+        if entry and time.monotonic() - entry[0] < _AUTH_USER_CACHE_SECONDS:
+            return copy.deepcopy(entry[1])
+        return None
+
+    hit = _hit()
+    if hit is not None:
+        return hit, ""
+    with _AUTH_USER_GUARD:
+        lock = _AUTH_USER_LOCKS.setdefault(key, threading.Lock())
+    with lock:
+        hit = _hit()
+        if hit is not None:
+            return hit, ""
+        user, error = fetch_auth_user(config, token)
+        with _AUTH_USER_GUARD:
+            if user:
+                if len(_AUTH_USER_CACHE) >= _AUTH_USER_CACHE_MAX:
+                    _AUTH_USER_CACHE.clear()
+                _AUTH_USER_CACHE[key] = (time.monotonic(), copy.deepcopy(user))
+            _AUTH_USER_LOCKS.pop(key, None)
+        return user, error
 
 
 def _access_token_claims(access_token: str) -> dict:

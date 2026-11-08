@@ -151,6 +151,17 @@ def _fake_redis_for_tests():
 
 
 @pytest.fixture(autouse=True)
+def _reset_auth_user_cache_for_tests():
+    """The GoTrue user memo is process-global; tests reuse tokens with
+    different stubbed users, so never let one test's lookup leak to the next."""
+    from modules import auth_supabase
+
+    auth_supabase.clear_auth_user_cache()
+    yield
+    auth_supabase.clear_auth_user_cache()
+
+
+@pytest.fixture(autouse=True)
 def _reset_sleeper_budget_for_tests():
     """modules.sleeper_budget keeps process-global last-known payloads and a
     call counter; without a reset one test's successful fetch would be served

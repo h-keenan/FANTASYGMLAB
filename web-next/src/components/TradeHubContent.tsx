@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import type { TradeHubResponse } from "@/lib/api";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
+import { AccentCard } from "@/components/AccentCard";
 import { EmptyState } from "@/components/EmptyState";
 import { TradeHubFilters } from "@/components/TradeHubFilters";
 import { filterTradeIdeas } from "@/lib/tradeHubFilters";
@@ -87,9 +88,13 @@ export function TradeHubContent({
             <TradeHubHoldCard hold={data.hold} />
           </div>
         ) : (
-          <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
-            {notice}
-          </p>
+          <div className="w-full max-w-3xl">
+            <AccentCard as="section" accent="var(--color-information)" compact>
+              <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+                {notice}
+              </p>
+            </AccentCard>
+          </div>
         )}
       </main>
     );

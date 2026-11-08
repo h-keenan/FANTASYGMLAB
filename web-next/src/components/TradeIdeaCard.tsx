@@ -269,10 +269,17 @@ export function TradeIdeaCardView({
         ) : null}
       </div>
       {reason ? (
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        <p
+          className="text-sm pl-3"
+          style={{ color: "var(--color-text-secondary)", borderLeft: "2px solid var(--color-border-strong)" }}
+        >
           {reason}
         </p>
       ) : null}
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="idea-signal-chips">
+        <ToneBadge label={`${idea.confidence_label} confidence`} color={levelColor(confidenceLvl)} />
+        <ToneBadge label={`${idea.market_realism_label}`} color={levelColor(realismLvl)} />
+      </div>
       <ManagerTendenciesCard leagueId={leagueId} teamName={idea.partner_team_name} />
 
       {/* Width-fill fix (PR #1050, reconfirmed here): minmax(0,1fr) on both

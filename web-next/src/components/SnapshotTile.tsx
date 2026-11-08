@@ -6,6 +6,34 @@ function formatRank(rank: number | null, tied: boolean): string {
   return tied ? `T-${rank}` : `#${rank}`;
 }
 
+function fillColor(fill: number): string {
+  return fill >= 0.67 ? "var(--color-success)" : fill >= 0.34 ? "var(--color-warning)" : "var(--color-danger)";
+}
+
+/** Thin standing meter (0..1), green / amber / red by third. */
+export function FillBar({ fill, label }: { fill: number; label: string }) {
+  const pct = Math.round(Math.min(1, Math.max(0, fill)) * 100);
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      className="h-1.5 w-full overflow-hidden"
+      style={{ background: "var(--color-surface-muted)", borderRadius: "var(--radius-pill)" }}
+    >
+      <div className="h-full" style={{ width: `${pct}%`, background: fillColor(fill), borderRadius: "var(--radius-pill)" }} />
+    </div>
+  );
+}
+
+/** Rank position as a 0..1 standing (1st of N = 1, last = 0); null when unknown. */
+export function rankFill(rank: number | null | undefined, size: number | null | undefined): number | null {
+  if (rank === null || rank === undefined || !size || size < 2 || rank < 1 || rank > size) return null;
+  return (size - rank) / (size - 1);
+}
+
 // coridian_, 2026-10-18 (screenshot): "team snapshot still has no color" —
 // every glyph inherited the label's --color-text-muted, so the whole
 // section read as flat grayscale regardless of tone. A fixed accent per
@@ -31,7 +59,12 @@ export function SnapshotTile({
   wrapNote = false,
   compact = false,
   reserveLabelLines = false,
+  fill,
 }: {
+  /** 0..1 relative standing (rank position, win share): draws a thin meter
+   * under the value, green / amber / red by third. Omit (or null) for a
+   * tile with no honest relative scale. */
+  fill?: number | null;
   label: string;
   value: string;
   // "premium" (Revision 14, Draft Center) is the gold highlight for a #1
@@ -87,6 +120,7 @@ export function SnapshotTile({
       >
         {value}
       </span>
+      {fill !== null && fill !== undefined ? <FillBar fill={fill} label={label} /> : null}
       {note ? (
         <span className={compact ? "text-xs text-center" : "text-xs"} style={{ color: "var(--color-text-muted)" }}>
           {note}

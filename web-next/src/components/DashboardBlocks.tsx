@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { BriefingItem, DashboardResponse } from "@/lib/api";
+import type { BriefingItem, DashboardResponse, ThisWeekRow } from "@/lib/api";
+import { AccentCard } from "@/components/AccentCard";
+import { ToneBadge } from "@/components/ToneBadge";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ButtonLink } from "@/components/Button";
 import { GamePlanCard } from "@/components/GamePlanCard";
@@ -17,6 +19,14 @@ const TONE_COLOR: Record<DashboardNowChip["tone"], string> = {
   risk: "var(--color-danger)",
   waiver: "var(--color-accent)",
   neutral: "var(--color-text-primary)",
+};
+
+const HOLD_TONE_COLOR: Record<ThisWeekRow["tone"], string> = {
+  positive: "var(--color-success)",
+  risk: "var(--color-danger)",
+  waiver: "var(--color-accent)",
+  trade: "var(--color-accent)",
+  neutral: "var(--color-text-muted)",
 };
 
 function chipHref(chip: DashboardNowChip, leagueId: string, leagueName: string): string {
@@ -90,10 +100,16 @@ export function DashboardTradesBlock({
   const goalLine = isBeginner ? tradesGoalLine(goal) : "";
   return (
     <section className="flex flex-col gap-3" aria-labelledby="trades-heading" data-testid="dashboard-trades-block">
-      <SectionHeading id="trades-heading">{TRADES_BLOCK_COPY.title}</SectionHeading>
-      {isBeginner ? (
-        <BeginnerHelp text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
-      ) : null}
+      <SectionHeading
+        id="trades-heading"
+        action={
+          isBeginner ? (
+            <BeginnerHelp popover text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
+          ) : undefined
+        }
+      >
+        {TRADES_BLOCK_COPY.title}
+      </SectionHeading>
       <DeadlineCard
         window={data.trade_window}
         strategy={data.team_strategy}
@@ -112,9 +128,24 @@ export function DashboardTradesBlock({
       ) : pending ? (
         <SkeletonBlock height={96} data-fgl-this-week-trade-pending="true" />
       ) : (
-        <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          {holdRow ? `${holdRow.headline}. ${holdRow.why}` : TRADES_BLOCK_COPY.empty}
-        </p>
+        holdRow ? (
+          <AccentCard accent={HOLD_TONE_COLOR[holdRow.tone]} compact>
+            <div className="flex flex-wrap items-center gap-2">
+              {holdRow.status ? <ToneBadge label={holdRow.status} color={HOLD_TONE_COLOR[holdRow.tone]} /> : null}
+              <span className="text-sm font-bold">{holdRow.headline}</span>
+            </div>
+            {/* The deadline card above already says when; only repeat the why without it. */}
+            {holdRow.why && !data.trade_window ? (
+              <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                {holdRow.why}
+              </p>
+            ) : null}
+          </AccentCard>
+        ) : (
+          <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            {TRADES_BLOCK_COPY.empty}
+          </p>
+        )
       )}
       <div className="flex items-center gap-4 flex-wrap">
         <ButtonLink href={`/trade-analyzer/${id}${query}`} size="sm">

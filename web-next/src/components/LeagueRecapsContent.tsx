@@ -21,6 +21,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { AccentCard } from "@/components/AccentCard";
 import {
   FILTER_ALL,
   FILTER_TRADES,
@@ -81,12 +82,10 @@ const MEMORY_VIEWS: MemoryView[] = ["Recaps", "History", "Storylines"];
 function RecapStoryCard({
   story,
   lead,
-  isFirstInGroup,
   onOpenHistory,
 }: {
   story: RecapStory;
   lead: boolean;
-  isFirstInGroup: boolean;
   onOpenHistory: (filter: string) => void;
 }) {
   const accent = recapCategoryColorVar(recapStoryCategory(story.story_type));
@@ -96,19 +95,6 @@ function RecapStoryCard({
       ? `${story.primary_team} vs ${story.secondary_team}`
       : story.secondary_team
     : story.primary_team;
-
-  const containerStyle = lead
-    ? {
-        background: "var(--color-surface-raised)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        borderLeft: `var(--border-width-semantic) solid ${accent}`,
-        boxShadow: "var(--shadow-card)",
-        padding: "var(--space-md)",
-      }
-    : {
-        borderTop: isFirstInGroup ? "none" : "var(--border-width-default) solid var(--color-border)",
-        padding: isFirstInGroup ? "0" : "var(--space-sm) 0 0",
-      };
 
   const body = (
     <>
@@ -137,7 +123,7 @@ function RecapStoryCard({
           >
             {story.metric_label || "Recorded"}
           </span>
-          <strong className="text-lg font-extrabold" style={{ color: accent }}>
+          <strong className={`${lead ? "text-2xl" : "text-lg"} font-extrabold`} style={{ color: accent }}>
             {story.metric_value}
           </strong>
         </div>
@@ -147,9 +133,15 @@ function RecapStoryCard({
           {story.players.map((name) => (
             <span
               key={name}
-              className="text-xs pl-2"
-              style={{ borderLeft: "var(--border-width-semantic) solid var(--color-border-strong)", color: "var(--color-text-primary)" }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-1"
+              style={{
+                borderRadius: "var(--radius-pill)",
+                background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 30%, transparent)`,
+                color: "var(--color-text-primary)",
+              }}
             >
+              <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: accent }} />
               {name}
             </span>
           ))}
@@ -170,25 +162,26 @@ function RecapStoryCard({
 
   if (deepLinkLabel) {
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => onOpenHistory(story.history_filter || FILTER_ALL)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") onOpenHistory(story.history_filter || FILTER_ALL);
-        }}
-        className="grid gap-1 cursor-pointer"
-        style={containerStyle}
-      >
-        {body}
-      </div>
+      <AccentCard accent={accent} compact={!lead} glow={lead} as="div">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenHistory(story.history_filter || FILTER_ALL)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") onOpenHistory(story.history_filter || FILTER_ALL);
+          }}
+          className="grid gap-1 cursor-pointer"
+        >
+          {body}
+        </div>
+      </AccentCard>
     );
   }
 
   return (
-    <article className="grid gap-1" style={containerStyle}>
-      {body}
-    </article>
+    <AccentCard accent={accent} compact={!lead} glow={lead}>
+      <div className="grid gap-1">{body}</div>
+    </AccentCard>
   );
 }
 
@@ -202,13 +195,12 @@ function RecapGroupSection({ group, onOpenHistory }: { group: RecapStoryGroup; o
           {group.label}
         </span>
       </div>
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-2">
         {group.stories.map((story, index) => (
           <RecapStoryCard
             key={`${story.story_type}-${story.title}-${index}`}
             story={story}
             lead={false}
-            isFirstInGroup={index === 0}
             onOpenHistory={onOpenHistory}
           />
         ))}
@@ -296,7 +288,7 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
         </p>
       ) : (
         <div className="flex flex-col gap-5" style={{ opacity: loading ? 0.6 : 1 }}>
-          <RecapStoryCard story={lead} lead isFirstInGroup onOpenHistory={onOpenHistory} />
+          <RecapStoryCard story={lead} lead onOpenHistory={onOpenHistory} />
           {groups.map((group, index) => (
             <RecapGroupSection key={`${group.category}-${index}`} group={group} onOpenHistory={onOpenHistory} />
           ))}
@@ -752,19 +744,12 @@ function StorylineCard({
   route?: string;
   onOpenHistory?: (filter: string) => void;
 }) {
-  const style = {
-    background: "var(--color-surface-raised)",
-    border: "var(--border-width-default) solid var(--color-border)",
-    padding: "var(--space-sm) var(--space-md)",
-    display: "grid",
-    gap: "var(--space-2xs)",
-    gridColumn: wide ? "1 / -1" : undefined,
-  };
+  const style = { gridColumn: wide ? "1 / -1" : undefined };
   const body = (
     <>
       <span
-        className="text-xs uppercase"
-        style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}
+        className="text-xs uppercase font-extrabold"
+        style={{ color: "var(--color-information)", letterSpacing: "var(--letter-spacing-badge)" }}
       >
         {kicker}
       </span>
@@ -776,21 +761,26 @@ function StorylineCard({
   );
   if (route && onOpenHistory) {
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => onOpenHistory(route)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") onOpenHistory(route);
-        }}
-        className="cursor-pointer"
-        style={style}
-      >
-        {body}
-      </div>
+      <AccentCard accent="var(--color-information)" compact as="div" style={style}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenHistory(route)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") onOpenHistory(route);
+          }}
+          className="cursor-pointer grid gap-1"
+        >
+          {body}
+        </div>
+      </AccentCard>
     );
   }
-  return <article style={style}>{body}</article>;
+  return (
+    <AccentCard accent="var(--color-information)" compact style={style}>
+      <div className="grid gap-1">{body}</div>
+    </AccentCard>
+  );
 }
 
 function StorylinesTab({
