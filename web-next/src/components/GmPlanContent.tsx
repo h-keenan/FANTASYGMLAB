@@ -412,6 +412,12 @@ export function GmPlanContent({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<GmPlanTab>(initialTab ?? "overview");
+  // The GM orb can pick another GM Plan tab while this page is mounted.
+  const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
+  if (initialTab !== seenInitialTab) {
+    setSeenInitialTab(initialTab);
+    if (initialTab) setTab(initialTab);
+  }
   const [showRoster, setShowRoster] = useState(false);
   const [stance, setStanceState] = useState<TeamStance | "">(teamStance?.stance ?? "");
   const [trackedRows, setTrackedRows] = useState<GmTarget[]>(targets ?? []);

@@ -70,6 +70,11 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [tab, setTab] = useState<DraftTab>(route.params.tab ?? 'overview');
+  // Picked from the GM orb while Draft Center is already open.
+  const requestedTab = route.params.tab;
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
   const [needGroups, setNeedGroups] = useState<Array<{ position: string; classification: string }> | null>(null);
   const [posture, setPosture] = useState<DraftPosture | null>(null);
   const [postureReason, setPostureReason] = useState('');

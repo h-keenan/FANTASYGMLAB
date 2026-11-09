@@ -14,7 +14,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { NavProMarker } from "@/components/NavProMarker";
 import { PositionBadge } from "@/components/PositionBadge";
-import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { FOUNDER_DESTINATION, isFounderSession, searchNavDestinations, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
@@ -129,9 +129,7 @@ export function GmOrb() {
   const destinationResults = useMemo(() => {
     if (!normalizedQuery) return [];
     const searchable = [...(leagueId ? [...coreLeagueDestinations, ...gmToolsDestinations] : []), ...generalDestinations, ...accountDestinations];
-    return searchable.filter((destination) =>
-      `${destination.label} ${destination.subtitle}`.toLowerCase().includes(normalizedQuery),
-    );
+    return searchNavDestinations(searchable, normalizedQuery);
   }, [normalizedQuery, leagueId, coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations]);
   const playerResults = useMemo(
     () => (wantsPlayers && poolReady ? matchPlayersByName(playerPool.players, normalizedQuery) : []),

@@ -59,12 +59,16 @@ const MAX_PLAYERS = 3;
  * Mirrors web-next's GamesContent; every number comes from modules/games.py.
  */
 export default function GamesScreen({ route, navigation }: Props) {
-  const { leagueId, leagueName } = route.params;
+  const { leagueId, leagueName, tab: requestedTab } = route.params;
   const headerHeight = useHeaderHeight();
   const orbClearance = useOrbClearance();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [tab, setTab] = useState<Tab>('sim');
+  const [tab, setTab] = useState<Tab>(requestedTab ?? 'sim');
+  // Picked from the GM orb while Games is already open.
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
 
   useScreenHeaderTitle(navigation, 'Games', leagueName);
 

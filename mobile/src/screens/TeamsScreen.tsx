@@ -230,6 +230,10 @@ export default function TeamsScreen({ route, navigation }: Props) {
     setActiveTab(tab);
     setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
   }, []);
+  // Picked from the GM orb while League Rankings is already open.
+  useEffect(() => {
+    if (initialTab && !espn) onChangeTab(initialTab);
+  }, [initialTab, espn, onChangeTab]);
 
   return (
     <View style={styles.root}>

@@ -58,6 +58,12 @@ export function DraftCenterContent({
   needGroups?: PositionNeedGroup[] | null;
 }) {
   const [tab, setTab] = useState<DraftCenterTab>(initialTab);
+  // The GM orb can pick another Draft Center tab while this page is mounted.
+  const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
+  if (initialTab !== seenInitialTab) {
+    setSeenInitialTab(initialTab);
+    setTab(initialTab);
+  }
   // Nothing to scope to without a resolved roster — don't strand the user
   // on an empty "My Picks" tab they can't fill, same guard mobile's screen
   // applies to its own initial pickScope.
