@@ -4,7 +4,7 @@ import AppText from '../components/AppText';
 import ToneBadge from '../components/ToneBadge';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,10 +20,12 @@ import ManagerProfileModal from '../components/ManagerProfileModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
+import PlayoffOddsPanel from './PlayoffOddsPanel';
 import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
@@ -33,8 +35,15 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Teams'>;
+type TeamsNavigation = NativeStackNavigationProp<RootStackParamList>;
 
 type RankingMetric = NonNullable<Props['route']['params']['metric']>;
+type TeamsTab = 'rankings' | 'playoff';
+
+const TEAMS_TABS: Array<{ key: TeamsTab; label: string }> = [
+  { key: 'rankings', label: 'Rankings' },
+  { key: 'playoff', label: 'Playoff Odds' },
+];
 
 /**
  * Per-metric leaderboard config — the one thing that changes between "Teams"
@@ -196,18 +205,87 @@ interface BaseTeamRow {
   ranking: TeamRanking | undefined;
 }
 
+/**
+ * League Rankings host: one screen with a top tab switcher (same pattern as
+ * the Trades host) holding the Rankings leaderboard and Playoff Odds. Each
+ * tab body is its own component, lazy-mounted on first visit and then kept
+ * mounted so switching back doesn't re-fetch. Playoff Odds stays Pro-gated
+ * exactly as before: its panel makes the same request and renders the same
+ * PremiumLock when the backend says the viewer isn't premium. The retired
+ * 'PlayoffOdds' route redirects here with `initialTab: 'playoff'`.
+ */
 export default function TeamsScreen({ route, navigation }: Props) {
-  const orbClearance = useOrbClearance();
+  const { leagueId, leagueName, metric, initialTab } = route.params;
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
+  // Playoff Odds was never available for ESPN leagues (the old route sat
+  // behind the ESPN gate), so ESPN only gets the Rankings tab.
+  const espn = isEspnLeagueId(leagueId);
+  const tabOptions = espn ? TEAMS_TABS.filter((option) => option.key === 'rankings') : TEAMS_TABS;
+  const firstTab: TeamsTab = espn ? 'rankings' : (initialTab ?? 'rankings');
+  const [activeTab, setActiveTab] = useState<TeamsTab>(firstTab);
+  const [visitedTabs, setVisitedTabs] = useState<Set<TeamsTab>>(() => new Set<TeamsTab>([firstTab]));
+  const onChangeTab = useCallback((tab: TeamsTab) => {
+    setActiveTab(tab);
+    setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+  }, []);
+
+  return (
+    <View style={styles.root}>
+      <GridBackground />
+      <View style={[styles.topSection, { paddingTop: headerHeight }]}>
+        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        {tabOptions.length > 1 ? (
+          <View style={styles.tabBarWrap}>
+            <SegmentedTabBar<TeamsTab> options={tabOptions} active={activeTab} onChange={onChangeTab} />
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.contentArea}>
+        {visitedTabs.has('rankings') ? (
+          <View style={[styles.tabPane, activeTab !== 'rankings' && styles.tabPaneHidden]}>
+            <RankingsPanel
+              leagueId={leagueId}
+              leagueName={leagueName}
+              initialMetric={metric}
+              active={activeTab === 'rankings'}
+              navigation={navigation}
+            />
+          </View>
+        ) : null}
+        {visitedTabs.has('playoff') ? (
+          <View style={[styles.tabPane, activeTab !== 'playoff' && styles.tabPaneHidden]}>
+            <PlayoffOddsPanel leagueId={leagueId} leagueName={leagueName} />
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function RankingsPanel({
+  leagueId,
+  leagueName,
+  initialMetric,
+  active,
+  navigation,
+}: {
+  leagueId: string;
+  leagueName: string;
+  initialMetric?: RankingMetric;
+  active: boolean;
+  navigation: TeamsNavigation;
+}) {
+  const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Local state, seeded once from `route.params.metric` (e.g. the Age tile's
   // deep link) rather than read directly from route.params on every render —
   // the in-screen switcher below changes this same state afterward, and a
   // user can land on any of the six metrics in-screen regardless of how they
   // navigated in.
-  const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
+  const [metric, setMetric] = useState<RankingMetric>(initialMetric ?? 'power');
   const config = METRIC_CONFIG[metric];
   const queryClient = useQueryClient();
   const [profileTeam, setProfileTeam] = useState<{ rosterId: number | string; teamName: string; ownerName: string; avatarId: string } | null>(null);
@@ -242,7 +320,9 @@ export default function TeamsScreen({ route, navigation }: Props) {
     enabled: !isRestoring,
   });
 
-  useScreenHeaderTitle(navigation, config.title, leagueName);
+  // Header title follows the active tab: the metric-specific rankings title,
+  // or Playoff Odds while that tab is showing.
+  useScreenHeaderTitle(navigation, active ? config.title : 'Playoff Odds', leagueName);
 
   useEffect(() => {
     navigation.setOptions({
@@ -353,21 +433,20 @@ export default function TeamsScreen({ route, navigation }: Props) {
   const rankedTeamCount = useMemo(() => teams.filter((team) => team.metricRank != null).length, [teams]);
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={styles.center}>
         <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: headerHeight }]}>
+    <View style={styles.root}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <View style={styles.metricTabBarWrap}>
         <SegmentedTabBar options={METRIC_TABS} active={metric} onChange={setMetric} />
       </View>
@@ -626,6 +705,12 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: 'transparent' },
+  topSection: { backgroundColor: 'transparent' },
+  tabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm },
+  contentArea: { flex: 1 },
+  tabPane: { flex: 1 },
+  // display: 'none' (not unmounting) keeps each tab's state alive across switches.
+  tabPaneHidden: { display: 'none' },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg },
   metricTabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },

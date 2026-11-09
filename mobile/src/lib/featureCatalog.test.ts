@@ -29,6 +29,8 @@ test('every item opens a screen that is registered in the navigator', () => {
 test('items reuse the icon, color and Pro flag the GM orb gives the same screen', () => {
   const colorOf = (key: string) => `colors.${key}`;
   for (const item of FEATURE_ITEMS) {
+    // Playoff Odds is a tab of League Rankings; the orb has one League Rankings row.
+    if (item.id === 'playoff-odds') continue;
     if (item.route === 'CollegeProspects') continue; // not in the orb; icon matches More's College Scouting row
     const at = orb.indexOf(`route: '${item.route}'`);
     assert.ok(at > 0, `${item.route} in GmOrb`);
@@ -37,7 +39,7 @@ test('items reuse the icon, color and Pro flag the GM orb gives the same screen'
     assert.ok(block.includes(`icon: '${item.icon}'`), `${item.id} icon`);
     assert.ok(block.includes(`color: ${colorOf(item.color)}`), `${item.id} color`);
     // Trades hosts three items; only Trade Finder is Pro and the orb row is not.
-    if (item.route !== 'Trades') assert.equal(block.includes('pro: true'), Boolean(item.pro), `${item.id} pro`);
+    if (item.route !== 'Trades' && item.route !== 'Teams') assert.equal(block.includes('pro: true'), Boolean(item.pro), `${item.id} pro`);
   }
   assert.match(more, /icon="school-outline"[\s\S]{0,80}colors\.accent[\s\S]{0,80}label="College Scouting"/);
 });
