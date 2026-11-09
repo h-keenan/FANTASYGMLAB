@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import PlayerNameText from '../components/PlayerNameText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -85,9 +86,7 @@ function ProspectRow({
             <Ionicons name={starIcon} size={17} color={starColor} />
           </TouchableOpacity>
         </View>
-        <AppText style={styles.gridName} numberOfLines={1}>
-          {prospect.name}
-        </AppText>
+        <PlayerNameText name={prospect.name} style={styles.gridName} />
         <AppText style={styles.meta} numberOfLines={1}>
           {classLabel}
         </AppText>
@@ -113,9 +112,7 @@ function ProspectRow({
     >
       <PositionBadge position={prospect.position} />
       <View style={styles.identity}>
-        <AppText style={styles.name} numberOfLines={1}>
-          {prospect.name}
-        </AppText>
+        <PlayerNameText name={prospect.name} style={styles.name} threshold={22} />
         <AppText style={styles.meta} numberOfLines={1}>
           {classLabel}
         </AppText>

@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
+import PlayerNameText from './PlayerNameText';
 import MeterRow, { confidenceLevelFor } from './ConfidenceMeter';
 import FAABGuidance from './FAABGuidance';
 import OverallRatingBadge from './OverallRatingBadge';
@@ -74,9 +75,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
       <View style={styles.suggestionPosBadgeWrap}>
         <PositionBadge position={player.position} size="sm" />
       </View>
-      <AppText style={styles.suggestionName} numberOfLines={1}>
-        {player.name ?? 'Unknown'}
-      </AppText>
+      <PlayerNameText name={player.name ?? 'Unknown'} style={styles.suggestionName} />
       <View style={styles.suggestionFooter}>
         <FAABGuidance faab={player.faab} size="compact" />
         {player.confidence_label ? (

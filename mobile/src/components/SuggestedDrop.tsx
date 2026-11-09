@@ -4,6 +4,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
+import PlayerNameText from './PlayerNameText';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import ToneBadge from './ToneBadge';
@@ -54,10 +55,8 @@ function DropPlayerLine({
     <View style={styles.playerLine}>
       <View style={styles.nameRow}>
         <PlayerAvatar playerId={player.player_id} size={32} />
-        <AppText style={[styles.playerName, { flexShrink: 1 }]}>
-          {lead ? `${lead} ` : ''}
-          {player.name}
-        </AppText>
+        {lead ? <AppText style={styles.playerName}>{lead}</AppText> : null}
+        <PlayerNameText name={player.name} style={[styles.playerName, { flexShrink: 1 }]} threshold={16} />
         <PositionBadge position={player.position} />
         {meta ? <AppText style={styles.meta}>{meta}</AppText> : null}
       </View>
@@ -108,7 +107,7 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: 'add
     <View style={[styles.tile, { borderColor: `${color}8C`, backgroundColor: `${color}14` }]} testID={`swap-${side}`}>
       <ToneBadge label={label} color={color} size="xs" />
       <PlayerAvatar playerId={playerId} size={44} />
-      <AppText style={[styles.playerName, { textAlign: 'center' }]}>{name}</AppText>
+      <PlayerNameText name={name} style={[styles.playerName, { textAlign: 'center' }]} />
       <View style={styles.pillRow}>
         <PositionBadge position={position} />
         {team ? <AppText style={styles.meta}>{`${team}${player?.age ? ` · ${Math.round(player.age)}` : ''}`}</AppText> : null}
@@ -175,9 +174,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
                 accessibilityLabel={`Cut ${alt.name} instead`}
               >
                 <PlayerAvatar playerId={alt.player_id} size={28} />
-                <AppText style={[styles.meta, { color: colors.textPrimary, fontWeight: '700', maxWidth: 110 }]} numberOfLines={1}>
-                  {alt.name}
-                </AppText>
+                <PlayerNameText name={alt.name} style={[styles.meta, { color: colors.textPrimary, fontWeight: '700', maxWidth: 110 }]} />
                 <PositionBadge position={alt.position} />
               </TouchableOpacity>
             ))}
@@ -221,7 +218,11 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
           <AppText style={[styles.badgeText, { color: badge.color }]}>{badge.label}</AppText>
         </View>
         {drop ? <PlayerAvatar playerId={drop.player_id} size={24} /> : null}
-        <AppText style={[styles.playerName, { flex: 1 }]}>{label}</AppText>
+        {drop ? (
+          <PlayerNameText name={label} style={[styles.playerName, { flex: 1 }]} threshold={20} />
+        ) : (
+          <AppText style={[styles.playerName, { flex: 1 }]}>{label}</AppText>
+        )}
         {drop ? <PositionBadge position={drop.position} /> : null}
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{open ? 'Hide' : 'Why'}</AppText>
       </TouchableOpacity>

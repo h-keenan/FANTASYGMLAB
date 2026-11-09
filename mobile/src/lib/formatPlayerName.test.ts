@@ -106,3 +106,11 @@ test('shared fixture list (identical on web) abbreviates as expected', () => {
     assert.equal(abbreviatePlayerName(input), expected, `input: ${JSON.stringify(input)}`);
   }
 });
+
+test('custom threshold lets wide rows keep names that fit and still shortens longer ones', () => {
+  // PlayerNameText passes a larger threshold for full-width list rows.
+  assert.equal(shouldAbbreviatePlayerName('Rhamondre Stevenson', 22), false);
+  assert.equal(shouldAbbreviatePlayerName('Rhamondre Stevenson', 18), true);
+  assert.equal(shouldAbbreviatePlayerName('Amon-Ra St. Brown', 16), true);
+  assert.equal(shouldAbbreviatePlayerName('Josh Allen', 16), false);
+});

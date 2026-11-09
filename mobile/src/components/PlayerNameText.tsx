@@ -30,9 +30,20 @@ import { abbreviatePlayerName, shouldAbbreviatePlayerName } from '../lib/formatP
  */
 export default function PlayerNameText({
   name,
+  threshold,
   ...rest
-}: { name: string } & Omit<TextProps, 'children' | 'numberOfLines' | 'onTextLayout'>) {
-  const needsAbbreviation = useMemo(() => shouldAbbreviatePlayerName(name), [name]);
+}: {
+  name: string;
+  /**
+   * Character count above which the name shortens to "F. Lastname".
+   * Defaults to the narrow-cell calibration (PLAYER_NAME_LENGTH_THRESHOLD).
+   * Wide single-line rows (a full-width list row with only an avatar and a
+   * badge beside the name) pass a larger value so a name that actually fits
+   * is not shortened needlessly.
+   */
+  threshold?: number;
+} & Omit<TextProps, 'children' | 'numberOfLines' | 'onTextLayout'>) {
+  const needsAbbreviation = useMemo(() => shouldAbbreviatePlayerName(name, threshold), [name, threshold]);
   const [clipped, setClipped] = useState(false);
   const abbreviated = needsAbbreviation || clipped;
   return (
