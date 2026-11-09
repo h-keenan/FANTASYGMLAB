@@ -5,6 +5,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * The standard left half of every player row: position badge, 40px avatar,
@@ -55,12 +56,12 @@ export function PlayerIdentity({
       <PositionBadge position={position} />
       <PlayerAvatar playerId={playerId ?? undefined} tier={tier ?? undefined} size={avatarSize} />
       <div className="flex flex-col gap-0.5 min-w-0">
-        <span
-          className="text-sm font-bold break-words"
+        <PlayerNameText
+          name={name}
+          threshold={Infinity}
+          className="text-sm font-bold"
           style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}
-        >
-          {name}
-        </span>
+        />
         <PlayerMetaLine injuryStatus={injuryStatus}>{children}</PlayerMetaLine>
         {after}
       </div>

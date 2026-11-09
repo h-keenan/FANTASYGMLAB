@@ -34,7 +34,6 @@ import {
   formatSeasonValue,
   formatSigned,
   hasKickedOff,
-  headToHeadShare,
   lineupTotals,
   rowWinner,
   lineupComparisonRows,
@@ -363,81 +362,92 @@ function LineupCell({
   const points = lineupPlayerPoints(player);
   const valueText = points.value != null ? points.value.toFixed(1) : points.note === "bye" ? null : "—";
   const reverse = mine ? "" : "flex-row-reverse";
+  const pointsColor =
+    emphasis === "win" ? "var(--color-accent)" : emphasis === "lose" ? "var(--color-text-muted)" : "var(--color-text-primary)";
+  // Two lines: avatar + name, then points (outer edge) and team/injury.
   const body = (
     <>
-      <span className="inline-flex shrink-0">
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={24} />
-      </span>
-      <span className={`flex flex-col min-w-0 flex-1 ${mine ? "" : "items-end text-right"}`}>
-        <span
-          className="text-[13px] font-bold truncate w-full leading-tight"
+      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={30} />
+      <span className={`flex flex-col min-w-0 flex-1 gap-0.5 ${mine ? "" : "items-end text-right"}`}>
+        <PlayerNameText
+          name={player.name || "Unknown player"}
+          className="text-[13px] font-bold w-full leading-tight"
           style={{ color: "var(--color-text-primary)" }}
-        >
-          {player.name || "Unknown player"}
-        </span>
-        <span className={`flex items-center gap-1 min-w-0 text-[11px] leading-tight ${mine ? "" : "flex-row-reverse"}`}>
-          <span className="truncate" style={{ color: "var(--color-text-muted)" }}>
+        />
+        <span className={`flex items-center gap-1.5 min-w-0 leading-tight ${reverse}`}>
+          {valueText ? (
+            <span
+              className="text-[15px] tabular-nums shrink-0"
+              style={{ color: pointsColor, fontWeight: emphasis === "lose" ? 600 : 800 }}
+              title={points.kind === "pts" ? "Real points" : "Projected points"}
+            >
+              {valueText}
+            </span>
+          ) : (
+            <ToneBadge label="Bye" color="var(--color-warning)" size="xs" />
+          )}
+          <span className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "FA"}
           </span>
           <PlayerInjuryBadge status={player.injury_label} />
         </span>
       </span>
-      <span className={`shrink-0 w-[2.1rem] ${mine ? "text-right" : "text-left"}`}>
-        {valueText ? (
-          <span
-            className="text-sm tabular-nums"
-            style={{
-              color: emphasis === "lose" ? "var(--color-text-muted)" : "var(--color-text-primary)",
-              fontWeight: emphasis === "win" ? 800 : emphasis === "lose" ? 500 : 700,
-            }}
-            title={points.kind === "pts" ? "Real points" : "Projected points"}
-          >
-            {valueText}
-          </span>
-        ) : (
-          <ToneBadge label="Bye" color="var(--color-warning)" size="xs" />
-        )}
-      </span>
     </>
   );
-  const cls = `flex items-center gap-1 py-2 w-full min-w-0 ${reverse}`;
-  return onEdit ? (
-    <button
-      type="button"
-      onClick={onEdit}
-      aria-label={`Swap ${player.name || "player"}`}
-      className={`${cls} text-left`}
-    >
-      {body}
-    </button>
-  ) : (
-    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Matchup" }} className={cls}>
-      {body}
-    </PlayerIdentityTrigger>
-  );
-}
-
-/** One thin edge-to-edge bar splitting the row's points between the sides. */
-function HeadToHeadBar({ share }: { share: number | null }) {
+  const cls = `flex items-center gap-1.5 w-full min-w-0 ${reverse}`;
+  const wrap = "rounded-lg px-1.5 py-2.5 min-w-0";
+  const tint = emphasis === "win" ? { background: "color-mix(in srgb, var(--color-accent) 9%, transparent)" } : undefined;
   return (
-    <span
-      className="flex h-[3px] w-full"
-      style={{ background: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}
-      aria-hidden="true"
-    >
-      {share != null ? (
-        <>
-          <span style={{ width: `${share}%`, background: "var(--color-accent)" }} />
-          <span style={{ flex: 1, background: "var(--color-border-strong)" }} />
-        </>
-      ) : null}
-    </span>
+    <div className={wrap} style={tint}>
+      {onEdit ? (
+        <button type="button" onClick={onEdit} aria-label={`Swap ${player.name || "player"}`} className={`${cls} text-left`}>
+          {body}
+        </button>
+      ) : (
+        <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Matchup" }} className={cls}>
+          {body}
+        </PlayerIdentityTrigger>
+      )}
+    </div>
   );
 }
 
 function emphasisFor(winner: ReturnType<typeof rowWinner>, side: "mine" | "opponent"): CellEmphasis {
   if (winner == null || winner === "tie") return "even";
   return winner === side ? "win" : "lose";
+}
+
+function TeamHeadCell({ side, mine }: { side: MatchupSide; mine: boolean }) {
+  return (
+    <span
+      role="columnheader"
+      className={`flex items-center gap-2 min-w-0 ${mine ? "" : "flex-row-reverse text-right"}`}
+    >
+      <TeamAvatar
+        avatarUrl={side.avatar_url}
+        name={side.team_name}
+        size={30}
+        ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
+      />
+      <span className="flex flex-col min-w-0 flex-1">
+        <span
+          className="text-xs font-bold leading-tight break-words"
+          style={{
+            color: mine ? "var(--color-accent)" : "var(--color-text-primary)",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {side.team_name || (mine ? "You" : "Opponent")}
+        </span>
+        <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+          {recordLabel(side)}
+        </span>
+      </span>
+    </span>
+  );
 }
 
 type LineupView = "suggested" | "actual";
@@ -487,7 +497,7 @@ function LineupComparison({
     : "Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.";
   const marginTone =
     Math.abs(totals.margin) < 0.05 ? "var(--color-text-muted)" : totals.margin > 0 ? "var(--color-success)" : "var(--color-danger)";
-  const gridCols = "grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)]";
+  const gridCols = "grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)]";
 
   return (
     <section className="glass-surface flex flex-col gap-2 p-3 sm:p-4" aria-labelledby="lineup-comparison-title">
@@ -555,14 +565,10 @@ function LineupComparison({
         </p>
       ) : (
         <div role="table" aria-label={actual ? "Actual lineups" : "Suggested lineups"} className="flex flex-col">
-          <div role="row" className={`grid ${gridCols} gap-1 items-end pb-1 text-[11px] font-bold uppercase tracking-wide`}>
-            <span role="columnheader" className="truncate" style={{ color: "var(--color-accent)" }}>
-              {mine.team_name || "You"}
-            </span>
+          <div role="row" className={`grid ${gridCols} gap-1 items-center pb-2`}>
+            <TeamHeadCell side={mine} mine />
             <span />
-            <span role="columnheader" className="truncate text-right" style={{ color: "var(--color-text-muted)" }}>
-              {opponent.team_name || "Opponent"}
-            </span>
+            <TeamHeadCell side={opponent} mine={false} />
           </div>
           {rows.map((row, index) => {
             const emptyOrdinal =
@@ -578,6 +584,7 @@ function LineupComparison({
                 role="row"
                 key={`${row.slot}-${index}`}
                 className="flex flex-col"
+                style={index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined}
               >
                 <div className={`grid ${gridCols} gap-1 items-center`}>
                   <div role="cell" className="min-w-0">
@@ -595,13 +602,13 @@ function LineupComparison({
                     <LineupCell player={row.opponent} mine={false} emphasis={emphasisFor(winner, "opponent")} />
                   </div>
                 </div>
-                <HeadToHeadBar share={headToHeadShare(myPts, theirPts)} />
               </div>
             );
           })}
           <div
             role="row"
-            className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 items-center pt-3"
+            className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 items-center mt-1 pt-3"
+            style={{ borderTop: "var(--border-width-default) solid var(--color-border-strong)" }}
           >
             <span role="cell" className="flex items-baseline gap-1.5 min-w-0">
               <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
@@ -775,6 +782,7 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
 }
 
 import { GuillotineCard, useGuillotine } from "@/components/GuillotineCard";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 export function MatchupContent({
   leagueName,

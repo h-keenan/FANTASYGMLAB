@@ -23,6 +23,7 @@ import {
 } from "@/lib/playerComparePresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Head-to-head Player Compare (Revision 12) — ports app.py's CURRENT,
@@ -134,9 +135,7 @@ function IdentityCard({ player }: { player: RankedPlayer }) {
       className="flex flex-col items-center gap-1 min-w-0 w-full"
     >
       <OvrGauge rating={player.overall_rating ?? null} size="md" />
-      <span className="text-sm font-bold text-center break-words w-full" style={{ color: "var(--color-text-primary)" }}>
-        {player.name || "Unknown"}
-      </span>
+      <PlayerNameText name={player.name || "Unknown"} className="text-sm font-bold text-center w-full" style={{ color: "var(--color-text-primary)" }} />
       <div className="flex items-center gap-1.5">
         <PositionBadge position={player.position} />
         {player.team ? (
@@ -202,9 +201,7 @@ function OpponentPicker({
             >
               <div className="flex items-center gap-2 min-w-0">
                 <PositionBadge position={candidate.position} />
-                <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-                  {candidate.name || "Unknown"}
-                </span>
+                <PlayerNameText name={candidate.name || "Unknown"} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                 <span className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
                   {candidate.team || "—"}
                 </span>

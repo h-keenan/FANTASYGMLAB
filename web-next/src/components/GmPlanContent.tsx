@@ -45,6 +45,7 @@ import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTa
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -146,9 +147,7 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
             <div key={player.player_id} className="flex items-center gap-2 py-1">
               <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "GM Plan" }} className="flex items-center gap-2 flex-1 min-w-0">
                 <PositionBadge position={player.position} />
-                <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-                  {player.name}
-                </span>
+                <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                 {player.team ? (
                   <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                     {player.team}

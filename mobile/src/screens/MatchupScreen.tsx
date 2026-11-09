@@ -23,6 +23,7 @@ import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPl
 import GuillotineCard from '../components/GuillotineCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PlayerNameText from '../components/PlayerNameText';
 import PositionBadge from '../components/PositionBadge';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -46,7 +47,6 @@ import {
   formatSeasonValue,
   formatSigned,
   hasKickedOff,
-  headToHeadShare,
   lineupTotals,
   rowWinner,
   lineupComparisonRows,
@@ -512,52 +512,65 @@ function LineupCell({
   const align = mine ? 'flex-start' : 'flex-end';
   return (
     <TouchableOpacity
-      style={[styles.cell, mine ? styles.cellRow : styles.cellRowReverse]}
+      style={[
+        styles.cell,
+        mine ? styles.cellRow : styles.cellRowReverse,
+        emphasis === 'win' && { backgroundColor: colors.accentMuted },
+      ]}
       onPress={() => (onEdit ? onEdit() : onPress(player))}
       accessibilityRole="button"
       accessibilityLabel={onEdit ? `Swap ${player.name ?? 'player'}` : `${player.name ?? 'Player'}, ${player.team ?? 'free agent'}`}
     >
-      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={24} />
+      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={30} />
       <View style={[styles.cellBody, { alignItems: align }]}>
-        <AppText style={[styles.cellName, !mine && styles.textRight]} numberOfLines={1}>
-          {player.name || 'Unknown player'}
-        </AppText>
-        <AppText style={[styles.cellTeam, !mine && styles.textRight]} numberOfLines={1}>
-          {player.team || 'FA'}
-          {player.injury_label ? ` · ${player.injury_label}` : ''}
-        </AppText>
-      </View>
-      <View style={[styles.cellPointsBox, { alignItems: mine ? 'flex-end' : 'flex-start' }]}>
-        {valueText ? (
-          <AppText
-            style={[
-              styles.cellPoints,
-              emphasis === 'win' && styles.cellPointsWin,
-              emphasis === 'lose' && styles.cellPointsLose,
-            ]}
-          >
-            {valueText}
+        <PlayerNameText
+          name={player.name || 'Unknown player'}
+          style={[styles.cellName, !mine && styles.textRight]}
+        />
+        <View style={[styles.cellMetaRow, !mine && { flexDirection: 'row-reverse' }]}>
+          {valueText ? (
+            <AppText
+              style={[
+                styles.cellPoints,
+                emphasis === 'win' && styles.cellPointsWin,
+                emphasis === 'lose' && styles.cellPointsLose,
+              ]}
+            >
+              {valueText}
+            </AppText>
+          ) : (
+            <ToneBadge label="Bye" color={colors.premium} />
+          )}
+          <AppText style={styles.cellTeam} numberOfLines={1}>
+            {player.team || 'FA'}
+            {player.injury_label ? ` · ${player.injury_label}` : ''}
           </AppText>
-        ) : (
-          <ToneBadge label="Bye" color={colors.premium} />
-        )}
+        </View>
       </View>
     </TouchableOpacity>
   );
 }
 
-/** One thin edge-to-edge bar splitting the row's points between the sides. */
-function HeadToHeadBar({ share }: { share: number | null }) {
+function TeamHeadCell({ side, mine }: { side: MatchupSide; mine: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.barTrack}>
-      {share != null ? (
-        <>
-          <View style={{ width: `${share}%`, backgroundColor: colors.accent }} />
-          <View style={{ flex: 1, backgroundColor: colors.borderStrong }} />
-        </>
-      ) : null}
+    <View style={[styles.teamHead, !mine && { flexDirection: 'row-reverse' }]}>
+      <TeamAvatar
+        avatarId={side.avatar_url}
+        name={side.team_name}
+        size={30}
+        style={StyleSheet.flatten([styles.scoreAvatar, { marginBottom: 0, borderColor: mine ? colors.accent : colors.borderStrong }])}
+      />
+      <View style={styles.teamHeadText}>
+        <AppText
+          style={[styles.teamHeader, { color: mine ? colors.accent : colors.textPrimary }, !mine && styles.textRight]}
+          numberOfLines={2}
+        >
+          {side.team_name || (mine ? 'You' : 'Opponent')}
+        </AppText>
+        <AppText style={[styles.cellTeam, !mine && styles.textRight]}>{recordLabel(side)}</AppText>
+      </View>
     </View>
   );
 }
@@ -662,13 +675,9 @@ function LineupComparison({
       ) : (
         <View>
           <View style={styles.teamHeaderRow}>
-            <AppText style={[styles.teamHeader, { color: colors.accent }]} numberOfLines={1}>
-              {mine.team_name || 'You'}
-            </AppText>
+            <TeamHeadCell side={mine} mine />
             <View style={styles.slotCell} />
-            <AppText style={[styles.teamHeader, styles.textRight]} numberOfLines={1}>
-              {opponent.team_name || 'Opponent'}
-            </AppText>
+            <TeamHeadCell side={opponent} mine={false} />
           </View>
           {rows.map((row, index) => {
             const emptyOrdinal =
@@ -680,7 +689,7 @@ function LineupComparison({
             const theirPts = pointsOf(row.opponent);
             const winner = rowWinner(myPts, theirPts);
             return (
-              <View key={`${row.slot}-${index}`}>
+              <View key={`${row.slot}-${index}`} style={index > 0 ? styles.rowDivider : undefined}>
                 <View style={styles.tableRow}>
                   <LineupCell
                     player={row.mine}
@@ -699,7 +708,6 @@ function LineupComparison({
                     onPress={onPressPlayer}
                   />
                 </View>
-                <HeadToHeadBar share={headToHeadShare(myPts, theirPts)} />
               </View>
             );
           })}
@@ -889,44 +897,44 @@ function createStyles(colors: ThemeColors) {
     emptyNote: { fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingVertical: spacing.md },
     lineupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     lineupControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    teamHeaderRow: { flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 4 },
+    teamHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: spacing.sm },
+    teamHead: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },
+    teamHeadText: { flex: 1, minWidth: 0, gap: 1 },
+    rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
     teamHeader: {
-      flex: 1,
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
-      letterSpacing: 0.4,
-      textTransform: 'uppercase',
+      lineHeight: 15,
       color: colors.textTertiary,
     },
     tableRow: { flexDirection: 'row', alignItems: 'stretch' },
-    cell: { flex: 1, paddingVertical: spacing.sm, minWidth: 0 },
+    cell: { flex: 1, paddingVertical: 10, paddingHorizontal: 6, borderRadius: radii.md, minWidth: 0 },
     cellCenter: { justifyContent: 'center' },
-    cellRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    cellRowReverse: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+    cellRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    cellRowReverse: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+    cellMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
     cellBody: { flex: 1, minWidth: 0 },
     cellName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, alignSelf: 'stretch' },
     textRight: { textAlign: 'right' },
     cellTeam: { fontSize: 11, color: colors.textTertiary, alignSelf: 'stretch' },
-    cellPointsBox: { width: 36, justifyContent: 'center' },
-    cellPoints: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
-    cellPointsWin: { fontWeight: '800' },
-    cellPointsLose: { fontWeight: '500', color: colors.textTertiary },
+        cellPoints: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    cellPointsWin: { fontWeight: '800', color: colors.accent },
+    cellPointsLose: { fontWeight: '600', color: colors.textTertiary },
     emptySlot: { fontSize: 12, fontStyle: 'italic', color: colors.textTertiary },
-    barTrack: {
-      height: 3,
-      alignSelf: 'stretch',
-      flexDirection: 'row',
-      borderRadius: radii.pill,
-      backgroundColor: colors.border,
-      overflow: 'hidden',
-    },
     slotCell: {
-      width: 44,
+      width: 40,
       alignItems: 'center',
       justifyContent: 'center',
       marginHorizontal: 2,
     },
-    totalRow: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.md },
+    totalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderStrong,
+    },
     totalSide: { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
     totalLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: colors.textTertiary },
     totalValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },

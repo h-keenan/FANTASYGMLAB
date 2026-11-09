@@ -40,6 +40,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { DroppablePlayersSection, NeedsBreakdown, SuggestedDrop } from "@/components/SuggestedDrop";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -273,9 +274,7 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <span className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
+          <PlayerNameText name={player.name || "Unknown player"} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
           <PlayerMetaLine injuryStatus={injury.label}>
             {player.team || "FA"}
             {contextLine ? ` · ${contextLine}` : ""}
@@ -329,14 +328,12 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
 /** Small tile used by Position Snapshot and the Stash / depth / FAAB rows. */
 function PlayerTile({ position, player, note }: { position: string; player: WaiverPlayer; note?: string }) {
   return (
-    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[7.5rem]">
+    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[8.5rem]">
       <div className="glass-surface flex flex-col items-center gap-1 p-3">
         <PositionBadge position={position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="md" />
-        <span className="text-sm font-extrabold break-words max-w-full" style={{ color: "var(--color-text-primary)" }}>
-          {player.name || "Unknown"}
-        </span>
+        <PlayerNameText name={player.name || "Unknown"} className="text-[13px] font-extrabold text-center" style={{ color: "var(--color-text-primary)" }} />
         <div className="flex flex-col items-center gap-0.5">
           <ValueStat value={formatWaiverScore(player.score)} align="center" />
           {note ? (

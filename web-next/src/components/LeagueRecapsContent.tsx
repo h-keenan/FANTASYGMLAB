@@ -41,6 +41,7 @@ import {
   recapStoryCategory,
 } from "@/lib/leagueRecapsPresentation";
 import { PageTitle } from "@/components/PageTitle";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Ports modules/league_recaps_ui.py + modules/league_history_ui.py for
@@ -315,7 +316,7 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
         <PositionBadge position={asset.position} />
-        <span style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{asset.name}</span>
+        <PlayerNameText name={asset.name} threshold={Infinity} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
       </span>
     );
   }
@@ -327,7 +328,7 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
       >
         <PlayerAvatar playerId={asset.player_id} size={20} />
         <PositionBadge position={asset.position} />
-        <span style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{asset.name}</span>
+        <PlayerNameText name={asset.name} threshold={Infinity} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
       </span>
     </PlayerIdentityTrigger>
   );
@@ -340,15 +341,12 @@ function TradePlayerRow({ asset }: { asset: HistoryTransaction["draft_picks"][nu
   const row = (
     <span className="flex items-center gap-2 min-w-0 w-full">
       {asset.player_id ? <PlayerAvatar playerId={asset.player_id} size={24} /> : <span style={{ width: 24 }} />}
-      <span className="text-sm font-bold min-w-0 break-words" style={{ color: nameColor }}>
-        {asset.name}
-        {asset.team ? (
-          <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>
-            {" "}
-            {asset.team}
-          </span>
-        ) : null}
-      </span>
+      <PlayerNameText name={asset.name} threshold={Infinity} className="text-sm font-bold" style={{ color: nameColor }} />
+      {asset.team ? (
+        <span className="text-xs font-normal shrink-0" style={{ color: "var(--color-text-muted)" }}>
+          {asset.team}
+        </span>
+      ) : null}
       <span className="flex-1" />
       <PositionBadge position={asset.position} />
     </span>

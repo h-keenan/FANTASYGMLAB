@@ -23,3 +23,25 @@ export function abbreviatePlayerName(name: string | null | undefined): string {
   const initial = Array.from(first)[0];
   return `${initial}. ${rest.join(" ")}`;
 }
+
+/**
+ * Ported from mobile/src/lib/formatPlayerName.ts (same threshold, same
+ * decision). The mobile calibration: 12 is the narrowest real container
+ * (Trade Hub exchange chips at 375pt, ~76pt of usable name width at a 14.5pt
+ * bold name, ~10 characters fit) plus a couple characters of headroom, so
+ * short names ("Josh Allen", "CeeDee Lamb") stay full while every name seen
+ * truncating in production ("Juwan Johnson", "Rhamondre Stevenson") is caught
+ * before the first frame. Wide web layouts pass `threshold={Infinity}` to
+ * PlayerNameText and rely on measured overflow instead.
+ */
+export const PLAYER_NAME_LENGTH_THRESHOLD = 12;
+
+export function shouldAbbreviatePlayerName(
+  name: string | null | undefined,
+  threshold: number = PLAYER_NAME_LENGTH_THRESHOLD,
+): boolean {
+  if (!name) return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return trimmed.length > threshold;
+}

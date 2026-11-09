@@ -276,7 +276,7 @@ describe("MatchupContent", () => {
 
     expect(screen.getByRole("tab", { name: "Actual" })).toHaveAttribute("aria-selected", "true");
     const table = screen.getByRole("table", { name: "Actual lineups" });
-    expect(within(table).getByText("Ashton Jeanty")).toBeInTheDocument();
+    expect(within(table).getByText("A. Jeanty")).toBeInTheDocument();
     expect(within(table).getByText("Chase Brown")).toBeInTheDocument();
     // Started: real points. Not started: projection, never a fake 0.0.
     expect(within(table).getByText("14.2")).toBeInTheDocument();
