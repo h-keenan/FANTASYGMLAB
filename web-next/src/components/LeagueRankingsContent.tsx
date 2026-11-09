@@ -56,6 +56,11 @@ function rankBadgeColor(tone: "positive" | "negative" | "neutral" = "neutral"): 
   return tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
 }
 
+/** Rank boards stay scannable: a row shows its first few badges, the rest as "+N". */
+const MAX_ROW_BADGES = 2;
+/** Rank boards open on the leaders; "Show all" reveals the rest of the league. */
+const BOARD_PREVIEW_COUNT = 3;
+
 export function RankingRow({
   rankLabel,
   teamName,
@@ -121,13 +126,18 @@ export function RankingRow({
         ) : null}
         {badges && badges.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-0.5">
-            {badges.map((badge) => (
+            {badges.slice(0, MAX_ROW_BADGES).map((badge) => (
               <ToneBadge key={badge.label} label={badge.label} color={rankBadgeColor(badge.tone)} />
             ))}
+            {badges.length > MAX_ROW_BADGES ? (
+              <span className="text-xs self-center" style={{ color: "var(--color-text-muted)" }}>
+                +{badges.length - MAX_ROW_BADGES}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
-      <div className="flex flex-col items-end gap-0.5 shrink-0">
+      <div className="flex flex-col items-end gap-0.5 shrink-0 max-w-[30%] text-right">
         <span className="text-sm font-extrabold" style={{ color: toneColor }}>
           {primaryMetric}
         </span>
@@ -388,12 +398,18 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
 function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: RankBoardKey; teams: TeamRanking[]; myRosterId: string; onOpenManager: OpenManager }) {
   const config = RANK_BOARD_CONFIG[board];
   const ordered = sortByBoard(teams, board);
+  const [expanded, setExpanded] = useState(false);
+  const canCollapse = ordered.length > BOARD_PREVIEW_COUNT + 1;
+  // Collapsed: the top three, plus the caller's own row if they sit below it.
+  const visible = !canCollapse || expanded
+    ? ordered
+    : ordered.filter((team, index) => index < BOARD_PREVIEW_COUNT || team.roster_id === myRosterId);
 
   return (
     <section className="flex flex-col gap-3">
       <SectionHeading kicker={config.kicker} note={config.note}>{config.title}</SectionHeading>
       <div className="glass-surface flex flex-col">
-        {ordered.map((team) => {
+        {visible.map((team) => {
           const rank = team[config.rankField] as number | null;
           const tied = Boolean(team[config.tiedField]);
           const score = team[config.scoreField] as number | null;
@@ -422,6 +438,17 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
             />
           );
         })}
+        {canCollapse ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            className="tap-link text-sm font-bold py-3"
+            style={{ color: "var(--color-accent)" }}
+          >
+            {expanded ? "Show top 3" : `Show all ${ordered.length} teams`}
+          </button>
+        ) : null}
       </div>
     </section>
   );
