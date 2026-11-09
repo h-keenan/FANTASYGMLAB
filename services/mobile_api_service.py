@@ -16266,6 +16266,7 @@ def get_trade_finder_ideas(
     lens: str = "Dynasty",
     pick_ids: str = "",
     return_picks: bool = False,
+    return_players: bool = False,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Trade Finder — "select these specific players, find who'd want
@@ -16359,6 +16360,7 @@ def get_trade_finder_ideas(
             team_stance=declared_team_stance,
             trade_block_pick_ids=selected_pick_ids,
             require_receive_picks=bool(return_picks),
+            require_receive_players=bool(return_players) and not return_picks,
             finder_trace=trace,
             posture=posture,
         )

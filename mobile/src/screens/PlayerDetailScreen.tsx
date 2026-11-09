@@ -25,6 +25,7 @@ import MetricCard from '../components/MetricCard';
 import PercentileExplorerSheet from '../components/PercentileExplorerSheet';
 import { type ExplorerPlayer } from '../lib/percentileExplorer';
 import PlayerHero from '../components/PlayerHero';
+import ToneBadge from '../components/ToneBadge';
 import DecisionFitCard from '../components/DecisionFitCard';
 import PlayerSharePreviewModal from '../components/PlayerSharePreviewModal';
 import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnapshotCard';
@@ -59,8 +60,8 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { tradeShortcutsFor } from '../lib/tradeShortcuts';
-import { useRosterOwnership } from '../lib/useRosterOwnership';
+import { playerLeagueStatus, playerLeagueStatusLabel, tradeShortcutsFor } from '../lib/tradeShortcuts';
+import { useRosterOwnershipWithTeams } from '../lib/useRosterOwnership';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import PlayerNewsSection from '../components/PlayerNewsSection';
@@ -1010,7 +1011,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   // "Add to Trade" / "Find trades" (tap-depth audit #1/#2) — shown only once
   // ownership is known: Add to Trade for any rostered player, Find trades
   // only for the user's own.
-  const tradeShortcuts = tradeShortcutsFor(player.player_id, useRosterOwnership(leagueId));
+  const { ownership: rosterOwnership, teamNameByRosterId } = useRosterOwnershipWithTeams(leagueId);
+  const tradeShortcuts = tradeShortcutsFor(player.player_id, rosterOwnership);
+  const leagueStatus = playerLeagueStatus(player.player_id, rosterOwnership, teamNameByRosterId);
   // Overall + Snapshot module: collapsed by default, tapping the hero's OVR
   // ring reveals the Snapshot detail in place (coridian_, Discord — "if you
   // tap on the overall, it gives you the expanded information") instead of
@@ -1261,6 +1264,15 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   // the news pill in alongside the buttons.
   const heroActions = (
     <>
+      {leagueStatus && leagueStatus.kind !== 'mine' ? (
+        <View style={styles.actionRow}>
+          <ToneBadge
+            label={playerLeagueStatusLabel(leagueStatus)}
+            color={leagueStatus.kind === 'free_agent' ? colors.success : colors.accent}
+            icon={leagueStatus.kind === 'free_agent' ? 'person-add-outline' : 'people-outline'}
+          />
+        </View>
+      ) : null}
       <View style={styles.playerShareRow}>
         <PlayerTags tags={tags} />
         <TouchableOpacity

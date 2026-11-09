@@ -394,7 +394,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [ownedPicks, setOwnedPicks] = useState<DraftPickAsset[]>([]);
   const [selectedPickIds, setSelectedPickIds] = useState<Set<string>>(new Set());
-  const [returnScope, setReturnScope] = useState<'any' | 'picks'>('any');
+  const [returnScope, setReturnScope] = useState<'any' | 'picks' | 'players'>('any');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeFinderClosestIdea[] | null>(null);
@@ -466,6 +466,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
       const result = await api.getTradeFinderIdeas(leagueId, playerIds, strategy, lens, {
         pickIds: Array.from(selectedPickIds),
         returnPicks: returnScope === 'picks',
+        returnPlayers: returnScope === 'players',
       });
       setIdeas(result.ideas);
       setNoResults({ search: result.search, closest: result.closest ?? [] });
@@ -534,10 +535,11 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
               text={`Pick the players and draft picks you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
             />
             <SectionHeading title="What You Want Back" topGap={12} />
-            <SegmentedTabBar<'any' | 'picks'>
+            <SegmentedTabBar<'any' | 'picks' | 'players'>
               options={[
                 { key: 'any', label: 'Any return' },
                 { key: 'picks', label: 'Picks back' },
+                { key: 'players', label: 'Players back' },
               ]}
               active={returnScope}
               onChange={(key) => {

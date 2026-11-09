@@ -163,7 +163,7 @@ describe("TradeFinderContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
     });
 
-    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty", { pickIds: [], returnPicks: false });
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty", { pickIds: [], returnPicks: false, returnPlayers: false });
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("Favorable")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("TradeFinderContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
     });
 
-    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "contender", "Dynasty", { pickIds: [], returnPicks: false });
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "contender", "Dynasty", { pickIds: [], returnPicks: false, returnPlayers: false });
   });
 
   it("lists only the caller's own picks and searches with a picks-only selection plus Picks back", async () => {
@@ -240,6 +240,7 @@ describe("TradeFinderContent", () => {
     expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", [], "retool", "Dynasty", {
       pickIds: ["2027:1:1"],
       returnPicks: true,
+      returnPlayers: false,
     });
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
   });
@@ -471,7 +472,7 @@ describe("TradeFinderContent", () => {
       await act(async () => {});
 
       expect(api.getTradeFinderIdeas).toHaveBeenCalledTimes(1);
-      expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p2"], "contender", "Dynasty", { pickIds: [], returnPicks: false });
+      expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p2"], "contender", "Dynasty", { pickIds: [], returnPicks: false, returnPlayers: false });
       expect(screen.getByText("Bench Guy").closest("button")).toHaveAttribute("aria-pressed", "true");
       expect(screen.getByText("Rival GM")).toBeInTheDocument();
     });

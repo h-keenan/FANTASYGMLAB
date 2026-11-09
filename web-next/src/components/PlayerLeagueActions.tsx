@@ -6,7 +6,13 @@ import { api } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
 import { canBuildOffer, offerBuilderHref } from "@/lib/tradeOffer";
-import { rosterOwnershipFrom, tradeShortcutsFor, type RosterOwnership } from "@/lib/tradeShortcuts";
+import {
+  playerLeagueStatus,
+  playerLeagueStatusLabel,
+  rosterOwnershipFrom,
+  tradeShortcutsFor,
+  type RosterOwnership,
+} from "@/lib/tradeShortcuts";
 
 /**
  * The contextual trade actions on Player Quick View and the Player Profile
@@ -49,6 +55,7 @@ export function PlayerLeagueActions({
 }) {
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [ownership, setOwnership] = useState<RosterOwnership | null>(null);
+  const [teamNames, setTeamNames] = useState<Record<string, string>>({});
   const [onMyRoster, setOnMyRoster] = useState<boolean | null>(null);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
@@ -66,9 +73,12 @@ export function PlayerLeagueActions({
           Promise.resolve()
             .then(() => api.getLeagueRosters(leagueId))
             .catch(() => null),
+          Promise.resolve()
+            .then(() => api.getLeagueTeamProfiles(leagueId))
+            .catch(() => null),
         ]),
       )
-      .then(async ([result, rostersResult]) => {
+      .then(async ([result, rostersResult, profilesResult]) => {
         if (cancelled) return;
         const players = Array.isArray(result?.roster?.players) ? (result.roster!.players as unknown[]) : [];
         const mine = players.map(String).includes(playerId);
@@ -78,6 +88,11 @@ export function PlayerLeagueActions({
         }
         setOnMyRoster(mine);
         setOwnership(rosterOwnershipFrom(result.roster ?? null, rostersResult?.rosters ?? []));
+        const names: Record<string, string> = {};
+        for (const profile of Object.values(profilesResult?.profiles ?? {})) {
+          if (profile?.team_name) names[String(profile.roster_id)] = profile.team_name;
+        }
+        setTeamNames(names);
         if (!mine) {
           try {
             const targets = await api.getGmTargets(leagueId);
@@ -128,8 +143,19 @@ export function PlayerLeagueActions({
 
   const showBuildOffer = ready && !hideAddToTrade && canBuildOffer(playerId, ownership);
 
+  const leagueStatus = ready ? playerLeagueStatus(playerId, ownership, teamNames) : null;
+
   return (
     <>
+      {leagueStatus && leagueStatus.kind !== "mine" ? (
+        <span
+          className="pqv-action-link"
+          data-testid="player-league-status"
+          style={{ color: leagueStatus.kind === "free_agent" ? "var(--color-success)" : "var(--color-accent)" }}
+        >
+          {playerLeagueStatusLabel(leagueStatus)}
+        </span>
+      ) : null}
       {showBuildOffer ? (
         <a
           className="pqv-action-link pqv-action-link--primary"

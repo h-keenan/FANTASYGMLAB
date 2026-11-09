@@ -4271,10 +4271,10 @@ export const api = {
     playerIds: string[],
     strategy: string = "retool",
     lens: string = "Dynasty",
-    options: { pickIds?: string[]; returnPicks?: boolean } = {},
+    options: { pickIds?: string[]; returnPicks?: boolean; returnPlayers?: boolean } = {},
   ) =>
     authorizedRequest<TradeFinderResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(","))}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}${options.pickIds && options.pickIds.length > 0 ? `&pick_ids=${encodeURIComponent(options.pickIds.join(","))}` : ""}${options.returnPicks ? "&return_picks=true" : ""}`,
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(","))}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}${options.pickIds && options.pickIds.length > 0 ? `&pick_ids=${encodeURIComponent(options.pickIds.join(","))}` : ""}${options.returnPicks ? "&return_picks=true" : ""}${options.returnPlayers ? "&return_players=true" : ""}`,
     ),
 
   getLeagueWaivers: (leagueId: string, lens: string = "Dynasty", limit: number = 150) =>

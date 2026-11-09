@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { rosterOwnershipFrom, tradeShortcutsFor } from "./tradeShortcuts";
+import { playerLeagueStatus, playerLeagueStatusLabel, rosterOwnershipFrom, tradeShortcutsFor } from "./tradeShortcuts";
 
 const ownership = rosterOwnershipFrom({ players: ["1", 2] }, [
   { roster_id: 1, players: ["1", "2"] },
@@ -19,5 +19,28 @@ describe("tradeShortcutsFor", () => {
     expect(tradeShortcutsFor("99", ownership)).toEqual({ canAddToTrade: false, canFindTrades: false });
     expect(tradeShortcutsFor("1", null)).toEqual({ canAddToTrade: false, canFindTrades: false });
     expect(tradeShortcutsFor("", ownership)).toEqual({ canAddToTrade: false, canFindTrades: false });
+  });
+});
+
+describe("playerLeagueStatus", () => {
+  const leagueOwnership = rosterOwnershipFrom({ roster_id: 1, players: ["a"] }, [
+    { roster_id: 1, players: ["a"] },
+    { roster_id: 2, players: ["b"] },
+  ]);
+
+  it("is null until ownership is known", () => {
+    expect(playerLeagueStatus("a", null)).toBeNull();
+  });
+
+  it("reports mine, rostered (with team name) and free agent", () => {
+    expect(playerLeagueStatus("a", leagueOwnership)).toEqual({ kind: "mine" });
+    expect(playerLeagueStatus("b", leagueOwnership, { "2": "Rival GM" })).toEqual({ kind: "rostered", teamName: "Rival GM" });
+    expect(playerLeagueStatus("c", leagueOwnership)).toEqual({ kind: "free_agent" });
+  });
+
+  it("still reports a rostered player when no team name is known", () => {
+    const status = playerLeagueStatus("b", leagueOwnership);
+    expect(status).toEqual({ kind: "rostered", teamName: null });
+    expect(playerLeagueStatusLabel(status!)).toBe("On another team");
   });
 });

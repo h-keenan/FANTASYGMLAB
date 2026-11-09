@@ -12,6 +12,7 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getMyRoster: vi.fn(),
       getLeagueRosters: vi.fn(),
+      getLeagueTeamProfiles: vi.fn(),
       getGmTargets: vi.fn(),
       addGmTarget: vi.fn(),
       removeGmTarget: vi.fn(),
@@ -42,11 +43,36 @@ describe("PlayerLeagueActions", () => {
         { roster_id: 2, players: ["other-1"] },
       ],
     });
+    vi.mocked(api.getLeagueTeamProfiles).mockReset();
+    vi.mocked(api.getLeagueTeamProfiles).mockResolvedValue({
+      ok: true,
+      profiles: {
+        u2: { team_name: "Rival GM", owner_name: "", username: "", avatar_id: "", avatar_url: "", roster_id: 2, owner_id: "u2" },
+      },
+    });
     vi.mocked(api.getGmTargets).mockReset();
     vi.mocked(api.addGmTarget).mockReset();
     vi.mocked(api.removeGmTarget).mockReset();
     vi.mocked(api.getMyRoster).mockResolvedValue({ ok: true, roster: { roster_id: 1, players: ["mine-1"] }, reason: "" });
     vi.mocked(api.getGmTargets).mockResolvedValue({ ok: true, targets: [] });
+  });
+
+  it("says which team holds a player who is not on my roster", async () => {
+    renderActions("other-1");
+    await act(async () => {});
+    expect(screen.getByTestId("player-league-status")).toHaveTextContent("On Rival GM");
+  });
+
+  it("says Free agent when no roster holds the player", async () => {
+    renderActions("nobody-has-me");
+    await act(async () => {});
+    expect(screen.getByTestId("player-league-status")).toHaveTextContent("Free agent");
+  });
+
+  it("shows no status for my own player", async () => {
+    renderActions("mine-1");
+    await act(async () => {});
+    expect(screen.queryByTestId("player-league-status")).toBeNull();
   });
 
   it("links Add to Trade to the analyzer with this player", async () => {
