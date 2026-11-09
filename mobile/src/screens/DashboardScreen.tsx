@@ -69,7 +69,7 @@ import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
-import { formatRank } from '../lib/percentile';
+import { formatRank, rankFill, winShare } from '../lib/percentile';
 import { getLastOpenedRecapId } from '../lib/recapSeen';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -530,8 +530,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             }
           />
-          <DashboardStatStrip snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
-          <TeamSnapshotRow snapshot={teamSnapshot} />
+          <DashboardStatStrip
+            snapshot={teamSnapshot}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            navigation={navigation}
+            leagueSize={teamRankings?.length ?? null}
+          />
+          <TeamSnapshotRow snapshot={teamSnapshot} leagueSize={teamRankings?.length ?? null} />
         </View>
       ) : null}
 
@@ -753,11 +759,14 @@ export function DashboardStatStrip({
   leagueId,
   leagueName,
   navigation,
+  leagueSize = null,
 }: {
   snapshot: TeamSnapshot;
   leagueId: string;
   leagueName: string;
   navigation: DashboardNavigation;
+  /** Teams in the league (from the team-rankings query); rank meters stay off until known. */
+  leagueSize?: number | null;
 }) {
   const record =
     snapshot.wins != null && snapshot.losses != null
@@ -779,17 +788,24 @@ export function DashboardStatStrip({
     <View>
       <DashboardStatRow
         items={[
-          { label: 'Record', icon: 'ribbon-outline', value: record },
+          {
+            label: 'Record',
+            icon: 'ribbon-outline',
+            value: record,
+            fill: winShare(snapshot.wins, snapshot.losses, snapshot.ties),
+          },
           {
             label: 'Power Rank',
             icon: 'trophy-outline',
             value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
+            fill: rankFill(snapshot.power_rank, leagueSize),
             onPress: goToTeams,
           },
           {
             label: 'Franchise',
             icon: 'shield-outline',
             value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
+            fill: rankFill(snapshot.franchise_rank, leagueSize),
             onPress: goToTeams,
           },
           {
@@ -809,7 +825,7 @@ export function DashboardStatStrip({
 
 /** Starter Strength, Bench Strength and Injuries only; renders under the
  * "My Team" heading together with the record/rank/age strip. */
-export function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
+export function TeamSnapshotRow({ snapshot, leagueSize = null }: { snapshot: TeamSnapshot; leagueSize?: number | null }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const copy = useExperienceCopy();
@@ -828,11 +844,13 @@ export function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
             label: 'Starter Strength',
             icon: 'link-outline',
             value: snapshot.starter_rank != null ? formatRank(snapshot.starter_rank, !!snapshot.starter_rank_tied) : '—',
+            fill: rankFill(snapshot.starter_rank, leagueSize),
           },
           {
             label: 'Bench Strength',
             icon: 'layers-outline',
             value: snapshot.bench_rank != null ? formatRank(snapshot.bench_rank, !!snapshot.bench_rank_tied) : '—',
+            fill: rankFill(snapshot.bench_rank, leagueSize),
           },
           {
             label: 'Injuries',

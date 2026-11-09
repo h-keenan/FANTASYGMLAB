@@ -2,14 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import AccentCard from './AccentCard';
 import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
 import Button from './Button';
+import ToneBadge from './ToneBadge';
 import DeadlineCard from './DeadlineCard';
 import SectionHeading from './SectionHeading';
 import SkeletonBlock from './SkeletonBlock';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { DashboardItem, DashboardResponse } from '../lib/api';
+import type { DashboardItem, DashboardResponse, ThisWeekRow } from '../lib/api';
 import {
   buildNowChips,
   tradesGoalLine,
@@ -71,6 +73,13 @@ export function DashboardNowStrip({
   );
 }
 
+function holdToneColor(tone: ThisWeekRow['tone'], colors: ThemeColors): string {
+  if (tone === 'positive') return colors.success;
+  if (tone === 'risk') return colors.danger;
+  if (tone === 'waiver' || tone === 'trade') return colors.accent;
+  return colors.textTertiary;
+}
+
 /**
  * The primary block: the best real trade idea, one primary action
  * ("Analyze a trade") and one quiet link to the rest of the board. Mirrors
@@ -121,9 +130,18 @@ export function DashboardTradesBlock({
       ) : pending ? (
         <SkeletonBlock height={96} radius={12} />
       ) : (
-        <AppText style={styles.bodyText}>
-          {holdRow ? `${holdRow.headline}. ${holdRow.why}` : TRADES_BLOCK_COPY.empty}
-        </AppText>
+        holdRow ? (
+          <AccentCard accent={holdToneColor(holdRow.tone, colors)} compact>
+            <View style={styles.holdHead}>
+              {holdRow.status ? <ToneBadge label={holdRow.status} color={holdToneColor(holdRow.tone, colors)} /> : null}
+              <AppText style={styles.holdHeadline}>{holdRow.headline}</AppText>
+            </View>
+            {/* The deadline card above already says when; only repeat the why without it. */}
+            {holdRow.why && !data.trade_window ? <AppText style={styles.holdWhy}>{holdRow.why}</AppText> : null}
+          </AccentCard>
+        ) : (
+          <AppText style={styles.bodyText}>{TRADES_BLOCK_COPY.empty}</AppText>
+        )
       )}
       <View style={styles.actionRow}>
         <Button
@@ -185,6 +203,9 @@ function createStyles(colors: ThemeColors) {
     chipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textTertiary },
     chipValue: { fontSize: 14, fontWeight: '700' },
     block: { gap: spacing.sm },
+    holdHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+    holdHeadline: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    holdWhy: { fontSize: 12, color: colors.textSecondary },
     bodyText: { fontSize: 14, color: colors.textSecondary },
     actionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
     link: { fontSize: 14, fontWeight: '700', color: colors.accent },

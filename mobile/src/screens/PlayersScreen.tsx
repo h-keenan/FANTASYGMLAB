@@ -97,7 +97,7 @@ function RowTradeActions({
         <TouchableOpacity
           onPress={onAddToTrade}
           hitSlop={6}
-          style={styles.rowActionButton}
+          style={[styles.rowActionButton, styles.rowActionAccent]}
           accessibilityRole="button"
           accessibilityLabel={`Add ${playerName} to a trade`}
         >
@@ -508,6 +508,8 @@ function createStyles(colors: ThemeColors) {
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: spacing.xs },
   // 40pt tap target (phone layout audit).
   rowActionButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  // Add-to-trade is the row's primary action: accent border + 12% tint (web parity).
+  rowActionAccent: { borderWidth: 1, borderColor: colors.accent, borderRadius: radii.sm, backgroundColor: `${colors.accent}1F` },
   idpNote: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.md },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
