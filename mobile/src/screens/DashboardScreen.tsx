@@ -77,8 +77,8 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
-import { DashboardMore, DashboardNowStrip, DashboardTradesBlock } from '../components/DashboardBlocks';
-import { isTradeItem, nextMoveRowFilter } from '../lib/dashboardLayout';
+import { DashboardMore, DashboardNeedsAttention, DashboardNowStrip, DashboardTradesBlock } from '../components/DashboardBlocks';
+import { buildNeedsAttention, isTradeItem, weekRowsAfterAttention } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -358,7 +358,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
           scrollEnabled={false}
         >
-          {/* Same order as the loaded screen: Now chips, Trades, Next moves, My Team, More. */}
+          {/* Same order as the loaded screen: At a glance, Needs attention, This week, Trade ideas, My Team, More. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {[0, 1, 2, 3].map((index) => (
               <View key={index} style={{ flexBasis: '48%', flexGrow: 1 }}>
@@ -412,9 +412,19 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // The trade idea lives in the Trades block and a "lineup set" row in the Now
   // strip, so the Next moves list never repeats them (lib/dashboardLayout.ts).
   const tradeItems = grouped.topPriority.filter(isTradeItem);
-  const nonTradeTopPriority = grouped.topPriority.filter((item) => !isTradeItem(item));
+  // Urgent items sit once in "Needs attention" (buildNeedsAttention reads only
+  // existing fields); "This week" keeps what is left.
+  const attention = buildNeedsAttention(
+    dashboardData?.this_week?.rows,
+    dashboardData?.trade_window,
+    grouped.topPriority,
+  );
+  const attentionItems = attention.flatMap((entry) => (entry.item ? [entry.item] : []));
+  const nonTradeTopPriority = grouped.topPriority.filter(
+    (item) => !isTradeItem(item) && !attentionItems.includes(item),
+  );
   const nextMovesThisWeek = dashboardData?.this_week
-    ? { ...dashboardData.this_week, rows: dashboardData.this_week.rows.filter(nextMoveRowFilter) }
+    ? { ...dashboardData.this_week, rows: weekRowsAfterAttention(dashboardData.this_week.rows, attention) }
     : dashboardData?.this_week;
   return (
     <View style={styles.root}>
@@ -437,32 +447,16 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : null}
 
       {dashboardData ? (
-        <DashboardNowStrip data={dashboardData} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
-      ) : null}
-
-      {dashboardData ? (
-        <DashboardTradesBlock
+        <DashboardNowStrip
           data={dashboardData}
-          tradeItems={tradeItems}
           leagueId={leagueId}
           leagueName={leagueName}
-          isBeginner={experienceCopy.isBeginner}
-          goal={goal}
           onNavigate={navigate}
-          renderTradeCard={(item, index) => (
-            <BriefingCard
-              key={`trade-${index}`}
-              item={item}
-              leagueId={leagueId}
-              leagueName={leagueName}
-              navigation={navigation}
-              isNew={newRecommendationIds.has(item.recommendation_id)}
-              showExplanations={showExplanations}
-              hideAction
-            />
-          )}
+          exclude={attention.map((entry) => entry.source)}
         />
       ) : null}
+
+      <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
 
       {/* Next moves: what is left of the week's plan once the trade idea (Trades
           block) and a "lineup set" row (Now strip) are shown where they belong. */}
@@ -475,7 +469,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
         onNavigate={navigate}
         right={
           <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
-            <AppText style={styles.viewAll}>View All ›</AppText>
+            <AppText style={styles.viewAll}>Full GM Plan ›</AppText>
           </TouchableOpacity>
         }
         renderCard={(item, index) => (
@@ -490,6 +484,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           />
         )}
         empty={
+          attention.length > 0 ? undefined : (
           <View style={styles.emptyCard}>
             <BrandMark width={120} height={82} />
             <AppText style={styles.emptyText}>
@@ -497,6 +492,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             </AppText>
             {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
           </View>
+          )
         }
       />
 
@@ -518,6 +514,18 @@ export default function DashboardScreen({ route, navigation }: Props) {
             description={`See ${entitlement.hidden_count} more roster, trade, waiver, and health signal${entitlement.hidden_count === 1 ? '' : 's'} so you don't miss the next best move.`}
           />
         </View>
+      ) : null}
+
+      {dashboardData ? (
+        <DashboardTradesBlock
+          data={dashboardData}
+          tradeItems={tradeItems}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          isBeginner={experienceCopy.isBeginner}
+          goal={goal}
+          onNavigate={navigate}
+        />
       ) : null}
 
       {teamSnapshot ? (

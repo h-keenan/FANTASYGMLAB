@@ -18,7 +18,7 @@ describe("SampleLeagueContent", () => {
     render(<SampleLeagueContent />);
     expect(screen.getByTestId("sample-dashboard")).toBeTruthy();
     // Today hero with a top priority, rank strip, watchlist, team snapshot.
-    expect(screen.getByRole("heading", { name: /Today/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /This week/ })).toBeTruthy();
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
     expect(screen.getByText("Power Rank")).toBeTruthy();
     expect(screen.getByTestId("watchlist-alerts")).toBeTruthy();
@@ -32,7 +32,7 @@ describe("SampleLeagueContent", () => {
   it("blocks Dashboard links in the sample and explains why", () => {
     render(<SampleLeagueContent />);
     expect(screen.queryByTestId("sample-blocked")).toBeNull();
-    fireEvent.click(screen.getByRole("link", { name: "View all game plan items" }));
+    fireEvent.click(screen.getByRole("link", { name: "Open the full GM Plan" }));
     expect(screen.getByTestId("sample-blocked").textContent).toContain("Connect your league");
   });
 

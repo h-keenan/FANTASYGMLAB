@@ -37,13 +37,13 @@ function data(over: Partial<DashboardResponse> = {}): DashboardResponse {
 describe("TodayModule", () => {
   it("is one section with the week in the heading and the risk row before the card", () => {
     const { container } = render(<TodayModule data={data()} leagueId="abc" leagueName="L" now={THURSDAY} />);
-    expect(screen.getByRole("heading", { name: "Today · Week 7" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "This week" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "This week · Wk 7" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Today" })).toBeNull();
     expect(container.querySelectorAll("section")).toHaveLength(1);
     const text = container.textContent ?? "";
     expect(text.indexOf("Starter RB is out")).toBeLessThan(text.indexOf("Roster pressure at WR"));
     expect(screen.getByRole("link", { name: "Review lineup" })).toHaveAttribute("href", "/matchup/abc?name=L");
-    expect(screen.getByRole("link", { name: "View all game plan items" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the full GM Plan" })).toBeInTheDocument();
   });
 
   it("puts waivers under Later this week on game days, and in the main list on Tuesday", () => {

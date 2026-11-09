@@ -1,17 +1,20 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { BriefingItem, DashboardResponse, ThisWeekRow } from "@/lib/api";
+import type { BriefingItem, DashboardResponse } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { ToneBadge } from "@/components/ToneBadge";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { ButtonLink } from "@/components/Button";
-import { GamePlanCard } from "@/components/GamePlanCard";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SkeletonBlock } from "@/components/Skeleton";
-import { buildNowChips, tradesGoalLine, TRADES_BLOCK_COPY, type DashboardNowChip } from "@/lib/dashboardLayout";
-import { DeadlineCard } from "@/components/DeadlineCard";
-import { DEADLINE_CARD_WEEKS } from "@/lib/deadlineMode";
+import {
+  buildNowChips,
+  tradeIdeasLine,
+  tradesGoalLine,
+  TRADES_BLOCK_COPY,
+  type DashboardAttentionEntry,
+  type DashboardNowChip,
+} from "@/lib/dashboardLayout";
+import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref, resolveGamePlanTargetPlayerId } from "@/lib/gamePlanPresentation";
 import { thisWeekHref } from "@/lib/thisWeek";
 
 const TONE_COLOR: Record<DashboardNowChip["tone"], string> = {
@@ -21,21 +24,13 @@ const TONE_COLOR: Record<DashboardNowChip["tone"], string> = {
   neutral: "var(--color-text-primary)",
 };
 
-const HOLD_TONE_COLOR: Record<ThisWeekRow["tone"], string> = {
-  positive: "var(--color-success)",
-  risk: "var(--color-danger)",
-  waiver: "var(--color-accent)",
-  trade: "var(--color-accent)",
-  neutral: "var(--color-text-muted)",
-};
-
 function chipHref(chip: DashboardNowChip, leagueId: string, leagueName: string): string {
   if (chip.route === "alerts") return `/alerts/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
   return thisWeekHref(chip.route, leagueId, leagueName);
 }
 
 /**
- * "What matters now": a compact row of real status chips (lineup, trade
+ * "At a glance": a compact row of real status chips (lineup, trade
  * deadline, alerts, waivers). Each is one tap to the place that fixes it.
  * Renders nothing when there is no real status to show.
  */
@@ -43,16 +38,19 @@ export function DashboardNowStrip({
   data,
   leagueId,
   leagueName,
+  exclude,
 }: {
   data: DashboardResponse;
   leagueId: string;
   leagueName: string;
+  /** Chip keys already listed under "Needs attention". */
+  exclude?: readonly string[];
 }) {
   const alertCount = data.items.filter((item) => item.category !== "top_priority").length;
-  const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount);
+  const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount, exclude);
   if (chips.length === 0) return null;
   return (
-    <section aria-label="What matters now" data-testid="dashboard-now-strip" className="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2">
+    <section aria-label="At a glance" data-testid="dashboard-now-strip" className="grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2">
       {chips.map((chip) => (
         <Link
           key={chip.key}
@@ -73,9 +71,65 @@ export function DashboardNowStrip({
 }
 
 /**
- * The primary block: the best real trade idea (the engine's Top Trade
- * Opportunity, with its give/get package and verdict), one primary action
- * ("Analyze a trade") and one quiet link to the rest of the board.
+ * "Needs attention": a compact list of the few urgent items, each one line with
+ * one link to where it is handled. Urgency is read only from existing fields
+ * (lib/dashboardLayout.ts buildNeedsAttention); the full plan stays on GM Plan.
+ * Renders nothing when nothing is urgent.
+ */
+export function DashboardNeedsAttention({
+  entries,
+  leagueId,
+  leagueName,
+}: {
+  entries: DashboardAttentionEntry<BriefingItem>[];
+  leagueId: string;
+  leagueName: string;
+}) {
+  if (entries.length === 0) return null;
+  const id = encodeURIComponent(leagueId);
+  const query = `?name=${encodeURIComponent(leagueName)}`;
+  const hrefFor = (entry: DashboardAttentionEntry<BriefingItem>): string => {
+    if (entry.target === "matchup") return thisWeekHref("matchup", leagueId, leagueName);
+    if (entry.target === "gm_plan" || !entry.item) return `/gm-plan/${id}${query}`;
+    const route = GAME_PLAN_INTERNAL_ROUTES[entry.item.destination] ?? "gm-plan";
+    return gamePlanTileHref(route, leagueId, leagueName, resolveGamePlanTargetPlayerId(entry.item));
+  };
+  return (
+    <section className="flex flex-col gap-2" aria-labelledby="needs-attention-heading" data-testid="dashboard-needs-attention">
+      <SectionHeading id="needs-attention-heading">
+        Needs attention
+      </SectionHeading>
+      <AccentCard accent="var(--color-danger)" compact>
+        <ul className="flex flex-col" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {entries.map((entry, index) => (
+            <li key={`${entry.source}-${index}`} style={index > 0 ? { borderTop: "1px solid var(--color-border)" } : undefined}>
+              <Link
+                href={hrefFor(entry)}
+                className="flex items-center gap-2 py-2.5"
+                style={{ minHeight: 44, color: "inherit", textDecoration: "none" }}
+              >
+                <ToneBadge label={entry.badge} color="var(--color-danger)" />
+                <span className="min-w-0 flex-1 flex flex-col">
+                  <span className="text-sm font-bold truncate">{entry.headline}</span>
+                  <span className="text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
+                    {entry.why}
+                  </span>
+                </span>
+                <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+                  →
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </AccentCard>
+    </section>
+  );
+}
+
+/**
+ * Trade ideas on the Dashboard are one line: a count and a link. The idea
+ * cards live only on GM Plan and Trade Hub.
  */
 export function DashboardTradesBlock({
   data,
@@ -96,10 +150,9 @@ export function DashboardTradesBlock({
   const id = encodeURIComponent(leagueId);
   const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
   const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
-  const holdRow = data.this_week?.rows.find((row) => row.key === "trade");
   const goalLine = isBeginner ? tradesGoalLine(goal) : "";
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="trades-heading" data-testid="dashboard-trades-block">
+    <section className="flex flex-col gap-2" aria-labelledby="trades-heading" data-testid="dashboard-trades-block">
       <SectionHeading
         id="trades-heading"
         action={
@@ -110,53 +163,16 @@ export function DashboardTradesBlock({
       >
         {TRADES_BLOCK_COPY.title}
       </SectionHeading>
-      <DeadlineCard
-        window={data.trade_window}
-        strategy={data.team_strategy}
-        maxWeeksLeft={DEADLINE_CARD_WEEKS}
+      <Link
         href={`/trade-hub/${id}${query}`}
-        ctaLabel="See deadline trade ideas"
-      />
-      {deadlinePassed ? (
-        <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          {TRADES_BLOCK_COPY.deadlinePassed}
-        </p>
-      ) : tradeItems.length > 0 ? (
-        tradeItems.slice(0, 3).map((item) => (
-          <GamePlanCard key={item.recommendation_id || item.headline} item={item} leagueId={leagueId} leagueName={leagueName} />
-        ))
-      ) : pending ? (
-        <SkeletonBlock height={96} data-fgl-this-week-trade-pending="true" />
-      ) : (
-        holdRow ? (
-          <AccentCard accent={HOLD_TONE_COLOR[holdRow.tone]} compact>
-            <div className="flex flex-wrap items-center gap-2">
-              {holdRow.status ? <ToneBadge label={holdRow.status} color={HOLD_TONE_COLOR[holdRow.tone]} /> : null}
-              <span className="text-sm font-bold">{holdRow.headline}</span>
-            </div>
-            {/* The deadline card above already says when; only repeat the why without it. */}
-            {holdRow.why && !data.trade_window ? (
-              <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                {holdRow.why}
-              </p>
-            ) : null}
-          </AccentCard>
-        ) : (
-          <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            {TRADES_BLOCK_COPY.empty}
-          </p>
-        )
-      )}
-      <div className="flex items-center gap-4 flex-wrap">
-        <ButtonLink href={`/trade-analyzer/${id}${query}`} size="sm">
-          {TRADES_BLOCK_COPY.analyze}
-        </ButtonLink>
-        {deadlinePassed ? null : (
-          <Link href={`/trade-hub/${id}${query}`} className="tap-link text-sm font-bold" style={{ color: "var(--color-accent)" }}>
-            {TRADES_BLOCK_COPY.more} →
-          </Link>
-        )}
-      </div>
+        className="glass-surface flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold"
+        style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }}
+      >
+        <span style={{ color: tradeItems.length > 0 && !deadlinePassed ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
+          {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
+        </span>
+        <span style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.link} →</span>
+      </Link>
     </section>
   );
 }

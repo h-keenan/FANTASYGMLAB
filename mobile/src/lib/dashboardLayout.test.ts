@@ -5,10 +5,13 @@ import { test } from 'node:test';
 
 import {
   DASHBOARD_MODULE_ORDER,
+  buildNeedsAttention,
   buildNowChips,
   deadlineChip,
   isTradeItem,
   nextMoveRowFilter,
+  tradeIdeasLine,
+  weekRowsAfterAttention,
 } from './dashboardLayout.ts';
 
 function shared(path: string): string {
@@ -23,8 +26,8 @@ test('web and app share one Dashboard layout block', () => {
   assert.equal(shared('src/lib/dashboardLayout.ts'), shared('../web-next/src/lib/dashboardLayout.ts'));
 });
 
-test('module order leads with what matters now, then trades', () => {
-  assert.deepEqual(DASHBOARD_MODULE_ORDER.slice(0, 3), ['start_here', 'now', 'trades']);
+test('module order: at a glance, needs attention, this week, then the one-line trade pointer', () => {
+  assert.deepEqual(DASHBOARD_MODULE_ORDER.slice(0, 5), ['start_here', 'now', 'needs_attention', 'next_moves', 'trades']);
   assert.equal(DASHBOARD_MODULE_ORDER[DASHBOARD_MODULE_ORDER.length - 1], 'more');
 });
 
@@ -48,4 +51,42 @@ test('now chips and next-move filter drop duplicates', () => {
   assert.equal(nextMoveRowFilter({ key: 'lineup', status: 'Out', tone: 'risk' }), true);
   assert.equal(isTradeItem({ presentation: { trade_package: {} } }), true);
   assert.equal(isTradeItem({ presentation: null }), false);
+});
+
+const row = (key: string, tone: string, extra: object = {}) => ({ key, status: 'Out', tone, headline: `${key} headline`, why: 'because', ...extra });
+const item = (headline: string, trade = false) => ({
+  headline,
+  reason: 'why',
+  destination: 'waivers',
+  presentation: trade ? { trade_package: {} } : null,
+});
+
+test('needs attention reads only existing urgency fields, capped at 3, never trade ideas', () => {
+  assert.deepEqual(buildNeedsAttention([row('lineup', 'positive')], null, []), []);
+  const entries = buildNeedsAttention(
+    [row('lineup', 'risk')],
+    { trade_deadline_week: 11, current_week: 10, trade_deadline_passed: false },
+    [item('Trade idea', true), item('A'), item('B')],
+  );
+  assert.deepEqual(entries.map((e) => e.source), ['lineup', 'deadline', 'item']);
+  assert.equal(entries[0].target, 'matchup');
+  assert.equal(entries[1].target, 'gm_plan');
+  assert.equal(entries[2].item?.headline, 'A');
+  // A far-off deadline is not urgent.
+  assert.deepEqual(buildNeedsAttention([], { trade_deadline_week: 11, current_week: 5, trade_deadline_passed: false }, []), []);
+});
+
+test('items shown under needs attention are not repeated in the chips or this-week rows', () => {
+  const attention = buildNeedsAttention([row('lineup', 'risk')], { trade_deadline_week: 11, current_week: 11, trade_deadline_passed: false }, []);
+  const keys = buildNowChips([row('lineup', 'risk')], { trade_deadline_week: 11, current_week: 11, trade_deadline_passed: false }, 0, attention.map((e) => e.source)).map((c) => c.key);
+  assert.deepEqual(keys, []);
+  assert.deepEqual(weekRowsAfterAttention([row('lineup', 'risk'), row('waiver', 'waiver')], attention).map((r) => r.key), ['waiver']);
+  assert.deepEqual(weekRowsAfterAttention([row('lineup', 'risk')], []).map((r) => r.key), ['lineup']);
+});
+
+test('trade ideas line is a count, never cards', () => {
+  assert.equal(tradeIdeasLine(1, false, false), '1 trade idea');
+  assert.equal(tradeIdeasLine(3, false, false), '3 trade ideas');
+  assert.match(tradeIdeasLine(0, false, false), /No trade idea/);
+  assert.match(tradeIdeasLine(2, true, false), /deadline has passed/);
 });

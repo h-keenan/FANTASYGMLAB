@@ -41,6 +41,6 @@ test('dedupes trade card vs row and waiver row vs waiver card; ignores non top-p
 
 test('empty and title', () => {
   assert.equal(buildTodayPlan(null, [], SUN).isEmpty, true);
-  assert.equal(todayTitle(wk([])), 'Today · Week 3');
-  assert.equal(todayTitle(null), 'Today');
+  assert.equal(todayTitle(wk([])), 'This week · Wk 3');
+  assert.equal(todayTitle(null), 'This week');
 });

@@ -687,7 +687,7 @@ export function GmPlanContent({
           ) : null}
 
           <section className="flex flex-col gap-2">
-            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade Opportunities</SectionHeading>
+            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade ideas</SectionHeading>
             {tradesBlock(tradeItems, 2)}
           </section>
 
@@ -712,7 +712,7 @@ export function GmPlanContent({
       {tab === "trades" ? (
         <>
           <section className="flex flex-col gap-2">
-            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade Opportunities</SectionHeading>
+            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade ideas</SectionHeading>
             {tradesBlock(tradeItems)}
           </section>
           {!planGate ? (
