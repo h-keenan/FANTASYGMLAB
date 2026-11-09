@@ -30,6 +30,7 @@ import {
 } from "@/lib/liveDraftPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Live Draft (Revision 21) — the last page on the original migration punch
@@ -259,9 +260,7 @@ function PickRowView({ row }: { row: LiveDraftPickRow }) {
       >
         <PickPlate round={row.round} pickNo={row.pick_no} />
         <PositionBadge position={row.position} />
-        <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-          {row.player_name}
-        </span>
+        <PlayerNameText name={row.player_name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
         <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
           {row.team}
         </span>

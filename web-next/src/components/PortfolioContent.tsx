@@ -21,7 +21,7 @@ import { PillRow } from "@/components/PillRow";
 import { PortfolioExposureView } from "@/components/PortfolioExposureView";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
-import { formatRank } from "@/components/SnapshotTile";
+import { FillBar, formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { SkeletonBlock } from "@/components/Skeleton";
@@ -275,6 +275,8 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
   // no `rank_badge`).
   const showRankBadge = league.power_rank != null && league.power_rank <= 3;
   const metadata = [record, showRankBadge ? "" : rankLabel(league)].filter(Boolean).join(" · ");
+  const games = (league.wins ?? 0) + (league.losses ?? 0) + (league.ties ?? 0);
+  const winFill = games > 0 ? ((league.wins ?? 0) + (league.ties ?? 0) / 2) / games : null;
   const showHealthFlag = Boolean(league.health_flag) && league.health_flag !== "Stable";
 
   return (
@@ -301,33 +303,19 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
             ) : null}
           </div>
         </div>
-        {showRankBadge ? (
-          <span
-            className="px-2 py-1 text-xs font-extrabold uppercase whitespace-nowrap"
-            style={{
-              borderRadius: "var(--radius-pill)",
-              background: "var(--color-action-soft)",
-              color: "var(--color-premium)",
-              letterSpacing: "var(--letter-spacing-badge)",
-            }}
-          >
-            {formatRank(league.power_rank, league.power_rank_tied)}
-          </span>
-        ) : null}
+        {showRankBadge ? <ToneBadge label={formatRank(league.power_rank, league.power_rank_tied)} color="var(--color-premium)" /> : null}
       </div>
 
+      {winFill !== null ? (
+        <div className="mt-2" data-testid="portfolio-record-bar">
+          <FillBar fill={winFill} label={`${league.league_name} win rate`} />
+        </div>
+      ) : null}
+
       {showHealthFlag ? (
-        <span
-          className="self-start mt-2 px-1.5 py-0.5 text-xs font-extrabold uppercase"
-          style={{
-            borderRadius: "var(--radius-pill)",
-            background: "var(--color-warning-soft)",
-            color: "var(--color-warning)",
-            letterSpacing: "var(--letter-spacing-badge)",
-          }}
-        >
-          {league.health_flag}
-        </span>
+        <div className="mt-2">
+          <ToneBadge label={league.health_flag} color="var(--color-warning)" />
+        </div>
       ) : null}
 
       {signals.length > 0 ? (
@@ -352,8 +340,13 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
 
       <Link
         href={`/dashboard/${encodeURIComponent(league.league_id)}?name=${encodeURIComponent(league.league_name)}`}
-        className="self-start text-sm font-bold mt-3"
-        style={{ color: "var(--color-accent)" }}
+        className="flex items-center justify-between gap-2 text-sm font-bold mt-3 px-3"
+        style={{
+          color: "var(--color-accent)",
+          minHeight: "var(--touch-target-min)",
+          borderRadius: "var(--radius-control)",
+          background: "color-mix(in srgb, var(--color-accent) 10%, transparent)",
+        }}
       >
         Open {league.league_name} Dashboard →
       </Link>

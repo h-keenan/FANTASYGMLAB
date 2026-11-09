@@ -67,19 +67,21 @@ export function TodayModule({
       <SectionHeading
         id="game-plan-heading"
         action={
-          <Link
-            href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`}
-            aria-label="View all game plan items"
-            className="tap-link text-sm font-bold shrink-0"
-            style={{ color: "var(--color-accent)" }}
-          >
-            View All →
-          </Link>
+          <span className="inline-flex items-center gap-3">
+            <BeginnerHelp popover term="dashboardGamePlan" />
+            <Link
+              href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`}
+              aria-label="View all game plan items"
+              className="tap-link text-sm font-bold shrink-0"
+              style={{ color: "var(--color-accent)" }}
+            >
+              View All →
+            </Link>
+          </span>
         }
       >
         {todayTitle(thisWeek)}
       </SectionHeading>
-      <BeginnerHelp term="dashboardGamePlan" />
       <FreeLimitNote
         kind="window"
         noun="next moves"

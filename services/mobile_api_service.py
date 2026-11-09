@@ -871,7 +871,7 @@ def require_user(
     config = auth_supabase.get_supabase_config()
     if not auth_supabase.is_configured(config):
         raise HTTPException(status_code=503, detail="Accounts are not configured.")
-    user, error = auth_supabase.fetch_auth_user(config, token)
+    user, error = auth_supabase.fetch_auth_user_cached(config, token)
     if not user:
         raise HTTPException(status_code=401, detail=error or "Invalid or expired session.")
     normalized = auth_supabase.normalize_auth_user(user, access_token=token)
@@ -908,7 +908,7 @@ def _resolve_espn_login(token: str) -> tuple[str, Any] | None:
     config = auth_supabase.get_supabase_config()
     found: tuple[str, Any] | None = None
     if auth_supabase.is_configured(config):
-        user, _error = auth_supabase.fetch_auth_user(config, token)
+        user, _error = auth_supabase.fetch_auth_user_cached(config, token)
         user_id = str((user or {}).get("id") or "")
         if user_id:
             credentials = espn_credentials.load(config, token, user_id=user_id)
@@ -971,7 +971,7 @@ def optional_user(
         config = auth_supabase.get_supabase_config()
         if not auth_supabase.is_configured(config):
             return None
-        user, _error = auth_supabase.fetch_auth_user(config, token)
+        user, _error = auth_supabase.fetch_auth_user_cached(config, token)
     except Exception:
         return None
     if not user:
@@ -15672,6 +15672,15 @@ def get_league_waivers(
         for _, row in limited.iterrows()
     ]
 
+    faab_season_stats: dict[str, Any] = {}
+    if current_week > 0:
+        try:
+            faab_season_stats = sleeper.get_season_player_stats(
+                season=sleeper.default_player_stats_season(), retain_weekly=True
+            )
+        except Exception:
+            faab_season_stats = {}
+    played_ids = waivers_logic.players_with_games(faab_season_stats) if faab_season_stats else None
     priority_df = waivers_logic.rank_priority_add_candidates(
         free_agents,
         score_field=score_field,
@@ -15682,6 +15691,7 @@ def get_league_waivers(
         league=league,
         rosters=rosters,
         needs_model=needs_model,
+        played_ids=played_ids,
     )
     if needs_model is not None:
         needs_model["headline"] = waivers_logic.align_headline_with_adds(needs_model, priority_df)
@@ -15714,14 +15724,6 @@ def get_league_waivers(
             faab_strategy = stance_strategy
     except Exception:
         faab_strategy = ""
-    faab_season_stats: dict[str, Any] = {}
-    if current_week > 0:
-        try:
-            faab_season_stats = sleeper.get_season_player_stats(
-                season=sleeper.default_player_stats_season(), retain_weekly=True
-            )
-        except Exception:
-            faab_season_stats = {}
     priority_adds: list[dict[str, Any]] = []
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     for _, row in priority_df.iterrows():

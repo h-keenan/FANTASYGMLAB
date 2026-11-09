@@ -46,7 +46,7 @@ export default function TradeAnalyzerPage() {
   const bridgeTrade = bridgeTradeFromSearch(`a=${searchParams.get("a") ?? ""}&b=${searchParams.get("b") ?? ""}`);
   // "Build an offer" hand-off: ?send=&receive=&sendPicks=&receivePicks= (lib/tradeOffer.ts).
   const offerPrefill = offerPrefillFromSearch(searchParams);
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +68,9 @@ export default function TradeAnalyzerPage() {
       router.replace("/");
       return;
     }
+    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+    if (!lensReady) return;
     let cancelled = false;
 
     Promise.all([
@@ -100,7 +103,7 @@ export default function TradeAnalyzerPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!data && !error)) {
     return (

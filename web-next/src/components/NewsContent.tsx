@@ -7,6 +7,8 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { eventTypeColorVar, eventTypeLabel, relativeTime } from "@/lib/alertsPresentation";
 import { groupNewsByDate } from "@/lib/newsPresentation";
 import { LeagueLinkStep } from "@/components/LeagueLinkStep";
+import { AccentCard } from "@/components/AccentCard";
+import { EventTypePill } from "@/components/EventTypeGlyph";
 
 /**
  * Ports modules/general_news_ui.py / mobile's NewsScreen.tsx for
@@ -40,16 +42,20 @@ import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
   const row = (
     <>
-      <PositionBadge position={identity.matched_player_position} />
-      <PlayerAvatar playerId={identity.matched_player_id} size={28} />
-      <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-        {identity.matched_player}
-      </span>
-      {identity.matched_player_team ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {identity.matched_player_team}
+      <PlayerAvatar playerId={identity.matched_player_id} size={36} />
+      <span className="flex flex-col min-w-0">
+        <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
+          {identity.matched_player}
         </span>
-      ) : null}
+        <span className="flex items-center gap-1.5">
+          <PositionBadge position={identity.matched_player_position} />
+          {identity.matched_player_team ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {identity.matched_player_team}
+            </span>
+          ) : null}
+        </span>
+      </span>
     </>
   );
   if (!identity.matched_player_id) {
@@ -99,7 +105,16 @@ function NewsIdentity({ item }: { item: NewsItem }) {
 }
 
 /** Exported for the full profile's News tab (one card for every news list). */
-export function NewsCard({ item, showEventTag = false }: { item: NewsItem; showEventTag?: boolean }) {
+export function NewsCard({
+  item,
+  showEventTag = false,
+  hero = false,
+}: {
+  item: NewsItem;
+  showEventTag?: boolean;
+  /** The first story of a bucket: a raised accent card with a larger headline. */
+  hero?: boolean;
+}) {
   const time = relativeTime(item.published_ts);
   const hasLink = Boolean(item.link);
 
@@ -117,13 +132,12 @@ export function NewsCard({ item, showEventTag = false }: { item: NewsItem; showE
           </span>
         ) : null}
         {showEventTag && item.event_type ? (
-          <span
-            className="uppercase font-extrabold text-xs"
-            style={{ color: eventTypeColorVar(item.event_type), letterSpacing: "var(--letter-spacing-badge)" }}
-            data-testid="news-event-tag"
-          >
-            {eventTypeLabel(item.event_type)}
-          </span>
+          <EventTypePill
+            eventType={item.event_type}
+            label={eventTypeLabel(item.event_type)}
+            color={eventTypeColorVar(item.event_type)}
+            testId="news-event-tag"
+          />
         ) : null}
         {item.speculative ? (
           <span className="text-xs font-bold" style={{ color: "var(--color-warning)" }}>
@@ -140,7 +154,7 @@ export function NewsCard({ item, showEventTag = false }: { item: NewsItem; showE
 
       <NewsIdentity item={item} />
 
-      <p className="text-sm font-bold mt-1" style={{ color: "var(--color-text-primary)" }}>
+      <p className={`${hero ? "text-base" : "text-sm"} font-bold mt-1`} style={{ color: "var(--color-text-primary)" }}>
         {item.title}
       </p>
 
@@ -160,17 +174,30 @@ export function NewsCard({ item, showEventTag = false }: { item: NewsItem; showE
 
   const rowStyle = { borderBottom: "var(--border-width-default) solid var(--color-border)" } as const;
 
+  const link = hasLink ? (
+    <a
+      href={item.link ?? "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={item.title ?? "Open article"}
+      className="absolute inset-0"
+    />
+  ) : null;
+
+  if (hero) {
+    return (
+      <AccentCard accent={eventTypeColorVar(item.event_type)} className="relative">
+        {body}
+        {link}
+      </AccentCard>
+    );
+  }
+
   if (hasLink) {
     return (
       <div className="relative block py-3" style={rowStyle}>
         {body}
-        <a
-          href={item.link ?? "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={item.title ?? "Open article"}
-          className="absolute inset-0"
-        />
+        {link}
       </div>
     );
   }
@@ -219,21 +246,16 @@ export function NewsContent({ data, playerName }: { data: NewsResponse; playerNa
                 return (
                   <div key={`${group.eventType ?? "other"}-${index}`} className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="inline-block" style={{ width: "3px", height: "0.8rem", background: accent }} />
-                      <span
-                        className="uppercase font-extrabold text-xs"
-                        style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}
-                      >
-                        {eventTypeLabel(group.eventType)}
-                      </span>
+                      <EventTypePill eventType={group.eventType} label={eventTypeLabel(group.eventType)} color={accent} />
                     </div>
-                    <div
-                      className="glass-surface px-3"
-                    >
-                      {group.items.map((item, itemIndex) => (
-                        <NewsCard key={item.link ?? `${item.title ?? "item"}-${itemIndex}`} item={item} />
-                      ))}
-                    </div>
+                    {index === 0 ? <NewsCard item={group.items[0]} hero /> : null}
+                    {group.items.length > (index === 0 ? 1 : 0) ? (
+                      <div className="glass-surface px-3">
+                        {group.items.slice(index === 0 ? 1 : 0).map((item, itemIndex) => (
+                          <NewsCard key={item.link ?? `${item.title ?? "item"}-${itemIndex}`} item={item} />
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

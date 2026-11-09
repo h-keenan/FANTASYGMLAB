@@ -9,7 +9,8 @@ import { Button } from "@/components/Button";
 import { LimitWall } from "@/components/LimitWall";
 import { useAuth } from "@/context/AuthContext";
 import { limitWallForReason, type LimitWallModel } from "@/lib/limitWall";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ToneBadge } from "@/components/ToneBadge";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 
 import {
@@ -471,21 +472,15 @@ function VerdictCard({
       <TradeOddsEffect leagueId={leagueId} send={sendAssets} receive={receiveAssets} lens={lens} />
 
       {summary ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
-            {verdict.rationale_label || "Why this works"}
-          </span>
+        <InsightRow color="var(--color-information)" label={verdict.rationale_label || "Why this works"} icon={<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z" />}>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {summary}
           </p>
-        </div>
+        </InsightRow>
       ) : null}
 
       {verdict.counter_guidance ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-accent)" }}>
-            Next move
-          </span>
+        <InsightRow color="var(--color-accent)" label="Next move" icon={<path d="M5 12h14M13 6l6 6-6 6" />}>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {verdict.counter_guidance}
           </p>
@@ -499,7 +494,7 @@ function VerdictCard({
               Build the counter →
             </button>
           ) : null}
-        </div>
+        </InsightRow>
       ) : null}
 
       {alternatePackages.length > 0 ? (
@@ -549,14 +544,11 @@ function VerdictCard({
       <BeginnerHelp term="analyzerConfidence" />
 
       {verdict.risk_summary ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-warning)" }}>
-            Risk
-          </span>
+        <InsightRow color="var(--color-warning)" label="Risk" icon={<path d="M12 4l9 16H3L12 4zM12 10v4M12 17h.01" />}>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {verdict.risk_summary}
           </p>
-        </div>
+        </InsightRow>
       ) : null}
 
       {hasMore ? (
@@ -602,6 +594,43 @@ function VerdictCard({
         Reply to your partner directly — no in-app accept.
       </p>
     </AccentCard>
+  );
+}
+
+/** A verdict insight: tinted glyph, ToneBadge label, then the text. Replaces bare uppercase text labels. */
+function InsightRow({
+  color,
+  label,
+  icon,
+  children,
+}: {
+  color: string;
+  label: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span
+        className="inline-flex items-center justify-center shrink-0"
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: "var(--radius-pill)",
+          background: `color-mix(in srgb, ${color} 15%, transparent)`,
+          color,
+        }}
+        aria-hidden="true"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {icon}
+        </svg>
+      </span>
+      <div className="flex flex-col gap-1 items-start min-w-0 flex-1">
+        <ToneBadge label={label} color={color} wrap />
+        {children}
+      </div>
+    </div>
   );
 }
 

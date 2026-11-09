@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import Button from './Button';
 import GlassCard from './GlassCard';
+import IconCircle from './IconCircle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 
@@ -12,12 +13,11 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
  * The one empty state, matching web-next's EmptyState (2026-10-27 parity):
- * a left-aligned glass card with a bold title, a muted one-line reason and,
- * when there is a next step, a small button. Web shows no icon, so `icon` is
- * accepted to keep the call sites stable but is not drawn.
+ * a glass card with an accent left rail, an icon disc, a bold title, a muted
+ * one-line reason and, when there is a next step, a small button.
  */
 export default function EmptyState({
-  icon: _icon,
+  icon,
   title,
   subtitle,
   actionLabel,
@@ -43,16 +43,19 @@ export default function EmptyState({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <GlassCard style={styles.container}>
-      <AppText style={styles.title}>{title}</AppText>
-      {subtitle ? <AppText style={styles.subtitle}>{subtitle}</AppText> : null}
-      {actionLabel && onPressAction ? (
-        <Button label={actionLabel} onPress={onPressAction} variant={actionVariant} size="sm" style={styles.button} />
-      ) : null}
-      {secondaryLabel && onPressSecondary ? (
-        <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
-          <AppText style={styles.secondaryLinkText}>{secondaryLabel}</AppText>
-        </TouchableOpacity>
-      ) : null}
+      <IconCircle name={icon} color={colors.accent} size={44} iconSize={22} />
+      <View style={styles.body}>
+        <AppText style={styles.title}>{title}</AppText>
+        {subtitle ? <AppText style={styles.subtitle}>{subtitle}</AppText> : null}
+        {actionLabel && onPressAction ? (
+          <Button label={actionLabel} onPress={onPressAction} variant={actionVariant} size="sm" style={styles.button} />
+        ) : null}
+        {secondaryLabel && onPressSecondary ? (
+          <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
+            <AppText style={styles.secondaryLinkText}>{secondaryLabel}</AppText>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </GlassCard>
   );
 }
@@ -63,11 +66,15 @@ function createStyles(colors: ThemeColors) {
     // still give a full-width card.
     container: {
       alignSelf: 'stretch',
+      flexDirection: 'row',
       alignItems: 'flex-start',
-      paddingVertical: spacing.xl,
+      paddingVertical: spacing.lg,
       paddingHorizontal: spacing.lg,
-      gap: spacing.xs,
+      gap: spacing.md,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accent,
     },
+    body: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: spacing.xs },
     title: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     subtitle: { fontSize: 12, color: colors.textTertiary, lineHeight: 17 },
     button: { marginTop: spacing.sm, alignSelf: 'flex-start' },

@@ -33,6 +33,14 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Something went wrong. It&apos;s been logged.
       </p>
+      {error?.message ? (
+        <details className="text-xs max-w-sm w-full" style={{ color: "var(--color-text-muted)" }}>
+          <summary className="cursor-pointer font-semibold">Details</summary>
+          <p className="mt-1 break-words" data-testid="app-error-details">
+            {error.message}
+          </p>
+        </details>
+      ) : null}
       <Button
         type="button"
         onClick={reset}

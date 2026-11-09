@@ -30,7 +30,7 @@ export default function GmPlanPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   const [gmPlan, setGmPlan] = useState<GmPlanResponse | null>(null);
   const [teamStance, setTeamStance] = useState<TeamStanceResponse | null>(null);
@@ -57,6 +57,9 @@ export default function GmPlanPage() {
       router.replace("/");
       return;
     }
+    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+    if (!lensReady) return;
     let cancelled = false;
 
     // Revision 20 (2026-10-18): GM Plan absorbed Team Situation (stance +
@@ -99,7 +102,7 @@ export default function GmPlanPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!gmPlan && !error)) {
     return <GmPlanSkeleton leagueName={leagueName} />;

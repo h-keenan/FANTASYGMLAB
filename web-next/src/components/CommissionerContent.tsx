@@ -8,9 +8,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PillRow } from "@/components/PillRow";
+import { IconRow, type IconRowIcon } from "@/components/IconRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
+import { SnapshotTile } from "@/components/SnapshotTile";
 import { ToneBadge } from "@/components/ToneBadge";
+import { ValueRing } from "@/components/ValueRing";
 import { VetoCalculator } from "@/components/VetoCalculator";
 import { api } from "@/lib/api";
 import {
@@ -55,56 +58,87 @@ function bandColor(band: IntegrityBand): string {
 function EfficiencyBars({ team }: { team: IntegrityTeam }) {
   if (!team.series.length) return null;
   return (
-    <div aria-label="Lineup efficiency by week" className="flex items-end gap-1" style={{ height: 40 }}>
-      {team.series.map((point) => {
-        const pct = Math.max(0.05, Math.min(1, point.efficiency ?? 0));
-        return (
-          <div key={point.week} className="flex flex-col items-center gap-0.5 flex-1" title={`Week ${point.week}: ${Math.round(pct * 100)}% of best possible`}>
-            <div
-              style={{
-                width: "100%",
-                height: `${Math.round(pct * 28)}px`,
-                background: point.flagged ? "var(--color-warning)" : "var(--color-text-muted)",
-                opacity: point.flagged ? 1 : 0.45,
-                borderRadius: 2,
-              }}
-            />
-            <span className="text-[0.625rem]" style={{ color: "var(--color-text-muted)" }}>
-              {point.week}
-            </span>
-          </div>
-        );
-      })}
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+        Lineup efficiency by week
+      </span>
+      <div
+        aria-label="Lineup efficiency by week"
+        className="flex items-end gap-1 px-2 pt-2"
+        style={{ height: 68, background: "var(--color-surface-muted)", borderRadius: "var(--radius-md, 6px)" }}
+      >
+        {team.series.map((point) => {
+          const pct = Math.max(0.05, Math.min(1, point.efficiency ?? 0));
+          return (
+            <div key={point.week} className="flex flex-col items-center gap-0.5 flex-1" title={`Week ${point.week}: ${Math.round(pct * 100)}% of best possible`}>
+              <div
+                style={{
+                  width: "100%",
+                  height: `${Math.round(pct * 40)}px`,
+                  background: point.flagged ? "var(--color-warning)" : "var(--color-success)",
+                  opacity: point.flagged ? 1 : 0.55,
+                  borderRadius: 2,
+                }}
+              />
+              <span className="text-[0.625rem]" style={{ color: "var(--color-text-muted)" }}>
+                {point.week}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <span className="flex items-center gap-3 text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
+        <span className="flex items-center gap-1">
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: "var(--color-success)", opacity: 0.55 }} />
+          Normal week
+        </span>
+        <span className="flex items-center gap-1">
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: "var(--color-warning)" }} />
+          Flagged week
+        </span>
+      </span>
     </div>
   );
 }
 
-function Bullets({ title, items }: { title: string; items: string[] }) {
+/** A titled group of icon rows (evidence / innocent explanations). */
+function Bullets({ title, items, icon, color }: { title: string; items: string[]; icon: IconRowIcon; color: string }) {
   if (!items.length) return null;
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-bold uppercase" style={{ color, letterSpacing: "var(--letter-spacing-badge)" }}>
         {title}
       </span>
-      <ul className="flex flex-col gap-1 list-disc pl-4">
+      <div className="flex flex-col gap-1.5">
         {items.map((text) => (
-          <li key={text} className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          <IconRow key={text} icon={icon} color={color}>
             {text}
-          </li>
+          </IconRow>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
+
+const INNOCENT_COLOR = "var(--color-information)";
 
 export function IntegrityTeamCard({ team }: { team: IntegrityTeam }) {
   const [open, setOpen] = useState(team.band === "strong");
   const expandable = team.band === "strong" || team.band === "worth_a_look";
   return (
     <AccentCard accent={bandColor(team.band)} as="article">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col">
-          <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+      <div className="flex items-center gap-3">
+        {team.weeks.evaluated ? (
+          <ValueRing
+            percent={Math.round((team.weeks.flagged / team.weeks.evaluated) * 100)}
+            tint={bandColor(team.band)}
+            display={`${team.weeks.flagged}/${team.weeks.evaluated}`}
+            ariaLabel={`${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged`}
+            size="md"
+          />
+        ) : null}
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-base font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
             {team.team_name}
           </span>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -132,9 +166,9 @@ export function IntegrityTeamCard({ team }: { team: IntegrityTeam }) {
           </button>
           {open ? (
             <>
-              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} />
+              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} icon="alert" color={bandColor(team.band)} />
               <EfficiencyBars team={team} />
-              <Bullets title="Could be innocent" items={team.innocent_explanations} />
+              <Bullets title="Could be innocent" items={team.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
             </>
           ) : null}
         </>
@@ -155,8 +189,8 @@ function CollusionCard({ pair }: { pair: IntegrityCollusionPair }) {
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
       </p>
-      <Bullets title="Evidence" items={pair.evidence} />
-      <Bullets title="Could be innocent" items={pair.innocent_explanations} />
+      <Bullets title="Evidence" items={pair.evidence} icon="alert" color={bandColor(pair.band)} />
+      <Bullets title="Could be innocent" items={pair.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
     </AccentCard>
   );
 }
@@ -167,25 +201,62 @@ function InactiveCard({ manager }: { manager: IntegrityInactiveManager }) {
       <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
         {manager.team_name}
       </span>
-      <Bullets title="Evidence" items={manager.evidence} />
-      <Bullets title="Could be innocent" items={manager.innocent_explanations} />
+      <Bullets title="Evidence" items={manager.evidence} icon="clock" color="var(--color-warning)" />
+      <Bullets title="Could be innocent" items={manager.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
     </AccentCard>
   );
 }
 
 function CalendarCard({ calendar }: { calendar: IntegrityCalendar | null | undefined }) {
-  const lines = calendarLines(calendar);
-  if (!lines.length) return null;
+  if (!calendarLines(calendar).length || !calendar) return null;
+  const d = calendar.trade_deadline_week;
+  const deadlineNote =
+    d == null
+      ? "No deadline set"
+      : calendar.deadline_phase === "passed"
+        ? "Passed; reopens after the season"
+        : calendar.deadline_phase === "final_week"
+          ? "This week: last call"
+          : calendar.weeks_to_deadline != null
+            ? `${calendar.weeks_to_deadline} week${calendar.weeks_to_deadline === 1 ? "" : "s"} left`
+            : undefined;
+  const season = calendar.regular_season_weeks;
+  const progress =
+    calendar.in_season && calendar.current_week && season
+      ? Math.max(0, Math.min(100, Math.round((calendar.current_week / season) * 100)))
+      : null;
   return (
-    <section className="glass-surface p-4 flex flex-col gap-1" aria-label="League calendar" data-testid="integrity-calendar">
-      <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-        League calendar
-      </span>
-      {lines.map((line) => (
-        <span key={line} className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          {line}
-        </span>
-      ))}
+    <section className="flex flex-col gap-2" aria-label="League calendar" data-testid="integrity-calendar">
+      <SectionHeading>League calendar</SectionHeading>
+      <div className="grid grid-cols-3 gap-2">
+        {calendar.current_week && calendar.in_season ? (
+          <SnapshotTile compact glyph="age" label="Now" value={`Wk ${calendar.current_week}`} note={season ? `of ${season}` : undefined} />
+        ) : null}
+        <SnapshotTile
+          compact
+          glyph="record"
+          label="Trade deadline"
+          value={d == null ? "None" : `Wk ${d}`}
+          note={deadlineNote}
+          tone={calendar.deadline_phase === "final_week" ? "risk" : "neutral"}
+        />
+        {calendar.playoff_week_start ? (
+          <SnapshotTile compact glyph="power" label="Playoffs" value={`Wk ${calendar.playoff_week_start}`} note="Start" />
+        ) : null}
+      </div>
+      {progress !== null ? (
+        <div
+          role="progressbar"
+          aria-label="Regular season progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+          className="h-1.5 w-full"
+          style={{ background: "var(--color-surface-muted)" }}
+        >
+          <div className="h-full" style={{ width: `${progress}%`, background: "var(--color-accent)" }} />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -256,9 +327,9 @@ export function CommissionerView({
         <section className="flex flex-col gap-3">
           <SectionHeading>{flagged.length ? "Everyone else" : "Team lineups"}</SectionHeading>
           <div className="glass-surface p-4 flex items-center justify-between gap-3" data-testid="integrity-rest-summary">
-            <span className="text-sm font-bold" style={{ color: "var(--color-success)" }}>
-              {restSummary(data.teams, flagged.length)}
-            </span>
+            <IconRow icon="check" color="var(--color-success)" textClassName="text-sm font-bold">
+              <span style={{ color: "var(--color-success)" }}>{restSummary(data.teams, flagged.length)}</span>
+            </IconRow>
             <button
               type="button"
               className="text-xs font-bold shrink-0"
@@ -278,13 +349,13 @@ export function CommissionerView({
           <summary className="text-sm font-bold cursor-pointer" style={{ color: "var(--color-text-primary)" }}>
             What this can and can&rsquo;t tell you
           </summary>
-          <ul className="flex flex-col gap-1 list-disc pl-4 mt-2">
+          <div className="flex flex-col gap-2 mt-3">
             {data.limits.map((limit) => (
-              <li key={limit} className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              <IconRow key={limit} icon="info" color="var(--color-text-muted)" textClassName="text-xs">
                 {limit}
-              </li>
+              </IconRow>
             ))}
-          </ul>
+          </div>
         </details>
       ) : null}
     </>

@@ -14,6 +14,7 @@ import {
   valueEffectText,
   weakestSlotText,
 } from "@/lib/dropsPresentation";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Suggested drops (modules/drop_candidates.py), shared by the Waivers cards and
@@ -45,10 +46,12 @@ function DropPlayerLine({
     <div className="flex flex-col gap-1" data-testid="drop-player">
       <span className="flex items-center gap-2 min-w-0">
         <PlayerAvatar playerId={player.player_id} size={32} />
-        <span className="text-sm font-bold min-w-0 break-words" style={{ color: "var(--color-text-primary)" }}>
-          {lead ? `${lead} ` : ""}
-          {player.name}
-        </span>
+        {lead ? (
+          <span className="text-sm font-bold shrink-0" style={{ color: "var(--color-text-primary)" }}>
+            {lead}{" "}
+          </span>
+        ) : null}
+        <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
         <PositionBadge position={player.position} />
         <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
           {[player.team, player.age ? Math.round(player.age) : null].filter(Boolean).join(" · ")}
@@ -147,9 +150,7 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: "add
     >
       <ToneBadge label={label} color={color} size="xs" />
       <PlayerAvatar playerId={playerId} size={44} />
-      <span className="text-sm font-bold leading-tight break-words w-full" style={{ color: "var(--color-text-primary)" }}>
-        {name}
-      </span>
+      <PlayerNameText name={name} className="text-sm font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
       <span className="flex items-center justify-center gap-1 flex-wrap">
         <PositionBadge position={position} />
         {team ? (
@@ -256,9 +257,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
                 }}
               >
                 <PlayerAvatar playerId={alt.player_id} size={28} />
-                <span className="text-xs font-bold truncate max-w-[7.5rem]" style={{ color: "var(--color-text-primary)" }}>
-                  {alt.name}
-                </span>
+                <PlayerNameText name={alt.name} className="text-xs font-bold max-w-[7.5rem]" style={{ color: "var(--color-text-primary)" }} />
                 <PositionBadge position={alt.position} />
               </button>
             ))}

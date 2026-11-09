@@ -14209,7 +14209,8 @@ def test_me_reports_the_saved_league_cap_for_the_plan(monkeypatch):
     with patch("requests.get", side_effect=[free_auth_response, free_profile]):
         free = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
     with patch("requests.get", side_effect=[paid_auth_response, premium_profile]):
-        paid = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+        # Different token too: the GoTrue user lookup is memoised per token.
+        paid = client.get("/v1/me", headers={"Authorization": "Bearer good-token-paid"})
 
     # The client renders the league wall from this number, so it has to be
     # the server's cap — never a constant duplicated in the app. coridian_,

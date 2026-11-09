@@ -108,8 +108,9 @@ describe("CommissionerContent", () => {
     render(<CommissionerContent leagueId="L1" leagueName="My League" />);
     expect(await screen.findByText("All 12 teams look fine this week")).toBeTruthy();
     expect(screen.queryByText("Team 1")).toBeNull();
-    expect(screen.getByText("Trade deadline: after week 11 (3 weeks left)")).toBeTruthy();
-    expect(screen.getByText("Playoffs start week 15")).toBeTruthy();
+    expect(screen.getByText("Wk 11")).toBeTruthy();
+    expect(screen.getByText("3 weeks left")).toBeTruthy();
+    expect(screen.getByText("Wk 15")).toBeTruthy();
     fireEvent.click(screen.getByText("Show 12 teams"));
     expect(screen.getByText("Team 12")).toBeTruthy();
   });

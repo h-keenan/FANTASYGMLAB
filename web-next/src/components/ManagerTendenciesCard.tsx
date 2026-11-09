@@ -1,6 +1,8 @@
 "use client";
 
-import { ButtonLink } from "@/components/Button";
+import Link from "next/link";
+
+import { ToneBadge } from "@/components/ToneBadge";
 import { useEffect, useState } from "react";
 
 import { trackUse } from "@/lib/analytics";
@@ -47,14 +49,20 @@ export function ManagerTendenciesCard({
   if (!data) return null;
   if (!data.is_premium) {
     return (
-      <ButtonLink
+      <Link
         href="/premium"
-        variant="premium"
-        size="sm"
         onClick={() => trackUse("manager_tendencies", "upsell_tapped", { leagueId, tier: "free" })}
+        className="tap-link flex items-center gap-2 text-xs font-bold"
+        style={{ color: "var(--color-text-secondary)" }}
+        data-testid="manager-tendencies-locked"
       >
-        How this manager trades · Pro →
-      </ButtonLink>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-premium)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+        <span>How this manager trades</span>
+        <ToneBadge label="Pro" color="var(--color-premium)" size="xs" />
+      </Link>
     );
   }
   if (chips.length === 0) return null;

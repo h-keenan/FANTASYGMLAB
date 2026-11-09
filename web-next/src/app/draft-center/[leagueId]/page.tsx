@@ -21,7 +21,7 @@ export default function DraftCenterPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   useEffect(() => {
     if (!session) return;
@@ -43,6 +43,9 @@ export default function DraftCenterPage() {
       router.replace("/");
       return;
     }
+    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+    if (!lensReady) return;
     let cancelled = false;
 
     api
@@ -77,7 +80,7 @@ export default function DraftCenterPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!draftCenter && !error)) {
     return (

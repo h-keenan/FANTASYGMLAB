@@ -26,7 +26,7 @@ export default function PlayersPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +37,9 @@ export default function PlayersPage() {
       router.replace("/");
       return;
     }
+    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+    if (!lensReady) return;
     let cancelled = false;
 
     Promise.all([
@@ -63,7 +66,7 @@ export default function PlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!data && !error)) {
     return (

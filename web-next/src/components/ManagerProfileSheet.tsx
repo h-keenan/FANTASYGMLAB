@@ -16,6 +16,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { PickPlate } from "@/components/PickRow";
 import { OpponentProfileCard } from "@/components/OpponentProfileCard";
 import type { OpponentProfileResponse } from "@/lib/opponentProfile";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
   if (asset.kind === "pick") {
@@ -29,7 +30,7 @@ function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
       <PositionBadge position={asset.position} />
-      <span className="text-sm font-bold break-words">{asset.name}</span>
+      <PlayerNameText name={asset.name} threshold={Infinity} className="text-sm font-bold" />
       {asset.team ? (
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {asset.team}

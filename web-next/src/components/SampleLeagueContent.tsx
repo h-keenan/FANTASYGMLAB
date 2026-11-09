@@ -24,6 +24,7 @@ import {
   type SamplePlayer,
   type SampleTab,
 } from "@/lib/sampleLeague";
+import { PlayerNameText } from "@/components/PlayerNameText";
 
 function SamplePlayerRow({ player }: { player: SamplePlayer }) {
   return (
@@ -32,7 +33,7 @@ function SamplePlayerRow({ player }: { player: SamplePlayer }) {
         <PositionBadge position={player.position} />
       </span>
       <span className="min-w-0 flex-1 flex flex-col">
-        <span className="text-sm font-bold">{player.name}</span>
+        <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" />
         <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
           Age {player.age} · {player.note}
         </span>

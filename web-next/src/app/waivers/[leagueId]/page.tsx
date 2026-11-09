@@ -25,7 +25,7 @@ export default function WaiversPage() {
   // gamePlanTileHref) instead of landing on this generic board with no way
   // to tell which free agent the tile meant.
   const highlightPlayerId = searchParams.get("playerId") || undefined;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   useEffect(() => {
     if (!session) return;
@@ -41,6 +41,9 @@ export default function WaiversPage() {
       router.replace("/");
       return;
     }
+    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+    if (!lensReady) return;
     let cancelled = false;
 
     api
@@ -55,7 +58,7 @@ export default function WaiversPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!waivers && !error)) {
     return (

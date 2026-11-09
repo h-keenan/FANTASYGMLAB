@@ -342,7 +342,7 @@ export function needsBreakdownText(needs: NeedsModel): string {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    compactWrap: { marginTop: spacing.xs, gap: spacing.xs },
+    compactWrap: { marginTop: spacing.xs, gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
     compactRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 36 },
     compactDetails: { gap: spacing.xs, paddingLeft: spacing.xs },
     box: {

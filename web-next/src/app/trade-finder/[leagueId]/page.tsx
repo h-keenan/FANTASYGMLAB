@@ -21,7 +21,7 @@ export default function TradeFinderPage() {
   const leagueName = searchParams.get("name") || leagueId;
   // "Find trades" from Player Quick View / Player Profile.
   const initialPlayerId = searchParams.get("playerId") || undefined;
-  const { lens } = useValuationLens(leagueId);
+  const { lens, lensReady } = useValuationLens(leagueId);
 
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,9 @@ export default function TradeFinderPage() {
       router.replace("/");
       return;
     }
+    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+    if (!lensReady) return;
     let cancelled = false;
 
     api
@@ -46,7 +49,7 @@ export default function TradeFinderPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, router]);
 
   if (authLoading || (!myTeam && !error)) {
     return (

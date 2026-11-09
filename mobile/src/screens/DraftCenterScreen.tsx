@@ -367,7 +367,9 @@ function DraftInsightBlock({ card, showDivider }: { card: DraftCard; showDivider
       <AppText style={styles.insightTitle}>{card.title}</AppText>
       {card.items.map((item, index) => (
         <View key={`${card.label}-${index}`} style={styles.insightItemRow}>
-          <AppText style={styles.insightItemMark}>{'•'}</AppText>
+          <View style={[styles.insightItemIcon, { backgroundColor: `${toneColor}26` }]}>
+            <Ionicons name="arrow-forward" size={11} color={toneColor} />
+          </View>
           <AppText style={styles.insightItemText}>{item}</AppText>
         </View>
       ))}
@@ -482,7 +484,14 @@ function createStyles(colors: ThemeColors) {
   insightBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   insightTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
   insightItemRow: { flexDirection: 'row', marginBottom: 4 },
-  insightItemMark: { color: colors.textSecondary, marginRight: spacing.sm },
+  insightItemIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
   insightItemText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   });
 }

@@ -3,6 +3,8 @@ import { PageTitle } from "@/components/PageTitle";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
+import { AccentCard } from "@/components/AccentCard";
+import { NetEdgeBar, TradeSwapGlyph } from "@/components/TradeOutcomeHeader";
 import { VerdictCallout } from "@/components/VerdictCallout";
 import {
   formatTradeHistoryDate,
@@ -46,11 +48,14 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const verdict = result && result.status === "ready" ? result.verdict : null;
   const detailText = result ? verdictDetailText(result) : "";
 
+  const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(outcome.outcome);
+  const netPct = result && result.status === "ready" ? (result.value?.net_delta_pct ?? null) : null;
+
   return (
-    <article className="glass-surface flex flex-col gap-2 p-4"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col min-w-0">
+    <AccentCard accent={accent} className="gap-2">
+      <div className="flex items-start gap-3">
+        <TradeSwapGlyph color={accent} />
+        <div className="flex flex-col min-w-0 flex-1">
           <h3 className="break-words" style={{ font: "var(--font-card-title)" }}>
             {partner}
           </h3>
@@ -66,12 +71,23 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
       {verdict && result ? (
         <VerdictCallout color={verdictToneColorVar(verdict)} label={result.verdict_label} detail={detailText} />
       ) : null}
+      {netPct !== null ? (
+        <NetEdgeBar
+          netPct={netPct}
+          label={
+            <>
+              <span>Partner ahead</span>
+              <span>You ahead</span>
+            </>
+          }
+        />
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
         <ExchangeSide label="You sent" dotColor="var(--color-danger)" assets={toTradeAssets(summary.send)} />
         <ExchangeSide label="You received" dotColor="var(--color-success)" assets={toTradeAssets(summary.receive)} />
       </div>
-    </article>
+    </AccentCard>
   );
 }
 

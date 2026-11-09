@@ -18,6 +18,15 @@ describe("Free league cap", () => {
   });
 });
 
+describe("ErrorState raw exception text", () => {
+  it("replaces a raw exception with friendly copy and keeps it behind Details", () => {
+    render(<ErrorState message="rankingsResult.players is not iterable" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("We couldn't load this");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("not iterable");
+    expect(screen.getByTestId("error-details")).toHaveTextContent("rankingsResult.players is not iterable");
+  });
+});
+
 describe("ErrorState", () => {
   it("shows the message and calls onRetry when the button is pressed", () => {
     const onRetry = vi.fn();
