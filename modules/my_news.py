@@ -398,10 +398,11 @@ def filter_news_for_players(
     seen_links = set()
     for item in news_items:
         link = str(item.get("link", "") or "").lower()
-        text = " ".join(
+        raw_text = " ".join(
             str(item.get(key, "") or "")
             for key in ["title", "summary", "description", "body", "content"]
-        ).lower()
+        )
+        text = raw_text.lower()
 
         contexts = _context_matches(text)
         team_match = any(_contains_phrase(text, term) for term in team_terms)
@@ -425,6 +426,7 @@ def filter_news_for_players(
                 and not news_signal.names_collide(
                     player["name"], text, roster_names=player_names
                 )
+                and not news_signal.other_first_name_before_surname(player["name"], raw_text)
             ):
                 matched_player = player["name"]
                 relevance_score = 70 + (10 if team_match else 0)
