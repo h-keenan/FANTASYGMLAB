@@ -21,6 +21,10 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import PickGroupList from '../components/PickGroupList';
+import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
+import { needPositionsFrom } from '../lib/scoutingLens';
+import { pickProvenance } from '../lib/pickGroups';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -35,6 +39,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'DraftCenter'>;
 
 type PickScope = 'mine' | 'league';
+type DraftTab = 'overview' | 'picks' | 'scouting';
 
 function toneColorMap(colors: ThemeColors): Record<string, string> {
   return {
@@ -64,6 +69,8 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
+  const [tab, setTab] = useState<DraftTab>(route.params.tab ?? 'overview');
+  const [needGroups, setNeedGroups] = useState<Array<{ position: string; classification: string }> | null>(null);
   const [posture, setPosture] = useState<DraftPosture | null>(null);
   const [postureReason, setPostureReason] = useState('');
   const [decisionCards, setDecisionCards] = useState<DraftCard[]>([]);
@@ -99,12 +106,14 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           // neither should be able to blank out the posture/insight cards
           // that were already here, so both degrade to "no pick browser"
           // rather than surfacing an error.
-          const [result, picksResult, myRoster] = await Promise.all([
+          const [result, picksResult, myRoster, needs] = await Promise.all([
             api.getLeagueDraftCenter(leagueId),
             api
               .getLeagueDraftPicks(leagueId)
               .catch(() => ({ ok: true as const, picks: [] as DraftPickAsset[], reason: 'unavailable' })),
             api.getMyRoster(leagueId).catch(() => null),
+            // Best-effort: only feeds the Scouting tab's league overlay.
+            api.getLeagueMyTeamNeeds(leagueId).catch(() => null),
           ]);
           if (cancelled) return;
           if (result.is_premium === false) {
@@ -117,6 +126,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           setPartnerCards(result.partner_cards);
           setReason(result.reason);
           setPicks(picksResult.picks);
+          setNeedGroups(needs?.position_groups ?? null);
           const resolvedRosterId = String(myRoster?.roster?.roster_id ?? '');
           setMyRosterId(resolvedRosterId);
           // Nothing to scope to without a resolved roster — don't strand the
@@ -147,16 +157,14 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
     );
   }, [picks, pickScope, myRosterId]);
 
-  const pickSeasons = useMemo(() => {
-    const bySeason = new Map<number, DraftPickAsset[]>();
-    for (const pick of visiblePicks) {
-      const season = pick.season ?? 0;
-      const bucket = bySeason.get(season);
-      if (bucket) bucket.push(pick);
-      else bySeason.set(season, [pick]);
-    }
-    return [...bySeason.entries()].sort(([a], [b]) => a - b);
-  }, [visiblePicks]);
+  const myPicks = useMemo(
+    () => (myRosterId ? picks.filter((pick) => pick.owner_roster_id === myRosterId) : []),
+    [picks, myRosterId],
+  );
+  const scoutingLens = useMemo(
+    () => (needGroups || myPicks.length ? { needPositions: needPositionsFrom(needGroups), myPicks } : null),
+    [needGroups, myPicks],
+  );
 
   // Distinct pick-owning rosters stand in for league size (rank -> percentile); null under 2.
   const leagueSize = useMemo(() => {
@@ -213,6 +221,19 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        <View style={styles.scopeRow}>
+          <SegmentedTabBar<DraftTab>
+            options={[
+              { key: 'overview', label: 'Overview' },
+              { key: 'picks', label: 'Picks' },
+              { key: 'scouting', label: 'Scouting' },
+            ]}
+            active={tab}
+            onChange={setTab}
+          />
+        </View>
+        {tab === 'overview' ? (
+          <>
         <SectionHeading title="Your Draft Posture" topGap={16} />
         {posture ? (
           <AccentCard accent={toneColorMap(colors)[posture.tone] ?? colors.accent}>
@@ -255,7 +276,10 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           />
         )}
 
-        {picks.length ? (
+          </>
+        ) : null}
+
+        {tab === 'picks' ? (
           <>
             <SectionHeading title="Pick Values" topGap={16} />
             {/* Only worth a toggle once there's a resolved roster to scope
@@ -273,38 +297,29 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                 />
               </View>
             ) : null}
-            {pickSeasons.length ? (
-              pickSeasons.map(([season, seasonPicks]) => (
-                <View key={season}>
-                  <AppText style={styles.pickSeasonLabel}>{season || 'Future'}</AppText>
-                  {/* A plain container, not AnimatedCard: the card here is a
-                      list shell, and its rows are what's pressable — an
-                      AnimatedCard would spring the whole season group on
-                      every row tap. */}
-                  <View style={styles.pickCard}>
-                    {seasonPicks.map((pick, index) => {
-                      const confidence =
-                        typeof pick.projection_confidence === 'number' ? pick.projection_confidence : null;
-                      return (
-                        <DraftPickAssetRow
-                          key={pick.pick_id}
-                          pickId={pick.pick_id}
-                          round={pick.round}
-                          label={pick.label}
-                          projectedRange={pick.projected_pick_range}
-                          pickTier={pick.pick_tier}
-                          contextLine={pickScope === 'league' ? pick.owner_team_name : null}
-                          trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
-                          trailingCaption={confidence !== null ? `${Math.round(confidence * 100)}% conf` : null}
-                          showChevron
-                          onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
-                          showDivider={index < seasonPicks.length - 1}
-                        />
-                      );
-                    })}
-                  </View>
-                </View>
-              ))
+            {visiblePicks.length ? (
+              <PickGroupList
+                picks={visiblePicks}
+                renderPick={(pick, isLast) => {
+                  const confidence =
+                    typeof pick.projection_confidence === 'number' ? pick.projection_confidence : null;
+                  return (
+                    <DraftPickAssetRow
+                      pickId={pick.pick_id}
+                      round={pick.round}
+                      label={pick.label}
+                      projectedRange={pick.projected_pick_range}
+                      pickTier={pick.pick_tier}
+                      contextLine={pickProvenance(pick, { showOwner: pickScope === 'league' })}
+                      trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
+                      trailingCaption={confidence !== null ? `${Math.round(confidence * 100)}% conf` : null}
+                      showChevron
+                      onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
+                      showDivider={!isLast}
+                    />
+                  );
+                }}
+              />
             ) : (
               <EmptyState
                 icon="information-circle-outline"
@@ -318,15 +333,26 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           </>
         ) : null}
 
-        <SectionHeading title="League Draft Decision Signals" topGap={16} />
-        {decisionCards.map((card) => (
-          <DraftInsightCard key={card.label} card={card} />
-        ))}
+        {tab === 'overview' ? (
+          <>
+            <SectionHeading title="League Draft Decision Signals" topGap={16} />
+            {decisionCards.map((card) => (
+              <DraftInsightCard key={card.label} card={card} />
+            ))}
 
-        <SectionHeading title="Draft Partner Discovery" topGap={16} />
-        {partnerCards.map((card) => (
-          <DraftInsightCard key={card.label} card={card} />
-        ))}
+            <SectionHeading title="Draft Partner Discovery" topGap={16} />
+            {partnerCards.map((card) => (
+              <DraftInsightCard key={card.label} card={card} />
+            ))}
+          </>
+        ) : null}
+
+        {tab === 'scouting' ? (
+          <CollegeScoutingPanel
+            onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })}
+            lens={scoutingLens}
+          />
+        ) : null}
         <ValuesCredit />
       </ScrollView>
     </View>

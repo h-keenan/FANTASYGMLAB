@@ -259,7 +259,12 @@ describe("TradeFinderContent", () => {
     );
     await act(async () => {});
 
-    for (const n of [1, 2, 3, 4]) fireEvent.click(screen.getByText(`Pick ${n}`));
+    // Picks are grouped under year tabs: switch to each year, then select.
+    for (const n of [1, 2, 3, 4]) {
+      fireEvent.click(screen.getByRole("tab", { name: `202${n} (1)` }));
+      fireEvent.click(screen.getByText(`Pick ${n}`));
+    }
+    fireEvent.click(screen.getByRole("tab", { name: "2025 (1)" }));
     const fifth = screen.getByText("Pick 5").closest("button");
     expect(fifth).toBeDisabled();
     expect(screen.getByRole("button", { name: /Find Realistic Trades \(4\)/ })).toBeInTheDocument();

@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
-import { api, type DraftCenterResponse, type DraftPickAsset } from "@/lib/api";
-import { DraftCenterContent } from "@/components/DraftCenterContent";
+import { api, type DraftCenterResponse, type DraftPickAsset, type PositionNeedGroup } from "@/lib/api";
+import { DraftCenterContent, parseDraftCenterTab, type DraftCenterTab } from "@/components/DraftCenterContent";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -35,6 +35,7 @@ export default function DraftCenterPage() {
   // loaded, so both degrade quietly instead of blocking the page, same
   // contract mobile's DraftCenterScreen.tsx follows.
   const [picks, setPicks] = useState<DraftPickAsset[]>([]);
+  const [needGroups, setNeedGroups] = useState<PositionNeedGroup[] | null>(null);
   const [myRosterId, setMyRosterId] = useState<string>("");
 
   useEffect(() => {
@@ -67,6 +68,15 @@ export default function DraftCenterPage() {
       });
 
     api
+      .getMyTeamNeeds(leagueId, lens)
+      .then((result) => {
+        if (!cancelled) setNeedGroups(result.position_groups ?? null);
+      })
+      .catch(() => {
+        /* best-effort: the league overlay just shows pick fits */
+      });
+
+    api
       .getMyRoster(leagueId)
       .then((result) => {
         if (!cancelled && result.roster) {
@@ -81,6 +91,14 @@ export default function DraftCenterPage() {
       cancelled = true;
     };
   }, [authLoading, session, leagueId, lens, lensReady, router]);
+
+  // Keep ?tab= in the address bar so a tab is linkable/refreshable without a navigation.
+  function syncTabToUrl(tab: DraftCenterTab) {
+    const url = new URL(window.location.href);
+    if (tab === "overview") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url);
+  }
 
   if (authLoading || (!draftCenter && !error)) {
     return (
@@ -109,6 +127,14 @@ export default function DraftCenterPage() {
   }
 
   return (
-    <DraftCenterContent leagueName={leagueName} data={draftCenter} picks={picks} myRosterId={myRosterId} />
+    <DraftCenterContent
+      leagueName={leagueName}
+      data={draftCenter}
+      picks={picks}
+      myRosterId={myRosterId}
+      initialTab={parseDraftCenterTab(searchParams.get("tab"))}
+      onTabChange={syncTabToUrl}
+      needGroups={needGroups}
+    />
   );
 }

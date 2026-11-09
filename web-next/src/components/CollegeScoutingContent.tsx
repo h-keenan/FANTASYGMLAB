@@ -3,12 +3,14 @@
 import { InfoTip } from "@/components/InfoTip";
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PillRow } from "@/components/PillRow";
 import { Button } from "@/components/Button";
+import { ToneBadge } from "@/components/ToneBadge";
+import { prospectFit, rankByFit, type ScoutingLens } from "@/lib/scoutingLens";
 import { PositionBadge } from "@/components/PositionBadge";
 import { confidenceColor } from "@/lib/waiversPresentation";
 import { aggregateText, classLabel, scoutingConfidenceLabel } from "@/lib/collegeScoutingPresentation";
@@ -69,7 +71,9 @@ function ProspectCard({
   onDraftChange,
   onSubmit,
   onRemove,
+  lens,
 }: {
+  lens?: ScoutingLens | null;
   prospect: CollegeProspect;
   expanded: boolean;
   draft: ReportDraft;
@@ -83,6 +87,7 @@ function ProspectCard({
 }) {
   const aggregate = prospect.aggregate;
   const hasReport = prospect.my_report != null;
+  const fit = lens ? prospectFit(prospect, lens) : null;
 
   return (
     <article
@@ -98,6 +103,12 @@ function ProspectCard({
             {classLabel(prospect.school, prospect.draft_year)}
           </span>
         </div>
+        {fit && (fit.needsPosition || fit.pickNote) ? (
+          <span className="flex flex-wrap justify-end gap-1">
+            {fit.needsPosition ? <ToneBadge label="Fits your need" color="var(--color-success)" /> : null}
+            {fit.pickNote ? <ToneBadge label={fit.pickNote} color="var(--color-information)" /> : null}
+          </span>
+        ) : null}
       </div>
 
       <div
@@ -233,7 +244,22 @@ function ProspectCard({
   );
 }
 
-export function CollegeScoutingContent({ data }: { data: CollegeProspectsResponse }) {
+function Shell({ embedded, children }: { embedded: boolean; children: ReactNode }) {
+  if (embedded) return <div className="flex flex-col gap-3">{children}</div>;
+  return <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">{children}</main>;
+}
+
+export function CollegeScoutingContent({
+  data,
+  embedded = false,
+  lens = null,
+}: {
+  /** League overlay (needs + your pick slots). Null with no league: the base list only. */
+  lens?: ScoutingLens | null;
+  data: CollegeProspectsResponse;
+  /** Inside the Draft Center Scouting tab: no page shell or title (the host page owns both). */
+  embedded?: boolean;
+}) {
   const [prospects, setProspects] = useState<CollegeProspect[]>(data.prospects);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -241,10 +267,11 @@ export function CollegeScoutingContent({ data }: { data: CollegeProspectsRespons
   const [flashes, setFlashes] = useState<Record<string, { tone: "success" | "error" | "warning"; message: string }>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const visible = useMemo(
-    () => (filter === "watchlist" ? prospects.filter((row) => row.on_watchlist) : prospects),
-    [prospects, filter],
-  );
+  const [view, setView] = useState<"base" | "league">("base");
+  const visible = useMemo(() => {
+    const scoped = filter === "watchlist" ? prospects.filter((row) => row.on_watchlist) : prospects;
+    return lens && view === "league" ? rankByFit(scoped, lens) : scoped;
+  }, [prospects, filter, lens, view]);
 
   const toggleWatchlist = (prospect: CollegeProspect) => {
     const next = !prospect.on_watchlist;
@@ -319,9 +346,9 @@ export function CollegeScoutingContent({ data }: { data: CollegeProspectsRespons
   };
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <Shell embedded={embedded}>
       <header className="flex flex-col gap-1">
-        <PageTitle page="College Scouting" />
+        {embedded ? null : <PageTitle page="College Scouting" />}
         <InfoTip label="How grades are used">
           Every signed-in user&apos;s grade on a prospect pools into one shared signal — that shared aggregate, not
           any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to
@@ -349,6 +376,25 @@ export function CollegeScoutingContent({ data }: { data: CollegeProspectsRespons
             onSelect={(value) => setFilter(value as FilterKey)}
           />
 
+          {lens ? (
+            <div className="flex flex-col gap-1">
+              <PillRow
+                ariaLabel="Scouting view"
+                options={[
+                  { label: "Best available", value: "base" },
+                  { label: "For my league", value: "league" },
+                ]}
+                active={view}
+                onSelect={(value) => setView(value === "league" ? "league" : "base")}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                {view === "league"
+                  ? "Prospects that fit a position you need or a round you hold are listed first and tagged. Same prospects and grades as Best available."
+                  : "The shared board, no league applied. Switch to For my league to see fits to your needs and picks."}
+              </p>
+            </div>
+          ) : null}
+
           {visible.length === 0 ? (
             <EmptyState
               title="No prospects followed yet"
@@ -369,12 +415,13 @@ export function CollegeScoutingContent({ data }: { data: CollegeProspectsRespons
                   onDraftChange={(next) => setDrafts((prev) => ({ ...prev, [prospect.id]: next }))}
                   onSubmit={() => submitReport(prospect)}
                   onRemove={() => removeReport(prospect)}
+                  lens={lens && view === "league" ? lens : null}
                 />
               ))}
             </div>
           )}
         </div>
       )}
-    </main>
+    </Shell>
   );
 }

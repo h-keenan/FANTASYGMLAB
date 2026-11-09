@@ -30,6 +30,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
+import PickGroupList from '../components/PickGroupList';
 import FilterDropdownButton from '../components/FilterDropdownButton';
 import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -98,7 +99,7 @@ type SideAssetItem =
 
 type SearchItem =
   | { kind: 'player'; player: RankedPlayer }
-  | { kind: 'pick'; pick: DraftPickAsset };
+  | { kind: 'pickGroups'; picks: DraftPickAsset[] };
 
 const MAX_SEARCH_RESULTS = 40;
 const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
@@ -375,11 +376,12 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const searchResults = useMemo<SearchItem[]>(() => {
     const query = search.trim().toLowerCase();
     if (assetType === 'picks') {
-      return pickSearchPool
+      // One list item: the grouped (year tabs -> round) pick list renders every result itself.
+      const matching = pickSearchPool
         .filter((p) => !selectedPickIds.has(p.pick_id))
         .filter((p) => !query || (p.label ?? '').toLowerCase().includes(query))
-        .slice(0, MAX_SEARCH_RESULTS)
-        .map((pick) => ({ kind: 'pick' as const, pick }));
+        .slice(0, MAX_SEARCH_RESULTS);
+      return matching.length ? [{ kind: 'pickGroups' as const, picks: matching }] : [];
     }
     return searchPool
       .filter((p) => !selectedIds.has(p.player_id))
@@ -732,7 +734,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       ListFooterComponent={<ValuesCredit />}
       style={styles.container}
       data={searchResults}
-      keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : item.pick.pick_id)}
+      keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : 'pick-groups')}
       contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={header}
@@ -755,33 +757,34 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           );
         }
         return (
-          <View style={[styles.pickResultRow, showDivider && styles.pickResultDivider]}>
-            <DraftPickAssetRow
-              style={styles.pickResultRowInner}
-              pickId={item.pick.pick_id}
-              round={item.pick.round}
-              label={item.pick.label}
-              projectedRange={item.pick.projected_pick_range}
-              pickTier={item.pick.pick_tier}
-              trailingValue={item.pick.score != null ? String(Math.round(item.pick.score)) : '—'}
-              onPress={() => addPickToSide(item.pick)}
-            />
-            {/* This info button is the escape hatch to "why is it worth
-                that?" (the same Pick Detail the Draft Center's pick list
-                opens) — the row itself still adds the pick on tap, so
-                bulk-adding stays one tap. */}
-            <TouchableOpacity
-              style={styles.pickInfoButton}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Pick details"
-              onPress={() =>
-                navigation.navigate('PickDetail', { pick: item.pick, leagueId, leagueName })
-              }
-            >
-              <Ionicons name="information-circle-outline" size={20} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
+          <PickGroupList
+            picks={item.picks}
+            renderPick={(pick, isLast) => (
+              <View style={[styles.pickResultRow, !isLast && styles.pickResultDivider]}>
+                <DraftPickAssetRow
+                  style={styles.pickResultRowInner}
+                  pickId={pick.pick_id}
+                  round={pick.round}
+                  label={pick.label}
+                  projectedRange={pick.projected_pick_range}
+                  pickTier={pick.pick_tier}
+                  trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
+                  onPress={() => addPickToSide(pick)}
+                />
+                {/* Info button: the escape hatch to "why is it worth that?"
+                    (Pick Detail). The row itself still adds the pick on tap. */}
+                <TouchableOpacity
+                  style={styles.pickInfoButton}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Pick details"
+                  onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
+                >
+                  <Ionicons name="information-circle-outline" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+            )}
+          />
         );
       }}
       ListEmptyComponent={

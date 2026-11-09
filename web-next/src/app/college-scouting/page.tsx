@@ -8,6 +8,7 @@ import { api, type CollegeProspectsResponse } from "@/lib/api";
 import { CollegeScoutingContent } from "@/components/CollegeScoutingContent";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
+import { useDefaultLeague } from "@/lib/useDefaultLeague";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio/News/Trade History, College Scouting has no [leagueId]
@@ -20,6 +21,7 @@ export default function CollegeScoutingPage() {
   const router = useRouter();
   const { session, loading: authLoading } = useAuth();
 
+  const defaultLeague = useDefaultLeague();
   const [data, setData] = useState<CollegeProspectsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +29,15 @@ export default function CollegeScoutingPage() {
     if (authLoading) return;
     if (!session) {
       router.replace("/");
+      return;
+    }
+    // College Scouting now lives in the Draft Center's Scouting tab. With a default
+    // league (the only one, or the last opened) go there; otherwise fall through and
+    // render the league-independent board right here so no league is ever required.
+    if (defaultLeague === null) return;
+    if (defaultLeague.only) {
+      const { leagueId, leagueName } = defaultLeague.only;
+      router.replace(`/draft-center/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}&tab=scouting`);
       return;
     }
     let cancelled = false;
@@ -43,9 +54,9 @@ export default function CollegeScoutingPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, router]);
+  }, [authLoading, session, router, defaultLeague]);
 
-  if (authLoading || (!data && !error)) {
+  if (authLoading || defaultLeague === null || defaultLeague.only || (!data && !error)) {
     return (
       <LoadingScreen status="Loading College Scouting…" />
     );

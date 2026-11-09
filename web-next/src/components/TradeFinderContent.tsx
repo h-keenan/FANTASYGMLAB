@@ -24,6 +24,7 @@ import {
 } from "@/components/TradeFinderNoResults";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
+import { PickGroupList } from "@/components/PickGroupList";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { TRADE_DEADLINE_PASSED_MESSAGE, tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
@@ -408,20 +409,18 @@ export function TradeFinderContent({
               >
                 Picks you&apos;d trade away
               </span>
-              <div className="flex flex-col" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
-                {ownedPicks.map((pick) => {
-                  const selected = selectedPickIds.has(pick.pick_id);
-                  return (
-                    <OwnedPickRow
-                      key={pick.pick_id}
-                      pick={pick}
-                      selected={selected}
-                      disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
-                      onToggle={() => togglePick(pick.pick_id)}
-                    />
-                  );
-                })}
-              </div>
+              <PickGroupList
+                picks={ownedPicks}
+                selectedIds={selectedPickIds}
+                renderPick={(pick) => (
+                  <OwnedPickRow
+                    pick={pick}
+                    selected={selectedPickIds.has(pick.pick_id)}
+                    disabled={!selectedPickIds.has(pick.pick_id) && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
+                    onToggle={() => togglePick(pick.pick_id)}
+                  />
+                )}
+              />
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Up to {TRADE_FINDER_MAX_PICKS} picks per search.
               </p>
