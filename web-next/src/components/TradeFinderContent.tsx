@@ -227,7 +227,7 @@ export function TradeFinderContent({
   );
   const [ownedPicks, setOwnedPicks] = useState<DraftPickAsset[]>([]);
   const [selectedPickIds, setSelectedPickIds] = useState<Set<string>>(new Set());
-  const [returnPicks, setReturnPicks] = useState(false);
+  const [returnScope, setReturnScope] = useState<"any" | "picks" | "players">("any");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeFinderClosestIdea[] | null>(null);
@@ -246,13 +246,14 @@ export function TradeFinderContent({
   const [strategy, setStrategy] = useState("retool");
 
   const runSearch = useCallback(
-    async (playerIds: Set<string>, pickIds: Set<string>, withReturnPicks: boolean, strategyKey: string) => {
+    async (playerIds: Set<string>, pickIds: Set<string>, scope: "any" | "picks" | "players", strategyKey: string) => {
       setSearchError(null);
       setSearching(true);
       try {
         const result = await api.getTradeFinderIdeas(leagueId, Array.from(playerIds), strategyKey, lens, {
           pickIds: Array.from(pickIds),
-          returnPicks: withReturnPicks,
+          returnPicks: scope === "picks",
+          returnPlayers: scope === "players",
         });
         setIdeas(result.ideas);
         setNoResults({ search: result.search, closest: result.closest ?? [] });
@@ -343,7 +344,7 @@ export function TradeFinderContent({
 
   function search() {
     if (selectionCount === 0) return;
-    void runSearch(selectedIds, selectedPickIds, returnPicks, strategy);
+    void runSearch(selectedIds, selectedPickIds, returnScope, strategy);
   }
 
   if (reasonMessage) {
@@ -438,10 +439,11 @@ export function TradeFinderContent({
               options={[
                 { label: "Any return", value: "any" },
                 { label: "Picks back", value: "picks" },
+                { label: "Players back", value: "players" },
               ]}
-              active={returnPicks ? "picks" : "any"}
+              active={returnScope}
               onSelect={(value) => {
-                setReturnPicks(value === "picks");
+                setReturnScope(value as "any" | "picks" | "players");
                 setIdeas(null);
                 setSearchError(null);
               }}
@@ -471,7 +473,7 @@ export function TradeFinderContent({
                 closest={noResults.closest}
                 leagueId={leagueId}
                 lens={lens}
-                onRetry={() => void runSearch(selectedIds, selectedPickIds, returnPicks, strategy)}
+                onRetry={() => void runSearch(selectedIds, selectedPickIds, returnScope, strategy)}
               />
             ) : (
               <div className="flex flex-col gap-4">

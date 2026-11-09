@@ -515,6 +515,7 @@ def generate_trade_idea_records(
     df_summary: pd.DataFrame | None = None,
     trade_block_pick_ids: tuple[str, ...] = (),
     require_receive_picks: bool = False,
+    require_receive_players: bool = False,
     keeper_context: Mapping[str, Any] | None = None,
     finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
 ) -> list[dict[str, Any]]:
@@ -672,6 +673,7 @@ def generate_trade_idea_records(
         prefetched_rosters=prefetched_rosters or None,
         trade_block_pick_ids=[str(pid) for pid in trade_block_pick_ids if str(pid)],
         require_receive_picks=bool(require_receive_picks),
+        require_receive_players=bool(require_receive_players),
         finder_trace=finder_trace,
     )
     enforced = enforce_generated_trade_ideas(
@@ -978,6 +980,7 @@ def generate_trade_finder_records(
     team_stance: str = "",
     trade_block_pick_ids: tuple[str, ...] = (),
     require_receive_picks: bool = False,
+    require_receive_players: bool = False,
     finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
     posture: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
@@ -1033,6 +1036,7 @@ def generate_trade_finder_records(
         team_stance=team_stance,
         trade_block_pick_ids=trade_block_pick_ids,
         require_receive_picks=require_receive_picks,
+        require_receive_players=require_receive_players,
         finder_trace=finder_trace,
     )
     if finder_trace is not None and posture:

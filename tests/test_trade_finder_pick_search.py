@@ -52,7 +52,7 @@ def _pick_id(fixture, season, round_num):
     raise AssertionError("pick not found")
 
 
-def _search(fixture, pick_ids, *, strategy="contender", return_picks=False, trace=None):
+def _search(fixture, pick_ids, *, strategy="contender", return_picks=False, return_players=False, trace=None):
     return trade_ideas.build_trade_ideas(
         fixture["players"],
         "fixture-league",
@@ -68,6 +68,7 @@ def _search(fixture, pick_ids, *, strategy="contender", return_picks=False, trac
         adapter=fixture["adapter"],
         trade_block_pick_ids=list(pick_ids),
         require_receive_picks=return_picks,
+        require_receive_players=return_players,
         finder_trace=trace,
     )
 
@@ -144,6 +145,15 @@ def test_two_pick_selection_can_consolidate_into_a_player():
     ids = [_pick_id(fixture, 2026, 3), _pick_id(fixture, 2027, 3), _pick_id(fixture, 2026, 4)]
     ideas = _search(fixture, ids)
     assert any(len(i["send_assets"]) >= 2 for i in ideas)
+
+
+def test_players_back_keeps_only_player_returns_with_no_pick():
+    fixture = _fixture("contender")
+    ideas = _search(fixture, [_pick_id(fixture, 2026, 1)], return_players=True)
+    assert ideas
+    for idea in ideas:
+        assert idea["receive_assets"]
+        assert all(a["asset_type"] == "player" for a in idea["receive_assets"])
 
 
 def test_picks_back_still_keeps_only_pick_returns():

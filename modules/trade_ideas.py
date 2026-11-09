@@ -4362,6 +4362,7 @@ def build_trade_ideas(
     prefetched_rosters: List[Dict[str, Any]] | None = None,
     trade_block_pick_ids: List[str] | None = None,
     require_receive_picks: bool = False,
+    require_receive_players: bool = False,
     finder_trace: "FinderSearchTrace | None" = None,
     trade_block_player_ids: Sequence[str] | None = None,
 ) -> List[Dict[str, Any]]:
@@ -4389,6 +4390,7 @@ def build_trade_ideas(
             prefetched_rosters=prefetched_rosters,
             trade_block_pick_ids=trade_block_pick_ids,
             require_receive_picks=require_receive_picks,
+            require_receive_players=require_receive_players,
             finder_trace=finder_trace,
             trade_block_player_ids=trade_block_player_ids,
         )
@@ -4648,6 +4650,7 @@ def _build_trade_ideas_impl(
     prefetched_rosters: List[Dict[str, Any]] | None = None,
     trade_block_pick_ids: List[str] | None = None,
     require_receive_picks: bool = False,
+    require_receive_players: bool = False,
     finder_trace: "FinderSearchTrace | None" = None,
     trade_block_player_ids: Sequence[str] | None = None,
 ) -> List[Dict[str, Any]]:
@@ -5769,6 +5772,12 @@ def _build_trade_ideas_impl(
     if require_receive_picks:
         # "Picks back" is a hard filter on the return, not a ranking nudge.
         ideas = [idea for idea in ideas if _has_pick(idea.get("receive_assets") or [])]
+    if require_receive_players:
+        # "Players back" likewise: the return is players only, no picks.
+        ideas = [
+            idea for idea in ideas
+            if _player_assets(idea.get("receive_assets") or []) and not _has_pick(idea.get("receive_assets") or [])
+        ]
 
     if required_send:
         # The selection is a hard constraint: a package that leaves a selected
