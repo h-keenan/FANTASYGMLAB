@@ -578,6 +578,34 @@ def names_collide(candidate: str, article_text_blob: str, *, roster_names: Seque
     return True
 
 
+_SURNAME_LEAD_STOPWORDS = frozenset(
+    "the a an and or but plus also with for from per mr mrs ms dr coach qb rb wr te "
+    "rookie veteran former star new young said says after before while when".split()
+)
+
+
+def other_first_name_before_surname(candidate: str, original_text: str) -> bool:
+    """True when the article names a *different* person with the candidate's
+    surname ("Russell Wilson" for candidate "Michael Wilson") and never names
+    the candidate. Needs the original-case text to spot "First Last"."""
+
+    last = player_last_name(candidate)
+    parts = normalize_player_name(candidate).split()
+    if not last or len(parts) < 2:
+        return False
+    first = parts[0]
+    text = str(original_text or "")
+    if contains_phrase(text.lower(), normalize_player_name(candidate)):
+        return False
+    pattern = re.compile(rf"\b([A-Z][a-zA-Z'\u2019\-]+)\s+{re.escape(last.capitalize())}\b")
+    for match in pattern.finditer(text):
+        lead = match.group(1).lower()
+        if lead in _SURNAME_LEAD_STOPWORDS or lead == first:
+            continue
+        return True
+    return False
+
+
 def valuation_safe_fields() -> frozenset[str]:
     """Fields news enrichment is allowed to write on article dicts."""
 
