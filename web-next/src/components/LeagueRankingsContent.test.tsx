@@ -102,6 +102,19 @@ describe("LeagueRankingsContent", () => {
     expect(screen.getAllByText("Rival Squad").length).toBeGreaterThan(0);
   });
 
+  it("opens each rank board on the top three and expands on tap", () => {
+    const teams = Array.from({ length: 8 }, (_, i) =>
+      team({ roster_id: String(i + 1), team_name: `Team ${i + 1}`, power_rank: i + 1, franchise_rank: i + 1, draft_capital_rank: i + 1, starter_rank: i + 1, bench_rank: i + 1, standing_rank: i + 1 }),
+    );
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={{ ...BASE_RESPONSE, teams }} />);
+    const buttons = screen.getAllByRole("button", { name: "Show all 8 teams" });
+    expect(buttons).toHaveLength(5);
+    expect(screen.getAllByText("Team 8")).toHaveLength(1); // standings only
+    fireEvent.click(buttons[0]);
+    expect(screen.getAllByText("Team 8")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Show top 3" })).toBeInTheDocument();
+  });
+
   it("ends with next-step links instead of a dead end", () => {
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
     expect(screen.getByRole("link", { name: /See trade ideas/ })).toHaveAttribute("href", "/trade-hub/L1?name=My%20League");
