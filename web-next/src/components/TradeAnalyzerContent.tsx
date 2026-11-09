@@ -30,6 +30,7 @@ import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { PickGroupList } from "@/components/PickGroupList";
 import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
@@ -1125,17 +1126,15 @@ export function TradeAnalyzerContent({
 
         <div className="flex flex-col divide-y max-h-80 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
           {assetType === "picks" ? (
-            pickResults.length === 0 ? (
-              <p className="text-sm py-2" style={{ color: "var(--color-text-muted)" }}>
-                {search ? "No matching picks." : "Start typing to search, or browse the list above."}
-              </p>
-            ) : (
-              pickResults.map((pick) => (
-                <button key={pick.pick_id} type="button" className="w-full text-left" onClick={() => addPick(pick)}>
+            <PickGroupList
+              picks={pickResults}
+              emptyMessage={search ? "No matching picks." : "No picks available."}
+              renderPick={(pick) => (
+                <button type="button" className="w-full text-left" onClick={() => addPick(pick)}>
                   <TradeAssetRow asset={pickToTradeAsset(pick)} />
                 </button>
-              ))
-            )
+              )}
+            />
           ) : playerResults.length === 0 ? (
             <p className="text-sm py-2" style={{ color: "var(--color-text-muted)" }}>
               {search ? "No matching players." : "Start typing to search, or browse the list above."}

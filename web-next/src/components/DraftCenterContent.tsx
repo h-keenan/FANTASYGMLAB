@@ -3,8 +3,11 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import { useMemo, useState } from "react";
 
-import type { DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
+import type { PositionNeedGroup, DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
+import { PickGroupList } from "@/components/PickGroupList";
+import { DraftScoutingTab } from "@/components/DraftScoutingTab";
+import { pickProvenance } from "@/lib/pickGroups";
 import { PillRow } from "@/components/PillRow";
 import { formatRank } from "@/components/SnapshotTile";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
@@ -18,7 +21,6 @@ import {
   POSTURE_REASON_MESSAGE,
   draftToneColor,
   leagueSizeFromPicks,
-  groupPicksBySeason,
   visibleDraftPicks,
   type PickScope,
 } from "@/lib/draftCenterPresentation";
@@ -32,17 +34,30 @@ import { PageTitle } from "@/components/PageTitle";
  * league-wide decision/partner cards. The live draft board lives on the
  * Live Draft page and prospect scouting on College Scouting.
  */
+export type DraftCenterTab = "overview" | "picks" | "scouting";
+
+export function parseDraftCenterTab(value: string | null | undefined): DraftCenterTab {
+  return value === "picks" || value === "scouting" ? value : "overview";
+}
+
 export function DraftCenterContent({
   leagueName,
   data,
   picks,
   myRosterId,
+  initialTab = "overview",
+  onTabChange,
+  needGroups = null,
 }: {
   leagueName: string;
   data: DraftCenterResponse;
   picks: DraftPickAsset[];
   myRosterId: string;
+  initialTab?: DraftCenterTab;
+  onTabChange?: (tab: DraftCenterTab) => void;
+  needGroups?: PositionNeedGroup[] | null;
 }) {
+  const [tab, setTab] = useState<DraftCenterTab>(initialTab);
   // Nothing to scope to without a resolved roster — don't strand the user
   // on an empty "My Picks" tab they can't fill, same guard mobile's screen
   // applies to its own initial pickScope.
@@ -52,8 +67,11 @@ export function DraftCenterContent({
     () => visibleDraftPicks(picks, pickScope, myRosterId),
     [picks, pickScope, myRosterId],
   );
-  const pickSeasons = useMemo(() => groupPicksBySeason(visiblePicks), [visiblePicks]);
 
+  const myPicks = useMemo(
+    () => (myRosterId ? picks.filter((pick) => pick.owner_roster_id === myRosterId) : []),
+    [picks, myRosterId],
+  );
   const leagueSize = useMemo(() => leagueSizeFromPicks(picks), [picks]);
 
   const { posture, posture_reason: postureReason, decision_cards: decisionCards, partner_cards: partnerCards } = data;
@@ -64,6 +82,24 @@ export function DraftCenterContent({
         <PageTitle page="Draft Center" leagueName={leagueName} />
       </header>
 
+      <PillRow
+        sticky
+        fullWidth
+        ariaLabel="Draft Center section"
+        options={[
+          { label: "Overview", value: "overview" },
+          { label: "Picks", value: "picks" },
+          { label: "Scouting", value: "scouting" },
+        ]}
+        active={tab}
+        onSelect={(value) => {
+          const next = parseDraftCenterTab(value);
+          setTab(next);
+          onTabChange?.(next);
+        }}
+      />
+
+      {tab === "overview" ? (
       <section className="flex flex-col gap-3" aria-labelledby="posture-heading">
         <SectionHeading id="posture-heading">
           Your Draft Posture
@@ -122,8 +158,9 @@ export function DraftCenterContent({
           <EmptyState title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."} />
         )}
       </section>
+      ) : null}
 
-      {picks.length > 0 ? (
+      {tab === "picks" ? (
         <section className="flex flex-col gap-3" aria-labelledby="pick-values-heading">
           <SectionHeading id="pick-values-heading">
             Pick Values
@@ -138,28 +175,17 @@ export function DraftCenterContent({
               onSelect={(value) => setPickScope(value as PickScope)}
             />
           ) : null}
-          {pickSeasons.length > 0 ? (
-            pickSeasons.map(([season, seasonPicks]) => (
-              <div key={season} className="flex flex-col gap-2">
-                <span
-                  className="text-xs font-bold uppercase"
-                  style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}
-                >
-                  {season || "Future"}
-                </span>
-                <div
-                  className="glass-surface"
-                >
-                  {seasonPicks.map((pick, index) => (
-                    <PickRow
-                      key={pick.pick_id}
-                      {...draftPickRowProps(pick, pickScope === "league")}
-                      showDivider={index < seasonPicks.length - 1}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
+          {visiblePicks.length > 0 ? (
+            <PickGroupList
+              picks={visiblePicks}
+              renderPick={(pick) => {
+                const row = draftPickRowProps(pick, false);
+                const context = [pickProvenance(pick, { showOwner: pickScope === "league" }), pick.pick_tier, pick.projected_pick_range]
+                  .filter(Boolean)
+                  .join(" · ");
+                return <PickRow {...row} pickNo={undefined} context={context} showDivider />;
+              }}
+            />
           ) : (
             <EmptyState
               title={
@@ -172,8 +198,14 @@ export function DraftCenterContent({
         </section>
       ) : null}
 
-      <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} />
-      <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} />
+      {tab === "overview" ? (
+        <>
+          <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} />
+          <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} />
+        </>
+      ) : null}
+
+      {tab === "scouting" ? <DraftScoutingTab myPicks={myPicks} needGroups={needGroups} /> : null}
 
       <ValuesCredit />
     </main>

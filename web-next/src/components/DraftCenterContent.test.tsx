@@ -68,18 +68,22 @@ describe("DraftCenterContent", () => {
       <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />,
     );
 
+    expect(screen.getByRole("tab", { name: "Scouting" })).toBeInTheDocument();
     expect(screen.getByText("Pick-Rich Rebuilder")).toBeInTheDocument();
     expect(screen.getByText("#1")).toBeInTheDocument(); // Draft Capital rank tile
     expect(screen.getByText("Best Pick Buyers")).toBeInTheDocument();
     expect(screen.getByText("Pick-Rich Teams")).toBeInTheDocument();
+    // Picks live on their own tab, grouped by year then round.
+    fireEvent.click(screen.getByRole("tab", { name: "Picks" }));
     // My Picks is the default scope when a roster id is resolved.
+    expect(screen.getByText("1st round")).toBeInTheDocument();
     expect(screen.getByText("2027 1st")).toBeInTheDocument();
     expect(screen.queryByText("2027 1st (Rival)")).not.toBeInTheDocument();
   });
 
   it("switches to League scope and shows every pick, with owner context", () => {
     render(
-      <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />,
+      <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" initialTab="picks" />,
     );
 
     fireEvent.click(screen.getByText("League"));
@@ -90,7 +94,7 @@ describe("DraftCenterContent", () => {
   });
 
   it("hides the My Picks/League toggle when no roster id resolves, defaulting to league scope", () => {
-    render(<DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="" />);
+    render(<DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="" initialTab="picks" />);
 
     expect(screen.queryByText("My Picks")).not.toBeInTheDocument();
     expect(screen.getByText("2027 1st (Rival)")).toBeInTheDocument();

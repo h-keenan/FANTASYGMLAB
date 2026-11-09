@@ -139,7 +139,7 @@ export type RootStackParamList = {
   PlayoffOdds: { leagueId: string; leagueName: string };
   Games: { leagueId: string; leagueName: string };
   Commissioner: { leagueId: string; leagueName: string };
-  DraftCenter: { leagueId: string; leagueName: string };
+  DraftCenter: { leagueId: string; leagueName: string; tab?: 'overview' | 'picks' | 'scouting' };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
   MyTeam: { leagueId: string; leagueName: string };
   Matchup: { leagueId: string; leagueName: string };

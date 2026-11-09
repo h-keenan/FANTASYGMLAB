@@ -52,7 +52,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
   { id: 'gm-plan', group: 'lineup', name: 'GM Plan', line: 'Set rebuilding, competing or balanced and get a roadmap.', extra: 'Pro adds focus areas.', route: 'GmPlan', leagueScoped: true, icon: 'map-outline', color: 'premium' },
 
   { id: 'waivers', group: 'pickup', name: 'Waivers', line: 'Ranked pickups for your roster, with FAAB bid guidance.', extra: 'Pro adds the FAAB shortlist and usage stats.', route: 'Waivers', leagueScoped: true, icon: 'swap-horizontal-outline', color: 'success' },
-  { id: 'draft-center', group: 'pickup', name: 'Draft Center', line: 'Your picks, draft order and draft-day decisions.', pro: true, route: 'DraftCenter', leagueScoped: true, icon: 'albums-outline', color: 'premium' },
+  { id: 'draft-center', group: 'pickup', name: 'Draft Center', line: 'Your picks, draft posture and college scouting in one place.', pro: true, route: 'DraftCenter', leagueScoped: true, icon: 'albums-outline', color: 'premium' },
   { id: 'live-draft', group: 'pickup', name: 'Live Draft', line: 'Pick recommendations while your Sleeper draft is running.', pro: true, route: 'LiveDraft', leagueScoped: true, icon: 'timer-outline', color: 'premium' },
 
   { id: 'players', group: 'scout', name: 'Players', line: 'Search any player for value, stats, trends and news.', route: 'Players', leagueScoped: true, icon: 'people-outline', color: 'violet' },

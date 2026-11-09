@@ -10,6 +10,7 @@ import Button from '../components/Button';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
+import PickGroupList from '../components/PickGroupList';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
@@ -599,20 +600,23 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
             {ownedPicks.length > 0 ? (
               <View>
                 <SectionHeading title={`Your Picks (up to ${TRADE_FINDER_MAX_PICKS})`} topGap={12} />
-                {ownedPicks.map((pick, index) => {
-                  const selected = selectedPickIds.has(pick.pick_id);
-                  return (
-                    <PickSelectRow
-                      key={pick.pick_id}
-                      pick={pick}
-                      selected={selected}
-                      disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
-                      onToggle={() => togglePick(pick.pick_id)}
-                      isFirst={index === 0}
-                      isLast={index === ownedPicks.length - 1}
-                    />
-                  );
-                })}
+                <PickGroupList
+                  picks={ownedPicks}
+                  selectedIds={selectedPickIds}
+                  renderPick={(pick, isLast) => {
+                    const selected = selectedPickIds.has(pick.pick_id);
+                    return (
+                      <PickSelectRow
+                        pick={pick}
+                        selected={selected}
+                        disabled={!selected && selectedPickIds.size >= TRADE_FINDER_MAX_PICKS}
+                        onToggle={() => togglePick(pick.pick_id)}
+                        isFirst
+                        isLast={isLast}
+                      />
+                    );
+                  }}
+                />
               </View>
             ) : null}
             <ValuesCredit />
