@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DashboardContent } from "./DashboardContent";
@@ -57,9 +57,8 @@ describe("DashboardContent", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "This week" })).toBeInTheDocument();
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
-    expect(screen.getByText("Test Back")).toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "My Team" })).toBeInTheDocument();
     // The stat strip appears once at the top and is not repeated in Team Snapshot.
@@ -132,7 +131,7 @@ describe("DashboardContent", () => {
     expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
   });
 
-  it("orders modules: now strip, Trades, next moves, My Team, alerts, League Activity, More", () => {
+  it("orders modules: at a glance, needs attention, this week, trade ideas, My Team, alerts, League Activity, More", () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       entitlement: { ...FIXTURE.entitlement, free_limit: 1 },
@@ -153,8 +152,8 @@ describe("DashboardContent", () => {
     const at = (marker: string) => html.indexOf(marker);
     const order = [
       at("dashboard-now-strip"),
-      at("dashboard-trades-block"),
       at("game-plan-heading"),
+      at("dashboard-trades-block"),
       at("snapshot-heading"),
       at("watchlist-heading"),
       at("dashboard-more"),
@@ -165,14 +164,59 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Free: showing 1 of 3 next moves")).toBeInTheDocument();
   });
 
-  it("shows the real trade deadline and the one primary Trades action", () => {
+  it("shows the real trade deadline chip and trade ideas as one count line with a Trade Hub link", () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
+      items: [
+        {
+          ...FIXTURE.items[0],
+          presentation: { trade_package: { send: [], receive: [] } },
+        } as unknown as DashboardResponse["items"][number],
+      ],
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
     expect(screen.getByText("2 wks left (Wk 11)")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Analyze a trade" })).toHaveAttribute("href", "/trade-analyzer/abc?name=Dynasty%20Overlords");
+    const block = screen.getByTestId("dashboard-trades-block");
+    expect(block.textContent).toMatch(/1 trade idea/);
+    expect(within(block).getByRole("link")).toHaveAttribute("href", "/trade-hub/abc?name=Dynasty%20Overlords");
+    // No idea cards on the Dashboard: the give/get package is not rendered here.
+    expect(within(block).queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
+  });
+
+  it("lists urgent items once under Needs attention, linking to GM Plan / Matchup", () => {
+    const data: DashboardResponse = {
+      ...FIXTURE,
+      trade_window: { trade_deadline_week: 11, current_week: 11, trade_deadline_passed: false, message: "" },
+      this_week: {
+        mode: "in_season",
+        week: 11,
+        rows: [{ key: "lineup", status: "Out", tone: "risk", headline: "Starter ruled out", why: "Replace him", cta_label: "Fix", route: "matchup", player_id: "" }],
+        next_action: null,
+      },
+    };
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
+    const block = screen.getByTestId("dashboard-needs-attention");
+    expect(within(block).getByRole("heading", { name: "Needs attention" })).toBeInTheDocument();
+    expect(within(block).getByText("Starter ruled out")).toBeInTheDocument();
+    expect(within(block).getByText(/Trade deadline: This week/)).toBeInTheDocument();
+    expect(within(block).getByRole("link", { name: /Starter ruled out/ })).toHaveAttribute("href", "/matchup/abc?name=Dynasty+Overlords");
+    expect(within(block).getByRole("link", { name: /Trade deadline/ })).toHaveAttribute("href", "/gm-plan/abc?name=Dynasty%20Overlords");
+    // Shown once: the at-a-glance strip drops the lineup and deadline chips.
+    expect(screen.getAllByText("Starter ruled out")).toHaveLength(1);
+    expect(screen.queryByText("Trade deadline")).not.toBeInTheDocument();
+  });
+
+  it("treats the server's top-priority non-trade tile as urgent and shows it once", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    const block = screen.getByTestId("dashboard-needs-attention");
+    expect(within(block).getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
+    expect(screen.getAllByText("Trade for a top-12 RB before the deadline")).toHaveLength(1);
+  });
+
+  it("shows no Needs attention list when nothing is urgent", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [] }} />);
+    expect(screen.queryByTestId("dashboard-needs-attention")).not.toBeInTheDocument();
   });
 
   it("never invents a deadline: no window means no deadline chip", () => {
@@ -187,7 +231,7 @@ describe("DashboardContent", () => {
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
     expect(screen.getByText(/Trade deadline has passed/)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /More trade ideas/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-trades-block").textContent).toMatch(/Trade deadline has passed/);
   });
 
   it("keeps the mini-games collapsed behind More", () => {

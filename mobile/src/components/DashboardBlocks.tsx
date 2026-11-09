@@ -5,21 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
-import Button from './Button';
 import ToneBadge from './ToneBadge';
-import DeadlineCard from './DeadlineCard';
 import SectionHeading from './SectionHeading';
-import SkeletonBlock from './SkeletonBlock';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { DashboardItem, DashboardResponse, ThisWeekRow } from '../lib/api';
+import type { DashboardItem, DashboardResponse } from '../lib/api';
 import {
   buildNowChips,
+  tradeIdeasLine,
   tradesGoalLine,
   TRADES_BLOCK_COPY,
+  type DashboardAttentionEntry,
   type DashboardNowChip,
 } from '../lib/dashboardLayout';
-import { DEADLINE_CARD_WEEKS } from '../lib/deadlineMode';
-import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 type Navigate = (name: string, params?: object) => void;
 
@@ -30,22 +28,25 @@ const CHIP_TARGET: Record<DashboardNowChip['route'], string> = {
   waivers: 'Waivers',
 };
 
-/** "What matters now": real status chips (lineup, trade deadline, alerts, waivers). Mirrors web DashboardNowStrip. */
+/** "At a glance": real status chips (lineup, trade deadline, alerts, waivers). Mirrors web DashboardNowStrip. */
 export function DashboardNowStrip({
   data,
   leagueId,
   leagueName,
   onNavigate,
+  exclude,
 }: {
   data: DashboardResponse;
   leagueId: string;
   leagueName: string;
   onNavigate: Navigate;
+  /** Chip keys already listed under "Needs attention". */
+  exclude?: readonly string[];
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const alertCount = data.items.filter((item) => item.category !== 'top_priority').length;
-  const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount);
+  const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount, exclude);
   if (chips.length === 0) return null;
   const tone: Record<DashboardNowChip['tone'], string> = {
     positive: colors.success,
@@ -54,7 +55,7 @@ export function DashboardNowStrip({
     neutral: colors.textPrimary,
   };
   return (
-    <View style={styles.chipGrid} accessibilityLabel="What matters now">
+    <View style={styles.chipGrid} accessibilityLabel="At a glance">
       {chips.map((chip) => (
         <Pressable
           key={chip.key}
@@ -73,17 +74,68 @@ export function DashboardNowStrip({
   );
 }
 
-function holdToneColor(tone: ThisWeekRow['tone'], colors: ThemeColors): string {
-  if (tone === 'positive') return colors.success;
-  if (tone === 'risk') return colors.danger;
-  if (tone === 'waiver' || tone === 'trade') return colors.accent;
-  return colors.textTertiary;
+const ATTENTION_ROUTE: Record<string, string> = {
+  trade_hub: 'Trades',
+  waivers: 'Waivers',
+  my_team: 'MyTeam',
+};
+
+/**
+ * "Needs attention": the few urgent items, one line each, each opening where it
+ * is handled. Urgency is read only from existing fields
+ * (lib/dashboardLayout.ts buildNeedsAttention). Mirrors web DashboardNeedsAttention.
+ */
+export function DashboardNeedsAttention({
+  entries,
+  leagueId,
+  leagueName,
+  onNavigate,
+}: {
+  entries: DashboardAttentionEntry<DashboardItem>[];
+  leagueId: string;
+  leagueName: string;
+  onNavigate: Navigate;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (entries.length === 0) return null;
+  const routeFor = (entry: DashboardAttentionEntry<DashboardItem>): string => {
+    if (entry.target === 'matchup') return 'Matchup';
+    if (entry.target === 'gm_plan' || !entry.item) return 'GmPlan';
+    return ATTENTION_ROUTE[entry.item.destination] ?? 'GmPlan';
+  };
+  return (
+    <View style={styles.block}>
+      <SectionHeading title="Needs attention" />
+      <AccentCard accent={colors.danger} compact>
+        {entries.map((entry, index) => (
+          <Pressable
+            key={`${entry.source}-${index}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${entry.headline}. ${entry.why}`}
+            onPress={() => onNavigate(routeFor(entry), { leagueId, leagueName })}
+            style={[styles.attentionRow, index > 0 && styles.attentionDivider]}
+          >
+            <ToneBadge label={entry.badge} color={colors.danger} size="xs" />
+            <View style={styles.attentionText}>
+              <AppText style={styles.holdHeadline} numberOfLines={1}>
+                {entry.headline}
+              </AppText>
+              <AppText style={styles.holdWhy} numberOfLines={1}>
+                {entry.why}
+              </AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+          </Pressable>
+        ))}
+      </AccentCard>
+    </View>
+  );
 }
 
 /**
- * The primary block: the best real trade idea, one primary action
- * ("Analyze a trade") and one quiet link to the rest of the board. Mirrors
- * web DashboardTradesBlock.
+ * Trade ideas on the Dashboard are one line: a count and a link. The idea cards
+ * live only on GM Plan and Trade Hub. Mirrors web DashboardTradesBlock.
  */
 export function DashboardTradesBlock({
   data,
@@ -93,7 +145,6 @@ export function DashboardTradesBlock({
   isBeginner,
   goal,
   onNavigate,
-  renderTradeCard,
 }: {
   data: DashboardResponse;
   tradeItems: DashboardItem[];
@@ -102,13 +153,11 @@ export function DashboardTradesBlock({
   isBeginner: boolean;
   goal: string | null | undefined;
   onNavigate: Navigate;
-  renderTradeCard: (item: DashboardItem, index: number) => React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
   const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
-  const holdRow = data.this_week?.rows.find((row) => row.key === 'trade');
   const goalLine = isBeginner ? tradesGoalLine(goal) : '';
   return (
     <View style={styles.block}>
@@ -116,49 +165,17 @@ export function DashboardTradesBlock({
       {isBeginner ? (
         <BeginnerHelp text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ''}`} />
       ) : null}
-      <DeadlineCard
-        window={data.trade_window}
-        strategy={data.team_strategy}
-        maxWeeksLeft={DEADLINE_CARD_WEEKS}
-        ctaLabel="See deadline trade ideas"
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={`${tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}. Open ${TRADES_BLOCK_COPY.link}`}
         onPress={() => onNavigate('Trades', { leagueId, leagueName })}
-      />
-      {deadlinePassed ? (
-        <AppText style={styles.bodyText}>{TRADES_BLOCK_COPY.deadlinePassed}</AppText>
-      ) : tradeItems.length > 0 ? (
-        tradeItems.slice(0, 3).map((item, index) => renderTradeCard(item, index))
-      ) : pending ? (
-        <SkeletonBlock height={96} radius={12} />
-      ) : (
-        holdRow ? (
-          <AccentCard accent={holdToneColor(holdRow.tone, colors)} compact>
-            <View style={styles.holdHead}>
-              {holdRow.status ? <ToneBadge label={holdRow.status} color={holdToneColor(holdRow.tone, colors)} /> : null}
-              <AppText style={styles.holdHeadline}>{holdRow.headline}</AppText>
-            </View>
-            {/* The deadline card above already says when; only repeat the why without it. */}
-            {holdRow.why && !data.trade_window ? <AppText style={styles.holdWhy}>{holdRow.why}</AppText> : null}
-          </AccentCard>
-        ) : (
-          <AppText style={styles.bodyText}>{TRADES_BLOCK_COPY.empty}</AppText>
-        )
-      )}
-      <View style={styles.actionRow}>
-        <Button
-          size="sm"
-          label={TRADES_BLOCK_COPY.analyze}
-          onPress={() => onNavigate('Trades', { leagueId, leagueName, initialTab: 'make' })}
-        />
-        {deadlinePassed ? null : (
-          <Pressable
-            accessibilityRole="link"
-            hitSlop={LINK_HIT_SLOP}
-            onPress={() => onNavigate('Trades', { leagueId, leagueName })}
-          >
-            <AppText style={styles.link}>{TRADES_BLOCK_COPY.more} ›</AppText>
-          </Pressable>
-        )}
-      </View>
+        style={styles.tradeLine}
+      >
+        <AppText style={styles.tradeLineText} numberOfLines={2}>
+          {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
+        </AppText>
+        <AppText style={styles.link}>{TRADES_BLOCK_COPY.link} ›</AppText>
+      </Pressable>
     </View>
   );
 }
@@ -203,11 +220,24 @@ function createStyles(colors: ThemeColors) {
     chipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textTertiary },
     chipValue: { fontSize: 14, fontWeight: '700' },
     block: { gap: spacing.sm },
-    holdHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+    attentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
+    attentionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+    attentionText: { flex: 1, minWidth: 0 },
+    tradeLine: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    tradeLineText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     holdHeadline: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     holdWhy: { fontSize: 12, color: colors.textSecondary },
-    bodyText: { fontSize: 14, color: colors.textSecondary },
-    actionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
     link: { fontSize: 14, fontWeight: '700', color: colors.accent },
     moreHeader: {
       flexDirection: 'row',

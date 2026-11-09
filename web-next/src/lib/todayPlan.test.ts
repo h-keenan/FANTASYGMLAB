@@ -40,7 +40,7 @@ describe("buildTodayPlan", () => {
 
   it("empty and title", () => {
     expect(buildTodayPlan(null, [], SUN).isEmpty).toBe(true);
-    expect(todayTitle(wk([]))).toBe("Today · Week 3");
-    expect(todayTitle(null)).toBe("Today");
+    expect(todayTitle(wk([]))).toBe("This week · Wk 3");
+    expect(todayTitle(null)).toBe("This week");
   });
 });

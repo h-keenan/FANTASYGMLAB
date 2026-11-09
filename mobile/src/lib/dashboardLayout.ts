@@ -10,9 +10,10 @@
 /** Top-to-bottom module order of the logged-in Dashboard, on every platform. */
 export const DASHBOARD_MODULE_ORDER = [
   "start_here", // first-run checklist (new accounts only, dismissible)
-  "now", // "what matters now" strip: lineup, trade deadline, alerts, waivers
-  "trades", // primary block: best trade idea + Analyze a trade
-  "next_moves", // other urgent actions (lineup risk, waiver, offseason next step)
+  "now", // "At a glance" strip: lineup, trade deadline, alerts, waivers
+  "needs_attention", // compact urgent list (see buildNeedsAttention), links out
+  "next_moves", // "This week": the rest of this week's actions
+  "trades", // one line: "N trade ideas -> Trade Hub" (cards live on GM Plan / Trade Hub)
   "my_team", // record / ranks / strengths / injuries in one section
   "alerts_waivers", // news and waivers that affect my players
   "more", // collapsed: league activity, recap, matchup, quick actions, league type, games
@@ -69,10 +70,12 @@ export function buildNowChips(
   rows: DashboardNowRow[] | null | undefined,
   tradeWindow: DashboardTradeWindow | null | undefined,
   alertCount: number,
+  /** Chip keys already shown in "Needs attention" (so nothing shows twice). */
+  exclude: readonly string[] = [],
 ): DashboardNowChip[] {
   const chips: DashboardNowChip[] = [];
   const lineup = (rows ?? []).find((row) => row.key === "lineup");
-  if (lineup) {
+  if (lineup && !exclude.includes("lineup")) {
     chips.push({
       key: "lineup",
       label: "Lineup",
@@ -82,7 +85,7 @@ export function buildNowChips(
     });
   }
   const deadline = deadlineChip(tradeWindow);
-  if (deadline) chips.push(deadline);
+  if (deadline && !exclude.includes("deadline")) chips.push(deadline);
   if (alertCount > 0) {
     chips.push({
       key: "alerts",
@@ -114,11 +117,86 @@ export function isTradeItem(item: { presentation?: { trade_package?: unknown } |
   return Boolean(item.presentation && item.presentation.trade_package);
 }
 
+export interface DashboardAttentionRow extends DashboardNowRow {
+  headline: string;
+  why: string;
+}
+
+export interface DashboardAttentionItem {
+  headline: string;
+  reason: string;
+  destination: string;
+  presentation?: { trade_package?: unknown } | null;
+}
+
+export interface DashboardAttentionEntry<T extends DashboardAttentionItem = DashboardAttentionItem> {
+  /** "lineup" and "deadline" match the Now chip keys; "item" is a server top-priority tile. */
+  source: "lineup" | "deadline" | "item";
+  badge: string;
+  headline: string;
+  why: string;
+  /** Where it opens: Matchup (lineup), GM Plan (deadline), or the item's own destination. */
+  target: "matchup" | "gm_plan" | "item";
+  item?: T;
+}
+
+export const NEEDS_ATTENTION_LIMIT = 3;
+
+/**
+ * The compact "Needs attention" list. No new scoring: "urgent" is read only
+ * from fields the Dashboard response already has, in this order:
+ *   1. a lineup row the server marked tone "risk" (an out/injured starter),
+ *   2. a trade deadline this week or next (deadlineChip's own risk tone),
+ *   3. the server's own top-priority, non-trade tiles (category top_priority).
+ * Capped at NEEDS_ATTENTION_LIMIT; the full list stays on GM Plan.
+ */
+export function buildNeedsAttention<T extends DashboardAttentionItem>(
+  rows: DashboardAttentionRow[] | null | undefined,
+  tradeWindow: DashboardTradeWindow | null | undefined,
+  topPriorityItems: T[],
+): DashboardAttentionEntry<T>[] {
+  const out: DashboardAttentionEntry<T>[] = [];
+  const lineup = (rows ?? []).find((row) => row.key === "lineup" && row.tone === "risk");
+  if (lineup) {
+    out.push({ source: "lineup", badge: lineup.status || "Lineup", headline: lineup.headline, why: lineup.why, target: "matchup" });
+  }
+  const deadline = deadlineChip(tradeWindow);
+  if (deadline && deadline.tone === "risk") {
+    out.push({
+      source: "deadline",
+      badge: "Deadline",
+      headline: `Trade deadline: ${deadline.value}`,
+      why: "Trades lock after the deadline. Review your plan before then.",
+      target: "gm_plan",
+    });
+  }
+  for (const item of topPriorityItems) {
+    if (item.presentation && item.presentation.trade_package) continue; // trade ideas live in Trade Hub
+    out.push({ source: "item", badge: "Top priority", headline: item.headline, why: item.reason, target: "item", item });
+  }
+  return out.slice(0, NEEDS_ATTENTION_LIMIT);
+}
+
+/** Rows "This week" still shows once Needs attention has taken its own. */
+export function weekRowsAfterAttention<R extends DashboardNowRow>(rows: R[], attention: { source: string }[]): R[] {
+  const lineupTaken = attention.some((entry) => entry.source === "lineup");
+  return rows.filter((row) => nextMoveRowFilter(row) && !(lineupTaken && row.key === "lineup"));
+}
+
+/** The Dashboard's one-line trade pointer: a count and a link, never idea cards. */
+export function tradeIdeasLine(count: number, deadlinePassed: boolean, pending: boolean): string {
+  if (deadlinePassed) return TRADES_BLOCK_COPY.deadlinePassed;
+  if (pending) return "Checking for trade ideas...";
+  if (count <= 0) return TRADES_BLOCK_COPY.empty;
+  return `${count} trade idea${count === 1 ? "" : "s"}`;
+}
+
 export const TRADES_BLOCK_COPY = {
-  title: "Trades",
+  title: "Trade ideas",
+  link: "Trade Hub",
   analyze: "Analyze a trade",
   more: "More trade ideas",
-  empty: "No trade idea stands out right now. Check any offer you get, or browse the board.",
+  empty: "No trade idea stands out right now.",
   deadlinePassed: "Trade deadline has passed; trades reopen after the season.",
   beginnerExplainer:
     "A trade idea shows who you give, who you get, and whether the value works out for you. Nothing happens until you send it in Sleeper.",

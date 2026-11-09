@@ -28,12 +28,15 @@ export function TodayModule({
   leagueId,
   leagueName,
   now,
+  hideEmpty = false,
 }: {
   data: DashboardResponse;
   leagueId: string;
   leagueName: string;
   /** Injected for tests; defaults to the current time. */
   now?: Date;
+  /** "Needs attention" already lists urgent items: don't also say nothing is urgent. */
+  hideEmpty?: boolean;
 }) {
   const thisWeek = data.this_week ?? null;
   const plan = buildTodayPlan(thisWeek, data.items, now);
@@ -57,6 +60,8 @@ export function TodayModule({
     }
   }
 
+  if (hideEmpty && plan.isEmpty && hidden === 0 && !tradePending) return null;
+
   return (
     <section
       className="flex flex-col gap-3"
@@ -71,11 +76,11 @@ export function TodayModule({
             <BeginnerHelp popover term="dashboardGamePlan" />
             <Link
               href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`}
-              aria-label="View all game plan items"
+              aria-label="Open the full GM Plan"
               className="tap-link text-sm font-bold shrink-0"
               style={{ color: "var(--color-accent)" }}
             >
-              View All →
+              Full GM Plan →
             </Link>
           </span>
         }

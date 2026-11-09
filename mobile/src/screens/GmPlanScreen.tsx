@@ -456,7 +456,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
               </AnimatedCard>
             ) : null}
 
-            <SectionHeading title="Trade Opportunities" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
+            <SectionHeading title="Trade ideas" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
             {tradeCards(2)}
 
             {roster.length > 0 ? (
@@ -475,7 +475,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
         {tab === 'trades' ? (
           <>
-            <SectionHeading title="Trade Opportunities" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
+            <SectionHeading title="Trade ideas" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
             {tradeCards()}
             {!gateNotice ? otherAreas.map((area) => <FocusAreaSection key={area.key} focusArea={area} />) : null}
           </>

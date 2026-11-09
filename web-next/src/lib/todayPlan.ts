@@ -84,5 +84,5 @@ export function buildTodayPlan(
 
 /** Section title: "Today", with the week when the server knows it. */
 export function todayTitle(thisWeek: ThisWeek | null | undefined): string {
-  return thisWeek?.week ? `Today · Week ${thisWeek.week}` : "Today";
+  return thisWeek?.week ? `This week · Wk ${thisWeek.week}` : "This week";
 }

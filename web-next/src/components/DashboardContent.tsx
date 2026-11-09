@@ -16,9 +16,9 @@ import { StatStrip } from "@/components/StatStrip";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
 import { DashboardOddsStrip } from "@/components/DashboardOddsStrip";
-import { DashboardMore, DashboardNowStrip, DashboardTradesBlock } from "@/components/DashboardBlocks";
+import { DashboardMore, DashboardNeedsAttention, DashboardNowStrip, DashboardTradesBlock } from "@/components/DashboardBlocks";
 import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
-import { isTradeItem, nextMoveRowFilter } from "@/lib/dashboardLayout";
+import { buildNeedsAttention, isTradeItem, weekRowsAfterAttention } from "@/lib/dashboardLayout";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -90,15 +90,22 @@ export function DashboardContent({
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const Shell: "div" | "main" = sample ? "div" : "main";
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
-  // Module order: lib/dashboardLayout.ts DASHBOARD_MODULE_ORDER. The trade
-  // idea and the trade row live in the Trades block, a "lineup set" row in the
-  // Now strip; "Next moves" keeps only what is left, so nothing shows twice.
+  // Module order: lib/dashboardLayout.ts DASHBOARD_MODULE_ORDER. Trade ideas are
+  // one line (count + Trade Hub link); urgent items sit once in "Needs
+  // attention"; "This week" keeps only what is left, so nothing shows twice.
   const tradeItems = data.items.filter((item) => item.category === "top_priority" && isTradeItem(item));
+  const attention = buildNeedsAttention(
+    data.this_week?.rows,
+    data.trade_window,
+    data.items.filter((item) => item.category === "top_priority"),
+  );
+  const attentionItems = attention.flatMap((entry) => (entry.item ? [entry.item] : []));
   const nextMovesData: DashboardResponse = {
     ...data,
-    items: data.items.filter((item) => !tradeItems.includes(item)),
-    this_week: data.this_week ? { ...data.this_week, rows: data.this_week.rows.filter(nextMoveRowFilter) } : data.this_week,
+    items: data.items.filter((item) => !tradeItems.includes(item) && !attentionItems.includes(item)),
+    this_week: data.this_week ? { ...data.this_week, rows: weekRowsAfterAttention(data.this_week.rows, attention) } : data.this_week,
   };
+  const attentionChipKeys = attention.map((entry) => entry.source);
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -137,7 +144,11 @@ export function DashboardContent({
         </p>
       ) : null}
 
-      <DashboardNowStrip data={data} leagueId={leagueId} leagueName={leagueName} />
+      <DashboardNowStrip data={data} leagueId={leagueId} leagueName={leagueName} exclude={attentionChipKeys} />
+
+      <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} />
+
+      <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty={attention.length > 0} />
 
       <DashboardTradesBlock
         data={data}
@@ -147,8 +158,6 @@ export function DashboardContent({
         isBeginner={copy.isBeginner}
         goal={goal}
       />
-
-      <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} />
 
       {snapshot ? (
         <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true" aria-label="Team summary">
