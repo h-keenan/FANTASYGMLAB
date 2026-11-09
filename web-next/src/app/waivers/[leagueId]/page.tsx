@@ -9,6 +9,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type WaiversResponse } from "@/lib/api";
 import { WaiversContent } from "@/components/WaiversContent";
+import { parseWaiverTab } from "@/lib/pageTabs";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -72,5 +73,5 @@ export default function WaiversPage() {
     );
   }
 
-  return <WaiversContent leagueName={leagueName} data={waivers} highlightPlayerId={highlightPlayerId} leagueId={leagueId} />;
+  return <WaiversContent leagueName={leagueName} data={waivers} highlightPlayerId={highlightPlayerId} initialTab={parseWaiverTab(searchParams.get("tab"))} leagueId={leagueId} />;
 }

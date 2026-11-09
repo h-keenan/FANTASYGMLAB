@@ -38,6 +38,7 @@ import { api, type RankedPlayer } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { queryKeys } from '../lib/queryKeys';
+import { searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
@@ -617,9 +618,8 @@ export default function GmOrb() {
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const searchResults = useMemo(() => {
     if (!normalizedQuery) return [];
-    return searchableDestinations.filter((destination) =>
-      `${destination.label} ${destination.subtitle}`.toLowerCase().includes(normalizedQuery),
-    );
+    // Page rows plus each page's tabs ("Draft Center > Scouting"); see lib/orbTabs.ts.
+    return searchOrbDestinations(searchableDestinations, normalizedQuery);
   }, [searchableDestinations, normalizedQuery]);
 
   // Player names too (tap-depth audit #3): the same league-ranked pool the
@@ -812,7 +812,7 @@ export default function GmOrb() {
     closeTimer.current = setTimeout(() => setVisible(false), CLOSE_MS);
   };
 
-  const go = (destination: Destination) => {
+  const go = (destination: Destination, tabParams?: Record<string, string>) => {
     closeSheet();
     if (!navigationRef.isReady()) return;
     // The orb is the app's only cross-section navigation affordance, so a
@@ -833,8 +833,13 @@ export default function GmOrb() {
       return;
     }
     if (!league) return;
-    navigationRef.dispatch(StackActions.popTo(destination.route, league));
+    navigationRef.dispatch(StackActions.popTo(destination.route, tabParams ? { ...league, ...tabParams } : league));
   };
+
+  // A search hit is the page or one of its tabs; a tab hit is a row of its
+  // own (own label/subtitle/Pro flag, maybe its own route) opening that tab.
+  const goToHit = (hit: OrbSearchHit<Destination>) =>
+    go({ ...hit.destination, route: hit.route, needsLeague: hit.needsLeague }, hit.params);
 
   const openPlayer = (player: RankedPlayer) => {
     closeSheet();
@@ -953,21 +958,23 @@ export default function GmOrb() {
               // results can span every group at once.
               searchResults.length > 0 || playerResults.length > 0 ? (
                 <>
-                {searchResults.map((destination) => (
+                {searchResults.map((hit) => (
                   <NavRow
-                    key={destination.route}
-                    destination={destination}
-                    isCurrent={destination.route === currentRouteName}
+                    key={hit.key}
+                    destination={{ ...hit.destination, label: hit.label, subtitle: hit.subtitle, pro: hit.pro }}
+                    isCurrent={!hit.tab && hit.route === currentRouteName}
                     showPro={showProTags}
-                    unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
+                    unreadCount={!hit.tab && hit.route === 'Alerts' ? unreadAlertCount : undefined}
                     hasNew={
-                      destination.route === 'Trades'
-                        ? tradeHubHasNew
-                        : destination.route === 'Recap'
-                          ? recapReady
-                          : false
+                      hit.tab
+                        ? false
+                        : hit.route === 'Trades'
+                          ? tradeHubHasNew
+                          : hit.route === 'Recap'
+                            ? recapReady
+                            : false
                     }
-                    onPress={() => go(destination)}
+                    onPress={() => goToHit(hit)}
                   />
                 ))}
                 {playerResults.length > 0 ? (

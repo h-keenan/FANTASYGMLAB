@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useAuth } from "@/context/AuthContext";
 import { GamesContent } from "@/components/GamesContent";
+import { parseGamesTab } from "@/lib/pageTabs";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function GamesPage() {
@@ -22,5 +23,5 @@ export default function GamesPage() {
   }, [authLoading, session, router]);
 
   if (authLoading || !session) return <LoadingScreen status="Loading Games…" />;
-  return <GamesContent leagueId={leagueId} leagueName={leagueName} />;
+  return <GamesContent leagueId={leagueId} leagueName={leagueName} initialTab={parseGamesTab(searchParams.get("tab"))} />;
 }

@@ -101,7 +101,7 @@ export type RootStackParamList = {
   Community: undefined;
   /** "What FantasyDesk can do". League params only when a link carries one (else the last league). */
   Features: { leagueId?: string; leagueName?: string } | undefined;
-  Waivers: { leagueId: string; leagueName: string; playerId?: string };
+  Waivers: { leagueId: string; leagueName: string; playerId?: string; tab?: 'recommended' | 'explore' | 'watchlist' };
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
   // Single consolidated host for Trade Hub ("Trade Block"), Trade Finder
@@ -137,7 +137,7 @@ export type RootStackParamList = {
   // as a redirect (see lib/homeRedirects.ts) so deep links and stale nav
   // state still resolve.
   PlayoffOdds: { leagueId: string; leagueName: string };
-  Games: { leagueId: string; leagueName: string };
+  Games: { leagueId: string; leagueName: string; tab?: 'sim' | 'pickem' };
   Commissioner: { leagueId: string; leagueName: string };
   DraftCenter: { leagueId: string; leagueName: string; tab?: 'overview' | 'picks' | 'scouting' };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };

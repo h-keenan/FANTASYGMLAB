@@ -5,6 +5,7 @@ import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
 import { useEffect, useMemo, useState } from "react";
+import type { WaiverTab } from "@/lib/pageTabs";
 
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -59,7 +60,7 @@ import { PlayerNameText } from "@/components/PlayerNameText";
 const DISCLOSURE_TEXT =
   "FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.";
 
-type WaiverTab = "recommended" | "explore" | "watchlist";
+
 
 const TAB_OPTIONS: { label: string; value: WaiverTab }[] = [
   { label: "Recommended", value: "recommended" },
@@ -372,6 +373,7 @@ export function WaiversContent({
   leagueName,
   data,
   highlightPlayerId,
+  initialTab,
   leagueId,
 }: {
   leagueName: string;
@@ -379,12 +381,15 @@ export function WaiversContent({
   /** See components/HighlightTarget.tsx — a GM Plan/Dashboard waiver tile's specific
    * player, threaded through as ?playerId= (gamePlanTileHref). */
   highlightPlayerId?: string;
+  /** `?tab=` deep link (the GM orb's "Waivers > Explore"); wins over the player-based default. */
+  initialTab?: WaiverTab;
   /** Needed only for the Watchlist tab (GM Targets lookup). */
   leagueId?: string;
 }) {
   // A GM Plan/Dashboard deep link to a player who isn't on the Recommended
   // tab opens Explore so the highlighted free agent is visible.
   const [tab, setTab] = useState<WaiverTab>(() => {
+    if (initialTab) return initialTab;
     if (!highlightPlayerId) return "recommended";
     const onRecommended = [
       ...data.priority_adds,
@@ -394,6 +399,12 @@ export function WaiversContent({
     ].some((p) => p.player_id === highlightPlayerId);
     return onRecommended ? "recommended" : "explore";
   });
+  // Already on Waivers when a tab link is picked: the page stays mounted.
+  const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
+  if (initialTab !== seenInitialTab) {
+    setSeenInitialTab(initialTab);
+    if (initialTab) setTab(initialTab);
+  }
   const [recFilter, setRecFilter] = useState<WaiverRecFilter>("all");
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");

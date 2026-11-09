@@ -63,6 +63,10 @@ export default function TradesScreen({ route, navigation }: Props) {
     setActiveTab(tab);
     setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
   }, []);
+  // Picked from the GM orb while Trades is already open.
+  useEffect(() => {
+    if (initialTab && !espn) onChangeTab(initialTab);
+  }, [initialTab, espn, onChangeTab]);
 
   useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
 

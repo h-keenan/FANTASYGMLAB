@@ -147,7 +147,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
     faab: '—',
     faabLabel: 'FAAB',
   });
-  const [tab, setTab] = useState<WaiverTab>('recommended');
+  const [tab, setTab] = useState<WaiverTab>(route.params.tab ?? 'recommended');
+  // Picked from the GM orb while Waivers is already open.
+  const requestedTab = route.params.tab;
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
   const [recFilter, setRecFilter] = useState<WaiverRecFilter>('all');
   const [targetIds, setTargetIds] = useState<string[] | null>(null);
   const [targetsFailed, setTargetsFailed] = useState(false);

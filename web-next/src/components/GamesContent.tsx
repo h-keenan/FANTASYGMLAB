@@ -3,6 +3,7 @@
 import { PageTitle } from "@/components/PageTitle";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GamesTab } from "@/lib/pageTabs";
 
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -51,10 +52,15 @@ import { matchPlayersByName } from "@/lib/playerSearch";
 
 const MAX_PLAYERS = 3;
 
-type Tab = "sim" | "pickem";
+type Tab = GamesTab;
 
-export function GamesContent({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
-  const [tab, setTab] = useState<Tab>("sim");
+export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: string; leagueName: string; initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "sim");
+  const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
+  if (initialTab !== seenInitialTab) {
+    setSeenInitialTab(initialTab);
+    if (initialTab) setTab(initialTab);
+  }
   return (
     <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
