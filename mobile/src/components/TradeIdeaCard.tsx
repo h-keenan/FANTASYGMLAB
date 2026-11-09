@@ -632,7 +632,16 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.sm,
     marginBottom: 2,
   },
-  rationale: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingHorizontal: spacing.md },
+  // Quote rail (mirrors web TradeIdeaCard's reason): a 2pt border-strong rail instead of a bare paragraph.
+  rationale: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginHorizontal: spacing.md,
+    paddingLeft: spacing.sm,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.border,
+  },
   rationaleExpandHint: {
     fontSize: 11,
     fontWeight: '600',

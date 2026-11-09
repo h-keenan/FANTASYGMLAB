@@ -93,6 +93,9 @@ const ANALYSIS_TONE_COLOR = (tone: TeamAnalysisRow['tone'], colors: ThemeColors)
         ? colors.danger
         : colors.accent;
 
+/** Four-segment room-strength meter fill, from the row's tone (mirrors web-next's RoomMeter). */
+const ANALYSIS_TONE_LEVEL: Record<TeamAnalysisRow['tone'], number> = { success: 4, information: 3, warning: 2, danger: 1 };
+
 export default function MyTeamScreen({ route, navigation }: Props) {
   const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
@@ -435,8 +438,20 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
               accessibilityState={{ expanded: isOpen }}
             >
               <PositionBadge position={row.position} />
-              <View style={[styles.analysisDot, { backgroundColor: ANALYSIS_TONE_COLOR(row.tone, colors) }]} />
-              <AppText style={styles.analysisStatus}>{row.status}</AppText>
+              <View style={styles.analysisStatus}>
+                <ToneBadge label={row.status} color={ANALYSIS_TONE_COLOR(row.tone, colors)} />
+                <View style={styles.roomMeter} accessible accessibilityLabel={`${row.position} room strength ${ANALYSIS_TONE_LEVEL[row.tone]} of 4`}>
+                  {[1, 2, 3, 4].map((i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.roomMeterSegment,
+                        { backgroundColor: i <= ANALYSIS_TONE_LEVEL[row.tone] ? ANALYSIS_TONE_COLOR(row.tone, colors) : colors.border },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
               <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textTertiary} />
             </TouchableOpacity>
             {isOpen ? <AppText style={styles.analysisBody}>{row.body}</AppText> : null}
@@ -629,8 +644,9 @@ function createStyles(colors: ThemeColors) {
   tabBar: { marginBottom: spacing.sm },
   skeletonList: { padding: spacing.md, marginTop: spacing.sm, marginBottom: spacing.sm },
   analysisRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  analysisDot: { width: 10, height: 10, borderRadius: 5 },
-  analysisStatus: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  analysisStatus: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 6 },
+  roomMeter: { flexDirection: 'row', gap: 4, width: '100%', maxWidth: 144 },
+  roomMeterSegment: { flex: 1, height: 6, borderRadius: 3 },
   analysisBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingBottom: spacing.sm },
   analysisNotes: { marginTop: spacing.sm },
   compBar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: spacing.md },

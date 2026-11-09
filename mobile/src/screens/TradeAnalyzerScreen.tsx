@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import PostureChip from '../components/PostureChip';
 import AppText from '../components/AppText';
+import ToneBadge, { withAlpha } from '../components/ToneBadge';
 import EmptyState from '../components/EmptyState';
 import Input from '../components/Input';
 import ErrorState from '../components/ErrorState';
@@ -813,11 +814,13 @@ function VerdictSection({
   if (!text) return null;
   return (
     <View style={styles.verdictSection}>
-      <View style={styles.verdictSectionLabelRow}>
-        <Ionicons name={icon} size={13} color={color} />
-        <AppText style={[styles.verdictLabel, { color }]}>{label}</AppText>
+      <View style={[styles.verdictGlyph, { backgroundColor: withAlpha(color, 0.15) }]}>
+        <Ionicons name={icon} size={16} color={color} />
       </View>
-      <AppText style={styles.verdictText}>{text}</AppText>
+      <View style={styles.verdictSectionBody}>
+        <ToneBadge label={label} color={color} />
+        <AppText style={styles.verdictText}>{text}</AppText>
+      </View>
     </View>
   );
 }
@@ -984,12 +987,12 @@ function VerdictCard({
         hasPicks={sendPicks.length > 0 || receivePicks.length > 0}
       />
       {summary ? (
-        <>
-          <AppText style={[styles.verdictLabel, { color: toneColor }]}>
-            {verdict.rationale_label || 'Why this works'}
-          </AppText>
-          <AppText style={[styles.verdictText, styles.verdictRationale]}>{summary}</AppText>
-        </>
+        <VerdictSection
+          icon="bulb-outline"
+          label={verdict.rationale_label || 'Why this works'}
+          text={summary}
+          color={colors.accent}
+        />
       ) : null}
       {alternatePackages.length > 0 ? (
         <View testID="alternate-packages" style={styles.lineupModel}>
@@ -1041,13 +1044,13 @@ function VerdictCard({
           <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
           <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
           <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={toneColor} />
-          <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={colors.danger} />
+          <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={colors.warning} />
           {verdict.counter_guidance ? (
             <VerdictSection
-              icon="swap-horizontal-outline"
-              label="Counter guidance"
+              icon="arrow-forward"
+              label="Next move"
               text={verdict.counter_guidance}
-              color={colors.premium}
+              color={colors.accent}
             />
           ) : null}
         </>
@@ -1299,8 +1302,9 @@ function createStyles(colors: ThemeColors) {
   verdictValueHero: { flex: 1 },
   verdictValueBar: { marginBottom: spacing.md },
   verdictMeter: { flexShrink: 0 },
-  verdictSection: { marginTop: spacing.sm },
-  verdictSectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
+  verdictSection: { marginTop: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  verdictGlyph: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  verdictSectionBody: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 4 },
   verdictLabel: {
     fontSize: 11,
     fontWeight: '700',
