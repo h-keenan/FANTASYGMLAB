@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import AnimatedCard from '../components/AnimatedCard';
+import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CompactPlayerModule from '../components/CompactPlayerModule';
@@ -13,6 +13,7 @@ import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SharedTradesFeed from '../components/SharedTradesFeed';
 import ValuesCredit from '../components/ValuesCredit';
+import { NetEdgeBar, TradeSwapGlyph } from '../components/TradeOutcomeHeader';
 import { api, type PastTradeOutcome, type SharedCommunityTrade, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useLastLeague } from '../lib/useLastLeague';
@@ -172,9 +173,13 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
           ? colors.violet
           : colors.textSecondary;
 
+  const accent = verdict ? verdictTone : outcomeTone;
+  const netPct = result && result.status === 'ready' ? (result.value?.net_delta_pct ?? null) : null;
+
   return (
-    <AnimatedCard style={styles.card}>
+    <AccentCard accent={accent} compact>
       <View style={styles.headerRow}>
+        <TradeSwapGlyph color={accent} />
         <AppText style={styles.partner} numberOfLines={2}>
           {partner}
         </AppText>
@@ -196,6 +201,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
           </View>
         </View>
       ) : null}
+      {netPct !== null ? <NetEdgeBar netPct={netPct} leftLabel="Partner ahead" rightLabel="You ahead" /> : null}
 
       <View style={styles.exchangeGroup}>
         <AppText style={styles.exchangeLabel}>You sent</AppText>
@@ -203,7 +209,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
         <AppText style={styles.exchangeLabel}>You received</AppText>
         <AssetList assets={summary.receive} />
       </View>
-    </AnimatedCard>
+    </AccentCard>
   );
 }
 
@@ -272,7 +278,7 @@ function createStyles(colors: ThemeColors) {
     error: { color: colors.danger, textAlign: 'center', marginTop: spacing.md },
     card: { padding: spacing.md, gap: spacing.xs },
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    partner: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+    partner: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, flexGrow: 1 },
     outcomeBadge: { borderRadius: radii.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 },
     outcomeBadgeText: { fontSize: 11, fontWeight: '700' },
     date: { fontSize: 12, color: colors.textTertiary },

@@ -8,6 +8,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { keepPreviousData, useIsRestoring, useQuery } from '@tanstack/react-query';
 
+import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
@@ -526,28 +527,28 @@ function StoryGroup({
           {meta.label}
         </AppText>
       </View>
-      <AnimatedCard style={styles.groupCard}>
-        {stories.map((story, index) =>
-          index === 0 ? (
-            <FeaturedStoryRow
-              key={`${story.story_type}-${index}`}
-              story={story}
-              showDivider={index < stories.length - 1}
-              onPress={resolvePress(story)}
-              rosterMap={rosterMap}
-              meta={meta}
-            />
-          ) : (
-            <StoryRow
-              key={`${story.story_type}-${index}`}
-              story={story}
-              showDivider={index < stories.length - 1}
-              onPress={resolvePress(story)}
-              rosterMap={rosterMap}
-            />
-          ),
-        )}
-      </AnimatedCard>
+      <View style={styles.groupCards}>
+        {stories.map((story, index) => (
+          <AccentCard key={`${story.story_type}-${index}`} accent={meta.color} style={styles.groupCard}>
+            {index === 0 ? (
+              <FeaturedStoryRow
+                story={story}
+                showDivider={false}
+                onPress={resolvePress(story)}
+                rosterMap={rosterMap}
+                meta={meta}
+              />
+            ) : (
+              <StoryRow
+                story={story}
+                showDivider={false}
+                onPress={resolvePress(story)}
+                rosterMap={rosterMap}
+              />
+            )}
+          </AccentCard>
+        ))}
+      </View>
     </View>
   );
 }
@@ -904,7 +905,8 @@ function createStyles(colors: ThemeColors) {
   groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
   groupIcon: { marginLeft: -2 },
   groupLabel: { flex: 1, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  groupCard: { padding: 0 },
+  groupCards: { gap: spacing.sm },
+  groupCard: { padding: 0, overflow: 'hidden' },
   // Featured row (tier 2) — the category's one real storyline: tinted
   // background, thicker colored rings, a larger bolded number, full summary.
   featuredRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
