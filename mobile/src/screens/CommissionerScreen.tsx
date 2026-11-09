@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -9,9 +8,12 @@ import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import BrandedSpinner from '../components/BrandedSpinner';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
+import IconRow, { type IconRowIcon } from '../components/IconRow';
+import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -114,31 +116,28 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   );
 }
 
+/** A titled group of icon rows (evidence / innocent explanations). */
 function Bullets({
   title,
   items,
   styles,
-  icon = 'information-circle',
+  icon = 'info',
   color,
 }: {
   title: string;
   items: string[];
   styles: ReturnType<typeof createStyles>;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconRowIcon;
   color?: string;
 }) {
-  const { colors } = useThemeMode();
   if (!items.length) return null;
   return (
     <View style={styles.bullets}>
-      <AppText style={styles.bulletsTitle}>{title}</AppText>
+      <AppText style={[styles.bulletsTitle, color ? { color } : null]}>{title}</AppText>
       {items.map((text) => (
-        <View key={text} style={styles.bulletRow}>
-          <View style={[styles.bulletIcon, color ? { backgroundColor: `${color}26` } : null]}>
-            <Ionicons name={icon} size={12} color={color ?? colors.textSecondary} />
-          </View>
-          <AppText style={styles.bullet}>{text}</AppText>
-        </View>
+        <IconRow key={text} icon={icon} color={color}>
+          {text}
+        </IconRow>
       ))}
     </View>
   );
@@ -147,24 +146,37 @@ function Bullets({
 function EfficiencyBars({ team, colors, styles }: { team: IntegrityTeam; colors: ThemeColors; styles: ReturnType<typeof createStyles> }) {
   if (!team.series.length) return null;
   return (
-    <View style={styles.bars} accessibilityLabel="Lineup efficiency by week">
-      {team.series.map((point) => {
-        const pct = Math.max(0.05, Math.min(1, point.efficiency ?? 0));
-        return (
-          <View key={point.week} style={styles.barCol}>
-            <View
-              style={{
-                width: '100%',
-                height: Math.round(pct * 28),
-                borderRadius: 2,
-                backgroundColor: point.flagged ? colors.warning : colors.textTertiary,
-                opacity: point.flagged ? 1 : 0.45,
-              }}
-            />
-            <AppText style={styles.barLabel}>{point.week}</AppText>
-          </View>
-        );
-      })}
+    <View style={styles.bullets}>
+      <AppText style={styles.bulletsTitle}>Lineup efficiency by week</AppText>
+      <View style={styles.bars} accessibilityLabel="Lineup efficiency by week">
+        {team.series.map((point) => {
+          const pct = Math.max(0.05, Math.min(1, point.efficiency ?? 0));
+          return (
+            <View key={point.week} style={styles.barCol}>
+              <View
+                style={{
+                  width: '100%',
+                  height: Math.round(pct * 40),
+                  borderRadius: 2,
+                  backgroundColor: point.flagged ? colors.warning : colors.success,
+                  opacity: point.flagged ? 1 : 0.55,
+                }}
+              />
+              <AppText style={styles.barLabel}>{point.week}</AppText>
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.success, opacity: 0.55 }]} />
+          <AppText style={styles.barLabel}>Normal week</AppText>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+          <AppText style={styles.barLabel}>Flagged week</AppText>
+        </View>
+      </View>
     </View>
   );
 }
@@ -184,7 +196,17 @@ function TeamCard({
   const expandable = team.band === 'strong' || team.band === 'worth_a_look';
   return (
     <AccentCard accent={toneColor(team.band)}>
-      <View style={styles.cardHead}>
+      <View style={[styles.cardHead, styles.cardHeadCenter]}>
+        {team.weeks.evaluated ? (
+          <CircularProgressRing
+            percent={Math.round((team.weeks.flagged / team.weeks.evaluated) * 100)}
+            size={48}
+            strokeWidth={5}
+            color={toneColor(team.band)}
+            valueLabel={`${team.weeks.flagged}/${team.weeks.evaluated}`}
+            valueFontScale={0.27}
+          />
+        ) : null}
         <View style={styles.flex}>
           <AppText style={styles.teamName}>{team.team_name}</AppText>
           <AppText style={styles.muted}>
@@ -206,9 +228,9 @@ function TeamCard({
           </TouchableOpacity>
           {open ? (
             <>
-              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert-circle" color={toneColor(team.band)} />
+              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert" color={toneColor(team.band)} />
               <EfficiencyBars team={team} colors={colors} styles={styles} />
-              <Bullets title="Could be innocent" items={team.innocent_explanations} styles={styles} />
+              <Bullets title="Could be innocent" items={team.innocent_explanations} styles={styles} icon="info" color={colors.accent} />
             </>
           ) : null}
         </>
@@ -265,7 +287,7 @@ function IntegrityBody({
             caption="Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict."
           />
           {data.collusion.map((pair) => (
-            <CollusionCard key={pair.roster_ids.join('-')} pair={pair} toneColor={toneColor} styles={styles} />
+            <CollusionCard key={pair.roster_ids.join('-')} pair={pair} toneColor={toneColor} accent={colors.accent} styles={styles} />
           ))}
         </View>
       ) : null}
@@ -274,7 +296,7 @@ function IntegrityBody({
         <View style={styles.stack}>
           <SectionHeading title="Possibly inactive" />
           {data.inactive.map((m) => (
-            <InactiveCard key={m.roster_id} manager={m} accent={colors.warning} styles={styles} />
+            <InactiveCard key={m.roster_id} manager={m} accent={colors.warning} infoColor={colors.accent} styles={styles} />
           ))}
         </View>
       ) : null}
@@ -284,7 +306,11 @@ function IntegrityBody({
           <SectionHeading title={flagged.length ? 'Everyone else' : 'Team lineups'} />
           <AccentCard accent={colors.success}>
             <View style={styles.cardHead}>
-              <AppText style={[styles.teamName, styles.flex, { color: colors.success }]}>{restSummary(data.teams, flagged.length)}</AppText>
+              <View style={styles.flex}>
+                <IconRow icon="check" color={colors.success} textStyle={[styles.teamName, { color: colors.success }]}>
+                  {restSummary(data.teams, flagged.length)}
+                </IconRow>
+              </View>
               <TouchableOpacity onPress={() => setShowRest((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showRest }}>
                 <AppText style={styles.link}>{showRest ? 'Hide teams' : `Show ${rest.length} team${rest.length === 1 ? '' : 's'}`}</AppText>
               </TouchableOpacity>
@@ -296,7 +322,7 @@ function IntegrityBody({
         </View>
       ) : null}
 
-      {data.limits?.length ? <Bullets title="What this can and can't tell you" items={data.limits} styles={styles} /> : null}
+      {data.limits?.length ? <Bullets title="What this can and can't tell you" items={data.limits} styles={styles} icon="info" color={colors.textTertiary} /> : null}
     </View>
   );
 }
@@ -310,27 +336,66 @@ function CalendarCard({
   accent: string;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const lines = calendarLines(calendar);
-  if (!lines.length) return null;
+  const { colors } = useThemeMode();
+  if (!calendarLines(calendar).length || !calendar) return null;
+  const d = calendar.trade_deadline_week;
+  const deadlineNote =
+    d == null
+      ? 'No deadline set'
+      : calendar.deadline_phase === 'passed'
+        ? 'Passed; reopens after the season'
+        : calendar.deadline_phase === 'final_week'
+          ? 'This week: last call'
+          : calendar.weeks_to_deadline != null
+            ? `${calendar.weeks_to_deadline} week${calendar.weeks_to_deadline === 1 ? '' : 's'} left`
+            : null;
+  const season = calendar.regular_season_weeks;
+  const progress =
+    calendar.in_season && calendar.current_week && season
+      ? Math.max(0, Math.min(100, Math.round((calendar.current_week / season) * 100)))
+      : null;
   return (
-    <AccentCard accent={accent}>
-      <AppText style={styles.bulletsTitle}>League calendar</AppText>
-      {lines.map((line) => (
-        <AppText key={line} style={styles.body}>
-          {line}
-        </AppText>
-      ))}
-    </AccentCard>
+    <View style={styles.bullets}>
+      <SectionHeading title="League calendar" />
+      <View style={styles.tileRow}>
+        {calendar.current_week && calendar.in_season ? (
+          <MetricCard style={styles.tile} icon="calendar-outline" label="Now" value={`Wk ${calendar.current_week}`} note={season ? `of ${season}` : null} />
+        ) : null}
+        <MetricCard
+          style={styles.tile}
+          icon="flag-outline"
+          label="Trade deadline"
+          value={d == null ? 'None' : `Wk ${d}`}
+          note={deadlineNote}
+          valueColor={calendar.deadline_phase === 'final_week' ? colors.warning : undefined}
+        />
+        {calendar.playoff_week_start ? (
+          <MetricCard style={styles.tile} icon="trophy-outline" label="Playoffs" value={`Wk ${calendar.playoff_week_start}`} note="Start" />
+        ) : null}
+      </View>
+      {progress !== null ? (
+        <View
+          style={styles.progressTrack}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Regular season progress"
+          accessibilityValue={{ min: 0, max: 100, now: progress }}
+        >
+          <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: accent }]} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 function CollusionCard({
   pair,
   toneColor,
+  accent,
   styles,
 }: {
   pair: IntegrityCollusionPair;
   toneColor: (band: IntegrityBand) => string;
+  accent: string;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
@@ -344,8 +409,8 @@ function CollusionCard({
       <AppText style={styles.body}>
         {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
       </AppText>
-      <Bullets title="Evidence" items={pair.evidence} styles={styles} />
-      <Bullets title="Could be innocent" items={pair.innocent_explanations} styles={styles} />
+      <Bullets title="Evidence" items={pair.evidence} styles={styles} icon="alert" color={toneColor(pair.band)} />
+      <Bullets title="Could be innocent" items={pair.innocent_explanations} styles={styles} icon="info" color={accent} />
     </AccentCard>
   );
 }
@@ -353,17 +418,19 @@ function CollusionCard({
 function InactiveCard({
   manager,
   accent,
+  infoColor,
   styles,
 }: {
   manager: IntegrityInactiveManager;
   accent: string;
+  infoColor: string;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <AccentCard accent={accent}>
       <AppText style={styles.teamName}>{manager.team_name}</AppText>
-      <Bullets title="Evidence" items={manager.evidence} styles={styles} />
-      <Bullets title="Could be innocent" items={manager.innocent_explanations} styles={styles} />
+      <Bullets title="Evidence" items={manager.evidence} styles={styles} icon="clock" color={accent} />
+      <Bullets title="Could be innocent" items={manager.innocent_explanations} styles={styles} icon="info" color={infoColor} />
     </AccentCard>
   );
 }
@@ -382,17 +449,24 @@ function createStyles(colors: ThemeColors) {
     link: { fontSize: 12, fontWeight: '700', color: colors.accent },
     bullets: { gap: spacing.xs },
     bulletsTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.textTertiary },
-    bullet: { flex: 1, fontSize: 13, color: colors.textSecondary },
-    bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    bulletIcon: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.border,
+    cardHeadCenter: { alignItems: 'center' },
+    tileRow: { flexDirection: 'row', gap: spacing.sm },
+    tile: { minWidth: 0, flexBasis: 0, flexGrow: 1 },
+    progressTrack: { height: 6, width: '100%', backgroundColor: colors.border, overflow: 'hidden' },
+    progressFill: { height: '100%' },
+    legend: { flexDirection: 'row', gap: spacing.md },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    legendDot: { width: 8, height: 8, borderRadius: 2 },
+    bars: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 4,
+      height: 68,
+      paddingHorizontal: spacing.sm,
+      paddingTop: spacing.sm,
+      backgroundColor: colors.glass,
+      borderRadius: 6,
     },
-    bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 44 },
     barCol: { flex: 1, alignItems: 'center', gap: 2 },
     barLabel: { fontSize: 10, color: colors.textTertiary },
   });

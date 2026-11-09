@@ -14,7 +14,9 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
+import IconRow from '../components/IconRow';
 import InsightRow from '../components/InsightRow';
+import ToneBadge from '../components/ToneBadge';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -28,6 +30,7 @@ import ExchangeSide from '../components/ExchangeSide';
 import {
   api,
   TEAM_STANCE_OPTIONS,
+  type TeamStance,
   type GmPlanFocusArea,
   type GmPlanResponse,
   type GmPlanTradeItem,
@@ -380,40 +383,52 @@ export default function GmPlanScreen({ route, navigation }: Props) {
           <>
             <SectionHeading title="Team Situation" icon="compass-outline" />
             <AnimatedCard style={styles.situation}>
-              <View style={styles.stanceRow}>
+              <View style={styles.stanceRow} accessibilityRole="tablist">
                 {TEAM_STANCE_OPTIONS.map((option) => {
                   const active = stance === option.value;
+                  const look = stanceLook(option.value, colors);
                   return (
-                    <TouchableOpacity accessibilityRole="button"
+                    <TouchableOpacity
+                      accessibilityRole="tab"
+                      accessibilityLabel={option.label}
                       key={option.value}
-                      style={[styles.stanceChip, active && styles.stanceChipActive]}
+                      style={[
+                        styles.stanceChip,
+                        active && { borderColor: look.color, backgroundColor: `${look.color}29`, borderBottomWidth: 3 },
+                      ]}
                       onPress={() => {
                         if (!active) setStance(option.value);
                       }}
                       accessibilityState={{ selected: active }}
                     >
-                      <AppText style={[styles.stanceLabel, active && styles.stanceLabelActive]}>{option.label}</AppText>
+                      <Ionicons name={look.icon} size={18} color={active ? look.color : colors.textSecondary} />
+                      <AppText style={[styles.stanceLabel, active && { color: look.color }]}>{option.label}</AppText>
+                      <AppText style={styles.stanceTagline}>{look.tagline}</AppText>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              <BeginnerHelp term="stanceRebuilding" />
-              <BeginnerHelp term="stanceCompeting" />
-              <BeginnerHelp term="stanceBalanced" />
               {TEAM_STANCE_OPTIONS.find((o) => o.value === stance) ? (
-                <AppText style={styles.caption}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
-              ) : null}
+                <View style={styles.stanceHelpRow}>
+                  <AppText style={[styles.caption, styles.flex1]}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
+                  <BeginnerHelp term={stanceLook(stance as TeamStance, colors).help} />
+                </View>
+              ) : (
+                <AppText style={styles.caption}>Pick the stance that fits your team right now.</AppText>
+              )}
               {weekAhead !== null ? (
                 <TouchableOpacity accessibilityRole="button" style={styles.banner} onPress={openTradeHub}>
-                  <Ionicons name="megaphone-outline" size={18} color={colors.accent} />
+                  <ToneBadge label={`Week ${weekAhead}`} color={colors.accent} />
                   <View style={styles.bannerText}>
                     <AppText style={styles.bannerTitle}>Trade deadline: Week {weekAhead}</AppText>
                     <AppText style={styles.caption}>Declaring a stance sharpens your recommendations.</AppText>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.accent} />
                 </TouchableOpacity>
               ) : pastDeadline ? (
-                <AppText style={styles.caption}>Past the trade deadline</AppText>
+                <IconRow icon="clock" color={colors.textTertiary} textStyle={styles.caption}>
+                  Past the trade deadline
+                </IconRow>
               ) : null}
             </AnimatedCard>
 
@@ -752,6 +767,15 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
   );
 }
 
+function stanceLook(
+  stance: TeamStance,
+  colors: ThemeColors,
+): { color: string; icon: keyof typeof Ionicons.glyphMap; tagline: string; help: 'stanceRebuilding' | 'stanceCompeting' | 'stanceBalanced' } {
+  if (stance === 'rebuilding') return { color: colors.accent, icon: 'leaf-outline', tagline: 'Youth + picks', help: 'stanceRebuilding' };
+  if (stance === 'competing') return { color: colors.success, icon: 'trophy-outline', tagline: 'Win now', help: 'stanceCompeting' };
+  return { color: colors.premium, icon: 'scale-outline', tagline: 'Both ways', help: 'stanceBalanced' };
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
@@ -771,22 +795,28 @@ function createStyles(colors: ThemeColors) {
     stanceRow: { flexDirection: 'row', gap: spacing.sm },
     stanceChip: {
       flex: 1,
+      minWidth: 0,
       alignItems: 'center',
-      paddingVertical: spacing.sm,
+      gap: 2,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xs,
       borderRadius: radii.md,
       borderWidth: StyleSheet.hairlineWidth * 1.5,
       borderColor: colors.glassBorder,
       backgroundColor: colors.glass,
     },
-    stanceChipActive: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
-    stanceLabel: { fontSize: 12, fontWeight: '700', color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    stanceLabelActive: { color: colors.accentOnTint },
+    stanceLabel: { fontSize: 12, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    stanceTagline: { fontSize: 11, color: colors.textTertiary },
+    stanceHelpRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
+    flex1: { flex: 1 },
     banner: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
       padding: spacing.sm,
       borderRadius: radii.md,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accent,
       backgroundColor: colors.accentMuted,
     },
     bannerText: { flex: 1, gap: 2 },

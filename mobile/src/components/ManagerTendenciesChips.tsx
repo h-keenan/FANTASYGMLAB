@@ -4,7 +4,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import AppText from './AppText';
+import ToneBadge from './ToneBadge';
 import { api } from '../lib/api';
 import { trackUse } from '../lib/analytics';
 import { findManagerRow, headlineChips } from '../lib/managerTendencies';
@@ -53,8 +56,12 @@ export default function ManagerTendenciesChips({
           navigation.navigate('Paywall');
         }}
         hitSlop={6}
+        accessibilityRole="link"
+        style={styles.upsellRow}
       >
-        <AppText style={styles.upsell}>How this manager trades · Pro</AppText>
+        <Ionicons name="lock-closed-outline" size={14} color={colors.premium} />
+        <AppText style={styles.upsell}>How this manager trades</AppText>
+        <ToneBadge label="Pro" color={colors.premium} size="xs" />
       </TouchableOpacity>
     );
   }
@@ -87,6 +94,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.glass,
     },
     chipText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-    upsell: { fontSize: 11, fontWeight: '600', color: colors.premium, marginTop: spacing.xs },
+    upsellRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+    upsell: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
   });
 }

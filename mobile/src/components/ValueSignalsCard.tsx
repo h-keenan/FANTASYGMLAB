@@ -52,6 +52,17 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
   if (!data || data.status === 'unavailable') return null;
   const status = signalsStatusMessage(data);
   const items = tab === 'buy_low' ? data.buy_low : data.sell_high;
+  // Both tabs empty: collapse to one line instead of tabs over two empty lists.
+  if (!status && data.buy_low.length === 0 && data.sell_high.length === 0) {
+    return (
+      <View style={styles.wrap} testID="value-signals">
+        <SectionHeading title="Buy low / Sell high" />
+        <AppText style={styles.note} testID="value-signals-none">
+          No buy-low or sell-high candidates right now. Nobody clears both the value-trend and production bars.
+        </AppText>
+      </View>
+    );
+  }
   return (
     <View style={styles.wrap} testID="value-signals">
       <SectionHeading title="Buy low / Sell high" />

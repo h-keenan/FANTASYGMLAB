@@ -9,7 +9,9 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import AccentCard from '../components/AccentCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import CircularProgressRing from '../components/CircularProgressRing';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -347,6 +349,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
   // Percentile denominator is the count of teams the backend actually ranked
   // for this metric (not every roster — an unclaimed team has no rank and
   // shouldn't shrink the league size other teams are compared against).
+  const myRanking = useMemo(() => baseRows.find((row) => row.isMine)?.ranking, [baseRows]);
   const rankedTeamCount = useMemo(() => teams.filter((team) => team.metricRank != null).length, [teams]);
 
   if (loading) {
@@ -381,6 +384,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
         keyExtractor={(item) => String(item.rosterId)}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
+            {myRanking ? <YourStandingCard me={myRanking} total={teamRankingsQuery.data?.teams.length ?? 0} colors={colors} styles={styles} /> : null}
             <ScreenInfoNote label={config.infoLabel} text={config.infoText} />
           </View>
         }
@@ -559,6 +563,65 @@ function TeamRowCard({
   );
 }
 
+/** "Your standing" hero above the board: Roster Power percentile ring, record, and the other four ranks as mini bars (mirrors web-next's YourStandingCard). */
+function YourStandingCard({
+  me,
+  total,
+  colors,
+  styles,
+}: {
+  me: TeamRanking;
+  total: number;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const powerPercent = percentileFromRank(me.power_rank, total);
+  const minis: Array<{ label: string; rank: number | null; tied: boolean }> = [
+    { label: 'Franchise', rank: me.franchise_rank, tied: me.franchise_rank_tied },
+    { label: 'Draft Capital', rank: me.draft_capital_rank, tied: me.draft_capital_rank_tied },
+    { label: 'Starters', rank: me.starter_rank, tied: me.starter_rank_tied },
+    { label: 'Bench', rank: me.bench_rank, tied: me.bench_rank_tied },
+  ];
+  return (
+    <AccentCard accent={colors.accent} style={styles.standingCard}>
+      <View style={styles.standingHead}>
+        <CircularProgressRing
+          percent={powerPercent ?? 0}
+          size={56}
+          strokeWidth={6}
+          color={percentileColor(powerPercent, colors)}
+          valueLabel={powerPercent === null ? '—' : `${powerPercent}`}
+          valueFontScale={0.32}
+        />
+        <View style={styles.standingHeadText}>
+          <AppText style={styles.standingEyebrow}>Your standing</AppText>
+          <AppText style={styles.standingTitle}>
+            Roster Power {formatRank(me.power_rank, me.power_rank_tied)}{total ? ` of ${total}` : ''}
+          </AppText>
+          <AppText style={styles.standingMeta}>{me.record_label ? `Record ${me.record_label}` : 'Record not available'}</AppText>
+        </View>
+      </View>
+      <View style={styles.standingGrid}>
+        {minis.map(({ label, rank, tied }) => {
+          const percentile = percentileFromRank(rank, total);
+          const tone = percentileColor(percentile, colors);
+          return (
+            <View key={label} style={styles.standingMini}>
+              <View style={styles.standingMiniHead}>
+                <AppText style={styles.standingMiniLabel}>{label}</AppText>
+                <AppText style={[styles.standingMiniRank, { color: tone }]}>{formatRank(rank, tied)}</AppText>
+              </View>
+              <View style={styles.standingTrack}>
+                <View style={[styles.standingFill, { width: `${percentile ?? 0}%`, backgroundColor: tone }]} />
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </AccentCard>
+  );
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -566,7 +629,20 @@ function createStyles(colors: ThemeColors) {
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg },
   metricTabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  infoNoteWrap: { marginBottom: spacing.md },
+  infoNoteWrap: { marginBottom: spacing.md, gap: spacing.md },
+  standingCard: { gap: spacing.md },
+  standingHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  standingHeadText: { flex: 1, minWidth: 0 },
+  standingEyebrow: { fontSize: 11, fontWeight: '800', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.85 },
+  standingTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  standingMeta: { fontSize: 12, color: colors.textTertiary },
+  standingGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.sm },
+  standingMini: { width: '47%', flexGrow: 1, gap: 4 },
+  standingMiniHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm },
+  standingMiniLabel: { fontSize: 12, color: colors.textTertiary },
+  standingMiniRank: { fontSize: 12, fontWeight: '800' },
+  standingTrack: { height: 6, width: '100%', backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' },
+  standingFill: { height: '100%' },
   center: {
     flex: 1,
     alignItems: 'center',

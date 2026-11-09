@@ -9,7 +9,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
-import AnimatedCard from '../components/AnimatedCard';
+import AccentCard from '../components/AccentCard';
+import CircularProgressRing from '../components/CircularProgressRing';
+import EmptyState from '../components/EmptyState';
+import IconRow from '../components/IconRow';
+import ToneBadge from '../components/ToneBadge';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -21,8 +25,7 @@ import ValuesCredit from '../components/ValuesCredit';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
-import { formatRank } from '../lib/percentile';
-import { contrastTextColor } from '../lib/playerTier';
+import { formatRank, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import PremiumLock from '../components/PremiumLock';
@@ -35,12 +38,16 @@ type PickScope = 'mine' | 'league';
 
 function toneColorMap(colors: ThemeColors): Record<string, string> {
   return {
-    power: colors.premium,
+    power: colors.accent,
     strength: colors.success,
     opportunity: colors.success,
     strategy: colors.accent,
-    weakness: colors.danger,
-    risk: colors.danger,
+    franchise: colors.premium,
+    need: colors.warning,
+    health: colors.warning,
+    warning: colors.warning,
+    weakness: colors.warning,
+    risk: colors.warning,
   };
 }
 
@@ -151,6 +158,16 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
     return [...bySeason.entries()].sort(([a], [b]) => a - b);
   }, [visiblePicks]);
 
+  // Distinct pick-owning rosters stand in for league size (rank -> percentile); null under 2.
+  const leagueSize = useMemo(() => {
+    const owners = new Set<string>();
+    for (const pick of picks) {
+      if (pick.owner_roster_id) owners.add(String(pick.owner_roster_id));
+      if (pick.original_roster_id) owners.add(String(pick.original_roster_id));
+    }
+    return owners.size >= 2 ? owners.size : null;
+  }, [picks]);
+
   if (loading) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
@@ -186,9 +203,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   if (reason) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.notReadyText}>
-          Draft Center isn't ready for this league yet — try again in a bit.
-        </AppText>
+        <EmptyState icon="time-outline" title="Draft Center isn't ready yet" subtitle="Try again in a bit." />
       </View>
     );
   }
@@ -200,19 +215,31 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <SectionHeading title="Your Draft Posture" topGap={16} />
         {posture ? (
-          <>
+          <AccentCard accent={toneColorMap(colors)[posture.tone] ?? colors.accent}>
+            <View style={styles.postureHead}>
+              <ToneBadge label={posture.label} color={toneColorMap(colors)[posture.tone] ?? colors.accent} />
+              <View style={styles.postureChips}>
+                <ToneBadge label={`${posture.first_rounders ?? 0} firsts`} color={colors.premium} />
+                <ToneBadge label={`${posture.pick_count ?? 0} picks`} color={colors.accent} />
+              </View>
+            </View>
+            <AppText style={styles.postureNote}>{posture.note}</AppText>
             <View style={styles.tileRow}>
-              <PostureTile
+              <CapitalCell
                 label="Draft Capital"
-                value={formatRank(posture.draft_capital_rank, posture.draft_capital_rank_tied)}
+                icon="trophy-outline"
+                rank={posture.draft_capital_rank}
+                tied={posture.draft_capital_rank_tied}
+                leagueSize={leagueSize}
                 note={posture.draft_capital != null ? `${Math.round(posture.draft_capital)} total capital` : ''}
-                first={posture.draft_capital_rank === 1}
               />
-              <PostureTile
+              <CapitalCell
                 label="Future Capital"
-                value={formatRank(posture.future_draft_capital_rank, posture.future_draft_capital_rank_tied)}
+                icon="calendar-outline"
+                rank={posture.future_draft_capital_rank}
+                tied={posture.future_draft_capital_rank_tied}
+                leagueSize={leagueSize}
                 note={posture.future_draft_capital != null ? `${Math.round(posture.future_draft_capital)} beyond this draft` : ''}
-                first={posture.future_draft_capital_rank === 1}
               />
               <PostureTile
                 label="Strategy"
@@ -220,26 +247,12 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                 note={`Roster Power ${formatRank(posture.power_rank, posture.power_rank_tied)} · Franchise ${formatRank(posture.franchise_rank, posture.franchise_rank_tied)}`}
               />
             </View>
-            <AnimatedCard
-              style={StyleSheet.flatten([styles.postureCard, { borderColor: toneColorMap(colors)[posture.tone] ?? colors.accent }])}
-            >
-              <View style={[styles.posturePill, { backgroundColor: toneColorMap(colors)[posture.tone] ?? colors.accent }]}>
-                <AppText
-                  style={[styles.postureLabel, { color: contrastTextColor(toneColorMap(colors)[posture.tone] ?? colors.accent) }]}
-                >
-                  {posture.label}
-                </AppText>
-              </View>
-              <AppText style={styles.postureNote}>{posture.note}</AppText>
-              <AppText style={styles.postureMeta}>
-                {posture.first_rounders ?? 0} tracked first-rounders · {posture.pick_count ?? 0} total picks
-              </AppText>
-            </AnimatedCard>
-          </>
+          </AccentCard>
         ) : (
-          <AppText style={styles.notice}>
-            {POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."}
-          </AppText>
+          <EmptyState
+            icon="information-circle-outline"
+            title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."}
+          />
         )}
 
         {picks.length ? (
@@ -293,50 +306,89 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                 </View>
               ))
             ) : (
-              <AppText style={styles.notice}>
-                {pickScope === 'mine'
-                  ? "You don't hold any tracked picks in this league right now."
-                  : 'No draft pick assets available for this league yet.'}
-              </AppText>
+              <EmptyState
+                icon="information-circle-outline"
+                title={
+                  pickScope === 'mine'
+                    ? "You don't hold any tracked picks in this league right now."
+                    : 'No draft pick assets available for this league yet.'
+                }
+              />
             )}
           </>
         ) : null}
 
         <SectionHeading title="League Draft Decision Signals" topGap={16} />
-        {decisionCards.length ? (
-          <AnimatedCard style={styles.insightGroupCard}>
-            {decisionCards.map((card, index) => (
-              <DraftInsightBlock key={card.label} card={card} showDivider={index < decisionCards.length - 1} />
-            ))}
-          </AnimatedCard>
-        ) : null}
+        {decisionCards.map((card) => (
+          <DraftInsightCard key={card.label} card={card} />
+        ))}
 
         <SectionHeading title="Draft Partner Discovery" topGap={16} />
-        {partnerCards.length ? (
-          <AnimatedCard style={styles.insightGroupCard}>
-            {partnerCards.map((card, index) => (
-              <DraftInsightBlock key={card.label} card={card} showDivider={index < partnerCards.length - 1} />
-            ))}
-          </AnimatedCard>
-        ) : null}
+        {partnerCards.map((card) => (
+          <DraftInsightCard key={card.label} card={card} />
+        ))}
         <ValuesCredit />
       </ScrollView>
     </View>
   );
 }
 
-function PostureTile({ label, value, note, first }: { label: string; value: string; note: string; first?: boolean }) {
+function PostureTile({ label, value, note }: { label: string; value: string; note: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[styles.tile, first && styles.tileFirst]}>
-      <View style={styles.tileValueRow}>
-        {first ? <Ionicons name="trophy" size={13} color={colors.premium} /> : null}
-        <AppText style={[styles.tileValue, first && styles.tileValueFirst]} numberOfLines={1}>
-          {value}
-        </AppText>
+    <View style={styles.tile}>
+      <View style={styles.tileLabelRow}>
+        <Ionicons name="flash-outline" size={11} color={colors.accent} />
+        <AppText style={styles.tileLabel}>{label}</AppText>
       </View>
-      <AppText style={styles.tileLabel}>{label}</AppText>
+      <AppText style={styles.tileValue} numberOfLines={1}>
+        {value}
+      </AppText>
+      {note ? (
+        <AppText style={styles.tileNote} numberOfLines={3}>
+          {note}
+        </AppText>
+      ) : null}
+    </View>
+  );
+}
+
+/** One capital metric: rank as the headline, a percentile ring when the league size is known. */
+function CapitalCell({
+  label,
+  icon,
+  rank,
+  tied,
+  leagueSize,
+  note,
+}: {
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  rank: number | null;
+  tied: boolean;
+  leagueSize: number | null;
+  note: string;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const percentile = leagueSize ? percentileFromRank(rank, leagueSize) : null;
+  const first = rank === 1;
+  const ringColor = percentile === null ? colors.accent : percentile < 34 ? colors.danger : percentile < 67 ? colors.warning : colors.success;
+  return (
+    <View style={[styles.tile, first && styles.tileFirst]}>
+      <View style={styles.tileLabelRow}>
+        <Ionicons name={icon} size={11} color={first ? colors.premium : colors.accent} />
+        <AppText style={styles.tileLabel}>{label}</AppText>
+      </View>
+      <View style={styles.capitalValueRow}>
+        <AppText style={[styles.tileValue, first && styles.tileValueFirst]} numberOfLines={1}>
+          {formatRank(rank, tied)}
+        </AppText>
+        {percentile !== null ? (
+          <CircularProgressRing percent={percentile} size={34} strokeWidth={4} color={ringColor} valueLabel={`${percentile}`} valueFontScale={0.34} />
+        ) : null}
+      </View>
       {note ? (
         <AppText style={styles.tileNote} numberOfLines={2}>
           {note}
@@ -347,33 +399,24 @@ function PostureTile({ label, value, note, first }: { label: string; value: stri
 }
 
 /**
- * One classification block ("Best Pick Buyers", "Pick-Rich Teams", ...)
- * inside the League Draft Decision Signals / Draft Partner Discovery
- * surfaces. Previously each block was its own separately-bordered
- * AnimatedCard — five-plus identical card shells stacked back to back is
- * exactly the "card → card → card" pattern the Magna Carta calls out (§12);
- * these now render as internal rows of one grouped surface, separated by a
- * hairline divider, the same way PickRow-family lists are grouped.
+ * One classification card ("Best Pick Buyers", "Pick-Rich Teams", ...): an
+ * AccentCard railed and badged in the tone's semantic color, items as icon
+ * rows. Mirrors web-next's DraftCardSection (PR #1696).
  */
-function DraftInsightBlock({ card, showDivider }: { card: DraftCard; showDivider: boolean }) {
+function DraftInsightCard({ card }: { card: DraftCard }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const toneColor = toneColorMap(colors)[card.tone] ?? colors.accent;
   return (
-    <View style={showDivider ? styles.insightBlockDivider : undefined}>
-      <View style={[styles.insightBadge, { backgroundColor: `${toneColor}26` }]}>
-        <AppText style={[styles.insightBadgeText, { color: toneColor }]}>{card.label}</AppText>
-      </View>
+    <AccentCard accent={toneColor} style={styles.insightCard}>
+      <ToneBadge label={card.label} color={toneColor} />
       <AppText style={styles.insightTitle}>{card.title}</AppText>
       {card.items.map((item, index) => (
-        <View key={`${card.label}-${index}`} style={styles.insightItemRow}>
-          <View style={[styles.insightItemIcon, { backgroundColor: `${toneColor}26` }]}>
-            <Ionicons name="arrow-forward" size={11} color={toneColor} />
-          </View>
-          <AppText style={styles.insightItemText}>{item}</AppText>
-        </View>
+        <IconRow key={`${card.label}-${index}`} icon="arrow" color={toneColor}>
+          {item}
+        </IconRow>
       ))}
-    </View>
+    </AccentCard>
   );
 }
 
@@ -407,49 +450,29 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tile: {
     flexBasis: '30%',
     flexGrow: 1,
+    minWidth: 100,
     backgroundColor: colors.glass,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.glassBorder,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    alignItems: 'center',
+    padding: spacing.sm,
+    gap: 2,
   },
-  tileValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tileValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  // League #1 in a capital rank gets the same trophy + premium/gold
-  // treatment as Teams' top power rank — "most draft capital in the league"
-  // should read at a glance, not as just another "#N".
+  tileLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tileLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  tileValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  capitalValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
+  // League #1 in a capital rank keeps the premium/gold treatment.
   tileFirst: { backgroundColor: `${colors.premium}1F`, borderColor: `${colors.premium}80` },
   tileValueFirst: { color: colors.premium },
-  tileLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 2,
-  },
-  tileNote: { fontSize: 10, color: colors.textSecondary, marginTop: 4, textAlign: 'center' },
-  postureCard: { padding: spacing.lg, borderWidth: 1, gap: spacing.xs },
-  // Solid-fill pill in the posture's tone color (same high-emphasis badge
-  // as Player Detail's hero tier pill) — this is the one headline verdict
-  // on the screen, so it earns the solid fill the dense insight badges
-  // below deliberately don't get.
-  posturePill: {
-    alignSelf: 'flex-start',
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    marginBottom: spacing.xs,
-  },
-  postureLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
+  tileNote: { fontSize: 10, color: colors.textSecondary },
+  postureHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
+  postureChips: { flexDirection: 'row', gap: spacing.xs, marginLeft: 'auto' },
   postureNote: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-  postureMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
   scopeRow: { marginBottom: spacing.sm },
   pickSeasonLabel: {
     fontSize: 11,
@@ -467,31 +490,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
   },
-  insightGroupCard: { padding: spacing.lg, marginBottom: spacing.sm },
-  insightBlockDivider: {
-    paddingBottom: spacing.md,
-    marginBottom: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
-  },
-  insightBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    marginBottom: spacing.xs,
-  },
-  insightBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  insightTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
-  insightItemRow: { flexDirection: 'row', marginBottom: 4 },
-  insightItemIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  insightItemText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  insightCard: { marginBottom: spacing.sm },
+  insightTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 0 },
   });
 }
