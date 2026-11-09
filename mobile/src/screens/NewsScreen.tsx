@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, RefreshControl, SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { Ionicons } from '@expo/vector-icons';
 
+import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
 import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
+import { EventTypePill } from '../components/EventTypeGlyph';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem, type NewsResponse } from '../lib/api';
@@ -19,9 +20,7 @@ import NextSteps from '../components/NextSteps';
 import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
-
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
+import { spacing, type ThemeColors } from '../theme';
 
 // Semantic mapping matches AlertsScreen's (adjacent, roster-tied feed) exactly:
 // red = injury/risk, cyan = transaction/GM intelligence, green = role upside,
@@ -36,13 +35,6 @@ export function eventBadgeColors(colors: ThemeColors): Record<string, string> {
     'off-field/drama': colors.textSecondary,
   };
 }
-
-const EVENT_BADGE_ICONS: Record<string, IconName> = {
-  'injury/status': 'medkit-outline',
-  transaction: 'swap-horizontal-outline',
-  'role/depth chart': 'layers-outline',
-  'off-field/drama': 'alert-circle-outline',
-};
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   'injury/status': 'Injury / Status',
@@ -203,27 +195,36 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
             />
           ) : null
         }
-        renderItem={({ item: group }) => {
+        renderItem={({ item: group, index }) => {
           const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
-          const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
+          // First story of the first cluster in each date bucket is the hero.
+          const heroItem = index === 0 ? group.items[0] : null;
+          const rest = heroItem ? group.items.slice(1) : group.items;
           return (
             <View style={styles.group}>
               <View style={styles.groupHeaderRow}>
-                <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
-                <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
-                <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
-                  {eventTypeLabel(group.eventType)}
-                </AppText>
+                <EventTypePill
+                  eventType={group.eventType}
+                  label={eventTypeLabel(group.eventType)}
+                  color={accentColor}
+                />
               </View>
-              <AnimatedCard style={styles.groupCard}>
-                {group.items.map((item, index) => (
-                  <NewsRow
-                    key={item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${index}`}
-                    item={item}
-                    showDivider={index < group.items.length - 1}
-                  />
-                ))}
-              </AnimatedCard>
+              {heroItem ? (
+                <AccentCard accent={accentColor} compact style={rest.length > 0 ? styles.heroGap : undefined}>
+                  <NewsRow item={heroItem} showDivider={false} hero />
+                </AccentCard>
+              ) : null}
+              {rest.length > 0 ? (
+                <AnimatedCard style={styles.groupCard}>
+                  {rest.map((item, itemIndex) => (
+                    <NewsRow
+                      key={item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${itemIndex}`}
+                      item={item}
+                      showDivider={itemIndex < rest.length - 1}
+                    />
+                  ))}
+                </AnimatedCard>
+              ) : null}
             </View>
           );
         }}
@@ -237,11 +238,14 @@ export function NewsRow({
   item,
   showDivider,
   showEventTag = false,
+  hero = false,
 }: {
   item: NewsItem;
   showDivider: boolean;
   /** Prefix the row with its impact tag (Injury / Transaction / ...). */
   showEventTag?: boolean;
+  /** First story of a bucket: rendered inside an AccentCard with a larger headline. */
+  hero?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createRowStyles(colors), [colors]);
@@ -256,7 +260,7 @@ export function NewsRow({
 
   return (
     <TouchableOpacity accessibilityRole="button"
-      style={[styles.row, showDivider && styles.rowDivider]}
+      style={[styles.row, hero && styles.rowHero, showDivider && styles.rowDivider]}
       onPress={() => {
         if (item.link) void Linking.openURL(item.link);
       }}
@@ -264,12 +268,13 @@ export function NewsRow({
       disabled={!item.link}
     >
       {showEventTag && item.event_type ? (
-        <AppText
-          style={[styles.eventTag, { color: eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary }]}
-          testID="news-event-tag"
-        >
-          {eventTypeLabel(item.event_type)}
-        </AppText>
+        <View style={styles.eventTag} testID="news-event-tag">
+          <EventTypePill
+            eventType={item.event_type}
+            label={eventTypeLabel(item.event_type)}
+            color={eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary}
+          />
+        </View>
       ) : null}
       <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
       {identities.map((identity, index) => (
@@ -296,7 +301,7 @@ export function NewsRow({
           }
         />
       ))}
-      <AppText style={styles.title} numberOfLines={2}>
+      <AppText style={[styles.title, hero && styles.titleHero]} numberOfLines={2}>
         {item.title}
       </AppText>
       {item.summary ? (
@@ -314,10 +319,12 @@ function createRowStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { paddingVertical: spacing.sm + 2 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    eventTag: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 2 },
+    eventTag: { marginBottom: spacing.xs, alignSelf: 'flex-start' },
+    rowHero: { paddingVertical: 0 },
     time: { fontSize: 11, color: colors.textTertiary, marginBottom: 3 },
     identity: { marginBottom: spacing.xs },
     title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },
+    titleHero: { fontSize: 16, fontWeight: '700' },
     summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
     footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
   });
@@ -337,15 +344,7 @@ function createStyles(colors: ThemeColors) {
     },
     group: { marginBottom: spacing.md },
     groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
-    groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
-    groupIcon: { marginLeft: -2 },
-    groupLabel: {
-      flex: 1,
-      fontSize: 12,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
+    heroGap: { marginBottom: spacing.sm },
     groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
     error: {
       color: colors.danger,

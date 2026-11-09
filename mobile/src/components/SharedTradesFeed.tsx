@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import AnimatedCard from './AnimatedCard';
+import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
+import { AnonymousTeamPair } from './TradeOutcomeHeader';
 import type { SharedCommunityTrade } from '../lib/api';
 import { assetLabel, gradeTone } from '../lib/sharedTrades';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -45,8 +46,9 @@ export default function SharedTradesFeed({
       <AppText style={styles.heading}>Shared by users</AppText>
       {visible.length === 0 ? <AppText style={styles.muted}>Nothing shared yet.</AppText> : null}
       {visible.map((trade) => (
-        <AnimatedCard key={trade.id} style={styles.card}>
+        <AccentCard key={trade.id} accent={toneColor[gradeTone(trade.grade)]} compact>
           <View style={styles.headerRow}>
+            <AnonymousTeamPair color={toneColor[gradeTone(trade.grade)]} />
             <View style={styles.headerText}>
               <AppText style={styles.name} numberOfLines={1}>
                 {trade.display_name}
@@ -80,7 +82,7 @@ export default function SharedTradesFeed({
               }}
             />
           )}
-        </AnimatedCard>
+        </AccentCard>
       ))}
     </View>
   );
@@ -92,7 +94,7 @@ function createStyles(colors: ThemeColors) {
     heading: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     card: { padding: spacing.md, gap: spacing.xs },
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    headerText: { flexShrink: 1 },
+    headerText: { flexShrink: 1, flexGrow: 1 },
     name: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     muted: { fontSize: 12, color: colors.textTertiary },
     why: { fontSize: 13, color: colors.textSecondary },
