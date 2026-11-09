@@ -279,7 +279,7 @@ export function TradeFinderContent({
     const runAutoSearch = (strategyKey: string) => {
       if (cancelled || !autoSearchPlayerId || autoSearchStarted.current) return;
       autoSearchStarted.current = true;
-      void runSearch(new Set([autoSearchPlayerId]), new Set(), false, strategyKey);
+      void runSearch(new Set([autoSearchPlayerId]), new Set(), "any", strategyKey);
     };
     api
       .getTeamStance(leagueId)

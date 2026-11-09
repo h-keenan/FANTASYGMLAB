@@ -2,7 +2,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isTradeAnalyzerRoute, quickAddPlacement, rosterOwnershipFrom, tradeShortcutsFor } from './tradeShortcuts.ts';
+import {
+  isTradeAnalyzerRoute,
+  playerLeagueStatus,
+  playerLeagueStatusLabel,
+  quickAddPlacement,
+  rosterOwnershipFrom,
+  tradeShortcutsFor,
+} from './tradeShortcuts.ts';
 
 const ownership = rosterOwnershipFrom({ players: ['1', 2] }, [
   { roster_id: 1, players: ['1', '2'] },
@@ -63,4 +70,19 @@ test('isTradeAnalyzerRoute: only the Analyzer tab of the Trades host', () => {
   assert.equal(isTradeAnalyzerRoute('Trades', 'search'), false);
   assert.equal(isTradeAnalyzerRoute('Waivers', 'make'), false);
   assert.equal(isTradeAnalyzerRoute(undefined), false);
+});
+
+test('playerLeagueStatus is null until ownership is known', () => {
+  assert.equal(playerLeagueStatus('a', null), null);
+});
+
+test('playerLeagueStatus reports mine, rostered with a team name, and free agent', () => {
+  const owned = rosterOwnershipFrom({ roster_id: 1, players: ['a'] }, [
+    { roster_id: 1, players: ['a'] },
+    { roster_id: 2, players: ['b'] },
+  ]);
+  assert.deepEqual(playerLeagueStatus('a', owned), { kind: 'mine' });
+  assert.deepEqual(playerLeagueStatus('b', owned, { '2': 'Rival GM' }), { kind: 'rostered', teamName: 'Rival GM' });
+  assert.deepEqual(playerLeagueStatus('c', owned), { kind: 'free_agent' });
+  assert.equal(playerLeagueStatusLabel({ kind: 'rostered', teamName: null }), 'On another team');
 });
