@@ -29,6 +29,7 @@ export default function MetricCard({
   valueColor,
   note,
   periodLabel,
+  fill,
   onPress,
   centered = false,
   style,
@@ -62,6 +63,10 @@ export default function MetricCard({
    * rather than being replaced by it, since the whole point is it must
    * stay visible even when a percentile is present. */
   periodLabel?: string | null;
+  /** 0..1 relative standing (rank position, win share): a thin meter under the
+   * value, green / amber / red like the percentile ramp. Omit for a tile with
+   * no honest relative scale. Mirrors web SnapshotTile `fill`. */
+  fill?: number | null;
   /** Makes the whole tile tappable (e.g. Dashboard's Roster Power/Franchise rank
    * tiles, which drill into the Teams screen) while leaving every other
    * caller — anything that omits this — a plain, non-interactive View. */
@@ -127,6 +132,7 @@ export default function MetricCard({
         </AppText>
       ) : null}
       <PercentileBar percentile={percentile} />
+      {fill != null && Number.isFinite(fill) && percentile == null ? <PercentileBar percentile={fill * 100} /> : null}
     </>
   );
   if (onPress) {

@@ -101,6 +101,22 @@ export function formatRank(rank: number | null | undefined, tied?: boolean): str
   return `${tied ? 'T' : '#'}${Math.round(rank)}`;
 }
 
+/** Rank position as a 0..1 standing (1st of N = 1, last = 0); null when unknown.
+ * Mirrors web-next's rankFill (SnapshotTile). */
+export function rankFill(rank: number | null | undefined, size: number | null | undefined): number | null {
+  if (rank == null || !size || size < 2 || rank < 1 || rank > size) return null;
+  return (size - rank) / (size - 1);
+}
+
+/** Share of decided games won (ties count half); null before any game is played. */
+export function winShare(wins: number | null | undefined, losses: number | null | undefined, ties?: number | null): number | null {
+  const w = wins ?? 0;
+  const l = losses ?? 0;
+  const t = ties ?? 0;
+  const games = w + l + t;
+  return games > 0 ? (w + t / 2) / games : null;
+}
+
 /** Real, not fabricated: the same percentile the badge text already shows,
  * just given a direction — at/above the 50th percentile reads as a trend
  * up, below it a trend down. Never a week-over-week delta (this app has no

@@ -12,6 +12,7 @@ import { useIsRestoring, useQueries, useQuery } from '@tanstack/react-query';
 import BrandedSpinner from '../components/BrandedSpinner';
 import FadeInView from '../components/FadeInView';
 import EmptyState from '../components/EmptyState';
+import PercentileBar from '../components/PercentileBar';
 import PremiumLock from '../components/PremiumLock';
 import GridBackground from '../components/GridBackground';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
@@ -37,6 +38,7 @@ const SLOW_LEAGUE_MS = 10_000;
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import { setLastLeague } from '../lib/lastLeague';
 import { ESPN_NOT_SUPPORTED } from '../lib/leaguesGlance';
+import { winShare } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -553,6 +555,7 @@ function PortfolioLeagueCard({
   const isChampion = league.power_rank === 1;
   const record = recordLabel(league);
   const { showRankBadge, metadata, rankText } = portfolioMetadata(record, league.power_rank, league.power_rank_tied);
+  const winFill = winShare(league.wins, league.losses, league.ties);
   const showHealthFlag = Boolean(league.health_flag) && league.health_flag !== 'Stable';
   // Quick-glance signals for this league: whichever are genuinely true
   // right now (never padded). Falls back to the single top_item for a
@@ -574,14 +577,12 @@ function PortfolioLeagueCard({
               {metadata ? <AppText style={styles.record}>{metadata}</AppText> : null}
             </View>
             {showRankBadge ? (
-              <View style={[styles.rankPill, isChampion && styles.rankPillFirst]}>
-                {isChampion ? <Ionicons name="trophy" size={12} color={colors.premium} /> : null}
-                <AppText style={[styles.rankValue, { color: colors.premium }]}>{rankText}</AppText>
-              </View>
+              <ToneBadge label={rankText} color={colors.premium} icon={isChampion ? 'trophy' : undefined} />
             ) : null}
           </View>
+          {winFill !== null ? <PercentileBar percentile={winFill * 100} /> : null}
           {showHealthFlag ? (
-            <ToneBadge label={league.health_flag} color={colors.danger} size="xs" style={styles.healthBadge} />
+            <ToneBadge label={league.health_flag} color={colors.warning} style={styles.healthBadge} />
           ) : null}
         </TouchableOpacity>
         {signals.length > 0 ? (
@@ -657,7 +658,17 @@ function createStyles(colors: ThemeColors) {
     linkTextSmall: { fontSize: 12, fontWeight: '700', color: colors.accent },
     noteBody: { flex: 1, gap: spacing.xs },
     noteLeagueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    openLink: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
+    openLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 44,
+      marginTop: spacing.sm,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.accent}1A`,
+    },
     emptySignals: { fontSize: 13, color: colors.textTertiary, paddingVertical: spacing.sm },
     signal: { paddingTop: spacing.sm, gap: spacing.xs },
     signalDivider: { marginTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline },
@@ -718,18 +729,6 @@ function createStyles(colors: ThemeColors) {
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
     record: { fontSize: 12, color: colors.textTertiary, marginTop: spacing.xs },
     healthBadge: { alignSelf: 'flex-start', marginTop: spacing.xs },
-    // Top-3 rank pill, same soft gold pill as the website's rank badge.
-    rankPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: `${colors.premium}1F`,
-      borderRadius: radii.pill,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 4,
-    },
-    rankValue: { fontSize: 12, fontWeight: '800' },
-    rankPillFirst: {},
     skeletonGap: { marginTop: spacing.xs },
     slowRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
     slowText: { color: colors.textTertiary, fontSize: 13 },

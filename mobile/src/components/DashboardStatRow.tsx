@@ -15,6 +15,8 @@ export type StatStripItem = {
   valueColor?: string;
   /** Semantic value color shortcut; `valueColor` wins when both are set. */
   tone?: 'positive' | 'risk';
+  /** 0..1 standing drawn as a thin meter under the value (see MetricCard `fill`). */
+  fill?: number | null;
   onPress?: () => void;
 };
 
@@ -37,6 +39,7 @@ export default function DashboardStatRow({ items, style }: { items: StatStripIte
           valueColor={
             item.valueColor ?? (item.tone === 'positive' ? colors.successBright : item.tone === 'risk' ? colors.danger : undefined)
           }
+          fill={item.fill}
           onPress={item.onPress}
           centered
           style={styles.tile}

@@ -426,9 +426,14 @@ export default function WaiversScreen({ route, navigation }: Props) {
           ListHeaderComponent={
             tab === 'recommended' ? (
               <View>
-                <AppText style={styles.needsHeadline} testID="needs-headline">
-                  {needsHeadline({ needs_model: needsModel, needed_positions: neededPositions })}
-                </AppText>
+                <View style={styles.needsRow}>
+                  <AppText style={styles.needsHeadline} testID="needs-headline">
+                    {needsHeadline({ needs_model: needsModel, needed_positions: neededPositions })}
+                  </AppText>
+                  {neededPositions.map((pos) => (
+                    <PositionBadge key={pos} position={pos} />
+                  ))}
+                </View>
                 {needsModel ? (
                   <ScreenInfoNote label="How we read your needs" text={needsBreakdownText(needsModel)} />
                 ) : null}
@@ -871,7 +876,8 @@ function createStyles(colors: ThemeColors) {
   loading: { marginTop: spacing.xl },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   sectionBlock: { marginBottom: spacing.lg },
-  needsHeadline: { fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginBottom: spacing.xs },
+  needsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
+  needsHeadline: { fontSize: 13, lineHeight: 18, color: colors.textSecondary, flexShrink: 1 },
   limitedNote: { fontSize: 12, lineHeight: 16, color: colors.warning, marginBottom: spacing.sm },
   compactGroupCard: { marginTop: spacing.sm, padding: spacing.sm },
   bestAvailableRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
