@@ -23,6 +23,13 @@ test('Team Situation redirects to the GM Plan Overview tab', () => {
   });
 });
 
+test('Playoff Odds redirects to the League Rankings Playoff Odds tab', () => {
+  assert.deepEqual(resolveLegacyRedirect('PlayoffOdds', league), {
+    name: 'Teams',
+    params: { ...league, initialTab: 'playoff' },
+  });
+});
+
 test('real routes are not redirected', () => {
   assert.equal(resolveLegacyRedirect('Dashboard', league), null);
   assert.equal(resolveLegacyRedirect('GmPlan', league), null);

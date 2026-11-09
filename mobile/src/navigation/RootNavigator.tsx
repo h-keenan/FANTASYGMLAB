@@ -45,7 +45,6 @@ import TradesScreen from '../screens/TradesScreen';
 import TradeOfferScreen from '../screens/TradeOfferScreen';
 import type { OfferPrefill } from '../lib/tradeOffer';
 import TeamsScreen from '../screens/TeamsScreen';
-import PlayoffOddsScreen from '../screens/PlayoffOddsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import CommissionerScreen from '../screens/CommissionerScreen';
 import DraftCenterScreen from '../screens/DraftCenterScreen';
@@ -130,7 +129,13 @@ export type RootStackParamList = {
     leagueId: string;
     leagueName: string;
     metric?: 'power' | 'franchise' | 'draft_capital' | 'starter' | 'bench' | 'age';
+    // League Rankings hosts two tabs (Rankings / Playoff Odds); defaults to
+    // 'rankings'. Ignored for ESPN leagues, which only have Rankings.
+    initialTab?: 'rankings' | 'playoff';
   };
+  // Retired: Playoff Odds is now the 'playoff' tab of Teams. Kept registered
+  // as a redirect (see lib/homeRedirects.ts) so deep links and stale nav
+  // state still resolve.
   PlayoffOdds: { leagueId: string; leagueName: string };
   Games: { leagueId: string; leagueName: string };
   Commissioner: { leagueId: string; leagueName: string };
@@ -179,10 +184,10 @@ function withEspnGate(Screen: React.ComponentType<any>): React.ComponentType<any
 const LeagueDetailRedirect = createLegacyRedirectScreen('LeagueDetail');
 const GmTargetsRedirect = createLegacyRedirectScreen('GmTargets');
 const TeamStanceRedirect = createLegacyRedirectScreen('TeamStance');
+const PlayoffOddsRedirect = createLegacyRedirectScreen('PlayoffOdds');
 const EspnWaiversScreen = withEspnGate(WaiversScreen);
 const EspnRecapScreen = withEspnGate(RecapScreen);
 const EspnDashboardScreen = withEspnGate(DashboardScreen);
-const EspnPlayoffOddsScreen = withEspnGate(PlayoffOddsScreen);
 const EspnGamesScreen = withEspnGate(GamesScreen);
 const EspnCommissionerScreen = withEspnGate(CommissionerScreen);
 const EspnDraftCenterScreen = withEspnGate(DraftCenterScreen);
@@ -341,7 +346,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Trades" component={TradesScreen} />
           <AppStack.Screen name="TradeOffer" component={TradeOfferScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
-          <AppStack.Screen name="PlayoffOdds" component={EspnPlayoffOddsScreen} />
+          <AppStack.Screen name="PlayoffOdds" component={PlayoffOddsRedirect} />
           <AppStack.Screen name="Games" component={EspnGamesScreen} />
           <AppStack.Screen name="Commissioner" component={EspnCommissionerScreen} />
           <AppStack.Screen name="DraftCenter" component={EspnDraftCenterScreen} />

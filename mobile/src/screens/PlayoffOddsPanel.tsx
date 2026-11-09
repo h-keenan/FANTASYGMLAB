@@ -3,10 +3,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import ToneBadge from '../components/ToneBadge';
 import ErrorState from '../components/ErrorState';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
 
 import BeginnerHelp from '../components/BeginnerHelp';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -17,13 +14,9 @@ import { api, type PlayoffOddsTeam } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { percentileColor } from '../lib/percentile';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import PremiumLock from '../components/PremiumLock';
 import { radii, spacing, type ThemeColors } from '../theme';
-import type { RootStackParamList } from '../navigation/RootNavigator';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'PlayoffOdds'>;
 
 // Honest, not-ready-yet copy per real `reason` code from the backend (see
 // modules.playoff_simulator.build_league_playoff_odds) — same convention
@@ -35,12 +28,14 @@ const REASON_MESSAGES: Record<string, string> = {
   unavailable: "Playoff odds aren't available for this league right now.",
 };
 
-export default function PlayoffOddsScreen({ route, navigation }: Props) {
+/**
+ * Playoff Odds tab body of the League Rankings host (TeamsScreen) — the host
+ * owns the header, BrandHeaderBar and tab bar. Not a registered route.
+ */
+export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
   const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   const [teams, setTeams] = useState<PlayoffOddsTeam[]>([]);
   const [reason, setReason] = useState<string>('');
   const [weeksRemaining, setWeeksRemaining] = useState<number | null>(null);
@@ -49,8 +44,6 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
   const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useScreenHeaderTitle(navigation, 'Playoff Odds', leagueName);
 
   useFocusEffect(
     useCallback(() => {
@@ -87,12 +80,12 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={styles.center}>
         <ErrorState title="Couldn't load playoff odds" message={error} />
       </View>
     );
@@ -100,9 +93,8 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
 
   if (locked) {
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]}>
+      <View style={styles.root}>
         <GridBackground />
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <View style={styles.infoNoteWrap}>
           <PremiumLock
             feature="playoff_odds"
@@ -120,9 +112,8 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
 
   if (reason || teams.length === 0) {
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]}>
+      <View style={styles.root}>
         <GridBackground />
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <View style={styles.center}>
           <AppText style={styles.quietText}>
             {REASON_MESSAGES[reason] || 'Playoff odds are not available for this league right now.'}
@@ -142,9 +133,8 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
         } This is a probabilistic estimate, not a guarantee.`;
 
   return (
-    <View style={[styles.root, { paddingTop: headerHeight }]}>
+    <View style={styles.root}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <FlatList
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}

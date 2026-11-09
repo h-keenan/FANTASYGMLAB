@@ -12,14 +12,16 @@
 export type GmPlanTab = 'overview' | 'trades' | 'core' | 'watching';
 
 export interface LegacyRedirect {
-  name: 'Dashboard' | 'GmPlan';
+  name: 'Dashboard' | 'GmPlan' | 'Teams';
   params: Record<string, unknown>;
 }
 
-const TARGETS: Record<string, { name: 'Dashboard' | 'GmPlan'; extra: Record<string, unknown> }> = {
+const TARGETS: Record<string, { name: 'Dashboard' | 'GmPlan' | 'Teams'; extra: Record<string, unknown> }> = {
   LeagueDetail: { name: 'Dashboard', extra: {} },
   GmTargets: { name: 'GmPlan', extra: { initialTab: 'watching' } },
   TeamStance: { name: 'GmPlan', extra: { initialTab: 'overview' } },
+  // Playoff Odds merged into League Rankings as a tab.
+  PlayoffOdds: { name: 'Teams', extra: { initialTab: 'playoff' } },
 };
 
 /** Routes that only redirect (rendered for one frame, never a real view). */

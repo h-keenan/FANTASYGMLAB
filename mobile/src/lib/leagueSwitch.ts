@@ -31,7 +31,6 @@ const KEEP_SCREEN_ROUTES = new Set([
   'Recap',
   'Trades',
   'Teams',
-  'PlayoffOdds',
   'Games',
   'Commissioner',
   'DraftCenter',

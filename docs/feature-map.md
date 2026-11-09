@@ -21,7 +21,7 @@ The user-facing version of this list is the in-app page "What FantasyDesk can do
 | Player profile / quick view | `/players/[id]/[playerId]`, quick-view sheet | `PlayerDetail`, quick-view sheet | Tapping any player anywhere, orb search | Free (advanced usage stats Pro) | A has Percentile sheet; W has Percentile explorer |
 | Player Compare | `/player-compare/[id]` | `PlayerCompare` | **Only** from a player's page or quick view (and GM Plan / Live Draft links on W) | Free | **One hidden way in** on both |
 | League Rankings (power) | `/league-rankings/[id]` | `Teams` | Nav, orb, Dashboard rank strip | Free | |
-| Playoff Odds | `/league-rankings/[id]#playoff-odds` | `PlayoffOdds` | Nav, orb, Games | **Pro** | W is a section of League Rankings; A is its own screen |
+| Playoff Odds | `/league-rankings/[id]#playoff-odds` | `Teams` (`initialTab: 'playoff'`) | Nav, orb (via League Rankings), Games | **Pro** | W is a section of League Rankings; A is the Playoff Odds tab of League Rankings (old `PlayoffOdds` route redirects) |
 | Trade ideas ("Trade Hub", A "Trade Block") | `/trade-hub/[id]` | `Trades` tab `block` | Nav, orb, Dashboard trades block, Start here | Part (free sees a few ideas) | |
 | Trade Analyzer | `/trade-analyzer/[id]` | `Trades` tab `make` | **Tab inside Trade Hub**, "Add to Trade" in quick view, shared deep links. No nav row on purpose | Free | Deep tab, not in nav |
 | Trade Finder | `/trade-finder/[id]` | `Trades` tab `search` | **Tab inside Trade Hub**, "Find trades" in quick view | **Pro** | Deep tab, not in nav |
@@ -71,7 +71,7 @@ The user-facing version of this list is the in-app page "What FantasyDesk can do
 ## 5. Web vs app differences worth knowing
 
 - Trades: W has `/trade-hub`, `/trade-analyzer`, `/trade-finder` as separate pages with tabs; A has one `Trades` screen with three tabs.
-- Playoff Odds: W is a section of League Rankings; A is its own screen.
+- Playoff Odds: W is a section of League Rankings; A is the Playoff Odds tab of the League Rankings screen (`PlayoffOdds` route is a redirect alias).
 - Dashboard playoff-odds strip: A only.
 - Team Situation / GM Targets: both are sections of GM Plan; A also has a header stance button and a More row.
 - Live Draft: A has an extra row in More. Guess leaderboard: A only in More, W only from the Guess cards.

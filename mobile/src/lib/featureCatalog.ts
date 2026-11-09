@@ -30,8 +30,8 @@ export interface FeatureItem {
   pro?: boolean;
   extra?: string;
   route: string;
-  /** Extra route params (Trades tab). */
-  tab?: 'block' | 'search' | 'make';
+  /** Extra route params: the Trades tab, or the League Rankings tab. */
+  tab?: 'block' | 'search' | 'make' | 'rankings' | 'playoff';
   /** Needs leagueId + leagueName; otherwise opens with no params. */
   leagueScoped: boolean;
   icon: string;
@@ -57,10 +57,10 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
 
   { id: 'players', group: 'scout', name: 'Players', line: 'Search any player for value, stats, trends and news.', route: 'Players', leagueScoped: true, icon: 'people-outline', color: 'violet' },
   { id: 'college-scouting', group: 'scout', name: 'College Scouting', line: 'Grade incoming prospects and keep a watchlist.', pro: true, route: 'CollegeProspects', leagueScoped: false, icon: 'school-outline', color: 'accent' },
-  { id: 'league-rankings', group: 'scout', name: 'League Rankings', line: 'Power rankings for every team in your league.', route: 'Teams', leagueScoped: true, icon: 'people-circle-outline', color: 'violet' },
+  { id: 'league-rankings', group: 'scout', name: 'League Rankings', line: 'Power rankings for every team in your league.', route: 'Teams', tab: 'rankings', leagueScoped: true, icon: 'people-circle-outline', color: 'violet' },
 
   { id: 'commissioner', group: 'league', name: 'Commissioner', line: 'League integrity, plus a trade veto calculator.', pro: true, route: 'Commissioner', leagueScoped: true, icon: 'shield-checkmark-outline', color: 'violet' },
-  { id: 'playoff-odds', group: 'league', name: 'Playoff Odds', line: "Every team's chance at the playoffs.", pro: true, route: 'PlayoffOdds', leagueScoped: true, icon: 'podium-outline', color: 'violet' },
+  { id: 'playoff-odds', group: 'league', name: 'Playoff Odds', line: "Every team's chance at the playoffs.", pro: true, route: 'Teams', tab: 'playoff', leagueScoped: true, icon: 'podium-outline', color: 'violet' },
   { id: 'games', group: 'league', name: 'Games', line: "Season simulator and weekly pick'em.", route: 'Games', leagueScoped: true, icon: 'dice-outline', color: 'violet' },
   { id: 'league-recaps', group: 'league', name: 'League Recaps', line: "Your league's weekly recap and stories.", route: 'Recap', leagueScoped: true, icon: 'newspaper-outline', color: 'violet' },
 
