@@ -65,7 +65,9 @@ export default function TodayHero({
       const actionable = Boolean(row.cta_label && row.route);
       const content = (
         <>
-          <ToneBadge label={row.status} color={color} />
+          <View style={styles.rowBadge}>
+            <ToneBadge label={row.status} color={color} />
+          </View>
           <View style={styles.rowText}>
             <AppText style={styles.headline} numberOfLines={1}>
               {row.headline}
@@ -151,6 +153,7 @@ function createStyles(colors: ThemeColors) {
     cta: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+    rowBadge: { width: 88, alignItems: 'flex-start' },
     rowText: { flex: 1, minWidth: 0 },
     arrow: { fontSize: 16, color: colors.accent },
     laterLabel: {

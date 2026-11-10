@@ -116,7 +116,9 @@ export function DashboardNeedsAttention({
             onPress={() => onNavigate(routeFor(entry), { leagueId, leagueName })}
             style={[styles.attentionRow, index > 0 && styles.attentionDivider]}
           >
-            <ToneBadge label={entry.badge} color={colors.danger} size="xs" />
+            <View style={styles.attentionBadge}>
+              <ToneBadge label={entry.badge} color={colors.danger} size="xs" />
+            </View>
             <View style={styles.attentionText}>
               <AppText style={styles.holdHeadline} numberOfLines={1}>
                 {entry.headline}
@@ -174,7 +176,7 @@ export function DashboardTradesBlock({
         <AppText style={styles.tradeLineText} numberOfLines={2}>
           {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
         </AppText>
-        <AppText style={styles.link}>{TRADES_BLOCK_COPY.link} ›</AppText>
+        <AppText style={styles.link} numberOfLines={1}>{TRADES_BLOCK_COPY.link} ›</AppText>
       </Pressable>
     </View>
   );
@@ -195,7 +197,7 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
         style={styles.moreHeader}
       >
         <AppText style={styles.moreTitle}>MORE</AppText>
-        <AppText style={styles.moreHint}>League activity, games, settings</AppText>
+        <AppText style={styles.moreHint} numberOfLines={1}>League activity, games, settings</AppText>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
       </Pressable>
       {open ? <View style={styles.moreBody}>{children}</View> : null}
@@ -219,9 +221,10 @@ function createStyles(colors: ThemeColors) {
     },
     chipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textTertiary },
     chipValue: { fontSize: 14, fontWeight: '700' },
-    block: { gap: spacing.sm },
+    block: { gap: spacing.md },
     attentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     attentionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+    attentionBadge: { width: 88, alignItems: 'flex-start' },
     attentionText: { flex: 1, minWidth: 0 },
     tradeLine: {
       flexDirection: 'row',
@@ -252,6 +255,6 @@ function createStyles(colors: ThemeColors) {
     },
     moreHint: { flex: 1, textAlign: 'right', marginRight: spacing.sm, fontSize: 11, color: colors.textTertiary },
     moreTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5, color: colors.textPrimary },
-    moreBody: { gap: spacing.md, paddingTop: spacing.md },
+    moreBody: { gap: spacing.lg, paddingTop: spacing.md },
   });
 }
