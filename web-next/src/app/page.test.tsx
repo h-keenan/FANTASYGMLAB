@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import LandingPage from "./page";
@@ -52,7 +52,14 @@ vi.mock("@/components/OnboardingPaywall", () => ({
   OnboardingPaywall: () => <div>OnboardingPaywall</div>,
 }));
 vi.mock("@/components/SleeperImportForm", () => ({
-  SleeperImportForm: () => <div>SleeperImportForm</div>,
+  SleeperImportForm: ({ onLeagueChosen }: { onLeagueChosen: (id: string, name: string) => void }) => (
+    <div>
+      SleeperImportForm
+      <button type="button" onClick={() => onLeagueChosen("L1", "My League")}>
+        choose-league
+      </button>
+    </div>
+  ),
 }));
 
 type MockSession = { user: { id: string } };
@@ -384,13 +391,24 @@ describe("LandingPage onboarding progress persistence", () => {
     window.localStorage.clear();
   });
 
-  it("does not replay the carousel for a signed-in account that already finished it", async () => {
+  it("does not replay the carousel for a signed-in account that already finished it, and connects BEFORE the trial offer", async () => {
     window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
     mockAuth({ user: { id: "user-1" } });
     mockSavedLeagues({ data: [] });
     render(<LandingPage />);
-    expect(await screen.findByText("OnboardingPaywall")).toBeInTheDocument();
+    expect(await screen.findByText(/SleeperImportForm/)).toBeInTheDocument();
     expect(screen.queryByText("OnboardingCarousel")).toBeNull();
+    expect(screen.queryByText("OnboardingPaywall")).toBeNull();
+  });
+
+  it("shows the trial offer after a league is chosen, then continues to that league on skip", async () => {
+    window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [] });
+    render(<LandingPage />);
+    fireEvent.click(await screen.findByText("choose-league"));
+    expect(await screen.findByText("OnboardingPaywall")).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("goes straight to league connect once carousel and trial offer were both done", async () => {
@@ -435,7 +453,8 @@ describe("LandingPage share-card redesign", () => {
     mockAuth(null);
     render(<LandingPage />);
     expect(screen.getByTestId("sample-league-button")).toHaveAttribute("href", "/sample-league");
-    expect(screen.getByRole("link", { name: "Import your league" })).toHaveAttribute("href", "#get-started");
+    expect(screen.getByRole("link", { name: "Create account and connect league" })).toHaveAttribute("href", "#get-started");
+    expect(screen.getByText(/Dynasty = fantasy leagues where you keep your players year to year/)).toBeInTheDocument();
     expect(document.getElementById("get-started")).not.toBeNull();
   });
 

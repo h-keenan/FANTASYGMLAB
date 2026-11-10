@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
+import { HelpLink } from "@/components/HelpLink";
 import { EmptyStateGlyph, StateIconRing } from "@/components/EmptyState";
 import { trackClientError } from "@/lib/analytics";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -82,6 +83,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
                 Try again
               </Button>
             ) : null}
+            <HelpLink context={{ topic: "error_state", detail: technical ? null : message }} className="mt-1" />
           </div>
         </div>
       </AccentCard>

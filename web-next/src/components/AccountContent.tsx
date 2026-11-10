@@ -1,5 +1,6 @@
 "use client";
 
+import { HelpLink } from "@/components/HelpLink";
 import { PageTitle } from "@/components/PageTitle";
 import { useState } from "react";
 
@@ -162,18 +163,24 @@ const GOAL_OPTIONS = (Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]).
 /** The onboarding carousel's "How much dynasty experience do you have?"
  * answer, editable later. Reads/writes through ExperienceLevelContext (the
  * same /v1/preferences field), so the change applies across the app right
- * away. An unanswered account (null) shows Veteran dynasty manager, which
- * is how it already behaves. */
+ * away. An unanswered account (null) shows "Not set" with no option
+ * selected (it gets beginner-lite help until answered). */
 function ExplanationsSetting() {
   const { level, setLevel } = useExperienceLevel();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const active: ExperienceLevel = level ?? "advanced";
+  const active: ExperienceLevel | null = level;
 
   return (
     <div className="flex flex-col gap-2">
       <span id="account-explanations-label" className="text-sm font-semibold">
-        Dynasty experience
+        Explanations
+        {level === null ? (
+          <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>
+            {" "}
+            · Not set
+          </span>
+        ) : null}
       </span>
       <div
         role="radiogroup"
@@ -405,6 +412,7 @@ function AccountActionsSection({
       >
         Replay the tour
       </button>
+      <HelpLink context={{ topic: "account" }} className="self-start" />
       {replaying ? <OnboardingCarousel replay onDone={() => setReplaying(false)} /> : null}
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>

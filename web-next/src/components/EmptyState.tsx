@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/Button";
+import { HelpLink } from "@/components/HelpLink";
 
 /** Default glyph for an empty list/panel (inbox tray) or an error (alert triangle); currentColor outline. */
 export function EmptyStateGlyph({ name = "inbox", size = 22 }: { name?: "inbox" | "alert"; size?: number }) {
@@ -62,6 +63,7 @@ export function EmptyState({
   icon,
   accent = "var(--color-accent)",
   centered = false,
+  helpTopic,
 }: {
   title: string;
   subtitle?: string;
@@ -71,6 +73,8 @@ export function EmptyState({
   icon?: ReactNode;
   accent?: string;
   centered?: boolean;
+  /** Adds the shared help link (for empties that may be a bug, not just "nothing yet"). */
+  helpTopic?: string;
 }) {
   return (
     <div
@@ -94,6 +98,7 @@ export function EmptyState({
             {actionLabel}
           </Button>
         ) : null}
+        {helpTopic ? <HelpLink context={{ topic: helpTopic }} className="mt-1" /> : null}
       </div>
     </div>
   );

@@ -45,8 +45,8 @@ export function BeginnerHelp({
   className?: string;
 }) {
   const copy = useExperienceCopy();
-  const single = text !== undefined ? (copy.isBeginner ? text : null) : term ? copy.help(term) : null;
-  const resolvedLines = lines ? (copy.isBeginner ? lines.filter((l): l is string => Boolean(l)) : []) : single ? [single] : [];
+  const single = text !== undefined ? (copy.showsHelp ? text : null) : term ? copy.help(term) : null;
+  const resolvedLines = lines ? (copy.showsHelp ? lines.filter((l): l is string => Boolean(l)) : []) : single ? [single] : [];
   const [dismissed, setDismissed] = useState(false);
   const [open, setOpen] = useState(false);
   const seen = useSyncExternalStore(

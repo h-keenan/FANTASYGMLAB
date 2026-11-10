@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 const SHARE_HEADLINE = "Someone shared a FantasyDesk trade verdict. Get yours for your own league.";
 
 const STEPS = [
-  { title: "Connect your league", body: "Use your Sleeper username, or a public ESPN, Fleaflicker or MFL league." },
+  { title: "Connect your league", body: "Use your Sleeper username, an ESPN league ID, or a public Fleaflicker or MFL league." },
   { title: "We read your roster", body: "Real player values, matched to your lineup, depth and what each manager needs." },
   { title: "Get your next move", body: "A clear verdict on trades, waivers and your lineup, with the reasons why. Full tools run on Sleeper leagues today." },
 ] as const;
@@ -108,10 +108,11 @@ export default function LandingPage() {
               Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front
               office would.
             </p>
+            <p className="lp-note">Dynasty = fantasy leagues where you keep your players year to year.</p>
             <div className="lp-cta">
               <SampleLeagueButton surface="landing_hero" variant="primary" />
               <a href="#get-started" className="lp-cta-secondary">
-                Import your league
+                Create account and connect league
               </a>
             </div>
             <p className="lp-note">Look around a full sample league free: no account or card needed.</p>
@@ -177,7 +178,7 @@ export default function LandingPage() {
                 and docs/platform-import-status.md: imported leagues get Dashboard,
                 Matchup, My Team, Trade Analyzer, Players and League Rankings. */}
             <p className="lp-note lp-marketing">
-              Works with Sleeper leagues, plus public ESPN, Fleaflicker and MFL leagues (Dashboard, Matchup, My Team,
+              Works with Sleeper leagues, plus ESPN (private leagues need two ESPN cookies), and public Fleaflicker and MFL leagues (Dashboard, Matchup, My Team,
               Trade Analyzer, Players and League Rankings).
             </p>
           </section>
