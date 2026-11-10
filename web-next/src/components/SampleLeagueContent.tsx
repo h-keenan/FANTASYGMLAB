@@ -89,7 +89,7 @@ function RosterTab() {
 function GamePlanTab({ onNavigate }: { onNavigate: (tab: SampleTab) => void }) {
   return (
     <section className="flex flex-col gap-2" aria-labelledby="sample-plan-heading">
-      <SectionHeading id="sample-plan-heading">Game Plan</SectionHeading>
+      <SectionHeading id="sample-plan-heading">Today</SectionHeading>
       {SAMPLE_GAME_PLAN.map((item) => (
         <AccentCard key={item.headline} accent="var(--color-accent)">
           <span className="uppercase" style={{ font: "var(--type-badge-size)", letterSpacing: "var(--letter-spacing-badge)", color: "var(--color-accent)" }}>

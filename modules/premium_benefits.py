@@ -111,7 +111,7 @@ def premium_comparison() -> list[dict[str, str]]:
     return [
         {
             "key": "next_moves",
-            "label": "Next Moves",
+            "label": "Today",
             "free": f"Top {FREE_NEXT_MOVE_ITEMS}",
             "pro": "Your full briefing",
         },

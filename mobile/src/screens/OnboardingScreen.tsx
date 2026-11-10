@@ -49,7 +49,7 @@ type ColorKey = 'accent' | 'premium' | 'success';
 // value step auto-advances through VALUE_SLIDE_KEYS inside one step; the full
 // 8-screen list is only used by the replay tour (More > Replay the tour).
 const FEATURES = [
-  { key: 'gameplan', title: 'Game Plan', benefit: 'One clear top priority every time you open the app.', image: require('../../assets/onboarding/onboarding-gameplan.webp') },
+  { key: 'gameplan', title: 'Today', benefit: 'One clear top priority every time you open the app.', image: require('../../assets/onboarding/onboarding-gameplan.webp') },
   { key: 'tradehub', title: 'Trade Hub', benefit: 'Trade ideas your league partners would actually accept.', image: require('../../assets/onboarding/onboarding-tradehub.webp') },
   { key: 'matchup', title: 'Matchup', benefit: 'Win odds for your week, before kickoff.', image: require('../../assets/onboarding/onboarding-matchup.webp') },
   { key: 'planner', title: 'Lineup Planner', benefit: 'See what a swap does to your win odds.', image: require('../../assets/onboarding/onboarding-planner.webp') },

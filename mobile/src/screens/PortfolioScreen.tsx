@@ -65,7 +65,7 @@ function recordLabel(league: PortfolioLeague): string {
  *
  * One continuous grouped surface with internal dividers (Magna Carta §12),
  * not a separately-bordered card per league: each row is a league identity +
- * record/rank header, plus that league's single highest-priority Next Move
+ * record/rank header, plus that league's single highest-priority item from Today
  * tile rendered with the shared InsightRow (§28) — the same "top need or
  * opportunity" headline the Dashboard itself leads with, not a new summary.
  * Tapping a row jumps straight into that league's own Dashboard, the same
@@ -600,7 +600,7 @@ function PortfolioLeagueCard({
             ))}
           </View>
         ) : (
-          <AppText style={styles.emptySignals}>Open this league to see your Next Move.</AppText>
+          <AppText style={styles.emptySignals}>Open this league to see what to do today.</AppText>
         )}
         <TouchableOpacity onPress={onPress} hitSlop={8} accessibilityRole="link" style={styles.openLink}>
           <AppText style={styles.linkText} numberOfLines={1}>

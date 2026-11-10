@@ -29,13 +29,15 @@ function selectOpeningTags(src: string): string[] {
       else if (ch === "}") depth -= 1;
       else if (ch === ">" && depth === 0 && src[i - 1] !== "=") break;
     }
-    tags.push(src.slice(start, i + 1));
+    const before = src.slice(0, start);
+    const wrapped = before.lastIndexOf("<label") > before.lastIndexOf("</label>");
+    tags.push(wrapped ? `${src.slice(start, i + 1)} aria-label="wrapped-in-label"` : src.slice(start, i + 1));
     from = i + 1;
   }
 }
 
 describe("native <select> accessibility", () => {
-  it("gives every <select> in components an accessible name (aria-label, aria-labelledby, id for a <label>, or a props spread from a wrapper)", () => {
+  it("gives every <select> in components an accessible name (aria-label, aria-labelledby, id for a <label>, being wrapped in a <label>, or a props spread from a wrapper)", () => {
     const unlabeled: string[] = [];
     for (const file of walk(COMPONENTS)) {
       for (const tag of selectOpeningTags(readFileSync(file, "utf8"))) {

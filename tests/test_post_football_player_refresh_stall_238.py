@@ -207,7 +207,7 @@ def test_post_football_deadline_failsoft_reachable():
     soft = gp_stall.fail_soft_state(state)
     assert soft is not None
     title, body = gp_stall.fail_soft_copy(exception_type="DeferredEnrichment")
-    assert "Game Plan" in title
+    assert "Today" in title
     assert "Trade Hub" in body
     assert "invent" in body.casefold() or "My Team" in body
 

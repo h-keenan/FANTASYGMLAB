@@ -39,6 +39,7 @@ export const IDENTICAL = [
   "simPresentation.ts",
   "startHere.ts",
   "startSitRange.ts",
+  "terms.ts",
   "tradeValueBands.generated.ts",
   "verdictText.ts",
 ];
@@ -52,6 +53,7 @@ export const MIRRORED = [
   "glossary.ts",
   "paidPreviews.ts",
   "playerNameFixtures.ts",
+  "paywallCopy.ts",
   "premiumComparison.ts",
   "sleeperConnectErrors.ts",
   "support.ts",

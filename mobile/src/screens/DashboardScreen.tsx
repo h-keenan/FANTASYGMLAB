@@ -296,7 +296,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // full-page error when there's truly nothing to show instead.
   const error =
     dashboardQuery.isError && !dashboardData
-      ? toUserErrorMessage(dashboardQuery.error, 'Failed to load your Next Move briefing.')
+      ? toUserErrorMessage(dashboardQuery.error, 'Failed to load Today.')
       : null;
 
   // Diffs each successful dashboard payload's recommendation ids against
@@ -393,7 +393,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   if (notReadyReason) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <EmptyState icon="time-outline" title="Not ready yet" subtitle={NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."} />
+        <EmptyState icon="time-outline" title="Not ready yet" subtitle={NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build Today for this league."} />
         <TodayHero
           thisWeek={dashboardData?.this_week}
           leagueId={leagueId}
@@ -641,7 +641,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
 const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
-    "Link your Sleeper username on the web app first — the Next Move briefing needs to know which roster is yours.",
+    "Link your Sleeper username on the web app first — Today needs to know which roster is yours.",
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: "This roster doesn't have any players yet.",

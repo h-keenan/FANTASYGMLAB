@@ -351,7 +351,7 @@ describe("LandingPage hero subtitle", () => {
   it("is not hidden on phone widths", () => {
     mockAuth(null, false);
     render(<LandingPage />);
-    const sub = screen.getByText(/Roster-aware dynasty trades, waivers and a weekly Game Plan/);
+    const sub = screen.getByText(/Roster-aware dynasty trades, waivers and a weekly game plan/);
     expect(sub.className).not.toMatch(/\bhidden\b/);
   });
 });
