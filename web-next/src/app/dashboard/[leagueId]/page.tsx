@@ -74,13 +74,14 @@ export default function DashboardPage() {
           setError(null);
           return;
         }
-        // An empty/quiet first pass would flash the "all quiet" state until
-        // the real answer lands, so keep the skeleton in that case.
-        const painted = !result.quiet && result.items.length > 0;
-        if (painted) {
-          setData(result);
-          setError(null);
-        }
+        // Always paint the first pass: the trade rows keep their reserved
+        // skeleton (TodayModule/DashboardBlocks key off trade_ideas_deferred)
+        // and the "all quiet" state is suppressed while the trade check is
+        // pending, so nothing flashes. Waiting for the full call used to leave
+        // a blank skeleton for the whole trade-idea search.
+        const painted = true;
+        setData(result);
+        setError(null);
         return loadFull().catch((err) => {
           // Keep an already-painted first pass if the follow-up fails.
           if (!cancelled && !painted) setError(err instanceof Error ? err.message : "Could not load the Dashboard.");

@@ -88,14 +88,16 @@ export function TodayModule({
       >
         {todayTitle(thisWeek)}
       </SectionHeading>
-      <FreeLimitNote
-        kind="window"
-        noun="next moves"
-        limit={data.entitlement.free_limit}
-        total={data.entitlement.visible_count + data.entitlement.hidden_count}
-        shown={data.entitlement.visible_count}
-        isPremium={data.entitlement.is_premium}
-      />
+      {hidden > 0 && !data.entitlement.is_premium ? null : (
+        <FreeLimitNote
+          kind="window"
+          noun="next moves"
+          limit={data.entitlement.free_limit}
+          total={data.entitlement.visible_count + data.entitlement.hidden_count}
+          shown={data.entitlement.visible_count}
+          isPremium={data.entitlement.is_premium}
+        />
+      )}
 
       {nextAction ? (
         <AccentCard accent="var(--color-accent)" compact glow>
@@ -138,7 +140,7 @@ export function TodayModule({
 
       {tradePending ? <SkeletonBlock height={64} data-fgl-this-week-trade-pending="true" /> : null}
 
-      {plan.isEmpty && hidden === 0 ? (
+      {plan.isEmpty && hidden === 0 && !tradePending ? (
         <EmptyState
           title={
             notReadyReasonMessage(data.reason, {
@@ -152,17 +154,21 @@ export function TodayModule({
       ) : null}
 
       {hidden > 0 ? (
-        <div
-          className="p-4 flex flex-col gap-2 premium-glow-card"
-          style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
+        // One compact tappable line; the free-limit note above is dropped when
+        // this shows, so the upsell never appears twice.
+        <Link
+          href="/premium"
+          className="glass-surface flex items-center justify-between gap-2 px-3"
+          style={{ minHeight: 44, border: "var(--border-width-default) solid var(--color-premium)", color: "inherit", textDecoration: "none" }}
+          data-testid="more-moves-upsell"
         >
-          <p className="text-sm font-bold">
-            {hidden} more move{hidden === 1 ? "" : "s"} available on Pro.
-          </p>
-          <ButtonLink href="/premium" variant="premium" size="sm">
+          <span className="text-sm font-bold">
+            {hidden} more move{hidden === 1 ? "" : "s"} on Pro
+          </span>
+          <span className="text-sm font-bold shrink-0" style={{ color: "var(--color-premium)" }}>
             Upgrade →
-          </ButtonLink>
-        </div>
+          </span>
+        </Link>
       ) : null}
     </section>
   );
