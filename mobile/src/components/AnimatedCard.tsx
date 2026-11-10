@@ -132,6 +132,8 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.lg,
     padding: 1.5,
   },
-  cardGlowInner: { borderWidth: 0 },
+  // Opaque fill: the translucent glass card would otherwise let the solid
+  // rim color show through and read as a garish full-card tint.
+  cardGlowInner: { borderWidth: 0, backgroundColor: colors.surface },
   });
 }

@@ -856,7 +856,7 @@ function createStyles(colors: ThemeColors) {
   // color — a $0 FAAB add shouldn't visually compete with the featured
   // row's bold colored number directly above it in the same group.
   metricValue: { fontSize: 16.5, fontWeight: '600', color: colors.textSecondary },
-  metricLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  metricLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   matchupTeamGroup: { flex: 1, alignItems: 'center', gap: 4 },
   matchupTeam: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   matchupTeamMuted: { color: colors.textSecondary, fontWeight: '500' },

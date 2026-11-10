@@ -524,12 +524,27 @@ export const typography = {
   title: { fontSize: 24, fontWeight: '700' as const },
   heading: { fontSize: 19, fontWeight: '600' as const },
   body: { fontSize: 16, fontWeight: '400' as const },
-  bodyMuted: { fontSize: 14, fontWeight: '400' as const },
-  label: { fontSize: 13, fontWeight: '600' as const },
-  kicker: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.8 },
-  caption: { fontSize: 12, fontWeight: '500' as const },
-  badge: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 0.3 },
+  bodyMuted: { fontSize: 15, fontWeight: '400' as const },
+  label: { fontSize: 13.5, fontWeight: '600' as const },
+  kicker: { fontSize: 12.5, fontWeight: '600' as const, letterSpacing: 0.8 },
+  caption: { fontSize: 13, fontWeight: '500' as const },
+  badge: { fontSize: 12, fontWeight: '800' as const, letterSpacing: 0.3 },
 };
+
+/**
+ * Minimum rendered sizes per role (2026-11-10 second pass). Enforced by
+ * src/lib/typographyMinimums.test.ts, which also fails on any new fontSize
+ * literal below FLOOR_FONT_SIZE outside the documented exceptions.
+ */
+export const TYPOGRAPHY_MINIMUMS = {
+  body: 15,
+  bodyMuted: 13,
+  label: 13,
+  kicker: 12,
+  caption: 12,
+  badge: 12,
+} as const;
+export const FLOOR_FONT_SIZE = 12;
 
 /** Ceiling for OS Dynamic Type on text (AppText default maxFontSizeMultiplier). */
 export const MAX_FONT_SCALE = 1.25;

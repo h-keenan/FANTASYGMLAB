@@ -118,6 +118,6 @@ function createStyles(colors: ThemeColors) {
     context: { fontSize: 12.5, color: colors.textTertiary, marginTop: 1 },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
-    trailingCaption: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
+    trailingCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
   });
 }

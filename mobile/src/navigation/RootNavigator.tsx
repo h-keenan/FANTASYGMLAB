@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { CollegeProspect, DraftPickAsset, RankedPlayer } from '../lib/api';
+import HeaderBackdrop from '../components/HeaderBackdrop';
 import BrandMark from '../components/BrandMark';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
@@ -294,6 +295,9 @@ export default function RootNavigator() {
             // since a transparent header no longer reserves layout space.
             headerTransparent: true,
             headerStyle: { backgroundColor: 'transparent' },
+            // Blurred/opaque backdrop so scrolling content never shows
+            // through the title and header chips (see HeaderBackdrop).
+            headerBackground: () => <HeaderBackdrop />,
             headerTintColor: colors.textPrimary,
             headerShadowVisible: false,
             headerTitleAlign: 'center',
