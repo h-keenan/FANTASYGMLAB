@@ -399,6 +399,7 @@ export default function RecapScreen({ route, navigation }: Props) {
         story={tradeStory}
         primaryAvatarId={avatarFor(rosterMap, tradeStory?.primary_roster_id)}
         secondaryAvatarId={avatarFor(rosterMap, tradeStory?.secondary_roster_id)}
+        avatarForRoster={(rosterId) => avatarFor(rosterMap, rosterId)}
       />
     </View>
   );

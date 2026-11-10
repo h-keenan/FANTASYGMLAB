@@ -812,15 +812,24 @@ def _trade_story(
     if len(sides) < 2:
         return None
     left, right = sides[0], sides[1]
-    left_name = _team_name(left)
-    right_name = _team_name(right)
-    if left_name == "Unknown team" or right_name == "Unknown team":
+    names = [_team_name(side) for side in sides]
+    if any(name == "Unknown team" for name in names):
         return None
-    left_gets = ", ".join(_player_names(left.get("receives") or [])[:3]) or "assets"
-    right_gets = ", ".join(_player_names(right.get("receives") or [])[:3]) or "assets"
+    left_name, right_name = names[0], names[1]
     lenses, editorial = _trade_lenses(item)
     title = _pick_template(fingerprint, ("Trade of the week", "The move of the week", "Notable trade"))
-    summary = f"{left_name} received {left_gets}; {right_name} received {right_gets}."
+    if len(sides) == 2:
+        left_gets = ", ".join(_player_names(left.get("receives") or [])[:3]) or "assets"
+        right_gets = ", ".join(_player_names(right.get("receives") or [])[:3]) or "assets"
+        summary = f"{left_name} received {left_gets}; {right_name} received {right_gets}."
+    else:
+        parts = [
+            f"{name} received "
+            f"{', '.join(_player_names(side.get('receives') or [])[:3]) or 'assets'}"
+            for name, side in zip(names, sides)
+        ]
+        summary = f"{len(sides)}-team trade: " + "; ".join(parts) + "."
+        title = f"{len(sides)}-team trade"
     return _story(
         story_type=STORY_TRADE,
         title=title,
@@ -828,8 +837,7 @@ def _trade_story(
         glyph="trade",
         primary_team=left_name,
         secondary_team=right_name,
-        players=_player_names(left.get("receives") or [])[:2]
-        + _player_names(right.get("receives") or [])[:2],
+        players=[name for side in sides for name in _player_names(side.get("receives") or [])[:2]],
         history_filter=history.FILTER_TRADES,
         history_week=week,
         source_event_ids=(_text(item.get("transaction_id")),),
@@ -844,6 +852,17 @@ def _trade_story(
             # field above, which stays truncated to 2-per-side for the card.
             "left_assets": _trade_side_assets(left),
             "right_assets": _trade_side_assets(right),
+            # Every participating team (3+ team trades); left/right above stay
+            # for older app builds.
+            "team_count": len(sides),
+            "sides": [
+                {
+                    "team_name": name,
+                    "roster_id": _roster_id_str(side.get("roster_id")),
+                    "assets": _trade_side_assets(side),
+                }
+                for name, side in zip(names, sides)
+            ],
         },
     )
 

@@ -2956,6 +2956,9 @@ export interface RecapStory {
   confidence: string;
   editorial_label?: string;
   history_filter?: string;
+  /** Trade stories: every participating team (3+ team trades carry all). */
+  team_count?: number;
+  sides?: { team_name: string; roster_id: string }[];
 }
 
 export interface WeeklyRecap {

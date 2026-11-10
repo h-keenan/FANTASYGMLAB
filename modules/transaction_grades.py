@@ -97,6 +97,41 @@ def _side_assets(side: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [dict(asset) for asset in side.get("receives") or [] if isinstance(asset, Mapping)]
 
 
+def _sent_assets_per_side(
+    sides: Sequence[Mapping[str, Any]],
+    received: Sequence[Sequence[Mapping[str, Any]]],
+) -> list[list[dict[str, Any]]]:
+    """Assets each side sent away, one list per side.
+
+    Two-team trades are a pure swap: what a side gave is what the other
+    received. With three or more teams that is false (A's gift may go to C), so
+    each side's outgoing set is built from its own edges (an explicit
+    ``sent`` list if given, else players it dropped plus picks whose previous owner is that roster).
+    """
+    if len(sides) == 2:
+        return [[dict(a) for a in received[1]], [dict(a) for a in received[0]]]
+    all_picks = [
+        asset
+        for assets in received
+        for asset in assets
+        if _is_pick(asset)
+    ]
+    given: list[list[dict[str, Any]]] = []
+    for side in sides:
+        if isinstance(side.get("sent"), Sequence) and not isinstance(side.get("sent"), str):
+            # Caller already resolved this side's outgoing edge list.
+            given.append([dict(a) for a in side["sent"] if isinstance(a, Mapping)])
+            continue
+        roster_id = _text(side.get("roster_id"))
+        sent = [dict(a) for a in side.get("drops") or [] if isinstance(a, Mapping)]
+        if roster_id:
+            sent.extend(
+                dict(a) for a in all_picks if _text(a.get("from_roster_id")) == roster_id
+            )
+        given.append(sent)
+    return given
+
+
 def _player_ids(assets: Sequence[Mapping[str, Any]]) -> set[str]:
     return {_text(asset.get("player_id")) for asset in assets if _text(asset.get("player_id"))}
 
@@ -263,11 +298,10 @@ def grade_trade(
             "sides": [_empty_side(team)],
         }
 
-    received = [_side_assets(side) for side in sides[:2]]
-    # What a side gave is what the other side received.
-    given = [received[1], received[0]]
+    received = [_side_assets(side) for side in sides]
+    given = _sent_assets_per_side(sides, received)
     graded_sides: list[dict[str, Any]] = []
-    for index, side in enumerate(sides[:2]):
+    for index, side in enumerate(sides):
         team = _text(side.get("team_name"), "Unknown team")
         coverage = _coverage(received[index], given[index], lookup)
         now_in, now_in_n = _sum_values(received[index], lambda asset: _lookup_current(asset, lookup))
