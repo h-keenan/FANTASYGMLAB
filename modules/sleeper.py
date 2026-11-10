@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import requests
 
-from modules import performance, sleeper_budget
+from modules import performance, sleeper_budget, sleeper_cache
 from modules.file_lock import ExclusiveFileLock
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
@@ -1386,13 +1386,25 @@ def _live_league_cache_bucket() -> int:
     return int(time.time() // LIVE_LEAGUE_ENDPOINT_TTL_SECONDS)
 
 
+def _live_league_json(label: str, url: str):
+    """Live league GET through the cluster-wide single-flight cache
+    (modules.sleeper_cache): one upstream call per URL per TTL across all
+    workers, last real payload served if Sleeper errors."""
+
+    return sleeper_cache.shared_json(
+        url,
+        ttl=LIVE_LEAGUE_ENDPOINT_TTL_SECONDS,
+        fetch=lambda: _request_json(label, url, timeout=5),
+    )
+
+
 @lru_cache(maxsize=128)
 def _get_users_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/users"
     try:
-        users = _request_json("sleeper_league_users", url, timeout=5)
+        users = _live_league_json("sleeper_league_users", url)
         return users if isinstance(users, list) else []
     except Exception:
         return []
@@ -1434,7 +1446,7 @@ def _get_rosters_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/rosters"
     try:
-        rosters = _request_json("sleeper_league_rosters", url, timeout=5)
+        rosters = _live_league_json("sleeper_league_rosters", url)
         return rosters if isinstance(rosters, list) else []
     except Exception:
         return []
@@ -1455,7 +1467,7 @@ def _get_league_cached(league_id: str, _bucket: int) -> Dict[str, Any]:
         return {}
     url = f"{SLEEPER_BASE}/league/{league_id}"
     try:
-        league = _request_json("sleeper_league", url, timeout=5)
+        league = _live_league_json("sleeper_league", url)
         return league if isinstance(league, dict) else {}
     except Exception:
         return {}
@@ -1521,7 +1533,7 @@ def _get_traded_picks_cached(league_id: str, _bucket: int) -> List[Dict[str, Any
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/traded_picks"
     try:
-        picks = _request_json("sleeper_traded_picks", url, timeout=5)
+        picks = _live_league_json("sleeper_traded_picks", url)
         return picks if isinstance(picks, list) else []
     except Exception:
         return []
@@ -1552,7 +1564,7 @@ def _get_transactions_cached(league_id: str, round_num: int, _bucket: int) -> Li
 
     url = f"{SLEEPER_BASE}/league/{league_id}/transactions/{round_num}"
     try:
-        transactions = _request_json("sleeper_transactions", url, timeout=5)
+        transactions = _live_league_json("sleeper_transactions", url)
         return transactions if isinstance(transactions, list) else []
     except Exception:
         return []
@@ -1585,6 +1597,7 @@ def clear_live_league_endpoint_caches() -> None:
     _get_traded_picks_cached.cache_clear()
     _get_transactions_cached.cache_clear()
     _get_matchups_cached.cache_clear()
+    sleeper_cache.clear_local()
 
 
 @lru_cache(maxsize=512)
@@ -1600,7 +1613,7 @@ def _get_matchups_cached(league_id: str, round_num: int, _bucket: int) -> List[D
 
     url = f"{SLEEPER_BASE}/league/{league_id}/matchups/{round_num}"
     try:
-        matchups = _request_json("sleeper_matchups", url, timeout=5)
+        matchups = _live_league_json("sleeper_matchups", url)
         return matchups if isinstance(matchups, list) else []
     except Exception:
         return []

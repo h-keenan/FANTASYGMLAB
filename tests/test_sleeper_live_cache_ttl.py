@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-from modules import sleeper
+from modules import sleeper, sleeper_cache
 
 
 def _clear_all():
@@ -46,6 +46,7 @@ def test_get_league_refetches_once_the_ttl_bucket_advances():
     with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
         with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
             first = sleeper.get_league("L1")
+        sleeper_cache.clear_local()  # the shared TTL layer expires with the bucket
         with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
             second = sleeper.get_league("L1")
     assert first["name"] == "Stale"
@@ -62,6 +63,7 @@ def test_get_rosters_and_get_users_also_expire_on_bucket_advance():
     with patch("requests.get", side_effect=[stale, fresh]):
         with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
             first = sleeper.get_rosters("L1")
+        sleeper_cache.clear_local()  # the shared TTL layer expires with the bucket
         with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
             second = sleeper.get_rosters("L1")
     assert len(first) == 1
@@ -77,6 +79,7 @@ def test_get_traded_picks_expires_on_bucket_advance():
     with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
         with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
             first = sleeper.get_traded_picks("L1")
+        sleeper_cache.clear_local()  # the shared TTL layer expires with the bucket
         with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
             second = sleeper.get_traded_picks("L1")
     assert first == []
@@ -93,6 +96,7 @@ def test_get_transactions_expires_on_bucket_advance():
     with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
         with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
             first = sleeper.get_transactions("L1", 3)
+        sleeper_cache.clear_local()  # the shared TTL layer expires with the bucket
         with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
             second = sleeper.get_transactions("L1", 3)
     assert first == []
@@ -109,6 +113,7 @@ def test_get_matchups_expires_on_bucket_advance():
     with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
         with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
             first = sleeper.get_matchups("L1", 3)
+        sleeper_cache.clear_local()  # the shared TTL layer expires with the bucket
         with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
             second = sleeper.get_matchups("L1", 3)
     assert first[0]["points"] == 90.0
