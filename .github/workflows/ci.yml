@@ -64,6 +64,21 @@ jobs:
       - name: Billing Edge Function tests
         run: deno test --no-lock supabase/functions/_shared/
 
+  lib-twins:
+    # Web and mobile each keep hand-maintained copies of the same pure-TS
+    # libs; this fails when one side drifts. Runs for a change to either tree
+    # (a mobile-only PR never starts the web-next job). No install needed.
+    needs: [classify]
+    if: needs.classify.outputs.mobile_app_changed == 'true' || needs.classify.outputs.web_next_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check web/mobile lib twins
+        run: node scripts/check_lib_twins.mjs
+
   mobile-app:
     needs: [classify]
     if: needs.classify.outputs.mobile_app_changed == 'true'
