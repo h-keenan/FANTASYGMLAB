@@ -12857,7 +12857,7 @@ def test_my_team_weekly_lineup_flags_bye_and_out_players(monkeypatch):
                 response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
 
     body = response.json()
-    mock_context.assert_called_once_with(5)
+    mock_context.assert_called_once_with(5, {"rec": 1.0})
     assert body["week"] == 5
     assert body["lineup_basis"] == "weekly_projection"
     bench = {p["player_id"]: p for p in body["bench"]}
@@ -12876,7 +12876,7 @@ def test_my_team_offseason_keeps_the_season_value_lineup(monkeypatch):
             response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
 
     body = response.json()
-    mock_context.assert_called_once_with(0)
+    mock_context.assert_called_once_with(0, {"rec": 1.0})
     assert body["lineup_basis"] == "season_value"
     assert body["week"] is None
     assert body["open_slots"] == []
@@ -13345,10 +13345,13 @@ def test_matchup_response_carries_a_live_win_probability(monkeypatch):
     win_probability = body["win_probability"]
     assert win_probability["available"] is True
     # My side: Normal(20, 5^2) (not yet started). Opponent: fixed 10 (real,
-    # game over). diff_mean = 10, diff_stdev = 5 -> z = 2.0.
+    # game over). diff_mean = 10, diff_stdev = C * 5 -> z = 2.0 / C, C being the
+    # calibrated spread multiplier (modules.projection_calibration).
     import math
 
-    expected = 0.5 * (1.0 + math.erf(2.0 / math.sqrt(2.0)))
+    from modules.projection_calibration import WIN_PROB_SPREAD_MULTIPLIER
+
+    expected = 0.5 * (1.0 + math.erf(2.0 / WIN_PROB_SPREAD_MULTIPLIER / math.sqrt(2.0)))
     assert win_probability["probability"] == round(expected, 4)
     assert win_probability["my_projected_total"] == 20.0
     assert win_probability["opponent_projected_total"] == 10.0

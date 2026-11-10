@@ -5756,12 +5756,16 @@ def _lineup_hole_waiver_options(
 
 
 def _attach_projection_ppg(
-    valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids: set[str], score_field: str
+    valued: pd.DataFrame,
+    pool: pd.DataFrame | None,
+    player_ids: set[str],
+    score_field: str,
+    lineup_settings: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
     """Weekly projection baselines for the lineup model; shared with the Trade
     Hub / Finder gate (modules.trade_grade.attach_projection_baselines)."""
 
-    return trade_grade.attach_projection_baselines(valued, pool, player_ids, score_field)
+    return trade_grade.attach_projection_baselines(valued, pool, player_ids, score_field, lineup_settings=lineup_settings)
 
 
 _STANCE_UNSET: Any = object()
@@ -6094,6 +6098,7 @@ def _compute_trade_analyzer(
             for pid in (roster.get("players") or [])
         },
         score_field,
+        lineup_settings=settings,
     )
     for code in model_status.frame_codes(valued):
         model_status.add(analyzer_status, code)
@@ -8645,6 +8650,8 @@ def _weekly_projection_for_player(
     weekly_stats: dict[str, Any],
     defense_strength: dict[str, Any],
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None,
+    scoring_settings: dict[str, Any] | None = None,
+    prior_weekly_by_player: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One player's per-game projection for one week, from data already
     fetched once by the caller (never re-reads the season stats cache file
@@ -8667,6 +8674,8 @@ def _weekly_projection_for_player(
         player_weekly_rows=weekly_rows or [],
         defense_strength=defense_strength,
         team_qb_pass_attempts_by_team=team_qb_pass_attempts_by_team,
+        scoring_settings=scoring_settings,
+        prior_weekly_rows=(prior_weekly_by_player or {}).get(str(player_id)),
     )
     summary = _projection_summary_dict(result)
     return _with_game_weather(summary, result)
@@ -8774,6 +8783,7 @@ def get_player_schedule(
                     weekly_stats=weekly_stats,
                     defense_strength=projection_defense_strength,
                     team_qb_pass_attempts_by_team=team_qb_pass_attempts,
+                    prior_weekly_by_player=player_projections.prior_season_weekly_map(season),
                 )
         except Exception:
             # Best-effort enrichment, same "fails soft" contract as every
@@ -8803,7 +8813,7 @@ EXTERNAL_API_KEY_ENV = "FANTASYDESK_EXTERNAL_API_KEY"
 # *field* change (adding/renaming/removing a key) is a separate, breaking-
 # vs-non-breaking concern this constant does not track — see
 # docs/external-api-contract.md's versioning policy for both.
-EXTERNAL_PROJECTIONS_MODEL_VERSION = "v1"
+EXTERNAL_PROJECTIONS_MODEL_VERSION = "v2"
 
 # Sleeper's own player_id already *is* this app's canonical player id (see
 # modules.player_identity.SUPPORTED_DIRECT_PLATFORMS) — this is reported so
@@ -13123,6 +13133,8 @@ def _weekly_lineup_inputs(
                 weekly_stats=projection_context.weekly_stats,
                 defense_strength=projection_context.defense_strength,
                 team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            scoring_settings=projection_context.scoring_settings,
+            prior_weekly_by_player=projection_context.prior_weekly_by_player,
             )
         except Exception:
             projection = None
@@ -13273,7 +13285,9 @@ def get_league_my_team(
         settings,
         score_field,
         players_lookup=my_team_players_lookup,
-        projection_context=_build_projection_context(_league_current_lineup_week(league)),
+        projection_context=_build_projection_context(
+            _league_current_lineup_week(league), league.get("scoring_settings")
+        ),
         meta=lineup_meta,
         idp_result=idp_result,
     )
@@ -13520,7 +13534,7 @@ def get_league_guillotine(
         valued = league_value_settings.build_valued_players_frame_cached(
             league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
         )
-        projection_context = _build_projection_context(week)
+        projection_context = _build_projection_context(week, league.get("scoring_settings"))
         if not valued.empty and projection_context is not None and all(rid in entries for rid in alive_ids):
             settings = league_value_settings.detect_league_value_settings_from_payload(league)
             score_field = league_value_settings.valuation_score_field(lens)
@@ -14105,6 +14119,8 @@ def _project_real_starter_row(
             weekly_stats=projection_context.weekly_stats,
             defense_strength=projection_context.defense_strength,
             team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            scoring_settings=projection_context.scoring_settings,
+            prior_weekly_by_player=projection_context.prior_weekly_by_player,
         )
         if projection_context is not None
         else None
@@ -14136,6 +14152,12 @@ class _ProjectionContext:
     defense_strength: dict[str, Any]
     games: pd.DataFrame | None = None
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None
+    # The league's Sleeper ``scoring_settings``: projections are converted to it
+    # at the source (modules.projection_calibration). None = PPR.
+    scoring_settings: dict[str, Any] | None = None
+    # Last season's weekly rows by player: seeds the estimator so week 1 has a
+    # projection (modules.projection_calibration.seed_with_prior_season).
+    prior_weekly_by_player: dict[str, Any] | None = None
 
 
 def _games_and_warm_weather() -> pd.DataFrame:
@@ -14147,7 +14169,9 @@ def _games_and_warm_weather() -> pd.DataFrame:
     return games
 
 
-def _build_projection_context(week: int) -> "_ProjectionContext | None":
+def _build_projection_context(
+    week: int, scoring_settings: dict[str, Any] | None = None
+) -> "_ProjectionContext | None":
     """The shared per-request projection inputs for one NFL week, or None
     when there's no week or anything fails to load (fails soft: callers
     fall back to the season-value lineup with no per-player projection)."""
@@ -14176,6 +14200,8 @@ def _build_projection_context(week: int) -> "_ProjectionContext | None":
             team_qb_pass_attempts_by_team=player_projections.team_qb_pass_attempts_by_week(
                 players_lookup, weekly_stats
             ),
+            scoring_settings=scoring_settings,
+            prior_weekly_by_player=player_projections.prior_season_weekly_map(season),
         )
     except Exception:
         return None
@@ -14365,6 +14391,8 @@ def _real_current_lineup(
                             weekly_stats=projection_context.weekly_stats,
                             defense_strength=projection_context.defense_strength,
                             team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            scoring_settings=projection_context.scoring_settings,
+            prior_weekly_by_player=projection_context.prior_weekly_by_player,
                         )
                         if projection_context is not None
                         else None
@@ -15052,7 +15080,7 @@ def _build_matchup(
     # player's projection and bye status, even before Sleeper has locked
     # either side's real starters. Best-effort, same "fails soft" contract
     # as everywhere else in this file.
-    projection_context = _build_projection_context(current_week)
+    projection_context = _build_projection_context(current_week, league.get("scoring_settings"))
     idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
 
     my_bench: list[dict[str, Any]] = []
@@ -15480,7 +15508,7 @@ def _waiver_roster_value_bundle(
     if "stale_free_agent" in pool.columns:
         pool = pool[~pool["stale_free_agent"].fillna(False).astype(bool)]
     pool = trade_hub_engine.apply_strategy_age_curve(pool, strategy, score_field)
-    valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field)
+    valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field, lineup_settings=settings)
     for code in model_status.frame_codes(valued_p):
         model_status.add(status, code)
     roster_df = valued_p[valued_p["player_id"].astype(str).isin(my_ids)].copy()

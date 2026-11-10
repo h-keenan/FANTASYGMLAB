@@ -623,10 +623,15 @@ def league_waiver_pool(rosters, valued: pd.DataFrame) -> pd.DataFrame | None:
 
 
 def attach_projection_baselines(
-    valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids, score_field: str
+    valued: pd.DataFrame,
+    pool: pd.DataFrame | None,
+    player_ids,
+    score_field: str,
+    lineup_settings: Mapping[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
-    """Attach the walk-forward weekly baseline (``proj_ppg``/``proj_sd``, PPR,
-    availability not applied) to the players the lineup model will look at:
+    """Attach the walk-forward weekly baseline (``proj_ppg``/``proj_sd``, in the
+    league's own scoring when ``lineup_settings`` carries it, else PPR; flagged
+    by ``proj_scoring_applied``; availability not applied) to the players the lineup model will look at:
     ``player_ids`` and the top free agents per position. Players with no usable
     weekly history simply get no column value; the model then labels its
     fallback basis. A lookup failure (not mere absence) is logged and marks the
@@ -650,7 +655,8 @@ def attach_projection_baselines(
             ids |= {str(pid) for pid in top["player_id"].astype(str)}
         wanted = valued[valued["player_id"].astype(str).isin(ids)]
         baselines = player_projections.baseline_weekly_points(
-            [{"player_id": str(r["player_id"]), "position": r.get("position")} for _, r in wanted.iterrows()]
+            [{"player_id": str(r["player_id"]), "position": r.get("position")} for _, r in wanted.iterrows()],
+            scoring_settings=(lineup_settings or {}).get("_scoring_settings") or None,
         )
         if not baselines:
             return valued, pool
@@ -662,6 +668,7 @@ def attach_projection_baselines(
             pids = frame["player_id"].astype(str)
             frame["proj_ppg"] = pids.map(lambda p: (baselines.get(p) or {}).get("ppg"))
             frame["proj_sd"] = pids.map(lambda p: (baselines.get(p) or {}).get("sd"))
+            frame["proj_scoring_applied"] = pids.map(lambda p: bool((baselines.get(p) or {}).get("scoring_applied")))
             return frame
 
         return apply(valued), apply(pool)

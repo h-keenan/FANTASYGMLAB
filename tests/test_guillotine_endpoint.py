@@ -55,7 +55,7 @@ def _project(monkeypatch, svc, pts):
         "modules.league_value_settings.build_valued_players_frame_cached",
         lambda **k: pd.DataFrame([{"player_id": "a"}]),
     )
-    monkeypatch.setattr(svc, "_build_projection_context", lambda week: object())
+    monkeypatch.setattr(svc, "_build_projection_context", lambda week, *_a, **_k: object())
     monkeypatch.setattr(
         svc,
         "_real_current_lineup",

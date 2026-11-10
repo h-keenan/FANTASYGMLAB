@@ -463,7 +463,9 @@ def build_target_offers(
         if str(r.get("player_id")) != target_id and ti._row_score(r, score_field) > 0
     ]
     gate_ids |= {str(a.get("player_id")) for a in partner_assets_pool if a.get("player_id")}
-    gate_players, gate_pool = trade_grade.attach_projection_baselines(df_players, gate_pool, gate_ids, score_field)
+    gate_players, gate_pool = trade_grade.attach_projection_baselines(
+        df_players, gate_pool, gate_ids, score_field, lineup_settings=league_settings
+    )
     gate_team_df = (
         gate_players[gate_players["player_id"].astype(str).isin(my_ids)].copy()
         if "player_id" in gate_players.columns and not my_team_df.empty

@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 
+from modules.projection_calibration import WIN_PROB_SPREAD_MULTIPLIER as C
 from modules.matchup_win_probability import (
     GAME_WALL_CLOCK,
     compute_live_win_probability,
@@ -62,14 +63,15 @@ def _unmodeled_starter():
 def test_hand_calculable_two_starter_case():
     # My side: one starter, mean 20, stdev 5 (low=15, high=25).
     # Opponent: one starter, mean 15, stdev 5 (low=10, high=20).
-    # diff_mean = 5, diff_stdev = sqrt(25 + 25) = sqrt(50).
+    # diff_mean = 5, diff_stdev = C * sqrt(25 + 25) = C * sqrt(50), C the
+    # calibrated spread multiplier (projection_calibration).
     my_starters = [_projected_starter(20.0, 15.0, 25.0)]
     opponent_starters = [_projected_starter(15.0, 10.0, 20.0)]
 
     result = compute_live_win_probability(my_starters, opponent_starters)
 
     assert result["available"] is True
-    expected = 0.5 * (1.0 + math.erf((5.0 / math.sqrt(50.0)) / math.sqrt(2.0)))
+    expected = 0.5 * (1.0 + math.erf((5.0 / (C * math.sqrt(50.0))) / math.sqrt(2.0)))
     assert result["probability"] == round(expected, 4)
     assert result["my_projected_total"] == 20.0
     assert result["opponent_projected_total"] == 15.0
@@ -186,10 +188,10 @@ def test_mid_game_is_points_so_far_plus_remaining_projection_with_shrunk_varianc
     assert result["my_projected_total"] == 17.5
     assert result["probability"] == 0.5
 
-    # Same game state vs a final 20: P = Phi((17.5 - 20) / sqrt(0.5 * 49)).
+    # Same game state vs a final 20: P = Phi((17.5 - 20) / (C * sqrt(0.5 * 49))).
     opponent = [_projected_starter(0.0, 0.0, 0.0, started=True, actual=20.0, final=True)]
     result = compute_live_win_probability(mine, opponent, now=now)
-    expected = 0.5 * (1.0 + math.erf(((17.5 - 20.0) / math.sqrt(0.5 * 49.0)) / math.sqrt(2.0)))
+    expected = 0.5 * (1.0 + math.erf(((17.5 - 20.0) / (C * math.sqrt(0.5 * 49.0))) / math.sqrt(2.0)))
     assert result["probability"] == round(expected, 4)
 
 
