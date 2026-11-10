@@ -17,7 +17,7 @@ import NextSteps from '../components/NextSteps';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import RecapReadyCard from '../components/RecapReadyCard';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
+import { api, type AlertItem, type RankedPlayer, type RosterRelationship, type RoundupNotice } from '../lib/api';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -140,6 +140,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<AlertItem[]>([]);
+  const [roundupNotice, setRoundupNotice] = useState<RoundupNotice | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +183,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
         // app), overlaid with any read tapped here that hasn't synced yet.
         const userId = await currentAlertReadUserId();
         setItems(await alertReadSync.reconcile(userId, leagueId, result.items));
+        setRoundupNotice(result.roundup_notice ?? null);
       }
     } catch (err) {
       setError(toUserErrorMessage(err, 'Failed to load alerts.'));
@@ -262,12 +264,30 @@ export default function AlertsScreen({ route, navigation }: Props) {
           <RefreshControl refreshing={loading || recapQuery.isFetching} onRefresh={onRefresh} />
         }
         ListHeaderComponent={
-          recapReadyWeek != null ? (
-            <RecapReadyCard
-              week={recapReadyWeek}
-              onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
-            />
-          ) : null
+          <>
+            {recapReadyWeek != null ? (
+              <RecapReadyCard
+                week={recapReadyWeek}
+                onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+              />
+            ) : null}
+            {roundupNotice ? (
+              <RecapReadyCard
+                week={roundupNotice.week}
+                title={roundupNotice.title}
+                subtitle={roundupNotice.body}
+                icon="stats-chart-outline"
+                onPress={() =>
+                  navigation.navigate('Recap', {
+                    leagueId,
+                    leagueName,
+                    initialTab: 'roundup',
+                    week: roundupNotice.week,
+                  })
+                }
+              />
+            ) : null}
+          </>
         }
         ListFooterComponent={
           !loading ? (

@@ -32,7 +32,7 @@ import pandas as pd
 import requests
 
 from modules import injury_status as injury_table
-from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, roster_value_model, sleeper, sleeper_leagues, team_stance
+from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, roster_value_model, sleeper, sleeper_leagues, team_stance, weekly_roundup
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -47,7 +47,7 @@ TRADE_OUTCOMES_TABLE = "trade_outcomes"
 TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
 # Every push category a user can individually toggle off — the Notification
 # Settings screen (mobile) reads/writes exactly this key set.
-TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder", "trade_deadline")
+TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder", "trade_deadline", "weekly_roundup")
 # push item category -> the preference key that gates it. Only the two
 # one-off pushes differ from their category name.
 PREFERENCE_KEY_BY_CATEGORY = {
@@ -64,6 +64,7 @@ PUSH_PRIORITY_ORDER = (
     "watch",
     "waiver_reminder",
     "trade_followup",
+    "weekly_roundup",
     "recap",
     "gm_stance_reminder",
 )
@@ -112,6 +113,7 @@ PUSH_TITLE_BY_CATEGORY = {
     "lineup_lock": "Lineup Lock",
     "waiver_reminder": "Waivers Process Soon",
     "trade_deadline": "Trade Deadline",
+    "weekly_roundup": "Weekly Roundup",
 }
 DEFAULT_LENS = league_value_settings.DEFAULT_VALUATION_LENS  # per-league lens: default_lens_for_league
 
@@ -605,6 +607,8 @@ def build_batched_message(items: list[dict[str, Any]]) -> tuple[str, str, dict[s
         "league_name": lead.get("league_name", ""),
         "category": lead["category"],
     }
+    if lead.get("week"):
+        data["week"] = lead["week"]
     if lead.get("player_id"):
         data["player_id"] = lead["player_id"]
         data["player_name"] = lead.get("player_name", "")
@@ -780,6 +784,67 @@ def recap_push_item(league_id: str, league: Mapping[str, Any]) -> dict[str, Any]
         "category": "recap",
         "headline": f"Week {week} recap is ready",
         "recommendation_id": f"recap:{league_id}:{week}",
+    }
+
+
+# Weekly roundup: Tuesday 9:00 ET through Thursday (games are final by Tuesday;
+# after that a new week's slate is close and the item is stale).
+ROUNDUP_START_HOUR_ET = 9
+ROUNDUP_WEEKDAYS_ET = (1, 2, 3)  # Tue, Wed, Thu
+
+
+def roundup_window_open(now: datetime) -> bool:
+    et = now.astimezone(_resolve_tzinfo(_ET))
+    if et.weekday() not in ROUNDUP_WEEKDAYS_ET:
+        return False
+    return not (et.weekday() == ROUNDUP_WEEKDAYS_ET[0] and et.hour < ROUNDUP_START_HOUR_ET)
+
+
+def roundup_enabled(preferences: dict[str, dict[str, bool]], user_id: str) -> bool:
+    """Gate the (comparatively expensive) roundup build on the user's toggle."""
+
+    return push_item_allowed(preferences, user_id=user_id, category="weekly_roundup")
+
+
+def weekly_roundup_push_item(
+    *,
+    league_id: str,
+    league_name: str,
+    league: Mapping[str, Any],
+    my_roster: Mapping[str, Any],
+    now: datetime,
+    is_already_sent: Any = None,
+    build: Any = None,
+) -> dict[str, Any] | None:
+    """"Your week N roundup is ready: you left X pts on the bench..." once per
+    league/week (dedup id ``weekly_roundup:{league}:{week}``).
+
+    Fires from Tuesday 9:00 ET (see roundup_window_open) and only for a week
+    League Recaps itself calls complete, so the push never beats the page.
+    ``is_already_sent(recommendation_id)`` is checked BEFORE the roundup is
+    computed, so Tue-Thu sweeps only pay for it once per league per week.
+    """
+
+    if not roundup_window_open(now) or not league_calendar.is_in_season(league):
+        return None
+    completed = weekly_roundup.completed_week(league, league_id)
+    week = completed[0]
+    if week <= 0:
+        return None
+    recommendation_id = f"weekly_roundup:{league_id}:{week}"
+    if is_already_sent is not None and is_already_sent(recommendation_id):
+        return None
+    built = (build or weekly_roundup.build_for_league)(league_id, league, my_roster, week=week, completed=completed)
+    roundup = built.get("roundup")
+    if not roundup:
+        return None
+    return {
+        "league_id": league_id,
+        "league_name": league_name,
+        "category": "weekly_roundup",
+        "headline": weekly_roundup.push_headline(roundup),
+        "recommendation_id": recommendation_id,
+        "week": week,
     }
 
 
@@ -1221,6 +1286,25 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 )
                 if deadline_item:
                     push_items.append(deadline_item)
+
+            if league_payload and roundup_enabled(preferences, user_id):
+                try:
+                    roundup_roster = resolve_roster_for_sleeper_user(sleeper.get_rosters(league_id), sleeper_user_id)
+                    if roundup_roster is not None:
+                        roundup_item = weekly_roundup_push_item(
+                            league_id=league_id,
+                            league_name=_safe_text(league_payload.get("name"), "Your league"),
+                            league=league_payload,
+                            my_roster=roundup_roster,
+                            now=_utcnow(),
+                            is_already_sent=lambda rid, _uid=user_id: bool(
+                                already_notified_batch(config, user_id=_uid, recommendation_ids=[rid])
+                            ),
+                        )
+                        if roundup_item:
+                            push_items.append(roundup_item)
+                except Exception as exc:
+                    stats["errors"].append(f"{user_id}/{league_id}: weekly roundup check failed ({exc})")
 
             try:
                 stance_item = gm_stance_reminder_push_item(

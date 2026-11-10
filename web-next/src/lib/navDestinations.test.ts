@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { searchNavDestinations, useNavDestinations, type NavDestination } from "./navDestinations";
 import { isGmPlanTab } from "@/components/GmPlanSections";
 import { parseDraftCenterTab } from "@/components/DraftCenterContent";
-import { parseGamesTab, parseWaiverTab } from "@/lib/pageTabs";
+import { parseGamesTab, parseRecapsTab, parseWaiverTab } from "@/lib/pageTabs";
 
 const APP_DIR = path.join(process.cwd(), "src", "app");
 const MOBILE_TABS = path.join(process.cwd(), "..", "mobile", "src", "lib", "orbTabs.ts");
@@ -21,6 +21,7 @@ const TAB_PARSERS: Record<string, (v: string) => unknown> = {
   "draft-center": (v) => (["overview", "picks", "scouting"].includes(v) ? parseDraftCenterTab(v) : undefined),
   waivers: (v) => parseWaiverTab(v),
   games: (v) => parseGamesTab(v),
+  "league-recaps": (v) => parseRecapsTab(v),
 };
 
 describe("GM orb tab destinations", () => {
@@ -28,7 +29,7 @@ describe("GM orb tab destinations", () => {
 
   it("covers the multi-tab pages", () => {
     expect(withTabs.map((d) => d.label).sort()).toEqual(
-      ["Draft Center", "GM Plan", "Games", "League Rankings", "Trade Hub", "Waivers"].sort(),
+      ["Draft Center", "GM Plan", "Games", "League Rankings", "League Recaps", "Trade Hub", "Waivers"].sort(),
     );
   });
 
@@ -81,6 +82,7 @@ describe("searchNavDestinations", () => {
     expect(labels("playoff odds")).toContain("League Rankings > Playoff Odds");
     expect(labels("finder")).toContain("Trade Hub > Finder");
     expect(labels("pickem")).toContain("Games > Pick'em");
+    expect(labels("bench regret")).toContain("League Recaps > Roundup");
     expect(labels("watchlist")).toEqual(expect.arrayContaining(["Waivers > Watchlist"]));
     expect(labels("draft center scouting")).toEqual(["Draft Center > Scouting"]);
   });

@@ -7660,7 +7660,7 @@ def test_get_push_preferences_defaults_all_categories_enabled(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert body["categories"] == {"top_priority": True, "watch": True, "recap": True, "injury": True, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True}
+    assert body["categories"] == {"top_priority": True, "watch": True, "recap": True, "injury": True, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True}
 
 
 def test_get_push_preferences_reflects_stored_overrides(monkeypatch):
@@ -7720,7 +7720,7 @@ def test_update_push_preference_upserts_merged_settings(monkeypatch):
     body = response.json()
     assert body == {
         "ok": True,
-        "categories": {"top_priority": True, "watch": False, "recap": True, "injury": False, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True},
+        "categories": {"top_priority": True, "watch": False, "recap": True, "injury": False, "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True},
     }
     # Existing "watch": False override is preserved, not clobbered by the new write.
     upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
@@ -7734,6 +7734,7 @@ def test_update_push_preference_upserts_merged_settings(monkeypatch):
         "lineup_lock": True,
         "waiver_reminder": True,
         "trade_deadline": True,
+        "weekly_roundup": True,
     }
 
 

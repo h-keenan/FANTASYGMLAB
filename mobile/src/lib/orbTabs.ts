@@ -53,6 +53,9 @@ export const ORB_TABS: Readonly<Record<string, readonly OrbTab[]>> = {
     { label: 'Explore', subtitle: 'Browse every free agent', keywords: ['free agents', 'search'], params: { tab: 'explore' } },
     { label: 'Watchlist', subtitle: 'Free agents you are tracking', keywords: ['targets', 'tracking'], params: { tab: 'watchlist' } },
   ],
+  Recap: [
+    { label: 'Roundup', subtitle: 'Your lineup vs the best possible one, and what you left on the bench', keywords: ['bench', 'optimal lineup', 'weekly roundup', 'bench regret', 'missed swaps'], params: { initialTab: 'roundup' } },
+  ],
   Games: [
     { label: 'Season Sim', subtitle: 'Season simulator', keywords: ['simulator', 'simulation', 'playoff odds', 'what if'], params: { tab: 'sim' } },
     { label: "Pick'em", subtitle: "Weekly pick'em in your league", keywords: ['pickem', 'picks', 'weekly'], params: { tab: 'pickem' } },

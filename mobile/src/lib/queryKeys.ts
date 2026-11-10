@@ -42,6 +42,9 @@ export const queryKeys = {
   // past-week navigation still fetches independently (a different week
   // isn't the same data any other screen reads), keyed off this same root.
   recap: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'recap'] as const,
+  // Weekly Team Roundup (League Recaps > Roundup); week undefined = latest completed.
+  roundup: (leagueId: string, week?: number) =>
+    [...userScopeKey(), 'league', leagueId, 'roundup', week ?? 'latest'] as const,
   // TeamsScreen's own metric-independent roster data (re-derived per-metric
   // client-side rather than refetched — see that screen's `baseRows` memo).
   teamProfiles: (leagueId: string) =>

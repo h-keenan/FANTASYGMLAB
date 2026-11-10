@@ -18,16 +18,29 @@ import { spacing, type ThemeColors } from '../theme';
  * styles, just extracted here so both call sites stay byte-for-byte
  * identical in appearance.
  */
-export default function RecapReadyCard({ week, onPress }: { week: number; onPress: () => void }) {
+export default function RecapReadyCard({
+  week,
+  onPress,
+  title,
+  subtitle,
+  icon = 'newspaper-outline',
+}: {
+  week: number;
+  onPress: () => void;
+  /** Override for the Weekly Roundup twin of this card (same shape, different destination). */
+  title?: string;
+  subtitle?: string;
+  icon?: React.ComponentProps<typeof Ionicons>['name'];
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity onPress={onPress}>
       <AnimatedCard glow style={styles.recapCard}>
-        <IconCircle name="newspaper-outline" color={colors.accent} size={36} style={styles.recapIconDisc} />
+        <IconCircle name={icon} color={colors.accent} size={36} style={styles.recapIconDisc} />
         <View style={styles.recapTextGroup}>
-          <AppText style={styles.recapTitle}>Week {week} League Recap is ready</AppText>
-          <AppText style={styles.recapSubtitle}>Tap to see this week's storylines</AppText>
+          <AppText style={styles.recapTitle}>{title ?? `Week ${week} League Recap is ready`}</AppText>
+          <AppText style={styles.recapSubtitle}>{subtitle ?? "Tap to see this week's storylines"}</AppText>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </AnimatedCard>

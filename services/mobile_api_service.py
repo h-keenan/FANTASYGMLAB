@@ -33,6 +33,7 @@ Deployment topology (Render):
   - GET  /v1/players/{id}/news           — news items matched to one player (limit/offset paging, group_duplicates)
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
+  - GET  /v1/leagues/{id}/roundup        — your lineup vs hindsight-optimal for a completed week (Free headline, Pro full)
   - GET  /v1/leagues/{id}/history        — season transaction timeline (trades/waivers/picks) with retrospective grades
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
@@ -251,6 +252,7 @@ from modules import (
     verdict_feedback,
     waivers_logic,
     weekly_box_scores,
+    weekly_roundup,
 )
 from modules import public_dynasty_values
 from modules import model_status
@@ -6493,6 +6495,71 @@ def get_league_recap(
     return {"ok": True, "recap": recap, "reason": "", "max_completed_week": completed_week}
 
 
+_ROUNDUP_UPSELL = {
+    "title": "See your full weekly roundup",
+    "body": (
+        "Pro shows your whole lineup against the best possible one, every missed "
+        "swap with whether it was foreseeable, and your season bench-regret tally."
+    ),
+}
+ROUNDUP_CACHE_TTL_SECONDS = 1800
+
+
+@app.get("/v1/leagues/{league_id}/roundup")
+def get_league_roundup(
+    league_id: str = Depends(require_league_access),
+    week: int | None = None,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Weekly Team Roundup: the signed-in user's actual lineup vs the
+    hindsight-optimal one for a completed week, the swaps that would have
+    gained points (each tagged foreseeable / coin flip / unforeseeable from
+    point-in-time projections; see `method`) and a season bench-regret tally.
+
+    Home: League Recaps > Roundup tab. Free accounts get the headline numbers,
+    takeaway and the single biggest swap; Pro gets the full lineup, every swap
+    and the season tally. Not-ready states (ESPN/other platforms, offseason, no
+    roster) are 200s with a `reason`, never errors.
+    """
+
+    def not_ready(reason: str, *, max_week: int = 0) -> dict[str, Any]:
+        return {
+            "ok": True, "reason": reason, "max_completed_week": max_week, "week": 0, "roundup": None,
+            "season": None, "method": weekly_roundup.METHOD_NOTE, "is_premium": False, "upsell": None,
+        }
+
+    if external_leagues.is_external_league_key(league_id):
+        return not_ready("unsupported_platform")
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    is_pro = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+    if not my_roster:
+        return not_ready(roster_reason or "no_roster")
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    cache_key = redis_cache.build_cache_key(
+        "weekly_roundup", league_id, str(my_roster.get("roster_id")), str(week or "latest"),
+        str((league.get("settings") or {}).get("last_scored_leg", 0)),
+    )
+    built = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=ROUNDUP_CACHE_TTL_SECONDS,
+        compute=lambda: weekly_roundup.build_for_league(league_id, league, my_roster, week=week),
+        lock_timeout_seconds=20.0,
+    )
+    payload = built if is_pro else weekly_roundup.gate_for_free(built)
+    return {
+        "ok": True,
+        **payload,
+        "is_premium": bool(is_pro),
+        "upsell": None if is_pro else _ROUNDUP_UPSELL,
+    }
+
+
 @app.get("/v1/leagues/{league_id}/history")
 def get_league_history(
     league_id: str = Depends(require_league_access),
@@ -6984,6 +7051,25 @@ def _project_alert_item(
     return payload
 
 
+def _roundup_notice(league_id: str) -> dict[str, Any] | None:
+    """Feed card for the latest scored week while the league is in season.
+    Cheap on purpose (league payload only); the Roundup tab shows the real
+    numbers and reports `no_completed_week` itself if the week is not final."""
+
+    try:
+        league = sleeper.get_league(league_id) or {}
+    except Exception:
+        return None
+    week = league_recaps.last_scored_week(league)
+    if week <= 0 or not league_calendar.is_in_season(league):
+        return None
+    return {
+        "week": week,
+        "title": f"Your week {week} roundup is ready",
+        "body": "See what you left on the bench and whether you could have known.",
+    }
+
+
 @app.get("/v1/leagues/{league_id}/alerts")
 def get_league_alerts(
     request: Request,
@@ -7066,7 +7152,14 @@ def get_league_alerts(
         )
         for item in curated
     ]
-    return {"ok": True, "items": items, "reason": ""}
+    return {
+        "ok": True,
+        "items": items,
+        "reason": "",
+        # In-app twin of the weekly roundup push: a pointer card (no compute on
+        # this hot endpoint) that deep-links to League Recaps > Roundup.
+        "roundup_notice": _roundup_notice(league_id),
+    }
 
 
 class MarkAlertReadRequest(BaseModel):

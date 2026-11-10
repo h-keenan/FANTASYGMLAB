@@ -34,6 +34,7 @@ GATED_ENDPOINTS = [
     ("GET", "/v1/leagues/{lid}/idp/values"),
     ("GET", "/v1/leagues/{lid}/players/p1/rank"),
     ("GET", "/v1/leagues/{lid}/recap"),
+    ("GET", "/v1/leagues/{lid}/roundup"),
     ("GET", "/v1/leagues/{lid}/history"),
     ("GET", "/v1/leagues/{lid}/storylines"),
     ("GET", "/v1/leagues/{lid}/managers/tendencies"),
@@ -60,7 +61,10 @@ def _is_locked(response) -> bool:
 
 
 @pytest.fixture
-def env(free_env):  # noqa: F811
+def env(free_env, monkeypatch):  # noqa: F811
+    # The roundup endpoint reads Sleeper's player map, whose real loader
+    # refreshes and rewrites data/sleeper_players.json; never touch it here.
+    monkeypatch.setattr("modules.sleeper.get_players", lambda *a, **k: {})
     # Routes the gate lets through run against thin mocks and may 4xx/5xx;
     # these tests only care whether the LOCK fired.
     client, state = free_env

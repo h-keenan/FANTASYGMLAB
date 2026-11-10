@@ -123,7 +123,10 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
             { label: "Scouting", path: tabPath("draft-center", "scouting"), subtitle: "Grade incoming prospects", keywords: ["college", "prospects", "rookies"] },
           ] },
         { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: accent("Live Draft"), pro: true },
-        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: accent("League Recaps") },
+        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap, stories, and your lineup roundup", glyph: "leagueRecaps", color: accent("League Recaps"),
+          tabs: [
+            { label: "Roundup", path: tabPath("league-recaps", "roundup"), subtitle: "Your lineup vs the best possible one, and what you left on the bench", keywords: ["bench", "optimal lineup", "weekly roundup", "bench regret", "missed swaps"] },
+          ] },
         { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: accent("Games"),
           tabs: [
             { label: "Season Sim", path: tabPath("games", "sim"), subtitle: "Season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
