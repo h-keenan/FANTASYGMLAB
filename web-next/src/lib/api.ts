@@ -4467,6 +4467,14 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?q=${encodeURIComponent(query)}&lens=${encodeURIComponent(lens)}&limit=${limit}`,
     ),
 
+  // Exact id lookup over the same full pool (max 25 ids, request order, unknown
+  // ids omitted). For ids that arrive via URL/share links, which may be ranked
+  // below the getLeagueRankings window. Same row shape as searchLeaguePlayers.
+  getLeaguePlayersByIds: (leagueId: string, ids: string[], lens: string = "Dynasty") =>
+    authorizedRequest<LeagueRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?ids=${encodeURIComponent(ids.join(","))}&lens=${encodeURIComponent(lens)}`,
+    ),
+
   // GM Targets (Revision 11) — the GM_TOOLS watchlist. Reads/writes the
   // exact same durable table (modules/gm_targets.py) and endpoints mobile's
   // GmTargetsScreen.tsx already calls; no new backend logic for this page.

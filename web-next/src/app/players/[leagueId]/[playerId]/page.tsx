@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { fetchMissingPlayersById, mergeSearchMatches } from "@/lib/leaguePlayerSearch";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -51,8 +52,10 @@ export default function PlayerProfilePage() {
 
     api
       .getLeagueRankings(leagueId, lens)
-      .then((result) => {
-        if (!cancelled) setRankings(result);
+      .then(async (result) => {
+        // Exact id lookup: a player ranked below the window still has a profile.
+        const extras = await fetchMissingPlayersById(leagueId, lens, [playerId], result.players);
+        if (!cancelled) setRankings({ ...result, players: mergeSearchMatches(result.players, extras) });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load this player's profile.");
@@ -61,7 +64,7 @@ export default function PlayerProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, playerId, router]);
 
   if (authLoading || (!rankings && !error)) {
     return <LoadingScreen status="Loading player profile…" />;

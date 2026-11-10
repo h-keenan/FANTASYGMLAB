@@ -3259,6 +3259,43 @@ def test_player_search_endpoint_finds_low_ranked_player_outside_rankings_window(
     assert bad_limit.status_code == 422
 
 
+def test_player_search_ids_lookup_resolves_player_outside_rankings_window(monkeypatch):
+    """Compare ?a=/?b= and other URL ids resolve by id from the full pool."""
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+    frame = _fake_players_frame()
+    ids = [str(pid) for pid in frame["player_id"]]
+    headers = {"Authorization": "Bearer good-token"}
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=frame):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    windowed = client.get("/v1/leagues/abc/rankings?limit=1", headers=headers).json()
+                    window_ids = {p["player_id"] for p in windowed["players"]}
+                    outside = next(pid for pid in ids if pid not in window_ids)
+                    found = client.get(f"/v1/leagues/abc/players/search?ids={outside},nope,{ids[0]}", headers=headers)
+                    too_many = client.get(
+                        "/v1/leagues/abc/players/search?ids=" + ",".join(str(i) for i in range(30)), headers=headers
+                    )
+
+    assert found.status_code == 200
+    players = found.json()["players"]
+    assert [p["player_id"] for p in players] == [outside, ids[0]]
+    assert "overall_rank" in players[0] and "stats" in players[0]
+    assert too_many.status_code == 422
+
+
 def test_player_search_available_only_excludes_rostered_players(monkeypatch):
     """Waivers picker: free agents only, but ranks stay league-global."""
 

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useSearchParams } from "@/lib/useSearchParams";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
@@ -17,6 +17,7 @@ import {
 import { idpTradePoolPlayers } from "@/lib/idpPresentation";
 import { TradeAnalyzerContent } from "@/components/TradeAnalyzerContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
+import { fetchMissingPlayersById, mergeSearchMatches } from "@/lib/leaguePlayerSearch";
 import { bridgeTradeFromSearch } from "@/lib/tradeBridge";
 import { offerPrefillFromSearch } from "@/lib/tradeOffer";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -47,6 +48,13 @@ export default function TradeAnalyzerPage() {
   // "Build an offer" hand-off: ?send=&receive=&sendPicks=&receivePicks= (lib/tradeOffer.ts).
   const offerPrefill = offerPrefillFromSearch(searchParams);
   const { lens, lensReady } = useValuationLens(leagueId);
+
+  const urlPlayerIdsKey = [
+    quickAddPlayerId ?? "",
+    ...(bridgeTrade ? [...bridgeTrade.a, ...bridgeTrade.b] : []),
+    ...(offerPrefill ? [...offerPrefill.send, ...offerPrefill.receive] : []),
+  ].join(",");
+  const urlPlayerIds = useMemo(() => urlPlayerIdsKey.split(",").filter(Boolean), [urlPlayerIdsKey]);
 
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +94,13 @@ export default function TradeAnalyzerPage() {
       // IDP leagues only (`idp: false` otherwise); a failure leaves offense untouched.
       api.getLeagueIdpValues(leagueId, { includeBelow: true }).catch(() => null),
     ])
-      .then(([myRoster, rankingsResult, picksResult, rostersResult, teamProfilesResult, idpResult]) => {
+      .then(async ([myRoster, rankingsResult, picksResult, rostersResult, teamProfilesResult, idpResult]) => {
+        // Ids that arrive via URL (quick-add, bridge, offer prefill) may be ranked below the window.
+        const extras = await fetchMissingPlayersById(leagueId, lens, urlPlayerIds, rankingsResult.players);
         if (cancelled) return;
         setData({
           myRoster,
-          rankings: [...rankingsResult.players, ...idpTradePoolPlayers(idpResult)],
+          rankings: [...mergeSearchMatches(rankingsResult.players, extras), ...idpTradePoolPlayers(idpResult)],
           picks: picksResult.picks,
           rosters: rostersResult.rosters,
           teamProfiles: teamProfilesResult.profiles,
@@ -103,7 +113,7 @@ export default function TradeAnalyzerPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, lensReady, router]);
+  }, [authLoading, session, leagueId, lens, lensReady, urlPlayerIds, router]);
 
   if (authLoading || (!data && !error)) {
     return (

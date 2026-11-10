@@ -5433,11 +5433,13 @@ def get_player_rank_in_league(
 
 
 MAX_PLAYER_SEARCH_LIMIT = 50
+MAX_PLAYER_LOOKUP_IDS = 25
 
 
 @app.get("/v1/leagues/{league_id}/players/search")
 def search_league_players(
-    q: str,
+    q: str = "",
+    ids: str = "",
     league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     position: str = "",
@@ -5445,7 +5447,14 @@ def search_league_players(
     available_only: bool = False,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    """Name search over the FULL valued pool, not the top-N /rankings window.
+    """Name search (`q`) or exact id lookup (`ids`) over the FULL valued pool,
+    not the top-N /rankings window.
+
+    `ids` is a comma-separated list of player ids (max MAX_PLAYER_LOOKUP_IDS)
+    resolved against the same pool with the same row shape, in request order,
+    unknown ids omitted. It is how URL/share-link ids (Compare ?a=/?b=, player
+    profile, trade prefill) resolve a player ranked below the rankings window.
+    When `ids` is given it takes precedence over `q`.
 
     `available_only=true` drops anyone rostered in this league (free agents
     only), which is what the Waivers picker needs.
@@ -5463,8 +5472,11 @@ def search_league_players(
         )
     if not 1 <= limit <= MAX_PLAYER_SEARCH_LIMIT:
         raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_PLAYER_SEARCH_LIMIT}.")
-    if not (q or "").strip():
-        raise HTTPException(status_code=422, detail="Provide a non-empty q.")
+    wanted_ids = player_search.parse_player_ids(ids)
+    if len(wanted_ids) > MAX_PLAYER_LOOKUP_IDS:
+        raise HTTPException(status_code=422, detail=f"ids accepts at most {MAX_PLAYER_LOOKUP_IDS} player ids.")
+    if not wanted_ids and not (q or "").strip():
+        raise HTTPException(status_code=422, detail="Provide a non-empty q or ids.")
 
     league = sleeper.get_league(league_id)
     if not league:
@@ -5493,9 +5505,12 @@ def search_league_players(
             str(pid) for r in (sleeper.get_rosters(league_id) or []) for pid in (r.get("players") or []) if pid is not None
         }
         ranked = ranked[~ranked["player_id"].astype(str).isin(rostered)]
-    matches = player_search.search_ranked_players(
-        ranked, q, score_field=score_field, position=position, limit=limit
-    )
+    if wanted_ids:
+        matches = player_search.select_ranked_players_by_ids(ranked, wanted_ids, position=position)
+    else:
+        matches = player_search.search_ranked_players(
+            ranked, q, score_field=score_field, position=position, limit=limit
+        )
     players = []
     for _, row in matches.iterrows():
         projected = _project_ranking_row(row, score_field)

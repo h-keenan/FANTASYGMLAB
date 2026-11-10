@@ -92,3 +92,41 @@ def search_ranked_players(
     out = out[out["_search_tier"].notna()]
     out = out.sort_values(["_search_tier", "_search_score"], ascending=[True, False], kind="stable")
     return out.head(max(1, int(limit))).drop(columns=["_search_tier", "_search_score"])
+
+
+def parse_player_ids(raw: Any) -> list[str]:
+    """Comma-separated id string -> de-duplicated ids in request order."""
+
+    seen: dict[str, None] = {}
+    for part in str(raw or "").split(","):
+        pid = part.strip()
+        if pid:
+            seen.setdefault(pid, None)
+    return list(seen)
+
+
+def select_ranked_players_by_ids(
+    ranked: pd.DataFrame,
+    player_ids: list[str],
+    *,
+    position: str = "",
+) -> pd.DataFrame:
+    """Rows of `ranked` whose player_id is in `player_ids`, in request order.
+
+    Same eligible pool and row shape as `search_ranked_players`; ids that are
+    not in the pool are simply absent. No rank/value cutoff, so a player ranked
+    below the rankings window still resolves from a shared link."""
+
+    if ranked is None or ranked.empty or not player_ids or "player_id" not in ranked.columns:
+        return pd.DataFrame() if ranked is None else ranked.iloc[0:0]
+    frame = ranked
+    wanted_position = str(position or "").strip().upper()
+    if wanted_position and "position" in frame.columns:
+        frame = frame[frame["position"].astype(str).str.upper() == wanted_position]
+    order = {pid: i for i, pid in enumerate(player_ids)}
+    keys = frame["player_id"].astype(str)
+    hit = frame[keys.isin(order)]
+    if hit.empty:
+        return hit
+    rank = hit["player_id"].astype(str).map(order)
+    return hit.assign(_lookup_order=rank.values).sort_values("_lookup_order", kind="stable").drop(columns=["_lookup_order"])

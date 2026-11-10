@@ -45,7 +45,7 @@ import TradeValueBar from '../components/TradeValueBar';
 import VerdictTrust from '../components/VerdictTrust';
 import type { VerdictAssumptions } from '../lib/verdictTrust';
 import type { RosterOverflow } from '../lib/api';
-import { mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
+import { fetchMissingPlayersById, mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import { RosterOverflowNote } from '../components/SuggestedDrop';
 import TradeValueHero from '../components/TradeValueHero';
 import {
@@ -232,6 +232,14 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
     setVerdict(null);
   }, [quickMode]);
 
+  // Ids carried in by a deep link/prefill may be ranked below the top-300 window;
+  // the load below resolves them by exact id. A ref so a new prefill does not refetch everything.
+  const prefillIdsRef = useRef<string[]>([]);
+  prefillIdsRef.current = [
+    quickAddPlayer?.player_id ?? '',
+    ...(offerPrefill ? [...offerPrefill.send, ...offerPrefill.receive] : []),
+  ].filter(Boolean);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -285,7 +293,9 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
           .filter((team) => team.rosterId && team.rosterId !== myId);
         setOtherTeams(teams);
 
-        setRankings([...rankingsResult.players, ...idpTradePoolPlayers(idpResult)]);
+        const extras = await fetchMissingPlayersById(leagueId, lens, prefillIdsRef.current, rankingsResult.players);
+        if (cancelled) return;
+        setRankings([...mergeSearchMatches(rankingsResult.players, extras), ...idpTradePoolPlayers(idpResult)]);
       } catch (err) {
         if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load trade data.'));
       } finally {
