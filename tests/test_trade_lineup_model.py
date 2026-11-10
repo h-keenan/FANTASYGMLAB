@@ -487,3 +487,31 @@ def test_a_healthy_in_season_run_is_not_marked_degraded():
     fit, _ = _evaluate(_thin_roster(), ["Jones"], [], receive_assets=[_pick(4800)])
     assert fit["lineup_model"] is not None
     assert fit["model_status"] == {"degraded": False, "reasons": []}
+
+
+# --- league scoring converted at the source / team SD (projection calibration) ----
+
+
+def _projected_wr(pid, *, ppg, applied):
+    return _row(pid, "WR", 6000, ppg=ppg, proj_ppg=ppg, proj_sd=4.0, proj_scoring_applied=applied,
+                receptions=80, games_played=8)
+
+
+def test_baseline_already_in_league_scoring_is_not_converted_a_second_time():
+    frame = pd.DataFrame([_projected_wr("W1", ppg=12.0, applied=True), _projected_wr("W2", ppg=12.0, applied=False)])
+    settings = {**SETTINGS, "scoring_format": "Half-PPR"}
+    window = trade_grade.season_window(settings)
+    ctx = model.build_context(frame, settings, "dynasty_score", window=window, strategy="retool")
+    by_id = {p.player_id: p for p in model.profile_roster(frame, ctx)}
+    assert by_id["W1"].ppg == pytest.approx(12.0)  # converted at the source: taken as is
+    assert by_id["W2"].ppg == pytest.approx(12.0 - 0.5 * 80 / 8)  # PPR baseline: converted here
+    assert by_id["W1"].basis == by_id["W2"].basis == "projection"
+
+
+def test_lineup_model_reports_the_teams_own_weekly_sd():
+    roster = _deep_roster()
+    fit, _ = _evaluate(roster, ["WR4"], [_row("IN_WR", "WR", 3000, ppg=10)])
+    sd = fit["lineup_model"]["points"]["team_weekly_sd"]
+    assert sd > 5.0
+    # Roughly the root of ten independent starters' variances, not a flat constant.
+    assert sd < 60.0

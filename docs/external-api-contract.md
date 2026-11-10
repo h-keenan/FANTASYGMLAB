@@ -102,7 +102,7 @@ status code.
   "high": 18.6,
   "confidence": "medium",
   "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-  "model_version": "v1",
+  "model_version": "v2",
   "display_name": "Nico Collins",
   "team": "HOU",
   "position": "WR",
@@ -171,7 +171,7 @@ status code.
   "high": null,
   "confidence": null,
   "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-  "model_version": "v1",
+  "model_version": "v2",
   "display_name": "Nico Collins",
   "team": "HOU",
   "position": "WR",
@@ -244,7 +244,7 @@ signal once for the whole request, not once per player.
   "week": 7,
   "season_type": "regular",
   "scoring_format": "ppr",
-  "model_version": "v1",
+  "model_version": "v2",
   "generated_at": "2026-10-19T18:04:12.903112+00:00",
   "source": {
     "players": "sleeper_player_directory",
@@ -272,7 +272,7 @@ signal once for the whole request, not once per player.
     { "player_id": "4046", "id_namespace": "sleeper", "season": 2026, "week": 7,
       "scoring_format": "ppr", "status": "ok", "projected_points": 14.2, "low": 9.8,
       "high": 18.6, "confidence": "medium", "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-      "model_version": "v1", "display_name": "Nico Collins", "team": "HOU",
+      "model_version": "v2", "display_name": "Nico Collins", "team": "HOU",
       "position": "WR", "position_group": "skill", "active": true, "opponent": "JAX",
       "is_home": true, "bye": false, "game_id": "2026_07_JAX_HOU",
       "kickoff_at": "2026-10-19T17:00:00+00:00", "availability": { "...": "see single-player example above" },
@@ -281,7 +281,7 @@ signal once for the whole request, not once per player.
     { "player_id": "9002", "id_namespace": "sleeper", "season": 2026, "week": 7,
       "scoring_format": "ppr", "status": "bye_week", "projected_points": null, "low": null,
       "high": null, "confidence": null, "calculated_at": "2026-10-19T18:04:12.903112+00:00",
-      "model_version": "v1", "display_name": "Some Player", "team": "DEN",
+      "model_version": "v2", "display_name": "Some Player", "team": "DEN",
       "position": "RB", "position_group": "skill", "active": true, "opponent": null,
       "is_home": null, "bye": true, "game_id": null, "kickoff_at": null,
       "availability": { "...": "game_status: bye" }, "factors": null,
@@ -451,7 +451,7 @@ that choice would surface.
 
 ## Versioning policy
 
-`model_version` (currently `"v1"`) identifies the projection **formula**
+`model_version` (currently `"v2"`) identifies the projection **formula**
 `project_player_week` used to compute a result — not this endpoint's
 response shape. The two change independently:
 
@@ -462,6 +462,11 @@ response shape. The two change independently:
   only reads the documented fields needs no code change; `model_version`
   is there so a bot can notice "the model changed" and, for example,
   annotate or re-pull recently-posted projections if it cares to.
+- **`"v2"` (2026-11):** projections are shrunk at the top tier by position,
+  and returning players are seeded with last season's games (so week 1 has a
+  projection). Same fields and statuses; `scoring_format` stays `"ppr"`
+  (league-scored output is for in-app surfaces). See
+  `docs/projection-calibration-2026-11.md`.
 - **Schema change (breaking):** adding a new field is additive and safe
   without warning. Renaming, removing, or changing the type/meaning of an
   existing field, or changing a status value's meaning, is a breaking

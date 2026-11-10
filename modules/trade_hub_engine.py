@@ -1231,7 +1231,7 @@ def generate_veto_check(
     for me, other in ((rid_a, rid_b), (rid_b, rid_a)):
         strategy_df = apply_strategy_age_curve(players_df, strategies[me], score_field)
         frame, pool = trade_grade.attach_projection_baselines(
-            strategy_df, free_agents, {str(p) for p in all_ids}, score_field
+            strategy_df, free_agents, {str(p) for p in all_ids}, score_field, lineup_settings=settings
         )
         my_ids = {str(p) for p in (by_rid[me].get("players") or []) if p is not None}
         roster_df = frame[frame["player_id"].astype(str).isin(my_ids)].copy()

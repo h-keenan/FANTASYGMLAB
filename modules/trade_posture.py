@@ -34,6 +34,7 @@ import re
 import math
 from typing import Any, Mapping, Sequence
 
+from modules import projection_calibration
 from modules.team_eval import normalize_team_strategy, team_strategy_label
 from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
 
@@ -101,10 +102,26 @@ DIRECTION_RATE = 0.10
 # what the same loss is charged.
 GAIN_CREDIT = 0.25
 # Weekly team-score standard deviation (points) behind the win-probability
-# slope. P(win) vs one opponent ~ Phi(d / (sqrt(2) * sigma)); slope at an even
-# matchup = phi(0) / (sqrt(2) * sigma) per point per week.
+# slope when the lineup model gave no lineup-derived one (older payloads):
+# P(win) vs one opponent ~ Phi(d / (sqrt(2) * sigma)); slope at an even
+# matchup = phi(0) / (sqrt(2) * sigma) per point per week. With the lineup
+# model, the slope is derived from the team's own starters instead (their
+# summed projection variance, widened by the same calibrated multiplier the
+# matchup win probability uses): see ``win_prob_per_point_for``. A flat 22 was
+# wrong by construction -- empirical team SD scales with lineup size (20 / 27 /
+# 31 pts for <8 / 8-10 / 11-13 modeled starters).
 WEEKLY_TEAM_SD = 22.0
 WIN_PROB_PER_POINT = 0.3989422804014327 / (math.sqrt(2.0) * WEEKLY_TEAM_SD)
+
+
+def win_prob_per_point_for(team_weekly_sd: float | None) -> float:
+    """Win probability per lineup point per week for a team whose own weekly
+    score SD (sum of starter variances) is ``team_weekly_sd``; the flat
+    ``WIN_PROB_PER_POINT`` when unknown."""
+
+    if team_weekly_sd and team_weekly_sd > 0:
+        return projection_calibration.win_prob_per_point(team_weekly_sd**2)
+    return WIN_PROB_PER_POINT
 # A lineup cost is "material" when it costs this many expected wins or this
 # share of the roster's projected points over the remaining weeks.
 MATERIAL_WINS = 0.35
@@ -280,11 +297,13 @@ def assess(posture: Mapping[str, Any], lineup_model: Mapping[str, Any] | None) -
     pts = lineup_model.get("points") or {}
     ros_delta = _num(pts.get("ros_delta"))
     ros_before = max(_num(pts.get("ros_before")), 1.0)
-    wins_delta = ros_delta * WIN_PROB_PER_POINT
+    team_sd = _num(pts.get("team_weekly_sd"))
+    win_per_point = win_prob_per_point_for(team_sd)
+    wins_delta = ros_delta * win_per_point
     win_weight = WINDOW_WIN_WEIGHT.get(key, WINDOW_WIN_WEIGHT["retool"])
     k = _num(lineup_model.get("value_per_point"))
     # Value units per expected win in THIS league's price scale.
-    win_value = win_weight * (k or STATIC_VALUE_PER_POINT) / WIN_PROB_PER_POINT
+    win_value = win_weight * (k or STATIC_VALUE_PER_POINT) / win_per_point
     window_term = win_value * (wins_delta if wins_delta < 0 else GAIN_CREDIT * wins_delta)
 
     present_term = PRESENT_ADJUST.get(key, 0.0) * k * ros_delta

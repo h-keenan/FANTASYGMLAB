@@ -5808,7 +5808,7 @@ def _build_trade_ideas_impl(
         if isinstance(asset, dict) and asset.get("player_id")
     }
     gate_players, gate_pool = trade_grade.attach_projection_baselines(
-        df_players, gate_pool, gate_player_ids, score_field
+        df_players, gate_pool, gate_player_ids, score_field, lineup_settings=league_settings
     )
     gate_team_df = (
         gate_players[gate_players["player_id"].astype(str).isin({str(pid) for pid in my_player_ids})].copy()

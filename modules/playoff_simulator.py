@@ -33,29 +33,23 @@ No intercept: there is no "home field"/first-mover edge between two
 fantasy rosters, so a symmetric model (``p(A beats B) == 1 - p(B beats
 A)``) is the honest shape, not an extra free parameter to fit.
 
-``slope`` is fit by maximum likelihood against this league's own
-season-to-date real results (every completed matchup this season: higher-
+``slope`` is fit by penalized maximum likelihood (MAP) against this league's
+own season-to-date real results (every completed matchup this season: higher-
 power_score team's z-differential vs. whether it actually won) whenever
 there are enough completed games to do that safely (see
-``MIN_GAMES_TO_FIT``); small-sample MLE for a single logistic parameter is
-numerically stable (one Newton-Raphson update per iteration, clamped to
-avoid runaway separation — see ``MAX_FIT_SLOPE``), so no second
-regularization mechanism is needed, INCLUDING when this season's completed
-games so far are perfectly (or near-perfectly) one-sided — e.g., every
-completed game has gone the way the power-score gap implied. An
-unclamped MLE genuinely diverges toward an infinite slope in that case
-(there is no counterexample to pull it back toward a finite estimate), but
-``MAX_FIT_SLOPE`` already exists specifically to stop that divergence at a
-strong-but-finite, explicitly documented effect size instead of letting it
-run away — so a real fit is still used there rather than discarded for the
-context-free default, as long as ``MIN_GAMES_TO_FIT`` games have been
-played. Below that games threshold (e.g., the first couple of weeks of a
+``MIN_GAMES_TO_FIT``). The penalty is a Normal prior at the pooled slope
+``DEFAULT_SLOPE`` worth ``PRIOR_GAMES`` games, so a league's few weeks of
+results move the slope without being able to swing it (the plain
+per-league MLE averaged 1.2-1.7 on 4-6 weeks of games against a pooled
+~0.4-0.5, and scored at or worse than a coin flip held-out; the MAP scored
+0.2265-0.2336 Brier vs 0.2447-0.2553 for the old default of 1.0, see
+``modules.projection_calibration.PLAYOFF_SLOPE_PRIOR``). Newton-Raphson steps
+are clamped to ``MAX_FIT_SLOPE`` so a perfectly one-sided sample cannot run
+away. Below ``MIN_GAMES_TO_FIT`` games (e.g., the first couple of weeks of a
 season) there is not enough same-season signal yet to fit anything
-honestly, so a **documented default slope of 1.0** is used instead — the
-"standard logistic" shape where a one-standard-deviation power_score edge
-is ~73% to win and a two-standard-deviation edge is ~88%, a modest,
-commonly-used effect size in sports win-probability models, not a
-precision claim. As the season progresses, real completed games
+honestly, so the **pooled prior slope** itself is used (``DEFAULT_SLOPE``,
+0.45: a one-standard-deviation power_score edge is ~61% to win and a two-
+standard-deviation edge ~71%), not a precision claim. As the season progresses, real completed games
 accumulate and the model re-calibrates itself to this specific league
 automatically (recomputed fresh on every cache-TTL refresh — see
 ``compute_playoff_odds_cached``).
@@ -109,7 +103,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from modules import league_rankings, league_recaps, league_standings, redis_cache, sleeper
+from modules import league_rankings, league_recaps, league_standings, projection_calibration, redis_cache, sleeper
 
 # Logistic-regression (no intercept) fit of win probability on z-scored
 # power_score differential needs enough same-season games to be more
@@ -120,17 +114,22 @@ from modules import league_rankings, league_recaps, league_standings, redis_cach
 # upset/chalk results from Week 1 alone can't swing it.
 MIN_GAMES_TO_FIT = 12
 
-# Used when there isn't enough same-season data to fit a slope yet (see
-# module docstring): sigmoid(1 SD) ~= 73.1%, sigmoid(2 SD) ~= 88.1%. A
-# modest, explicitly-labeled default effect size — not a claim about this
-# specific league.
-DEFAULT_SLOPE = 1.0
+# Pooled prior for the slope, used outright when there isn't enough same-season
+# data to fit one yet, and as the Normal prior mean (worth
+# ``PRIOR_GAMES`` games) that every league's own fit is shrunk toward. The old
+# default of 1.0 (and an unregularized per-league MLE) was ~2x too steep
+# against every strength proxy, and the MLE averaged 1.2-1.7 on 4-6 weeks of
+# games, scoring at or worse than a coin flip. Fit, validation and caveats:
+# ``modules.projection_calibration`` (PLAYOFF_SLOPE_*). sigmoid(0.45 * 1 SD)
+# ~= 61%, sigmoid(0.45 * 2 SD) ~= 71%.
+DEFAULT_SLOPE = projection_calibration.PLAYOFF_SLOPE_PRIOR
+PRIOR_GAMES = projection_calibration.PLAYOFF_SLOPE_PRIOR_GAMES
+PRIOR_FISHER_PER_GAME = projection_calibration.PLAYOFF_SLOPE_FISHER_PER_GAME
 
 # Keeps Newton-Raphson from diverging under near-perfect separation in a
-# small sample (e.g., every observed upset this season happened to go the
-# same direction) — the fit saturates at a strong-but-finite effect size
-# instead of running away to an arbitrarily large one.
-MAX_FIT_SLOPE = 6.0
+# small sample — and a hard ceiling on the effect size: a league's own games
+# can pull the slope above the prior, but never to a value no proxy supports.
+MAX_FIT_SLOPE = projection_calibration.PLAYOFF_MAX_SLOPE
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
@@ -148,8 +147,13 @@ def fit_win_probability_slope(
     default_slope: float = DEFAULT_SLOPE,
     max_slope: float = MAX_FIT_SLOPE,
     iterations: int = 25,
+    prior_games: float = PRIOR_GAMES,
 ) -> tuple[float, bool, int]:
-    """Fit the single logistic slope parameter by maximum likelihood.
+    """Fit the single logistic slope parameter by penalized maximum likelihood
+    (MAP): the league's own games plus a Normal prior at ``default_slope``
+    worth ``prior_games`` games of information (``prior_games=0`` is the plain
+    MLE). The prior is what makes a few weeks of games usable: the plain MLE
+    was unstable (one parameter, ~50 games).
 
     ``z_differentials[i]`` is (z of team A's power_score - z of team B's
     power_score) for one real, completed game this season; ``outcomes[i]``
@@ -178,11 +182,12 @@ def fit_win_probability_slope(
     if n_games < min_games:
         return default_slope, False, n_games
 
+    ridge = float(prior_games) * PRIOR_FISHER_PER_GAME
     slope = default_slope
     for _ in range(iterations):
         p = _sigmoid(slope * x)
-        gradient = float(np.sum(x * (y - p)))
-        hessian = float(-np.sum(x * x * p * (1.0 - p)))
+        gradient = float(np.sum(x * (y - p))) - ridge * (slope - default_slope)
+        hessian = float(-np.sum(x * x * p * (1.0 - p))) - ridge
         if hessian == 0.0:
             break
         step = gradient / hessian

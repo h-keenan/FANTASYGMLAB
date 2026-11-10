@@ -148,6 +148,7 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings["_sources"] = {key: "default" for key in DEFAULT_LEAGUE_VALUE_SETTINGS}
     settings["_detected_scoring"] = {}
+    settings["_scoring_settings"] = {}
     settings["_keeper_mode"] = False
     if not isinstance(league, dict) or not league:
         return settings
@@ -213,6 +214,12 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     for key in ("pass_td", "pass_int", "fum_lost", "bonus_rec_yd_100", "bonus_rush_yd_100", "fd_rec", "fd_rush"):
         if key in scoring:
             settings["_detected_scoring"][key] = _safe_float(scoring.get(key), 0.0)
+
+    # The league's raw numeric scoring weights, so projections can be converted
+    # to this league's scoring at the source (modules.projection_calibration).
+    from modules import projection_calibration
+
+    settings["_scoring_settings"] = projection_calibration.numeric_scoring_settings(scoring)
 
     qb_count = roster_positions.count("QB")
     rb_count = roster_positions.count("RB")
@@ -345,6 +352,7 @@ def detect_league_value_settings(league_id: str | None, *, league: dict | None =
         settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
         settings["_sources"] = {key: "default" for key in DEFAULT_LEAGUE_VALUE_SETTINGS}
         settings["_detected_scoring"] = {}
+        settings["_scoring_settings"] = {}
         settings["_keeper_mode"] = False
         return settings
     if league is None:

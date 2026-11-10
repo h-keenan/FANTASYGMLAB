@@ -135,7 +135,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from modules import injury_status, nfl_schedule, rankings, redis_cache, sleeper
+from modules import injury_status, nfl_schedule, projection_calibration, rankings, redis_cache, sleeper
 
 # Positions with a real opponent-defense-strength-by-position signal (see
 # ``team_defense_points_allowed_by_position``). Kickers are deliberately
@@ -207,7 +207,7 @@ _MIN_TEAMS_FOR_QB_QUALITY_LEAGUE_AVERAGE = 2
 _MIN_BAND_HALF_WIDTH = 2.5
 
 # Bumped whenever the estimator changes; surfaced in ``basis.model_version``.
-PROJECTION_MODEL_VERSION = "v3-usage-eb-2026-11"
+PROJECTION_MODEL_VERSION = "v3.2-calibrated-2026-11"
 
 
 def _recency_weight(weeks_ago: int, half_life_weeks: float) -> float:
@@ -1241,6 +1241,61 @@ def _questionable_plays_adjustment(player: Dict[str, Any], games_ahead: int) -> 
 # ---------------------------------------------------------------------------
 
 
+_PRIOR_SEASON_MAP_TTL_SECONDS = 6 * 60 * 60
+_prior_season_map_cache: Dict[int, tuple] = {}
+
+
+def prior_season_weekly_map(season: int) -> Dict[str, List[Dict[str, Any]]]:
+    """Every player's weekly rows for the season BEFORE ``season`` (cached
+    process-wide for hours: a completed season is immutable and the file read is
+    the expensive part). Empty when that season is not on disk."""
+
+    previous = int(season) - 1
+    cached = _prior_season_map_cache.get(previous)
+    now = time.time()
+    if cached is not None and now - cached[0] < _PRIOR_SEASON_MAP_TTL_SECONDS:
+        return cached[1]
+    try:
+        weekly = sleeper.cached_season_weekly_map(previous)
+    except Exception:
+        weekly = {}
+    _prior_season_map_cache[previous] = (now, weekly)
+    return weekly
+
+
+def _calibrated_baseline(baseline_ppr: float, position: str) -> float:
+    """The usage estimator's PPR baseline after the validated top-tier shrink
+    (``projection_calibration.TOP_SHRINK``)."""
+
+    return projection_calibration.shrink_top_tier(float(baseline_ppr), position)
+
+
+def _scoring_adjustment(
+    weekly_rows: List[Dict[str, Any]],
+    position: str,
+    scoring_settings: Optional[Dict[str, Any]],
+    as_of_week: Optional[int],
+) -> float:
+    """Per-game (league scoring - PPR) points for this player, from his own
+    played games up to ``as_of_week`` (see ``modules.projection_calibration``).
+    0.0 when no scoring was given or it is PPR."""
+
+    scoring = projection_calibration.numeric_scoring_settings(scoring_settings)
+    if projection_calibration.is_ppr_scoring(scoring) or as_of_week is None:
+        return 0.0
+    played = [
+        row
+        for row in weekly_rows or []
+        if isinstance(row, dict)
+        and row.get("week") is not None
+        and int(row["week"]) <= int(as_of_week)
+        and sleeper.week_row_fantasy_points_ppr(row) is not None
+    ]
+    return projection_calibration.league_scoring_adjustment(
+        played, position, scoring, reference_week=int(as_of_week)
+    )
+
+
 def project_player_week(
     player_id: str,
     week: int,
@@ -1252,8 +1307,24 @@ def project_player_week(
     team_qb_quality: Optional[Dict[str, Dict[str, Any]]] = None,
     weekly_stats: Optional[Dict[str, Dict[str, Any]]] = None,
     team_qb_pass_attempts_by_team: Optional[Dict[str, Dict[int, Dict[str, float]]]] = None,
+    scoring_settings: Optional[Dict[str, Any]] = None,
+    prior_weekly_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """A first-pass real weekly point projection for one player, one week.
+
+    ``prior_weekly_rows`` (last season's rows for this player) seed the
+    estimator so week 1 has a projection and weeks 2-4 improve
+    (``projection_calibration.seed_with_prior_season``). When
+    ``player_weekly_rows`` is not injected they are read from the cached prior
+    season; an injecting caller passes them (or none) explicitly.
+
+    ``scoring_settings`` (a Sleeper league's ``scoring_settings``) converts
+    the PPR estimate to that league's scoring at the source: the player's own
+    recency-weighted per-game (league - PPR) difference is added to the point
+    estimate and the band (``projection_calibration.league_scoring_adjustment``;
+    validated: projected-vs-actual league-points bias -1.11 -> -0.58, MAE
+    6.571 -> 6.436). Without it the output is PPR, exactly as before, and
+    ``basis.league_scoring_applied`` is False.
 
     Always returns a dict with a ``status`` key:
 
@@ -1379,11 +1450,18 @@ def project_player_week(
             **identity_fields,
         }
 
-    weekly_rows = (
-        player_weekly_rows
-        if player_weekly_rows is not None
-        else sleeper.cached_season_player_weekly(player_id, season)
+    if player_weekly_rows is not None:
+        weekly_rows = player_weekly_rows
+    else:
+        weekly_rows = sleeper.cached_season_player_weekly(player_id, season)
+        if prior_weekly_rows is None:
+            prior_weekly_rows = prior_season_weekly_map(season).get(player_id)
+    current_season_games = sum(
+        1 for row in weekly_rows or [] if isinstance(row, dict) and sleeper.week_row_fantasy_points_ppr(row) is not None
     )
+    prior_seeded = bool(prior_weekly_rows)
+    if prior_seeded:
+        weekly_rows = projection_calibration.seed_with_prior_season(weekly_rows, prior_weekly_rows)
     # Anchor the recency window on the real "as-of" week — the latest week
     # actually reflected in this player's own weekly rows — not on
     # ``week - 1``, the target week being projected. Otherwise, projecting
@@ -1478,15 +1556,24 @@ def project_player_week(
     # opponent and team-QB multipliers are computed above as context but NOT
     # applied: neither improved out-of-sample error in the 2024->2025 backtest
     # (docs/projections-v2-backtest.md).
-    raw_point_estimate = trend["baseline_ppr"]
+    raw_point_estimate = _calibrated_baseline(trend["baseline_ppr"], position)
     availability = _availability_adjustment(player, _games_ahead(schedule, week))
     role = _role_adjustment(player, players)
     plays = _questionable_plays_adjustment(player, _games_ahead(schedule, week))
-    point_estimate = (
-        max(0.0, raw_point_estimate) * availability["multiplier"] * role["multiplier"] * plays["multiplier"]
+    scoring_adjustment = _scoring_adjustment(weekly_rows, position, scoring_settings, as_of_week)
+    scored_estimate, _scored_low, _scored_high = projection_calibration.apply_scoring_to_projection(
+        max(0.0, raw_point_estimate), 0.0, 0.0, scoring_adjustment
     )
+    point_estimate = scored_estimate * availability["multiplier"] * role["multiplier"] * plays["multiplier"]
     confidence = _v2_confidence(trend["games_played"])
+    if prior_seeded and current_season_games < 2 and confidence == "high":
+        # Mostly last season's games: usable, but not the same trust as a
+        # full current-season sample.
+        confidence = "medium"
     low, high = _v2_range(max(0.0, raw_point_estimate), position, confidence)
+    _scored_est, low, high = projection_calibration.apply_scoring_to_projection(
+        max(0.0, raw_point_estimate), low, high, scoring_adjustment
+    )
     if availability["multiplier"] == 0.0:
         low = high = 0.0
         confidence = "high"
@@ -1521,9 +1608,13 @@ def project_player_week(
             "model_version": PROJECTION_MODEL_VERSION,
             "recent_games_played": trend["recent_games"],
             "season_games_played": trend["games_played"],
-            "recent_weeks_used": trend["weeks_used"],
+            "recent_weeks_used": [week for week in trend["weeks_used"] if week > 0],
+            "prior_season_seeded": prior_seeded,
+            "top_tier_shrink_applied": raw_point_estimate != trend["baseline_ppr"],
             "recent_weighted_avg_ppr": round(trend["weighted_avg_ppr"], 2),
             "season_avg_ppr": round(trend["simple_avg_ppr"], 2),
+            "league_scoring_applied": bool(scoring_adjustment),
+            "league_scoring_adjustment": round(scoring_adjustment, 2),
             "usage_implied_ppr": round(trend["usage_implied_ppr"], 2),
             "efficiency_adjustment_ppr": round(trend["efficiency_adjustment_ppr"], 2),
             "efficiency_weight": round(trend["efficiency_weight"], 3),
@@ -1566,6 +1657,8 @@ def baseline_weekly_points(
     season: Optional[int] = None,
     weekly_by_player: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     as_of_week: Optional[int] = None,
+    scoring_settings: Optional[Dict[str, Any]] = None,
+    prior_weekly_by_player: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """The v3 walk-forward baseline (PPR points per game, availability NOT
     applied) for many players at once, from the weekly rows already cached.
@@ -1578,16 +1671,27 @@ def baseline_weekly_points(
     labels the basis.
 
     ``player_rows``: dicts with ``player_id`` and ``position``. Returns
-    ``{player_id: {"ppg", "sd", "games", "confidence"}}``.
+    ``{player_id: {"ppg", "sd", "games", "confidence", "scoring_applied"}}``.
+    With ``scoring_settings`` the ppg is in that league's scoring (same
+    conversion as ``project_player_week``) and ``scoring_applied`` is True, so
+    the trade lineup model does not convert it a second time.
     """
 
     season = int(season) if season is not None else sleeper.default_player_stats_season()
-    weekly_map = weekly_by_player if weekly_by_player is not None else sleeper.cached_season_weekly_map(season)
+    if weekly_by_player is not None:
+        weekly_map = weekly_by_player
+    else:
+        weekly_map = sleeper.cached_season_weekly_map(season)
+        if prior_weekly_by_player is None:
+            prior_weekly_by_player = prior_season_weekly_map(season)
     out: Dict[str, Dict[str, Any]] = {}
     for row in player_rows or []:
         pid = str(row.get("player_id") or "")
         position = str(row.get("position") or "").strip().upper()
         weekly_rows = weekly_map.get(pid) or []
+        prior_rows = (prior_weekly_by_player or {}).get(pid)
+        if prior_rows:
+            weekly_rows = projection_calibration.seed_with_prior_season(weekly_rows, prior_rows)
         if not pid or position not in PROJECTABLE_POSITIONS or not weekly_rows:
             continue
         before = int(as_of_week) if as_of_week is not None else 99
@@ -1595,13 +1699,24 @@ def baseline_weekly_points(
         trend = _player_usage_trend(weekly_rows, position=position, upto_week=upto)
         if trend is None:
             continue
-        estimate = max(0.0, trend["baseline_ppr"])
+        estimate = max(0.0, _calibrated_baseline(trend["baseline_ppr"], position))
         confidence = _v2_confidence(trend["games_played"])
         low, high = _v2_range(estimate, position, confidence)
+        scoring = projection_calibration.numeric_scoring_settings(scoring_settings)
+        adjustment = _scoring_adjustment(weekly_rows, position, scoring, upto)
+        estimate, low, high = projection_calibration.apply_scoring_to_projection(estimate, low, high, adjustment)
         out[pid] = {
             "ppg": round(estimate, 2),
             "sd": round(max(0.5, (high - low) / 2.0), 2),
             "games": trend["games_played"],
             "confidence": confidence,
+            # True when this ppg is already in the league's scoring: a real
+            # conversion happened, or the league IS PPR. A non-PPR league whose
+            # rows carried no box-score stats gets a zero adjustment and stays
+            # False, so the trade lineup model still converts it itself.
+            "scoring_applied": bool(adjustment) or (
+                projection_calibration.has_core_scoring(scoring)
+                and projection_calibration.is_ppr_scoring(scoring)
+            ),
         }
     return out
