@@ -255,7 +255,7 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
             onSelect={(value) => loadWeek(Number(value))}
           />
           {archive.overflow.length > 0 ? (
-            <select
+            <select aria-label="More weeks"
               className="text-xs px-2 py-2"
               style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
               value={archive.overflow.some((o) => o.week === selectedWeek) ? String(selectedWeek) : ""}

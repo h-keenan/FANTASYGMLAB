@@ -376,7 +376,7 @@ export function PlayersContent({
               placeholder="Search players"
               className="filter-input col-span-2 px-3 py-2 text-sm sm:flex-1 sm:min-w-[10rem]"
             />
-            <select
+            <select aria-label="Position"
               value={position}
               onChange={(event) => setPosition(event.target.value)}
               className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
@@ -387,7 +387,7 @@ export function PlayersContent({
                 </option>
               ))}
             </select>
-            <select
+            <select aria-label="Age"
               value={ageFilter}
               onChange={(event) => setAgeFilter(event.target.value as PlayersAgeFilter)}
               className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
@@ -398,7 +398,7 @@ export function PlayersContent({
                 </option>
               ))}
             </select>
-            <select
+            <select aria-label="Status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as PlayersStatusFilter)}
               className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
@@ -409,7 +409,7 @@ export function PlayersContent({
                 </option>
               ))}
             </select>
-            <select
+            <select aria-label="Availability"
               value={availabilityFilter}
               onChange={(event) => setAvailabilityFilter(event.target.value as PlayersAvailabilityFilter)}
               className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
@@ -421,7 +421,7 @@ export function PlayersContent({
               ))}
             </select>
             {rosterOwnershipKnown ? (
-              <select
+              <select aria-label="Roster"
                 value={rosterFilter}
                 onChange={(event) => setRosterFilter(event.target.value as PlayersRosterFilter)}
                 className="filter-select col-span-2 w-full px-3 py-2 text-sm sm:col-span-1 sm:w-auto"
@@ -447,7 +447,7 @@ export function PlayersContent({
             <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
               Sort by
             </span>
-            <select
+            <select aria-label="Sort by"
               value={activeSortOption.key}
               onChange={(event) => setSortKey(event.target.value)}
               className="filter-select px-3 py-2 text-sm"

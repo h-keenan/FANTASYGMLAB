@@ -292,7 +292,7 @@ function RankingsBoard({
         <SectionHeading id="live-draft-rankings-heading">
           Available Player Rankings
         </SectionHeading>
-        <select
+        <select aria-label="Position filter"
           value={options.includes(filter) ? filter : "Overall"}
           onChange={(event) => setFilter(event.target.value as LiveDraftRankFilter)}
           className="filter-select px-3 py-2 text-sm"
@@ -403,7 +403,7 @@ export function LiveDraftContent({
       ) : (
         <>
           {liveOrPaused.length > 1 ? (
-            <select
+            <select aria-label="Draft"
               value={selectedDraftId}
               onChange={(event) => onSelectDraft(event.target.value)}
               className="filter-select px-3 py-2 text-sm self-start"
