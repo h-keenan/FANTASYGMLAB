@@ -1,3 +1,4 @@
+import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 import type { OfferPrefill } from "@/lib/tradeOffer";
 import { bridgeNotice, resolveBridgeTrade, type BridgeTrade } from "@/lib/tradeBridge";
 import { VerdictTrust } from "@/components/VerdictTrust";
@@ -728,12 +729,16 @@ export function TradeAnalyzerContent({
 
   const positionOptions = useMemo(() => tradePositionOptions(ALL_POSITION_OPTIONS, rankings), [rankings]);
 
+  // The rankings prop is the top-300 window; a rostered player ranked below it
+  // (rookie backup, etc.) must still be tradeable, so search also asks the server.
+  const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
   const searchPool = useMemo(() => {
-    if (activeSide === "send") return rankings.filter((p) => myRosterIds.has(p.player_id));
-    if (selectedTeamId === ALL_TEAMS_ID) return rankings.filter((p) => !myRosterIds.has(p.player_id));
+    const pool = mergeSearchMatches(rankings, searchMatches);
+    if (activeSide === "send") return pool.filter((p) => myRosterIds.has(p.player_id));
+    if (selectedTeamId === ALL_TEAMS_ID) return pool.filter((p) => !myRosterIds.has(p.player_id));
     const team = otherTeams.find((t) => t.rosterId === selectedTeamId);
-    return team ? rankings.filter((p) => team.playerIds.has(p.player_id)) : [];
-  }, [rankings, myRosterIds, otherTeams, selectedTeamId, activeSide]);
+    return team ? pool.filter((p) => team.playerIds.has(p.player_id)) : [];
+  }, [rankings, searchMatches, myRosterIds, otherTeams, selectedTeamId, activeSide]);
 
   const pickSearchPool = useMemo(() => {
     if (activeSide === "send") return picks.filter((p) => p.owner_roster_id === myRosterId);

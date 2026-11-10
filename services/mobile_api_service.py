@@ -252,6 +252,7 @@ from modules import (
     waivers_logic,
     weekly_box_scores,
 )
+from modules import player_search
 from modules import public_dynasty_values
 from modules import model_status
 from modules import drop_candidates, roster_value_model
@@ -5427,6 +5428,67 @@ def get_player_rank_in_league(
     if matches.empty:
         return {"ok": True, "player": None}
     return {"ok": True, "player": _project_ranking_row(matches.iloc[0], score_field)}
+
+
+MAX_PLAYER_SEARCH_LIMIT = 50
+
+
+@app.get("/v1/leagues/{league_id}/players/search")
+def search_league_players(
+    q: str,
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    position: str = "",
+    limit: int = 25,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Name search over the FULL valued pool, not the top-N /rankings window.
+
+    Every client search box used to filter a `limit=300` rankings page, which
+    made any player ranked below ~300 (low-value rookies, blocked backups)
+    unsearchable. Rows have the exact /rankings shape; low-value players simply
+    carry a low rank. See modules.player_search.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if not 1 <= limit <= MAX_PLAYER_SEARCH_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_PLAYER_SEARCH_LIMIT}.")
+    if not (q or "").strip():
+        raise HTTPException(status_code=422, detail="Provide a non-empty q.")
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if valued.empty:
+        return {"ok": True, "players": []}
+
+    score_field = league_value_settings.valuation_score_field(lens)
+    scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
+    ranked = canonical_player_ranking.attach_canonical_ranks(
+        valued,
+        scoring_format=scoring_context.scoring_format,
+        score_field=score_field,
+        context=scoring_context,
+    )
+    ranked["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(ranked, score_column=score_field)
+    ranked = player_quick_view.annotate_rankings_stat_pool(ranked)
+    matches = player_search.search_ranked_players(
+        ranked, q, score_field=score_field, position=position, limit=limit
+    )
+    players = []
+    for _, row in matches.iterrows():
+        projected = _project_ranking_row(row, score_field)
+        projected["stats"] = player_quick_view.rankings_stat_entries_for_row(row)
+        players.append(projected)
+    return {"ok": True, "players": players}
 
 
 _NEWS_SOURCE_DISPLAY_NAMES = {
