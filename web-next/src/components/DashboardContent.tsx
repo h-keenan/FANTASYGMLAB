@@ -13,6 +13,8 @@ import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatc
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
+import { TeamStatusHero, useTeamStatusData } from "@/components/TeamStatusHero";
+import { leagueAverageAge } from "@/lib/teamStatus";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
@@ -49,7 +51,10 @@ export function DashboardContent({
   userId,
   accountCreatedAt,
   sample,
+  lens = "Dynasty",
 }: {
+  /** Valuation lens the page loaded the Dashboard with, reused for the hero's reads. */
+  lens?: string;
   leagueId: string;
   leagueName: string;
   data: DashboardResponse;
@@ -93,8 +98,15 @@ export function DashboardContent({
   // My Team: six equal tiles (the odds come from the season simulator; until
   // it has something real the two slots hold Starter / Bench Strength), the
   // rest behind "More team stats".
-  const { items: oddsItems, caption: oddsCaption } = useSeasonOdds(leagueId, !sample);
-  const teamStats = snapshot ? buildTeamStats(snapshot, oddsItems, copy.label("averageAge", "Avg Age")) : null;
+  const { caption: oddsCaption, sim } = useSeasonOdds(leagueId, !sample);
+  const teamStatus = useTeamStatusData(leagueId, lens, !sample, teamRankings);
+  const teams = teamStatus.rankings?.teams ?? null;
+  const teamStats = snapshot
+    ? buildTeamStats(snapshot, copy.label("averageAge", "Avg Age"), {
+        teamCount: teams && teams.length > 1 ? teams.length : null,
+        leagueAge: leagueAverageAge(teams),
+      })
+    : null;
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -132,6 +144,8 @@ export function DashboardContent({
           {data.platform_notice}
         </p>
       ) : null}
+
+      <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} />
 
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} />
 
@@ -174,21 +188,6 @@ export function DashboardContent({
           {teamStats ? (
             <>
               <StatStrip columns={3} items={teamStats.main} />
-              {teamStats.more.length > 0 ? (
-                <details data-testid="my-team-more-stats">
-                  <summary className="tap-link cursor-pointer text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
-                    More team stats
-                  </summary>
-                  <div className="pt-2">
-                    <StatStrip columns={3} items={teamStats.more} />
-                  </div>
-                </details>
-              ) : null}
-              {oddsCaption ? (
-                <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  Rest-of-season simulation: {oddsCaption}.
-                </p>
-              ) : null}
             </>
           ) : null}
           <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
@@ -223,63 +222,45 @@ export function DashboardContent({
   );
 }
 
-/** Default My Team tiles (Record, Power, Franchise, Playoff odds, Proj. record, Injuries) and the "more" set. All plain tiles: no meters. */
+/**
+ * My Team tiles: the league ranks and roster-health facts the hero does not
+ * carry (record, standing and odds live there). Each tile adds its context
+ * only when the data exists: team count from team-rankings, league-average age
+ * from the same response.
+ */
 function buildTeamStats(
   snapshot: NonNullable<DashboardResponse["team_snapshot"]>,
-  odds: StatStripItem[] | null,
   ageLabel: string,
-): { main: StatStripItem[]; more: StatStripItem[] } {
+  context: { teamCount: number | null; leagueAge: string | null },
+): { main: StatStripItem[] } {
   const injured = snapshot.injured_starters && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
-  const starter: StatStripItem = {
-    glyph: "starter",
-    label: "Starter Strength",
-    value: formatRank(snapshot.starter_rank, snapshot.starter_rank_tied),
-    tone: snapshot.starter_rank === 1 ? "premium" : "neutral",
-  };
-  const bench: StatStripItem = {
-    glyph: "bench",
-    label: "Bench Strength",
-    value: formatRank(snapshot.bench_rank, snapshot.bench_rank_tied),
-    tone: snapshot.bench_rank === 1 ? "premium" : "neutral",
-  };
-  const age: StatStripItem = {
-    glyph: "age",
-    label: ageLabel,
-    value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
-  };
-  const playoff = odds?.find((item) => item.label === "Playoff odds");
-  const projRecord = odds?.find((item) => item.label === "Proj. record");
-  const projSeed = odds?.find((item) => item.label !== "Playoff odds" && item.label !== "Proj. record");
-  const haveOdds = Boolean(playoff && projRecord);
+  const ofTeams = context.teamCount ? `of ${context.teamCount} teams` : undefined;
+  const rank = (glyph: StatStripItem["glyph"], label: string, value: number | null, tied: boolean, note?: string): StatStripItem => ({
+    glyph,
+    label,
+    value: formatRank(value, tied),
+    tone: value === 1 ? "premium" : "neutral",
+    note: value != null ? note : undefined,
+  });
   const main: StatStripItem[] = [
+    rank("power", "Power Rank", snapshot.power_rank, snapshot.power_rank_tied, ofTeams),
+    rank("franchise", "Franchise Rank", snapshot.franchise_rank, snapshot.franchise_rank_tied, ofTeams),
+    rank("starter", "Starter Strength", snapshot.starter_rank, snapshot.starter_rank_tied, ofTeams),
+    rank("bench", "Bench Strength", snapshot.bench_rank, snapshot.bench_rank_tied, ofTeams),
     {
-      glyph: "record",
-      label: "Record",
-      value: `${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`,
+      glyph: "age",
+      label: ageLabel,
+      value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
+      note: snapshot.average_age !== null && context.leagueAge ? `League avg ${context.leagueAge}` : undefined,
     },
-    {
-      glyph: "power",
-      label: "Power Rank",
-      value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
-      tone: snapshot.power_rank === 1 ? "premium" : "neutral",
-    },
-    {
-      glyph: "franchise",
-      label: "Franchise Rank",
-      value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
-      tone: snapshot.franchise_rank === 1 ? "premium" : "neutral",
-    },
-    ...(haveOdds ? [playoff as StatStripItem, projRecord as StatStripItem] : [starter, bench]),
     {
       glyph: "injury",
-      label: "Injuries",
-      // A count, not the long health_flag wording; the why lives in Watchlist & Alerts.
-      value: injured > 0 ? String(injured) : "Stable",
+      label: "Injured starters",
+      value: injured > 0 ? String(injured) : "None",
       tone: injured > 0 ? "risk" : "positive",
     },
   ];
-  const more = haveOdds ? [starter, bench, age, ...(projSeed ? [projSeed] : [])] : [age];
-  return { main, more };
+  return { main };
 }
 
 function ViewAllLink({ href, label, label2 = "View all →" }: { href: string; label: string; label2?: string }) {

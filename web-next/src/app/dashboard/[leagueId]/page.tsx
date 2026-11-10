@@ -138,6 +138,7 @@ export default function DashboardPage() {
       leagueName={leagueName}
       data={data}
       teamRankings={teamRankings ?? undefined}
+      lens={lens}
       userId={session?.user?.id}
       accountCreatedAt={session?.user?.created_at}
     />

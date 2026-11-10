@@ -82,7 +82,7 @@ export function DashboardOddsStrip({ leagueId, leagueName }: { leagueId: string;
  * odds tiles out itself (the Dashboard's My Team grid). `items` is null until
  * the simulator has something real to say.
  */
-export function useSeasonOdds(leagueId: string, enabled = true): { items: StatStripItem[] | null; caption: string } {
+export function useSeasonOdds(leagueId: string, enabled = true): { items: StatStripItem[] | null; caption: string; sim: GamesSeasonSimResponse | null } {
   const [data, setData] = useState<GamesSeasonSimResponse | null>(null);
   useEffect(() => {
     if (!enabled) return;
@@ -108,5 +108,5 @@ export function useSeasonOdds(leagueId: string, enabled = true): { items: StatSt
           .filter(Boolean)
           .join(", ")
       : "";
-  return { items, caption };
+  return { items, caption, sim: data };
 }

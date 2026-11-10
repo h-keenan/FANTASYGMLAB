@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -11,11 +10,10 @@ import GlossaryNote from './GlossaryNote';
 import ToneBadge from './ToneBadge';
 import SectionHeading from './SectionHeading';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { api, type DashboardItem, type DashboardResponse, type TeamSnapshot } from '../lib/api';
+import type { DashboardItem, DashboardResponse, TeamRanking, TeamSnapshot } from '../lib/api';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
-import { formatOdds } from '../lib/gamesPresentation';
 import { formatRank } from '../lib/percentile';
-import { queryKeys } from '../lib/queryKeys';
+import { leagueAverageAge } from '../lib/teamStatus';
 import {
   deadlineChip,
   tradeIdeasLine,
@@ -148,115 +146,59 @@ export function DashboardTradesBlock({
 }
 
 /**
- * My Team on the Dashboard: six equal tiles in two rows of three (Record,
- * Power Rank, Franchise Rank, Playoff odds, Proj. record, Injuries; Starter /
- * Bench Strength stand in until the season simulator has odds), the rest
- * behind "More team stats". Plain tiles with no meters. Mirrors web
+ * My Team on the Dashboard: the league ranks and roster-health facts the
+ * "Your team right now" hero does not carry (record, standing and odds live
+ * there). Each tile adds context only when the data exists: team count and
+ * league-average age come from the team-rankings response. Mirrors web
  * DashboardContent buildTeamStats.
  */
 export function DashboardTeamStats({
   snapshot,
+  teams,
   leagueId,
   leagueName,
   onNavigate,
 }: {
   snapshot: TeamSnapshot;
+  teams: TeamRanking[] | null;
   leagueId: string;
   leagueName: string;
   onNavigate: Navigate;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const copy = useExperienceCopy();
-  const isRestoring = useIsRestoring();
-  const [showMore, setShowMore] = useState(false);
-  const oddsQuery = useQuery({
-    queryKey: queryKeys.seasonSim(leagueId),
-    queryFn: () => api.getGamesSeasonSim(leagueId),
-    enabled: !isRestoring,
-  });
-  const sim = oddsQuery.data;
-  const mine = sim && !sim.reason ? sim.my_team : null;
   const goToTeams = () => onNavigate('Teams', { leagueId, leagueName });
   const injured = snapshot.injured_starters != null && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
-  const record =
-    snapshot.wins != null && snapshot.losses != null
-      ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
-      : '—';
-  const starter: StatStripItem = {
-    label: 'Starter Strength',
-    icon: 'link-outline',
-    value: snapshot.starter_rank != null ? formatRank(snapshot.starter_rank, !!snapshot.starter_rank_tied) : '—',
-  };
-  const bench: StatStripItem = {
-    label: 'Bench Strength',
-    icon: 'layers-outline',
-    value: snapshot.bench_rank != null ? formatRank(snapshot.bench_rank, !!snapshot.bench_rank_tied) : '—',
-  };
-  const age: StatStripItem = {
-    label: copy.label('averageAge', 'Avg Age'),
-    icon: 'hourglass-outline',
-    value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
-  };
-  const playoff: StatStripItem | null = mine
-    ? {
-        label: 'Playoff odds',
-        icon: 'flag-outline',
-        value: mine.clinched ? 'Clinched' : mine.eliminated ? 'Out' : formatOdds(mine.playoff_probability),
-        tone: mine.clinched ? 'positive' : mine.eliminated ? 'risk' : undefined,
-        onPress: () => onNavigate('Games', { leagueId, leagueName }),
-      }
-    : null;
-  const projRecord: StatStripItem | null = mine
-    ? { label: 'Proj. record', icon: 'football-outline', value: `${mine.median_final_wins}-${mine.median_final_losses}` }
-    : null;
-  const projSeed: StatStripItem | null = mine
-    ? { label: 'Proj. seed', icon: 'podium-outline', value: `#${mine.median_seed}` }
-    : null;
-  const odds = playoff && projRecord ? [playoff, projRecord] : null;
-  const main: StatStripItem[] = [
-    { label: 'Record', icon: 'ribbon-outline', value: record },
+  const ofTeams = teams && teams.length > 1 ? `of ${teams.length} teams` : null;
+  const leagueAge = leagueAverageAge(teams);
+  const rank = (label: string, icon: StatStripItem['icon'], value: number | null | undefined, tied: boolean, onPress?: () => void): StatStripItem => ({
+    label,
+    icon,
+    value: value != null ? formatRank(value, tied) : '—',
+    note: value != null ? ofTeams : null,
+    onPress,
+  });
+  const items: StatStripItem[] = [
+    rank('Power Rank', 'trophy-outline', snapshot.power_rank, !!snapshot.power_rank_tied, goToTeams),
+    rank('Franchise Rank', 'shield-outline', snapshot.franchise_rank, !!snapshot.franchise_rank_tied, goToTeams),
+    rank('Starter Strength', 'link-outline', snapshot.starter_rank, !!snapshot.starter_rank_tied),
+    rank('Bench Strength', 'layers-outline', snapshot.bench_rank, !!snapshot.bench_rank_tied),
     {
-      label: 'Power Rank',
-      icon: 'trophy-outline',
-      value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
-      onPress: goToTeams,
+      label: copy.label('averageAge', 'Avg Age'),
+      icon: 'hourglass-outline',
+      value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
+      note: snapshot.average_age != null && leagueAge ? `League avg ${leagueAge}` : null,
     },
     {
-      label: 'Franchise Rank',
-      icon: 'shield-outline',
-      value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
-      onPress: goToTeams,
-    },
-    ...(odds ?? [starter, bench]),
-    {
-      label: 'Injuries',
+      label: 'Injured starters',
       icon: 'medkit-outline',
-      value: injured > 0 ? String(injured) : 'Stable',
+      value: injured > 0 ? String(injured) : 'None',
       tone: injured > 0 ? 'risk' : 'positive',
     },
   ];
-  const more: StatStripItem[] = odds ? [starter, bench, age, ...(projSeed ? [projSeed] : [])] : [age];
-  const rows = (items: StatStripItem[]) => {
-    const out: StatStripItem[][] = [];
-    for (let i = 0; i < items.length; i += 3) out.push(items.slice(i, i + 3));
-    return out;
-  };
   return (
     <View>
-      {rows(main).map((row, index) => (
-        <DashboardStatRow key={`main-${index}`} items={row} />
-      ))}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: showMore }}
-        accessibilityLabel="More team stats"
-        onPress={() => setShowMore((value) => !value)}
-        style={styles.quietLink}
-      >
-        <AppText style={styles.quietLinkText}>{showMore ? 'Fewer team stats' : 'More team stats'}</AppText>
-      </Pressable>
-      {showMore ? rows(more).map((row, index) => <DashboardStatRow key={`more-${index}`} items={row} />) : null}
+      <DashboardStatRow items={items.slice(0, 3)} />
+      <DashboardStatRow items={items.slice(3)} />
       <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />
     </View>
   );
@@ -288,8 +230,6 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     block: { gap: spacing.md },
-    quietLink: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: spacing.xs },
-    quietLinkText: { fontSize: 12, fontWeight: '600', color: colors.textTertiary },
     attentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     attentionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
     attentionBadge: { width: 88, alignItems: 'flex-start' },
