@@ -256,9 +256,9 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     explanation: {
-      fontSize: 13,
+      fontSize: 14.5,
       color: colors.textSecondary,
-      lineHeight: 18,
+      lineHeight: 20,
       marginTop: spacing.md,
       paddingTop: spacing.md,
       borderTopWidth: StyleSheet.hairlineWidth,
@@ -266,14 +266,14 @@ function createStyles(colors: ThemeColors) {
     },
     detailGroup: { marginTop: spacing.sm },
     detailLabel: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
       marginBottom: 2,
     },
     tradeLine: {
-      fontSize: 12,
+      fontSize: 13.5,
       color: colors.textTertiary,
       marginTop: spacing.sm,
     },

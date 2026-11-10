@@ -109,7 +109,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     premiumOutlineDisabled: { borderColor: colors.borderStrong },
     dangerOutlineDisabled: { borderColor: colors.borderStrong },
     disabled: { opacity: disabledOpacity },
-    text: { fontSize: 15, fontWeight: '700' },
-    textSm: { fontSize: 13 },
+    text: { fontSize: 16.5, fontWeight: '700' },
+    textSm: { fontSize: 14.5 },
   });
 }

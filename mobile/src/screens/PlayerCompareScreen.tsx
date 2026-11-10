@@ -478,20 +478,20 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.accentMuted,
   },
-  changeButtonText: { fontSize: 12, fontWeight: '600', color: colors.accent },
+  changeButtonText: { fontSize: 13.5, fontWeight: '600', color: colors.accent },
   compareShareButton: { alignItems: 'center', justifyContent: 'center', padding: spacing.xs },
   scrollContent: { paddingHorizontal: spacing.lg },
   identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.sm },
   identity: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  identityName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  identityName: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   identityMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  identityMeta: { fontSize: 11, color: colors.textSecondary },
-  vsLabel: { fontSize: 12, fontWeight: '800', color: colors.textTertiary, marginTop: spacing.xl },
+  identityMeta: { fontSize: 12.5, color: colors.textSecondary },
+  vsLabel: { fontSize: 13.5, fontWeight: '800', color: colors.textTertiary, marginTop: spacing.xl },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowLabel: {
     flex: 1.1,
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textSecondary,
     textAlign: 'center',
@@ -507,13 +507,13 @@ function createStyles(colors: ThemeColors) {
     borderColor: 'transparent',
   },
   rowValuePillWin: { backgroundColor: `${colors.successBright}1F`, borderColor: colors.successBright },
-  rowValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  rowValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   rowValueWin: { color: colors.successBright, fontWeight: '800' },
   // Text-row value (Status/Injury Status/Role Trend) — smaller than the
   // numeric rowValue since these are often full words ("Questionable",
   // "Injured Reserve") rather than a compact number, and never gets the
   // win-pill treatment CompareRowView's numeric values get.
-  rowValueText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  rowValueText: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   narrativeGroup: { gap: spacing.md },
   narrativeBlock: {
     backgroundColor: colors.backgroundElevated,
@@ -521,7 +521,7 @@ function createStyles(colors: ThemeColors) {
     padding: spacing.md,
     gap: 4,
   },
-  narrativeName: { fontSize: 11, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.3 },
-  narrativeText: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  narrativeName: { fontSize: 12.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.3 },
+  narrativeText: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },
   });
 }

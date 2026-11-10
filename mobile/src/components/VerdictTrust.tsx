@@ -112,12 +112,12 @@ export default function VerdictTrust({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.sm, marginTop: spacing.sm },
-    muted: { fontSize: 12, color: colors.textTertiary },
-    item: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
-    reportLink: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, textDecorationLine: 'underline' },
-    prompt: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    muted: { fontSize: 13.5, color: colors.textTertiary },
+    item: { fontSize: 13.5, color: colors.textTertiary, marginTop: 2 },
+    reportLink: { fontSize: 13.5, fontWeight: '700', color: colors.textTertiary, textDecorationLine: 'underline' },
+    prompt: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     reasons: { gap: spacing.xs, padding: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border },
-    thanks: { fontSize: 14, color: colors.success },
-    error: { fontSize: 12, color: colors.danger },
+    thanks: { fontSize: 15.5, color: colors.success },
+    error: { fontSize: 13.5, color: colors.danger },
   });
 }

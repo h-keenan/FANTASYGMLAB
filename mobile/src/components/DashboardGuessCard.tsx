@@ -76,14 +76,14 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: { flex: 1, padding: spacing.md, gap: spacing.sm },
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    title: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 },
+    title: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 },
     identityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.backgroundElevated, borderWidth: 1, borderColor: colors.border },
     identityText: { flex: 1, gap: 2 },
-    hidden: { fontSize: 14, fontWeight: '700', color: colors.textTertiary },
+    hidden: { fontSize: 15.5, fontWeight: '700', color: colors.textTertiary },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    meta: { fontSize: 11, color: colors.textSecondary },
-    stats: { fontSize: 12, color: colors.textSecondary },
-    streak: { fontSize: 11, color: colors.textTertiary },
+    meta: { fontSize: 12.5, color: colors.textSecondary },
+    stats: { fontSize: 13.5, color: colors.textSecondary },
+    streak: { fontSize: 12.5, color: colors.textTertiary },
   });
 }

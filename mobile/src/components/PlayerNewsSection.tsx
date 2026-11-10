@@ -115,14 +115,14 @@ function createStyles(colors: ThemeColors) {
     container: { gap: spacing.md },
     section: { gap: spacing.xs },
     dayHeading: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '700',
       color: colors.textTertiary,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
     card: { padding: spacing.md, paddingVertical: spacing.xs },
-    muted: { fontSize: 12, color: colors.textTertiary },
+    muted: { fontSize: 13.5, color: colors.textTertiary },
     errorBlock: { gap: spacing.sm, alignItems: 'flex-start' },
   });
 }

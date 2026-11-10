@@ -62,15 +62,15 @@ function createStyles(colors: ThemeColors) {
     root: { flex: 1, backgroundColor: 'transparent' },
     content: { flex: 1, paddingHorizontal: spacing.lg, justifyContent: 'space-between' },
     closeButton: { alignSelf: 'flex-end', paddingVertical: spacing.sm },
-    closeButtonText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+    closeButtonText: { fontSize: 15.5, fontWeight: '600', color: colors.textSecondary },
     body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
     icon: { marginBottom: spacing.sm },
-    title: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+    title: { fontSize: 25, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
     subtitle: {
-      fontSize: 15,
+      fontSize: 16.5,
       color: colors.textSecondary,
       textAlign: 'center',
-      lineHeight: 21,
+      lineHeight: 23,
       paddingHorizontal: spacing.md,
     },
     primaryButton: {
@@ -80,6 +80,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     glowWrap: { marginBottom: spacing.lg },
-    primaryButtonText: { fontSize: 16, fontWeight: '600', color: colors.onPremium },
+    primaryButtonText: { fontSize: 17, fontWeight: '600', color: colors.onPremium },
   });
 }

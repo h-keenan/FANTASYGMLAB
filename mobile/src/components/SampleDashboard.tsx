@@ -97,7 +97,7 @@ export default function SampleDashboard() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.md },
-    note: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
-    blocked: { fontSize: 12, fontWeight: '700', color: colors.accent },
+    note: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
+    blocked: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
   });
 }

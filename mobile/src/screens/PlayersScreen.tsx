@@ -475,7 +475,7 @@ function createStyles(colors: ThemeColors) {
   playerRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   playerIdentity: { flex: 1 },
   playerTrailing: { alignItems: 'flex-end', gap: 3, paddingLeft: spacing.sm },
-  playerScore: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  playerScore: { fontSize: 17, fontWeight: '700', color: colors.accent },
   playerTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
   positionRankPill: {
     backgroundColor: colors.backgroundElevated,
@@ -483,7 +483,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
   },
-  positionRankText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
+  positionRankText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
   // Grid (2-up compact card) mode — see PlayerRankRow's `grid` branch.
   // `flex: 1` + a `spacing.sm` column gap so the 2-up gutter matches the
   // vertical gap (the old `width: '48%'` left a ~14pt gutter at phone
@@ -510,7 +510,7 @@ function createStyles(colors: ThemeColors) {
   rowActionButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   // Add-to-trade is the row's primary action: accent border + 12% tint (web parity).
   rowActionAccent: { borderWidth: 1, borderColor: colors.accent, borderRadius: radii.sm, backgroundColor: `${colors.accent}1F` },
-  idpNote: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.md },
+  idpNote: { fontSize: 12.5, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.md },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }

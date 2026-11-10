@@ -100,7 +100,7 @@ function createStyles(colors: ThemeColors) {
       minHeight: 44,
     },
     buttonActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent, borderWidth: 1.5 },
-    buttonText: { fontSize: 12, fontWeight: '600', letterSpacing: -0.2, color: colors.textSecondary, flexShrink: 1 },
+    buttonText: { fontSize: 13.5, fontWeight: '600', letterSpacing: -0.2, color: colors.textSecondary, flexShrink: 1 },
     buttonTextActive: { color: colors.accentOnTint, fontWeight: '700' },
     backdrop: {
       flex: 1,
@@ -115,7 +115,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       padding: spacing.lg,
     },
-    title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+    title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
     optionRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -124,7 +124,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
     },
-    optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    optionText: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
     optionTextActive: { color: colors.accent },
   });
 }

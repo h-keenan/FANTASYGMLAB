@@ -146,7 +146,7 @@ function createStyles(colors: ThemeColors) {
       padding: spacing.lg,
       maxHeight: '60%',
     },
-    title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+    title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
     list: { flexGrow: 0 },
     optionRow: {
       flexDirection: 'row',
@@ -157,7 +157,7 @@ function createStyles(colors: ThemeColors) {
     },
     optionIcon: { marginRight: spacing.sm },
     addRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginTop: spacing.xs },
-    optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+    optionText: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
     // accentOnTint: plain accent measures only 4.02:1 against this sheet's
     // backgroundElevated surface on light mode, under AA (color-system
     // audit, 2026-09-25).

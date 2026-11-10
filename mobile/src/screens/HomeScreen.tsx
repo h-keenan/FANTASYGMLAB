@@ -861,7 +861,7 @@ function createStyles(colors: ThemeColors) {
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   brandName: { ...typography.label, color: colors.textSecondary, letterSpacing: 0.4 },
-  email: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginTop: 2 },
+  email: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, marginTop: 2 },
   entitlementPill: {
     alignSelf: 'flex-start',
     marginTop: spacing.md,
@@ -873,9 +873,9 @@ function createStyles(colors: ThemeColors) {
   entitlementPillPremium: {
     backgroundColor: colors.premiumMuted,
   },
-  entitlementText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  entitlementText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
   entitlementTextPremium: { color: colors.premium },
-  signOut: { color: colors.danger, fontSize: 14, fontWeight: '500' },
+  signOut: { color: colors.danger, fontSize: 15.5, fontWeight: '500' },
   quickActions: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -893,8 +893,8 @@ function createStyles(colors: ThemeColors) {
     borderLeftColor: colors.accent,
   },
   quickActionPrimaryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  quickActionPrimaryLabel: { fontSize: 11, fontWeight: '600', color: colors.accentSoft, textTransform: 'uppercase' },
-  quickActionPrimaryValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+  quickActionPrimaryLabel: { fontSize: 12.5, fontWeight: '600', color: colors.accentSoft, textTransform: 'uppercase' },
+  quickActionPrimaryValue: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   quickActionSecondary: {
     flex: 1,
     padding: spacing.md,
@@ -902,7 +902,7 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     gap: 2,
   },
-  quickActionSecondaryLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  quickActionSecondaryLabel: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
   quickActionIconCircle: { marginBottom: 2 },
   sectionHeader: {
     flexDirection: 'row',
@@ -921,12 +921,12 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     backgroundColor: colors.accentMuted,
   },
-  addLeagueLabel: { fontSize: 12, fontWeight: '700', color: colors.accent },
+  addLeagueLabel: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
   capLock: { marginBottom: spacing.sm },
   glanceTeaser: { marginTop: spacing.xl },
   capLockInModal: { marginTop: spacing.md },
   platformTabs: { marginBottom: spacing.md },
-  addError: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
+  addError: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },
   noLeagueToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -936,8 +936,8 @@ function createStyles(colors: ThemeColors) {
   },
   sampleLeagueButton: { marginTop: spacing.md, alignSelf: 'stretch' },
   addErrorTitle: { fontWeight: '700' },
-  addErrorHint: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 17 },
-  noLeagueToggleText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  addErrorHint: { fontSize: 13.5, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 19 },
+  noLeagueToggleText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
   noLeagueCard: {
     marginTop: spacing.sm,
     padding: spacing.md,
@@ -946,7 +946,7 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.border,
     backgroundColor: colors.glass,
   },
-  noLeagueText: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  noLeagueText: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19 },
   noLeagueButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -954,7 +954,7 @@ function createStyles(colors: ThemeColors) {
     alignSelf: 'flex-start',
     marginTop: spacing.sm,
   },
-  noLeagueButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  noLeagueButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   addOptions: { marginTop: spacing.md },
   // Bounded so a manager with a dozen leagues still sees the action row
   // below the list instead of a modal that runs off the screen.
@@ -968,8 +968,8 @@ function createStyles(colors: ThemeColors) {
     borderBottomColor: colors.border,
   },
   addOptionText: { flex: 1, marginRight: spacing.sm },
-  addOptionName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  addOptionMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  addOptionName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
+  addOptionMeta: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
   listContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl * 3,
@@ -1002,7 +1002,7 @@ function createStyles(colors: ThemeColors) {
   leagueIcon: { marginRight: spacing.sm },
   leagueTextGroup: { flex: 1, marginRight: spacing.sm },
   leagueNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  leagueName: { flexShrink: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary },
+  leagueName: { flexShrink: 1, fontSize: 17, fontWeight: '500', color: colors.textPrimary },
   renameButton: { marginLeft: spacing.sm, marginRight: spacing.sm, padding: 2 },
   error: {
     color: colors.danger,

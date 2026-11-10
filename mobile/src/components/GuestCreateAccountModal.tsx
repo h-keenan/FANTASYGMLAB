@@ -156,7 +156,7 @@ export default function GuestCreateAccountModal({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     input: { marginBottom: spacing.sm },
-    error: { fontSize: 12, color: colors.danger, marginTop: spacing.xs, lineHeight: 16 },
-    notice: { fontSize: 12, color: colors.success, marginTop: spacing.xs, lineHeight: 16 },
+    error: { fontSize: 13.5, color: colors.danger, marginTop: spacing.xs, lineHeight: 18 },
+    notice: { fontSize: 13.5, color: colors.success, marginTop: spacing.xs, lineHeight: 18 },
   });
 }

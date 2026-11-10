@@ -1659,7 +1659,7 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   // The injury/news pill used to live inside actionRow (flexWrap, sharing a
   // line with the buttons) — now its own row, positioned above actionRow, so
   // it never crowds or unpredictably wraps against the buttons.
@@ -1683,7 +1683,7 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.accent,
   },
-  watchButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
+  watchButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.onAccent },
   watchButtonTextActive: { color: colors.accent },
   untouchableButton: {
     width: 34,
@@ -1705,7 +1705,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
   },
-  compareButtonText: { fontSize: 13, fontWeight: '500', color: colors.accent },
+  compareButtonText: { fontSize: 14.5, fontWeight: '500', color: colors.accent },
   // Always-visible row (unlike the conditional tag/news/action rows around
   // it) so there is a share entry point regardless of watch/news state —
   // same icon-only "share-outline" treatment TradeHub's share trigger uses.
@@ -1723,7 +1723,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     borderWidth: 1,
   },
-  newsImpactText: { fontSize: 12, fontWeight: '700' },
+  newsImpactText: { fontSize: 13.5, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: scrim,
@@ -1744,18 +1744,18 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   modalScroll: { flexGrow: 0 },
   modalArticle: {
     paddingVertical: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  modalArticleTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 4 },
-  modalArticleSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginBottom: 4 },
-  modalArticleSource: { fontSize: 11, color: colors.textTertiary },
+  modalArticleTitle: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary, marginBottom: 4 },
+  modalArticleSummary: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20, marginBottom: 4 },
+  modalArticleSource: { fontSize: 12.5, color: colors.textTertiary },
   modalSpeculative: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: colors.premium,
     fontWeight: '700',
     marginBottom: 4,
@@ -1808,9 +1808,9 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
   },
-  ageChipLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
-  ageChipValue: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  trendText: { fontSize: 12, fontWeight: '600' },
+  ageChipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  ageChipValue: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  trendText: { fontSize: 13.5, fontWeight: '600' },
   usageTrendBlock: { marginTop: spacing.sm, gap: spacing.xs },
   usageTrendChip: {
     flexDirection: 'row',
@@ -1822,11 +1822,11 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.sm,
     borderWidth: 1,
   },
-  usageTrendValue: { fontSize: 12, fontWeight: '700' },
-  usageTrendLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-  usageTrendDetail: { fontSize: 11, color: colors.textTertiary },
+  usageTrendValue: { fontSize: 13.5, fontWeight: '700' },
+  usageTrendLabel: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
+  usageTrendDetail: { fontSize: 12.5, color: colors.textTertiary },
   seasonLabel: {
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: '600',
     color: colors.textSecondary,
     marginTop: spacing.xl,
@@ -1837,7 +1837,7 @@ function createStyles(colors: ThemeColors) {
   // tile — states the percentile comparison pool a single time per
   // coridian_'s "that can drastically sway percentiles" Discord concern.
   percentileContextNote: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: colors.textTertiary,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
@@ -1858,18 +1858,18 @@ function createStyles(colors: ThemeColors) {
   statCellLabelIcon: { marginRight: 4 },
   statCellLabel: {
     flexShrink: 1,
-    fontSize: 11,
+    fontSize: 12.5,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  statCellValue: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   // Suffix, not a second stat: it sits on the value's baseline and shrinks
   // first, so the density pass that folded this tab into one card holds.
   statCellValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
   statCellPercentileRow: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
   statCellPercentile: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.accentSoft,
     letterSpacing: 0.2,
@@ -1883,9 +1883,9 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     marginBottom: 4,
   },
-  percentLabel: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
+  percentLabel: { fontSize: 13.5, color: colors.textSecondary, flexShrink: 1 },
   percentValueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
-  percentValue: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+  percentValue: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
   percentTrack: {
     height: 6,
     borderRadius: radii.pill,
@@ -1916,16 +1916,16 @@ function createStyles(colors: ThemeColors) {
   beginnerHelpBlock: { marginTop: spacing.sm, gap: spacing.xs },
   notice: {
     marginTop: spacing.md,
-    fontSize: 12,
+    fontSize: 13.5,
     color: colors.textSecondary,
     textAlign: 'center',
   },
   statsSkeletonWrap: { marginTop: spacing.sm },
   statsSkeletonLabel: { marginBottom: spacing.sm },
   scheduleDisclaimer: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: colors.textTertiary,
-    lineHeight: 15,
+    lineHeight: 17,
     marginBottom: spacing.sm,
   },
   scheduleRow: {
@@ -1936,25 +1936,25 @@ function createStyles(colors: ThemeColors) {
     borderTopColor: colors.border,
   },
   scheduleWeekCol: { width: 52 },
-  scheduleWeekLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  scheduleWeekLabel: { fontSize: 12.5, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   scheduleOpponentCol: { flex: 1 },
-  scheduleOpponent: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  scheduleBye: { fontSize: 14, fontWeight: '700', color: colors.danger, letterSpacing: 0.4 },
-  scheduleDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
-  scheduleDetailMuted: { fontSize: 12, color: colors.textTertiary, marginTop: 1, fontStyle: 'italic' },
+  scheduleOpponent: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary },
+  scheduleBye: { fontSize: 15.5, fontWeight: '700', color: colors.danger, letterSpacing: 0.4 },
+  scheduleDetail: { fontSize: 13.5, color: colors.textSecondary, marginTop: 1 },
+  scheduleDetailMuted: { fontSize: 13.5, color: colors.textTertiary, marginTop: 1, fontStyle: 'italic' },
   // Far-right projection slot — a supporting figure, sized/weighted well
   // below scheduleOpponent (the row's one dominant identity) so it never
   // reads as a second competing number.
   scheduleProjectionCol: { width: 64, alignItems: 'flex-end', marginLeft: spacing.sm },
   scheduleProjectionLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.textTertiary,
     letterSpacing: 0.5,
   },
-  scheduleProjectionValue: { fontSize: 14, fontWeight: '700', color: colors.accent, marginTop: 1 },
+  scheduleProjectionValue: { fontSize: 15.5, fontWeight: '700', color: colors.accent, marginTop: 1 },
   scheduleProjectionMuted: {
-    fontSize: 10,
+    fontSize: 12,
     color: colors.textTertiary,
     fontStyle: 'italic',
     textAlign: 'right',

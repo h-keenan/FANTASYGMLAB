@@ -79,7 +79,7 @@ export default function ScreenInfoNote({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
-    label: { fontSize: 12, fontWeight: '600', color: colors.textTertiary },
+    label: { fontSize: 13.5, fontWeight: '600', color: colors.textTertiary },
     backdrop: {
       flex: 1,
       backgroundColor: scrim,
@@ -94,12 +94,12 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
-    sheetTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    sheetBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+    sheetTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    sheetBody: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 21 },
     legendList: { marginTop: spacing.md, gap: spacing.sm },
     legendRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     legendDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-    legendLabel: { fontSize: 13, fontWeight: '700' },
-    legendText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+    legendLabel: { fontSize: 14.5, fontWeight: '700' },
+    legendText: { flex: 1, fontSize: 14.5, color: colors.textSecondary, lineHeight: 21 },
   });
 }

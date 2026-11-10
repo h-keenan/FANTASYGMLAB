@@ -109,11 +109,11 @@ export default function ReferralCard() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: { padding: spacing.md, gap: spacing.md },
-    body: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    body: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },
     linkBox: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-    link: { fontSize: 13, color: colors.textPrimary },
+    link: { fontSize: 14.5, color: colors.textPrimary },
     statRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    label: { fontSize: 13, color: colors.textSecondary },
-    value: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
+    label: { fontSize: 14.5, color: colors.textSecondary },
+    value: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
   });
 }

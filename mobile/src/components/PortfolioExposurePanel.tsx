@@ -170,7 +170,7 @@ export default function PortfolioExposurePanel() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     gap: { gap: spacing.md },
-    muted: { fontSize: 12, color: colors.textSecondary },
+    muted: { fontSize: 13.5, color: colors.textSecondary },
     row: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: spacing.xs },
     rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     identity: { flex: 1 },
@@ -181,7 +181,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
       paddingVertical: 4,
     },
-    countText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    countText: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
     leagueList: { paddingLeft: spacing.xl, paddingBottom: spacing.xs, gap: 2 },
   });
 }

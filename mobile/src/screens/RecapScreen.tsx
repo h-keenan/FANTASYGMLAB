@@ -788,7 +788,7 @@ function createStyles(colors: ThemeColors) {
     marginRight: spacing.sm,
   },
   weekPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
-  weekPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  weekPillText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
   weekPillTextActive: { color: colors.accent },
   recapSkeletonHeadline: { marginTop: spacing.xs },
   headerRow: {
@@ -798,8 +798,8 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.lg,
   },
   headerTextGroup: { flex: 1 },
-  kicker: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.8, marginBottom: 4 },
-  headline: { fontSize: 26, fontWeight: '700', color: colors.textPrimary },
+  kicker: { fontSize: 12.5, fontWeight: '700', color: colors.accent, letterSpacing: 0.8, marginBottom: 4 },
+  headline: { fontSize: 27, fontWeight: '700', color: colors.textPrimary },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -811,18 +811,18 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.cardBorder,
     marginTop: 2,
   },
-  shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  shareButtonText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
   storyTextGroup: { flex: 1 },
   metricGroup: { alignItems: 'flex-end' },
   // Routine-row metric: deliberately plain textSecondary, not the category
   // color — a $0 FAAB add shouldn't visually compete with the featured
   // row's bold colored number directly above it in the same group.
-  metricValue: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-  metricLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  metricValue: { fontSize: 16.5, fontWeight: '600', color: colors.textSecondary },
+  metricLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   matchupTeamGroup: { flex: 1, alignItems: 'center', gap: 4 },
-  matchupTeam: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  matchupTeam: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   matchupTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
-  matchupVs: { fontSize: 11, color: colors.textTertiary, fontWeight: '600' },
+  matchupVs: { fontSize: 12.5, color: colors.textTertiary, fontWeight: '600' },
   // Colored rings — a bolder presence than a flat icon/avatar, scaled down
   // for the featured tier vs. the hero tier (Magna Carta §19/§20: one
   // player/team-identity visual language, varied through size/weight only).
@@ -841,7 +841,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
   },
-  tradeChipText: { flex: 1, fontSize: 12, fontWeight: '600', color: colors.textPrimary },
+  tradeChipText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.textPrimary },
   error: { color: colors.danger, textAlign: 'center' },
 
   // Lead story (hero) card — bigger type + glow, the one card on this screen
@@ -861,15 +861,15 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.md,
   },
   leadHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  leadKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 3 },
-  leadTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  leadKicker: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.6, marginBottom: 3 },
+  leadTitle: { fontSize: 19.5, fontWeight: '700', color: colors.textPrimary },
   // Bumped from 24->30 — the one number on this screen allowed to read as a
   // genuine headline stat rather than a label-adjacent figure (Magna Carta
   // §10's "display/hero" tier, reserved here for the single most dramatic
   // story on the whole screen).
-  leadMetricValue: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
+  leadMetricValue: { fontSize: 31, fontWeight: '800', letterSpacing: -0.5 },
   tradeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-  leadSummary: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginTop: spacing.md },
+  leadSummary: { fontSize: 15.5, color: colors.textSecondary, lineHeight: 22, marginTop: spacing.md },
   leadFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -879,7 +879,7 @@ function createStyles(colors: ThemeColors) {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  leadFooterText: { fontSize: 12, fontWeight: '700' },
+  leadFooterText: { fontSize: 13.5, fontWeight: '700' },
 
   // Hero-tier matchup "scoreboard": two team avatars flanking one giant
   // centered margin number — the number genuinely IS the story here, so it
@@ -887,13 +887,13 @@ function createStyles(colors: ThemeColors) {
   // teams' names at equal weight (coridian_'s core complaint).
   scoreboardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   scoreboardTeam: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  scoreboardTeamName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  scoreboardTeamName: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   scoreboardTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
   scoreboardMetric: { alignItems: 'center', paddingHorizontal: spacing.xs },
-  scoreboardValue: { fontSize: 38, fontWeight: '800', letterSpacing: -1 },
+  scoreboardValue: { fontSize: 40, fontWeight: '800', letterSpacing: -1 },
   // Featured-tier (in-group) scoreboard — same idea, smaller.
   scoreboardRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  scoreboardValueCompact: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  scoreboardValueCompact: { fontSize: 23, fontWeight: '800', letterSpacing: -0.5 },
 
   // Grouped-story surfaces below the hero — one AnimatedCard per category
   // with internal dividers between rows (Magna Carta §12). The card itself
@@ -904,24 +904,24 @@ function createStyles(colors: ThemeColors) {
   groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
   groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
   groupIcon: { marginLeft: -2 },
-  groupLabel: { flex: 1, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupLabel: { flex: 1, fontSize: 13.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   groupCards: { gap: spacing.sm },
   groupCard: { padding: 0, overflow: 'hidden' },
   // Featured row (tier 2) — the category's one real storyline: tinted
   // background, thicker colored rings, a larger bolded number, full summary.
   featuredRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  featuredTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  featuredMetricValue: { fontSize: 20, fontWeight: '800' },
-  featuredSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
+  featuredTitle: { flex: 1, fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+  featuredMetricValue: { fontSize: 21, fontWeight: '800' },
+  featuredSummary: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20, marginTop: spacing.sm },
   // Routine row (tier 3) — everything else in the category: quieter type,
   // neutral metric color, tighter summary clamp (coridian_'s "$0 FAAB
   // pickup" example shouldn't fight the featured row above it for attention).
   row: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowTitle: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.textSecondary },
+  rowTitle: { flex: 1, fontSize: 14.5, fontWeight: '500', color: colors.textSecondary },
   matchupRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   tradeRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  storySummary: { fontSize: 12, color: colors.textTertiary, lineHeight: 17, marginTop: spacing.xs },
+  storySummary: { fontSize: 13.5, color: colors.textTertiary, lineHeight: 19, marginTop: spacing.xs },
   });
 }

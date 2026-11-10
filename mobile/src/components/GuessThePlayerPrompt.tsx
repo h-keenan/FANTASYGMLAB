@@ -259,7 +259,7 @@ function createStyles(colors: ThemeColors) {
     headerText: { flex: 1, gap: 2 },
     kicker: { ...typography.kicker, color: colors.accent, textTransform: 'uppercase' },
     title: { ...typography.heading, color: colors.textPrimary },
-    closeGlyph: { fontSize: 15, color: colors.textTertiary, paddingTop: 2 },
+    closeGlyph: { fontSize: 16.5, color: colors.textTertiary, paddingTop: 2 },
     identityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     identityText: { flex: 1, gap: 4 },
     name: { ...typography.heading, color: colors.textPrimary },

@@ -34,7 +34,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.input,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
-      fontSize: 16,
+      fontSize: 17,
       backgroundColor: colors.glassInput,
       color: colors.textPrimary,
     },

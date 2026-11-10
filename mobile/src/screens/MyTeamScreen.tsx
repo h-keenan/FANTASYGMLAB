@@ -647,15 +647,15 @@ function createStyles(colors: ThemeColors) {
   analysisStatus: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 6 },
   roomMeter: { flexDirection: 'row', gap: 4, width: '100%', maxWidth: 144 },
   roomMeterSegment: { flex: 1, height: 6, borderRadius: 3 },
-  analysisBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingBottom: spacing.sm },
+  analysisBody: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20, paddingBottom: spacing.sm },
   analysisNotes: { marginTop: spacing.sm },
   compBar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: spacing.md },
   compLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   compLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   compDot: { width: 8, height: 8, borderRadius: 4 },
-  compLegendText: { fontSize: 12, color: colors.textSecondary },
-  compLegendPct: { fontSize: 12, fontWeight: '800', color: colors.textPrimary },
-  rosterEmpty: { fontSize: 13, color: colors.textTertiary, paddingVertical: spacing.md },
+  compLegendText: { fontSize: 13.5, color: colors.textSecondary },
+  compLegendPct: { fontSize: 13.5, fontWeight: '800', color: colors.textPrimary },
+  rosterEmpty: { fontSize: 14.5, color: colors.textTertiary, paddingVertical: spacing.md },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -663,11 +663,11 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.background,
     padding: spacing.xl,
   },
-  disclaimer: { fontSize: 12, color: colors.textTertiary, lineHeight: 17, marginBottom: spacing.md },
+  disclaimer: { fontSize: 13.5, color: colors.textTertiary, lineHeight: 19, marginBottom: spacing.md },
   analyticsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   analyticsRingWrap: { alignItems: 'center' },
   analyticsRingCaption: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textTertiary,
     letterSpacing: 0.5,
@@ -682,7 +682,7 @@ function createStyles(colors: ThemeColors) {
   // (Magna Carta §3: cyan = GM intelligence/analytical emphasis, at its
   // strongest here since the archetype label is this card's headline call-out).
   outlookBadge: { alignSelf: 'flex-start' },
-  analyticsRankLine: { fontSize: 13, color: colors.textSecondary },
+  analyticsRankLine: { fontSize: 14.5, color: colors.textSecondary },
   analyticsMetricsRow: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
@@ -696,7 +696,7 @@ function createStyles(colors: ThemeColors) {
   // of MetricCard's default `minWidth: '46%'`, which is tuned for a 2-up
   // grid and would wrap a 3rd tile onto its own oversized row here.
   analyticsMetricTile: { flexBasis: 0, flexGrow: 1, minWidth: 0, paddingHorizontal: spacing.sm },
-  sectionTotal: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
+  sectionTotal: { fontSize: 12.5, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
   headerLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   // One grouped surface per lineup section (Starters, Bench) with a
   // PlayerIdentityRow per player and hairline dividers between them,
@@ -712,8 +712,8 @@ function createStyles(colors: ThemeColors) {
   },
   compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   compactIdentity: { flex: 1 },
-  valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-  linkRowText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  valueLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  linkRowText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   bestBallNote: { color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.md },
   error: { color: colors.danger, textAlign: 'center' },

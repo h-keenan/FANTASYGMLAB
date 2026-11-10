@@ -173,6 +173,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.glassInset,
     },
     chipActive: { borderColor: colors.accent },
-    chipText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    chipText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   });
 }

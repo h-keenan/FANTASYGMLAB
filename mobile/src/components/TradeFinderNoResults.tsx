@@ -130,10 +130,10 @@ function createStyles(colors: ThemeColors) {
     reasons: { gap: spacing.xs, paddingHorizontal: spacing.xs },
     reasonRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     reasonGlyph: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    reason: { flex: 1, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
+    reason: { flex: 1, fontSize: 13.5, lineHeight: 19, color: colors.textSecondary },
     option: { gap: spacing.xs },
     noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    noteText: { flex: 1, fontSize: 12, lineHeight: 17, color: colors.textTertiary },
-    summary: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
+    noteText: { flex: 1, fontSize: 13.5, lineHeight: 19, color: colors.textTertiary },
+    summary: { fontSize: 15.5, lineHeight: 22, color: colors.textSecondary },
   });
 }

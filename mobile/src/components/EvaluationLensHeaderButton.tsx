@@ -94,7 +94,7 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
     maxWidth: 110,
   },
-  buttonText: { fontSize: 12, fontWeight: '700', color: colors.premium, flexShrink: 1 },
+  buttonText: { fontSize: 13.5, fontWeight: '700', color: colors.premium, flexShrink: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: scrim,
@@ -108,8 +108,8 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.border,
     padding: spacing.lg,
   },
-  title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.md },
+  title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  subtitle: { fontSize: 14.5, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.md },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -119,8 +119,8 @@ function createStyles(colors: ThemeColors) {
     borderBottomColor: colors.border,
   },
   optionTextGroup: { flexShrink: 1, paddingRight: spacing.sm },
-  optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  optionText: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
   optionTextActive: { color: colors.premium },
-  optionHint: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
+  optionHint: { fontSize: 13.5, color: colors.textTertiary, marginTop: 2 },
   });
 }

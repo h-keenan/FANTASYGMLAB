@@ -1176,7 +1176,7 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: 'transparent',
     padding: spacing.xl,
   },
-  disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
+  disclaimer: { fontSize: 13.5, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 18 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   modeRow: { marginBottom: spacing.sm },
   sidesRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
@@ -1195,9 +1195,9 @@ function createStyles(colors: ThemeColors) {
   sideActive: { borderColor: colors.accent },
   sideLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
   sideDot: { width: 7, height: 7, borderRadius: 3.5 },
-  sideLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
+  sideLabel: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
   sideLabelActive: { color: colors.accent },
-  sideEmpty: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
+  sideEmpty: { fontSize: 13.5, color: colors.textSecondary, fontStyle: 'italic' },
   // Nested inside `side` (a `surface` panel): step *up* the ramp rather than
   // down, so the asset group reads as a raised token instead of a hole
   // punched in the panel at near-identical luminance — same treatment Trade
@@ -1232,16 +1232,16 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.glassBorder,
   },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  pillText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: colors.onAccent },
   analyzeButton: { marginBottom: spacing.sm },
-  analyzeHint: { color: colors.textTertiary, fontSize: 12, marginBottom: spacing.md },
+  analyzeHint: { color: colors.textTertiary, fontSize: 13.5, marginBottom: spacing.md },
   // Quick Compare's instant readout — same label + bar shape as the full
   // verdict's value strip (below), just driven by a client-computed delta.
   quickCompareSection: { marginBottom: spacing.md },
   deltaLabel: {
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
@@ -1269,10 +1269,10 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     marginBottom: spacing.sm,
   },
-  extremeEyebrowText: { fontSize: 11, fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3 },
+  extremeEyebrowText: { fontSize: 12.5, fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3 },
   verdictHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  verdictBand: { fontSize: 18, fontWeight: '800', marginBottom: spacing.xs },
-  verdictBandExtreme: { fontSize: 22 },
+  verdictBand: { fontSize: 19.5, fontWeight: '800', marginBottom: spacing.xs },
+  verdictBandExtreme: { fontSize: 23 },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1283,7 +1283,7 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.glassBorder,
   },
-  shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  shareButtonText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
   counterButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1294,7 +1294,7 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1.5,
     borderColor: colors.accent,
   },
-  counterButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  counterButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   verdictHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1309,11 +1309,11 @@ function createStyles(colors: ThemeColors) {
   verdictGlyph: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   verdictSectionBody: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 4 },
   verdictLabel: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  verdictText: { fontSize: 13, color: colors.textPrimary, lineHeight: 18, flex: 1 },
+  verdictText: { fontSize: 14.5, color: colors.textPrimary, lineHeight: 20, flex: 1 },
   // The rationale is a full-width block under the hero strip now, not a
   // flex child sharing a row with the confidence ring.
   verdictRationale: { flex: 0 },
@@ -1323,12 +1323,12 @@ function createStyles(colors: ThemeColors) {
     borderLeftWidth: 4,
     backgroundColor: colors.warningMuted,
   },
-  lineupWarningHeadline: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
-  lineupWarningDetail: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
+  lineupWarningHeadline: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
+  lineupWarningDetail: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19, marginTop: 2 },
   lineupModel: { marginTop: spacing.sm, gap: 2 },
-  lineupModelLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
-  lineupModelHeadline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  lineupModelFootnote: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  lineupModelLabel: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
+  lineupModelHeadline: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+  lineupModelFootnote: { fontSize: 12.5, color: colors.textTertiary, marginTop: 2 },
   resultsList: { paddingBottom: spacing.xl },
   // A pick search row pairs DraftPickAssetRow (which owns the "add to
   // package" tap) with a separate "view pick detail" button — the outer row
@@ -1341,7 +1341,7 @@ function createStyles(colors: ThemeColors) {
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   planningNote: { color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: spacing.sm },
   roleNotes: { gap: spacing.xs, marginBottom: spacing.sm },
-  roleNotesTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
-  roleNote: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
+  roleNotesTitle: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
+  roleNote: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary },
   });
 }

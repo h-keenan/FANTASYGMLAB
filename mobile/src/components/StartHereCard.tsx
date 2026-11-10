@@ -124,13 +124,13 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.sm },
     hide: { minHeight: 44, justifyContent: 'center' },
-    hideText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-    headline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    why: { fontSize: 13, color: colors.textSecondary },
+    hideText: { fontSize: 14.5, fontWeight: '700', color: colors.textSecondary },
+    headline: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    why: { fontSize: 14.5, color: colors.textSecondary },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
     rowText: { flex: 1, minWidth: 0 },
-    mark: { width: 20, fontSize: 16, fontWeight: '700' },
-    arrow: { fontSize: 16, color: colors.accent },
+    mark: { width: 20, fontSize: 17, fontWeight: '700' },
+    arrow: { fontSize: 17, color: colors.accent },
   });
 }

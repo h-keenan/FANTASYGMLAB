@@ -247,11 +247,11 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surface,
     },
     tradeLineTextGroup: { flex: 1, paddingVertical: spacing.sm },
-    deadlineNote: { fontSize: 12, color: colors.textTertiary },
-    tradeLineText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    holdHeadline: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    holdWhy: { fontSize: 12, color: colors.textSecondary },
-    link: { fontSize: 14, fontWeight: '700', color: colors.accent },
+    deadlineNote: { fontSize: 13.5, color: colors.textTertiary },
+    tradeLineText: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    holdHeadline: { flexShrink: 1, fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    holdWhy: { fontSize: 13.5, color: colors.textSecondary },
+    link: { fontSize: 15.5, fontWeight: '700', color: colors.accent },
     moreHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -263,8 +263,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    moreHint: { flex: 1, textAlign: 'right', marginRight: spacing.sm, fontSize: 11, color: colors.textTertiary },
-    moreTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5, color: colors.textPrimary },
+    moreHint: { flex: 1, textAlign: 'right', marginRight: spacing.sm, fontSize: 12.5, color: colors.textTertiary },
+    moreTitle: { fontSize: 14.5, fontWeight: '700', letterSpacing: 0.5, color: colors.textPrimary },
     moreBody: { gap: spacing.lg, paddingTop: spacing.md },
   });
 }

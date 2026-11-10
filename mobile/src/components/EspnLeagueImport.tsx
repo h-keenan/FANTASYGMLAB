@@ -301,7 +301,7 @@ export default function EspnLeagueImport({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    hint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
+    hint: { fontSize: 13.5, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 18 },
     input: { marginBottom: spacing.md },
     kicker: {
       ...typography.kicker,
@@ -310,8 +310,8 @@ function createStyles(colors: ThemeColors) {
       marginBottom: spacing.xs,
       marginTop: spacing.sm,
     },
-    leagueName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-    meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.xs },
+    leagueName: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+    meta: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.xs },
     teamList: { maxHeight: 220 },
     teamRow: {
       flexDirection: 'row',
@@ -322,7 +322,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     teamText: { flex: 1, marginRight: spacing.sm },
-    teamName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    teamName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
     featureCard: {
       marginTop: spacing.md,
       padding: spacing.md,
@@ -332,13 +332,13 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    featureText: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
-    featureStrong: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-    retryText: { fontSize: 13, fontWeight: '700', color: colors.accent, marginTop: spacing.sm },
-    error: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
+    featureText: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19 },
+    featureStrong: { fontSize: 13.5, fontWeight: '700', color: colors.textPrimary },
+    retryText: { fontSize: 14.5, fontWeight: '700', color: colors.accent, marginTop: spacing.sm },
+    error: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md },
     cancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
-    cancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+    cancelText: { fontSize: 15.5, fontWeight: '600', color: colors.textSecondary },
     primaryButton: {
       backgroundColor: colors.accent,
       paddingHorizontal: spacing.lg,
@@ -348,6 +348,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     primaryButtonDisabled: { opacity: 0.5 },
-    primaryText: { fontSize: 14, fontWeight: '700', color: colors.onAccent },
+    primaryText: { fontSize: 15.5, fontWeight: '700', color: colors.onAccent },
   });
 }

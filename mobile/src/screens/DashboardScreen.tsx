@@ -445,7 +445,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : null}
 
       {dashboardData?.platform_notice ? (
-        <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
+        <AppText style={{ color: colors.textSecondary, fontSize: 13.5 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
 
       <TeamStatusHero
@@ -1228,7 +1228,7 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -1236,7 +1236,7 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.background,
     padding: spacing.xl,
   },
-  disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16, textAlign: 'center' },
+  disclaimer: { fontSize: 13.5, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 18, textAlign: 'center' },
   // Dashboard's content container has no `gap` (everything else here relies
   // on manual marginBottom), so the shared grid's own spacing is overridden
   // here rather than the grid inventing an opinion about screen spacing —
@@ -1261,9 +1261,9 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: spacing.sm,
     marginBottom: spacing.md,
   },
-  checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
+  checkInText: { fontSize: 13.5, fontWeight: '600', color: colors.accent, flexShrink: 1 },
   snapshotSection: { marginBottom: spacing.md },
-  viewAll: { fontSize: 12, fontWeight: '700', color: colors.accent },
+  viewAll: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
   activityRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch', marginBottom: spacing.md },
   activityCell: { flex: 1, minWidth: 0 },
   snapshotHelp: { marginTop: spacing.xs },
@@ -1279,9 +1279,9 @@ function createStyles(colors: ThemeColors) {
   card: { gap: 0, marginBottom: spacing.sm },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
   cardIcon: { marginRight: spacing.xs },
-  cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  cardHeadline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  cardReason: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
+  cardLabel: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  cardHeadline: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  cardReason: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20, marginTop: spacing.sm },
   tradeBadge: { marginLeft: 'auto' },
   sidesStack: { gap: spacing.sm, marginTop: spacing.sm },
   valueRow: {
@@ -1302,17 +1302,17 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: spacing.xs,
   },
   meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
-  meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  meterLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   meterSegments: { flexDirection: 'row', gap: 3 },
   meterSegment: { width: 18, height: 5, borderRadius: radii.pill },
-  meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  meterValue: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
   destButton: { marginTop: spacing.md, borderColor: colors.accent, paddingVertical: spacing.sm },
   emptyCard: {
     alignItems: 'center',
     padding: spacing.xl,
     gap: spacing.sm,
   },
-  emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  emptyText: { fontSize: 15.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   });
 }

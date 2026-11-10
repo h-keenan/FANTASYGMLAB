@@ -40,7 +40,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.glass,
     },
     copy: { flex: 1, gap: spacing.xs },
-    label: { fontSize: 11, fontWeight: '800', letterSpacing: 1, color: colors.accent },
-    narrative: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
+    label: { fontSize: 12.5, fontWeight: '800', letterSpacing: 1, color: colors.accent },
+    narrative: { fontSize: 15.5, lineHeight: 22, color: colors.textSecondary },
   });
 }

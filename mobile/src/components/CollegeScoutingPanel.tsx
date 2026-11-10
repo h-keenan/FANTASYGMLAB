@@ -298,7 +298,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     panel: { gap: spacing.sm },
     lensBlock: { gap: spacing.xs },
-    lensNote: { fontSize: 11, color: colors.textSecondary },
+    lensNote: { fontSize: 12.5, color: colors.textSecondary },
     fitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: 2 },
     gridWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
     center: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xl },
@@ -331,11 +331,11 @@ function createStyles(colors: ThemeColors) {
     },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     identity: { flex: 1, minWidth: 0 },
-    name: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    meta: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+    name: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    meta: { fontSize: 12.5, color: colors.textSecondary, marginTop: 1 },
     trailing: { alignItems: 'flex-end', gap: 1 },
-    aggregate: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-    myGrade: { fontSize: 10, color: colors.accent, marginTop: 1 },
+    aggregate: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
+    myGrade: { fontSize: 12, color: colors.accent, marginTop: 1 },
     starButton: { padding: spacing.xs },
     // Grid (2-up compact card) mode — see ProspectRow's `grid` branch. Same
     // width/space-between approach as the other grid-ified list screens
@@ -350,7 +350,7 @@ function createStyles(colors: ThemeColors) {
       gap: 2,
     },
     gridTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    gridName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+    gridName: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
     gridTrailingFooter: {
       marginTop: spacing.xs,
       paddingTop: spacing.xs,

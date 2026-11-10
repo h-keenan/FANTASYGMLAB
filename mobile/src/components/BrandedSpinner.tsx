@@ -58,6 +58,6 @@ export default function BrandedSpinner({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-    label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
+    label: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
   });
 }

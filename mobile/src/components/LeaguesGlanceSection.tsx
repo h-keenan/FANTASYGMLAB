@@ -322,7 +322,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     section: { marginBottom: spacing.xl, gap: spacing.sm },
     sectionTitle: {
-      fontSize: 13,
+      fontSize: 14.5,
       fontWeight: '700',
       color: colors.textSecondary,
       textTransform: 'uppercase',
@@ -345,12 +345,12 @@ function createStyles(colors: ThemeColors) {
     cardCompact: { flex: 1, minWidth: 0, paddingBottom: spacing.xs },
     cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingBottom: spacing.xs },
     identity: { flex: 1, minWidth: 0 },
-    leagueName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    teamName: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+    leagueName: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    teamName: { fontSize: 13.5, color: colors.textSecondary, marginTop: 1 },
     recordRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs, marginTop: spacing.xs },
-    recordValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-    recordMeta: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-    playoffStatus: { fontSize: 11, fontWeight: '600', color: colors.accentSoft, marginTop: 2 },
+    recordValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+    recordMeta: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
+    playoffStatus: { fontSize: 12.5, fontWeight: '600', color: colors.accentSoft, marginTop: 2 },
     newsBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -359,9 +359,9 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 3,
       borderRadius: radii.pill,
     },
-    newsBadgeText: { fontSize: 12, fontWeight: '700' },
-    emptyModules: { fontSize: 12, color: colors.textSecondary, paddingVertical: spacing.md },
-    errorText: { fontSize: 12, color: colors.textSecondary, paddingHorizontal: spacing.sm },
+    newsBadgeText: { fontSize: 13.5, fontWeight: '700' },
+    emptyModules: { fontSize: 13.5, color: colors.textSecondary, paddingVertical: spacing.md },
+    errorText: { fontSize: 13.5, color: colors.textSecondary, paddingHorizontal: spacing.sm },
     failedNote: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -370,11 +370,11 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.sm,
       padding: spacing.sm,
     },
-    failedNoteText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    failedNoteText: { flex: 1, fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
     skeletonGap: { marginTop: spacing.sm, marginBottom: spacing.xs },
     teaser: { opacity: 0.45 },
     teaserRow: { paddingVertical: spacing.sm, gap: spacing.xs },
-    teaserLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4, color: colors.textTertiary },
+    teaserLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: colors.textTertiary },
     teaserBar: { height: 10, width: '80%', borderRadius: radii.sm, backgroundColor: colors.backgroundElevated },
   });
 }

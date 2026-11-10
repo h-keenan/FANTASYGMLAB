@@ -31,9 +31,9 @@ export default function ScreenHeaderTitle({ screen, league }: { screen: string; 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { alignItems: 'center', maxWidth: 220 },
-    screen: { fontSize: 17, fontWeight: '600', color: colors.textPrimary },
+    screen: { fontSize: 18, fontWeight: '600', color: colors.textPrimary },
     league: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '600',
       color: colors.textSecondary,
       letterSpacing: 0.8,

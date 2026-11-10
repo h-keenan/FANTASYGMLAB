@@ -112,8 +112,8 @@ function createStyles(colors: ThemeColors) {
     },
     cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
     cardIcon: { marginRight: spacing.xs },
-    cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-    cardHeadline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+    cardLabel: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+    cardHeadline: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
     matchupValueRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -123,17 +123,17 @@ function createStyles(colors: ThemeColors) {
     matchupValueSide: { flex: 1 },
     matchupValueSideRight: { alignItems: 'flex-end' },
     matchupAvatar: { borderWidth: 2, marginBottom: spacing.xs },
-    matchupSideLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
-    matchupSideValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
+    matchupSideLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
+    matchupSideValue: { fontSize: 21, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
     matchupVersus: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '800',
       letterSpacing: 0.8,
       color: colors.textTertiary,
       paddingHorizontal: spacing.sm,
     },
-    matchupEdge: { fontSize: 13, fontWeight: '700', marginTop: spacing.md },
-    matchupBasis: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
+    matchupEdge: { fontSize: 14.5, fontWeight: '700', marginTop: spacing.md },
+    matchupBasis: { fontSize: 12.5, color: colors.textTertiary, lineHeight: 18, marginTop: spacing.xs },
     destButton: {
       marginTop: spacing.md,
       borderWidth: 1.5,
@@ -142,6 +142,6 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.sm,
       alignItems: 'center',
     },
-    destButtonText: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
+    destButtonText: { fontSize: 13.5, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
   });
 }

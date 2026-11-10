@@ -321,12 +321,12 @@ function createRowStyles(colors: ThemeColors) {
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     eventTag: { marginBottom: spacing.xs, alignSelf: 'flex-start' },
     rowHero: { paddingVertical: 0 },
-    time: { fontSize: 11, color: colors.textTertiary, marginBottom: 3 },
+    time: { fontSize: 12.5, color: colors.textTertiary, marginBottom: 3 },
     identity: { marginBottom: spacing.xs },
-    title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },
-    titleHero: { fontSize: 16, fontWeight: '700' },
-    summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-    footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
+    title: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },
+    titleHero: { fontSize: 17, fontWeight: '700' },
+    summary: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },
+    footerMeta: { fontSize: 12.5, color: colors.textTertiary, marginTop: spacing.xs },
   });
 }
 
@@ -336,7 +336,7 @@ function createStyles(colors: ThemeColors) {
     listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
     sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
     sectionHeaderText: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '700',
       color: colors.textTertiary,
       textTransform: 'uppercase',

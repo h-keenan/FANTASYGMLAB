@@ -95,11 +95,11 @@ export function NetEdgeBar({
 const styles = StyleSheet.create({
   pair: { flexDirection: 'row', alignItems: 'center' },
   dot: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  dotText: { fontSize: 12, fontWeight: '800' },
+  dotText: { fontSize: 13.5, fontWeight: '800' },
   barWrap: { gap: spacing.xs },
   track: { height: 6, borderRadius: radii.pill, overflow: 'hidden' },
   fill: { position: 'absolute', top: 0, bottom: 0 },
   mid: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, marginLeft: -1 },
   labels: { flexDirection: 'row', justifyContent: 'space-between' },
-  label: { fontSize: 11 },
+  label: { fontSize: 12.5 },
 });

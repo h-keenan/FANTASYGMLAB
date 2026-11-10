@@ -49,13 +49,13 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
     solidPill: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radii.pill },
-    solidText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+    solidText: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.3 },
     outlinePill: {
       paddingHorizontal: spacing.sm,
       paddingVertical: 3,
       borderRadius: radii.pill,
       borderWidth: 1,
     },
-    outlineText: { fontSize: 11, fontWeight: '700' },
+    outlineText: { fontSize: 12.5, fontWeight: '700' },
   });
 }

@@ -76,16 +76,16 @@ function createStyles(colors: ThemeColors) {
     },
     headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
     icon: { marginRight: spacing.xs },
-    label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-    headline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+    label: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+    headline: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
     storyList: { gap: spacing.sm },
     storyRow: {
       paddingTop: spacing.sm,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.hairline,
     },
-    storyTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
-    storySummary: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
+    storyTitle: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
+    storySummary: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19, marginTop: 2 },
     footerRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -93,6 +93,6 @@ function createStyles(colors: ThemeColors) {
       gap: 2,
       marginTop: spacing.md,
     },
-    footerText: { fontSize: 12, fontWeight: '700', color: colors.accentSoft, letterSpacing: 0.4 },
+    footerText: { fontSize: 13.5, fontWeight: '700', color: colors.accentSoft, letterSpacing: 0.4 },
   });
 }

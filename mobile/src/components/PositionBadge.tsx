@@ -54,6 +54,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   badgeMd: { height: 24, minWidth: 38, paddingHorizontal: 10 },
-  text: { fontSize: 11, fontWeight: '800', letterSpacing: 0.44, textTransform: 'uppercase' },
-  textMd: { fontSize: 13, letterSpacing: 0.52 },
+  text: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.44, textTransform: 'uppercase' },
+  textMd: { fontSize: 14.5, letterSpacing: 0.52 },
 });

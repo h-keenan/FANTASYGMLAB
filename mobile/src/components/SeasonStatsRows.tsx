@@ -30,7 +30,7 @@ export default function SeasonStatsRows({
     <>
       {stats.seasons.map((season) => (
         <View key={season.label}>
-          <AppText style={{ fontSize: 15, fontWeight: '700', marginVertical: 8, color: colors.textPrimary }}>
+          <AppText style={{ fontSize: 16.5, fontWeight: '700', marginVertical: 8, color: colors.textPrimary }}>
             {season.label}
             {season.games != null ? ` · ${season.games} games` : ''}
           </AppText>

@@ -127,6 +127,6 @@ const styles = StyleSheet.create({
   // recolored version of the ordinary pill.
   badgeCrowned: { alignItems: 'center', paddingTop: 2, gap: 1 },
   crown: { marginBottom: -1 },
-  text: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  textMd: { fontSize: 11 },
+  text: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  textMd: { fontSize: 12.5 },
 });

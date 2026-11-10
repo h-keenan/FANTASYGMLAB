@@ -112,8 +112,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
     card: { width: '100%', maxWidth: 360, paddingHorizontal: spacing.xl },
-    title: { ...typography.title, fontSize: 22, color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.sm },
-    body: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg, lineHeight: 20 },
+    title: { ...typography.title, fontSize: 23, color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.sm },
+    body: { fontSize: 16.5, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg, lineHeight: 22 },
     row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
     input: { textAlign: 'center' },
     inputSmall: { flex: 1 },

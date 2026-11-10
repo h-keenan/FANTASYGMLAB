@@ -98,7 +98,7 @@ function createStyles(colors: ThemeColors) {
       overflow: 'hidden',
     },
     header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-    headerTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    headerTitle: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     chevron: { marginLeft: 'auto' },
     body: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: spacing.md },
   });

@@ -85,15 +85,15 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: { borderWidth: 1, borderColor: colors.premium },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    title: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    description: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    title: { flex: 1, fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    description: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
     button: { alignSelf: 'flex-start' },
     preview: { gap: 4 },
-    previewLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
+    previewLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
     bulletRow: { flexDirection: 'row', gap: spacing.sm },
-    bulletDot: { fontSize: 12, lineHeight: 16, color: colors.textSecondary },
-    bulletText: { flex: 1, fontSize: 12, lineHeight: 16, color: colors.textPrimary },
-    example: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: colors.textPrimary },
-    freeIncludes: { fontSize: 11, lineHeight: 15, color: colors.textTertiary },
+    bulletDot: { fontSize: 13.5, lineHeight: 18, color: colors.textSecondary },
+    bulletText: { flex: 1, fontSize: 13.5, lineHeight: 18, color: colors.textPrimary },
+    example: { fontSize: 13.5, lineHeight: 18, fontWeight: '700', color: colors.textPrimary },
+    freeIncludes: { fontSize: 12.5, lineHeight: 17, color: colors.textTertiary },
   });
 }

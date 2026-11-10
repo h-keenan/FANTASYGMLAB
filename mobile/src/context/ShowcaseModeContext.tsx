@@ -101,7 +101,7 @@ function PrivacyModePill({ onPress }: { onPress: () => void }) {
         elevation: 9999,
       }}
     >
-      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Privacy mode on</Text>
+      <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>Privacy mode on</Text>
     </TouchableOpacity>
   );
 }

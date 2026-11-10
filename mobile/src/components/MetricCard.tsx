@@ -169,15 +169,15 @@ function createStyles(colors: ThemeColors) {
     labelIcon: { marginRight: 4 },
     label: {
       flexShrink: 1,
-      fontSize: 10,
+      fontSize: 12,
       color: colors.textSecondary,
       textTransform: 'uppercase',
       letterSpacing: 0.3,
     },
-    value: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    value: { fontSize: 19.5, fontWeight: '700', color: colors.textPrimary },
     pctlRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 3 },
-    pctlText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2 },
-    noteText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2, marginTop: 3 },
+    pctlText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
+    noteText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2, marginTop: 3 },
     // Neutral pill, deliberately quieter than the percentile/position
     // badges — it's disambiguating metadata ("is this a season total or a
     // per-game rate"), not a judgment on the number, so it borrows
@@ -189,7 +189,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 1,
     },
     periodTagText: {
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: '700',
       letterSpacing: 0.3,
       color: colors.textTertiary,

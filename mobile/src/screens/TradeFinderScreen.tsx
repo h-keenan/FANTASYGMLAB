@@ -665,7 +665,7 @@ function createStyles(colors: ThemeColors) {
     // grouped surface per section 12 — see `rosterRow`/`rosterRowDivider`.
     listContent: { padding: spacing.lg, paddingTop: 0 },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '700',
       color: colors.textTertiary,
       textTransform: 'uppercase',
@@ -731,11 +731,11 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    partnerInitial: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    partnerInitial: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
     partnerTextGroup: { flex: 1 },
     partnerNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-    partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
+    partnerName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+    partnerArchetype: { fontSize: 13.5, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
     fairnessPill: {
       flexShrink: 0,
       borderWidth: 1,
@@ -743,7 +743,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
       paddingVertical: 1,
     },
-    fairnessPillText: { fontSize: 10, fontWeight: '700' },
+    fairnessPillText: { fontSize: 12, fontWeight: '700' },
     valueHero: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
     exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: spacing.sm },
     // Each side is its own small tinted surface so PlayerIdentityRow/
@@ -761,14 +761,14 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     rationaleLabel: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '700',
       color: colors.textPrimary,
       paddingHorizontal: spacing.md,
       marginTop: spacing.sm,
       marginBottom: 2,
     },
-    rationale: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingHorizontal: spacing.md },
+    rationale: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20, paddingHorizontal: spacing.md },
     footerRow: {
       flexDirection: 'row',
       marginTop: spacing.sm,
@@ -779,10 +779,10 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.lg,
     },
     meter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-    meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+    meterLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
     meterSegments: { flexDirection: 'row', gap: 3 },
     meterSegment: { width: 14, height: 4, borderRadius: 2 },
-    meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+    meterValue: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
     ctaBar: {
       backgroundColor: colors.glass,
       borderTopWidth: StyleSheet.hairlineWidth * 1.5,

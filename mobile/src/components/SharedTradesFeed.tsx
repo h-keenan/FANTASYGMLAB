@@ -91,14 +91,14 @@ export default function SharedTradesFeed({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     section: { gap: spacing.md, marginTop: spacing.lg },
-    heading: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    heading: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
     card: { padding: spacing.md, gap: spacing.xs },
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     headerText: { flexShrink: 1, flexGrow: 1 },
-    name: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    muted: { fontSize: 12, color: colors.textTertiary },
-    why: { fontSize: 13, color: colors.textSecondary },
-    sideLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, marginTop: spacing.xs },
-    asset: { fontSize: 13, color: colors.textPrimary },
+    name: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    muted: { fontSize: 13.5, color: colors.textTertiary },
+    why: { fontSize: 14.5, color: colors.textSecondary },
+    sideLabel: { fontSize: 12.5, fontWeight: '700', color: colors.textTertiary, marginTop: spacing.xs },
+    asset: { fontSize: 14.5, color: colors.textPrimary },
   });
 }

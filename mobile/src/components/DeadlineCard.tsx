@@ -58,8 +58,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    headline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    body: { fontSize: 14, color: colors.textSecondary },
-    link: { fontSize: 14, fontWeight: '700', color: colors.accent },
+    headline: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    body: { fontSize: 15.5, color: colors.textSecondary },
+    link: { fontSize: 15.5, fontWeight: '700', color: colors.accent },
   });
 }

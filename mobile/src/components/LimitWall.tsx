@@ -57,9 +57,9 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: { borderWidth: 1, borderColor: colors.premium },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    title: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    body: { fontSize: 12, color: colors.textPrimary, lineHeight: 16 },
-    pro: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    title: { flex: 1, fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    body: { fontSize: 13.5, color: colors.textPrimary, lineHeight: 18 },
+    pro: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
     button: { alignSelf: 'flex-start' },
   });
 }

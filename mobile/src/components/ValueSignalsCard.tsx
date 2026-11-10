@@ -121,7 +121,7 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.sm, marginTop: spacing.lg },
-    note: { fontSize: 12, color: colors.textTertiary },
+    note: { fontSize: 13.5, color: colors.textTertiary },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -133,6 +133,6 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     rowMain: { flex: 1 },
-    delta: { fontSize: 15, fontWeight: '800' },
+    delta: { fontSize: 16.5, fontWeight: '800' },
   });
 }

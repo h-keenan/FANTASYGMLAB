@@ -61,10 +61,10 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { alignItems: 'flex-start', gap: 1 },
     primaryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    primary: { fontSize: 14, fontWeight: '800', color: colors.success },
-    primaryProminent: { fontSize: 19, fontWeight: '800' },
-    claim: { fontSize: 14, fontWeight: '800', color: colors.textSecondary },
-    secondary: { fontSize: 10, color: colors.textTertiary },
-    secondaryProminent: { fontSize: 11.5 },
+    primary: { fontSize: 15.5, fontWeight: '800', color: colors.success },
+    primaryProminent: { fontSize: 20.5, fontWeight: '800' },
+    claim: { fontSize: 15.5, fontWeight: '800', color: colors.textSecondary },
+    secondary: { fontSize: 12, color: colors.textTertiary },
+    secondaryProminent: { fontSize: 13 },
   });
 }

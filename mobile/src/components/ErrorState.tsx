@@ -59,8 +59,8 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
     },
     compact: { paddingVertical: spacing.lg },
-    title: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
-    message: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 },
+    title: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
+    message: { fontSize: 14.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
     button: { marginTop: spacing.md, paddingVertical: spacing.sm },
   });
 }

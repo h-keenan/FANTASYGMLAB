@@ -91,13 +91,13 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     monogramSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
-    monogramText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    monogramText: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     monogramTextSelected: { color: colors.onAccent },
-    cardTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    cardBlurb: { fontSize: 12, color: colors.textTertiary },
+    cardTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    cardBlurb: { fontSize: 13.5, color: colors.textTertiary },
     otherRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
-    otherLabel: { fontSize: 12, color: colors.textTertiary },
-    otherLink: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    otherLabel: { fontSize: 13.5, color: colors.textTertiary },
+    otherLink: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
     otherLinkActive: { color: colors.accent },
   });
 }
