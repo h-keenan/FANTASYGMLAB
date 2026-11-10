@@ -13,7 +13,7 @@ vi.mock("@/context/PlayerQuickViewContext", () => ({
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { ...actual.api, getLeagueRankings: vi.fn() } };
+  return { ...actual, api: { ...actual.api, searchLeaguePlayers: vi.fn() } };
 });
 
 vi.mock("@/context/AuthContext", () => ({
@@ -128,12 +128,10 @@ describe("GmOrb analytics wiring", () => {
 describe("GmOrb search", () => {
   it("matches league players by name and opens their quick view", async () => {
     mockAuth({ user: { id: "user-1" } });
-    vi.mocked(api.getLeagueRankings).mockResolvedValue({
+    // The server does the matching over the whole pool, so only Kelce comes back.
+    vi.mocked(api.searchLeaguePlayers).mockResolvedValue({
       ok: true,
-      players: [
-        { player_id: "p1", name: "Travis Kelce", position: "TE", team: "KC" },
-        { player_id: "p2", name: "Mike Evans", position: "WR", team: "TB" },
-      ],
+      players: [{ player_id: "p1", name: "Travis Kelce", position: "TE", team: "KC" }],
     } as never);
     render(<GmOrb />);
 
@@ -142,7 +140,7 @@ describe("GmOrb search", () => {
 
     const playerRow = await screen.findByRole("button", { name: /Travis Kelce/ });
     expect(screen.queryByText("Mike Evans")).not.toBeInTheDocument();
-    expect(api.getLeagueRankings).toHaveBeenCalledWith("league-1");
+    expect(api.searchLeaguePlayers).toHaveBeenCalledWith("league-1", "kelce", "Dynasty");
 
     fireEvent.click(playerRow);
     expect(openPlayer).toHaveBeenCalledWith(
@@ -152,7 +150,7 @@ describe("GmOrb search", () => {
 
   it("filters destinations without fetching players for a one-letter query", () => {
     mockAuth({ user: { id: "user-1" } });
-    vi.mocked(api.getLeagueRankings).mockClear();
+    vi.mocked(api.searchLeaguePlayers).mockClear();
     render(<GmOrb />);
 
     fireEvent.click(screen.getByLabelText("Open GM menu"));
@@ -160,6 +158,6 @@ describe("GmOrb search", () => {
 
     expect(screen.getByText("Waivers")).toBeInTheDocument();
     expect(screen.queryByText("General")).not.toBeInTheDocument();
-    expect(api.getLeagueRankings).not.toHaveBeenCalled();
+    expect(api.searchLeaguePlayers).not.toHaveBeenCalled();
   });
 });

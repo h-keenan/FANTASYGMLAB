@@ -12,6 +12,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { SnapshotTile } from "@/components/SnapshotTile";
 import { TradeAssetRow } from "@/components/TradeAssetExchange";
+import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 import { api, type DraftPickAsset, type RankedPlayer, type TeamProfile } from "@/lib/api";
 import {
   buildVetoRequest,
@@ -271,14 +272,19 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
   const selectedPlayerIds = useMemo(() => new Set([...aPlayers, ...bPlayers].map((p) => p.player_id)), [aPlayers, bPlayers]);
   const selectedPickIds = useMemo(() => new Set([...aPicks, ...bPicks].map((p) => p.pick_id)), [aPicks, bPicks]);
 
+  // `pool.rankings` is the top-300 window; a rostered player ranked below it
+  // must still be findable, so server search matches are merged in.
+  const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
+  const searchablePlayers = useMemo(() => mergeSearchMatches(pool.rankings, searchMatches), [pool.rankings, searchMatches]);
+
   const playerResults = useMemo(() => {
     if (!activeTeam) return [];
     const q = search.trim().toLowerCase();
-    return pool.rankings
+    return searchablePlayers
       .filter((p) => activeTeam.playerIds.has(p.player_id) && !selectedPlayerIds.has(p.player_id))
       .filter((p) => !q || (p.name ?? "").toLowerCase().includes(q))
       .slice(0, MAX_RESULTS);
-  }, [pool.rankings, activeTeam, search, selectedPlayerIds]);
+  }, [searchablePlayers, activeTeam, search, selectedPlayerIds]);
 
   const pickResults = useMemo(() => {
     if (!activeTeam) return [];

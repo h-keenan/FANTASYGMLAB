@@ -3902,9 +3902,10 @@ export const api = {
   },
   // Name search over the FULL valued pool (not the top-300 rankings window) so a
   // low-value rookie/backup is still findable. Same row shape as getLeagueRankings.
-  searchLeaguePlayers: (leagueId: string, query: string, options?: { lens?: ValuationLens; limit?: number }) => {
+  searchLeaguePlayers: (leagueId: string, query: string, options?: { lens?: ValuationLens; limit?: number; availableOnly?: boolean }) => {
     const params = new URLSearchParams();
     params.set('q', query);
+    if (options?.availableOnly) params.set('available_only', 'true');
     if (options?.lens) params.set('lens', options.lens);
     params.set('limit', String(options?.limit ?? 25));
     return authorizedFetch<LeagueRankingsResponse>(

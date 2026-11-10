@@ -5442,9 +5442,13 @@ def search_league_players(
     lens: str = "Dynasty",
     position: str = "",
     limit: int = 25,
+    available_only: bool = False,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Name search over the FULL valued pool, not the top-N /rankings window.
+
+    `available_only=true` drops anyone rostered in this league (free agents
+    only), which is what the Waivers picker needs.
 
     Every client search box used to filter a `limit=300` rankings page, which
     made any player ranked below ~300 (low-value rookies, blocked backups)
@@ -5482,6 +5486,13 @@ def search_league_players(
     )
     ranked["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(ranked, score_column=score_field)
     ranked = player_quick_view.annotate_rankings_stat_pool(ranked)
+    if available_only:
+        # Filter AFTER ranking/rating so ranks and OVR stay league-global, the
+        # same numbers /rankings shows for this player.
+        rostered = {
+            str(pid) for r in (sleeper.get_rosters(league_id) or []) for pid in (r.get("players") or []) if pid is not None
+        }
+        ranked = ranked[~ranked["player_id"].astype(str).isin(rostered)]
     matches = player_search.search_ranked_players(
         ranked, q, score_field=score_field, position=position, limit=limit
     )

@@ -17,7 +17,7 @@ vi.mock("@/lib/api", async () => {
       postGamesWhatIf: vi.fn(),
       getGamesPickem: vi.fn(),
       postGamesPick: vi.fn(),
-      getLeagueRankings: vi.fn(),
+      searchLeaguePlayers: vi.fn(),
     },
   };
 });
@@ -121,6 +121,23 @@ describe("GamesContent season sim", () => {
     await waitFor(() => expect(api.postGamesWhatIf).toHaveBeenCalledWith("9", { add: [], drop: ["10"] }));
     expect(await screen.findByText("Raises your playoff odds by 9.0 points.")).toBeInTheDocument();
     expect(screen.getByText("+20 starter value")).toBeInTheDocument();
+  });
+
+  it("finds an add candidate through server search and excludes my roster", async () => {
+    vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
+    vi.mocked(api.searchLeaguePlayers).mockResolvedValue({
+      ok: true,
+      players: [
+        { player_id: "10", name: "Sam Starter", position: "WR", team: "KC" },
+        { player_id: "650", name: "Carson Beck", position: "QB", team: "ARI" },
+      ],
+    } as never);
+    render(<GamesContent leagueId="9" leagueName="Test League" />);
+    fireEvent.change(await screen.findByLabelText("Search players to add"), { target: { value: "beck" } });
+    expect(await screen.findByText("Carson Beck")).toBeInTheDocument();
+    expect(api.searchLeaguePlayers).toHaveBeenCalledWith("9", "beck", "Dynasty");
+    // Sam Starter is already on the roster, so only appears once (in the Drop list).
+    expect(screen.getAllByText("Sam Starter")).toHaveLength(1);
   });
 
   it("shows an empty state with a next step when the season has not started", async () => {

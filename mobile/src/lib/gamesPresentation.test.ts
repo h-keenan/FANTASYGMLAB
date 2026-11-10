@@ -6,7 +6,6 @@ import {
   formatOdds,
   gamesReasonAction,
   gamesReasonMessage,
-  matchPlayersByName,
   recordLabel,
   tradeOddsView,
   seedChangeLabel,
@@ -55,15 +54,9 @@ test('optimistic pick touches one matchup only', () => {
   ]);
 });
 
-test('record and player search', () => {
+test('record label', () => {
   assert.equal(recordLabel({ correct: 7, graded: 10 }), '7-3');
   assert.equal(recordLabel(undefined), '0-0');
-  const pool = [{ name: 'Travis Kelce' }, { name: 'Kelvin Harmon' }, { name: 'Jake Elliott' }];
-  assert.deepEqual(
-    matchPlayersByName(pool, 'kel').map((p) => p.name),
-    ['Kelvin Harmon', 'Travis Kelce'],
-  );
-  assert.deepEqual(matchPlayersByName(pool, 'k'), []);
 });
 
 test('tradeOddsView states the change with margin and sample size, omits when thin', () => {

@@ -58,7 +58,8 @@ import { listRowIndex, locateWaiverPlayer, WAIVER_HIGHLIGHT_MS } from '../lib/wa
 import HighlightFrame from '../components/HighlightFrame';
 import { useOrbClearance } from '../lib/orbLayout';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
-import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
+import { rankedPlayerFromWaiverPlayer, waiverPlayerFromRankedPlayer } from '../lib/playerStubs';
+import { useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -218,13 +219,23 @@ export default function WaiversScreen({ route, navigation }: Props) {
     }, [leagueId, lens, reloadToken]),
   );
 
+  // The loaded wire is the top 300 free agents; a typed search also asks the
+  // server (free agents only) so a deeper free agent is still findable. IDP
+  // free agents are already loaded in full, so they need no server search.
+  const idpTab = isIdpPositionFilter(position);
+  const searchMatches = useLeaguePlayerSearch(idpTab ? '' : leagueId, lens, search, { availableOnly: true });
   const filtered = useMemo(() => {
     if (!freeAgents) return [];
     const query = search.trim().toLowerCase();
-    return (isIdpPositionFilter(position) ? idpAgents : freeAgents)
+    let pool = idpTab ? idpAgents : freeAgents;
+    if (!idpTab && searchMatches.length > 0) {
+      const seen = new Set(pool.map((p) => p.player_id));
+      pool = [...pool, ...searchMatches.filter((p) => !seen.has(p.player_id)).map(waiverPlayerFromRankedPlayer)];
+    }
+    return pool
       .filter((p) => position === 'ALL' || p.position === position)
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
-  }, [freeAgents, idpAgents, position, search]);
+  }, [freeAgents, idpAgents, idpTab, position, search, searchMatches]);
   const positionOptions = useMemo(() => withIdpPositionOptions(POSITIONS, idpAgents), [idpAgents]);
 
   // Mirrors modules/waivers_ui.py's render_free_agent_summary_cards: prefer

@@ -22,6 +22,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type RankedPlayer } from '../lib/api';
+import { PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from '../lib/leaguePlayerSearch';
 import { useOrbClearance } from '../lib/orbLayout';
 import { injuryTone } from '../lib/injuryDisplay';
 import {
@@ -267,15 +268,16 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
       .slice(0, 50);
   }, [candidates, player.position, player.score]);
 
+  // Once the user actually types a name, the server searches the WHOLE league
+  // pool (not the top-300 window) — only the default, pre-search suggestion
+  // list is scoped to the base player's own level.
+  const { players: searchMatches, pending: searchPending } = useLeaguePlayerSearchState(leagueId, 'Dynasty', search);
+  const searching = search.trim().length >= PLAYER_SEARCH_MIN_CHARS;
   const filteredCandidates = useMemo(() => {
     if (!candidates) return [];
-    const query = search.trim().toLowerCase();
-    // Once the user actually types a name, search the full pool by name
-    // match (unrestricted by position/value window) — only the default,
-    // pre-search suggestion list is scoped to the base player's own level.
-    if (!query) return defaultSuggestions;
-    return candidates.filter((p) => (p.name ?? '').toLowerCase().includes(query)).slice(0, 50);
-  }, [candidates, search, defaultSuggestions]);
+    if (!searching) return defaultSuggestions;
+    return searchMatches.filter((p) => p.player_id !== player.player_id);
+  }, [candidates, searching, searchMatches, defaultSuggestions, player.player_id]);
 
   if (!playerB) {
     return (
@@ -306,7 +308,11 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
               keyExtractor={(item) => item.player_id}
               contentContainerStyle={{ paddingBottom: orbClearance }}
               ListEmptyComponent={
-                <EmptyState icon="search-outline" title="No players match" subtitle="Try a different search term." />
+                searching && searchPending ? (
+                  <BrandedSpinner style={styles.center} />
+                ) : (
+                  <EmptyState icon="search-outline" title="No players match" subtitle="Try a different search term." />
+                )
               }
               renderItem={({ item, index }) => (
                 // overallRating/positionRank here match Players/Waivers/GM

@@ -17,11 +17,11 @@ import {
   defaultCompareCandidates,
   hasAnyTextValue,
   hasAnyValue,
-  searchCompareCandidates,
   type CompareRow,
   type CompareTextRow,
 } from "@/lib/playerComparePresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerNameText } from "@/components/PlayerNameText";
 
@@ -149,10 +149,12 @@ function IdentityCard({ player }: { player: RankedPlayer }) {
 }
 
 function OpponentPicker({
+  leagueId,
   basePlayer,
   pool,
   onSelect,
 }: {
+  leagueId: string;
   basePlayer: RankedPlayer;
   pool: RankedPlayer[];
   onSelect: (player: RankedPlayer) => void;
@@ -160,9 +162,12 @@ function OpponentPicker({
   const [search, setSearch] = useState("");
   const candidatePool = useMemo(() => pool.filter((p) => p.player_id !== basePlayer.player_id), [pool, basePlayer.player_id]);
   const suggestions = useMemo(() => defaultCompareCandidates(candidatePool, basePlayer), [candidatePool, basePlayer]);
+  // Typed searches go to the server so players below the loaded rankings window are found.
+  const { players: searchMatches, pending } = useLeaguePlayerSearchState(leagueId, "Dynasty", search);
+  const searching = search.trim().length >= PLAYER_SEARCH_MIN_CHARS;
   const results = useMemo(
-    () => (search.trim() ? searchCompareCandidates(candidatePool, search) : suggestions),
-    [search, candidatePool, suggestions],
+    () => (searching ? searchMatches.filter((p) => p.player_id !== basePlayer.player_id) : suggestions),
+    [searching, searchMatches, suggestions, basePlayer.player_id],
   );
 
   return (
@@ -188,7 +193,7 @@ function OpponentPicker({
       <div className="glass-surface flex flex-col">
         {results.length === 0 ? (
           <p className="text-sm px-3 py-4" style={{ color: "var(--color-text-muted)" }}>
-            No players match.
+            {searching && pending ? "Searching players…" : "No players match."}
           </p>
         ) : (
           results.map((candidate) => (
@@ -259,11 +264,13 @@ function NarrativeBlock({
 }
 
 export function PlayerCompareContent({
+  leagueId,
   leagueName,
   playerA,
   initialPlayerB,
   pool,
 }: {
+  leagueId: string;
   leagueName: string;
   playerA: RankedPlayer;
   initialPlayerB: RankedPlayer | null;
@@ -364,7 +371,7 @@ export function PlayerCompareContent({
       </header>
 
       {!playerB ? (
-        <OpponentPicker basePlayer={playerA} pool={pool} onSelect={setPlayerB} />
+        <OpponentPicker leagueId={leagueId} basePlayer={playerA} pool={pool} onSelect={setPlayerB} />
       ) : (
         <div className="flex flex-col gap-5">
           <button

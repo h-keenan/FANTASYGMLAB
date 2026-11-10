@@ -93,6 +93,6 @@ export default function PlayerComparePage() {
   const initialPlayerB = playerBId ? (rankings.players.find((p) => p.player_id === playerBId) ?? null) : null;
 
   return (
-    <PlayerCompareContent leagueName={leagueName} playerA={playerA} initialPlayerB={initialPlayerB} pool={rankings.players} />
+    <PlayerCompareContent leagueId={leagueId} leagueName={leagueName} playerA={playerA} initialPlayerB={initialPlayerB} pool={rankings.players} />
   );
 }
