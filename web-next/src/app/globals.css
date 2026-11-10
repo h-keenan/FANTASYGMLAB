@@ -3023,6 +3023,12 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   color: var(--color-text-primary);
 }
 .lp-lede,
+.lp-pro-note {
+  margin-top: var(--space-lg);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
 .lp-body {
   margin: 0;
   font-size: 0.9375rem;
