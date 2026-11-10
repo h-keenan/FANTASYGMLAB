@@ -45,6 +45,7 @@ import TradeValueBar from '../components/TradeValueBar';
 import VerdictTrust from '../components/VerdictTrust';
 import type { VerdictAssumptions } from '../lib/verdictTrust';
 import type { RosterOverflow } from '../lib/api';
+import { mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import { RosterOverflowNote } from '../components/SuggestedDrop';
 import TradeValueHero from '../components/TradeValueHero';
 import {
@@ -353,17 +354,21 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const hasAnyAssets =
     sendIds.length > 0 || receiveIds.length > 0 || sendPicks.length > 0 || receivePicks.length > 0;
 
+  // `rankings` is the top-300 window; a rostered player ranked below it must still
+  // be tradeable, so search also asks the server.
+  const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
   const searchPool = useMemo(() => {
+    const pool = mergeSearchMatches(rankings, searchMatches);
     if (activeSide === 'send') {
-      return rankings.filter((p) => myRosterIds.has(p.player_id));
+      return pool.filter((p) => myRosterIds.has(p.player_id));
     }
     if (selectedTeamId === ALL_TEAMS_ID) {
-      return rankings.filter((p) => !myRosterIds.has(p.player_id));
+      return pool.filter((p) => !myRosterIds.has(p.player_id));
     }
     const team = otherTeams.find((t) => t.rosterId === selectedTeamId);
     if (!team) return [];
-    return rankings.filter((p) => team.playerIds.has(p.player_id));
-  }, [rankings, myRosterIds, otherTeams, selectedTeamId, activeSide]);
+    return pool.filter((p) => team.playerIds.has(p.player_id));
+  }, [rankings, searchMatches, myRosterIds, otherTeams, selectedTeamId, activeSide]);
 
   const pickSearchPool = useMemo(() => {
     if (activeSide === 'send') {

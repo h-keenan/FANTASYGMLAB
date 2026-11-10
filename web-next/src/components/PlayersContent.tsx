@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { useMemo, useState } from "react";
+import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 
 import type { DraftPickAsset, LeagueIdpValuesResponse, LeagueRankingsResponse, RankedPlayer } from "@/lib/api";
 import {
@@ -261,6 +262,7 @@ export function PlayersContent({
   picks = [],
   rosters = [],
   idp = null,
+  lens = "Dynasty",
 }: {
   leagueId: string;
   leagueName: string;
@@ -270,6 +272,8 @@ export function PlayersContent({
   /** IDP leagues only (see lib/idpPresentation.ts); null/`idp: false` leaves
    * this page exactly as it is for every other league. */
   idp?: LeagueIdpValuesResponse | null;
+  /** Valuation lens the `data` rankings were fetched under; used for name search. */
+  lens?: string;
 }) {
   const [view, setView] = useState<PlayersView>("players");
   const [search, setSearch] = useState("");
@@ -307,7 +311,12 @@ export function PlayersContent({
   }, [idp]);
   const positionOptions = useMemo(() => playersPositionOptions(PLAYERS_POSITION_FILTERS, idp), [idp]);
   const idpSelected = idpPlayers.length > 0 && isIdpPositionFilter(position);
-  const pool = idpSelected ? idpPlayers : data.players;
+  // The rankings window is the top 300; search also asks the server so a lower-ranked
+  // player (e.g. a rookie backup) is still found rather than silently absent.
+  const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
+  const windowPool = data.players;
+  const offensePool = useMemo(() => mergeSearchMatches(windowPool, searchMatches), [windowPool, searchMatches]);
+  const pool = idpSelected ? idpPlayers : offensePool;
 
   const filtered = useMemo(
     () =>

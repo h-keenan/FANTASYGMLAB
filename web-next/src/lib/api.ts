@@ -4459,6 +4459,14 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?lens=${encodeURIComponent(lens)}&limit=${limit}`,
     ),
 
+  // Name search over the FULL valued pool (not the top-300 /rankings window), so a
+  // low-value rookie/backup (e.g. a ~rank-650 QB) is still findable. Same row shape
+  // as getLeagueRankings.
+  searchLeaguePlayers: (leagueId: string, query: string, lens: string = "Dynasty", limit: number = 25) =>
+    authorizedRequest<LeagueRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?q=${encodeURIComponent(query)}&lens=${encodeURIComponent(lens)}&limit=${limit}`,
+    ),
+
   // GM Targets (Revision 11) — the GM_TOOLS watchlist. Reads/writes the
   // exact same durable table (modules/gm_targets.py) and endpoints mobile's
   // GmTargetsScreen.tsx already calls; no new backend logic for this page.

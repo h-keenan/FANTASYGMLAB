@@ -3222,6 +3222,43 @@ def test_rankings_endpoint_returns_ranked_players_for_real_league_settings(monke
         assert "opportunity_label" in player
 
 
+def test_player_search_endpoint_finds_low_ranked_player_outside_rankings_window(monkeypatch):
+    """Regression (Carson Beck): search used to filter only the top-N /rankings
+    window client-side, so a low-value player ranked below it was unfindable."""
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+    frame = _fake_players_frame()
+    # Backup Runner is rank 2 of 2; a rankings page of limit=1 omits him.
+    headers = {"Authorization": "Bearer good-token"}
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=frame):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    windowed = client.get("/v1/leagues/abc/rankings?limit=1", headers=headers).json()
+                    found = client.get("/v1/leagues/abc/players/search?q=backup runner", headers=headers)
+                    empty = client.get("/v1/leagues/abc/players/search?q=", headers=headers)
+                    bad_limit = client.get("/v1/leagues/abc/players/search?q=x&limit=0", headers=headers)
+
+    assert [p["name"] for p in windowed["players"]] == ["Star Wideout"]
+    assert found.status_code == 200
+    players = found.json()["players"]
+    assert [p["name"] for p in players] == ["Backup Runner"]
+    assert players[0]["overall_rank"] == 2
+    assert empty.status_code == 422
+    assert bad_limit.status_code == 422
+
+
 def test_rankings_endpoint_returns_404_for_missing_league(monkeypatch):
     client = _client(monkeypatch)
 

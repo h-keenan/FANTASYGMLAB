@@ -88,6 +88,7 @@ export default function PlayersPage() {
       picks={data.picks}
       rosters={data.rosters}
       idp={data.idp}
+      lens={lens}
     />
   );
 }

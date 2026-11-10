@@ -22,6 +22,7 @@ import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
+import { mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import { api, type LeagueIdpValuesResponse, type RankedPlayer, type ValuationLens } from '../lib/api';
 import {
   IDP_CONFIDENCE_LABEL,
@@ -331,8 +332,12 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const positionOptions = useMemo(() => playersPositionOptions(POSITIONS, idp), [idp]);
   const idpSelected = idpPlayers.length > 0 && isIdpPositionFilter(position);
 
+  // The rankings window is the top 300; search also asks the server so a lower-ranked
+  // player (e.g. a rookie backup) is found instead of silently absent.
+  const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
+
   const filtered = useMemo(() => {
-    const pool = idpSelected ? idpPlayers : players;
+    const pool = idpSelected ? idpPlayers : players ? mergeSearchMatches(players, searchMatches) : players;
     if (!pool) return [];
     const query = search.trim().toLowerCase();
     return pool
@@ -341,7 +346,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
       .filter((p) => matchesStatus(p.status, statusFilter))
       .filter((p) => matchesAvailability(p.injury_status, availabilityFilter))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
-  }, [players, idpPlayers, idpSelected, position, ageFilter, statusFilter, availabilityFilter, search]);
+  }, [players, searchMatches, idpPlayers, idpSelected, position, ageFilter, statusFilter, availabilityFilter, search]);
 
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
