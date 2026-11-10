@@ -1,7 +1,7 @@
 /**
  * Portfolio's quick-glance league cards show up to PORTFOLIO_MAX_SIGNALS
- * (modules/dashboard_engine.py) per-league "Next Move" signals — the exact
- * same BriefingItem shape and `category` taxonomy Today's Game Plan's
+ * (modules/dashboard_engine.py) per-league "top priority" signals — the exact
+ * same BriefingItem shape and `category` taxonomy Today's
  * GamePlanCard already renders (top_priority / watch / waiver_opportunity /
  * league_movement), just several per league instead of one hero item.
  *
@@ -25,7 +25,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function categoryLabel(category: string | null | undefined): string {
-  if (!category) return "Next Move";
+  if (!category) return "Top priority";
   if (CATEGORY_LABELS[category]) return CATEGORY_LABELS[category];
   return category
     .split("_")

@@ -142,7 +142,7 @@ export function TodayModule({
         <EmptyState
           title={
             notReadyReasonMessage(data.reason, {
-              linkAccount: "Connect your Sleeper account to see your Game Plan.",
+              linkAccount: "Connect your Sleeper account to see what to do today.",
               emptyRoster: "Your roster doesn't have any players yet. This is expected if your draft is still in progress.",
             }) || "No urgent roster issues right now."
           }

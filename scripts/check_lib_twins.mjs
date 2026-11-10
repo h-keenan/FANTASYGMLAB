@@ -38,6 +38,7 @@ export const IDENTICAL = [
   "sampleLeague.ts",
   "startHere.ts",
   "startSitRange.ts",
+  "terms.ts",
   "tradeValueBands.generated.ts",
   "verdictText.ts",
 ];

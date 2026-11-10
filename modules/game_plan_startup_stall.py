@@ -304,13 +304,13 @@ def fail_soft_copy(*, exception_type: str = "") -> tuple[str, str]:
     label = str(exception_type or "").casefold()
     if label in {"deferredenrichment", "deferred_enrichment", "post_football_refresh"}:
         return (
-            "Game Plan is catching up",
+            "Today is catching up",
             "Your dashboard shell stays available. Open My Team, Trade Hub, "
-            "Waivers, League, or PQV while Game Plan finishes — we will not invent recommendations.",
+            "Waivers, League, or PQV while Today finishes — we will not invent recommendations.",
         )
     return (
-        "Game Plan is taking longer than expected",
-        "Your dashboard shell stays available. Retry Game Plan, or open My Team, "
+        "Today is taking longer than expected",
+        "Your dashboard shell stays available. Retry Today, or open My Team, "
         "Trade Hub, Waivers, or League while we recover.",
     )
 

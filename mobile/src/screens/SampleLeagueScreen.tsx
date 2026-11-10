@@ -96,7 +96,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
 
         {tab === 'game_plan' ? (
           <>
-            <SectionHeading title="Game Plan" />
+            <SectionHeading title="Today" />
             {SAMPLE_GAME_PLAN.map((item) => (
               <AccentCard key={item.headline} accent={colors.accent}>
                 <AppText style={styles.kicker}>{item.kicker}</AppText>

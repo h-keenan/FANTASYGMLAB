@@ -41,7 +41,7 @@ describe("SampleLeagueContent", () => {
     render(<SampleLeagueContent />);
     fireEvent.click(screen.getByRole("tab", { name: "Roster" }));
     expect(screen.getByText("Alex Sampleton")).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: "Game Plan" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Today" }));
     expect(screen.getByText(/Sell Casey Placeholder/)).toBeTruthy();
     expect(screen.getByTestId("sample-banner")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Open sample trade/ }));

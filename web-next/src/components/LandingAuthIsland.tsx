@@ -268,7 +268,7 @@ export function LandingAuthIsland() {
           ) : null}
           <header className="flex flex-col gap-1">
             <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
-            <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Game Plan.</p>
+            <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Today briefing.</p>
           </header>
           <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
         </div>

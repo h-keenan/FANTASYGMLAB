@@ -47,7 +47,7 @@ describe("OnboardingCarousel", () => {
     // Step 1: one value line over a screenshot with its benefit.
     expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
     expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Today screen/ })).toBeInTheDocument();
     expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(3);
 
     clickNext(1); // -> connect
@@ -149,7 +149,7 @@ describe("OnboardingCarousel value step previews", () => {
     vi.useFakeTimers();
     try {
       render(<OnboardingCarousel onDone={vi.fn()} />);
-      expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: /Today screen/ })).toBeInTheDocument();
       act(() => {
         vi.advanceTimersByTime(ONBOARDING_VALUE_SLIDE_MS + 50);
       });
