@@ -67,19 +67,16 @@
           "bullets": []
         },
         {
-          "title": "Governing law and dispute resolution (DRAFT \u2014 pending legal review)",
+          "title": "Governing law and dispute resolution",
           "paragraphs": [
-            "DRAFT \u2014 PENDING LEGAL REVIEW. This section is a first-pass draft prepared for an attorney to review and edit. It is not final, has not been reviewed or approved by qualified counsel, and must not be relied upon as binding until that review is complete.",
             "These Terms are governed by the laws of the State of Wyoming, without regard to its conflict-of-laws principles, except where applicable law (including consumer-protection law in your jurisdiction) requires otherwise.",
-            "Before filing a claim against FantasyDesk, you agree to first contact us at support@fantasydesk.app and attempt in good faith to resolve the dispute informally. Most concerns can be resolved this way without a formal proceeding.",
-            "OPTIONAL, NOT YET ADOPTED \u2014 whether to include a mandatory arbitration and class-action-waiver clause at all is a separate business-risk decision that coridian_ and counsel should confirm before this paragraph is finalized. If adopted, this paragraph would require you and FantasyDesk to resolve any dispute not settled informally through binding individual arbitration rather than a court proceeding, and would require you to waive the right to participate in a class action or jury trial, subject to any rights that cannot be waived under applicable law."
+            "Before filing a claim against FantasyDesk, you agree to first contact us at support@fantasydesk.app and attempt in good faith to resolve the dispute informally. Most concerns can be resolved this way without a formal proceeding."
           ],
           "bullets": []
         },
         {
-          "title": "User-generated content (DRAFT \u2014 pending legal review)",
+          "title": "User-generated content",
           "paragraphs": [
-            "DRAFT \u2014 PENDING LEGAL REVIEW. This section is a first-pass draft prepared for an attorney to review and edit. It is not final, has not been reviewed or approved by qualified counsel, and must not be relied upon as binding until that review is complete.",
             "The College Prospects feature lets any signed-in user submit a scouting grade, optional round projection, and an optional short note on a college prospect. These submissions are pooled into a shared aggregate and the individual grades and notes are visible to every signed-in user \u2014 this is a shared, crowdsourced feature, not a private one.",
             "You retain ownership of any content you submit. By submitting a scouting grade, note, or other content, you grant FantasyDesk a non-exclusive, worldwide, royalty-free license to host, store, display, and aggregate that content as part of this and similar shared features, for as long as your account or the feature exists.",
             "FantasyDesk may remove or hide submitted content that violates these Terms or is abusive, illegal, harassing, or otherwise inappropriate, without prior notice.",
@@ -122,7 +119,7 @@
           "title": "Third-party services and data",
           "paragraphs": [
             "FantasyDesk uses the following third-party services to operate: Supabase (account sign-in and app data storage), the Sleeper API and ESPN Fantasy API (public league, roster, and player data from the fantasy platform you connect), Apple Sign in with Apple and Google Sign-In (optional sign-in methods), RevenueCat and, on the web app, Stripe (subscription billing), the nflverse public data project (NFL schedule and game results), and Expo's push notification service (delivering app notifications to your device).",
-            "Each provider receives only the information it needs to perform its function \u2014 for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. FantasyDesk does not use any third-party advertising, analytics, or session-recording service, and does not sell your data.",
+            "Each provider receives only the information it needs to perform its function \u2014 for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. FantasyDesk does not use any third-party advertising, analytics, or session-recording service, and does not sell your data. The one exception is optional crash and error monitoring: when enabled, technical error reports (error message, stack trace, app version, and device/OS type, without your name or email) are sent to Sentry solely to find and fix bugs.",
             "Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. FantasyDesk does not control those services."
           ],
           "bullets": []

@@ -20,29 +20,13 @@ NO_AFFILIATION_TEXT = (
 SUPPORT_EMAIL = "support@fantasydesk.app"
 
 
-# --- Part 2 draft legal text -------------------------------------------
+# --- Part 2 legal text ------------------------------------------------
 #
-# DRAFT — PENDING LEGAL REVIEW. The sections tagged with this notice below
-# (governing law / dispute resolution, and user-generated content) are a
-# first-pass draft prepared for an attorney to review and edit — NOT final,
-# reviewed, or approved legal language. Do not treat as binding, and do not
-# let this notice or the "(DRAFT — pending legal review)" section titles be
-# removed until qualified counsel has reviewed and signed off. In
-# particular:
-#   - The governing-law jurisdiction below is Wyoming, confirmed directly by
-#     the terminal operator on 2026-10-10 (no company name or registered
-#     business address has been found in this codebase otherwise — if that
-#     changes, double-check it's still consistent with the real entity).
-#   - Whether to include a mandatory arbitration / class-action-waiver
-#     clause at all is a separate business-risk decision for coridian_ and
-#     counsel to make explicitly; it is included below only as optional,
-#     clearly-flagged draft language, not as an adopted decision.
-_DRAFT_PENDING_LEGAL_REVIEW_NOTICE = (
-    "DRAFT — PENDING LEGAL REVIEW. This section is a first-pass draft prepared "
-    "for an attorney to review and edit. It is not final, has not been reviewed "
-    "or approved by qualified counsel, and must not be relied upon as binding "
-    "until that review is complete."
-)
+# Governing-law jurisdiction (Wyoming) was confirmed by the account owner on
+# 2026-10-10. Counsel sign-off on the governing-law and user-generated-content
+# sections is tracked outside the public copy (see the pre-ad readiness
+# audit); a mandatory arbitration / class-action-waiver clause is NOT part of
+# these Terms and must only be added after counsel review.
 
 
 @dataclass(frozen=True)
@@ -126,16 +110,9 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                     "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms.",
                 ),
             ),
-            # DRAFT — pending legal review. See _DRAFT_PENDING_LEGAL_REVIEW_NOTICE
-            # above: not final, not attorney-reviewed. The jurisdiction below
-            # (Wyoming) was confirmed directly by the terminal operator on
-            # 2026-10-10 — no longer a placeholder — but the arbitration/
-            # class-action-waiver paragraph is still explicitly flagged as an
-            # unadopted, optional business decision.
             LegalSection(
-                "Governing law and dispute resolution (DRAFT — pending legal review)",
+                "Governing law and dispute resolution",
                 (
-                    _DRAFT_PENDING_LEGAL_REVIEW_NOTICE,
                     "These Terms are governed by the laws of the State of Wyoming, without "
                     "regard to its conflict-of-laws principles, except where applicable "
                     "law (including consumer-protection law in your jurisdiction) "
@@ -143,22 +120,11 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                     f"Before filing a claim against {brand_identity.PRODUCT_NAME}, you agree to first "
                     f"contact us at {SUPPORT_EMAIL} and attempt in good faith to resolve the dispute "
                     "informally. Most concerns can be resolved this way without a formal proceeding.",
-                    "OPTIONAL, NOT YET ADOPTED — whether to include a mandatory arbitration "
-                    "and class-action-waiver clause at all is a separate business-risk decision "
-                    "that coridian_ and counsel should confirm before this paragraph is "
-                    "finalized. If adopted, this paragraph would require you and "
-                    f"{brand_identity.PRODUCT_NAME} to resolve any dispute not settled informally "
-                    "through binding individual arbitration rather than a court proceeding, and "
-                    "would require you to waive the right to participate in a class action or "
-                    "jury trial, subject to any rights that cannot be waived under applicable law.",
                 ),
             ),
-            # DRAFT — pending legal review. See _DRAFT_PENDING_LEGAL_REVIEW_NOTICE
-            # above: not final, not attorney-reviewed.
             LegalSection(
-                "User-generated content (DRAFT — pending legal review)",
+                "User-generated content",
                 (
-                    _DRAFT_PENDING_LEGAL_REVIEW_NOTICE,
                     "The College Prospects feature lets any signed-in user submit a scouting "
                     "grade, optional round projection, and an optional short note on a college "
                     "prospect. These submissions are pooled into a shared aggregate and the "
@@ -207,7 +173,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 "Third-party services and data",
                 (
                     f"{brand_identity.PRODUCT_NAME} uses the following third-party services to operate: Supabase (account sign-in and app data storage), the Sleeper API and ESPN Fantasy API (public league, roster, and player data from the fantasy platform you connect), Apple Sign in with Apple and Google Sign-In (optional sign-in methods), RevenueCat and, on the web app, Stripe (subscription billing), the nflverse public data project (NFL schedule and game results), and Expo's push notification service (delivering app notifications to your device).",
-                    f"Each provider receives only the information it needs to perform its function — for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. {brand_identity.PRODUCT_NAME} does not use any third-party advertising, analytics, or session-recording service, and does not sell your data.",
+                    f"Each provider receives only the information it needs to perform its function — for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. {brand_identity.PRODUCT_NAME} does not use any third-party advertising, analytics, or session-recording service, and does not sell your data. The one exception is optional crash and error monitoring: when enabled, technical error reports (error message, stack trace, app version, and device/OS type, without your name or email) are sent to Sentry solely to find and fix bugs.",
                     f"Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. {brand_identity.PRODUCT_NAME} does not control those services.",
                 ),
             ),
