@@ -241,9 +241,14 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         "utm_source",
         "utm_medium",
         "utm_campaign",
+        "utm_content",
+        "utm_term",
         "referrer_host",
         "has_ref",
         "click_id",
+        # The ad click id VALUE (gclid/fbclid/ttclid/...): an opaque, case-
+        # sensitive token needed to attribute paid conversions to the ad.
+        "click_id_value",
     }
 )
 
@@ -924,6 +929,10 @@ def _safe_text(value: object, default: str = "") -> str:
     return text if text else default
 
 
+# Ad click ids routinely exceed the 120-char default (gclid/gbraid can be ~100-200).
+_PROP_VALUE_LIMITS: dict[str, int] = {"click_id_value": 200}
+
+
 def _safe_props(props: Mapping[str, Any] | None) -> dict[str, Any]:
     clean: dict[str, Any] = {}
     raw = dict(props or {})
@@ -949,7 +958,7 @@ def _safe_props(props: Mapping[str, Any] | None) -> dict[str, Any]:
             else:
                 clean[name] = value
         elif isinstance(value, str):
-            clean[name] = value.strip()[:120]
+            clean[name] = value.strip()[:_PROP_VALUE_LIMITS.get(name, 120)]
         else:
             continue
     return clean

@@ -180,7 +180,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
             LegalSection(
                 "First-party product analytics",
                 (
-                    f"Separately from the third-party services above, {brand_identity.PRODUCT_NAME} also collects a first-party, pseudonymous analytics signal — for example, which screens or features are used and basic session timing — to diagnose problems and improve the product.",
+                    f"Separately from the third-party services above, {brand_identity.PRODUCT_NAME} also collects a first-party, pseudonymous analytics signal — for example, which screens or features are used and basic session timing — to diagnose problems and improve the product. If you arrive from an ad or a campaign link, we also record that link's campaign parameters (such as utm_source and utm_campaign) and any advertising click identifier in the link, so we can tell which campaigns bring people to the product.",
                     "These events are tied to a pseudonymous session identifier and a one-way hashed account identifier, never your name, email, or raw account ID, and are never shared with a third party or advertising network.",
                 ),
             ),

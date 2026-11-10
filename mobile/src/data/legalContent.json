@@ -127,7 +127,7 @@
         {
           "title": "First-party product analytics",
           "paragraphs": [
-            "Separately from the third-party services above, FantasyDesk also collects a first-party, pseudonymous analytics signal \u2014 for example, which screens or features are used and basic session timing \u2014 to diagnose problems and improve the product.",
+            "Separately from the third-party services above, FantasyDesk also collects a first-party, pseudonymous analytics signal \u2014 for example, which screens or features are used and basic session timing \u2014 to diagnose problems and improve the product. If you arrive from an ad or a campaign link, we also record that link's campaign parameters (such as utm_source and utm_campaign) and any advertising click identifier in the link, so we can tell which campaigns bring people to the product.",
             "These events are tied to a pseudonymous session identifier and a one-way hashed account identifier, never your name, email, or raw account ID, and are never shared with a third party or advertising network."
           ],
           "bullets": []
