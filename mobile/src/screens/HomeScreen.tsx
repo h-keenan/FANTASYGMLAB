@@ -57,6 +57,7 @@ import Button from '../components/Button';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { leagueCapMessage } from '../lib/leagueCap';
 import Input from '../components/Input';
+import HelpLink from '../components/HelpLink';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -75,7 +76,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { session, signOut } = useAuth();
   const { showcaseMode } = useShowcaseMode();
-  const { consumeFirstLeagueTeamStanceRouting } = useOnboarding();
+  const { consumeFirstLeagueTeamStanceRouting, consumeFirstLeagueTrialOffer } = useOnboarding();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [leagues, setLeagues] = useState<SavedLeague[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -246,6 +247,12 @@ export default function HomeScreen({ navigation, route }: Props) {
     await load();
     if (routeToTeamStance) {
       navigation.navigate('GmPlan', { leagueId, leagueName: leagueName || 'League', initialTab: 'overview' });
+    }
+    // Pro trial offer, shown once, right after the very first league connects
+    // (moved here from before the connect step, 2026-11-10). Closing it
+    // returns to the league they just connected.
+    if (await consumeFirstLeagueTrialOffer()) {
+      navigation.navigate('Paywall', undefined);
     }
   };
 
@@ -695,7 +702,8 @@ export default function HomeScreen({ navigation, route }: Props) {
             ) : (
             <>
             <ModalFormHint>
-              Enter your Sleeper username to pick from your leagues — or paste a league ID directly.
+              Enter your Sleeper username to pick from your leagues — or paste a league ID directly. We never ask for
+              your Sleeper password and never change your lineup.
             </ModalFormHint>
             <Input
               value={addQuery}
@@ -760,6 +768,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     style={styles.sampleLeagueButton}
                   />
                 ) : null}
+                <HelpLink context={{ topic: 'connect_error', platform: 'sleeper', detail: addConnectError.message }} />
               </View>
             ) : null}
             {addMessage ? <AppText style={styles.addError}>{addMessage}</AppText> : null}

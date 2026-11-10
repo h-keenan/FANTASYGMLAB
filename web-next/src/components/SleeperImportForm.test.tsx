@@ -69,7 +69,7 @@ describe("SleeperImportForm", () => {
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "nobody" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "nobody" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -77,7 +77,7 @@ describe("SleeperImportForm", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/not your display name or email/i);
     expect(screen.getByRole("alert")).toHaveTextContent(/don't have a sleeper account/i);
     // The typed username stays filled in, and the sample league is offered.
-    expect(screen.getByPlaceholderText("Sleeper username")).toHaveValue("nobody");
+    expect(screen.getByPlaceholderText("e.g. gridiron_gm")).toHaveValue("nobody");
     expect(screen.getByRole("link", { name: /try a sample league/i })).toHaveAttribute("href", "/sample-league");
   });
 
@@ -90,30 +90,30 @@ describe("SleeperImportForm", () => {
       message: "server text",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "empty" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "empty" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).toHaveTextContent(/no leagues found on sleeper for "empty"/i);
     expect(screen.getByRole("alert")).toHaveTextContent(/this season and last season/i);
     expect(screen.getByRole("link", { name: /try a sample league/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Sleeper username")).toHaveValue("empty");
+    expect(screen.getByPlaceholderText("e.g. gridiron_gm")).toHaveValue("empty");
   });
 
   it("shows a retry message on a network failure and keeps the username", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockRejectedValue(new ApiError(0, "Could not reach the server."));
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).toHaveTextContent(/couldn't reach sleeper or fantasydesk/i);
     expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Sleeper username")).toHaveValue("someone");
+    expect(screen.getByPlaceholderText("e.g. gridiron_gm")).toHaveValue("someone");
   });
 
   it("tracks a click on the sample league button", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "x" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
     const link = await screen.findByRole("link", { name: /try a sample league/i });
     fireEvent.click(link);
@@ -126,7 +126,7 @@ describe("SleeperImportForm", () => {
   it("skips its own sample button when the page already renders one below", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm sampleCtaBelow onLeagueChosen={vi.fn()} />);
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "x" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
     await screen.findByRole("alert");
     expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
@@ -142,7 +142,7 @@ describe("SleeperImportForm", () => {
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -157,7 +157,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.lookupSleeperLeagues).mockReturnValue(new Promise(() => {})); // never resolves
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     expect(trackFeatureUse).toHaveBeenCalledWith("league_import_started");
@@ -173,7 +173,7 @@ describe("SleeperImportForm", () => {
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -191,7 +191,7 @@ describe("SleeperImportForm", () => {
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "nobody" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "nobody" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -215,7 +215,7 @@ describe("SleeperImportForm", () => {
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("league-solo", "Solo League"));
@@ -238,7 +238,7 @@ describe("SleeperImportForm", () => {
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByText("League B")).toBeInTheDocument());
@@ -266,7 +266,7 @@ describe("SleeperImportForm", () => {
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getAllByText("Dynasty Warriors")).toHaveLength(2));
@@ -289,7 +289,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockRejectedValue(new Error("network down"));
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() =>
@@ -313,7 +313,7 @@ describe("SleeperImportForm", () => {
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
@@ -338,7 +338,7 @@ describe("SleeperImportForm", () => {
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
     await waitFor(() => expect(screen.getByText("League B")).toBeInTheDocument());
     fireEvent.click(screen.getByText("League B"));
@@ -360,7 +360,7 @@ describe("SleeperImportForm", () => {
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Sleeper username"), { target: { value: "someone" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/didn't load just now/i));

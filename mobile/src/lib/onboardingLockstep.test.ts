@@ -17,7 +17,7 @@ function listOf(src: string, name: string): string[] {
 
 test('onboarding funnel step ids match web', () => {
   const steps = listOf(mobile, 'STEP_KEYS');
-  assert.deepEqual(steps, ['value', 'connect', 'level']);
+  assert.deepEqual(steps, ['level', 'value']);
   assert.deepEqual(listOf(web, 'ONBOARDING_STEP_KEYS'), steps);
 });
 

@@ -40,23 +40,17 @@ describe("OnboardingCarousel", () => {
     page.remove();
   });
 
-  it("walks value, then Connect, then the experience picker, and calls onDone after a pick", async () => {
+  it("asks the experience level FIRST, then shows the value step, and calls onDone from there", async () => {
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
 
-    // Step 1: one value line over a screenshot with its benefit.
-    expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
-    expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
-    expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(3);
+    // Step 1: the question, before any jargon. No false "setup step" copy.
+    expect(screen.getByRole("heading", { name: /how familiar are you with fantasy football/i })).toBeInTheDocument();
+    expect(screen.queryByText(/one setup step/i)).toBeNull();
+    expect(screen.queryByText(/last thing/i)).toBeNull();
+    expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(2);
 
-    clickNext(1); // -> connect
-    expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
-
-    clickNext(1); // -> experience level
-    expect(screen.getByRole("heading", { name: /how much dynasty experience/i })).toBeInTheDocument();
-
-    // Can't finish without picking a level.
+    // Can't continue without picking a level (Decide later is the way out).
     expect(screen.getByRole("button", { name: /^continue$/i })).toBeDisabled();
 
     // All three levels are offered, including the new, more granular one.
@@ -73,82 +67,84 @@ describe("OnboardingCarousel", () => {
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
     await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith("win_now"));
-    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+
+    // Step 2: one value line over a screenshot with its benefit.
+    expect(await screen.findByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
+    expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Connect my league" }));
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it("lets a brand-new fantasy player pick the most beginner level, and skips the goal chip write when none is picked", async () => {
-    const onDone = vi.fn();
-    render(<OnboardingCarousel onDone={onDone} />);
-    clickNext(2);
+    render(<OnboardingCarousel onDone={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /new to fantasy football/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("new_to_fantasy"));
-    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     expect(api.setExperienceGoal).not.toHaveBeenCalled();
   });
 
   it("clears the goal chip on a second click, same as never picking one", async () => {
-    const onDone = vi.fn();
-    render(<OnboardingCarousel onDone={onDone} />);
-    clickNext(2);
+    render(<OnboardingCarousel onDone={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
     fireEvent.click(screen.getByRole("tab", { name: /^rebuilding$/i }));
     fireEvent.click(screen.getByRole("tab", { name: /^rebuilding$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
-    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalled());
     expect(api.setExperienceGoal).not.toHaveBeenCalled();
   });
 
-  it("goes back a slide with Back and advances/retreats on swipe", () => {
+  it("goes back a slide with Back, and a swipe never skips the question", async () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
-
-    clickNext(1);
-    expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
 
     const content = document.querySelector(".onboarding-content") as HTMLElement;
     fireEvent.touchStart(content, { touches: [{ clientX: 300 }] });
     fireEvent.touchEnd(content, { changedTouches: [{ clientX: 100 }] });
-    expect(screen.getByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeInTheDocument();
-    fireEvent.touchStart(content, { touches: [{ clientX: 100 }] });
-    fireEvent.touchEnd(content, { changedTouches: [{ clientX: 300 }] });
+    expect(screen.getByRole("heading", { name: /how familiar are you/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(screen.getByRole("heading", { name: /how familiar are you/i })).toBeInTheDocument();
+  });
+
+  it("Decide later skips the question without saving a level and does NOT leave onboarding", () => {
+    const onDone = vi.fn();
+    render(<OnboardingCarousel onDone={onDone} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
+
+    expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
-  });
-
-  it("calls onDone immediately on Skip, without saving an experience level", () => {
-    const onDone = vi.fn();
-    render(<OnboardingCarousel onDone={onDone} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-
-    expect(onDone).toHaveBeenCalledTimes(1);
     expect(api.setExperienceLevel).not.toHaveBeenCalled();
+    // Skip on the value step finishes.
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("still calls onDone even when the preference write fails", async () => {
+  it("still moves on even when the preference write fails", async () => {
     vi.mocked(api.setExperienceLevel).mockRejectedValueOnce(new Error("network error"));
-    const onDone = vi.fn();
-    render(<OnboardingCarousel onDone={onDone} />);
+    render(<OnboardingCarousel onDone={vi.fn()} />);
 
-    clickNext(2);
     fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
-    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
   });
 });
 
 describe("OnboardingCarousel value step previews", () => {
-  it("auto-advances screenshots inside step 1 without adding steps, and pauses on request", () => {
+  it("auto-advances screenshots inside the value step without adding steps, and pauses on request", () => {
     vi.useFakeTimers();
     try {
       render(<OnboardingCarousel onDone={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
       expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
       act(() => {
         vi.advanceTimersByTime(ONBOARDING_VALUE_SLIDE_MS + 50);
@@ -162,7 +158,7 @@ describe("OnboardingCarousel value step previews", () => {
       expect(screen.getByRole("img", { name: /Trade Hub screen/ })).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Show Waivers" }));
       expect(screen.getByRole("img", { name: /Waivers screen/ })).toBeInTheDocument();
-      expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(3);
+      expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }
@@ -175,7 +171,6 @@ describe("OnboardingCarousel replay", () => {
     render(<OnboardingCarousel replay onDone={onDone} />);
     clickNext(FEATURE_COUNT - 1);
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Connect Sleeper or ESPN" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(api.setExperienceLevel).not.toHaveBeenCalled();

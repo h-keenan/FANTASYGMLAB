@@ -1,3 +1,4 @@
+import HelpLink from '../components/HelpLink';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -483,6 +484,8 @@ export default function PaywallScreen({ navigation, route }: Props) {
           <AppText style={styles.skipFreeText}>Skip for now — continue free</AppText>
         </TouchableOpacity>
       ) : null}
+
+      <HelpLink context={{ topic: 'paywall' }} />
 
       <AppText style={styles.disclosure}>
         Payment is charged to your account at confirmation of purchase. Your subscription

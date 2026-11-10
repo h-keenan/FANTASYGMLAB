@@ -1,5 +1,6 @@
 "use client";
 
+import { HelpLink } from "@/components/HelpLink";
 import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState } from "react";
 
@@ -182,6 +183,7 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
       >
         Skip for now — continue free
       </button>
+      <HelpLink context={{ topic: "paywall" }} className="self-center" />
     </div>
   );
 }
