@@ -22,6 +22,6 @@ export default function PageTitle({ children, style }: { children: React.ReactNo
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    title: { fontSize: 24, fontWeight: '900', letterSpacing: -0.2, color: colors.textPrimary },
+    title: { fontSize: 25, fontWeight: '900', letterSpacing: -0.2, color: colors.textPrimary },
   });
 }

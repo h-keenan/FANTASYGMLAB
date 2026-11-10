@@ -722,14 +722,14 @@ function createStyles(colors: ThemeColors) {
   standingCard: { gap: spacing.md },
   standingHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   standingHeadText: { flex: 1, minWidth: 0 },
-  standingEyebrow: { fontSize: 11, fontWeight: '800', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.85 },
-  standingTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
-  standingMeta: { fontSize: 12, color: colors.textTertiary },
+  standingEyebrow: { fontSize: 12.5, fontWeight: '800', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.85 },
+  standingTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+  standingMeta: { fontSize: 13.5, color: colors.textTertiary },
   standingGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.sm },
   standingMini: { width: '47%', flexGrow: 1, gap: 4 },
   standingMiniHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm },
-  standingMiniLabel: { fontSize: 12, color: colors.textTertiary },
-  standingMiniRank: { fontSize: 12, fontWeight: '800' },
+  standingMiniLabel: { fontSize: 13.5, color: colors.textTertiary },
+  standingMiniRank: { fontSize: 13.5, fontWeight: '800' },
   standingTrack: { height: 6, width: '100%', backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' },
   standingFill: { height: '100%' },
   center: {
@@ -766,8 +766,8 @@ function createStyles(colors: ThemeColors) {
   avatar: { marginRight: spacing.sm },
   ownerGroup: { flex: 1, marginRight: spacing.sm },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
-  owner: { fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
-  record: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  owner: { fontSize: 17, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
+  record: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
   archetypeBadge: {
     alignSelf: 'flex-start',
     backgroundColor: colors.badgeBackground,
@@ -776,13 +776,13 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 2,
     marginTop: spacing.xs,
   },
-  archetypeBadgeText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
+  archetypeBadgeText: { fontSize: 12, fontWeight: '700', color: colors.badgeText },
   // Wraps every real-signal row (trade tendency + team_badges) so a team
   // with several badges at once (e.g. "Highly Active" + "Pick Hoarder")
   // flows them onto a second line instead of clipping or overlapping.
   signalBadgeWrap: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: 2, marginTop: 3 },
   tendencyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  tendencyText: { fontSize: 11, fontWeight: '600' },
+  tendencyText: { fontSize: 12.5, fontWeight: '600' },
   rankPill: {
     backgroundColor: colors.background,
     borderRadius: radii.sm,
@@ -793,13 +793,13 @@ function createStyles(colors: ThemeColors) {
     minWidth: 52,
   },
   rankLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.textTertiary,
     letterSpacing: 0.4,
   },
-  rankValue: { fontSize: 15, fontWeight: '700' },
-  rankDetail: { fontSize: 9, fontWeight: '600', color: colors.textTertiary, marginTop: 1 },
+  rankValue: { fontSize: 16.5, fontWeight: '700' },
+  rankDetail: { fontSize: 11, fontWeight: '600', color: colors.textTertiary, marginTop: 1 },
   // League #1 gets the same premium/gold hue as an award badge instead of
   // the standard accent — a leaderboard's top spot should read as "the"
   // rank at a glance, not just another pill in the same color scheme as
@@ -814,7 +814,7 @@ function createStyles(colors: ThemeColors) {
     minWidth: 28,
     alignItems: 'center',
   },
-  count: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  count: { fontSize: 14.5, fontWeight: '600', color: colors.textSecondary },
   error: { color: colors.danger, textAlign: 'center' },
   });
 }

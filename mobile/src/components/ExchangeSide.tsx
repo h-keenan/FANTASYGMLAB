@@ -60,14 +60,14 @@ function createStyles(colors: ThemeColors) {
     labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dot: { width: 6, height: 6, borderRadius: 3 },
     label: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '700',
       color: colors.textTertiary,
       textTransform: 'uppercase',
       letterSpacing: 0.9,
     },
-    total: { marginLeft: 'auto', fontSize: 14, fontWeight: '900', color: colors.textSecondary },
-    none: { fontSize: 12, color: colors.textTertiary },
+    total: { marginLeft: 'auto', fontSize: 15.5, fontWeight: '900', color: colors.textSecondary },
+    none: { fontSize: 13.5, color: colors.textTertiary },
     list: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   });
 }

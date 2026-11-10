@@ -404,10 +404,13 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    // Solid elevated sheet, same treatment as every other bottom sheet.
+    // Sheet fill is `surface`, not `backgroundElevated`: the elevated tier is
+    // #3d4248 in dark (web --color-surface-raised, meant for small raised
+    // controls), which painted the whole sheet a flat mid-gray lighter than
+    // the near-black app. `surface` keeps the card tiers inside it readable.
     backdrop: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
     sheet: {
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.surface,
       borderTopLeftRadius: radii.lg,
       borderTopRightRadius: radii.lg,
       borderWidth: 1,
@@ -416,7 +419,7 @@ function createStyles(colors: ThemeColors) {
     },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
-    kicker: { flex: 1, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary, textTransform: 'uppercase' },
+    kicker: { flex: 1, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary, textTransform: 'uppercase' },
     closeButton: {
       width: 28,
       height: 28,
@@ -428,15 +431,15 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.glassInset,
     },
     footnote: { gap: 2 },
-    rankLine: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-    note: { fontSize: 12, lineHeight: 17, color: colors.textTertiary },
+    rankLine: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
+    note: { fontSize: 13.5, lineHeight: 19, color: colors.textTertiary },
     signalRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
     body: { gap: spacing.lg },
     section: { gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: spacing.md },
     statGroup: { gap: spacing.xs },
-    groupTitle: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    groupTitle: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
     tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    muted: { fontSize: 13, color: colors.textSecondary },
+    muted: { fontSize: 14.5, color: colors.textSecondary },
     actionButtons: { flexDirection: 'row', gap: spacing.sm },
     actionButton: { flex: 1 },
     actions: {

@@ -233,7 +233,7 @@ function createStyles(colors: ThemeColors) {
       padding: spacing.xl,
       backgroundColor: colors.background,
     },
-    quietText: { color: colors.textSecondary, textAlign: 'center', fontSize: 15 },
+    quietText: { color: colors.textSecondary, textAlign: 'center', fontSize: 16.5 },
     // Continuous grouped surface with internal dividers (Magna Carta §12),
     // same leaderboard shape TeamsScreen uses — every team is a peer row in
     // one ranked list, not N independent cards.
@@ -258,8 +258,8 @@ function createStyles(colors: ThemeColors) {
     avatar: { marginRight: spacing.sm },
     ownerGroup: { flex: 1, marginRight: spacing.sm },
     nameRow: { flexDirection: 'row', alignItems: 'center' },
-    owner: { fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
-    record: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    owner: { fontSize: 17, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
+    record: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
     statusBadge: {
       alignSelf: 'flex-start',
       borderRadius: radii.pill,
@@ -267,7 +267,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 2,
       marginTop: spacing.xs,
     },
-    statusBadgeText: { fontSize: 10, fontWeight: '700' },
+    statusBadgeText: { fontSize: 12, fontWeight: '700' },
     oddsPill: {
       backgroundColor: colors.background,
       borderRadius: radii.sm,
@@ -277,8 +277,8 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       minWidth: 56,
     },
-    oddsLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-    oddsValue: { fontSize: 15, fontWeight: '700' },
+    oddsLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+    oddsValue: { fontSize: 16.5, fontWeight: '700' },
     error: { color: colors.danger, textAlign: 'center' },
   });
 }

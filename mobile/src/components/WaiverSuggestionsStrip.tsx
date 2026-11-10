@@ -103,10 +103,10 @@ function createStyles(colors: ThemeColors) {
       minHeight: 14,
       marginBottom: spacing.xs,
     },
-    suggestionPrestigeLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+    suggestionPrestigeLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
     suggestionAvatar: { marginTop: 2 },
     suggestionPosBadgeWrap: { alignSelf: 'center', marginTop: spacing.xs },
-    suggestionName: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    suggestionName: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
     suggestionFooter: { alignSelf: 'stretch', alignItems: 'center', gap: 4, marginTop: spacing.xs },
   });
 }

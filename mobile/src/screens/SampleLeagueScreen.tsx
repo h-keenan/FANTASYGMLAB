@@ -144,15 +144,15 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1 },
     content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-    title: { fontSize: 24, fontWeight: '900', color: colors.textPrimary },
-    muted: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
-    kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.accent },
-    cardTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-    link: { fontSize: 14, fontWeight: '700', color: colors.accent },
+    title: { fontSize: 25, fontWeight: '900', color: colors.textPrimary },
+    muted: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
+    kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.accent },
+    cardTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    link: { fontSize: 15.5, fontWeight: '700', color: colors.accent },
     badgeSlot: { width: 40, alignItems: 'flex-start' },
     playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
     playerText: { flex: 1 },
-    playerName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    playerName: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     verdictRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   });
 }

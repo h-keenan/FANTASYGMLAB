@@ -18,7 +18,7 @@ export default function GuillotineCard({ data }: { data: GuillotineResponse | nu
   return (
     <AccentCard accent={color} compact>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <AppText style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, textTransform: 'uppercase' }}>
+        <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.textTertiary, textTransform: 'uppercase' }}>
           Guillotine
         </AppText>
         <ToneBadge label={view.badge.label} color={color} />

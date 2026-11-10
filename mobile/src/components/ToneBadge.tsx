@@ -72,6 +72,6 @@ const styles = StyleSheet.create({
   pillXs: { paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
   // Web: text-xs (12px) / 0.625rem xs, tracking --letter-spacing-badge (0.085em). 11/10 on phone
   // so a pill stays one size family with PositionBadge (11).
-  text: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.9 },
-  textXs: { fontSize: 10, letterSpacing: 0.85 },
+  text: { fontSize: 12.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.9 },
+  textXs: { fontSize: 12, letterSpacing: 0.85 },
 });

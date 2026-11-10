@@ -23,5 +23,5 @@ export default function PostureChip({ posture }: { posture: TradePosture }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
-  why: { fontSize: 12, color: colors.textTertiary, flexShrink: 1 },
+  why: { fontSize: 13.5, color: colors.textTertiary, flexShrink: 1 },
 });

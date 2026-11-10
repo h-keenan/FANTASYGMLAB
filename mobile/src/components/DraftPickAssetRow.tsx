@@ -138,12 +138,12 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm + 2 },
     divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     body: { flex: 1, gap: 1 },
-    label: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    meta: { fontSize: 11, color: colors.textSecondary },
-    context: { fontSize: 11, color: colors.textTertiary },
+    label: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    meta: { fontSize: 12.5, color: colors.textSecondary },
+    context: { fontSize: 12.5, color: colors.textTertiary },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
-    trailingValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    trailingCaption: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },
+    trailingValue: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    trailingCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
     chevron: { marginLeft: spacing.xs },
   });
 }

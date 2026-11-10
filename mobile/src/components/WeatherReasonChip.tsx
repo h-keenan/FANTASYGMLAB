@@ -66,5 +66,5 @@ export function ProjectionWeatherChip({ weather }: { weather: PlayerWeekWeather 
 const styles = StyleSheet.create({
   list: { gap: 2, marginTop: 2 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  text: { flex: 1, fontSize: 12, minWidth: 0 },
+  text: { flex: 1, fontSize: 13.5, minWidth: 0 },
 });

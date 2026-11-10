@@ -34,6 +34,6 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       marginRight: 8,
     },
-    text: { fontSize: 11, fontWeight: '800', color: colors.accent, lineHeight: 13 },
+    text: { fontSize: 12.5, fontWeight: '800', color: colors.accent, lineHeight: 15 },
   });
 }

@@ -80,10 +80,10 @@ export default function UsageBlock({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     flag: { borderWidth: 1, borderRadius: radii.sm, padding: spacing.sm, marginVertical: spacing.sm, gap: spacing.xs },
-    flagLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-    flagText: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
-    note: { fontSize: 12, lineHeight: 17, color: colors.textTertiary, marginVertical: spacing.xs },
-    noteOut: { fontSize: 11, lineHeight: 16, color: colors.textTertiary, marginBottom: spacing.xs },
-    credit: { fontSize: 11, color: colors.textTertiary, textDecorationLine: 'underline', marginBottom: spacing.md },
+    flagLabel: { fontSize: 12.5, fontWeight: '800', letterSpacing: 1 },
+    flagText: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary },
+    note: { fontSize: 13.5, lineHeight: 19, color: colors.textTertiary, marginVertical: spacing.xs },
+    noteOut: { fontSize: 12.5, lineHeight: 18, color: colors.textTertiary, marginBottom: spacing.xs },
+    credit: { fontSize: 12.5, color: colors.textTertiary, textDecorationLine: 'underline', marginBottom: spacing.md },
   });
 }

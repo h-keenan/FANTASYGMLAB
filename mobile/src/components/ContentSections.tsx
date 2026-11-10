@@ -88,7 +88,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     section: { marginBottom: spacing.xl },
     sectionTitle: {
-      fontSize: 17,
+      fontSize: 18,
       fontWeight: '700',
       color: colors.textPrimary,
       marginBottom: spacing.sm,

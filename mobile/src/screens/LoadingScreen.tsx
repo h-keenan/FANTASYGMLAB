@@ -59,7 +59,7 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.background,
     gap: spacing.sm,
   },
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  status: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.lg },
+  title: { fontSize: 23, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+  status: { fontSize: 15.5, color: colors.textSecondary, marginTop: spacing.lg },
   });
 }

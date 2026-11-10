@@ -340,9 +340,9 @@ function createStyles(colors: ThemeColors) {
       maxHeight: '80%',
     },
     sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-    sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+    sheetTitle: { fontSize: 19.5, fontWeight: '800', color: colors.textPrimary },
     sheetBody: { flexGrow: 0 },
-    muted: { fontSize: 13, color: colors.textTertiary, paddingVertical: spacing.md },
+    muted: { fontSize: 14.5, color: colors.textTertiary, paddingVertical: spacing.md },
     candidate: {
       paddingVertical: spacing.sm,
       gap: 4,
@@ -353,11 +353,11 @@ function createStyles(colors: ThemeColors) {
     blockedRow: { flexDirection: 'row', paddingLeft: spacing.xs },
     bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: spacing.xs },
     dot: { width: 6, height: 6, borderRadius: 3 },
-    bulletText: { fontSize: 12, color: colors.textSecondary },
+    bulletText: { fontSize: 13.5, color: colors.textSecondary },
     bar: { gap: spacing.sm },
     barRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     barButton: { flex: 1 },
-    link: { fontSize: 13, fontWeight: '700', color: colors.accent },
-    barNote: { fontSize: 12, color: colors.textSecondary },
+    link: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
+    barNote: { fontSize: 13.5, color: colors.textSecondary },
   });
 }

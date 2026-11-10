@@ -101,10 +101,10 @@ export default function TradeOddsEffect({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { marginTop: spacing.sm, gap: 2 },
-    label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
-    headline: { fontSize: 14, fontWeight: '700' },
-    title: { fontSize: 13, color: colors.textSecondary },
-    caption: { fontSize: 11, color: colors.textTertiary },
-    upgrade: { fontSize: 11, fontWeight: '700', color: colors.premium },
+    label: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
+    headline: { fontSize: 15.5, fontWeight: '700' },
+    title: { fontSize: 14.5, color: colors.textSecondary },
+    caption: { fontSize: 12.5, color: colors.textTertiary },
+    upgrade: { fontSize: 12.5, fontWeight: '700', color: colors.premium },
   });
 }

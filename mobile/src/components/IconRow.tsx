@@ -49,5 +49,5 @@ export default function IconRow({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   chip: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  text: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 18, paddingTop: 1 },
+  text: { flex: 1, minWidth: 0, fontSize: 14.5, lineHeight: 20, paddingTop: 1 },
 });

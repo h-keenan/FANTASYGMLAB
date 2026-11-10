@@ -250,7 +250,7 @@ function createStyles(colors: ThemeColors) {
     headerText: { flex: 1, gap: 2 },
     kicker: { ...typography.kicker, color: colors.accent, textTransform: 'uppercase' },
     title: { ...typography.heading, color: colors.textPrimary },
-    closeGlyph: { fontSize: 15, color: colors.textTertiary, paddingTop: 2 },
+    closeGlyph: { fontSize: 16.5, color: colors.textTertiary, paddingTop: 2 },
     identitiesRow: { flexDirection: 'row', gap: spacing.md },
     identityColumn: { flex: 1, gap: 2 },
     identityKicker: { ...typography.caption, color: colors.textTertiary, textTransform: 'uppercase' },

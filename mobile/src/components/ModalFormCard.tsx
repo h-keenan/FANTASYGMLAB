@@ -88,8 +88,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.cardBorder,
       padding: spacing.lg,
     },
-    title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-    hint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
+    title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+    hint: { fontSize: 13.5, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 18 },
     actions: {
       flexDirection: 'row',
       justifyContent: 'flex-end',

@@ -59,9 +59,9 @@ export default function LeagueWarmupProgress({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.sm, paddingVertical: spacing.md },
-    title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+    title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    label: { fontSize: 14, color: colors.textSecondary },
+    label: { fontSize: 15.5, color: colors.textSecondary },
     labelDone: { color: colors.textPrimary },
   });
 }

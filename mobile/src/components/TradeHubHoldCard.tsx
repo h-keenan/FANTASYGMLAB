@@ -66,7 +66,7 @@ const createStyles = (colors: ThemeColors) =>
     glyph: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
     rowText: { flex: 1, alignItems: 'flex-start', gap: 4 },
-    title: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    line: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
-    note: { fontSize: 12, fontWeight: '600', color: colors.textTertiary, marginTop: 2 },
+    title: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    line: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary },
+    note: { fontSize: 13.5, fontWeight: '600', color: colors.textTertiary, marginTop: 2 },
   });

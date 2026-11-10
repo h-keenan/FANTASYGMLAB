@@ -135,14 +135,14 @@ export default function LeagueStandingStrips({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     contextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    contextText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, letterSpacing: 0.2 },
+    contextText: { fontSize: 13.5, fontWeight: '500', color: colors.textSecondary, letterSpacing: 0.2 },
     stripCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, gap: spacing.sm },
     stripTextGroup: { flex: 1 },
     stripNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    stripName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-    stripValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-    stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
-    oddsCaption: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
-    stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+    stripName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+    stripValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+    stripValueLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
+    oddsCaption: { fontSize: 12.5, color: colors.textTertiary, marginTop: 2 },
+    stripTextGroup2: { flex: 1, fontSize: 15.5, fontWeight: '600', color: colors.textPrimary },
   });
 }

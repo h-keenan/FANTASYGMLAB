@@ -38,7 +38,7 @@ export default function LeagueTypeControl({
   };
   return (
     <View style={{ gap: 6 }}>
-      <AppText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>League type</AppText>
+      <AppText style={{ fontSize: 13.5, fontWeight: '700', color: colors.textSecondary }}>League type</AppText>
       <SegmentedTabBar options={OPTIONS} active={data.league_type_override ?? 'auto'} onChange={select} />
     </View>
   );

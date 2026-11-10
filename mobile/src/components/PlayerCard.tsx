@@ -312,7 +312,7 @@ function createStyles(colors: ThemeColors) {
       minHeight: 14,
       marginBottom: spacing.xs,
     },
-    prestigeLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+    prestigeLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
     avatarWrap: { marginTop: spacing.xs },
     injuryDot: {
       position: 'absolute',
@@ -328,7 +328,7 @@ function createStyles(colors: ThemeColors) {
     // Most visually dominant text on the card (UI_HIERARCHY_DIRECTIVE.md
     // §11 — player identity must outrank badges/chips), bottom-anchored via
     // `justifyContent` on the front face's own flex layout.
-    name: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: 'auto', textAlign: 'center' },
+    name: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary, marginTop: 'auto', textAlign: 'center' },
     backHeaderRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -336,19 +336,19 @@ function createStyles(colors: ThemeColors) {
       alignSelf: 'stretch',
       gap: spacing.xs,
     },
-    backName: { flex: 1, fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+    backName: { flex: 1, fontSize: 14.5, fontWeight: '800', color: colors.textPrimary },
     backNote: {
       alignSelf: 'stretch',
-      fontSize: 10.5,
+      fontSize: 12,
       color: colors.textSecondary,
-      lineHeight: 14,
+      lineHeight: 16,
       marginTop: spacing.xs,
     },
     backStatsList: { alignSelf: 'stretch', marginTop: spacing.xs, gap: 3 },
     backStatRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.xs },
-    backStatLabel: { fontSize: 9.5, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
-    backStatValue: { fontSize: 11, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
-    backEmpty: { fontSize: 10.5, color: colors.textTertiary, marginTop: spacing.xs },
+    backStatLabel: { fontSize: 11.5, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    backStatValue: { fontSize: 12.5, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+    backEmpty: { fontSize: 12, color: colors.textTertiary, marginTop: spacing.xs },
     detailButton: {
       position: 'absolute',
       left: 4,

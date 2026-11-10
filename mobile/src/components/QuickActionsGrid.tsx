@@ -86,6 +86,6 @@ function createStyles(colors: ThemeColors) {
       gap: 4,
       borderWidth: 1,
     },
-    label: { fontSize: 11, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    label: { fontSize: 12.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   });
 }

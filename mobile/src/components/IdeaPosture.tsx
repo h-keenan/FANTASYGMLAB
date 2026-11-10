@@ -37,5 +37,5 @@ export default function IdeaPosture({ idea }: { idea: IdeaPostureFields }) {
 
 const styles = StyleSheet.create({
   block: { gap: spacing.xs, alignItems: 'flex-start' },
-  note: { fontSize: 12, lineHeight: 17, color: colors.textSecondary },
+  note: { fontSize: 13.5, lineHeight: 19, color: colors.textSecondary },
 });

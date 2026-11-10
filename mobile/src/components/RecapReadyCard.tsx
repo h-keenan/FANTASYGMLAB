@@ -45,7 +45,7 @@ function createStyles(colors: ThemeColors) {
     },
     recapIconDisc: { marginRight: spacing.sm },
     recapTextGroup: { flex: 1 },
-    recapTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    recapSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    recapTitle: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    recapSubtitle: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
   });
 }

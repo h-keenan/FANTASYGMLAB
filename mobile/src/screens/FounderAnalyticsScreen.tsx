@@ -202,10 +202,10 @@ function createStyles(colors: ThemeColors) {
     content: { padding: spacing.lg, gap: spacing.md },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
     inlineSpinner: { paddingVertical: spacing.xl },
-    muted: { fontSize: 12, color: colors.textTertiary },
-    body: { fontSize: 14, color: colors.textSecondary },
+    muted: { fontSize: 13.5, color: colors.textTertiary },
+    body: { fontSize: 15.5, color: colors.textSecondary },
     note: {
-      fontSize: 13,
+      fontSize: 14.5,
       color: colors.textPrimary,
       padding: spacing.sm,
       borderRadius: radii.sm,
@@ -213,10 +213,10 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.premium,
     },
     storage: { gap: 4 },
-    storageTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+    storageTitle: { fontSize: 13.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
     tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     tile: { flexGrow: 1, flexBasis: '45%', padding: spacing.md },
-    tileValue: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
+    tileValue: { fontSize: 23, fontWeight: '800', color: colors.textPrimary },
     listCard: { padding: 0 },
     row: {
       flexDirection: 'row',
@@ -227,7 +227,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.sm,
     },
     rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.glassBorder },
-    rowLabel: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-    rowValue: { flexShrink: 1, fontSize: 12, color: colors.textTertiary, textAlign: 'right' },
+    rowLabel: { flexShrink: 1, fontSize: 15.5, fontWeight: '600', color: colors.textPrimary },
+    rowValue: { flexShrink: 1, fontSize: 13.5, color: colors.textTertiary, textAlign: 'right' },
   });
 }

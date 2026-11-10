@@ -150,11 +150,11 @@ function createStyles(colors: ThemeColors) {
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     pad: { paddingHorizontal: spacing.lg },
     content: { paddingHorizontal: spacing.lg, gap: spacing.md },
-    headline: { fontSize: 14, color: colors.textSecondary },
+    headline: { fontSize: 15.5, color: colors.textSecondary },
     titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    offerTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    priceNote: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-    why: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
-    acceptReason: { fontSize: 12, color: colors.textTertiary },
+    offerTitle: { flex: 1, fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+    priceNote: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary },
+    why: { fontSize: 14.5, lineHeight: 21, color: colors.textSecondary },
+    acceptReason: { fontSize: 13.5, color: colors.textTertiary },
   });
 }

@@ -78,8 +78,8 @@ function createStyles(colors: ThemeColors) {
     },
     dismiss: { position: 'absolute', top: spacing.sm, right: spacing.sm, zIndex: 1, padding: 2 },
     textCol: { paddingRight: spacing.lg },
-    title: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    subtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 3, lineHeight: 17 },
+    title: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    subtitle: { fontSize: 13.5, color: colors.textSecondary, marginTop: 3, lineHeight: 19 },
     actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
     button: {
       flex: 1,
@@ -89,8 +89,8 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     yesButton: { backgroundColor: colors.accent },
-    yesButtonText: { color: colors.onAccent, fontSize: 13, fontWeight: '700' },
+    yesButtonText: { color: colors.onAccent, fontSize: 14.5, fontWeight: '700' },
     noButton: { backgroundColor: colors.surfaceSolid, borderWidth: 1, borderColor: colors.border },
-    noButtonText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+    noButtonText: { color: colors.textSecondary, fontSize: 14.5, fontWeight: '600' },
   });
 }

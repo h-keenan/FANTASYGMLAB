@@ -104,7 +104,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     box: { borderWidth: 1, borderColor: colors.cardBorder, borderRadius: radii.sm, padding: spacing.md, gap: spacing.sm, marginTop: spacing.sm },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    label: { fontSize: 14, color: colors.textSecondary },
+    label: { fontSize: 15.5, color: colors.textSecondary },
     form: { gap: spacing.sm },
     input: {
       borderWidth: 1,
@@ -112,10 +112,10 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.sm,
       paddingHorizontal: spacing.md,
       paddingVertical: 10,
-      fontSize: 15,
+      fontSize: 16.5,
       backgroundColor: colors.surface,
       color: colors.textPrimary,
     },
-    hint: { fontSize: 12, color: colors.textTertiary },
+    hint: { fontSize: 13.5, color: colors.textTertiary },
   });
 }

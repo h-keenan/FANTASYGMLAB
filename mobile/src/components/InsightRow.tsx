@@ -127,9 +127,9 @@ function createStyles(colors: ThemeColors) {
     icon: { marginTop: 2 },
     textGroup: { flex: 1, gap: 2 },
     labelRow: { flexDirection: 'row', alignItems: 'center' },
-    label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-    headline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    detail: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    label: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
+    headline: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    detail: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
     actionChip: {
       borderWidth: 1,
       borderColor: colors.accent,
@@ -138,6 +138,6 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.xs,
       alignSelf: 'center',
     },
-    actionChipText: { fontSize: 10, fontWeight: '700', color: colors.accent, letterSpacing: 0.3 },
+    actionChipText: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 0.3 },
   });
 }

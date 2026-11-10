@@ -124,7 +124,7 @@ const pillStyles = StyleSheet.create({
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
   },
-  text: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
+  text: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
 });
 
 /** Up to two reason chips from real, already-computed signals only
@@ -166,7 +166,7 @@ function UsageFlagChip({ player }: { player: WaiverPriorityAdd }) {
 const chipStyles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: { borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 2, flexShrink: 1 },
-  text: { fontSize: 11, fontWeight: '700' },
+  text: { fontSize: 12.5, fontWeight: '700' },
 });
 
 /**
@@ -325,7 +325,7 @@ function createStyles(colors: ThemeColors) {
     primaryCard: { padding: spacing.lg },
     actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
     actionLabel: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '700',
       color: colors.premium,
       textTransform: 'uppercase',
@@ -352,13 +352,13 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.accent,
     },
-    detailsButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    detailsButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
     beginnerHelp: { marginTop: spacing.xs },
-    faabWhy: { marginTop: spacing.sm, fontSize: 12, lineHeight: 16, color: colors.textSecondary },
+    faabWhy: { marginTop: spacing.sm, fontSize: 13.5, lineHeight: 18, color: colors.textSecondary },
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
-    scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
-    scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },
-    scoreLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
+    scoreNumberPrimary: { fontSize: 23, fontWeight: '800', color: colors.accent },
+    scoreNumberCompact: { fontSize: 17, fontWeight: '700', color: colors.accent },
+    scoreLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
     metricsDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: colors.border },
     breakdownRow: {
       flexDirection: 'row',
@@ -367,7 +367,7 @@ function createStyles(colors: ThemeColors) {
       gap: 2,
       marginTop: spacing.sm,
     },
-    breakdownText: { fontSize: 12, fontWeight: '700', color: colors.accentSoft },
+    breakdownText: { fontSize: 13.5, fontWeight: '700', color: colors.accentSoft },
     compactRow: {
       paddingVertical: spacing.md,
       gap: spacing.sm,

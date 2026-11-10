@@ -62,6 +62,6 @@ function createStyles(colors: ThemeColors) {
     },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
     headerIcon: { marginRight: spacing.xs },
-    title: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    title: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
   });
 }

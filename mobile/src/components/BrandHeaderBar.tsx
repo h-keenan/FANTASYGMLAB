@@ -113,13 +113,13 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.border,
   },
   wordmark: {
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: '800',
     letterSpacing: 1,
     color: colors.textPrimary,
   },
   wordmarkAccent: {
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: '800',
     color: colors.accent,
   },

@@ -39,6 +39,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surface,
     },
     row: { gap: spacing.sm, alignItems: 'flex-start' },
-    body: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+    body: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
   });
 }

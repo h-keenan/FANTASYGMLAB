@@ -112,12 +112,12 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     avatar: {},
     body: { flex: 1, gap: 1 },
-    name: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    name: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    team: { fontSize: 10.5, color: colors.textSecondary },
-    context: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
+    team: { fontSize: 12, color: colors.textSecondary },
+    context: { fontSize: 12.5, color: colors.textTertiary, marginTop: 1 },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
-    trailingValue: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    trailingCaption: { fontSize: 9, color: colors.textTertiary, marginTop: 1 },
+    trailingValue: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    trailingCaption: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
   });
 }

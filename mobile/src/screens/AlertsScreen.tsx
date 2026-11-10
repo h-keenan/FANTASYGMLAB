@@ -408,18 +408,18 @@ function createRowStyles(colors: ThemeColors) {
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
     unreadDot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: colors.accent },
     relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
-    relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+    relationshipPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
     metaSpacer: { flex: 1 },
-    time: { fontSize: 11, color: colors.textTertiary },
+    time: { fontSize: 12.5, color: colors.textTertiary },
     linkChevron: { marginLeft: spacing.xs },
-    title: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: 3 },
+    title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: 3 },
     titleRead: { fontWeight: '500', color: colors.textSecondary },
-    summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    summary: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },
     // Matches PlayerDetailScreen's modalSpeculative treatment for the same
     // flag — bold amber/"pending" tone (Magna Carta §3) rather than the
     // plain gray metadata line below it.
-    speculative: { fontSize: 11, color: colors.premium, fontWeight: '700', marginTop: spacing.xs },
-    footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
+    speculative: { fontSize: 12.5, color: colors.premium, fontWeight: '700', marginTop: spacing.xs },
+    footerMeta: { fontSize: 12.5, color: colors.textTertiary, marginTop: spacing.xs },
   });
 }
 
@@ -442,7 +442,7 @@ function createStyles(colors: ThemeColors) {
     groupIcon: { marginLeft: -2 },
     groupLabel: {
       flex: 1,
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.5,

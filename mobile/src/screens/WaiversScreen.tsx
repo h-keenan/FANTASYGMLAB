@@ -863,11 +863,11 @@ function createStyles(colors: ThemeColors) {
   container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
   listWrap: { flex: 1 },
   notice: {
-    fontSize: 13,
+    fontSize: 14.5,
     color: colors.textSecondary,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position used to be a full row of always-expanded pills — now one
@@ -882,8 +882,8 @@ function createStyles(colors: ThemeColors) {
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   sectionBlock: { marginBottom: spacing.lg },
   needsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-  needsHeadline: { fontSize: 13, lineHeight: 18, color: colors.textSecondary, flexShrink: 1 },
-  limitedNote: { fontSize: 12, lineHeight: 16, color: colors.warning, marginBottom: spacing.sm },
+  needsHeadline: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary, flexShrink: 1 },
+  limitedNote: { fontSize: 13.5, lineHeight: 18, color: colors.warning, marginBottom: spacing.sm },
   compactGroupCard: { marginTop: spacing.sm, padding: spacing.sm },
   bestAvailableRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   bestAvailableCard: {
@@ -906,17 +906,17 @@ function createStyles(colors: ThemeColors) {
     minHeight: 14,
     marginBottom: spacing.xs,
   },
-  bestAvailablePrestigeLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  bestAvailablePrestigeLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   avatarWrap: { marginRight: spacing.md },
   bestAvailablePosBadgeWrap: { alignSelf: 'center', marginTop: spacing.xs },
   // The most visually dominant text on the card (UI_HIERARCHY_DIRECTIVE.md
   // §11: player identity must outrank badges/chips) — larger and bolder
   // than the prestige label above it and the OVR badge's own text, even
   // though both of those sit higher in the layout.
-  bestAvailableName: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+  bestAvailableName: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
   bestAvailableFooterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  bestAvailableScore: { fontSize: 13, fontWeight: '700', color: colors.accent },
-  bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
+  bestAvailableScore: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
+  bestAvailableCount: { fontSize: 12, color: colors.textTertiary },
   // No marginTop here (unlike when this board rendered as the list's own
   // ListFooterComponent, trailing the whole page): it now sits directly
   // after Priority Adds' own sectionBlock, which already contributes
@@ -925,7 +925,7 @@ function createStyles(colors: ThemeColors) {
   // sections (Magna Carta §7: avoid gaps with no information).
   secondaryLockWrap: { marginTop: 0, marginBottom: spacing.lg },
   secondaryBoard: { marginTop: 0 },
-  secondaryCaption: { fontSize: 12, color: colors.textSecondary, lineHeight: 16, marginBottom: spacing.md },
+  secondaryCaption: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18, marginBottom: spacing.md },
   // Name line first (full width), value + chips on a second line, so names
   // never truncate to "Ja…" on phones.
   freeAgentRow: {
@@ -955,7 +955,7 @@ function createStyles(colors: ThemeColors) {
   freeAgentStale: { opacity: 0.55 },
   freeAgentIdentity: { alignSelf: 'stretch' },
   freeAgentTrailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs, paddingBottom: spacing.xs },
-  freeAgentValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  freeAgentValue: { fontSize: 17, fontWeight: '700', color: colors.accent },
   beginnerIntro: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   headerRow: {
     flexDirection: 'row',
@@ -967,8 +967,8 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   statRow: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
-  headerSubtitle: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
-  sleeperLink: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  headerSubtitle: { fontSize: 14.5, color: colors.textSecondary, flexShrink: 1 },
+  sleeperLink: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   tabWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   filterPills: { marginBottom: spacing.sm },
   freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
@@ -978,7 +978,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
   },
-  positionRankText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
+  positionRankText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
   // Grid (2-up compact card) mode — see FreeAgentRow's `grid` branch. Same
   // width/space-between approach as PlayersScreen's PlayerRankRow grid cell
   // (keeps an unpaired last card from stretching to double width).

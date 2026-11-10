@@ -55,13 +55,13 @@ function createStyles(colors: ThemeColors) {
       flexShrink: 1,
       // Web --type-section-title: display weight, primary text color, uppercase, 0.02em tracking.
       // Web scales 21.6px at phone width; 17 keeps one-line titles inside the app's denser cards.
-      fontSize: 17,
+      fontSize: 18,
       fontWeight: '900',
       color: colors.textPrimary,
       textTransform: 'uppercase',
       letterSpacing: 0.35,
     },
     right: { marginLeft: 'auto' },
-    caption: { fontSize: 12, color: colors.textTertiary },
+    caption: { fontSize: 13.5, color: colors.textTertiary },
   });
 }

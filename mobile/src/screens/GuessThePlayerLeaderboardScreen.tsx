@@ -169,11 +169,11 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, minHeight: 56 },
     rowMine: { backgroundColor: colors.badgeBackground },
     divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    rank: { width: 32, textAlign: 'center', fontSize: 15, fontWeight: '800', color: colors.textTertiary },
+    rank: { width: 32, textAlign: 'center', fontSize: 16.5, fontWeight: '800', color: colors.textTertiary },
     nameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    name: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    name: { flexShrink: 1, fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
     right: { alignItems: 'flex-end' },
-    streak: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-    muted: { fontSize: 12, fontWeight: '400', color: colors.textTertiary },
+    streak: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary },
+    muted: { fontSize: 13.5, fontWeight: '400', color: colors.textTertiary },
   });
 }

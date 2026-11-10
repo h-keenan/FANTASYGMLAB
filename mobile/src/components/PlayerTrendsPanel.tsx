@@ -115,8 +115,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.glassBorder,
     },
     yearPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-    yearPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+    yearPillText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
     yearPillTextActive: { color: colors.onAccent },
-    notice: { marginTop: spacing.md, fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
+    notice: { marginTop: spacing.md, fontSize: 13.5, color: colors.textSecondary, textAlign: 'center' },
   });
 }

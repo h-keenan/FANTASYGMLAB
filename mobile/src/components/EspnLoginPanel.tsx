@@ -135,12 +135,12 @@ export function EspnLoginStatus({ saved, onRemoved }: { saved: boolean; onRemove
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    title: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
-    hint: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginBottom: spacing.xs },
-    link: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    title: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
+    hint: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.xs },
+    link: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
     steps: { marginTop: spacing.sm },
-    kicker: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, marginTop: spacing.sm, marginBottom: spacing.xs },
-    error: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
+    kicker: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, marginTop: spacing.sm, marginBottom: spacing.xs },
+    error: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },
     primaryButton: {
       backgroundColor: colors.accent,
       paddingHorizontal: spacing.lg,
@@ -149,7 +149,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       marginTop: spacing.md,
     },
-    primaryText: { fontSize: 14, fontWeight: '700', color: colors.onAccent },
+    primaryText: { fontSize: 15.5, fontWeight: '700', color: colors.onAccent },
     statusRow: { marginBottom: spacing.sm },
   });
 }

@@ -138,9 +138,9 @@ function createStyles(colors: ThemeColors) {
     width: '100%',
     maxWidth: 400,
   },
-  title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14.5,
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs,
@@ -155,8 +155,8 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.md,
     gap: 2,
   },
-  summaryLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, marginTop: spacing.xs },
-  summaryValue: { fontSize: 14, color: colors.textPrimary },
+  summaryLabel: { fontSize: 12.5, fontWeight: '700', color: colors.textTertiary, marginTop: spacing.xs },
+  summaryValue: { fontSize: 15.5, color: colors.textPrimary },
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   button: {
     flex: 1,
@@ -166,11 +166,11 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
   },
   yesButton: { backgroundColor: colors.success },
-  yesButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  yesButtonText: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
   noButton: { backgroundColor: colors.danger },
-  noButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  noButtonText: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
   secondaryButton: { backgroundColor: colors.surfaceSolid, borderWidth: 1, borderColor: colors.border },
-  secondaryButtonText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  secondaryButtonText: { color: colors.textSecondary, fontSize: 14.5, fontWeight: '600' },
   spinner: { marginVertical: spacing.md },
   });
 }

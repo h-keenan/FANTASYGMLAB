@@ -711,7 +711,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.lg },
     sectionLabel: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '700',
       color: colors.textTertiary,
       textTransform: 'uppercase',
@@ -721,7 +721,7 @@ function createStyles(colors: ThemeColors) {
     },
     sectionLabelFirst: { marginTop: 0 },
     groupCaption: {
-      fontSize: 12,
+      fontSize: 13.5,
       fontWeight: '600',
       color: colors.textSecondary,
       marginBottom: spacing.xs,
@@ -729,7 +729,7 @@ function createStyles(colors: ThemeColors) {
     // One grouped surface per section with hairline dividers between rows,
     // instead of a separately bordered/backgrounded row per item — Magna
     // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
-    identityValue: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
+    identityValue: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
     groupCard: { padding: spacing.md, paddingVertical: 0 },
     // Web wraps Preferences in one glass card; the option tiles nest as glassInset.
     prefsCard: { padding: spacing.md, paddingBottom: 0 },
@@ -752,11 +752,11 @@ function createStyles(colors: ThemeColors) {
     labelGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, flex: 1 },
     icon: { marginRight: spacing.md },
     labelTextGroup: { flexShrink: 1 },
-    label: { fontSize: 15, color: colors.textPrimary, flexShrink: 1 },
+    label: { fontSize: 16.5, color: colors.textPrimary, flexShrink: 1 },
     labelDisabled: { color: colors.textDisabled },
-    dangerLabel: { fontSize: 15, fontWeight: '600', color: colors.danger, flexShrink: 1 },
-    chevron: { fontSize: 20, color: colors.textSecondary },
-    rowDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    dangerLabel: { fontSize: 16.5, fontWeight: '600', color: colors.danger, flexShrink: 1 },
+    chevron: { fontSize: 21, color: colors.textSecondary },
+    rowDescription: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
     optionRow: {
       flexDirection: 'row',
       gap: spacing.sm,
@@ -776,7 +776,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.accentMuted,
     },
     optionLabel: {
-      fontSize: 14,
+      fontSize: 15.5,
       fontWeight: '700',
       color: colors.textPrimary,
       marginBottom: 2,
@@ -785,7 +785,7 @@ function createStyles(colors: ThemeColors) {
       color: colors.accent,
     },
     optionDescription: {
-      fontSize: 12,
+      fontSize: 13.5,
       color: colors.textSecondary,
     },
   });

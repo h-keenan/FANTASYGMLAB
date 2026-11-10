@@ -507,17 +507,29 @@ export const radii = {
   input: 14,
 };
 
+/**
+ * Type scale (2026-11-09, owner: "most things seem way too small on the
+ * app"). Raised ~1-3pt app-wide: body 16, secondary 14, labels 13,
+ * kickers/captions 12, badges 11. Old values: display 34, title 22,
+ * heading 17, body 15, bodyMuted 13, label 12, kicker 11, caption 11,
+ * badge 9. Hard-coded fontSize literals across screens were moved up the
+ * same ramp and AppText caps OS Dynamic Type growth
+ * at MAX_FONT_SCALE so layouts stay intact.
+ */
 export const typography = {
-  display: { fontSize: 34, fontWeight: '700' as const, letterSpacing: -0.5 },
-  title: { fontSize: 22, fontWeight: '700' as const },
-  heading: { fontSize: 17, fontWeight: '600' as const },
-  body: { fontSize: 15, fontWeight: '400' as const },
-  bodyMuted: { fontSize: 13, fontWeight: '400' as const },
-  label: { fontSize: 12, fontWeight: '600' as const },
-  kicker: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 0.8 },
-  caption: { fontSize: 11, fontWeight: '500' as const },
-  badge: { fontSize: 9, fontWeight: '800' as const, letterSpacing: 0.3 },
+  display: { fontSize: 36, fontWeight: '700' as const, letterSpacing: -0.5 },
+  title: { fontSize: 24, fontWeight: '700' as const },
+  heading: { fontSize: 19, fontWeight: '600' as const },
+  body: { fontSize: 16, fontWeight: '400' as const },
+  bodyMuted: { fontSize: 14, fontWeight: '400' as const },
+  label: { fontSize: 13, fontWeight: '600' as const },
+  kicker: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.8 },
+  caption: { fontSize: 12, fontWeight: '500' as const },
+  badge: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 0.3 },
 };
+
+/** Ceiling for OS Dynamic Type on text (AppText default maxFontSizeMultiplier). */
+export const MAX_FONT_SCALE = 1.25;
 
 /**
  * Apple-style dark-mode elevation: a black drop shadow alone reads as a

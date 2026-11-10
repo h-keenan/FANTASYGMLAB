@@ -84,7 +84,7 @@ export default function ManagerTendenciesChips({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
-    label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, alignSelf: 'center' },
+    label: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, alignSelf: 'center' },
     chip: {
       paddingHorizontal: spacing.sm,
       paddingVertical: 2,
@@ -93,8 +93,8 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.glassBorder,
       backgroundColor: colors.glass,
     },
-    chipText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+    chipText: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
     upsellRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
-    upsell: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    upsell: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
   });
 }

@@ -285,13 +285,13 @@ function createStyles(colors: ThemeColors) {
   },
   title: {
     ...typography.title,
-    fontSize: 30,
+    fontSize: 31,
     color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 16.5,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -311,10 +311,10 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  socialButtonText: { color: colors.textPrimary, fontSize: 16, fontWeight: '600' },
+  socialButtonText: { color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.md },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  dividerText: { color: colors.textTertiary, fontSize: 12, marginHorizontal: spacing.sm },
+  dividerText: { color: colors.textTertiary, fontSize: 13.5, marginHorizontal: spacing.sm },
   input: { marginBottom: spacing.md },
   button: { marginTop: spacing.xs },
   buttonDisabled: { opacity: disabledOpacity },
@@ -327,7 +327,7 @@ function createStyles(colors: ThemeColors) {
     textAlign: 'center',
     marginTop: spacing.sm,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 14.5,
   },
   legalRow: {
     flexDirection: 'row',
@@ -337,12 +337,12 @@ function createStyles(colors: ThemeColors) {
   },
   legalLink: {
     color: colors.textTertiary,
-    fontSize: 12,
+    fontSize: 13.5,
     textDecorationLine: 'underline',
   },
   legalDivider: {
     color: colors.textTertiary,
-    fontSize: 12,
+    fontSize: 13.5,
     marginHorizontal: spacing.sm,
   },
   legalModalHeader: {
@@ -352,8 +352,8 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.md,
   },
-  legalModalTitle: { ...typography.title, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
-  legalModalClose: { color: colors.accent, fontSize: 16, fontWeight: '600' },
+  legalModalTitle: { ...typography.title, fontSize: 21, color: colors.textPrimary, flexShrink: 1 },
+  legalModalClose: { color: colors.accent, fontSize: 17, fontWeight: '600' },
   legalModalContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl * 2 },
   error: {
     color: colors.danger,

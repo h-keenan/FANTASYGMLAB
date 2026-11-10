@@ -517,8 +517,8 @@ function createStyles(colors: ThemeColors) {
   contextBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, gap: 2 },
   landedTargetRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   postureBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
-  landedTargetText: { fontSize: 11, fontWeight: '600', color: colors.premium, flexShrink: 1 },
-  sourceTeamLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
+  landedTargetText: { fontSize: 12.5, fontWeight: '600', color: colors.premium, flexShrink: 1 },
+  sourceTeamLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
   categoryBadge: {
     alignSelf: 'flex-start',
     borderRadius: radii.sm,
@@ -527,7 +527,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 3,
   },
   categoryBadgeText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -552,7 +552,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     paddingVertical: 4,
   },
-  fairnessPillText: { fontSize: 12, fontWeight: '700' },
+  fairnessPillText: { fontSize: 13.5, fontWeight: '700' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -569,12 +569,12 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  partnerInitial: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  partnerInitial: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
   partnerTextGroup: { flex: 1 },
-  partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-  partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
+  partnerName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+  partnerArchetype: { fontSize: 13.5, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
   tendencyChip: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  tendencyChipText: { fontSize: 11, fontWeight: '600' },
+  tendencyChipText: { fontSize: 12.5, fontWeight: '600' },
   // Plain icon per the concept mockups — no filled circular backdrop
   // (that read as an extra decorative surface neither concept image has).
   // hitSlop on the TouchableOpacity keeps the tap target comfortable
@@ -592,7 +592,7 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.accent,
   },
-  shareButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  shareButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: spacing.sm },
   // Each side is its own small tinted surface (per section 6: "the
   // strongest visual element in the card") so PlayerIdentityRow/
@@ -625,7 +625,7 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
   },
   rationaleLabel: {
-    fontSize: 12,
+    fontSize: 13.5,
     fontWeight: '700',
     color: colors.textPrimary,
     paddingHorizontal: spacing.md,
@@ -634,16 +634,16 @@ function createStyles(colors: ThemeColors) {
   },
   // Quote rail (mirrors web TradeIdeaCard's reason): a 2pt border-strong rail instead of a bare paragraph.
   rationale: {
-    fontSize: 13,
+    fontSize: 14.5,
     color: colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 20,
     marginHorizontal: spacing.md,
     paddingLeft: spacing.sm,
     borderLeftWidth: 2,
     borderLeftColor: colors.border,
   },
   rationaleExpandHint: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '600',
     color: colors.accentSoft,
     paddingHorizontal: spacing.md,
@@ -671,15 +671,15 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  rationaleSheetTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
+  rationaleSheetTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
   rationaleSheetPartner: {
-    fontSize: 12,
+    fontSize: 13.5,
     color: colors.textTertiary,
     marginTop: 2,
     marginBottom: spacing.sm,
   },
   rationaleSheetBody: { flexGrow: 0 },
-  rationaleSheetText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  rationaleSheetText: { fontSize: 15.5, color: colors.textSecondary, lineHeight: 22 },
   // Compact confidence/realism status strip (section 10): one shared
   // MeterRow component for both metrics, tight vertical padding so it reads
   // as a footer strip rather than a second content section.

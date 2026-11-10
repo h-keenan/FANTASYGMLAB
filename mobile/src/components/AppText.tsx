@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
+import { MAX_FONT_SCALE } from '../theme';
+
 /**
  * Drop-in replacement for RN's `Text` that renders in Inter — the brand
  * sheet (theme.ts's own header comment) specifies Inter SemiBold/Medium/
@@ -42,5 +44,5 @@ function interFamilyFor(style: TextProps['style']): string {
 }
 
 export default function AppText({ style, ...rest }: TextProps) {
-  return <Text {...rest} style={[{ fontFamily: interFamilyFor(style) }, style]} />;
+  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} style={[{ fontFamily: interFamilyFor(style) }, style]} />;
 }

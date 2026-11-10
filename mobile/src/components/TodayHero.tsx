@@ -148,16 +148,16 @@ export default function TodayHero({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.sm },
-    headline: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    why: { fontSize: 13, color: colors.textSecondary },
+    headline: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    why: { fontSize: 14.5, color: colors.textSecondary },
     cta: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
     rowBadge: { width: 88, alignItems: 'flex-start' },
     rowText: { flex: 1, minWidth: 0 },
-    arrow: { fontSize: 16, color: colors.accent },
+    arrow: { fontSize: 17, color: colors.accent },
     laterLabel: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '700',
       letterSpacing: 0.5,
       textTransform: 'uppercase',

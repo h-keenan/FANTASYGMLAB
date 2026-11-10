@@ -106,18 +106,18 @@ function createStyles(colors: ThemeColors) {
     healthBlock: { paddingVertical: spacing.md, gap: spacing.sm },
     cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
     cardIcon: { marginRight: spacing.xs },
-    cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-    healthSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    cardLabel: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+    healthSummary: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },
     detailListGroup: { gap: spacing.sm },
     detailListLabel: {
-      fontSize: 11,
+      fontSize: 12.5,
       fontWeight: '700',
       color: colors.textTertiary,
       textTransform: 'uppercase',
       letterSpacing: 0.4,
       marginBottom: 2,
     },
-    detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    detailListItem: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },
     injuryPlayerRow: { paddingVertical: spacing.xs },
   });
 }
