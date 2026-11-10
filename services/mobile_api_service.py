@@ -156,6 +156,7 @@ from modules import (
     trade_eval_usage,
     account_store,
     app_config,
+    app_version_policy,
     auth_supabase,
     build_identity,
     canonical_player_ranking,
@@ -728,6 +729,17 @@ def _with_sleeper_as_of(fn):
         return result
 
     return wrapper
+
+
+@app.get("/v1/app-config")
+def get_app_config() -> JSONResponse:
+    """Public, anonymous client bootstrap config (no user data): the minimum
+    supported mobile app version per platform + store links. See
+    modules/app_version_policy.py. Short cache: ops can raise the floor quickly."""
+    return JSONResponse(
+        content=app_version_policy.build_app_config(),
+        headers={"Cache-Control": "public, max-age=60"},
+    )
 
 
 @app.get("/health")

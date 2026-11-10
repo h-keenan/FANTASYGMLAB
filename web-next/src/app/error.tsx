@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect } from "react";
 
 import { trackClientError } from "@/lib/analytics";
+import { reportError } from "@/lib/errorReporter";
 import { BRAND_NAME } from "@/lib/brand";
 import { Button } from "@/components/Button";
 
@@ -22,6 +23,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     console.error("Unhandled app error", error);
     // Team-visible signal: error constructor name + sanitized route only.
     trackClientError("application_error", error);
+    reportError(error, { source: "app/error.tsx", digest: error.digest });
   }, [error]);
 
   return (
@@ -33,13 +35,12 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Something went wrong. It&apos;s been logged.
       </p>
-      {error?.message ? (
-        <details className="text-xs max-w-sm w-full" style={{ color: "var(--color-text-muted)" }}>
-          <summary className="cursor-pointer font-semibold">Details</summary>
-          <p className="mt-1 break-words" data-testid="app-error-details">
-            {error.message}
-          </p>
-        </details>
+      {error?.digest ? (
+        // Raw error.message can leak internals; the digest is an opaque id
+        // support can match to server logs.
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="app-error-digest">
+          Reference: {error.digest}
+        </p>
       ) : null}
       <Button
         type="button"
