@@ -13,25 +13,20 @@ import TradeAnalyzerScreen from './TradeAnalyzerScreen';
 import TradeFinderScreen from './TradeFinderScreen';
 import TradeHubScreen from './TradeHubScreen';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { TRADES_TAB_OPTIONS, type TradesTab } from '../lib/tradesTabs';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Trades'>;
-type TradesTab = 'block' | 'search' | 'make';
 
-const TAB_OPTIONS: Array<{ key: TradesTab; label: string }> = [
-  { key: 'block', label: 'Trade Block' },
-  { key: 'search', label: 'Search' },
-  { key: 'make', label: 'Make a Trade' },
-];
+const TAB_OPTIONS = TRADES_TAB_OPTIONS;
 
 /**
  * Single host screen for FantasyDesk's three trade workflows — Trade Hub
- * ("Trade Block"), Trade Finder ("Search"), and Trade Analyzer ("Make a
- * Trade") — consolidated behind one Madden-style trade menu per coridian_'s
- * request, replacing three standalone screens that each duplicated the same
+ * ("Hub"), Trade Finder ("Finder"), and Trade Analyzer ("Analyzer") —
+ * consolidated behind one Madden-style trade menu per coridian_'s request, replacing three standalone screens that each duplicated the same
  * header chrome (League Switcher / Evaluation Lens / GM Stance / Trade
  * History buttons, BrandHeaderBar). This screen owns that header exactly
  * once; the three screens below are otherwise unchanged — same state,
@@ -51,7 +46,7 @@ export default function TradesScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   // ESPN leagues (lib/leaguePlatform.ts) only have Trade Analyzer: Trade
-  // Block and Search need Sleeper-only league data, so their tabs aren't
+  // Hub and Finder need Sleeper-only league data, so their tabs aren't
   // offered at all rather than opening onto an error.
   const espn = isEspnLeagueId(leagueId);
   const tabOptions = espn ? TAB_OPTIONS.filter((option) => option.key === 'make') : TAB_OPTIONS;

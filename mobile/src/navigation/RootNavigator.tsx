@@ -104,8 +104,8 @@ export type RootStackParamList = {
   Waivers: { leagueId: string; leagueName: string; playerId?: string; tab?: 'recommended' | 'explore' | 'watchlist' };
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
-  // Single consolidated host for Trade Hub ("Trade Block"), Trade Finder
-  // ("Search"), and Trade Analyzer ("Make a Trade") — see TradesScreen.
+  // Single consolidated host for Trade Hub ("Hub"), Trade Finder
+  // ("Finder"), and Trade Analyzer ("Analyzer") — see TradesScreen.
   // `initialTab` defaults to 'block' when omitted. `tradePlayer` is the
   // player a PlayerDetail / Players "Add to Trade" or "Find trades" shortcut
   // started from: 'make' files them on the right side of Trade Analyzer,
@@ -115,7 +115,7 @@ export type RootStackParamList = {
     leagueName: string;
     initialTab?: 'block' | 'search' | 'make';
     tradePlayer?: RankedPlayer;
-    // A built offer ("Build an offer") loaded into Make a Trade to tweak/share.
+    // A built offer ("Build an offer") loaded into the Analyzer tab to tweak/share.
     offerPrefill?: OfferPrefill;
   };
   // "Build an offer": 2-3 built packages to get a player off another team.

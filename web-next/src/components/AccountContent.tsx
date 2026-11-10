@@ -19,9 +19,11 @@ import { Button, ButtonLink } from "@/components/Button";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { trackOnboarding } from "@/lib/onboardingAnalytics";
 import { Toggle } from "@/components/Toggle";
+import { SavedLeaguesSection } from "@/components/SavedLeaguesSection";
+import { SleeperUsernameRelink } from "@/components/SleeperUsernameRelink";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
- * — same six categories, same copy — so a user who's seen this in the app
+ * — same nine categories, same copy — so a user who's seen this in the app
  * recognizes it here. Order matches modules.push_triggers.
  * TOGGLEABLE_PUSH_CATEGORIES. */
 const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; description: string }> = [
@@ -45,6 +47,8 @@ function SectionHeading({ id, children, color }: { id: string; children: React.R
 }
 
 function IdentitySection({ user }: { user: MeResponse["user"] }) {
+  const [linkedUsername, setLinkedUsername] = useState<string | null>(null);
+  const sleeperUsername = linkedUsername ?? user.sleeper_username;
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-identity-heading">
       <SectionHeading id="account-identity-heading">Identity</SectionHeading>
@@ -55,7 +59,7 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
         </div>
         <div className="flex items-center justify-between gap-3">
           <dt style={{ color: "var(--color-text-secondary)" }}>Sleeper username</dt>
-          <dd className="font-semibold">{user.sleeper_username || "Not linked"}</dd>
+          <dd className="font-semibold">{sleeperUsername || "Not linked"}</dd>
         </div>
         <div className="flex items-center justify-between gap-3">
           <dt style={{ color: "var(--color-text-secondary)" }}>Plan</dt>
@@ -64,6 +68,7 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
           </dd>
         </div>
       </dl>
+      <SleeperUsernameRelink current={sleeperUsername || ""} onLinked={setLinkedUsername} />
     </section>
   );
 }
@@ -477,6 +482,7 @@ export function AccountContent({
 
       <IdentitySection user={user} />
       <BillingSection entitlement={user.entitlement} trialEndsAt={user.trial_ends_at} onOpenBillingPortal={onOpenBillingPortal} />
+      <SavedLeaguesSection />
       <ReferralCard referral={referral} error={referralError} onRetry={onRetryReferral} />
       <PreferencesSection
         communityOptedOut={communityOptedOut}

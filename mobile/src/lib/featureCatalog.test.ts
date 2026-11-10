@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { accentFor } from './destinationAccents.generated.ts';
 import { FEATURE_GROUPS, FEATURE_ITEMS, featureTarget } from './featureCatalog.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -26,8 +27,7 @@ test('every item opens a screen that is registered in the navigator', () => {
   }
 });
 
-test('items reuse the icon, color and Pro flag the GM orb gives the same screen', () => {
-  const colorOf = (key: string) => `colors.${key}`;
+test('items reuse the icon, accent color and Pro flag the GM orb gives the same screen', () => {
   for (const item of FEATURE_ITEMS) {
     // Playoff Odds is a tab of League Rankings; the orb has one League Rankings row.
     if (item.id === 'playoff-odds') continue;
@@ -37,7 +37,11 @@ test('items reuse the icon, color and Pro flag the GM orb gives the same screen'
     const rest = orb.slice(at);
     const block = rest.slice(0, rest.search(/\n\s*\},?\n/));
     assert.ok(block.includes(`icon: '${item.icon}'`), `${item.id} icon`);
-    assert.ok(block.includes(`color: ${colorOf(item.color)}`), `${item.id} color`);
+    // Orb rows color themselves from the shared accent map by label; the
+    // catalog item carries the same token for the same destination.
+    const label = [...orb.slice(0, at).matchAll(/label: '([^']+)'/g)].pop()![1];
+    assert.ok(block.includes(`color: accentColor(colors, '${label}')`), `${item.id} orb color uses the shared map`);
+    assert.equal(item.color, accentFor(label), `${item.id} color`);
     // Trades hosts three items; only Trade Finder is Pro and the orb row is not.
     if (item.route !== 'Trades' && item.route !== 'Teams') assert.equal(block.includes('pro: true'), Boolean(item.pro), `${item.id} pro`);
   }

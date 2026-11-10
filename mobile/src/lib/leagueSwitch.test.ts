@@ -43,7 +43,7 @@ test('screens with old-league params, or not league-scoped, go to Dashboard', ()
   );
 });
 
-test('ESPN target: unsupported screens fall back to the Dashboard, Trades opens on Make a Trade', () => {
+test('ESPN target: unsupported screens fall back to the Dashboard, Trades opens on Analyzer', () => {
   const espn = { leagueId: 'espn:1:2026', leagueName: 'ESPN' };
   assert.deepEqual(
     leagueSwitchDestination({ name: 'Waivers', params: { leagueId: 'OLD', leagueName: 'Old' } }, 'OLD', espn),
