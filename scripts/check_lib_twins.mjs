@@ -52,6 +52,7 @@ export const MIRRORED = [
   "glossary.ts",
   "paidPreviews.ts",
   "playerNameFixtures.ts",
+  "paywallCopy.ts",
   "premiumComparison.ts",
   "sleeperConnectErrors.ts",
   "support.ts",

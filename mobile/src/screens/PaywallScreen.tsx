@@ -1,4 +1,13 @@
 import HelpLink from '../components/HelpLink';
+import {
+  PAYWALL_COMPARISON_TITLE,
+  PAYWALL_HERO_SUB,
+  PAYWALL_HERO_TITLE,
+  PAYWALL_TRIAL_REASSURANCE,
+  annualSavingsPercent,
+  proHighlights,
+  type HighlightIcon,
+} from '../lib/paywallCopy';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -107,6 +116,12 @@ function packagePriceSuffix(type: PurchasesPackage['packageType']): string {
   }
 }
 
+const HIGHLIGHT_ICONS: Record<HighlightIcon, React.ComponentProps<typeof Ionicons>['name']> = {
+  today: 'checkbox-outline',
+  trades: 'swap-horizontal-outline',
+  waivers: 'list-outline',
+};
+
 export default function PaywallScreen({ navigation, route }: Props) {
   // Set when this is the first-run trial offer right after the intro
   // carousel (web-next's OnboardingPaywall step). Leaving it, by Skip,
@@ -146,6 +161,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [showAllRows, setShowAllRows] = useState(false);
   const mountedRef = useRef(true);
 
   // Shared by the initial load, pull-to-refresh, and the explicit Retry
@@ -321,32 +337,50 @@ export default function PaywallScreen({ navigation, route }: Props) {
           store trial exists, otherwise the Pro page's "Unlock the full
           GM toolkit". */}
       <AppText style={styles.title}>
-        {trial ? `Try Pro free for ${trial.lengthLabel.replace('-day', ' days')}` : 'Unlock the full GM toolkit'}
+        {trial ? `Try Pro free for ${trial.lengthLabel.replace('-day', ' days')}` : PAYWALL_HERO_TITLE}
       </AppText>
-      <AppText style={styles.subtitle}>
-        {trial
-          ? 'Full access to the GM toolkit.'
-          : 'Your price is locked in for as long as you stay subscribed.'}
-      </AppText>
+      <AppText style={styles.subtitle}>{PAYWALL_HERO_SUB}</AppText>
 
-      <SectionHeading title="Free vs Pro" icon="checkmark-done" />
-      <AppText style={styles.featuresIntro}>
-        Free keeps working. Pro removes the caps.
-      </AppText>
-      <View style={styles.featuresCard} accessibilityLabel="Free compared with Pro">
-        <View style={[styles.compareRow, styles.compareHeaderRow]}>
-          <AppText style={[styles.compareLabel, styles.compareHeaderText]}>What you get</AppText>
-          <AppText style={[styles.compareCell, styles.compareHeaderText]}>Free</AppText>
-          <AppText style={[styles.compareCell, styles.compareHeaderText, styles.compareProHeader]}>Pro</AppText>
-        </View>
-        {comparison.map((row) => (
-          <View key={row.key} style={[styles.compareRow, styles.featureRowDivider]}>
-            <AppText style={styles.compareLabel}>{row.label}</AppText>
-            <AppText style={[styles.compareCell, styles.compareFree]}>{row.free}</AppText>
-            <AppText style={[styles.compareCell, styles.comparePro]}>{row.pro}</AppText>
+      <SectionHeading title="What Pro adds" icon="sparkles-outline" />
+      <View style={styles.highlights} testID="pro-highlights">
+        {proHighlights(comparison).map((item) => (
+          <View key={item.key} style={styles.highlightRow}>
+            <View style={styles.highlightIcon}>
+              <Ionicons name={HIGHLIGHT_ICONS[item.icon]} size={20} color={colors.premium} />
+            </View>
+            <View style={styles.highlightText}>
+              <AppText style={styles.highlightTitle}>{item.title}</AppText>
+              <AppText style={styles.highlightBody}>{item.body}</AppText>
+            </View>
           </View>
         ))}
       </View>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showAllRows }}
+        onPress={() => setShowAllRows((v) => !v)}
+        style={styles.compareToggle}
+        hitSlop={LINK_HIT_SLOP}
+      >
+        <AppText style={styles.compareToggleText}>{PAYWALL_COMPARISON_TITLE}</AppText>
+        <Ionicons name={showAllRows ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+      </TouchableOpacity>
+      {showAllRows ? (
+        <View style={styles.featuresCard} accessibilityLabel="Free compared with Pro">
+          <View style={[styles.compareRow, styles.compareHeaderRow]}>
+            <AppText style={[styles.compareLabel, styles.compareHeaderText]}>What you get</AppText>
+            <AppText style={[styles.compareCell, styles.compareHeaderText]}>Free</AppText>
+            <AppText style={[styles.compareCell, styles.compareHeaderText, styles.compareProHeader]}>Pro</AppText>
+          </View>
+          {comparison.map((row) => (
+            <View key={row.key} style={[styles.compareRow, styles.featureRowDivider]}>
+              <AppText style={styles.compareLabel}>{row.label}</AppText>
+              <AppText style={[styles.compareCell, styles.compareFree]}>{row.free}</AppText>
+              <AppText style={[styles.compareCell, styles.comparePro]}>{row.pro}</AppText>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {loading ? (
         <ActivityIndicator style={styles.loadingIndicator} color={colors.accent} />
@@ -372,11 +406,15 @@ export default function PaywallScreen({ navigation, route }: Props) {
           <SectionHeading title="Choose Your Plan" icon="card-outline" />
           <View style={styles.packages}>
             {packages.map((pack) => {
+              const monthlyPack = packages.find((p) => p.packageType === PACKAGE_TYPE.MONTHLY);
               const isSelected = pack.identifier === selectedId;
               // packageType (RevenueCat's predefined-package enum), not the
               // offering's custom `identifier` string — see loadOffering's
               // own note above.
               const isAnnual = pack.packageType === PACKAGE_TYPE.ANNUAL || pack.identifier === 'annual';
+              // Percent from the two real store prices (never a typed number).
+              const savingsPercent =
+                isAnnual && monthlyPack ? annualSavingsPercent(monthlyPack.product.price, pack.product.price) : null;
               const periodLabel = packagePeriodLabel(pack.packageType);
               const priceSuffix = packagePriceSuffix(pack.packageType);
               return (
@@ -406,7 +444,9 @@ export default function PaywallScreen({ navigation, route }: Props) {
                         </AppText>
                         {isAnnual ? (
                           <View style={styles.bestValueBadge}>
-                            <AppText style={styles.bestValueBadgeText}>Best value</AppText>
+                            <AppText style={styles.bestValueBadgeText}>
+                              {savingsPercent ? `Save ${savingsPercent}%` : 'Best value'}
+                            </AppText>
                           </View>
                         ) : null}
                       </View>
@@ -466,7 +506,9 @@ export default function PaywallScreen({ navigation, route }: Props) {
         <AppText style={styles.trialTerms}>
           {thenPriceLine(selected.product.priceString, packagePriceSuffix(selected.packageType))}
         </AppText>
-      ) : null}
+      ) : (
+        <AppText style={styles.trialTerms}>{PAYWALL_TRIAL_REASSURANCE}</AppText>
+      )}
         </>
       )}
 
@@ -574,6 +616,27 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.xs,
   },
   featureBadgeText: { color: colors.premium, fontSize: 12, fontWeight: '700' },
+  highlights: { gap: spacing.md, marginBottom: spacing.md },
+  highlightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  highlightIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.premiumMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  highlightText: { flex: 1, gap: 2 },
+  highlightTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
+  highlightBody: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary },
+  compareToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    marginBottom: spacing.sm,
+  },
+  compareToggleText: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
   loadingIndicator: { marginVertical: spacing.xl },
   packages: { gap: spacing.sm, marginBottom: spacing.lg },
   packageRow: { flexDirection: 'row', alignItems: 'center' },

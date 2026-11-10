@@ -54,22 +54,38 @@ describe("PremiumContent", () => {
     vi.mocked(api.openBillingPortal).mockReset();
   });
 
-  it("renders all 3 plans and no Manage Billing banner for a free account", () => {
+  it("shows one plan at a time (annual first, with the saving), toggles to monthly, and no Manage Billing for a free account", () => {
     render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
 
-    expect(screen.getByText("$9.99")).toBeInTheDocument();
+    // Annual is the default, with the real saving: 1 - 59.99 / (9.99 * 12) = 50%.
     expect(screen.getByText("$59.99")).toBeInTheDocument();
+    expect(screen.getByText("About $5.00/month, billed yearly")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Annual · Save 50%/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Monthly" }));
+    expect(screen.getByText("$9.99")).toBeInTheDocument();
     expect(screen.getByText("$99.99")).toBeInTheDocument();
     expect(screen.queryByText("Manage Billing")).not.toBeInTheDocument();
   });
 
-  it("lists each plan's own features, not a shared generic list", () => {
+  it("shows the benefits once (3 highlights with the real Free limits), not repeated per plan", () => {
     render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
 
-    expect(screen.getAllByText("Full League Pulse")).toHaveLength(2);
-    expect(screen.getByText("Priority support")).toBeInTheDocument();
-    // Front Office's "Everything in Pro" must not bleed onto the Pro cards.
-    expect(screen.getAllByText("Everything in Pro")).toHaveLength(1);
+    const highlights = screen.getByTestId("pro-highlights");
+    expect(highlights.querySelectorAll("li")).toHaveLength(3);
+    expect(screen.getByText(/Free shows the top 4/)).toBeInTheDocument();
+    expect(screen.getByText(/Free shows the first 2/)).toBeInTheDocument();
+    // The old per-plan feature wall is gone.
+    expect(screen.queryByText("Full League Pulse")).not.toBeInTheDocument();
+    expect(screen.queryByText("Priority support")).not.toBeInTheDocument();
+  });
+
+  it("links terms, subscription terms and privacy and offers help", () => {
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
+    expect(screen.getByRole("link", { name: "Subscription Terms" })).toHaveAttribute("href", "/legal/subscription_terms");
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/legal/privacy");
+    expect(screen.getByTestId("help-link")).toBeInTheDocument();
   });
 
   it("shows Manage Billing for a premium account, alongside the same 3 plans", () => {
@@ -93,7 +109,7 @@ describe("PremiumContent", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
 
     expect(await screen.findByLabelText("Close checkout")).toBeInTheDocument();
-    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", undefined, "embedded");
+    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "annual", undefined, "embedded");
   });
 
   it("guest sees account-required gate instead of a checkout button and never calls checkout", () => {
@@ -147,8 +163,8 @@ describe("PremiumContent", () => {
     render(
       <PremiumContent entitlement="free" plans={PLANS} publishableKey="pk" trial={{ days: 3, eligible: true }} />,
     );
-    expect(screen.getAllByRole("button", { name: "Start 3-day free trial" })).toHaveLength(2);
-    expect(screen.getAllByText("Then $9.99/month. Cancel anytime.")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Start 3-day free trial" })).toHaveLength(1);
+    expect(screen.getByText(/Then \$59\.99\/year\. Cancel anytime\./)).toBeInTheDocument();
     // Front Office gets no trial.
     expect(screen.getAllByRole("button", { name: "Subscribe" })).toHaveLength(1);
   });
@@ -168,7 +184,8 @@ describe("PremiumContent", () => {
 
   it("renders the Free vs Pro comparison", () => {
     render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
-    expect(screen.getByRole("table")).toBeTruthy();
-    expect(screen.getByRole("rowheader", { name: "Trade Hub ideas" })).toBeTruthy();
+    // Collapsed behind "Everything in Pro" so it is not a wall of text.
+    expect(screen.getByTestId("pro-comparison").tagName).toBe("DETAILS");
+    expect(screen.getByRole("rowheader", { name: "Trade Hub ideas", hidden: true })).toBeTruthy();
   });
 });
