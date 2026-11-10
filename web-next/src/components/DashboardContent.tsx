@@ -115,7 +115,7 @@ export function DashboardContent({
     // (it only restated what the heading already said; the real content —
     // the actionable cards below — is what should hit the fold).
     <Shell
-      className={sample ? "flex flex-col gap-6" : "flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto"}
+      className={sample ? "flex flex-col gap-6" : "flex-1 flex flex-col gap-5 px-4 py-3 max-w-3xl w-full mx-auto"}
       {...(sample
         ? {
             "data-testid": "sample-dashboard",

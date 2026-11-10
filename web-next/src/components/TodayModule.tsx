@@ -175,7 +175,9 @@ function MoveRows({ rows, leagueId, leagueName }: { rows: ThisWeekRow[]; leagueI
         const actionable = Boolean(row.cta_label && row.route);
         const body = (
           <>
-            <ToneBadge label={row.status} color={color} />
+            <span className="shrink-0 w-[5.5rem]">
+              <ToneBadge label={row.status} color={color} />
+            </span>
             {row.player_id ? <PlayerAvatar playerId={row.player_id} size={28} /> : null}
             <span className="min-w-0 flex-1 flex flex-col">
               <span className="text-sm font-bold truncate">{row.headline}</span>

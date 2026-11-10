@@ -95,7 +95,7 @@ export function DashboardNeedsAttention({
     return gamePlanTileHref(route, leagueId, leagueName, resolveGamePlanTargetPlayerId(entry.item));
   };
   return (
-    <section className="flex flex-col gap-2" aria-labelledby="needs-attention-heading" data-testid="dashboard-needs-attention">
+    <section className="flex flex-col gap-3" aria-labelledby="needs-attention-heading" data-testid="dashboard-needs-attention">
       <SectionHeading id="needs-attention-heading">
         Needs attention
       </SectionHeading>
@@ -108,7 +108,9 @@ export function DashboardNeedsAttention({
                 className="flex items-center gap-2 py-2.5"
                 style={{ minHeight: 44, color: "inherit", textDecoration: "none" }}
               >
-                <ToneBadge label={entry.badge} color="var(--color-danger)" />
+                <span className="shrink-0 w-[5.5rem]">
+                  <ToneBadge label={entry.badge} color="var(--color-danger)" />
+                </span>
                 <span className="min-w-0 flex-1 flex flex-col">
                   <span className="text-sm font-bold truncate">{entry.headline}</span>
                   <span className="text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
@@ -152,7 +154,7 @@ export function DashboardTradesBlock({
   const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
   const goalLine = isBeginner ? tradesGoalLine(goal) : "";
   return (
-    <section className="flex flex-col gap-2" aria-labelledby="trades-heading" data-testid="dashboard-trades-block">
+    <section className="flex flex-col gap-3" aria-labelledby="trades-heading" data-testid="dashboard-trades-block">
       <SectionHeading
         id="trades-heading"
         action={
@@ -168,10 +170,10 @@ export function DashboardTradesBlock({
         className="glass-surface flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold"
         style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }}
       >
-        <span style={{ color: tradeItems.length > 0 && !deadlinePassed ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
+        <span className="min-w-0 truncate" style={{ color: tradeItems.length > 0 && !deadlinePassed ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
           {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
         </span>
-        <span style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.link} →</span>
+        <span className="shrink-0" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.link} →</span>
       </Link>
     </section>
   );
@@ -182,15 +184,15 @@ export function DashboardMore({ children }: { children: ReactNode }) {
   return (
     <details className="glass-surface" data-testid="dashboard-more">
       <summary
-        className="flex items-center justify-between px-4 text-sm font-bold uppercase cursor-pointer"
+        className="flex items-center justify-between gap-3 px-4 text-sm font-bold uppercase cursor-pointer"
         style={{ minHeight: "var(--touch-target-min)", letterSpacing: "0.02em" }}
       >
-        <span>More</span>
-        <span className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
+        <span className="shrink-0">More</span>
+        <span className="min-w-0 truncate text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
           League activity, games, settings
         </span>
       </summary>
-      <div className="flex flex-col gap-6 px-4 pb-4 pt-2">{children}</div>
+      <div className="flex flex-col gap-5 px-4 pb-4 pt-2">{children}</div>
     </details>
   );
 }
