@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { api, type AlertItem, type HistoryTransaction } from "@/lib/api";
+import { api, type HistoryTransaction } from "@/lib/api";
 import {
   advanceLastVisit,
   buildSinceItems,
@@ -37,8 +37,9 @@ function writeState(key: string, state: { since: number; last: number }) {
 /**
  * Dashboard "Since your last visit" strip (web twin of the app's "Since your
  * last check-in"). Real data only: new trades and waiver activity in the
- * league (GET .../history) and news/injuries on rostered players (GET
- * .../alerts) after the stored last-visit time. Renders nothing on a first
+ * league (GET .../history) after the stored last-visit time. News and
+ * injuries on rostered players are not repeated here: they live once, in
+ * Watchlist & Alerts. Renders nothing on a first
  * visit, when nothing changed, or when either request fails. The two reads
  * start only for a returning visitor, after the Dashboard has painted.
  */
@@ -60,12 +61,11 @@ export function SinceLastVisitStrip({
     writeState(key, next);
     if (display == null) return;
 
-    const settled = Promise.allSettled([api.getLeagueHistory(leagueId), api.getLeagueAlerts(leagueId, 30)]);
-    void settled.then(([history, alerts]) => {
+    const settled = Promise.allSettled([api.getLeagueHistory(leagueId)]);
+    void settled.then(([history]) => {
       if (cancelled) return;
       const transactions: HistoryTransaction[] = history.status === "fulfilled" ? history.value.transactions ?? [] : [];
-      const alertItems: AlertItem[] = alerts.status === "fulfilled" ? alerts.value.items ?? [] : [];
-      setItems(buildSinceItems({ transactions, alerts: alertItems, sinceMs: display }));
+      setItems(buildSinceItems({ transactions, alerts: [], sinceMs: display }));
     });
     return () => {
       cancelled = true;

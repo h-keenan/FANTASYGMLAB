@@ -114,7 +114,7 @@ describe("DashboardContent", () => {
     // Type tags, a real usage-drop indicator, and no placeholder copy.
     expect(screen.getByText("Trending")).toBeInTheDocument();
     expect(screen.getByText("Waiver")).toBeInTheDocument();
-    expect(screen.getByText("↓ 13%")).toBeInTheDocument();
+    expect(screen.getByText("Usage is down 13% recently.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Watchlist/ })).toBeInTheDocument();
     expect(document.body.textContent?.toLowerCase()).not.toContain("placeholder");
   });
@@ -131,7 +131,7 @@ describe("DashboardContent", () => {
     expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
   });
 
-  it("orders modules: at a glance, needs attention, this week, trade ideas, My Team, alerts, League Activity, More", () => {
+  it("orders modules: needs attention, this week, trade ideas, My Team, alerts, League Activity, More", () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       entitlement: { ...FIXTURE.entitlement, free_limit: 1 },
@@ -151,7 +151,6 @@ describe("DashboardContent", () => {
     const html = container.innerHTML;
     const at = (marker: string) => html.indexOf(marker);
     const order = [
-      at("dashboard-now-strip"),
       at("game-plan-heading"),
       at("dashboard-trades-block"),
       at("snapshot-heading"),
@@ -176,7 +175,8 @@ describe("DashboardContent", () => {
       ],
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
-    expect(screen.getByText("2 wks left (Wk 11)")).toBeInTheDocument();
+    expect(screen.getByText("Trade deadline: 2 wks left (Wk 11)")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-now-strip")).toBeNull();
     const block = screen.getByTestId("dashboard-trades-block");
     expect(block.textContent).toMatch(/1 trade idea/);
     expect(within(block).getByRole("link")).toHaveAttribute("href", "/trade-hub/abc?name=Dynasty%20Overlords");

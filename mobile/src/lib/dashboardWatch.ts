@@ -36,3 +36,42 @@ export const WATCH_TAG_LABEL: Record<WatchTagKind, string | null> = {
   waiver: 'Waiver',
   other: null,
 };
+
+const NON_TERMINAL = /^(?:[A-Z]|Jr|Sr|II|III|IV|St|vs)\.$/;
+
+/**
+ * The first sentence of a feed string, with any " | " tail dropped and name
+ * suffixes (Jr., II.) and initials not treated as sentence ends. Capped so a
+ * row summary never runs away. Mirrors web lib/dashboardPresentation.ts.
+ */
+export function firstSentence(text: string | null | undefined, max = 140): string {
+  const head = (text ?? '').split(/\s\|\s/)[0].replace(/\s+/g, ' ').trim();
+  const re = /[.!?](?=\s|$)/g;
+  let end = head.length;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(head))) {
+    const token = head.slice(0, match.index + 1).split(' ').pop() ?? '';
+    if (NON_TERMINAL.test(token)) continue;
+    end = match.index + 1;
+    break;
+  }
+  const out = head.slice(0, end);
+  return out.length > max ? `${out.slice(0, max - 1).trimEnd()}…` : out;
+}
+
+/** One clean sentence for a Watchlist row: from structured fields when there are any, else the first sentence. */
+export function watchSummary(
+  item: Pick<DashboardItem, 'reason'> & { supporting_context?: string | null; route_player_injury_status?: string | null },
+): string {
+  const pct = usageTrendPct(item);
+  if (pct !== null) return `Usage is down ${pct}% recently.`;
+  const status = (item.route_player_injury_status ?? '').trim();
+  if (status) return `Listed as ${status}; check your lineup.`;
+  return firstSentence(item.reason);
+}
+
+/** Row title when the item names no player: its headline, never a bare position code. */
+export function watchTitle(item: Pick<DashboardItem, 'headline'>): string {
+  const headline = (item.headline ?? '').trim();
+  return /^[A-Z]{1,3}$/.test(headline) ? `${headline} room` : headline;
+}

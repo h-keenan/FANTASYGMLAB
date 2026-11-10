@@ -64,7 +64,7 @@ import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
 import ToneBadge from '../components/ToneBadge';
 import { requestOrbSearch } from '../lib/orbEvents';
-import { WATCH_TAG_LABEL, usageTrendPct, watchTagKind } from '../lib/dashboardWatch';
+import { WATCH_TAG_LABEL, watchSummary, watchTagKind, watchTitle } from '../lib/dashboardWatch';
 import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -77,7 +77,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
-import { DashboardMore, DashboardNeedsAttention, DashboardNowStrip, DashboardTradesBlock } from '../components/DashboardBlocks';
+import { DashboardMore, DashboardNeedsAttention, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
 import { buildNeedsAttention, isTradeItem, weekRowsAfterAttention } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -358,7 +358,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
           scrollEnabled={false}
         >
-          {/* Same order as the loaded screen: At a glance, Needs attention, This week, Trade ideas, My Team, More. */}
+          {/* Same order as the loaded screen: Needs attention, This week, Trade ideas, My Team, More. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {[0, 1, 2, 3].map((index) => (
               <View key={index} style={{ flexBasis: '48%', flexGrow: 1 }}>
@@ -446,16 +446,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
 
-      {dashboardData ? (
-        <DashboardNowStrip
-          data={dashboardData}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          onNavigate={navigate}
-          exclude={attention.map((entry) => entry.source)}
-        />
-      ) : null}
-
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
 
       {/* Next moves: what is left of the week's plan once the trade idea (Trades
@@ -524,6 +514,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           leagueName={leagueName}
           isBeginner={experienceCopy.isBeginner}
           goal={goal}
+          deadlineInAttention={attention.some((entry) => entry.source === 'deadline')}
           onNavigate={navigate}
         />
       ) : null}
@@ -538,14 +529,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             }
           />
-          <DashboardStatStrip
-            snapshot={teamSnapshot}
-            leagueId={leagueId}
-            leagueName={leagueName}
-            navigation={navigation}
-            leagueSize={teamRankings?.length ?? null}
-          />
-          <TeamSnapshotRow snapshot={teamSnapshot} leagueSize={teamRankings?.length ?? null} />
+          <DashboardTeamStats snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
         </View>
       ) : null}
 
@@ -1061,15 +1045,13 @@ function DashboardInsightRow({
   const tagKind = watchTagKind(item);
   const tagColor = tagKind === 'trending' ? colors.danger : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : baseMeta.color;
   const meta = { ...baseMeta, label: WATCH_TAG_LABEL[tagKind] ?? baseMeta.label, color: tagColor };
-  const trendPct = usageTrendPct(item);
   const routeName = DESTINATION_ROUTE[item.destination];
-  const actionLabel = DESTINATION_BUTTON_LABEL[item.destination];
   const onActionPress = routeName
     ? () => (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName })
     : undefined;
   const onPress = item.route_player_id
     ? () => openQuickView(playerStubFromItem(item), { leagueId, leagueName })
-    : undefined;
+    : onActionPress; // no player: the row itself opens the item's destination
 
   // Every other player the item names (web shows all of them, not just the
   // route player) via the shared BriefingItemPlayers.
@@ -1098,8 +1080,6 @@ function DashboardInsightRow({
         label={meta.label}
         headline={headlineIsPlayerName ? null : item.headline}
         isNew={isNew}
-        actionLabel={onActionPress ? actionLabel : null}
-        onActionPress={onActionPress}
         onPress={onPress}
         last={last}
         playerId={item.route_player_id}
@@ -1109,8 +1089,8 @@ function DashboardInsightRow({
         tier={item.route_player_tier || null}
         value={item.route_player_score}
         valueLabel="VALUE"
-        detail={showExplanations ? item.reason : null}
-        trailing={trendPct !== null ? <ToneBadge label={`↓ ${trendPct}%`} color={colors.danger} /> : null}
+        detail={watchSummary(item)}
+        detailLines={2}
       >
         {playersBlock(item.route_player_id)}
       </PlayerInsightRow>
@@ -1122,11 +1102,9 @@ function DashboardInsightRow({
       icon={meta.icon}
       color={meta.color}
       label={meta.label}
-      headline={item.headline}
-      detail={showExplanations ? item.reason : null}
+      headline={watchTitle(item)}
+      detail={watchSummary(item)}
       isNew={isNew}
-      actionLabel={onActionPress ? actionLabel : null}
-      onActionPress={onActionPress}
       onPress={onPress}
       last={last}
     >

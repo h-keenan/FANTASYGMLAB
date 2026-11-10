@@ -1,6 +1,6 @@
 import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
-import { useEffect, useState, type MouseEvent } from "react";
+import type { MouseEvent } from "react";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -11,12 +11,12 @@ import { GlossaryNote } from "@/components/GlossaryNote";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
-import { formatRank, rankFill } from "@/components/SnapshotTile";
-import { StatStrip } from "@/components/StatStrip";
+import { formatRank } from "@/components/SnapshotTile";
+import { StatStrip, type StatStripItem } from "@/components/StatStrip";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
-import { DashboardOddsStrip } from "@/components/DashboardOddsStrip";
-import { DashboardMore, DashboardNeedsAttention, DashboardNowStrip, DashboardTradesBlock } from "@/components/DashboardBlocks";
+import { useSeasonOdds } from "@/components/DashboardOddsStrip";
+import { DashboardMore, DashboardNeedsAttention, DashboardTradesBlock } from "@/components/DashboardBlocks";
 import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { buildNeedsAttention, isTradeItem, weekRowsAfterAttention } from "@/lib/dashboardLayout";
 
@@ -66,22 +66,6 @@ export function DashboardContent({
   sample?: { onBlockedLink: () => void };
 }) {
   const snapshot = data.team_snapshot;
-  // League size for the rank meters: the team-rankings request the page already
-  // has in flight (no new fetch); the meters simply stay off until it lands.
-  const [leagueSize, setLeagueSize] = useState<number | null>(null);
-  useEffect(() => {
-    if (!teamRankings) return;
-    let cancelled = false;
-    teamRankings.then(
-      (res) => {
-        if (!cancelled && res?.teams?.length) setLeagueSize(res.teams.length);
-      },
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [teamRankings]);
   const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(sample ? undefined : leagueId);
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
@@ -105,7 +89,12 @@ export function DashboardContent({
     items: data.items.filter((item) => !tradeItems.includes(item) && !attentionItems.includes(item)),
     this_week: data.this_week ? { ...data.this_week, rows: weekRowsAfterAttention(data.this_week.rows, attention) } : data.this_week,
   };
-  const attentionChipKeys = attention.map((entry) => entry.source);
+  const deadlineInAttention = attention.some((entry) => entry.source === "deadline");
+  // My Team: six equal tiles (the odds come from the season simulator; until
+  // it has something real the two slots hold Starter / Bench Strength), the
+  // rest behind "More team stats".
+  const { items: oddsItems, caption: oddsCaption } = useSeasonOdds(leagueId, !sample);
+  const teamStats = snapshot ? buildTeamStats(snapshot, oddsItems, copy.label("averageAge", "Avg Age")) : null;
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -144,8 +133,6 @@ export function DashboardContent({
         </p>
       ) : null}
 
-      <DashboardNowStrip data={data} leagueId={leagueId} leagueName={leagueName} exclude={attentionChipKeys} />
-
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} />
 
       <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty={attention.length > 0} />
@@ -157,12 +144,14 @@ export function DashboardContent({
         leagueName={leagueName}
         isBeginner={copy.isBeginner}
         goal={goal}
+        deadlineInAttention={deadlineInAttention}
       />
 
       {snapshot ? (
         <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true" aria-label="Team summary">
           <SectionHeading
             id="snapshot-heading"
+            size="compact"
             action={
               <span className="inline-flex items-center gap-3">
                 <BeginnerHelp
@@ -182,64 +171,26 @@ export function DashboardContent({
           >
             My Team
           </SectionHeading>
-          <StatStrip
-            columns={4}
-            items={[
-              {
-                glyph: "record",
-                label: "Record",
-                value: `${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`,
-                fill: winShare(snapshot.wins, snapshot.losses, snapshot.ties),
-              },
-              {
-                glyph: "power",
-                label: "Power Rank",
-                value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
-                tone: snapshot.power_rank === 1 ? "premium" : "neutral",
-                fill: rankFill(snapshot.power_rank, leagueSize),
-              },
-              {
-                glyph: "franchise",
-                label: "Franchise Rank",
-                value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
-                tone: snapshot.franchise_rank === 1 ? "premium" : "neutral",
-                fill: rankFill(snapshot.franchise_rank, leagueSize),
-              },
-              {
-                glyph: "age",
-                label: copy.label("averageAge", "Avg Age"),
-                value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
-              },
-            ]}
-          />
-          <StatStrip
-            columns={3}
-            items={[
-              {
-                glyph: "starter",
-                label: "Starter Strength",
-                value: formatRank(snapshot.starter_rank, snapshot.starter_rank_tied),
-                tone: snapshot.starter_rank === 1 ? "premium" : "neutral",
-                fill: rankFill(snapshot.starter_rank, leagueSize),
-              },
-              {
-                glyph: "bench",
-                label: "Bench Strength",
-                value: formatRank(snapshot.bench_rank, snapshot.bench_rank_tied),
-                tone: snapshot.bench_rank === 1 ? "premium" : "neutral",
-                fill: rankFill(snapshot.bench_rank, leagueSize),
-              },
-              {
-                glyph: "injury",
-                label: "Injuries",
-                // A count, not the long health_flag wording ("Future Asset Health Watch"
-                // overflowed the tile); the why lives in Watchlist & Alerts.
-                value: snapshot.injured_starters && snapshot.injured_starters > 0 ? String(snapshot.injured_starters) : "Stable",
-                tone: snapshot.injured_starters && snapshot.injured_starters > 0 ? "risk" : "positive",
-              },
-            ]}
-          />
-          {sample ? null : <DashboardOddsStrip leagueId={leagueId} leagueName={leagueName} />}
+          {teamStats ? (
+            <>
+              <StatStrip columns={3} items={teamStats.main} />
+              {teamStats.more.length > 0 ? (
+                <details data-testid="my-team-more-stats">
+                  <summary className="tap-link cursor-pointer text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+                    More team stats
+                  </summary>
+                  <div className="pt-2">
+                    <StatStrip columns={3} items={teamStats.more} />
+                  </div>
+                </details>
+              ) : null}
+              {oddsCaption ? (
+                <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  Rest-of-season simulation: {oddsCaption}.
+                </p>
+              ) : null}
+            </>
+          ) : null}
           <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
         </section>
       ) : null}
@@ -248,7 +199,7 @@ export function DashboardContent({
 
       {watchItems.length > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
-          <SectionHeading id="watchlist-heading" action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" />}>
+          <SectionHeading id="watchlist-heading" size="compact" action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" label2="View all →" />}>
             Watchlist &amp; Alerts
           </SectionHeading>
           <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
@@ -272,16 +223,66 @@ export function DashboardContent({
   );
 }
 
-/** Share of decided games won (ties count half); null before any game is played. */
-function winShare(wins: number | null, losses: number | null, ties: number | null): number | null {
-  const w = wins ?? 0;
-  const l = losses ?? 0;
-  const t = ties ?? 0;
-  const games = w + l + t;
-  return games > 0 ? (w + t / 2) / games : null;
+/** Default My Team tiles (Record, Power, Franchise, Playoff odds, Proj. record, Injuries) and the "more" set. All plain tiles: no meters. */
+function buildTeamStats(
+  snapshot: NonNullable<DashboardResponse["team_snapshot"]>,
+  odds: StatStripItem[] | null,
+  ageLabel: string,
+): { main: StatStripItem[]; more: StatStripItem[] } {
+  const injured = snapshot.injured_starters && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
+  const starter: StatStripItem = {
+    glyph: "starter",
+    label: "Starter Strength",
+    value: formatRank(snapshot.starter_rank, snapshot.starter_rank_tied),
+    tone: snapshot.starter_rank === 1 ? "premium" : "neutral",
+  };
+  const bench: StatStripItem = {
+    glyph: "bench",
+    label: "Bench Strength",
+    value: formatRank(snapshot.bench_rank, snapshot.bench_rank_tied),
+    tone: snapshot.bench_rank === 1 ? "premium" : "neutral",
+  };
+  const age: StatStripItem = {
+    glyph: "age",
+    label: ageLabel,
+    value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
+  };
+  const playoff = odds?.find((item) => item.label === "Playoff odds");
+  const projRecord = odds?.find((item) => item.label === "Proj. record");
+  const projSeed = odds?.find((item) => item.label !== "Playoff odds" && item.label !== "Proj. record");
+  const haveOdds = Boolean(playoff && projRecord);
+  const main: StatStripItem[] = [
+    {
+      glyph: "record",
+      label: "Record",
+      value: `${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`,
+    },
+    {
+      glyph: "power",
+      label: "Power Rank",
+      value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
+      tone: snapshot.power_rank === 1 ? "premium" : "neutral",
+    },
+    {
+      glyph: "franchise",
+      label: "Franchise Rank",
+      value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
+      tone: snapshot.franchise_rank === 1 ? "premium" : "neutral",
+    },
+    ...(haveOdds ? [playoff as StatStripItem, projRecord as StatStripItem] : [starter, bench]),
+    {
+      glyph: "injury",
+      label: "Injuries",
+      // A count, not the long health_flag wording; the why lives in Watchlist & Alerts.
+      value: injured > 0 ? String(injured) : "Stable",
+      tone: injured > 0 ? "risk" : "positive",
+    },
+  ];
+  const more = haveOdds ? [starter, bench, age, ...(projSeed ? [projSeed] : [])] : [age];
+  return { main, more };
 }
 
-function ViewAllLink({ href, label, label2 = "View All →" }: { href: string; label: string; label2?: string }) {
+function ViewAllLink({ href, label, label2 = "View all →" }: { href: string; label: string; label2?: string }) {
   return (
     <Link href={href} aria-label={label} className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
       {label2}

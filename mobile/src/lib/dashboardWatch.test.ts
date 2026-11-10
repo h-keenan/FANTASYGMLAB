@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { usageTrendPct, watchTagKind } from './dashboardWatch.ts';
+import { firstSentence, usageTrendPct, watchSummary, watchTagKind, watchTitle } from './dashboardWatch.ts';
 
 const base = { category: 'watch', headline: 'x', reason: '' } as const;
 
@@ -18,4 +18,16 @@ test('watchTagKind maps waiver, trending and injury items', () => {
   assert.equal(watchTagKind({ ...base, route_player_injury_status: 'Questionable' }), 'injury');
   assert.equal(watchTagKind({ ...base, headline: '2 injured starters' }), 'injury');
   assert.equal(watchTagKind({ ...base, category: 'league_movement' }), 'other');
+});
+
+test('watch row sentences are clean and never raw feed text', () => {
+  assert.equal(firstSentence('Jalen Hurts (QB) - starter | Brashard Smith (RB) - bench'), 'Jalen Hurts (QB) - starter');
+  assert.equal(
+    firstSentence('Monitor Gardner Minshew II. A same-team QB teammate is rising. More.'),
+    'Monitor Gardner Minshew II. A same-team QB teammate is rising.',
+  );
+  assert.equal(watchSummary({ reason: 'x | y', route_player_injury_status: 'IR' }), 'Listed as IR; check your lineup.');
+  assert.equal(watchSummary({ reason: 'Usage down 24% (high confidence).' }), 'Usage is down 24% recently.');
+  assert.equal(watchTitle({ headline: 'RB' }), 'RB room');
+  assert.equal(watchTitle({ headline: 'Handcuff watch' }), 'Handcuff watch');
 });
