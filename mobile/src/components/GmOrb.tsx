@@ -219,6 +219,15 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       subtitle: "Season simulator and weekly pick'em",
     },
     {
+      label: 'Fantasy Sim',
+      route: 'FantasySim',
+      icon: 'flask-outline',
+      needsLeague: true,
+      color: accentColor(colors, 'Fantasy Sim'),
+      subtitle: 'Set a strategy and play out your season',
+      pro: true,
+    },
+    {
             label: 'Commissioner',
             route: 'Commissioner',
             icon: 'shield-checkmark-outline',

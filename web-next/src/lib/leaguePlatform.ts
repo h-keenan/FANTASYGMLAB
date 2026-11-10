@@ -65,6 +65,7 @@ const LEAGUE_SCOPED_SEGMENTS = new Set([
   "gm-targets",
   "team-situation",
   "draft-center",
+  "fantasy-sim",
   "live-draft",
   "league-recaps",
   "commissioner",

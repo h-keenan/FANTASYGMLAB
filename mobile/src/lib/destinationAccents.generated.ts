@@ -30,6 +30,7 @@ const TABLE = {
     "community": "premium",
     "gm-plan": "success",
     "draft-center": "danger",
+    "fantasy-sim": "opportunity",
     "live-draft": "danger",
     "league-recaps": "information",
     "games": "opportunity",

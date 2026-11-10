@@ -1,6 +1,7 @@
 import { env } from "./env";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
+import type { SimRunResponse, SimStatusResponse, SimStrategy, SimWorldResponse, SimWorldsResponse } from "./simPresentation";
 import type { CandidateCompare, MoveRange } from "./startSitRange";
 import { trackClientError } from "./analytics";
 import type { PercentileExplorerResponse } from "./percentileExplorer";
@@ -53,7 +54,7 @@ function reportApiFailure(status: number): void {
 
 async function performRequest<T>(
   path: string,
-  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   // Server load shedding (503 server_busy + Retry-After): idempotent reads
@@ -73,7 +74,7 @@ async function performRequest<T>(
 
 async function performRequestOnce<T>(
   path: string,
-  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
@@ -137,7 +138,7 @@ async function performRequestOnce<T>(
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal },
+  init?: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal },
 ): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -4629,6 +4630,20 @@ export const api = {
   // Draft Center (Revision 14) — same two endpoints mobile's
   // DraftCenterScreen.tsx calls (Overview pane + pick assets); no new
   // backend logic for this page.
+  // Fantasy Sim (Pro what-if season). UI only calls /v1/sim/*; see
+  // docs/fantasy-sim-api.md. Every route 404s until SIM_ENABLED is on.
+  getSimStatus: () => authorizedRequest<SimStatusResponse>("/v1/sim/status"),
+  listSimWorlds: () => authorizedRequest<SimWorldsResponse>("/v1/sim/worlds"),
+  createSimWorld: (body: { league_id: string; mode: "remaining" | "full"; roster_id?: string; strategy: SimStrategy }) =>
+    authorizedRequest<SimWorldResponse>("/v1/sim/worlds", { method: "POST", jsonBody: body }),
+  updateSimStrategy: (worldId: string, strategy: SimStrategy) =>
+    authorizedRequest<SimWorldResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/strategy`, { method: "PUT", jsonBody: { strategy } }),
+  runSimWorld: (worldId: string) =>
+    authorizedRequest<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/run`, { method: "POST", jsonBody: {} }),
+  getSimResult: (worldId: string) => authorizedRequest<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/result`),
+  deleteSimWorld: (worldId: string) =>
+    authorizedRequest<{ ok: boolean }>(`/v1/sim/worlds/${encodeURIComponent(worldId)}`, { method: "DELETE" }),
+
   getLeagueDraftCenter: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<DraftCenterResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/draft-center?lens=${encodeURIComponent(lens)}`,
