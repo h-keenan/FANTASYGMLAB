@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api, type RankedPlayer } from "@/lib/api";
 
+const EMPTY: RankedPlayer[] = [];
 export const PLAYER_SEARCH_MIN_CHARS = 2;
 export const PLAYER_SEARCH_DEBOUNCE_MS = 250;
 
@@ -19,28 +20,28 @@ export function mergeSearchMatches(pool: RankedPlayer[], extras: RankedPlayer[])
  * anyone ranked below the loaded rankings window is still searchable. Returns
  * [] for short queries and on failure (the windowed list keeps working). */
 export function useLeaguePlayerSearch(leagueId: string, lens: string, query: string): RankedPlayer[] {
-  const [results, setResults] = useState<RankedPlayer[]>([]);
+  // Results are stored with the key they answer, so a short/changed query is
+  // derived to [] at render time instead of calling setState inside the effect.
+  const [answer, setAnswer] = useState<{ key: string; players: RankedPlayer[] }>({ key: "", players: [] });
   const term = query.trim();
+  const key = `${leagueId}|${lens}|${term}`;
   useEffect(() => {
-    if (term.length < PLAYER_SEARCH_MIN_CHARS) {
-      setResults([]);
-      return;
-    }
+    if (term.length < PLAYER_SEARCH_MIN_CHARS) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       api
         .searchLeaguePlayers(leagueId, term, lens)
         .then((res) => {
-          if (!cancelled) setResults(res.players);
+          if (!cancelled) setAnswer({ key, players: res.players });
         })
         .catch(() => {
-          if (!cancelled) setResults([]);
+          if (!cancelled) setAnswer({ key, players: [] });
         });
     }, PLAYER_SEARCH_DEBOUNCE_MS);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [leagueId, lens, term]);
-  return results;
+  }, [leagueId, lens, term, key]);
+  return term.length >= PLAYER_SEARCH_MIN_CHARS && answer.key === key ? answer.players : EMPTY;
 }
