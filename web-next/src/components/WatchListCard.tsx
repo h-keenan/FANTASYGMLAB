@@ -7,8 +7,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
-import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { usageTrendPct, watchTag } from "@/lib/dashboardPresentation";
+import { watchSummary, watchTag, watchTitle } from "@/lib/dashboardPresentation";
 import {
   GAME_PLAN_INTERNAL_ROUTES,
   gamePlanTileHref,
@@ -20,11 +19,10 @@ import { PlayerNameText } from "@/components/PlayerNameText";
 /**
  * Watchlist & Alerts: every Game Plan item except Top Priority, as one
  * list. Each row is one tap target: a type tag (TRENDING / INJURY / WAIVER),
- * the player, one line of why, and on the right a trend indicator only when
- * the item carries a real figure (today: the usage-drop percentage of a
- * Value Trend item). Rows without data show just the chevron; nothing is
- * drawn or labelled as a placeholder. Beginner mode shows the full reason,
- * advanced clamps it to two lines (one line cut the reason to "Usage..." at 390px).
+ * the player (avatar, name, position/team chip), one clean sentence of why
+ * (lib/dashboardPresentation.ts watchSummary: built from structured fields,
+ * else the feed's first sentence; clamped to two lines) and a chevron. Every
+ * row has the same slots; a row with no player shows its headline as title.
  */
 export function WatchListCard({
   items,
@@ -35,14 +33,12 @@ export function WatchListCard({
   leagueId: string;
   leagueName: string;
 }) {
-  const copy = useExperienceCopy();
   if (items.length === 0) return null;
   return (
     <article className="glass-surface flex flex-col" style={{ overflow: "hidden" }} data-testid="watchlist-alerts">
       {items.map((item, index) => {
         const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination] ?? "dashboard";
         const tag = watchTag(item);
-        const trendPct = usageTrendPct(item);
         const mentioned = item.mentioned_players?.[0];
         const playerId = item.route_player_id || mentioned?.player_id || "";
         const name = item.route_player_name || mentioned?.name || "";
@@ -57,43 +53,41 @@ export function WatchListCard({
             <span className="shrink-0 w-[5.5rem]">
               <ToneBadge label={tag.label} color={tag.color} />
             </span>
-            {playerId ? <PlayerAvatar playerId={playerId} tier={tier} size={36} /> : null}
+            {playerId ? (
+              <PlayerAvatar playerId={playerId} tier={tier} size={36} />
+            ) : (
+              <span aria-hidden="true" className="shrink-0" style={{ width: 36 }} />
+            )}
             <span className="flex flex-col gap-0.5 min-w-0 flex-1">
-              <span className="flex items-center gap-2 min-w-0">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                 {name ? (
                   <PlayerNameText name={name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                 ) : (
                   <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-                    {item.headline}
+                    {watchTitle(item)}
                   </span>
                 )}
-                {team ? (
-                  <span className="hidden sm:inline text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
+                {name ? <PositionBadge position={position} /> : null}
+                {name && team ? (
+                  <span className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
                     {team}
                   </span>
                 ) : null}
                 <PlayerInjuryBadge status={injury} />
               </span>
-              <span className="flex items-start gap-1.5 min-w-0">
-              <PositionBadge position={position} />
               <span
                 className="text-xs min-w-0"
                 style={{
                   color: "var(--color-text-secondary)",
-                  ...(copy.isBeginner
-                    ? {}
-                    : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical" as const,
+                  overflow: "hidden",
                 }}
               >
-                {item.reason}
-              </span>
+                {watchSummary(item)}
               </span>
             </span>
-            {trendPct !== null ? (
-              <span className="shrink-0">
-                <ToneBadge label={`↓ ${trendPct}%`} color="var(--color-danger)" />
-              </span>
-            ) : null}
             <span aria-hidden="true" className="shrink-0 text-lg" style={{ color: "var(--color-accent)" }}>
               ›
             </span>

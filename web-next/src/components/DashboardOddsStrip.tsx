@@ -76,3 +76,37 @@ export function DashboardOddsStrip({ leagueId, leagueName }: { leagueId: string;
     </Link>
   );
 }
+
+/**
+ * The same season-sim read as DashboardOddsStrip, for a caller that lays the
+ * odds tiles out itself (the Dashboard's My Team grid). `items` is null until
+ * the simulator has something real to say.
+ */
+export function useSeasonOdds(leagueId: string, enabled = true): { items: StatStripItem[] | null; caption: string } {
+  const [data, setData] = useState<GamesSeasonSimResponse | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    api
+      .getGamesSeasonSim(leagueId)
+      .then((result) => {
+        if (!cancelled) setData(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, enabled]);
+  const items = oddsStripItems(data);
+  const caption =
+    items && data
+      ? [
+          data.weeks_remaining ? `${data.weeks_remaining} weeks left` : null,
+          data.trials ? `${data.trials.toLocaleString("en-US")} simulated seasons` : null,
+          data.slope_fitted === false ? "early-season estimate" : null,
+        ]
+          .filter(Boolean)
+          .join(", ")
+      : "";
+  return { items, caption };
+}

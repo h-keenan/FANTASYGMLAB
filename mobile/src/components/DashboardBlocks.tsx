@@ -1,78 +1,31 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
+import DashboardStatRow, { type StatStripItem } from './DashboardStatRow';
+import GlossaryNote from './GlossaryNote';
 import ToneBadge from './ToneBadge';
 import SectionHeading from './SectionHeading';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { DashboardItem, DashboardResponse } from '../lib/api';
+import { api, type DashboardItem, type DashboardResponse, type TeamSnapshot } from '../lib/api';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import { formatOdds } from '../lib/gamesPresentation';
+import { formatRank } from '../lib/percentile';
+import { queryKeys } from '../lib/queryKeys';
 import {
-  buildNowChips,
+  deadlineChip,
   tradeIdeasLine,
   tradesGoalLine,
   TRADES_BLOCK_COPY,
   type DashboardAttentionEntry,
-  type DashboardNowChip,
 } from '../lib/dashboardLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 type Navigate = (name: string, params?: object) => void;
-
-const CHIP_TARGET: Record<DashboardNowChip['route'], string> = {
-  matchup: 'Matchup',
-  trade_hub: 'Trades',
-  alerts: 'Alerts',
-  waivers: 'Waivers',
-};
-
-/** "At a glance": real status chips (lineup, trade deadline, alerts, waivers). Mirrors web DashboardNowStrip. */
-export function DashboardNowStrip({
-  data,
-  leagueId,
-  leagueName,
-  onNavigate,
-  exclude,
-}: {
-  data: DashboardResponse;
-  leagueId: string;
-  leagueName: string;
-  onNavigate: Navigate;
-  /** Chip keys already listed under "Needs attention". */
-  exclude?: readonly string[];
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const alertCount = data.items.filter((item) => item.category !== 'top_priority').length;
-  const chips = buildNowChips(data.this_week?.rows, data.trade_window, alertCount, exclude);
-  if (chips.length === 0) return null;
-  const tone: Record<DashboardNowChip['tone'], string> = {
-    positive: colors.success,
-    risk: colors.danger,
-    waiver: colors.accent,
-    neutral: colors.textPrimary,
-  };
-  return (
-    <View style={styles.chipGrid} accessibilityLabel="At a glance">
-      {chips.map((chip) => (
-        <Pressable
-          key={chip.key}
-          accessibilityRole="button"
-          accessibilityLabel={`${chip.label}: ${chip.value}`}
-          onPress={() => onNavigate(CHIP_TARGET[chip.route], { leagueId, leagueName })}
-          style={styles.chip}
-        >
-          <AppText style={styles.chipLabel}>{chip.label.toUpperCase()}</AppText>
-          <AppText style={[styles.chipValue, { color: tone[chip.tone] }]} numberOfLines={1}>
-            {chip.value}
-          </AppText>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
 
 const ATTENTION_ROUTE: Record<string, string> = {
   trade_hub: 'Trades',
@@ -120,10 +73,10 @@ export function DashboardNeedsAttention({
               <ToneBadge label={entry.badge} color={colors.danger} size="xs" />
             </View>
             <View style={styles.attentionText}>
-              <AppText style={styles.holdHeadline} numberOfLines={1}>
+              <AppText style={styles.holdHeadline} numberOfLines={2}>
                 {entry.headline}
               </AppText>
-              <AppText style={styles.holdWhy} numberOfLines={1}>
+              <AppText style={styles.holdWhy} numberOfLines={2}>
                 {entry.why}
               </AppText>
             </View>
@@ -146,6 +99,7 @@ export function DashboardTradesBlock({
   leagueName,
   isBeginner,
   goal,
+  deadlineInAttention = false,
   onNavigate,
 }: {
   data: DashboardResponse;
@@ -154,6 +108,8 @@ export function DashboardTradesBlock({
   leagueName: string;
   isBeginner: boolean;
   goal: string | null | undefined;
+  /** "Needs attention" already lists a near deadline: don't repeat it here. */
+  deadlineInAttention?: boolean;
   onNavigate: Navigate;
 }) {
   const { colors } = useThemeMode();
@@ -161,6 +117,8 @@ export function DashboardTradesBlock({
   const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
   const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
   const goalLine = isBeginner ? tradesGoalLine(goal) : '';
+  // The one home for the deadline: here, not also as a chip.
+  const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
   return (
     <View style={styles.block}>
       <SectionHeading title={TRADES_BLOCK_COPY.title} />
@@ -173,11 +131,133 @@ export function DashboardTradesBlock({
         onPress={() => onNavigate('Trades', { leagueId, leagueName })}
         style={styles.tradeLine}
       >
-        <AppText style={styles.tradeLineText} numberOfLines={2}>
-          {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
-        </AppText>
+        <View style={styles.tradeLineTextGroup}>
+          <AppText style={styles.tradeLineText} numberOfLines={2}>
+            {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
+          </AppText>
+          {deadline ? (
+            <AppText style={[styles.deadlineNote, deadline.tone === 'risk' && { color: colors.danger }]} numberOfLines={1}>
+              Trade deadline: {deadline.value}
+            </AppText>
+          ) : null}
+        </View>
         <AppText style={styles.link} numberOfLines={1}>{TRADES_BLOCK_COPY.link} ›</AppText>
       </Pressable>
+    </View>
+  );
+}
+
+/**
+ * My Team on the Dashboard: six equal tiles in two rows of three (Record,
+ * Power Rank, Franchise Rank, Playoff odds, Proj. record, Injuries; Starter /
+ * Bench Strength stand in until the season simulator has odds), the rest
+ * behind "More team stats". Plain tiles with no meters. Mirrors web
+ * DashboardContent buildTeamStats.
+ */
+export function DashboardTeamStats({
+  snapshot,
+  leagueId,
+  leagueName,
+  onNavigate,
+}: {
+  snapshot: TeamSnapshot;
+  leagueId: string;
+  leagueName: string;
+  onNavigate: Navigate;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const copy = useExperienceCopy();
+  const isRestoring = useIsRestoring();
+  const [showMore, setShowMore] = useState(false);
+  const oddsQuery = useQuery({
+    queryKey: queryKeys.seasonSim(leagueId),
+    queryFn: () => api.getGamesSeasonSim(leagueId),
+    enabled: !isRestoring,
+  });
+  const sim = oddsQuery.data;
+  const mine = sim && !sim.reason ? sim.my_team : null;
+  const goToTeams = () => onNavigate('Teams', { leagueId, leagueName });
+  const injured = snapshot.injured_starters != null && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
+  const record =
+    snapshot.wins != null && snapshot.losses != null
+      ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
+      : '—';
+  const starter: StatStripItem = {
+    label: 'Starter Strength',
+    icon: 'link-outline',
+    value: snapshot.starter_rank != null ? formatRank(snapshot.starter_rank, !!snapshot.starter_rank_tied) : '—',
+  };
+  const bench: StatStripItem = {
+    label: 'Bench Strength',
+    icon: 'layers-outline',
+    value: snapshot.bench_rank != null ? formatRank(snapshot.bench_rank, !!snapshot.bench_rank_tied) : '—',
+  };
+  const age: StatStripItem = {
+    label: copy.label('averageAge', 'Avg Age'),
+    icon: 'hourglass-outline',
+    value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
+  };
+  const playoff: StatStripItem | null = mine
+    ? {
+        label: 'Playoff odds',
+        icon: 'flag-outline',
+        value: mine.clinched ? 'Clinched' : mine.eliminated ? 'Out' : formatOdds(mine.playoff_probability),
+        tone: mine.clinched ? 'positive' : mine.eliminated ? 'risk' : undefined,
+        onPress: () => onNavigate('Games', { leagueId, leagueName }),
+      }
+    : null;
+  const projRecord: StatStripItem | null = mine
+    ? { label: 'Proj. record', icon: 'football-outline', value: `${mine.median_final_wins}-${mine.median_final_losses}` }
+    : null;
+  const projSeed: StatStripItem | null = mine
+    ? { label: 'Proj. seed', icon: 'podium-outline', value: `#${mine.median_seed}` }
+    : null;
+  const odds = playoff && projRecord ? [playoff, projRecord] : null;
+  const main: StatStripItem[] = [
+    { label: 'Record', icon: 'ribbon-outline', value: record },
+    {
+      label: 'Power Rank',
+      icon: 'trophy-outline',
+      value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
+      onPress: goToTeams,
+    },
+    {
+      label: 'Franchise Rank',
+      icon: 'shield-outline',
+      value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
+      onPress: goToTeams,
+    },
+    ...(odds ?? [starter, bench]),
+    {
+      label: 'Injuries',
+      icon: 'medkit-outline',
+      value: injured > 0 ? String(injured) : 'Stable',
+      tone: injured > 0 ? 'risk' : 'positive',
+    },
+  ];
+  const more: StatStripItem[] = odds ? [starter, bench, age, ...(projSeed ? [projSeed] : [])] : [age];
+  const rows = (items: StatStripItem[]) => {
+    const out: StatStripItem[][] = [];
+    for (let i = 0; i < items.length; i += 3) out.push(items.slice(i, i + 3));
+    return out;
+  };
+  return (
+    <View>
+      {rows(main).map((row, index) => (
+        <DashboardStatRow key={`main-${index}`} items={row} />
+      ))}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showMore }}
+        accessibilityLabel="More team stats"
+        onPress={() => setShowMore((value) => !value)}
+        style={styles.quietLink}
+      >
+        <AppText style={styles.quietLinkText}>{showMore ? 'Fewer team stats' : 'More team stats'}</AppText>
+      </Pressable>
+      {showMore ? rows(more).map((row, index) => <DashboardStatRow key={`more-${index}`} items={row} />) : null}
+      <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />
     </View>
   );
 }
@@ -207,21 +287,9 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    chip: {
-      flexBasis: '48%',
-      flexGrow: 1,
-      minHeight: 44,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-    },
-    chipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textTertiary },
-    chipValue: { fontSize: 14, fontWeight: '700' },
     block: { gap: spacing.md },
+    quietLink: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: spacing.xs },
+    quietLinkText: { fontSize: 12, fontWeight: '600', color: colors.textTertiary },
     attentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     attentionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
     attentionBadge: { width: 88, alignItems: 'flex-start' },
@@ -238,7 +306,9 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    tradeLineText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    tradeLineTextGroup: { flex: 1, paddingVertical: spacing.sm },
+    deadlineNote: { fontSize: 12, color: colors.textTertiary },
+    tradeLineText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     holdHeadline: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     holdWhy: { fontSize: 12, color: colors.textSecondary },
     link: { fontSize: 14, fontWeight: '700', color: colors.accent },

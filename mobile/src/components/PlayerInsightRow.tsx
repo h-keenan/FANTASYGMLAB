@@ -43,6 +43,7 @@ export default function PlayerInsightRow({
   value,
   valueLabel,
   detail,
+  detailLines,
   trailing,
   children,
 }: {
@@ -70,6 +71,8 @@ export default function PlayerInsightRow({
   /** Same role as InsightRow's `detail` — the reason/note text, shown only
    * when provided. */
   detail?: string | null;
+  /** Lines `detail` may wrap to (default: one line). */
+  detailLines?: number;
   /** Optional right-side indicator (e.g. a real trend figure), before the chevron. */
   trailing?: React.ReactNode;
   /** Extra content under the player module (other mentioned players). */
@@ -108,6 +111,7 @@ export default function PlayerInsightRow({
           value={value}
           valueLabel={valueLabel}
           contextLine={detail}
+          contextLines={detailLines}
         />
         {children}
       </View>

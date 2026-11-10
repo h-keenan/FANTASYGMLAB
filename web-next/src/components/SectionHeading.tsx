@@ -20,6 +20,7 @@ export function SectionHeading({
   id,
   className = "flex flex-col gap-1",
   action,
+  size = "default",
 }: {
   children: ReactNode;
   /** Small accent label above the title (e.g. "Head-to-Head"). */
@@ -31,9 +32,15 @@ export function SectionHeading({
   className?: string;
   /** Right-aligned slot on the title row (e.g. a "View All" link). */
   action?: ReactNode;
+  /** "compact" uses the existing --font-size-section-title / --font-weight-title tokens (the Dashboard's calmer in-page headings; matches the app's 17px). */
+  size?: "default" | "compact";
 }) {
+  const font =
+    size === "compact"
+      ? "var(--font-weight-title) var(--font-size-section-title) / var(--line-height-title) var(--font-family-sans)"
+      : "var(--type-section-title)";
   const title = (
-    <h2 id={id} className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
+    <h2 id={id} className="uppercase" style={{ font, letterSpacing: "0.02em" }}>
       {children}
     </h2>
   );

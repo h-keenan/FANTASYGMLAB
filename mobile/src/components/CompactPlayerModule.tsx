@@ -29,6 +29,8 @@ export interface CompactPlayerModuleProps {
    * injury status/relevance read for an injury-impact card. Kept to one
    * line by the caller. */
   contextLine?: string | null;
+  /** Lines the context line may wrap to before truncating (default 1). */
+  contextLines?: number;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -58,6 +60,7 @@ export default function CompactPlayerModule({
   value,
   valueLabel,
   contextLine,
+  contextLines = 1,
   onPress,
   style,
 }: CompactPlayerModuleProps) {
@@ -83,7 +86,7 @@ export default function CompactPlayerModule({
           ) : null}
         </View>
         {contextLine ? (
-          <AppText style={styles.context} numberOfLines={1}>
+          <AppText style={styles.context} numberOfLines={contextLines}>
             {contextLine}
           </AppText>
         ) : null}

@@ -71,6 +71,7 @@ export function TodayModule({
     >
       <SectionHeading
         id="game-plan-heading"
+        size="compact"
         action={
           <span className="inline-flex items-center gap-3">
             <BeginnerHelp popover term="dashboardGamePlan" />
