@@ -42,6 +42,11 @@ logger = logging.getLogger("fantasygm.sleeper_cache")
 
 STALE_TTL_SECONDS = 6 * 60 * 60
 LOCAL_MAX_ENTRIES = 1024
+# ``large=True`` payloads (e.g. ~1MB+ weekly stats dumps) must not sit in every
+# worker's heap for hours: Redis carries them; the process keeps only a few,
+# briefly, enough to coalesce a burst when Redis is unreachable.
+LARGE_LOCAL_MAX_ENTRIES = 24
+LARGE_LOCAL_SECONDS = 120.0
 # Short in-process negative cache: when Sleeper is failing and we hold nothing
 # to serve, do not let every request re-hit it.
 NEGATIVE_TTL_SECONDS = 3.0
@@ -54,6 +59,7 @@ _REDIS_COOLDOWN_SECONDS = 5.0
 
 _lock = threading.Lock()
 _local: "OrderedDict[str, tuple[Any, float]]" = OrderedDict()
+_local_large: "OrderedDict[str, tuple[Any, float]]" = OrderedDict()
 _negative: dict[str, float] = {}
 _key_locks: dict[str, list] = {}  # key -> [Lock, refcount]
 _redis_down_until = 0.0
@@ -78,6 +84,7 @@ def reset_for_tests() -> None:
     _fresh_floor = 0.0
     with _lock:
         _local.clear()
+        _local_large.clear()
         _negative.clear()
         _key_locks.clear()
         for k in _stats:
@@ -94,6 +101,7 @@ def clear_local() -> None:
     _fresh_floor = time.time()
     with _lock:
         _local.clear()
+        _local_large.clear()
         _negative.clear()
 
 
@@ -129,6 +137,12 @@ def _get_entry(key: str) -> tuple[Any, float] | None:
 
     with _lock:
         best = _local.get(key)
+        big = _local_large.get(key)
+        if big is not None and time.time() - big[1] > LARGE_LOCAL_SECONDS:
+            _local_large.pop(key, None)
+            big = None
+        if big is not None and (best is None or big[1] > best[1]):
+            best = big
     client = _redis()
     if client is not None:
         try:
@@ -143,17 +157,18 @@ def _get_entry(key: str) -> tuple[Any, float] | None:
     return best
 
 
-def _put_entry(key: str, payload: Any, ts: float) -> None:
+def _put_entry(key: str, payload: Any, ts: float, *, large: bool = False, store_ttl: float = STALE_TTL_SECONDS) -> None:
     with _lock:
-        _local[key] = (payload, ts)
-        _local.move_to_end(key)
-        while len(_local) > LOCAL_MAX_ENTRIES:
-            _local.popitem(last=False)
+        store, cap = (_local_large, LARGE_LOCAL_MAX_ENTRIES) if large else (_local, LOCAL_MAX_ENTRIES)
+        store[key] = (payload, ts)
+        store.move_to_end(key)
+        while len(store) > cap:
+            store.popitem(last=False)
         _negative.pop(key, None)
     client = _redis()
     if client is not None:
         try:
-            client.set(key, json.dumps({"ts": ts, "p": payload}), ex=STALE_TTL_SECONDS)
+            client.set(key, json.dumps({"ts": ts, "p": payload}), ex=int(max(STALE_TTL_SECONDS, store_ttl)))
         except Exception:
             _redis_failed()
 
@@ -192,7 +207,9 @@ def _redis_unlock(client, lock_key: str, token: bytes) -> None:
 
 
 # --------------------------------------------------------------- main entry
-def _fetch_and_store(key: str, url: str, fetch: Callable[[], Any]) -> tuple[Any, bool]:
+def _fetch_and_store(
+    key: str, url: str, fetch: Callable[[], Any], *, large: bool = False, store_ttl: float = STALE_TTL_SECONDS
+) -> tuple[Any, bool]:
     """Run ``fetch``. Returns ``(payload, is_fresh)``; fresh payloads are stored."""
 
     started = time.time()
@@ -206,7 +223,7 @@ def _fetch_and_store(key: str, url: str, fetch: Callable[[], Any]) -> tuple[Any,
     known = sleeper_budget.last_known(url)
     if known is not None and known[1] < started - 0.001:
         return payload, False
-    _put_entry(key, payload, time.time())
+    _put_entry(key, payload, time.time(), large=large, store_ttl=store_ttl)
     return payload, True
 
 
@@ -216,9 +233,17 @@ def shared_json(
     ttl: float,
     fetch: Callable[[], Any],
     max_age_on_error: float = STALE_TTL_SECONDS,
+    large: bool = False,
+    store_ttl: float | None = None,
 ) -> Any:
     """Return the JSON payload for ``url``, fetching at most once per ``ttl``
-    cluster-wide. ``None`` only when there is neither a live nor a stale value."""
+    cluster-wide. ``None`` only when there is neither a live nor a stale value.
+
+    ``store_ttl`` (default ``STALE_TTL_SECONDS``) is how long Redis keeps the
+    envelope; set it >= ``ttl`` for long-lived entries. ``large`` keeps the
+    payload out of the long-lived per-process store (see LARGE_LOCAL_*)."""
+
+    store_ttl = max(STALE_TTL_SECONDS, float(store_ttl if store_ttl is not None else ttl))
 
     key = cache_key(url)
     entry = _get_entry(key)
@@ -270,7 +295,7 @@ def shared_json(
                     if lock_gone:
                         break  # leader finished without a result: take over
             try:
-                payload, fresh = _fetch_and_store(key, url, fetch)
+                payload, fresh = _fetch_and_store(key, url, fetch, large=large, store_ttl=store_ttl)
             finally:
                 if client is not None and leader:
                     _redis_unlock(client, lock_key, token)

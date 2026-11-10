@@ -171,6 +171,10 @@ def _reset_sleeper_budget_for_tests():
 
     sleeper_budget.reset_for_tests()
     sleeper_cache.reset_for_tests()
+    from modules import sleeper
+
+    with sleeper._season_stats_memo_lock:
+        sleeper._season_stats_fallback.clear()
     yield
     sleeper_budget.reset_for_tests()
     sleeper_cache.reset_for_tests()

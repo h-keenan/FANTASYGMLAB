@@ -596,7 +596,7 @@ def build_for_league(
         season = int(league.get("season") or sleeper.default_player_stats_season())
     except (TypeError, ValueError):
         season = sleeper.default_player_stats_season()
-    weekly = sleeper.cached_season_weekly_map(season)
+    weekly = sleeper.season_weekly_map(season)
     built = build_roundup(
         league=league,
         roster=roster,
