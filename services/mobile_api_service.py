@@ -255,6 +255,7 @@ from modules import (
     weekly_roundup,
 )
 from modules import player_search
+from modules.admission import AdmissionControlMiddleware
 from modules import public_dynasty_values
 from modules import model_status
 from modules import drop_candidates, roster_value_model
@@ -623,6 +624,11 @@ class _EspnLeagueRouteGate:
 
 
 app.add_middleware(_EspnLeagueRouteGate)
+# Load shedding for the expensive engine routes (modules.admission): bounded
+# per-worker concurrency + short queue, 503 + Retry-After beyond that. Added
+# before the rate limiter so it sits inside it (a throttled request never takes
+# a slot) and inside CORS (the 503 carries CORS headers).
+app.add_middleware(AdmissionControlMiddleware)
 # Added after GZip so it wraps outermost and runs before any other work
 # (including gzip'ing a response nobody should have gotten) on a throttled
 # request.
@@ -645,6 +651,8 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
+    # Lets the browser read Retry-After on 429/503 (cross-origin hides it otherwise).
+    expose_headers=["Retry-After"],
 )
 
 
